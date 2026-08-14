@@ -1,0 +1,524 @@
+# Reglas no escritas
+
+Este archivo existe porque las reglas más caras del marco eran justamente
+las que ningún archivo declaraba. Se practicaban, se transmitían en review
+y en Slack, y sobrevivían mientras las mismas tres personas siguieran acá.
+Cada una se compró con un incidente, una corrida perdida o una discusión
+que no queremos repetir. Acá quedan escritas por primera vez.
+
+**La premisa del marco**: un ritual que alguien debe recordar **no cuenta
+como enforcement**. Solo cuentan los checks que fallan solos. Por eso cada
+regla se registra con su estado real y, cuando todavía no es automática,
+con la forma concreta de volverla automática. La suma de esas formas es el
+[backlog de automatización](#backlog-de-automatización) del marco, y es un
+producto del documento, no un apéndice.
+
+## Cómo leer los estados
+
+| Estado | Significa |
+|---|---|
+| 🟢 **AUTOMÁTICO** | Un check falla solo cuando alguien se aparta. No requiere que nadie se acuerde. |
+| 🟡 **SEMIAUTOMÁTICO** | El marco lo empuja (plantilla, scaffold, hook local) pero se puede evadir sin que nada se ponga rojo. |
+| 🔴 **DISCIPLINA** | Hoy depende de que una persona se acuerde. Es deuda declarada, no una preferencia. |
+
+---
+
+## 1. Tests ROJOS primero
+
+**La regla.** El test se escribe **antes** del cambio y **debe verse
+fallar**. No "se escribieron tests"; el rojo se evidencia y se registra:
+en qué corrida, con qué mensaje de error. En el `tasks.md` del change eso
+se anota junto a la tarea:
+
+> `[x] 2.2 HECHO: 5 tests — ROJO evidenciado en CI (run 30670720618):
+> carrera de reservas simultáneas, ambas 201 (double-booking real)`
+
+En migraciones de datos el "test rojo" es la **verificación de invariantes
+que hoy no se cumple**: se corre antes, falla, y esa es la prueba de que
+mide lo que dice medir.
+
+**Por qué.** Un test escrito después del arreglo prueba que el código hace
+lo que hace. Solo el rojo previo prueba que el test **puede fallar** — que
+no está afirmando `true == true` con pasos de más. En el proyecto piloto el
+rojo previo cazó cosas que el arreglo solo, verde de entrada, habría
+ocultado: una carrera real de doble reserva que devolvía dos 201, un
+`0.10 × 3 = 0.30000000000000004` que vivía en las agregaciones y no en la
+lectura individual, un endpoint que aceptaba identidad por el body del
+request. Y en varios casos el rojo **cambió el diagnóstico**: el defecto no
+estaba donde el diseño creía.
+
+**Estado**: 🔴 DISCIPLINA. CI ve el verde final; no puede ver un rojo que
+ocurrió antes. La evidencia hoy es una frase escrita a mano.
+
+**Cómo volverla automática.**
+- Check de PR: si el PR toca código de comportamiento, el `tasks.md` del
+  bloque debe traer la marca de rojo evidenciado **con enlace** a la
+  corrida o al commit del test rojo. Es un grep con criterio, barato de
+  escribir, y convierte la frase en un enlace verificable.
+- Complemento con más valor y más costo: cobertura **por diff** (líneas
+  nuevas sin test = rojo). No prueba el orden, pero cierra el hueco de
+  "cambio sin test", que es el que más veces se cuela.
+
+---
+
+## 2. Spike de "bloque 0" antes de comprometerse con una dependencia
+
+**La regla.** Cuando un plan depende de que algo externo se comporte de
+cierta forma —una librería, un servicio administrado, un runtime, una
+integración— **el bloque 0 del `tasks.md` es un spike que lo prueba**, en
+laboratorio o en el ambiente de desarrollo, **antes** de escribir la
+primera línea del plan real. El spike tiene tres salidas posibles:
+**VIABLE**, **VIABLE con hallazgos** (se anotan y modifican el plan), o
+**plan B** (que se declara en el design *antes* de necesitarlo). El
+resultado se escribe en la tarea, con fecha.
+
+Cuando el spike descubre un contrato que hay que preservar, **se queda como
+test permanente**. En el piloto uno de ellos verificaba que cierto punto de
+enganche de una librería fuera observable; quedó como test propio, de modo
+que un upgrade que rompa esa observabilidad se pone rojo en vez de degradar
+en silencio a un comportamiento peor.
+
+**Por qué.** El costo de descubrir que la suposición era falsa crece con lo
+que ya construiste encima. Los spikes del piloto devolvieron, entre otros:
+que la configuración de test necesitaba una opción sin la cual el DOM se
+filtraba entre tests; que la URL "obvia" de un ambiente rompía todos los
+requests por CORS y la buena era otra; que la suposición de un cambio de
+contrato de fechas era **falsa** y el contrato que sí cambiaba era el de
+dinero. Ninguno de los tres se descubre leyendo documentación.
+
+Y hay un beneficio secundario que se nota tarde: el spike va **primero
+porque es el riesgo más incierto**, no porque sea lo más fácil. Ordenar el
+trabajo por incertidumbre en vez de por comodidad es lo que hace que las
+malas noticias lleguen el día 1 y no el día 9.
+
+**Estado**: 🟡 SEMIAUTOMÁTICO. La plantilla de `tasks.md` del marco trae el
+bloque 0 y la costumbre está instalada, pero nada impide borrarlo.
+
+**Cómo volverla automática.**
+- Check de OpenSpec: si el `design.md` declara una dependencia nueva o un
+  riesgo con plan B, el `tasks.md` **debe** tener bloque 0 con al menos una
+  tarea. Es una relación estructural entre dos artefactos que ya se
+  validan: cabe en el mismo guardrail.
+- Convención de nombre para las ramas de spike (`feat/<change>-b0-spike`)
+  para que el rastro exista aunque el spike se descarte.
+
+---
+
+## 3. Fail-open RUIDOSO
+
+**La regla.** Cuando una detección automática falla o queda en duda, el
+sistema **hace el trabajo completo y avisa**. Nunca omite en silencio.
+Concretamente, en cualquier lógica de "esto se puede saltar porque...":
+
+- la rama de duda va al camino **caro y seguro** (correr todo, desplegar
+  todo, verificar todo);
+- **y emite un `::warning::` con el motivo**. Sin aviso no hay fail-open,
+  hay un agujero.
+
+Es la contracara del fail-**closed** que gobierna la seguridad: en auth,
+sin claim válido se rechaza. En optimizaciones del pipeline, ante la duda
+se trabaja de más. La pregunta que decide cuál aplica es *¿qué pasa si me
+equivoco en silencio?* — en seguridad, entra alguien; en el pipeline, se
+saltea una verificación.
+
+**Por qué.** El fail-open silencioso es peor que no tener la optimización:
+te deja creyendo que la optimización funciona. Dos veces pasó lo mismo en
+el piloto, con la misma forma:
+
+- El carril rápido de docs nunca actuó durante días: el paso que listaba
+  los archivos del PR daba 403 por un permiso faltante del token, el
+  fail-open corría el CI completo y **nadie se enteró** porque no había
+  aviso. Se descubrió mirando otra cosa.
+- El reuso de verificación por tree hash falló en su debut por la misma
+  causa (otro permiso faltante) y degradó a promoción completa. Esta vez se
+  cazó rápido porque alguien sabía que el tree **sí** coincidía y el reuso
+  debía haber aplicado — o sea, se cazó por conocimiento humano, no por el
+  sistema.
+
+Los comentarios en los workflows del piloto conservan la lección textual:
+*"RUIDOSO a propósito: el fallo era silencioso y el carril rápido nunca
+actuó — el fail-open lo tapaba"*.
+
+**Estado**: 🟡 SEMIAUTOMÁTICO. El patrón está escrito en los workflows del
+marco y se revisa en review, pero nada verifica que una rama de degradación
+nueva traiga su aviso.
+
+**Cómo volverla automática.**
+- Lint de workflows: toda rama de degradación (`|| echo`, `|| true`,
+  `continue-on-error`, un `catch` que sigue) debe emitir `::warning::` o
+  `::notice::` con motivo. Es un check de texto sobre `.github/workflows/`,
+  determinista y barato.
+- Contador de avisos: el job final del pipeline reporta cuántos fail-open
+  se activaron en la corrida. Un fail-open que se activa **siempre** es un
+  bug disfrazado de tolerancia — y solo se ve contándolos.
+
+---
+
+## 4. Toda acción manual sobre un ambiente va por botón, no por `curl`
+
+**La regla.** Disparar un proceso interno, forzar un barrido, sembrar
+datos, re-ejecutar un job: **cada una es un `workflow_dispatch` con su
+botón en Actions**, con inputs descritos. Nunca un `curl` desde la terminal
+de alguien, nunca un script personal, nunca "lo corro yo que tengo el
+token".
+
+Corolario del mismo principio: **desplegar es solo por el pipeline**, y
+probar una rama en el ambiente de desarrollo es un dispatch eligiendo la
+rama — no un build local empujado a mano.
+
+**Por qué.** Cuatro cosas que el botón da gratis y el `curl` no:
+
+1. **Rastro.** Queda quién lo disparó, cuándo, con qué inputs y qué
+   respondió. En un post-mortem, "alguien corrió el barrido como a las 4"
+   es lo que separa treinta minutos de diagnóstico de dos.
+2. **Permisos acotados.** El job asume el rol del pipeline, con sus
+   permisos justos y por tiempo limitado. El `curl` corre con las
+   credenciales personales de quien lo tipea, que casi siempre pueden más.
+3. **El secreto no pasa por la terminal de nadie.** El job lo resuelve en
+   el runner y lo enmascara en el log; nunca queda en un historial de
+   shell, en un portapapeles ni en un mensaje.
+4. **Repetible por cualquiera.** El botón lo aprieta quien esté disponible,
+   incluso quien no sabe la forma exacta del request. Un `curl` que solo
+   una persona sabe armar es una dependencia de esa persona.
+
+En el piloto el ambiente de desarrollo **no** tiene disparo automático por
+schedule a propósito (mantener recursos despiertos 24/7 cuesta), así que
+todas las pruebas de procesos programados salen de estos botones, con un
+input opcional para simular la fecha y ver el resultado en el canal
+sandbox.
+
+**Estado**: 🟡 SEMIAUTOMÁTICO. El marco trae los workflows de dispatch y
+los guards estructurales que impiden que el ambiente de desarrollo toque el
+mundo real, pero nada impide que alguien con credenciales haga el `curl`.
+
+**Cómo volverla automática.**
+- Los secretos operativos viven **solo** donde el pipeline los alcanza, y
+  ninguna persona tiene lectura directa: sin token en la máquina, el
+  `curl` no existe como opción.
+- Los endpoints internos exigen un token que solo el rol del pipeline puede
+  resolver, y **loguean el origen** de cada llamada. Una invocación desde
+  fuera del pipeline es visible en los logs, no solo desaconsejada.
+- Regla de repo: ningún script del proyecto ejecuta llamadas contra un
+  ambiente desplegado fuera de `.github/workflows/`; check de texto.
+
+---
+
+## 5. Invariantes como propiedades, no como números
+
+**La regla.** Toda verificación que decide si una migración o un proceso
+masivo continúa o aborta se escribe como **propiedad**, no como cantidad
+esperada:
+
+- ✅ *"todas las filas siguen teniendo dueño"*, *"los conteos por día
+  coinciden en ambas direcciones"*, *"no hay huérfanas en las cuatro
+  tablas"*, *"un puesto tiene exactamente una fila"*.
+- ❌ *"deben quedar 41 usuarios"*, *"deben migrarse 90 reservas"*.
+
+**Por qué.** Un número esperado es correcto exactamente durante el ensayo y
+falso para siempre después: alguien crea un registro entre el ensayo y la
+ejecución real, y el invariante aborta una migración perfectamente sana. Es
+un falso rojo, que es el tipo de fallo que enseña al equipo a ignorar los
+rojos. La propiedad, en cambio, vale en el ensayo, en producción y dentro
+de seis meses.
+
+Del lado contrario, la propiedad **sí** caza lo que importa: en el piloto,
+una migración de tipos de fecha se validó comparando conteos por día **en
+ambas direcciones** dentro de la misma transacción, y ahí apareció un bug
+de precedencia de SQL (`EXCEPT`/`UNION ALL` asocian a la izquierda) que se
+cazó **antes de commitear**, reescribiendo el invariante con dos tablas
+temporales.
+
+Dos corolarios operativos, del mismo linaje:
+
+- El invariante corre **dentro de la transacción** y aborta el cambio si no
+  se cumple. Verificar después de commitear es escribir un post-mortem.
+- Los números medidos sí se registran (el ensayo de restore anotó "5 min el
+  cluster, 5 min la instancia, ~20 min el borrado"), pero como **dato para
+  planificar**, jamás como condición de aprobación.
+
+**Estado**: 🔴 DISCIPLINA. Se revisa en review de migraciones.
+
+**Cómo volverla automática.**
+- Lint sobre archivos de migración: marcar comparaciones contra literales
+  numéricos dentro de bloques de invariante o de asserts. Alto ruido si se
+  aplica a todo el archivo, útil si se acota a los bloques marcados como
+  invariante — lo que a su vez exige una convención de marcado, que es la
+  mitad barata de la automatización.
+- Plantilla de migración en el scaffold con la sección de invariantes ya
+  escrita como propiedades y el bloque transaccional armado. El camino
+  fácil tiene que ser el correcto.
+
+---
+
+## 6. Auditar los permisos del token de un job ANTES del estreno
+
+**La regla.** Cuando un job nuevo llama a una API —o cuando un job
+existente estrena una llamada nueva— se audita **acción por acción** contra
+los permisos de su token o rol, **antes** de la primera corrida real. Cada
+job declara sus `permissions` explícitamente; ninguno hereda el default.
+
+**Por qué.** Es la lección más repetida del piloto: **tres apariciones**,
+la última anotada textualmente en el workflow —*"TERCERA aparición de la
+lección: cada llamada nueva de un job se audita contra los permisos de su
+token ANTES del estreno"*—. Las tres veces el patrón fue idéntico: falta un
+permiso, la API devuelve 403, y **el fail-open convierte el 403 en un
+comportamiento degradado que parece normal**. Ver también la regla 3: estas
+dos reglas son la misma lección vista desde los dos extremos, y por eso la
+combinación es tan cara — el permiso faltante no rompe nada, solo apaga en
+silencio la optimización que acabás de construir.
+
+Segundo motivo, independiente: declarar `permissions` por job es el
+principio de menor privilegio en el único lugar donde es barato. El default
+de un token de CI puede tener bastante más de lo que ese job necesita, y
+`contents: read` explícito no cuesta nada.
+
+**Estado**: 🔴 DISCIPLINA, con una parte trivialmente automatizable que es
+el mejor primer paso del backlog.
+
+**Cómo volverla automática.**
+- **Check duro y barato**: todo job de todo workflow declara un bloque
+  `permissions:` explícito. Es un parse de YAML de veinte líneas y elimina
+  la clase entera de "heredé lo que había".
+- Los pasos que llaman a la API del proveedor **distinguen 403 de "no hay
+  datos"**: un 403 es error de configuración y va a rojo o a `warning`
+  nombrando el permiso faltante, jamás al mismo camino que "no encontré
+  nada".
+- Estreno en seco: el debut de un job nuevo corre primero en una rama, con
+  su salida esperada declarada en el PR. Barato, y convierte el estreno en
+  una verificación en vez de una apuesta.
+
+---
+
+## 7. Suite local antes del push
+
+**La regla.** La suite corre **en la máquina** antes de cada push. CI es la
+corrida **vinculante**, no el banco de pruebas.
+
+**Por qué.** No es una cuestión de costo de minutos de CI: es de ciclo de
+atención. Empujar para ver qué dice CI cuesta entre cinco y quince minutos
+por iteración, durante los cuales el problema se enfría y quien esperaba el
+pipeline queda detrás de tu cola. Un fallo trivial de lint descubierto en
+CI cuesta un ciclo completo; el mismo fallo en local cuesta veinte
+segundos.
+
+Hay un segundo efecto, más importante: cuando CI es el banco de pruebas, la
+historia del branch se llena de commits "fix ci", "otra vez", "ahora sí", y
+esa historia es la que alguien va a leer dentro de un año buscando por qué
+algo quedó así.
+
+**Estado**: 🔴 DISCIPLINA pura. Ninguna máquina puede saber si corriste
+algo antes de empujar.
+
+**Cómo volverla automática.**
+- Hook `pre-push` en el scaffold, instalado por el `setup` del proyecto vía
+  `core.hooksPath` (versionado en el repo, no en `.git/`): corre lint +
+  typecheck + la suite rápida. Se puede saltar con `--no-verify`, y está
+  bien: el objetivo es que el camino fácil sea el correcto, no bloquear a
+  quien sabe lo que hace.
+- Un comando único y memorable (`pnpm verificar`) que corra **exactamente**
+  lo que corre CI en el carril de código. Si el comando local y el de CI
+  divergen, la regla se muere sola porque deja de servir.
+
+---
+
+## 8. Ramas siempre desde `main` actualizado
+
+**La regla.** Una sola operación, atómica, sin excepciones:
+
+```bash
+git checkout main && git pull --ff-only && git checkout -b feat/<nombre>
+```
+
+Y antes de abrir el PR: **mirar la lista de commits**. Si aparece algo que
+no escribiste, ramificaste desde el lugar equivocado o te falta un rebase.
+
+**Por qué.** Ramificar desde una rama de trabajo, o desde un `main` de hace
+tres días, produce PRs que arrastran commits ajenos. Eso rompe tres cosas a
+la vez: el review (el revisor no distingue tu cambio del ruido), la
+historia (el mismo cambio aparece dos veces) y la promoción (el pipeline
+verifica un contenido que no es el que creés). En el modelo trunk-based del
+[ADR 002](adr/002-trunk-based-promocion.md), donde `main` es la única rama
+permanente y el reuso de verificación se decide **por el tree hash del
+contenido**, una rama con base vieja es directamente un contenido distinto
+del que se verificó.
+
+**Estado**: 🟡 SEMIAUTOMÁTICO — y de las pocas que tienen un botón oficial
+sin escribir código.
+
+**Cómo volverla automática.**
+- En el ruleset de `main`: **exigir que la rama esté al día antes de
+  mergear** más **historia lineal**. Es configuración, no código, y elimina
+  el modo de fallo más caro.
+- Alias o script en el scaffold (`nueva-rama <nombre>`) que haga la
+  secuencia completa: hace más cómodo hacerlo bien que hacerlo mal.
+
+---
+
+## 9. PRs con `Closes` desde la creación
+
+**La regla.** Todo PR de bloque lleva **`Closes #<sub-issue>` en el cuerpo,
+desde que se crea** — no agregado después, no en un comentario. La relación
+bloque ↔ PR es 1:1. El `Closes` apunta **solo** al sub-issue; el issue
+macro del change lo cierra únicamente el PR final.
+
+La evidencia del bloque se comenta **en el sub-issue, antes del merge**; el
+merge lo cierra solo. **Los sub-issues no se cierran a mano.**
+
+**Por qué.** Porque un `ref #N` en texto plano **no enlaza nada**. Se ve
+igual en el cuerpo del PR, parece que documenta la relación, y la sección
+Development de ambos lados queda vacía: el tablero no refleja el trabajo, y
+al cerrar el change hay que reconstruir a mano qué PR resolvió qué. Es un
+error que se cometió y se corrigió en el piloto, cazado en review.
+
+Y "desde la creación" no es cosmético: agregarlo después funciona para el
+cierre, pero durante toda la vida del PR el tablero miente, que es
+exactamente cuando alguien lo mira para saber qué está en curso.
+
+**Estado**: 🔴 DISCIPLINA. Es, junto con la regla 6, el candidato más
+barato del backlog.
+
+**Cómo volverla automática.**
+- Check de PR: el cuerpo debe contener `Closes #<n>` (con excepciones
+  declaradas por etiqueta para el PR final de un change y para los de solo
+  docs). Una expresión regular; el PR se pone rojo hasta que exista el
+  enlace.
+- Plantilla de PR en el scaffold con la línea `Closes #` ya puesta y vacía:
+  cuesta más borrarla que completarla.
+
+---
+
+## 10. Convención de mensajes de commit
+
+**La regla.** Cuatro elementos, en este orden:
+
+```
+tipo(alcance): qué cambió, en español y en indicativo (change <nombre>)
+```
+
+1. **Conventional commits**: `feat`, `fix`, `docs`, `chore`, `refactor`,
+   con alcance entre paréntesis (`api`, `web`, `pipeline`, `openspec`,
+   `infra`, `marco`).
+2. **En español**, y describiendo el **efecto**, no la operación. No
+   *"actualiza el archivo de specs"* sino *"los specs dejan de describir un
+   pipeline que nadie corre"*. El asunto se lee como una afirmación sobre
+   el sistema después del commit.
+3. **El change entre paréntesis al final** cuando el commit pertenece a un
+   change de OpenSpec: `(change carril-docs-completo)`. Es lo que permite
+   reconstruir un change desde el log sin abrir el archive.
+4. **Atribución de quién cazó el error**, cuando corresponde:
+   `(cazado por <handle>)`, `(aporte de <handle>)`, `(corrección de
+   <handle>)`. Va en el asunto, no escondida en el cuerpo.
+
+Ejemplos del piloto, con los handles parametrizados:
+
+```
+fix(pipeline): serializar Deploy — dev compartido no se pisa (cazado por {{BUILDER_1}})
+feat(pipeline): reuso de verificacion por tree hash (aporte de {{BUILDER_1}})
+fix(openspec): el scenario conserva su titulo — el guardrail de deltas cazo el retitulado como perdida
+docs(openspec): carril-docs-completo cerrado y archivado — 2/2, estreno en un acto
+```
+
+**Por qué.** El log es el índice de búsqueda que más se usa y el único que
+nunca se desactualiza. Un asunto que dice el efecto contesta *"¿cuándo
+empezó a pasar esto?"* con un `git log --oneline`; uno que dice la
+operación obliga a abrir el diff.
+
+La atribución merece su propio párrafo porque es la parte que parece
+opcional y no lo es. Reconocer en el log a quien cazó el problema hace tres
+cosas: le da valor visible a revisar en serio (el review deja de ser un
+trámite), deja rastro de **cómo** se encontró el fallo —dato de oro para
+el post-mortem y para decidir qué automatizar—, y separa culpa de crédito
+en la dirección correcta: **acá se nombra a quien encuentra, nunca a quien
+introduce**. Es la misma regla del post-mortem sin culpas, aplicada al
+día a día.
+
+**Estado**: 🔴 DISCIPLINA (los elementos 1 a 3; el 4 es cultura y no se
+automatiza — ni debería).
+
+**Cómo volverla automática.**
+- `commitlint` con la configuración del marco (tipos y alcances
+  permitidos), corriendo en el hook `commit-msg` local **y** como check
+  sobre los commits del PR. Cubre el elemento 1 por completo.
+- Check de OpenSpec: si la rama es de un change, los commits deben citar el
+  change entre paréntesis. Cubre el 3.
+- El 2 y el 4 no se automatizan: viven en el review y en esta página.
+
+---
+
+## Backlog de automatización
+
+Ordenado por relación valor/costo. Los primeros tres son días-hombre de
+una tarde entre todos y cierran las clases de error más caras.
+
+| # | Check a construir | Cierra la regla | Costo | Estado hoy |
+|---|---|---|---|---|
+| 1 | Todo job declara `permissions:` explícito | 6 | bajo | 🔴 |
+| 2 | El cuerpo del PR contiene `Closes #<n>` | 9 | bajo | 🔴 |
+| 3 | Ruleset: rama al día antes de mergear + historia lineal | 8 | bajo (config) | 🟡 |
+| 4 | `commitlint` en hook y en PR | 10 | bajo | 🔴 |
+| 5 | Hook `pre-push` versionado + `pnpm verificar` idéntico a CI | 7 | bajo | 🔴 |
+| 6 | Lint de workflows: toda degradación emite `::warning::` | 3 | medio | 🟡 |
+| 7 | Los pasos que llaman a la API distinguen 403 de "sin datos" | 3 y 6 | medio | 🔴 |
+| 8 | Guardrail OpenSpec: `design` con dependencia nueva ⇒ `tasks` con bloque 0 | 2 | medio | 🟡 |
+| 9 | Check de PR: rojo evidenciado con enlace en el `tasks.md` | 1 | medio | 🔴 |
+| 10 | Cobertura por diff (líneas nuevas sin test) | 1 | alto | 🔴 |
+| 11 | Plantilla de migración con invariantes de propiedad + lint de literales | 5 | alto | 🔴 |
+| 12 | Contador de fail-open activados por corrida | 3 | medio | 🔴 |
+
+**Cómo se cierra una fila**: el check se construye en Projects (referenciado,
+para que llegue a todos los proyectos de una), la regla cambia de estado en
+esta página, y la fila sale de la tabla. Una fila que lleva meses acá es
+una regla que el marco decidió no hacer cumplir — y eso es una decisión
+válida, pero que se toma a propósito y no por olvido.
+
+---
+
+## Lo que YA es automático
+
+Para no confundir deuda con vacío. Estas reglas **no** están en la lista de
+arriba porque un check ya falla solo cuando alguien se aparta:
+
+> Dónde vive cada uno, para no leer de más: la validación estricta de OpenSpec,
+> el guardrail de deltas y el veredicto que reporta en los dos carriles los trae
+> Projects como pieza **referenciada** (`marco-ci.yml` y las composite actions), y
+> un proyecto los hereda con `uses: ...@v1` sin escribir nada. El resto es
+> **contrato del marco** —lo especifica `openspec/specs/`— y lo ejecuta el
+> pipeline de cada proyecto. La protección de `main` es un acto humano
+> deliberado y su estado real se documenta en cada repo
+> (`.github/proteccion-main.md`).
+
+- Lint sin warnings (`--max-warnings=0`), typecheck, suites y build en CI.
+- `openspec validate --all --strict` en todo PR y push, en los dos carriles.
+- Guardrail de deltas: un `MODIFIED` que omite escenarios vigentes no pasa.
+- El check requerido reporta en **ambos** carriles (código y docs), así que
+  un PR de solo docs puede mergearse y uno de código no puede escaparse.
+- Review cruzado: CODEOWNERS asigna al par que no escribió el cambio.
+- `main` protegida: solo avanza por PR.
+- Deploys serializados con cola, nunca cancelados.
+- Producción solo por promoción: sin smoke y E2E de dev en verde, el deploy
+  a producción no arranca.
+- `verificar-prod` al final del deploy, con aviso al canal de alertas.
+- Guard estructural de ambiente: el modo real de las integraciones exige
+  ambiente de producción, así que el de desarrollo no puede contactar
+  usuarios reales aunque alguien se equivoque.
+- Dependabot semanal con la política de merge por tipo de bump.
+
+---
+
+## Cómo entra una regla nueva acá
+
+El ciclo completo, que es también el ciclo de vida del marco:
+
+1. **Un incidente o un review** deja una lección.
+2. El **post-mortem** la escribe como regla en su sección *Lecciones*
+   (plantilla en [plantillas/postmortem.md](plantillas/postmortem.md)).
+3. La regla **aterriza en un archivo**: la constitución del repo si es una
+   frontera, un [ADR](adr/) si es estructural, un runbook si es operativa,
+   **o esta página si es una práctica sin lugar propio**.
+4. Se le asigna **estado** (🟢/🟡/🔴) y, si no es 🟢, su fila en el backlog.
+5. Cuando el check existe, **la regla sale del backlog** y se anota en
+   [lo que ya es automático](#lo-que-ya-es-automático).
+
+Una lección que se queda en el paso 1 se olvida en dos semanas. Una que
+llega al 3 sobrevive a la memoria del equipo. Una que llega al 5 sobrevive
+al equipo.

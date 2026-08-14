@@ -1,0 +1,357 @@
+name: Marco CI (reusable)
+
+# ---------------------------------------------------------------------------
+# QUE ES ESTO
+#
+# Los jobs de CI que TODO proyecto la organización hereda del marco Projects:
+#
+#   1. cambios   -> detecta si el PR/push toca solo documentacion (carril rapido)
+#   2. openspec  -> guardrail de deltas + validacion estricta de changes y specs
+#   3. marco-ok  -> veredicto agregado de los dos jobs anteriores
+#
+# El proyecto consumidor NO copia estos jobs: los referencia. Un arreglo aca
+# arregla el CI de todos los repos a la vez.
+#
+# ---------------------------------------------------------------------------
+# COMO LO CONSUME UN PROYECTO
+#
+# En {{PROYECTO}}/.github/workflows/ci.yml:
+#
+#   name: CI
+#   on:
+#     push:
+#       branches: [main]
+#     pull_request:
+#
+#   # OBLIGATORIO. Un workflow reusable NUNCA puede pedir mas permisos que los
+#   # que le concede quien lo llama: si aca falta pull-requests:read, el job
+#   # "cambios" no puede listar los archivos del PR, cae al fail-open y el
+#   # carril rapido no actua nunca (incidente real del 2026-08-05).
+#   permissions:
+#     contents: read
+#     pull-requests: read
+#
+#   jobs:
+#     marco:
+#       uses: {{ORG}}/Projects/.github/workflows/marco-ci.yml@v1
+#       # Opcional: solo si el default no sirve para este repo.
+#       # with:
+#       #   version_openspec: "1.9.0"
+#
+#     build_test:
+#       name: build-test
+#       needs: marco
+#       if: needs.marco.outputs.solo_docs == 'false'
+#       runs-on: ubuntu-latest
+#       steps: [...]   # lo del producto: lint, typecheck, test, build
+#
+#     # EL CHECK REQUERIDO DEL RULESET ES ESTE, no build-test. build-test queda
+#     # "skipped" en el carril de docs y un check omitido NO REPORTA NUNCA: si
+#     # fuera el requerido, todo PR de solo docs quedaria esperando para siempre
+#     # una senal que no llega. ci-ok reporta en AMBOS carriles.
+#     ci_ok:
+#       name: ci-ok
+#       needs: [marco, build_test]
+#       if: always()
+#       runs-on: ubuntu-latest
+#       steps:
+#         - name: Veredicto
+#           run: |
+#             [ "${{ needs.marco.result }}" = "success" ] || { echo "::error::el CI de marco fallo"; exit 1; }
+#             if [ "${{ needs.build_test.result }}" = "success" ]; then exit 0; fi
+#             if [ "${{ needs.build_test.result }}" = "skipped" ] && [ "${{ needs.marco.outputs.solo_docs }}" = "true" ]; then
+#               echo "solo docs: build-test omitido a proposito"; exit 0
+#             fi
+#             echo "::error::build-test termino en '${{ needs.build_test.result }}'"; exit 1
+#
+# El scaffold de {{PROYECTO}} ya trae ese ci.yml armado: no hay que escribirlo
+# a mano. Y el ruleset main-protegida debe exigir el check "ci-ok".
+# ---------------------------------------------------------------------------
+
+on:
+  workflow_call:
+    inputs:
+      version_openspec:
+        description: >-
+          Version pineada del CLI de OpenSpec. OJO: el paquete es
+          @fission-ai/openspec; el nombre pelado "openspec" en npm es un
+          placeholder ajeno (0.0.0, squatting). Dependabot NO ve este pin
+          porque mira manifests, no un npx inline: se sube a mano aca y todos
+          los repos del marco lo heredan.
+        type: string
+        required: false
+        default: "1.9.0"
+      version_node:
+        description: Version de Node para el guardrail y el CLI de OpenSpec.
+        type: string
+        required: false
+        default: "22"
+      rutas_carril_docs:
+        description: >-
+          Patrones (ERE de grep, uno por linea) de las rutas que NO alteran lo
+          que se sirve en runtime. Si el cambio completo cae dentro de estos
+          patrones, solo_docs=true y el consumidor puede omitir su build/test.
+          Se admiten lineas en blanco y comentarios con #.
+        type: string
+        required: false
+        default: |
+          ^openspec/
+          \.md$
+          ^docs/
+          ^\.github/
+          ^infra/
+          ^infra-prod/
+      ruta_guardrail:
+        description: >-
+          Ruta del script del guardrail de deltas, relativa a la raiz del REPO
+          DEL MARCO (ahi vive la copia canonica, junto a la composite action
+          que lo empaqueta). Se resuelve primero contra el marco; si el
+          checkout del marco falla, se busca la MISMA ruta dentro del repo
+          consumidor como respaldo ruidoso. Cambiar este default rompe el
+          dogfooding: el CI de Projects exige que el archivo exista aca.
+        type: string
+        required: false
+        default: actions/guardrail-deltas/check-openspec-deltas.mjs
+      repo_marco:
+        description: Repo del marco de donde se trae el guardrail canonico.
+        type: string
+        required: false
+        default: im-diego-ec/Projects
+      ref_marco:
+        description: >-
+          Ref del marco a usar para el guardrail. Vacio (default) = el mismo
+          commit del marco que provee ESTE workflow (github.job_workflow_sha),
+          asi el script y el workflow nunca quedan desfasados.
+        type: string
+        required: false
+        default: ""
+      runner:
+        description: Runner para todos los jobs de marco.
+        type: string
+        required: false
+        default: ubuntu-latest
+    secrets:
+      token_marco:
+        description: >-
+          Solo si el repo del marco es privado: token con lectura sobre el.
+          Sin esto el checkout del marco da 403, se avisa con ::warning y se
+          cae al respaldo local del guardrail.
+        required: false
+    outputs:
+      solo_docs:
+        description: >-
+          "true" si el cambio toca UNICAMENTE rutas del carril de docs. El
+          consumidor lo usa para decidir si corre su build/test.
+        value: ${{ jobs.cambios.outputs.solo_docs }}
+      deteccion_confiable:
+        description: >-
+          "false" si la deteccion no pudo leer la lista real de archivos y
+          cayo al fail-open (solo_docs queda en false y corre el CI completo).
+        value: ${{ jobs.cambios.outputs.confiable }}
+
+# Techo de permisos de los jobs del marco. Esto NO agrega permisos: el maximo
+# lo fija el workflow llamador. Ver el bloque "COMO LO CONSUME UN PROYECTO".
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  # Detecta si el cambio es SOLO documentacion. Fail-open: ante cualquier duda
+  # o error de deteccion, solo_docs=false y corre el CI completo — nunca se
+  # omite la validacion de codigo en silencio. Y el fail-open es RUIDOSO
+  # (::warning): el 2026-08-05 este fallo fue mudo durante una semana.
+  cambios:
+    name: cambios
+    runs-on: ${{ inputs.runner }}
+    outputs:
+      solo_docs: ${{ steps.detectar.outputs.solo_docs }}
+      confiable: ${{ steps.detectar.outputs.confiable }}
+    steps:
+      # Solo el carril de push necesita el arbol git (para el diff del rango).
+      # En PR se lista por API, que es lo correcto para merge, squash y rebase.
+      - name: Checkout (solo para el diff de push)
+        if: github.event_name != 'pull_request' && github.event_name != 'pull_request_target'
+        uses: actions/checkout@v7
+        with: { fetch-depth: 0 }
+
+      - id: detectar
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          NUMERO_PR: ${{ github.event.pull_request.number }}
+          ANTES: ${{ github.event.before }}
+          RUTAS_DOCS: ${{ inputs.rutas_carril_docs }}
+        run: |
+          SOLO_DOCS=false
+          CONFIABLE=true
+
+          if [ "${GITHUB_EVENT_NAME}" = "pull_request" ] || [ "${GITHUB_EVENT_NAME}" = "pull_request_target" ]; then
+            if ! gh api "repos/${GITHUB_REPOSITORY}/pulls/${NUMERO_PR}/files" \
+                --paginate --jq '.[].filename' > files.txt 2> gh-error.txt; then
+              echo "::warning::no se pudieron listar los archivos del PR — se corre el CI completo (fail-open). Detalle: $(tr '\n' ' ' < gh-error.txt)"
+              # Origen preciso: el 2026-08-05 la causa fue exactamente esta y el
+              # sintoma era invisible (todo PR corria el CI completo "porque si").
+              if grep -qiE 'not accessible|403|Resource not accessible by integration' gh-error.txt; then
+                echo "::warning::pinta a permisos: el workflow llamador debe declarar 'permissions: pull-requests: read' (incidente 2026-08-05)"
+              fi
+              CONFIABLE=false
+              : > files.txt
+            fi
+          else
+            if [ -z "${ANTES}" ] || [ "${ANTES}" = "0000000000000000000000000000000000000000" ]; then
+              echo "::warning::no hay commit previo comparable (push inicial, rama nueva o dispatch) — se corre el CI completo (fail-open)"
+              CONFIABLE=false
+              : > files.txt
+            elif ! git diff --name-only "${ANTES}" "${GITHUB_SHA}" > files.txt; then
+              echo "::warning::git diff fallo entre ${ANTES} y ${GITHUB_SHA} — se corre el CI completo (fail-open)"
+              CONFIABLE=false
+              : > files.txt
+            fi
+          fi
+
+          echo "== archivos del cambio =="
+          cat files.txt
+
+          # Los patrones llegan uno por linea: se limpian y se unen con "|".
+          PATRON=$(printf '%s\n' "${RUTAS_DOCS}" \
+            | tr -d '\r' \
+            | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//' \
+            | grep -vE '^(#|$)' \
+            | paste -sd '|' -)
+          echo "== patron del carril de docs =="
+          echo "${PATRON}"
+
+          if [ -z "${PATRON}" ]; then
+            # Un ERE vacio hace match con TODA linea: sin este corte, "no queda
+            # nada fuera del carril" seria cierto siempre y un cambio de codigo
+            # se colaria como solo-docs. Fail-open explicito.
+            echo "::warning::rutas_carril_docs quedo vacio — se corre el CI completo (fail-open)"
+            CONFIABLE=false
+          elif [ "${CONFIABLE}" = "true" ]; then
+            set +e
+            grep -vE "${PATRON}" files.txt > fuera-del-carril.txt
+            RC=$?
+            set -e
+            if [ "${RC}" -gt 1 ]; then
+              # grep devuelve >1 solo por error real (ERE invalido, etc.).
+              echo "::warning::el patron del carril de docs no compilo (grep rc=${RC}) — se corre el CI completo (fail-open)"
+              CONFIABLE=false
+            elif [ -s files.txt ] && [ ! -s fuera-del-carril.txt ]; then
+              SOLO_DOCS=true
+            else
+              echo "== archivos fuera del carril de docs =="
+              cat fuera-del-carril.txt
+            fi
+          fi
+
+          echo "solo_docs=${SOLO_DOCS}" >> "$GITHUB_OUTPUT"
+          echo "confiable=${CONFIABLE}" >> "$GITHUB_OUTPUT"
+          echo "solo_docs=${SOLO_DOCS} confiable=${CONFIABLE}"
+
+  # Validacion de OpenSpec: barata (sin DB, sin install del monorepo) y corre
+  # SIEMPRE, sea docs o codigo. Aqui viven el guardrail de deltas y la
+  # validacion estricta de todos los changes y specs.
+  openspec:
+    name: openspec
+    runs-on: ${{ inputs.runner }}
+    steps:
+      - name: Checkout del repo consumidor
+        uses: actions/checkout@v7
+
+      # El guardrail es CANONICO del marco: se trae desde el repo del marco, no
+      # de una copia por proyecto que se desactualiza sola. Si el marco es
+      # privado y no hay token, esto falla y el paso siguiente avisa fuerte y
+      # cae al respaldo local — nunca se saltea la verificacion en silencio.
+      #
+      # Se trae UNICAMENTE el archivo del guardrail (sparse sin cone), por dos
+      # razones: no arrastrar el openspec/ del marco al workspace del proyecto
+      # —dos arboles de specs en el mismo checkout confunden al validador— y no
+      # pagar el clon completo. CONTRATO: el guardrail tiene que ser un script
+      # autocontenido, sin imports de otros archivos del marco.
+      - name: Checkout del marco (fuente canonica del guardrail)
+        if: github.repository != inputs.repo_marco
+        continue-on-error: true
+        uses: actions/checkout@v7
+        with:
+          repository: ${{ inputs.repo_marco }}
+          ref: ${{ inputs.ref_marco != '' && inputs.ref_marco || github.job_workflow_sha }}
+          path: .marco
+          persist-credentials: false
+          token: ${{ secrets.token_marco || github.token }}
+          sparse-checkout: ${{ inputs.ruta_guardrail }}
+          sparse-checkout-cone-mode: false
+
+      - uses: actions/setup-node@v7
+        with: { node-version: "${{ inputs.version_node }}" }
+
+      - name: Exigir OpenSpec en el repo
+        shell: bash
+        run: |
+          [ -d openspec ] || {
+            echo "::error::el repo no tiene openspec/ — el marco Projects exige que las specs vivan en el repo"
+            exit 1
+          }
+
+      - name: Resolver el guardrail de deltas
+        id: guardrail
+        shell: bash
+        env:
+          RUTA: ${{ inputs.ruta_guardrail }}
+          REPO_MARCO: ${{ inputs.repo_marco }}
+          REF_MARCO: ${{ inputs.ref_marco }}
+        run: |
+          # Solo DOS fuentes posibles, ambas canonicas. No hay respaldo con la
+          # copia local del consumidor a proposito: un guardrail viejo que pasa
+          # en verde es peor que uno ausente que falla — daria por verificado un
+          # delta que la version nueva si habria cazado. Si el marco no se puede
+          # traer, esto se rompe fuerte y dice exactamente como arreglarlo.
+          if [ "${GITHUB_REPOSITORY}" = "${REPO_MARCO}" ] && [ -f "${RUTA}" ]; then
+            # Dogfooding: el marco se valida contra la copia del propio PR.
+            echo "el marco corre su propia copia del guardrail: ${RUTA}"
+            echo "script=${RUTA}" >> "$GITHUB_OUTPUT"
+          elif [ -f ".marco/${RUTA}" ]; then
+            echo "guardrail canonico desde ${REPO_MARCO}: .marco/${RUTA}"
+            echo "script=.marco/${RUTA}" >> "$GITHUB_OUTPUT"
+          else
+            echo "::error::no se pudo traer el guardrail canonico (${RUTA}) desde ${REPO_MARCO}."
+            echo "::error::Revisar, en este orden: (1) que el repo del marco tenga Settings -> Actions -> General -> Access = 'Accessible from repositories in the organization'; (2) si el marco es privado, pasar el secret token_marco con un PAT que lo lea; (3) que la ref '${REF_MARCO:-<sha del workflow>}' exista y contenga ese archivo."
+            exit 1
+          fi
+
+      # Un bloque "## MODIFIED Requirements" REEMPLAZA al requirement completo
+      # en el spec vigente al archivar: si el delta omite un escenario que el
+      # spec ya tenia, ese escenario se BORRA. Paso el 2026-07-31 y lo atrapo
+      # la herramienta recien en el ultimo paso del change; aca se detecta en
+      # cada PR, sin depender de que alguien se acuerde de mirarlo.
+      - name: Deltas de OpenSpec sin perdida de escenarios
+        shell: bash
+        run: node "${{ steps.guardrail.outputs.script }}"
+
+      - name: Validacion estricta de changes y specs
+        shell: bash
+        env:
+          VERSION_OPENSPEC: ${{ inputs.version_openspec }}
+        run: npx --yes "@fission-ai/openspec@${VERSION_OPENSPEC}" validate --all --strict
+
+  # Veredicto agregado DEL MARCO. Reporta siempre (docs o codigo). No conoce el
+  # build/test del producto: ese lo agrega el ci-ok del repo consumidor, que es
+  # el check requerido por el ruleset.
+  marco_ok:
+    name: marco-ok
+    needs: [cambios, openspec]
+    if: always()
+    runs-on: ${{ inputs.runner }}
+    steps:
+      - name: Veredicto
+        shell: bash
+        run: |
+          [ "${{ needs.cambios.result }}" = "success" ] || { echo "::error::la deteccion de cambios fallo"; exit 1; }
+          [ "${{ needs.openspec.result }}" = "success" ] || { echo "::error::la validacion de OpenSpec fallo"; exit 1; }
+          if [ "${{ needs.cambios.outputs.solo_docs }}" = "true" ]; then
+            echo "carril de docs: el consumidor puede omitir su build/test"
+          else
+            echo "carril completo: el consumidor debe correr su build/test"
+          fi
+          if [ "${{ needs.cambios.outputs.confiable }}" != "true" ]; then
+            echo "::warning::la deteccion del carril cayo al fail-open — el veredicto es valido, pero el carril rapido no actuo"
+          fi

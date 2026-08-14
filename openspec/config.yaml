@@ -1,0 +1,51 @@
+schema: spec-driven
+context: |
+  Proyecto: Projects — marco de ingeniería de la organización.
+  Qué es: el marco de trabajo (no una aplicación) que los proyectos del área
+  adoptan para nacer ya cumpliendo el estándar. Se destiló del estado maduro
+  del primer proyecto que lo ejercitó y evoluciona con vida propia.
+  Qué contiene, según cómo evoluciona cada pieza:
+    - Referenciado: workflows reusables y composite actions que los proyectos
+      consumen con `uses: <org>/projects/...@v<major>`. Cambian una vez para todos.
+    - Scaffold: plantillas que se copian UNA vez al crear el proyecto y luego
+      son del proyecto (AGENTS.md, CODEOWNERS, plantilla de PR, configuración
+      de lint y de agentes). Usan placeholders {{DOBLE_LLAVE}} documentados.
+    - Canónico: los specs de marco (`openspec/specs/`) viven SOLO en este repo;
+      los proyectos adoptantes no los copian, los cumplen.
+    - Regenerado: las skills y comandos de OpenSpec no se vendoran; el marco
+      pina la versión del CLI y cada repo las regenera.
+  Premisa dura: el cumplimiento del marco debe ser AUTOMÁTICO (CI, scaffolds,
+  skills preconfiguradas). Un ritual que alguien debe recordar NO cuenta como
+  enforcement: solo cuentan los checks que fallan solos.
+  Invariantes: se enuncian como PROPIEDADES, nunca como implementaciones ni
+  cantidades esperadas (un invariante con un número concreto aborta corridas
+  legítimas con falsos fallos).
+  Despersonalización: los specs canónicos no nombran personas, cuentas de nube,
+  dominios, prefijos de recursos ni paquetes concretos; hablan de roles y de
+  ambientes. Lo que el pipeline consume en runtime (URLs, ARNs, log groups)
+  viaja por variables y secrets del proveedor de CI.
+  Stack del marco: monorepo TypeScript con pnpm, GitHub Actions para CI/CD,
+  AWS + Terraform para infraestructura.
+  Idioma de specs: español en la prosa; keywords de OpenSpec en inglés.
+rules:
+  proposal:
+    - Mencionar el impacto visible para quien adopta el marco (proyecto
+      consumidor o builder), no solo el cambio interno
+    - Declarar a qué categoría de distribución pertenece lo que cambia
+      (referenciado, scaffold, canónico o regenerado) y si rompe a los
+      adoptantes existentes
+  specs:
+    - Usar escenarios con viñetas WHEN / THEN bajo `#### Scenario:` (prosa en
+      español, keywords en inglés). No usar Dado / Cuando / Entonces
+    - Enunciar los requirements con SHALL como propiedades observables, sin
+      nombres de recursos, cantidades esperadas ni detalles de implementación
+      que cada proyecto fija por su cuenta
+  design:
+    - Registrar las alternativas descartadas con su motivo
+    - Justificar cómo el cambio se hace cumplir solo (qué check falla si
+      alguien no lo cumple); si el cumplimiento depende de que alguien se
+      acuerde, decirlo explícitamente como deuda
+  tasks:
+    - Tareas pequeñas, ejecutables en un paso
+    - Cada tarea deja evidencia verificable (comando corrido, check en verde,
+      archivo creado)

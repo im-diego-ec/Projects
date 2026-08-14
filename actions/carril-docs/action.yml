@@ -1,0 +1,250 @@
+name: Carril de docs
+description: >-
+  Detecta si un cambio toca SOLO rutas que no alteran lo que se sirve en
+  runtime, y lo publica como output `solo_docs` para saltar build, tests o
+  despliegue. Fail-open ruidoso: ante cualquier duda, solo_docs=false.
+author: la organización
+
+# ---------------------------------------------------------------------------
+# PERMISOS MINIMOS QUE DEBE CONCEDER EL CONSUMIDOR
+#
+#   modo pr  (pull_request / pull_request_target) y modo sha (workflow_run):
+#     permissions:
+#       contents: read
+#       pull-requests: read   # listar los archivos del PR y, en modo sha,
+#                             # resolver el PR asociado al commit
+#
+#   modo push:
+#     permissions:
+#       contents: read        # no hay llamadas a la API: es un git diff local
+#
+# POR QUE ESTA ESCRITO ACA: en otro repo esta deteccion nacio SIN
+# pull-requests:read. El token daba 403, el fail-open tapaba el error y el
+# carril rapido jamas actuo — en silencio, durante semanas. La leccion se
+# repitio en cada job nuevo (pull-requests:read primero, actions:read despues).
+# El marco la trae escrita para que no se vuelva a pagar.
+#
+# OJO: si el workflow declara un bloque `permissions:` (a nivel de workflow o
+# de job), ese bloque REEMPLAZA los permisos por defecto del token — hay que
+# listar contents:read explicitamente, no se hereda.
+#
+# REQUISITOS DEL JOB QUE LA USA
+#   modo pr / sha : ninguno. No necesita checkout (todo sale de la API).
+#   modo push     : actions/checkout con `fetch-depth: 0` ANTES de esta action;
+#                   sin el historial completo el commit anterior no esta en el
+#                   clon y la deteccion cae al fail-open.
+#   Runner con `gh` CLI (viene en todos los runners hospedados por GitHub).
+# ---------------------------------------------------------------------------
+
+inputs:
+  rutas-neutras:
+    description: >-
+      Lista de patrones (expresiones regulares ERE, uno por línea) de rutas que
+      NO alteran lo que se sirve en runtime. Las líneas en blanco y las que
+      empiezan con "#" se ignoran; el resto se une con "|" en un solo patrón.
+      Un cambio es solo_docs cuando TODOS sus archivos calzan con alguno.
+      El default replica el filtro que el marco trae de otro repo.
+      Nota sobre ^\.github/ — incluirlo significa que un cambio de workflows no
+      dispara build ni despliegue: es deliberado (el workflow nuevo se ejecuta
+      solo, en su propio run), pero un proyecto que genere artefactos desde
+      .github/ debe quitarlo de esta lista.
+    required: false
+    default: |
+      ^openspec/
+      \.md$
+      ^docs/
+      ^\.github/
+      ^infra/
+      ^infra-prod/
+  modo:
+    description: >-
+      Cómo obtener la lista de archivos del cambio.
+      "auto" (recomendado) decide por el evento: pull_request y
+      pull_request_target -> pr; workflow_run -> sha; push -> push.
+      "pr"   lista los archivos de un PR por número (correcto para merge,
+             squash y rebase, a diferencia de un diff de commits).
+      "sha"  resuelve el PR asociado a un commit y luego lista sus archivos
+             (el caso de un workflow_run disparado por el merge a main).
+      "push" compara contra el commit anterior con git diff.
+    required: false
+    default: auto
+  pr:
+    description: >-
+      Número de PR a inspeccionar. Vacío = se deduce del evento (modo pr) o del
+      commit (modo sha).
+    required: false
+    default: ""
+  sha:
+    description: >-
+      Commit a inspeccionar. Vacío = head_sha del workflow_run (modo sha) o
+      github.sha (modo push).
+    required: false
+    default: ""
+  base:
+    description: >-
+      Commit anterior con el que comparar en modo push. Vacío = github.event.before.
+    required: false
+    default: ""
+  token:
+    description: >-
+      Token para las llamadas a la API de GitHub. El default alcanza siempre que
+      el job conceda pull-requests: read.
+    required: false
+    default: ${{ github.token }}
+
+outputs:
+  solo_docs:
+    description: >-
+      "true" solo si TODOS los archivos del cambio calzan con rutas-neutras.
+      "false" en cualquier otro caso, incluido todo fail-open.
+    value: ${{ steps.detectar.outputs.solo_docs }}
+  motivo:
+    description: Frase corta con la razón de la decisión, apta para logs y para `if:`.
+    value: ${{ steps.detectar.outputs.motivo }}
+  total_archivos:
+    description: Cantidad de archivos que se evaluaron (0 en un fail-open).
+    value: ${{ steps.detectar.outputs.total_archivos }}
+  archivos:
+    description: Ruta al listado de archivos evaluados, uno por línea, dentro de RUNNER_TEMP.
+    value: ${{ steps.detectar.outputs.archivos }}
+
+runs:
+  using: composite
+  steps:
+    - id: detectar
+      shell: bash
+      env:
+        GH_TOKEN: ${{ inputs.token }}
+        RUTAS_NEUTRAS: ${{ inputs.rutas-neutras }}
+        MODO_IN: ${{ inputs.modo }}
+        PR_IN: ${{ inputs.pr }}
+        SHA_IN: ${{ inputs.sha }}
+        BASE_IN: ${{ inputs.base }}
+        EVENTO: ${{ github.event_name }}
+        PR_EVENTO: ${{ github.event.pull_request.number }}
+        SHA_WORKFLOW_RUN: ${{ github.event.workflow_run.head_sha }}
+        ANTES_PUSH: ${{ github.event.before }}
+      run: |
+        set -uo pipefail
+
+        LISTADO="${RUNNER_TEMP}/carril-docs-archivos.txt"
+        : > "$LISTADO"
+
+        # Fail-open RUIDOSO: ante cualquier duda el cambio se trata como codigo
+        # (solo_docs=false) y ademas se deja un ::warning:: visible en el run.
+        # Omitir build o deploy por un error de deteccion seria invisible y
+        # peligroso; correr de mas solo cuesta minutos de runner.
+        fail_open() {
+          echo "::warning::carril-docs: $1 -- se trata como cambio de codigo (fail-open)"
+          {
+            echo "solo_docs=false"
+            echo "motivo=fail-open: $1"
+            echo "total_archivos=0"
+            echo "archivos=${LISTADO}"
+          } >> "$GITHUB_OUTPUT"
+          echo "carril-docs: fail-open -- $1" >> "$GITHUB_STEP_SUMMARY"
+          exit 0
+        }
+
+        # --- patron de rutas neutras -----------------------------------------
+        PATRON=$(printf '%s\n' "$RUTAS_NEUTRAS" \
+          | grep -v '^[[:space:]]*#' \
+          | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//' \
+          | grep -v '^$' \
+          | paste -sd '|' -)
+        [ -n "$PATRON" ] || fail_open "la lista de rutas neutras quedo vacia"
+        echo "== rutas neutras =="
+        echo "$PATRON"
+
+        # --- de que evento sacamos los archivos ------------------------------
+        MODO="$MODO_IN"
+        if [ "$MODO" = "auto" ]; then
+          if [ -n "$PR_IN" ]; then
+            MODO=pr
+          else
+            case "$EVENTO" in
+              pull_request|pull_request_target) MODO=pr ;;
+              workflow_run)                     MODO=sha ;;
+              push)                             MODO=push ;;
+              *) fail_open "evento '${EVENTO}' no soportado por modo auto -- fija el input modo" ;;
+            esac
+          fi
+        fi
+
+        listar_pr() {
+          # La API del PR da los archivos EXACTOS del cambio, y vale igual para
+          # merge, squash y rebase -- un diff de commits no.
+          if ! gh api "repos/${GITHUB_REPOSITORY}/pulls/$1/files" \
+               --paginate --jq '.[].filename' > "$LISTADO"; then
+            fail_open "no se pudieron listar los archivos del PR #$1 (revisa permissions: pull-requests: read)"
+          fi
+        }
+
+        case "$MODO" in
+          pr)
+            NUM="${PR_IN:-${PR_EVENTO:-}}"
+            [ -n "$NUM" ] || fail_open "modo pr sin numero de PR (evento '${EVENTO}')"
+            listar_pr "$NUM"
+            ORIGEN="PR #${NUM}"
+            ;;
+          sha)
+            COMMIT="${SHA_IN:-${SHA_WORKFLOW_RUN:-${GITHUB_SHA}}}"
+            [ -n "$COMMIT" ] || fail_open "modo sha sin commit que inspeccionar"
+            NUM=$(gh api "repos/${GITHUB_REPOSITORY}/commits/${COMMIT}/pulls" --jq '.[0].number' 2>/dev/null || echo "")
+            if [ -z "$NUM" ] || [ "$NUM" = "null" ]; then
+              fail_open "sin PR asociado al commit ${COMMIT:0:12} (o sin permiso para consultarlo)"
+            fi
+            listar_pr "$NUM"
+            ORIGEN="PR #${NUM} (commit ${COMMIT:0:12})"
+            ;;
+          push)
+            ANTES="${BASE_IN:-${ANTES_PUSH:-}}"
+            HASTA="${SHA_IN:-${GITHUB_SHA}}"
+            case "$ANTES" in
+              ""|0000000000000000000000000000000000000000)
+                fail_open "push sin commit anterior (rama nueva o historial reescrito)" ;;
+            esac
+            git cat-file -e "${ANTES}^{commit}" 2>/dev/null \
+              || fail_open "el commit anterior ${ANTES:0:12} no esta en el clon (usa actions/checkout con fetch-depth: 0)"
+            git diff --name-only "$ANTES" "$HASTA" > "$LISTADO" \
+              || fail_open "git diff ${ANTES:0:12}..${HASTA:0:12} fallo"
+            ORIGEN="push ${ANTES:0:12}..${HASTA:0:12}"
+            ;;
+          *)
+            fail_open "modo '${MODO}' invalido (usa auto, pr, sha o push)" ;;
+        esac
+
+        echo "== archivos del cambio (${ORIGEN}) =="
+        cat "$LISTADO"
+        [ -s "$LISTADO" ] || fail_open "el cambio no listo ningun archivo (${ORIGEN})"
+        # grep -c (y no wc -l) cuenta bien la ultima linea aunque no termine en
+        # salto. Sin `|| echo 0` a proposito: ese fallback puede producir DOS
+        # lineas y un output multilinea rompe el formato clave=valor.
+        TOTAL=$(grep -c '' "$LISTADO")
+
+        # Un solo archivo fuera del patron basta para que el cambio sea codigo.
+        SOLO_DOCS=false
+        MOTIVO="hay archivos fuera de las rutas neutras (${ORIGEN})"
+        if ! grep -vE "$PATRON" "$LISTADO" | grep -q .; then
+          SOLO_DOCS=true
+          MOTIVO="todos los archivos calzan con las rutas neutras (${ORIGEN})"
+        fi
+
+        {
+          echo "solo_docs=${SOLO_DOCS}"
+          echo "motivo=${MOTIVO}"
+          echo "total_archivos=${TOTAL}"
+          echo "archivos=${LISTADO}"
+        } >> "$GITHUB_OUTPUT"
+
+        echo "solo_docs=${SOLO_DOCS} -- ${MOTIVO}"
+        if [ "$SOLO_DOCS" = "true" ]; then
+          echo "::notice::carril-docs: ${TOTAL} archivo(s), ninguno altera lo que se sirve -- se toma el carril rapido"
+        fi
+        {
+          echo "### Carril de docs"
+          echo ""
+          echo "- \`solo_docs\`: **${SOLO_DOCS}**"
+          echo "- Motivo: ${MOTIVO}"
+          echo "- Archivos evaluados: ${TOTAL}"
+        } >> "$GITHUB_STEP_SUMMARY"

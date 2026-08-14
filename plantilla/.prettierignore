@@ -1,0 +1,13 @@
+node_modules
+dist
+pnpm-lock.yaml
+
+# Generados: los reescribe una herramienta, formatearlos solo genera diffs.
+# Ajustar a los generados de este proyecto (cliente del ORM, componentes de UI).
+# {{PAQUETE_WEB}}/src/components/ui
+# {{PAQUETE_API}}/src/generated
+
+# El archive de OpenSpec es HISTORIA INMUTABLE: reformatearlo cambiaria
+# documentos que ya cerraron y ensuciaria el registro del porque. Los changes
+# activos y los specs vivos SI se formatean.
+openspec/changes/archive

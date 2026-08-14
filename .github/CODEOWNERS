@@ -1,0 +1,38 @@
+# CODEOWNERS de PROJECTS — automatiza el REVIEW CRUZADO entre builders y el gate
+# del PO sobre los contratos del marco. Los roles y su alcance estan en
+# AGENTS.md; el reparto vigente se fijo el 2026-08-13.
+#
+# Mecanica clave: GitHub solicita review a todos los owners EXCEPTO el autor
+# del PR. Con AMBOS builders como owners de todo, el PR de un builder
+# auto-asigna al otro — "el que no escribio, revisa", sin automatizacion
+# custom.
+#
+# OJO: este archivo es la gobernanza de ESTE repo. El CODEOWNERS que reciben
+# los proyectos es otro y vive en plantilla/, con los handles parametrizados
+# por rol ({{BUILDER_1}}, {{BUILDER_2}}, {{PO}}). Aca van handles REALES a
+# proposito: es la unica excepcion a "nada de nombres propios en el marco",
+# porque un placeholder sin sustituir —o un handle mal escrito— no falla:
+# GitHub simplemente no asigna a nadie y Projects se queda sin el review
+# automatico que promete. Cuando un rol cambie de persona, se cambia el handle
+# aca y en el ruleset, no en la prosa de los demas archivos.
+#
+# Enforcement duro (required_approving_review_count=1 +
+# require_code_owner_review en el ruleset que protege main): se aplica como
+# acto humano deliberado al crear el repo y se documenta en .github/ con su
+# estado real — reglas activas, check requerido por su nombre exacto y lo que
+# quede diferido con su issue.
+
+*                                  @builder-uno @builder-dos
+
+# El PO es el UNICO owner de los contratos del marco: la ultima regla que
+# matchea REEMPLAZA a los owners (no suma), asi que en estas rutas el reviewer
+# auto-asignado es el PO — y con el enforcement duro activo, su aprobacion es
+# EL gate, sin que un builder pueda satisfacerlo por el. Los builders igual
+# quedan asignados via el resto de archivos del mismo PR (design, tasks,
+# workflows, scaffold).
+#
+# Por que los specs y los proposals y no el resto: son el QUE y el POR QUE del
+# marco. El COMO (workflows, actions, plantilla) es territorio de builders.
+/openspec/specs/                   @po
+/openspec/changes/**/proposal.md   @po
+/openspec/changes/**/specs/        @po
