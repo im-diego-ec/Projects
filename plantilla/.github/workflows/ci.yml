@@ -1,0 +1,87 @@
+name: CI
+
+# ---------------------------------------------------------------------------
+# CI de {{PROYECTO}}. Este archivo es la UNICA pieza de CI que el scaffold
+# copia: es un llamador delgado. La MECANICA del marco (deteccion del carril
+# de docs, guardrail de deltas de OpenSpec, validacion estricta) NO vive aca —
+# se consume por referencia desde Projects, asi un arreglo alla llega a este repo
+# sin abrir un PR aca.
+#
+# Regla dura del marco: este repo NO copia el workflow reusable para editarlo.
+# Si le falta algo, o es un input que hay que agregar en Projects, o es un change
+# de OpenSpec en Projects. Ver AGENTS.md.
+#
+# HUECO A LLENAR AL CREAR EL PROYECTO: los pasos de build_test son del
+# producto. Estan escritos con los scripts que el marco da por hechos
+# (pnpm lint / typecheck / test / build); ajustalos al stack fijado en
+# AGENTS.md y borra este parrafo cuando quede hecho.
+# ---------------------------------------------------------------------------
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# OBLIGATORIO y no decorativo: un workflow reusable NUNCA recibe mas permisos
+# que los que le concede quien lo llama. Sin pull-requests:read el job de
+# deteccion del carril de docs no puede listar los archivos del PR, cae al
+# fail-open y el carril rapido no actua nunca (incidente del 2026-08-05).
+permissions:
+  contents: read
+  pull-requests: read
+
+# Un PR que recibe varios pushes no necesita corridas viejas compitiendo.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # Lo que hereda del marco: carril de docs + OpenSpec (guardrail y --strict).
+  marco:
+    # Entre comillas a proposito: sin ellas, el placeholder de doble llave hace
+    # que YAML lea un mapa en flujo y el archivo no parsea antes de sustituirlo.
+    uses: "{{ORG}}/Projects/.github/workflows/marco-ci.yml@v1"
+
+  # Lo del producto. Se omite cuando el cambio no altera lo que se sirve.
+  build_test:
+    name: build-test
+    needs: marco
+    if: needs.marco.outputs.solo_docs == 'false'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      # corepack en vez de una action de terceros: menos superficie que auditar
+      # y una dependencia menos que pinear por SHA.
+      - run: corepack enable
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "22"
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm lint
+      - run: pnpm format:check
+      - run: pnpm -r typecheck
+      - run: pnpm -r test
+      - run: pnpm -r build
+
+  # EL CHECK REQUERIDO POR EL RULESET DE main ES ESTE (nombre exacto: "ci-ok").
+  #
+  # No puede ser build-test: en el carril de docs queda "skipped" y un check
+  # omitido NO REPORTA NUNCA, asi que el ruleset esperaria para siempre una
+  # senal que no llega (paso de verdad, una semana entera, en el repo de
+  # origen). ci-ok reporta en AMBOS carriles gracias a if: always().
+  ci_ok:
+    name: ci-ok
+    needs: [marco, build_test]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Veredicto
+        shell: bash
+        run: |
+          [ "${{ needs.marco.result }}" = "success" ] || { echo "::error::el CI de marco fallo"; exit 1; }
+          if [ "${{ needs.build_test.result }}" = "success" ]; then exit 0; fi
+          if [ "${{ needs.build_test.result }}" = "skipped" ] && [ "${{ needs.marco.outputs.solo_docs }}" = "true" ]; then
+            echo "solo docs: build-test omitido a proposito"; exit 0
+          fi
+          echo "::error::build-test termino en '${{ needs.build_test.result }}'"; exit 1

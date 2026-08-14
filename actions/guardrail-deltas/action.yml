@@ -1,0 +1,62 @@
+name: Guardrail de deltas de OpenSpec
+description: >-
+  Falla si un bloque "## MODIFIED Requirements" perdería escenarios del spec
+  vigente al archivar, o si modifica un requirement que no existe en él.
+author: la organización
+
+# ---------------------------------------------------------------------------
+# PERMISOS MINIMOS QUE DEBE CONCEDER EL CONSUMIDOR
+#
+#   permissions:
+#     contents: read   # el checkout previo; esta action no llama a la API
+#
+# No necesita pull-requests ni actions: todo el analisis es de archivos ya
+# clonados. Si el workflow declara `permissions` a nivel de workflow y no
+# concede contents:read, falla el checkout, no esta action.
+#
+# REQUISITOS DEL JOB QUE LA USA
+#   1. actions/checkout ANTES de esta action (lee openspec/ del working dir).
+#      Basta el checkout por defecto: no necesita historial (fetch-depth: 0).
+#   2. Nada mas. No instala dependencias del repo ni toca la red.
+# ---------------------------------------------------------------------------
+
+inputs:
+  directorio-changes:
+    description: Carpeta de changes de OpenSpec, relativa a la raíz del checkout.
+    required: false
+    default: openspec/changes
+  directorio-specs:
+    description: Carpeta de specs vigentes de OpenSpec, relativa a la raíz del checkout.
+    required: false
+    default: openspec/specs
+  instalar-node:
+    description: >-
+      "true" para instalar Node con actions/setup-node. Ponlo en "false" si el
+      job ya hizo su propio setup-node y no quieres pagarlo dos veces.
+    required: false
+    default: "true"
+  version-node:
+    description: Versión de Node a instalar cuando instalar-node es "true".
+    required: false
+    default: "22"
+
+runs:
+  using: composite
+  steps:
+    # El guardrail es un script sin dependencias: alcanza con un Node moderno.
+    # No hay pnpm install ni build; corre en segundos incluso en un repo grande.
+    - name: Node para el guardrail
+      if: inputs.instalar-node == 'true'
+      uses: actions/setup-node@v7
+      with:
+        node-version: ${{ inputs.version-node }}
+
+    - name: Deltas de OpenSpec sin perdida de escenarios
+      shell: bash
+      env:
+        OPENSPEC_CHANGES: ${{ inputs.directorio-changes }}
+        OPENSPEC_SPECS: ${{ inputs.directorio-specs }}
+      # GITHUB_ACTION_PATH apunta a la copia de ESTA action (projects), no al repo
+      # del consumidor: por eso el script viaja con la action y el proyecto no
+      # vendora ninguna copia que se pueda quedar vieja.
+      run: node "${GITHUB_ACTION_PATH}/check-openspec-deltas.mjs"

@@ -1,0 +1,50 @@
+# Dependabot — actualizaciones automaticas de dependencias.
+# Politica del marco (ver fronteras ⚠️ en AGENTS.md): cada ecosistema abre PRs
+# semanales; minor+patch llegan AGRUPADOS en un solo PR para no inundar y los
+# mergea cualquier builder con la promocion en verde. Los majors llegan SOLOS
+# porque pueden romper: sesion dedicada, orden de riesgo (devDeps -> runtime ->
+# auth) y verificacion real en dev antes de prod. Sin auto-merge en ningun caso.
+version: 2
+updates:
+  - package-ecosystem: "npm"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    open-pull-requests-limit: 5
+    groups:
+      minor-y-patch:
+        update-types: ["minor", "patch"]
+
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    groups:
+      actions:
+        patterns: ["*"]
+
+  - package-ecosystem: "docker"
+    directory: "/{{PAQUETE_API}}"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    ignore:
+      # Solo se ignoran las versiones IMPARES de node (no-LTS, soporte corto).
+      # Las PARES (LTS) SI llegan como PR automatico — la deteccion no se apaga,
+      # se filtra. Ajustar la lista si el proyecto arranca en otra mayor.
+      - dependency-name: "node"
+        versions: ["23-slim", "25-slim", "27-slim", "29-slim"]
+
+  - package-ecosystem: "terraform"
+    directory: "/infra"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+
+  - package-ecosystem: "terraform"
+    directory: "/infra-prod"
+    schedule:
+      interval: "weekly"
+      day: "monday"

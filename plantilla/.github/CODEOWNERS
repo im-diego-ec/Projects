@@ -1,0 +1,23 @@
+# CODEOWNERS — automatiza el REVIEW CRUZADO entre builders y el gate del PO.
+# Los roles y su alcance estan en AGENTS.md (seccion "Como trabajamos: OpenSpec").
+#
+# Mecanica clave: GitHub solicita review a todos los owners EXCEPTO el autor del
+# PR. Con AMBOS builders como owners de todo, un PR de {{BUILDER_1}} auto-asigna
+# a {{BUILDER_2}} y uno de {{BUILDER_2}} auto-asigna a {{BUILDER_1}} — "el que no
+# escribio, revisa", sin automatizacion custom.
+#
+# Enforcement duro (required_approving_review_count=1 +
+# require_code_owner_review + required_signatures en el ruleset de main): se
+# activa al crear el repo. Sin eso, CODEOWNERS solo sugiere reviewers; con eso,
+# el review cruzado es una condicion de merge.
+
+*                       @{{BUILDER_1}} @{{BUILDER_2}}
+
+# El PO es el UNICO owner de los contratos de negocio: la ultima regla que
+# matchea REEMPLAZA a los owners (no suma), asi que en estas rutas el reviewer
+# auto-asignado es el PO — y con el enforcement duro activo, su aprobacion es EL
+# gate del PO, sin que un builder pueda satisfacerlo por el. Los builders igual
+# quedan asignados via el resto de archivos del mismo PR (design, tasks, codigo).
+/openspec/changes/**/proposal.md   @{{PO}}
+/openspec/changes/**/specs/        @{{PO}}
+/openspec/specs/                   @{{PO}}

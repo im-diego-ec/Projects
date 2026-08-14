@@ -1,0 +1,48 @@
+# Dependencias y artefactos de build
+node_modules
+dist
+build
+*.tsbuildinfo
+coverage
+
+# Entorno local y ruido del sistema
+.env
+.env.local
+.env.production
+*.log
+.DS_Store
+.idea
+
+# Terraform: estado, plan y tfvars NUNCA se versionan (llevan valores reales
+# y a veces secretos). El .terraform.lock.hcl SI se versiona: fija providers.
+infra/.terraform
+infra/*.tfstate*
+infra/*.tfvars
+infra/tfplan*
+infra-prod/.terraform
+infra-prod/*.tfstate*
+infra-prod/*.tfvars
+infra-prod/tfplan*
+
+# Claude Code: config por maquina y estado de runtime.
+# (.claude/settings.json SI se versiona: es el allowlist del equipo)
+# Sin estas reglas cada quien las repite en .git/info/exclude de su maquina;
+# aqui las hereda todo el equipo.
+**/.claude/settings.local.json
+**/.claude/scheduled_tasks.lock
+**/.claude/scheduled_tasks.json
+**/.claude/routines/.state/
+**/.claude/worktrees/
+**/.claude/checkpoints/
+**/.claude/mailbox/
+**/.claude/agent-registry.json
+**/.claude/agent-memory-local
+**/.claude/first-run
+**/.claude/assistant-daemon-state.json
+
+# Lockfile espurio: en un workspace pnpm el unico lockfile valido es el de la
+# raiz. Uno dentro de un paquete lo genera un `pnpm install` corrido ahi y hace
+# que local y CI resuelvan dependencias distinto. Se ignora en cualquier nivel
+# y se reincorpora solo el de la raiz (el orden importa: la negacion va despues).
+**/pnpm-lock.yaml
+!/pnpm-lock.yaml

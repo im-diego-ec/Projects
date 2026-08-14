@@ -1,0 +1,45 @@
+# .gitignore de PROJECTS (el repo del marco).
+#
+# OJO: este NO es el .gitignore que reciben los proyectos — ese es un archivo
+# de scaffold y vive en plantilla/.
+#
+# Projects no tiene codigo de aplicacion: casi todo lo versionado es texto
+# (workflows, actions, plantilla, specs, docs). Por eso la lista es corta a
+# proposito. Antes de agregar un patron amplio, verificar que no matchee nada
+# dentro de plantilla/: un archivo de scaffold que deja de versionarse hace que
+# los proyectos nuevos nazcan incompletos, y el hueco no se nota hasta el
+# bootstrap siguiente. Contraprueba: `git check-ignore -v plantilla/<archivo>`.
+#
+# Nota de git, por si plantilla/ trae su propio .gitignore: ese archivo tambien
+# rige sobre plantilla/ DENTRO de este repo, no solo en el proyecto destino.
+
+# Tooling interno del repo (validadores, scripts de bootstrap)
+node_modules/
+*.log
+npm-debug.log*
+pnpm-debug.log*
+*.tsbuildinfo
+
+# Entornos locales. .env.example NO matchea estos patrones (se versiona).
+.env
+.env.local
+
+# Sistema operativo y editores
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+
+# Claude Code: config por maquina y estado de runtime.
+# (.claude/settings.json SI se versiona: es el allowlist del equipo)
+**/.claude/settings.local.json
+**/.claude/scheduled_tasks.lock
+**/.claude/scheduled_tasks.json
+**/.claude/routines/.state/
+**/.claude/worktrees/
+**/.claude/checkpoints/
+**/.claude/mailbox/
+**/.claude/agent-registry.json
+**/.claude/agent-memory-local
+**/.claude/first-run
+**/.claude/assistant-daemon-state.json

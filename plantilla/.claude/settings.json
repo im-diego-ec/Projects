@@ -1,0 +1,32 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npx --yes @fission-ai/openspec@1.9.0 validate *)",
+      "Bash(npx --yes @fission-ai/openspec@1.9.0 list)",
+      "Bash(npx --yes @fission-ai/openspec@1.9.0 list *)",
+      "Bash(npx --yes @fission-ai/openspec@1.9.0 status *)",
+      "Bash(npx --yes @fission-ai/openspec@1.9.0 show *)",
+      "Bash(pnpm lint)",
+      "Bash(pnpm format:check)",
+      "Bash(pnpm --filter {{PAQUETE_API}} lint)",
+      "Bash(pnpm --filter {{PAQUETE_API}} typecheck)",
+      "Bash(pnpm --filter {{PAQUETE_API}} test *)",
+      "Bash(pnpm --filter {{PAQUETE_WEB}} lint)",
+      "Bash(pnpm --filter {{PAQUETE_WEB}} typecheck)",
+      "Bash(pnpm --filter {{PAQUETE_WEB}} test *)",
+      "Bash(pnpm --filter {{PAQUETE_WEB}} build)",
+      "Bash(terraform validate)",
+      "Bash(terraform validate *)",
+      "Bash(terraform fmt -check *)",
+      "Bash(AWS_PROFILE={{PERFIL_DEV}} terraform plan *)",
+      "Bash(AWS_PROFILE={{PERFIL_PROD}} terraform plan *)",
+      "Bash(git fetch *)",
+      "Bash(gh run watch *)",
+      "mcp__{{ID_MCP_SLACK}}__slack_read_channel",
+      "mcp__{{ID_MCP_SLACK}}__slack_read_thread",
+      "mcp__{{ID_MCP_SLACK}}__slack_search_users",
+      "mcp__{{ID_MCP_SLACK}}__slack_search_channels",
+      "mcp__{{ID_MCP_SLACK}}__slack_read_file"
+    ]
+  }
+}
