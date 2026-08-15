@@ -1,23 +1,31 @@
 # CODEOWNERS — automatiza el REVIEW CRUZADO entre builders y el gate del PO.
 # Los roles y su alcance estan en AGENTS.md (seccion "Como trabajamos: OpenSpec").
 #
-# Mecanica clave: GitHub solicita review a todos los owners EXCEPTO el autor del
-# PR. Con AMBOS builders como owners de todo, un PR de {{BUILDER_1}} auto-asigna
-# a {{BUILDER_2}} y uno de {{BUILDER_2}} auto-asigna a {{BUILDER_1}} — "el que no
-# escribio, revisa", sin automatizacion custom.
+# Se usan EQUIPOS de la organizacion, no handles personales, por tres razones:
+# sobreviven a que un rol cambie de persona (se edita el equipo, no N archivos
+# en N repos); no filtran nombres propios al scaffold; y un equipo vacio o mal
+# escrito se nota, mientras que un handle mal escrito falla en silencio —
+# GitHub simplemente no asigna a nadie y el review cruzado desaparece sin ruido.
 #
-# Enforcement duro (required_approving_review_count=1 +
-# require_code_owner_review + required_signatures en el ruleset de main): se
-# activa al crear el repo. Sin eso, CODEOWNERS solo sugiere reviewers; con eso,
-# el review cruzado es una condicion de merge.
+# REQUISITO: los equipos deben tener acceso de ESCRITURA al repo. Un equipo sin
+# permiso de escritura NO puede ser code owner: GitHub lo ignora y, otra vez, el
+# review cruzado se pierde sin avisar.
+#
+# Mecanica clave: GitHub solicita review a los owners EXCEPTO el autor del PR.
+# Con el equipo de builders como owner de todo, el PR de un builder auto-asigna
+# a los demas builders — "el que no escribio, revisa", sin automatizacion custom.
 
-*                       @{{BUILDER_1}} @{{BUILDER_2}}
+*                                  @{{ORG}}/{{EQUIPO_BUILDERS}}
 
 # El PO es el UNICO owner de los contratos de negocio: la ultima regla que
 # matchea REEMPLAZA a los owners (no suma), asi que en estas rutas el reviewer
 # auto-asignado es el PO — y con el enforcement duro activo, su aprobacion es EL
-# gate del PO, sin que un builder pueda satisfacerlo por el. Los builders igual
-# quedan asignados via el resto de archivos del mismo PR (design, tasks, codigo).
-/openspec/changes/**/proposal.md   @{{PO}}
-/openspec/changes/**/specs/        @{{PO}}
-/openspec/specs/                   @{{PO}}
+# gate del PO, sin que un builder pueda satisfacerlo por el.
+#
+# Por eso mismo el PO NO debe ser miembro del equipo de builders: si lo fuera,
+# podria satisfacer su propio gate desde el otro rol y la separacion se cae.
+# Los builders igual quedan asignados via el resto de archivos del mismo PR
+# (design, tasks, codigo).
+/openspec/changes/**/proposal.md   @{{ORG}}/{{EQUIPO_PO}}
+/openspec/changes/**/specs/        @{{ORG}}/{{EQUIPO_PO}}
+/openspec/specs/                   @{{ORG}}/{{EQUIPO_PO}}

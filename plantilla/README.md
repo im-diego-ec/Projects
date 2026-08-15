@@ -81,13 +81,30 @@ cuál paquete corre en Node y cuál en el navegador.
 
 | Placeholder | Qué poner |
 |---|---|
+| `{{EQUIPO_BUILDERS}}` | Slug del **equipo** de builders en la organización (ej. `builders`). Se usa en `CODEOWNERS` |
+| `{{EQUIPO_PO}}` | Slug del **equipo** del PO (ej. `po`). Se usa en `CODEOWNERS` |
 | `{{BUILDER_1}}` | Handle de GitHub del builder que sostiene **la llave de producción**: su OK explícito es obligatorio para toda escritura en prod |
 | `{{BUILDER_2}}` | Handle del otro builder (el review cruzado es simétrico entre ambos) |
 | `{{PO}}` | Handle del PO: dueño de proposals y specs |
 
-El orden de los builders no es cosmético — `{{BUILDER_1}}` aparece en las fronteras 🛑 y en
-el checklist del PR como el que autoriza producción. Si esa autoridad cambia de persona, se
-cambia el handle en `AGENTS.md` y en `.github/PULL_REQUEST_TEMPLATE.md`.
+**Equipos en `CODEOWNERS`, handles en la prosa**, y la distinción tiene motivo. La
+asignación automática de reviewers va por equipo: sobrevive a que un rol cambie de persona
+(se edita el equipo, no N archivos en N repos) y su composición es auditable en un solo
+lugar. La prosa, en cambio, necesita nombrar a alguien concreto: "el OK de un equipo" no
+es una autoridad, "el OK de @fulano" sí.
+
+Dos condiciones que **fallan en silencio** si no se cumplen, así que conviene verificarlas:
+
+- Los equipos deben tener **acceso de escritura** al repo. Sin eso GitHub los ignora como
+  code owners y no avisa nada — el review cruzado desaparece sin ruido.
+  Verificá con `gh api repos/{{ORG}}/{{PROYECTO}}/teams --jq '.[] | "\(.slug): \(.permission)"'`.
+- El PO **no debe ser miembro del equipo de builders**. Si lo fuera, podría satisfacer su
+  propio gate desde el otro rol y la separación se cae. Ojo: quien crea un equipo por API
+  queda dentro automáticamente.
+
+El orden de los builders tampoco es cosmético — `{{BUILDER_1}}` aparece en las fronteras 🛑
+y en el checklist del PR como el que autoriza producción. Si esa autoridad cambia de
+persona, se cambia el handle en `AGENTS.md` y en `.github/PULL_REQUEST_TEMPLATE.md`.
 
 ### AWS
 
