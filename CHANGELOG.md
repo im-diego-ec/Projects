@@ -40,6 +40,22 @@ del área. Nada de esto está publicado todavía — **no existe aún el tag `v1
 así que ningún proyecto lo consume: hasta que la Fase 1 cierre con `v1.0.0`, el
 único consumidor es el propio repo.
 
+### Cambiado — decisiones del PO sobre el bootstrap (2026-08-14)
+
+- **`CODEOWNERS` pasa a equipos de la organización** en vez de handles
+  personales, acá y en el scaffold: `@{{ORG}}/{{EQUIPO_BUILDERS}}` sobre todo y
+  `@{{ORG}}/{{EQUIPO_PO}}` sobre los contratos. Sobrevive a que un rol cambie de
+  persona, saca los nombres propios del marco y hace auditable la composición en
+  un solo lugar. Se documentan las dos condiciones que **fallan en silencio**:
+  el equipo necesita acceso de **escritura** o GitHub lo ignora como code owner
+  sin avisar, y el PO **no** debe pertenecer al equipo de builders o podría
+  satisfacer su propio gate (quien crea un equipo por API queda dentro
+  automáticamente — pasó, y se corrigió).
+- **pnpm queda fijado por el marco**, junto a Terraform y GitHub Actions: deja
+  de ser un hueco 🕳️ del scaffold. El CI que trae la plantilla lo ejecuta
+  directamente y el marco depende de una propiedad concreta del workspace —un
+  único lockfile en la raíz— que el `.gitignore` del scaffold ya protege.
+
 ### Añadido — la casa (raíz del repo)
 
 - `README.md`: qué es Projects, por qué existe —con la tabla de incidentes reales
