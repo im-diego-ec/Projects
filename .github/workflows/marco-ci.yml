@@ -101,42 +101,11 @@ on:
           ^\.github/
           ^infra/
           ^infra-prod/
-      ruta_guardrail:
-        description: >-
-          Ruta del script del guardrail de deltas, relativa a la raiz del REPO
-          DEL MARCO (ahi vive la copia canonica, junto a la composite action
-          que lo empaqueta). Se resuelve primero contra el marco; si el
-          checkout del marco falla, se busca la MISMA ruta dentro del repo
-          consumidor como respaldo ruidoso. Cambiar este default rompe el
-          dogfooding: el CI de Projects exige que el archivo exista aca.
-        type: string
-        required: false
-        default: actions/guardrail-deltas/check-openspec-deltas.mjs
-      repo_marco:
-        description: Repo del marco de donde se trae el guardrail canonico.
-        type: string
-        required: false
-        default: im-diego-ec/Projects
-      ref_marco:
-        description: >-
-          Ref del marco a usar para el guardrail. Vacio (default) = el mismo
-          commit del marco que provee ESTE workflow (github.job_workflow_sha),
-          asi el script y el workflow nunca quedan desfasados.
-        type: string
-        required: false
-        default: ""
       runner:
         description: Runner para todos los jobs de marco.
         type: string
         required: false
         default: ubuntu-latest
-    secrets:
-      token_marco:
-        description: >-
-          Solo si el repo del marco es privado: token con lectura sobre el.
-          Sin esto el checkout del marco da 403, se avisa con ::warning y se
-          cae al respaldo local del guardrail.
-        required: false
     outputs:
       solo_docs:
         description: >-
@@ -258,29 +227,6 @@ jobs:
       - name: Checkout del repo consumidor
         uses: actions/checkout@v7
 
-      # El guardrail es CANONICO del marco: se trae desde el repo del marco, no
-      # de una copia por proyecto que se desactualiza sola. Si el marco es
-      # privado y no hay token, esto falla y el paso siguiente avisa fuerte y
-      # cae al respaldo local — nunca se saltea la verificacion en silencio.
-      #
-      # Se trae UNICAMENTE el archivo del guardrail (sparse sin cone), por dos
-      # razones: no arrastrar el openspec/ del marco al workspace del proyecto
-      # —dos arboles de specs en el mismo checkout confunden al validador— y no
-      # pagar el clon completo. CONTRATO: el guardrail tiene que ser un script
-      # autocontenido, sin imports de otros archivos del marco.
-      - name: Checkout del marco (fuente canonica del guardrail)
-        if: github.repository != inputs.repo_marco
-        continue-on-error: true
-        uses: actions/checkout@v7
-        with:
-          repository: ${{ inputs.repo_marco }}
-          ref: ${{ inputs.ref_marco != '' && inputs.ref_marco || github.job_workflow_sha }}
-          path: .marco
-          persist-credentials: false
-          token: ${{ secrets.token_marco || github.token }}
-          sparse-checkout: ${{ inputs.ruta_guardrail }}
-          sparse-checkout-cone-mode: false
-
       - uses: actions/setup-node@v7
         with: { node-version: "${{ inputs.version_node }}" }
 
@@ -292,40 +238,26 @@ jobs:
             exit 1
           }
 
-      - name: Resolver el guardrail de deltas
-        id: guardrail
-        shell: bash
-        env:
-          RUTA: ${{ inputs.ruta_guardrail }}
-          REPO_MARCO: ${{ inputs.repo_marco }}
-          REF_MARCO: ${{ inputs.ref_marco }}
-        run: |
-          # Solo DOS fuentes posibles, ambas canonicas. No hay respaldo con la
-          # copia local del consumidor a proposito: un guardrail viejo que pasa
-          # en verde es peor que uno ausente que falla — daria por verificado un
-          # delta que la version nueva si habria cazado. Si el marco no se puede
-          # traer, esto se rompe fuerte y dice exactamente como arreglarlo.
-          if [ "${GITHUB_REPOSITORY}" = "${REPO_MARCO}" ] && [ -f "${RUTA}" ]; then
-            # Dogfooding: el marco se valida contra la copia del propio PR.
-            echo "el marco corre su propia copia del guardrail: ${RUTA}"
-            echo "script=${RUTA}" >> "$GITHUB_OUTPUT"
-          elif [ -f ".marco/${RUTA}" ]; then
-            echo "guardrail canonico desde ${REPO_MARCO}: .marco/${RUTA}"
-            echo "script=.marco/${RUTA}" >> "$GITHUB_OUTPUT"
-          else
-            echo "::error::no se pudo traer el guardrail canonico (${RUTA}) desde ${REPO_MARCO}."
-            echo "::error::Revisar, en este orden: (1) que el repo del marco tenga Settings -> Actions -> General -> Access = 'Accessible from repositories in the organization'; (2) si el marco es privado, pasar el secret token_marco con un PAT que lo lea; (3) que la ref '${REF_MARCO:-<sha del workflow>}' exista y contenga ese archivo."
-            exit 1
-          fi
-
       # Un bloque "## MODIFIED Requirements" REEMPLAZA al requirement completo
       # en el spec vigente al archivar: si el delta omite un escenario que el
       # spec ya tenia, ese escenario se BORRA. Paso el 2026-07-31 y lo atrapo
       # la herramienta recien en el ultimo paso del change; aca se detecta en
       # cada PR, sin depender de que alguien se acuerde de mirarlo.
+      #
+      # El guardrail viaja como composite action del marco: GitHub la descarga
+      # igual que a este workflow, resolviendola por la configuracion de Actions
+      # de la organizacion. NO se hace checkout del repo del marco — el
+      # GITHUB_TOKEN del consumidor no tiene lectura sobre otro repo y daria 404
+      # (comprobado el 2026-08-14 en la validacion de Fase 2). El script viaja
+      # DENTRO de la action, asi que ningun proyecto vendora una copia que se
+      # pueda quedar vieja.
+      #
+      # La ref es literal por obligacion: GitHub NO admite expresiones en el
+      # campo "uses". Cuando exista el tag pasa a @v1 y se sube con el release.
       - name: Deltas de OpenSpec sin perdida de escenarios
-        shell: bash
-        run: node "${{ steps.guardrail.outputs.script }}"
+        uses: im-diego-ec/Projects/actions/guardrail-deltas@main
+        with:
+          instalar-node: "false"
 
       - name: Validacion estricta de changes y specs
         shell: bash
