@@ -35,10 +35,40 @@ mueve sobre un cambio incompatible.
 
 ## [No publicado]
 
-Bootstrap del repositorio: Projects nace como repo propio del marco de ingeniería
-del área. Nada de esto está publicado todavía — **no existe aún el tag `v1`**,
-así que ningún proyecto lo consume: hasta que la Fase 1 cierre con `v1.0.0`, el
-único consumidor es el propio repo.
+Nada todavía.
+
+---
+
+## [1.0.0] — 2026-08-17
+
+**Primera versión publicada del marco.** A partir de acá los proyectos lo
+consumen con `uses: im-diego-ec/Projects/...@v1`, y `v1` es un tag
+**móvil**: apunta siempre a la última `1.x`.
+
+Validado contra un consumidor real antes de publicarse: `un-proyecto-anterior`
+reemplazó sus jobs de marco por el reusable y quedó verde de punta a punta —los
+tres jobs del marco más su `build-test` completo (Postgres, Prisma, lint,
+typecheck, tests y builds)—. Esa validación encontró y corrigió un defecto de
+diseño antes del tag; está abajo, en *Corregido*.
+
+### Corregido
+
+- **El guardrail de deltas viaja como composite action, no por `checkout`.** El
+  reusable hacía `actions/checkout` del repo del marco para traerse el script y
+  fallaba con `Not Found`: el `GITHUB_TOKEN` de un consumidor **no tiene lectura
+  sobre otro repo**, ni dentro de la misma organización. En la misma corrida el
+  job de detección sí pasó, lo que reveló la regla general: **el `uses:` de un
+  workflow o de una action en repo privado se resuelve por la configuración de
+  Actions de la organización, sin token; `checkout` no**. Consecuencia para el
+  consumidor: **no hace falta crear ningún PAT** — desaparecen los inputs
+  `ruta_guardrail`, `repo_marco` y `ref_marco`, y el secret `token_marco`.
+
+### Para consumidores
+
+Un proyecto nuevo nace del scaffold (`plantilla/`). Uno existente reemplaza sus
+jobs de marco por una llamada al reusable y conserva el nombre de su check
+agregado —el que exige la protección de rama— para no dejar `main` esperando una
+señal que ya no existe.
 
 ### Cambiado — decisiones del PO sobre el bootstrap (2026-08-14)
 
@@ -138,6 +168,3 @@ El marco se destila del estado **actual** de `un-proyecto-anterior` (primer comm
 del README los enumera con fecha— y esa trazabilidad es un requisito, no un
 adorno: el post-mortem es el proposal del change que crea el guardrail.
 
-### Para consumidores
-
-Nada que hacer. No hay versión publicada.
