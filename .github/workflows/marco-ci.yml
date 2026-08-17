@@ -253,9 +253,11 @@ jobs:
       # pueda quedar vieja.
       #
       # La ref es literal por obligacion: GitHub NO admite expresiones en el
-      # campo "uses". Cuando exista el tag pasa a @v1 y se sube con el release.
+      # campo "uses". Apunta a @v1 —el mismo tag movil que consumen los
+      # proyectos— asi la action y este workflow avanzan juntos y no hay que
+      # tocar esta linea en cada release.
       - name: Deltas de OpenSpec sin perdida de escenarios
-        uses: im-diego-ec/Projects/actions/guardrail-deltas@main
+        uses: im-diego-ec/Projects/actions/guardrail-deltas@v1
         with:
           instalar-node: "false"
 
