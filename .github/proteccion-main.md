@@ -8,21 +8,25 @@ Projects. El equivalente para los proyectos se copia del scaffold
 
 ## Estado real
 
+Ruleset **`main-protegida`**, id `20876718`, `enforcement: active` desde el
+2026-08-14, aplicado por Builder 1.
+
 | Regla | Estado | Nota |
 |---|---|---|
-| Requiere pull request para integrar | 🔴 pendiente | Se activa al publicar el repo en la organización |
-| 1 aprobación requerida | 🔴 pendiente | |
-| Review de code owner requerido | 🔴 pendiente | Es lo que convierte [`CODEOWNERS`](CODEOWNERS) en gate: sin esto solo sugiere reviewers |
-| Check requerido: **`ci-ok`** | 🔴 pendiente | Nombre exacto. Ver abajo por qué no puede ser otro |
-| Rama al día antes del merge | 🔴 pendiente | |
-| Commits firmados | 🔴 pendiente | |
-| Prohibido force-push y borrado de `main` | 🔴 pendiente | |
-| Sin bypass para nadie (admins incluidos) | 🔴 pendiente | Cualquier excepción que se conceda se escribe acá con su motivo |
+| Requiere pull request para integrar | 🟢 activa | Nada entra a `main` por push directo |
+| Check requerido: **`ci-ok`** | 🟢 activa | Nombre exacto. Ver abajo por qué no puede ser otro |
+| Rama al día antes del merge | 🟢 activa | `strict_required_status_checks_policy` |
+| Prohibido force-push y borrado de `main` | 🟢 activa | Reglas `non_fast_forward` y `deletion` |
+| Sin bypass para nadie (admins incluidos) | 🟢 activa | `bypass_actors` vacío. Cualquier excepción que se conceda se escribe acá con su motivo |
+| 1 aprobación requerida | 🔴 diferida | Hoy en `0`. Con un solo builder operativo bloquearía los merges del día a día; se activa cuando el equipo esté en el flujo de review |
+| Review de code owner requerido | 🔴 diferida | Hoy en `false`. Es lo que convierte [`CODEOWNERS`](CODEOWNERS) en gate real: sin esto solo sugiere reviewers. Va junto con la fila de arriba |
+| Commits firmados | 🔴 no configurada | Requiere GPG operativo en todas las máquinas del equipo |
 
-**Por qué todo está pendiente:** el repo todavía no tiene commits ni existe en la
-organización; la Fase 1 lo crea. Este documento se actualiza en el **mismo PR**
-que aplique la protección, y cada cambio posterior de la configuración se
-refleja acá en el cambio que lo introduce.
+Las tres filas 🔴 están diferidas **a propósito**, no olvidadas: el spec
+`gobierno-contribucion` exige justamente que lo que no se activa quede declarado
+con su motivo, en vez de omitirse o presentarse como activo. Cada cambio
+posterior de la configuración se refleja acá en el mismo cambio que lo
+introduce.
 
 ## El check requerido es `ci-ok`, y no es un detalle
 
@@ -45,16 +49,22 @@ Por UI, que es donde el acto queda con autor y fecha:
 4. Reglas a marcar:
    - Restrict deletions
    - Block force pushes
-   - Require signed commits
-   - Require a pull request before merging → Required approvals: **1** →
-     Require review from Code Owners
+   - Require a pull request before merging (las aprobaciones requeridas y el
+     review de code owners se suben cuando el equipo esté operativo en el flujo;
+     activarlas antes bloquea los merges del día a día)
    - Require status checks to pass → Require branches to be up to date before
-     merging → agregar el check **`ci-ok`** (aparece en la lista recién después
-     de la primera corrida de CI: si no está, abrí un PR cualquiera primero)
+     merging → agregar el check **`ci-ok`**
+   - Require signed commits, cuando todas las máquinas tengan GPG
 5. **Bypass list: vacía.** Ninguna identidad —admins, apps, automatizaciones—
    se salta las reglas. Si alguna vez se concede una, se escribe en la tabla de
    arriba con su motivo.
-6. Volver acá y pasar los 🔴 a 🟢 en el mismo PR.
+6. Volver acá y actualizar la tabla de estado en el mismo PR.
+
+> **Orden que importa:** el check `ci-ok` **no aparece en la lista de GitHub
+> hasta que haya corrido al menos una vez**. En un repo recién creado hay que
+> dejar que el CI corra primero (un push a `main` o un PR cualquiera) y recién
+> después agregarlo como requerido. Si no está en la lista, no es que esté mal
+> escrito: todavía no existe para GitHub.
 
 ## Contrastar lo escrito contra la configuración real
 
