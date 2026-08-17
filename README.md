@@ -181,6 +181,8 @@ escriben handles, cuentas ni dominios reales de ningún proyecto. Es una fronter
 | `{{PROYECTO}}` | Nombre del proyecto y del repo | `people-agenda` |
 | `{{ORG}}` | Organización de GitHub | `im-diego-ec` |
 | `{{PAQUETES}}` | Paquetes del monorepo | `web, api, e2e` |
+| `{{EQUIPO_BUILDERS}}` | Slug del equipo de builders en la org (va en `CODEOWNERS`) | `builders` |
+| `{{EQUIPO_PO}}` | Slug del equipo del PO (va en `CODEOWNERS`) | `po` |
 | `{{BUILDER_1}}` | Handle del builder que sostiene la llave de producción | `@builder-uno` |
 | `{{BUILDER_2}}` | Handle del otro builder (el review cruzado es simétrico) | `@builder-dos` |
 | `{{PO}}` | Handle del Product Owner | `@po-del-area` |
