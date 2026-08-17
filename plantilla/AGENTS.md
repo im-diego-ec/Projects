@@ -48,12 +48,19 @@ miente desde el día 1.
 | Validación de input externo | 🕳️ (por defecto del marco: **Zod**) |
 | Infra | **AWS** + **Terraform** (IaC; `infra/` dev, `infra-prod/` producción) |
 | CI/CD | **GitHub Actions** (promoción por ambientes, workflows reusables de Projects) |
-| Package manager | 🕳️ (monorepo: {{PAQUETES}}) |
+| Package manager | **pnpm** con workspaces (monorepo: {{PAQUETES}}) |
 | Tests | 🕳️ (unit/integración) + 🕳️ (E2E contra dev) |
 
-Las filas **Infra** y **CI/CD** llegan llenas porque no son elección del proyecto:
-Terraform como IaC y GitHub Actions como pipeline los fija el marco. Todo lo demás lo
-decide el proyecto una vez, acá.
+Las filas **Infra**, **CI/CD** y **Package manager** llegan llenas porque no son
+elección del proyecto: Terraform como IaC, GitHub Actions como pipeline y pnpm con
+workspaces los fija el marco. Todo lo demás lo decide el proyecto una vez, acá.
+
+pnpm está fijado porque el CI que trae el scaffold lo ejecuta directamente
+(`corepack enable`, `pnpm -r`) y porque el marco depende de una propiedad concreta
+del workspace: **un único lockfile, en la raíz**. Un lockfile suelto dentro de un
+paquete hace que local y CI resuelvan dependencias distinto; por eso el `.gitignore`
+del scaffold los bloquea. Cambiar de package manager no es sustituir un comando: es
+reescribir el job de build del CI y rehacer esa garantía.
 
 Toda dependencia nueva se pregunta primero. Para las dependencias YA existentes, la
 política automática está en las fronteras (⚠️).
