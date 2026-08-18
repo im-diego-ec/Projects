@@ -35,11 +35,11 @@ estado: pendiente-de-revision
 
 ## 2. El propio marco primero
 
-- [ ] 2.1 Los checks corren sobre Projects antes de publicarse. Si uno no sirve
+- [x] 2.1 Los checks corren sobre Projects antes de publicarse. Si uno no sirve
       para este repo, tampoco sirve para los demás — y este repo es el primero
       que los ejercita en cada PR. Con una excepción declarada: el de marcadores
       se omite acá, porque este repo distribuye el scaffold (design D4).
-- [ ] 2.2 Verificar contra el consumidor real ANTES de mover el tag: apuntar su
+- [x] 2.2 Verificar contra el consumidor real ANTES de mover el tag: apuntar su
       CI al SHA de la rama de este change y confirmar el comportamiento previsto
       en el proposal — dos checks en verde, el de regenerados en rojo. Es el mismo
       patrón con el que se validó la primera versión del marco.
@@ -50,6 +50,6 @@ estado: pendiente-de-revision
       checks (la regeneración ya ocurrió en 0.1).
 - [ ] 3.2 Archivar el change y mover el tag mayor. Los checks llegan solos a todo
       consumidor: no hay nada que copiar ni configurar del otro lado.
-- [ ] 3.3 Anotar en la lista de reglas no escritas del marco que la serialización
+- [x] 3.3 Anotar en la lista de reglas no escritas del marco que la serialización
       de despliegues dejó de ser prosa y pasó a ser contrato, y que su check
       automático llega con el esqueleto de entrega (design, tabla de enforcement).
