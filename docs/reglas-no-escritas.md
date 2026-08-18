@@ -457,7 +457,7 @@ una tarde entre todos y cierran las clases de error más caras.
 | 3 | Ruleset: rama al día antes de mergear + historia lineal | 8 | bajo (config) | 🟡 |
 | 4 | `commitlint` en hook y en PR | 10 | bajo | 🔴 |
 | 5 | Hook `pre-push` versionado + `pnpm verificar` idéntico a CI | 7 | bajo | 🔴 |
-| 6 | Lint de workflows: toda degradación emite `::warning::` | 3 | medio | 🟡 |
+| 6 | Lint de workflows: toda degradación emite `::warning::` | 3 | medio | 🟡 (el lint ya existe: `actionlint` + `shellcheck` en el job `higiene`; falta la regla propia del `::warning::`) |
 | 7 | Los pasos que llaman a la API distinguen 403 de "sin datos" | 3 y 6 | medio | 🔴 |
 | 8 | Guardrail OpenSpec: `design` con dependencia nueva ⇒ `tasks` con bloque 0 | 2 | medio | 🟡 |
 | 9 | Check de PR: rojo evidenciado con enlace en el `tasks.md` | 1 | medio | 🔴 |
@@ -494,7 +494,12 @@ arriba porque un check ya falla solo cuando alguien se aparta:
   un PR de solo docs puede mergearse y uno de código no puede escaparse.
 - Review cruzado: CODEOWNERS asigna al par que no escribió el cambio.
 - `main` protegida: solo avanza por PR.
-- Deploys serializados con cola, nunca cancelados.
+- Deploys serializados con cola, nunca cancelados. **Dejó de ser prosa y pasó
+  a ser contrato** (`despliegue-ci`, change `marco-se-cumple-solo`), pero su
+  check automático todavía no existe: la serialización se configura en el
+  workflow de despliegue, que el marco aún no provee. Llega con el esqueleto de
+  entrega. Hasta entonces es contrato verificable en revisión, no check — y por
+  eso figura acá con asterisco en vez de contarse como cerrado.
 - Producción solo por promoción: sin smoke y E2E de dev en verde, el deploy
   a producción no arranca.
 - `verificar-prod` al final del deploy, con aviso al canal de alertas.
