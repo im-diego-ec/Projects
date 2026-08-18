@@ -42,9 +42,12 @@ una sorpresa?** Si la respuesta es sí, era un change.
 ### El flujo, y quién aprueba qué
 
 1. **Proposal** → por qué y qué cambia, con el **impacto en los proyectos
-   consumidores** explícito. **Aprueba el PO.**
-2. **Specs** → deltas con `#### Scenario:` (ADDED/MODIFIED/REMOVED), en
-   lenguaje de negocio. **Aprueba el PO.**
+   consumidores** explícito. Lo escribe un builder; **lo revisa el otro**.
+2. **Specs** → deltas con `#### Scenario:` (ADDED/MODIFIED/REMOVED),
+   enunciados como **propiedades observables** del marco. Lo escribe un
+   builder; **lo revisa el otro** — salvo los de la capability de
+   gobernanza del trabajo, que
+   **aprueba el PO** (ver abajo).
 3. **Design** → decisiones con alternativas descartadas, incluida la
    **clasificación de distribución** de cada pieza que se toca (referenciado /
    scaffold / canónico / regenerado) y la justificación de por qué esa y no
@@ -53,6 +56,21 @@ una sorpresa?** Si la respuesta es sí, era un change.
 5. **Implementar** → un PR por bloque, **review cruzado entre builders**.
 6. **Verify + archive** → cierra cuando los specs vivos validan `--strict`, las
    tareas tienen evidencia y el `CHANGELOG.md` refleja el cambio.
+
+**Por qué acá el PO no aprueba proposals y specs, y en un proyecto sí.** En un
+repo de producto esos artefactos son el QUE y el POR QUÉ del negocio, y el PO es
+su dueño. En Projects no hay producto: **todo** change es técnico del estándar de
+trabajo, así que heredar ese reparto convertía al PO en revisor obligatorio de
+cada guardrail de ingeniería — un cuello de botella pidiéndole criterio sobre
+decisiones que no son suyas.
+
+El reparto acotado mantiene la misma línea de siempre —el PO es dueño del QUE y
+el POR QUÉ, los builders del CÓMO— y acá eso se traduce en que el PO gatea la
+**gobernanza del trabajo** (los roles, quién aprueba qué, cómo se revisa: la
+capability `gobierno-contribucion`), porque ese es su modelo operativo; y no
+gatea la **maquinaria** (pipelines, guardrails, scaffold), que es de builders.
+Sigue informado de todo change y puede revisar lo que quiera: se le quita la
+obligación, no el acceso.
 
 Tras editar CUALQUIER archivo de `openspec/`: `openspec validate --strict` +
 relectura de coherencia entre proposal/specs/design/tasks antes de commitear.
