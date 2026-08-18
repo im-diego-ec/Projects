@@ -65,6 +65,17 @@ Es una elección de alcance, no un olvido: el modo de falla real observado es el
 placeholder que sobrevive al bootstrap, no el valor bien sustituido pero
 equivocado.
 
+**Quién queda exento, y cómo se decide.** Un repositorio que *distribuye* el
+scaffold —el marco mismo— contiene los marcadores a propósito: en la plantilla y
+en toda la documentación que la explica. La exención se detecta **sola**, por la
+presencia del scaffold en el repositorio, en vez de pedirse por parámetro: un
+parámetro sería una perilla que un proyecto puede apagar por descuido, y este
+check protege justamente contra el descuido.
+
+La consecuencia se declara en vez de disimularse: de los tres checks, este es el
+único que el marco **no se aplica a sí mismo**. Su valor está entero del lado de
+los proyectos, y el log lo dice en cada corrida en vez de pasar en silencio.
+
 ### D5 — El requirement de serialización habla de propiedades, no de mecanismos
 
 Se enuncia como **hacer cola sin cancelar** sobre ambientes compartidos, sin
@@ -84,7 +95,7 @@ requirement lo dice así.
 |---|---|---|
 | Artefactos regenerados sin divergencia | job de marco | la versión declarada en un artefacto generado ≠ el pin vigente |
 | Definiciones de pipeline validadas | job de marco | una definición de pipeline no parsea o tiene una expresión inválida |
-| Sin marcadores del scaffold | job de marco | queda un placeholder o un hueco marcado en el repo consumidor |
+| Sin marcadores del scaffold | job de marco (no aplica al repo que distribuye el scaffold) | queda un placeholder o un hueco marcado en el repo consumidor |
 | Despliegues serializados | — | **no tiene check automático** |
 
 La última fila es la excepción honesta de este change: la serialización se
