@@ -38,8 +38,8 @@ tres veces con permisos de token: el fallo era detectable pero el síntoma no
 nombraba la causa. Todos los checks de este change emiten el comando o la ruta
 concreta que cierra el hallazgo.
 
-Esto es también lo que hace aceptable que el check de artefactos regenerados
-entre como fallo directo: el rojo del día uno viene con su propia solución.
+Esto es también lo que hace barato el fallo del check de regenerados cuando
+aparezca: viene con su propia solución.
 
 ### D3 — El check de regenerados compara declaraciones, no contenidos
 
@@ -95,9 +95,15 @@ deuda en vez de dejar la tabla dando a entender que los cuatro se cumplen solos.
 
 ## Riesgos
 
-- **El check de regenerados pone rojo al consumidor actual el día uno.** Mitigado
-  coordinando la regeneración en la misma ventana del merge; el mensaje trae el
-  comando. Estrenarlo como aviso solo enseñaría a convivir con el aviso.
+- **El check de regenerados encontraría rojo al consumidor actual.** La
+  constitución del marco define como breaking «endurecer un check de modo que un
+  repo que hoy pasa mañana falle», y prescribe estrenar en modo aviso y endurecer
+  en el major siguiente. Acá se resuelve por **orden** en vez de por modo aviso:
+  la regla habla de un consumidor *que no modifica una sola línea*, así que si el
+  consumidor regenera primero y el check aterriza después, no hay repo roto y no
+  hay major que abrir. El modo aviso queda para el caso que la regla contempla
+  —endurecer contra consumidores que no controlamos—, que hoy no aplica: hay uno
+  solo y es nuestro. Cuando haya varios, se estrena como aviso.
 - **Un check nuevo que falla en falso bloquea a todos los consumidores a la vez.**
   Es el precio de referenciar en vez de copiar. Por eso los tres automatizables se
   verificaron contra el consumidor real antes de proponerse, y por eso el marco se

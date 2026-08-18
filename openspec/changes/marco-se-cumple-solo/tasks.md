@@ -6,6 +6,15 @@ informado: PO / Builder 2
 estado: pendiente-de-revision
 ---
 
+## 0. Primero el consumidor, después el check
+
+- [ ] 0.1 Regenerar los artefactos de OpenSpec en el consumidor y mergear ESE PR
+      **antes** de que el check de regenerados aterrice. El orden no es
+      cosmético: la constitución define breaking como «un repo consumidor que no
+      modifica una sola línea queda roto», así que regenerar primero es lo que
+      evita abrir un major. Evidencia: la versión declarada en los artefactos del
+      consumidor coincide con el pin vigente.
+
 ## 1. Los checks
 
 - [ ] 1.1 Verificación de artefactos regenerados en el job de marco: compara la
@@ -36,8 +45,8 @@ estado: pendiente-de-revision
 
 ## 3. Cierre
 
-- [ ] 3.1 Coordinar la regeneración en el consumidor dentro de la misma ventana
-      del merge, para que el rojo del día uno dure minutos y no una tarde.
+- [ ] 3.1 Confirmar que ningún consumidor quedó rojo por el aterrizaje de los
+      checks (la regeneración ya ocurrió en 0.1).
 - [ ] 3.2 Archivar el change y mover el tag mayor. Los checks llegan solos a todo
       consumidor: no hay nada que copiar ni configurar del otro lado.
 - [ ] 3.3 Anotar en la lista de reglas no escritas del marco que la serialización
