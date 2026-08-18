@@ -35,7 +35,59 @@ mueve sobre un cambio incompatible.
 
 ## [No publicado]
 
-Nada todavía.
+### Añadido
+
+- **Tres checks nuevos en el job de marco (`higiene`), que cierran huecos donde
+  el marco afirmaba algo y nada lo verificaba.** Llegan solos a todo consumidor
+  de `@v1`: no hay nada que copiar ni configurar del otro lado.
+
+  1. **Artefactos regenerados al día.** Compara la versión declarada en los
+     artefactos que genera el CLI de OpenSpec (`.claude/`, `.agents/`) contra el
+     pin del marco. *Regenerado* era la única de las cuatro formas de
+     distribución que se apoyaba solo en que alguien se acordara de ejecutarla.
+     El fallo trae el comando exacto de regeneración.
+  2. **Definiciones de pipeline válidas** (actionlint, pineado, con `shellcheck`
+     sobre cada bloque `run:`). Eran el único código del repo que nadie linteaba:
+     un error de sintaxis o una expresión inválida se descubrían *ejecutando*, o
+     sea después del merge.
+  3. **Sin marcadores del scaffold sin resolver.** Un placeholder que sobrevive
+     al bootstrap falla en silencio — en el archivo de propietarios de código no
+     produce error alguno, simplemente no asigna revisores, y el review cruzado
+     que el marco promete desaparece sin ruido desde el primer día.
+
+- Input `version_actionlint` (default `1.7.12`) para pinar el validador.
+
+### Para consumidores
+
+**Checks 2 y 3: nada que hacer.** Se verificó contra el consumidor real antes de
+publicar: `un-proyecto-anterior` los pasa sin tocar una línea (con un hallazgo real
+de `shellcheck` que se arregló en su propio repo, no acá).
+
+**Check 1 (artefactos regenerados): puede pedir una acción de una sola vez.** Un
+repo cuyos artefactos vengan de una versión anterior del CLI dará rojo hasta que
+corra lo que el propio mensaje de error indica:
+
+```
+npx --yes @fission-ai/openspec@<pin> update --force
+```
+
+Esto **no** es breaking para `@v1`, y el orden es la razón. La definición del
+marco es que un consumidor *que no modifica una sola línea* quede roto; acá el
+consumidor regeneró **antes** de que el check aterrizara, así que ningún repo
+amaneció en rojo. Cuando el marco tenga consumidores que no controlamos, un
+endurecimiento así se estrena en modo aviso y endurece en el major siguiente
+—como manda `AGENTS.md`—; con un solo consumidor y nuestro, ordenar los merges es
+más honesto que enseñar a convivir con un aviso.
+
+### Nota sobre el alcance del check 3
+
+En **este** repo el check de marcadores se omite y lo dice en el log: Projects
+distribuye el scaffold, así que los marcadores son su materia prima (están en
+`plantilla/` y en toda la documentación que la explica). La detección es
+automática —la presencia del scaffold— y no un input que un consumidor pueda
+apagar sin querer. Consecuencia declarada: de los tres checks, este es el único
+que el marco no se aplica a sí mismo. Su valor está entero del lado de los
+proyectos.
 
 ---
 

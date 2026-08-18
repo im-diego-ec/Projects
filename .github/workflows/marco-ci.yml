@@ -7,7 +7,10 @@ name: Marco CI (reusable)
 #
 #   1. cambios   -> detecta si el PR/push toca solo documentacion (carril rapido)
 #   2. openspec  -> guardrail de deltas + validacion estricta de changes y specs
-#   3. marco-ok  -> veredicto agregado de los dos jobs anteriores
+#   3. higiene   -> lo que el marco AFIRMA y hasta hoy nadie verificaba:
+#                   artefactos regenerados al dia, definiciones de pipeline
+#                   validas y cero marcadores del scaffold sin resolver
+#   4. marco-ok  -> veredicto agregado de los tres jobs anteriores
 #
 # El proyecto consumidor NO copia estos jobs: los referencia. Un arreglo aca
 # arregla el CI de todos los repos a la vez.
@@ -86,6 +89,17 @@ on:
         type: string
         required: false
         default: "22"
+      version_actionlint:
+        description: >-
+          Version pineada de actionlint, el validador de las definiciones de
+          pipeline. Se descarga del release oficial y se verifica el sha256
+          contra el archivo de checksums del MISMO release: eso protege de una
+          descarga corrupta o de un asset cambiado, no de un release
+          comprometido de raiz. Dependabot no lo ve (no es un manifest): se
+          sube a mano aca y llega a todos los repos.
+        type: string
+        required: false
+        default: "1.7.12"
       rutas_carril_docs:
         description: >-
           Patrones (ERE de grep, uno por linea) de las rutas que NO alteran lo
@@ -267,12 +281,157 @@ jobs:
           VERSION_OPENSPEC: ${{ inputs.version_openspec }}
         run: npx --yes "@fission-ai/openspec@${VERSION_OPENSPEC}" validate --all --strict
 
+  # Los checks que hacen que el marco se cumpla SOLO. Cada uno cierra un hueco
+  # donde el marco AFIRMABA algo (en un README, en una guia de bootstrap, en un
+  # comentario de YAML) y nada lo verificaba.
+  #
+  # Corre SIEMPRE, tambien en el carril rapido de docs: las definiciones de
+  # pipeline caen dentro de ese carril (^\.github/) porque no se sirven en
+  # runtime — pero si se EJECUTAN, y un error en ellas se manifiesta en la
+  # corrida siguiente, cuando el cambio ya esta integrado y, en el caso del
+  # marco, cuando otros repos ya lo consumen.
+  higiene:
+    name: higiene
+    runs-on: ${{ inputs.runner }}
+    steps:
+      - uses: actions/checkout@v7
+
+      # HUECO 1 — "regenerado" era la unica forma de distribucion del marco que
+      # se apoyaba solo en que alguien se acordara de ejecutarla. El marco pina
+      # la version del CLI y delega la regeneracion en cada repo; hasta hoy,
+      # nada comparaba una cosa con la otra (un-proyecto-anterior vivio tres
+      # minors atrasado sin que se notara).
+      #
+      # Se comparan DECLARACIONES, no contenidos: cada artefacto lleva en su
+      # cabecera la version que lo genero. Regenerar en CI y diffear el arbol
+      # seria sensible a cualquier diferencia cosmetica de entorno y convertiria
+      # un check de segundos en uno fragil. Limite asumido y declarado: detecta
+      # divergencia de VERSION, no edicion manual del contenido.
+      - name: Artefactos regenerados al dia
+        shell: bash
+        env:
+          PIN: ${{ inputs.version_openspec }}
+        run: |
+          set -euo pipefail
+
+          DIRS=()
+          if [ -d .claude ]; then DIRS+=(.claude); fi
+          if [ -d .agents ]; then DIRS+=(.agents); fi
+          if [ ${#DIRS[@]} -eq 0 ]; then
+            echo "este repo no tiene artefactos generados por el CLI: nada que verificar"
+            exit 0
+          fi
+
+          grep -rn 'generatedBy:' "${DIRS[@]}" > declarados.txt || true
+          if [ ! -s declarados.txt ]; then
+            echo "no hay artefactos con version declarada: nada que verificar"
+            exit 0
+          fi
+
+          grep -v "generatedBy: \"${PIN}\"" declarados.txt > divergentes.txt || true
+          if [ -s divergentes.txt ]; then
+            # El mensaje trae el ARREGLO, no el diagnostico: un artefacto viejo
+            # es un problema con solucion conocida, y obligar a redescubrirla
+            # convierte el check en friccion en vez de en ayuda.
+            echo "::error::hay artefactos generados por una version distinta al pin del marco (${PIN}). Regeneralos con: npx --yes @fission-ai/openspec@${PIN} update --force"
+            echo "== artefactos divergentes =="
+            cat divergentes.txt
+            exit 1
+          fi
+
+          echo "$(wc -l < declarados.txt) artefactos declaran la version pineada (${PIN})"
+
+      # HUECO 2 — las definiciones de pipeline eran el unico codigo del repo que
+      # nadie linteaba. Un error de sintaxis o una expresion invalida se
+      # descubrian EJECUTANDO, es decir despues del merge.
+      #
+      # shellcheck ya viene en el runner y actionlint lo detecta solo: cada
+      # bloque "run:" pasa ademas por el. Eso importa mas de lo que parece en un
+      # marco cuyos guardrails son, casi todos, bash dentro de YAML.
+      - name: Definiciones de pipeline validas
+        shell: bash
+        env:
+          VERSION_ACTIONLINT: ${{ inputs.version_actionlint }}
+        run: |
+          set -euo pipefail
+
+          if [ ! -d .github/workflows ]; then
+            echo "::error::el repo no tiene .github/workflows — el marco exige que el pipeline viva en el repo"
+            exit 1
+          fi
+
+          TMP=$(mktemp -d)
+          BASE="https://github.com/rhysd/actionlint/releases/download/v${VERSION_ACTIONLINT}"
+          TAR="actionlint_${VERSION_ACTIONLINT}_linux_amd64.tar.gz"
+          curl -fsSL -o "${TMP}/${TAR}" "${BASE}/${TAR}"
+          curl -fsSL -o "${TMP}/checksums.txt" "${BASE}/actionlint_${VERSION_ACTIONLINT}_checksums.txt"
+          # Verifica el asset contra los checksums del MISMO release: cubre
+          # descarga corrupta o asset cambiado, no un release comprometido de
+          # raiz. Se declara el alcance en vez de dar por sentado que "hay
+          # checksum" significa "es seguro".
+          ( cd "${TMP}" && sha256sum --check --ignore-missing checksums.txt )
+          tar -xzf "${TMP}/${TAR}" -C "${TMP}" actionlint
+
+          "${TMP}/actionlint" --version
+          if ! "${TMP}/actionlint" -color; then
+            echo "::error::las definiciones de pipeline no pasan la validacion (archivo y linea, arriba). Reproducilo local instalando actionlint ${VERSION_ACTIONLINT} y corriendolo en la raiz del repo"
+            exit 1
+          fi
+          echo "definiciones de pipeline validas"
+
+      # HUECO 3 — un marcador del scaffold que sobrevive al bootstrap falla en
+      # SILENCIO. El caso que motiva el check: un placeholder sin sustituir en
+      # el archivo de propietarios de codigo no produce error alguno, solo deja
+      # de asignar revisores — y el review cruzado que el marco promete
+      # desaparece sin ruido desde el primer dia del proyecto.
+      #
+      # Se verifica la AUSENCIA de marcadores, no la correccion de los valores
+      # que los reemplazaron: comprobar que un handle existe o que una cuenta es
+      # la del proyecto exige credenciales y contexto que CI no tiene, y su
+      # falso positivo bloquearia integraciones legitimas.
+      - name: Sin marcadores del scaffold sin resolver
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          # Un repo que DISTRIBUYE un scaffold —el marco mismo— contiene los
+          # marcadores a proposito: en la plantilla y en toda la documentacion
+          # que la explica. Se detecta solo, por la presencia del scaffold, en
+          # vez de por un input que un consumidor pueda apagar por descuido.
+          # Consecuencia honesta: en el repo del marco este check no verifica
+          # nada. Su valor esta entero del lado de los proyectos.
+          if [ -f plantilla/.github/workflows/ci.yml ]; then
+            echo "::notice::este repo distribuye un scaffold (plantilla/): los marcadores son su materia prima, no un bootstrap a medias — verificacion omitida"
+            exit 0
+          fi
+
+          # {{MAYUSCULAS}} es la forma exacta que emite el scaffold. El [^$]
+          # inicial descarta las expresiones que el proveedor de CI resuelve en
+          # cada corrida (needs.build_test.result y companía), que ademas llevan
+          # puntos y minusculas.
+          git ls-files -z | xargs -0 grep -nIE '(^|[^$])\{\{[A-Z0-9_]+\}\}' > pendientes.txt || true
+
+          # El hueco de decision del scaffold. Se arma por codepoint (U+1F573)
+          # en vez de pegar el emoji: asi matchea lo mismo lleve o no el
+          # selector de variacion, y no depende del locale del runner.
+          HUECO=$(printf '\xf0\x9f\x95\xb3')
+          git ls-files -z | xargs -0 grep -nIF "${HUECO}" >> pendientes.txt || true
+
+          if [ -s pendientes.txt ]; then
+            echo "::error::quedaron marcadores del scaffold sin resolver — el bootstrap del repo esta a medias y hay promesas del marco que no se estan cumpliendo (revisa sobre todo el archivo de propietarios de codigo)"
+            echo "== marcadores pendientes =="
+            cat pendientes.txt
+            exit 1
+          fi
+
+          echo "sin marcadores del scaffold pendientes"
+
   # Veredicto agregado DEL MARCO. Reporta siempre (docs o codigo). No conoce el
   # build/test del producto: ese lo agrega el ci-ok del repo consumidor, que es
   # el check requerido por el ruleset.
   marco_ok:
     name: marco-ok
-    needs: [cambios, openspec]
+    needs: [cambios, openspec, higiene]
     if: always()
     runs-on: ${{ inputs.runner }}
     steps:
@@ -281,6 +440,7 @@ jobs:
         run: |
           [ "${{ needs.cambios.result }}" = "success" ] || { echo "::error::la deteccion de cambios fallo"; exit 1; }
           [ "${{ needs.openspec.result }}" = "success" ] || { echo "::error::la validacion de OpenSpec fallo"; exit 1; }
+          [ "${{ needs.higiene.result }}" = "success" ] || { echo "::error::los checks de higiene del marco fallaron"; exit 1; }
           if [ "${{ needs.cambios.outputs.solo_docs }}" = "true" ]; then
             echo "carril de docs: el consumidor puede omitir su build/test"
           else
