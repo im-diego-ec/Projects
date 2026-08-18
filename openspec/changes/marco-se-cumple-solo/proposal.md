@@ -84,11 +84,12 @@ precisión porque la respuesta no es uniforme:
 - La validación de las definiciones de pipeline y el check de marcadores del
   scaffold **pasan en verde hoy** en el único consumidor real. Nacen como fallo
   directo: no rompen nada.
-- El check de artefactos regenerados **pondría rojo al consumidor actual desde el
-  primer día**, porque su divergencia es precisamente el hallazgo que lo motiva.
-  Se coordina en la misma ventana: el proyecto regenera y el check entra. Es
-  minutos de trabajo, y estrenarlo como aviso primero solo enseñaría a convivir
-  con el aviso.
+- El check de artefactos regenerados **encontraría rojo al consumidor actual**,
+  porque su divergencia es precisamente el hallazgo que lo motiva. Por eso el
+  orden importa y es parte del change: **primero el consumidor regenera, después
+  el check aterriza**. Hecho en ese orden, ningún repo que no toque una línea
+  queda roto —que es la definición de breaking de este marco— y el check nace
+  como fallo directo sin necesidad de estrenarse en modo aviso.
 
 Para un proyecto consumidor, el efecto neto es que **cuatro promesas del marco
 pasan a fallar solas**. No hay nada que copiar ni que configurar: los checks
