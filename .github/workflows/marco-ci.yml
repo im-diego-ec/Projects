@@ -348,7 +348,14 @@ jobs:
       # shellcheck ya viene en el runner y actionlint lo detecta solo: cada
       # bloque "run:" pasa ademas por el. Eso importa mas de lo que parece en un
       # marco cuyos guardrails son, casi todos, bash dentro de YAML.
+      # Los tres checks son independientes y CADA UNO tiene que reportar. Sin
+      # esto, el primero en fallar deja a los otros dos en "skipped" y el repo
+      # se entera de un solo problema por corrida: se arregla, vuelve a pushear,
+      # y recien ahi descubre el siguiente. El descubrimiento vino de la
+      # verificacion contra el consumidor real, no de leer el YAML.
+      # !cancelled() y no always(): si alguien cancela la corrida, se para.
       - name: Definiciones de pipeline validas
+        if: '!cancelled()'
         shell: bash
         env:
           VERSION_ACTIONLINT: ${{ inputs.version_actionlint }}
@@ -390,6 +397,7 @@ jobs:
       # la del proyecto exige credenciales y contexto que CI no tiene, y su
       # falso positivo bloquearia integraciones legitimas.
       - name: Sin marcadores del scaffold sin resolver
+        if: '!cancelled()'
         shell: bash
         run: |
           set -euo pipefail

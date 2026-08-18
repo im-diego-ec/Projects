@@ -40,6 +40,8 @@ mueve sobre un cambio incompatible.
 - **Tres checks nuevos en el job de marco (`higiene`), que cierran huecos donde
   el marco afirmaba algo y nada lo verificaba.** Llegan solos a todo consumidor
   de `@v1`: no hay nada que copiar ni configurar del otro lado.
+  Los tres son independientes entre sí: un repo con dos problemas los ve
+  **los dos en la misma corrida**, no de a uno por push.
 
   1. **Artefactos regenerados al día.** Compara la versión declarada en los
      artefactos que genera el CLI de OpenSpec (`.claude/`, `.agents/`) contra el
