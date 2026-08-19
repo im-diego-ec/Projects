@@ -146,6 +146,28 @@ precedente aplicado, no una excepción nueva.
 
 El modo aviso queda para cuando haya consumidores que no controlamos.
 
+### D6b — Apareció el segundo consumidor, y la decisión se tomó igual por rojo
+
+El 2026-08-19 un segundo proyecto —una intranet que **no nació del scaffold**—
+adoptó el marco y pasó sus cuatro checks en verde. Es la validación más fuerte
+que el marco tuvo hasta hoy: otro repositorio no podía darla, porque el
+marco se destiló de él y le calza por construcción.
+
+Eso activó la condición que este mismo design declaraba: *«el modo aviso queda
+para endurecer contra consumidores que no controlamos, que hoy no aplica porque
+hay uno solo y es nuestro; cuando haya varios, se estrena como aviso»*. Con dos
+consumidores, la regla pedía estrenar el check de cableado en modo aviso.
+
+**Se decidió estrenarlo en rojo igual**, y la razón no anula la regla: la
+intranet **está en desarrollo y no salió al aire**, así que el rojo no
+interrumpe ninguna operación, hay margen para corregirlo antes de su
+lanzamiento, y su responsable está disponible para hacerlo. El modo aviso
+protege a un consumidor al que no se puede coordinar; acá se puede.
+
+Queda escrito porque es una **excepción deliberada a una regla propia**, no un
+descuido: la próxima vez que haya un consumidor en producción al que no
+controlemos, la regla vuelve a aplicar sin discusión y el estreno es en aviso.
+
 ## Cómo se hace cumplir solo
 
 | Requirement | Check | Falla cuando |
