@@ -1,5 +1,15 @@
 # calidad-codigo — Delta
 
+## RENAMED Requirements
+
+- FROM: `### Requirement: Scripts de lint sin enmascaramiento de fallo`
+- TO: `### Requirement: Scripts de verificación sin enmascaramiento de fallo`
+
+El título decía "lint" desde el principio mientras su cuerpo ya hablaba de
+"scripts de verificación". El retitulado alinea el título con lo que el
+requirement siempre dijo, y con el hecho de que ahora hay un check que lo
+comprueba sobre cualquier script de verificación, no solo el de lint.
+
 ## MODIFIED Requirements
 
 ### Requirement: Lint y formato configurados para todos los paquetes
