@@ -3,12 +3,12 @@ artefacto: tasks
 dri: Builder 1
 aprueba: Builder 1
 informado: PO / Builder 2
-estado: pendiente-de-revision
+estado: completado
 ---
 
 ## 0. Primero el consumidor, después el check
 
-- [ ] 0.1 Regenerar los artefactos de OpenSpec en el consumidor y mergear ESE PR
+- [x] 0.1 Regenerar los artefactos de OpenSpec en el consumidor y mergear ESE PR
       **antes** de que el check de regenerados aterrice. El orden no es
       cosmético: la constitución define breaking como «un repo consumidor que no
       modifica una sola línea queda roto», así que regenerar primero es lo que
@@ -46,9 +46,9 @@ estado: pendiente-de-revision
 
 ## 3. Cierre
 
-- [ ] 3.1 Confirmar que ningún consumidor quedó rojo por el aterrizaje de los
+- [x] 3.1 Confirmar que ningún consumidor quedó rojo por el aterrizaje de los
       checks (la regeneración ya ocurrió en 0.1).
-- [ ] 3.2 Archivar el change y mover el tag mayor. Los checks llegan solos a todo
+- [x] 3.2 Archivar el change y mover el tag mayor. Los checks llegan solos a todo
       consumidor: no hay nada que copiar ni configurar del otro lado.
 - [x] 3.3 Anotar en la lista de reglas no escritas del marco que la serialización
       de despliegues dejó de ser prosa y pasó a ser contrato, y que su check

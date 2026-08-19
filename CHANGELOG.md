@@ -35,6 +35,17 @@ mueve sobre un cambio incompatible.
 
 ## [No publicado]
 
+Nada todavía.
+
+---
+
+## [1.1.0] — 2026-08-18
+
+**El marco empieza a hacerse cumplir solo.** Tres checks nuevos que cierran
+huecos donde el marco afirmaba algo y nada lo verificaba. Validado contra el
+consumidor real antes de mover el tag móvil: `un-proyecto-anterior` quedó verde de
+punta a punta con el job `higiene` corriendo.
+
 ### Añadido
 
 - **Tres checks nuevos en el job de marco (`higiene`), que cierran huecos donde
