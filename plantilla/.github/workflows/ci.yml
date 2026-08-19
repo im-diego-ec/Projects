@@ -12,9 +12,10 @@ name: CI
 # de OpenSpec en Projects. Ver AGENTS.md.
 #
 # HUECO A LLENAR AL CREAR EL PROYECTO: los pasos de build_test son del
-# producto. Estan escritos con los scripts que el marco da por hechos
-# (pnpm lint / typecheck / test / build); ajustalos al stack fijado en
-# AGENTS.md y borra este parrafo cuando quede hecho.
+# producto. Estan escritos con los scripts que el marco da por hechos —lint y
+# format:check UNA vez desde la raiz; typecheck, test y build en CADA
+# paquete—; ajustalos al stack fijado en AGENTS.md y borra este parrafo
+# cuando quede hecho.
 # ---------------------------------------------------------------------------
 
 on:
@@ -58,11 +59,237 @@ jobs:
           node-version: "22"
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+
+      # El cliente de la capa de datos se genera ANTES del lint. El codigo de
+      # acceso a datos esta tipado CONTRA ese cliente generado: sin el, las
+      # reglas type-aware no tienen tipos que mirar y cada acceso a datos
+      # vuelve a ser `any` silencioso — el lint pasa en verde sin haber
+      # verificado nada. Leccion aprendida en otro repo, no precaucion
+      # teorica. Vale para cualquier artefacto generado del que dependa el
+      # tipado, no solo para el cliente de datos.
+      #
+      # --fail-if-no-match no es decoracion: sin el, un --filter que no matchea
+      # (paquete renombrado o movido) imprime "No projects matched the filters"
+      # y sale 0 — la generacion no ocurre y el fail-open aparece disfrazado de
+      # lint verde. Comprobado en pnpm 9.15 y 11.18: el exit 0 es el mismo.
+      #
+      # Si el proyecto no genera ningun cliente de datos, borra este paso.
+      - name: Generar el cliente de la capa de datos
+        run: pnpm --filter {{PAQUETE_API}} --fail-if-no-match exec {{GENERAR_CLIENTE_DATOS}}
+
+      # Lint y formato corren UNA vez desde la raiz sobre todo el arbol
+      # (eslint . / prettier --check .), no por paquete: asi los archivos que
+      # viven FUERA de los paquetes —configuracion, scripts sueltos, los
+      # workflows mismos— tambien quedan dentro del alcance. Aca no hay salteo
+      # posible: si la raiz no declara el script, `pnpm <script>` sale 1.
       - run: pnpm lint
       - run: pnpm format:check
-      - run: pnpm -r typecheck
-      - run: pnpm -r test
-      - run: pnpm -r build
+
+      # -------------------------------------------------------------------
+      # POR QUE NO HAY `pnpm -r typecheck` / `-r test` / `-r build` ACA
+      #
+      # `pnpm -r <script>` SALTEA EN SILENCIO todo paquete que no declara ese
+      # script: imprime "Scope: N of M workspace projects" —que cuenta los
+      # paquetes SELECCIONADOS, no los que corrieron— y sale 0. Un paquete
+      # nuevo sin typecheck, o un script renombrado por error, quedan
+      # "verificados" por omision y nadie se entera nunca.
+      #
+      # Enumerar por --filter TAMPOCO alcanza, y esto es lo que sorprende: con
+      # el script ausente, `pnpm --filter <paquete> <script>` imprime "None of
+      # the selected packages has a <script> script" y sale 0 en pnpm 9.15
+      # (recien en 11.18 sale 1). O sea que la enumeracion explicita tiene el
+      # mismo agujero, mejor escondido, y ademas depende de la version del
+      # gestor: una garantia que cambia con un bump de herramienta no es
+      # garantia.
+      #
+      # Por eso la verificacion es en dos pasos y no depende de ningun codigo
+      # de salida ajeno:
+      #   1. se DERIVA de pnpm la lista de paquetes (no hay lista escrita aca
+      #      que alguien tenga que acordarse de actualizar) y se comprueba
+      #      contra cada manifiesto que el script este DECLARADO;
+      #   2. recien entonces se corre, parado dentro de cada paquete.
+      # Un paquete nuevo entra solo. Si no declara los scripts, es rojo con el
+      # arreglo escrito, que es exactamente lo contrario de un punto ciego.
+      # -------------------------------------------------------------------
+      - name: Todo paquete declara los scripts de verificacion
+        shell: bash
+        env:
+          # Los scripts que este CI le exige a CADA paquete. Es la definicion
+          # del pipeline, no una lista de paquetes: incorporar un paquete no
+          # obliga a tocar esta linea.
+          SCRIPTS: "typecheck test build"
+          # Las EXCEPCIONES, "<carpeta>:<script>", con su motivo escrito. La
+          # carpeta es la del paquete relativa a la raiz del repo.
+          #   {{PAQUETE_E2E}}:test  -> la suite E2E corre con navegadores
+          #     contra un ambiente ya desplegado; su workflow es el de
+          #     promocion, no el CI del PR.
+          #   {{PAQUETE_E2E}}:build -> una suite de pruebas no produce
+          #     artefacto que servir.
+          # Es la unica lista del paso, y solo puede equivocarse hacia el
+          # rojo: si falta una excepcion, el CI falla pidiendo el script; si
+          # sobra, falla por excepcion muerta. Olvidarse de algo aca nunca
+          # produce un verde falso. Si el proyecto no tiene suite E2E, borra
+          # las dos entradas.
+          EXCEPCIONES: "{{PAQUETE_E2E}}:test {{PAQUETE_E2E}}:build"
+        run: |
+          set -euo pipefail
+
+          pnpm list -r --depth -1 --json > "${RUNNER_TEMP}/paquetes.json"
+
+          cat > "${RUNNER_TEMP}/verificar-scripts.mjs" <<'FIN'
+          // Comprueba que cada paquete del workspace DECLARE los scripts que
+          // el CI corre, y escribe el plan de ejecucion. La comprobacion se
+          // hace sobre los manifiestos, no sobre el codigo de salida del
+          // gestor de paquetes, que ya demostro cambiar entre versiones mayor.
+          //
+          // No hay salida en verde sin datos: sin paquetes, sin scripts o con
+          // el plan vacio, esto sale 1.
+          import { readFileSync, writeFileSync } from "node:fs";
+          import { relative } from "node:path";
+
+          const [, , rutaProyectos, rutaPlan] = process.argv;
+          const raiz = process.cwd();
+          const lista = (v) => (v || "").trim().split(/\s+/).filter(Boolean);
+          const scripts = lista(process.env.SCRIPTS);
+          const excepciones = lista(process.env.EXCEPCIONES);
+
+          let hayFallo = false;
+          // El mensaje de una anotacion es de UNA linea: el detalle va suelto
+          // arriba y la anotacion se queda con el arreglo, que es lo que hay
+          // que leer.
+          const problema = (mensaje, detalle = []) => {
+            for (const linea of detalle) console.log(`  ${linea}`);
+            console.log(`::error::${mensaje}`);
+            hayFallo = true;
+          };
+
+          // La raiz del workspace queda fuera: sus scripts son agregadores del
+          // monorepo, no la verificacion de un paquete (pnpm -r tampoco la
+          // incluye). Se la reconoce porque su ruta relativa es vacia.
+          const paquetes = JSON.parse(readFileSync(rutaProyectos, "utf8"))
+            .map((p) => relative(raiz, p.path).split("\\").join("/"))
+            .filter((dir) => dir !== "")
+            .sort();
+
+          if (paquetes.length === 0) {
+            problema(
+              "pnpm no reporto ningun paquete ademas de la raiz: no se verifico nada, y eso no pasa en verde. Arreglo: si es un monorepo, revisa pnpm-workspace.yaml; si el repo es de un solo paquete, corre sus scripts directamente en este job y borra estos dos pasos",
+            );
+          }
+          if (scripts.length === 0) {
+            problema("SCRIPTS quedo vacio: no hay nada que verificar. Arreglo: declara los scripts en el env de este paso");
+          }
+
+          const malFormadas = excepciones.filter((e) => !/^[^:]+:[^:]+$/.test(e));
+          if (malFormadas.length > 0) {
+            problema(
+              `hay excepciones mal escritas: ${malFormadas.join(", ")}. Arreglo: el formato es "<carpeta>:<script>", separadas por espacios`,
+            );
+          }
+
+          const muertas = excepciones
+            .filter((e) => /^[^:]+:[^:]+$/.test(e))
+            .filter((e) => !paquetes.includes(e.split(":")[0]));
+          if (muertas.length > 0) {
+            problema(
+              `estas excepciones no corresponden a ningun paquete del workspace: ${muertas.join(", ")}. Arreglo: borralas de EXCEPCIONES, o corregi la carpeta. Una excepcion que sobrevive a lo que la justificaba tapa un agujero que ya nadie ve`,
+            );
+          }
+
+          const plan = [];
+          const faltantes = [];
+          for (const script of scripts) {
+            for (const dir of paquetes) {
+              if (excepciones.includes(`${dir}:${script}`)) continue;
+              const manifiesto = JSON.parse(readFileSync(`${dir}/package.json`, "utf8"));
+              if (manifiesto.scripts && manifiesto.scripts[script]) plan.push(`${dir}:${script}`);
+              else faltantes.push(`${dir}:${script}`);
+            }
+          }
+
+          if (faltantes.length > 0) {
+            problema(
+              'hay paquetes que no declaran un script que este CI exige (detalle arriba). Arreglo: agregalo a "scripts" de ese package.json; si de verdad no corresponde, escribi la excepcion con su motivo en EXCEPCIONES de .github/workflows/ci.yml',
+              faltantes.map((f) => `${f.split(":")[0]}/package.json -> falta el script "${f.split(":")[1]}"`),
+            );
+          }
+
+          if (!hayFallo && plan.length === 0) {
+            problema(
+              "el plan quedo vacio: ningun paquete correria ninguna verificacion. Arreglo: revisa SCRIPTS y EXCEPCIONES, porque tal como estan el paso siguiente no verifica nada",
+            );
+          }
+
+          if (hayFallo) process.exit(1);
+
+          writeFileSync(rutaPlan, `${plan.join("\n")}\n`);
+          console.log(`paquetes del workspace (${paquetes.length}): ${paquetes.join(", ")}`);
+          for (const e of excepciones) console.log(`excepcion declarada y vigente: ${e}`);
+          console.log(`plan: ${plan.length} verificaciones -> ${plan.join(", ")}`);
+          FIN
+
+          node "${RUNNER_TEMP}/verificar-scripts.mjs" \
+            "${RUNNER_TEMP}/paquetes.json" "${RUNNER_TEMP}/plan-verificacion.txt"
+
+      # Se corre parado DENTRO de cada paquete a proposito: ahi `pnpm run
+      # <script>` SI falla cuando el script no existe (ERR_PNPM_NO_SCRIPT,
+      # salida 1), tanto en 9.15 como en 11.18. Es la red de seguridad del
+      # paso anterior, no su reemplazo. El plan viene ordenado por script, asi
+      # que la senal mas barata (typecheck de todos) llega antes que la mas
+      # cara (build).
+      - name: Verificar cada paquete
+        shell: bash
+        run: |
+          set -euo pipefail
+          while IFS= read -r PAR; do
+            [ -n "${PAR}" ] || continue
+            DIR="${PAR%%:*}"
+            SCRIPT="${PAR##*:}"
+            echo "::group::${DIR}: pnpm run ${SCRIPT}"
+            if ! ( cd "${DIR}" && pnpm run "${SCRIPT}" ); then
+              echo "::endgroup::"
+              echo "::error::fallo '${SCRIPT}' en el paquete '${DIR}'. Reproducilo local con: cd ${DIR} && pnpm run ${SCRIPT}"
+              exit 1
+            fi
+            echo "::endgroup::"
+          done < "${RUNNER_TEMP}/plan-verificacion.txt"
+
+      # -------------------------------------------------------------------
+      # LAS DOS VERIFICACIONES QUE EL MARCO PROVEE COMO ACTIONS
+      #
+      # Van DESPUES de la verificacion por paquete a proposito: ambas
+      # interrogan al toolchain ya instalado y, en el caso de la cobertura,
+      # consumen los reportes que las pruebas acaban de emitir. Antes de ese
+      # punto no habria nada que leer.
+      #
+      # No se pueden borrar sin que el marco lo note: el job de marco
+      # comprueba estaticamente que este workflow invoque el censo, y si no
+      # lo encuentra da rojo con el paso listo para pegar. Un guardrail que
+      # se puede sacar en silencio no es un guardrail.
+      # -------------------------------------------------------------------
+
+      # Ningun archivo fuente versionado queda invisible para las
+      # herramientas. Un archivo que no mira ni el analizador ni el
+      # compilador no tiene lint ni tipos, y sus errores llegan a produccion
+      # sin poner nada en rojo. El alcance se DERIVA de las herramientas
+      # configuradas, asi que un paquete o un directorio nuevo entra solo:
+      # no hay lista que nadie tenga que acordarse de actualizar.
+      #
+      # Si un archivo queda fuera a proposito, se declara en el package.json
+      # de SU paquete, bajo projects.cobertura.excluidos, con su motivo escrito.
+      # La exclusion no vuelve imposible la evasion: la vuelve visible, en un
+      # diff, bajo review.
+      - uses: {{ORG}}/Projects/actions/censo-fuentes@v1
+
+      # Cobertura de las lineas que el cambio agrega o modifica. Sin holgura:
+      # codigo nuevo sin pruebas es rojo aunque el paquete tenga margen de
+      # sobra sobre su piso. El piso del total es la OTRA compuerta y vive en
+      # la configuracion de cobertura de cada paquete.
+      #
+      # No mide nada en un push a main —ahi no hay rango— y lo dice en vez de
+      # simular un 100%. Y si no encuentra reportes habiendo lineas
+      # agregadas, es ROJO: "sin datos" no es "todo cubierto".
+      - uses: {{ORG}}/Projects/actions/cobertura-diff@v1
 
   # EL CHECK REQUERIDO POR EL RULESET DE main ES ESTE (nombre exacto: "ci-ok").
   #

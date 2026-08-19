@@ -1,0 +1,66 @@
+name: Censo de fuentes
+description: >-
+  Deriva el alcance real de la verificacion de calidad y falla si algun archivo
+  fuente versionado queda fuera de el, sin exclusion declarada con motivo.
+author: la organización
+
+# ---------------------------------------------------------------------------
+# PERMISOS MINIMOS QUE DEBE CONCEDER EL CONSUMIDOR
+#
+#   permissions:
+#     contents: read   # el checkout previo; esta action no llama a la API
+#
+# No necesita pull-requests ni actions: todo el analisis es local al checkout.
+#
+# REQUISITOS DEL JOB QUE LA USA — LOS DOS, Y EN ESTE ORDEN
+#   1. actions/checkout ANTES de esta action. Basta el checkout por defecto: no
+#      necesita historial (el universo sale de `git ls-files`, no de un diff).
+#   2. Las DEPENDENCIAS DEL REPO YA INSTALADAS (pnpm install / npm ci) ANTES de
+#      esta action. Es la frontera nueva que declara el design (D4): hasta hoy
+#      el marco solo LEIA archivos del consumidor; el censo EJECUTA el toolchain
+#      del consumidor para preguntarle que archivos ve. No lintea, no compila
+#      para emitir, no instala nada — pero sin dependencias instaladas no hay a
+#      quien preguntarle, y la action lo dice con un ::warning:: ruidoso en vez
+#      de pasar en verde.
+#
+# QUE HACE, EN UNA LINEA
+#   universo (git ls-files, filtrado por extension de fuente)
+#     - lo que enumera el analizador estatico del repo
+#     - lo que lista el compilador de cada tsconfig que declara sus entradas
+#     - las exclusiones declaradas en projects.cobertura.excluidos
+#     = los agujeros, y cada uno es rojo con su arreglo escrito.
+#
+# LO QUE NO HACE (limites declarados, no olvidos)
+#   · Dice "alguien lo mira", no "lo mira con las reglas del contrato": un
+#     archivo puede estar dentro del alcance y quedar fuera de las reglas que
+#     dependen de tipos. Es otra propiedad y otro check.
+#   · Un programa de tipos que ningun script ejecuta igual da cobertura: crear
+#     un tsconfig que nadie corre satisface la propiedad.
+#   · Ignorar un archivo del control de versiones lo saca del universo. Es la
+#     evasion mas limpia que existe; la unica defensa es que ignorar codigo
+#     propio es una linea de diff que no se justifica sola.
+#   · La lista de extensiones de fuente vive en el script y se mantiene a mano.
+#     Vive en el marco, asi que se arregla una vez para todos.
+# ---------------------------------------------------------------------------
+
+inputs:
+  directorio-trabajo:
+    description: >-
+      Raiz del repositorio a censar, relativa al working directory del job.
+      Por defecto se usa el toplevel que reporte git.
+    required: false
+    default: ""
+
+runs:
+  using: composite
+  steps:
+    # GITHUB_ACTION_PATH apunta a la copia de ESTA action (projects), no al repo
+    # del consumidor: por eso el script viaja con la action y el proyecto no
+    # vendora ninguna copia que se pueda quedar vieja. Y por eso NO se hace
+    # checkout del repo del marco: el GITHUB_TOKEN de un consumidor no lee otro
+    # repositorio y daria 404 (comprobado el 2026-08-14).
+    - name: Ningun archivo fuente fuera del alcance de la verificacion
+      shell: bash
+      env:
+        CENSO_RAIZ: ${{ inputs.directorio-trabajo }}
+      run: node "${GITHUB_ACTION_PATH}/censo-fuentes.mjs"

@@ -1,0 +1,14 @@
+{
+  "name": "fixture-paquete-a",
+  "private": true,
+  "projects": {
+    "cobertura": {
+      "excluidos": [
+        {
+          "patron": "src/*.gen.ts",
+          "motivo": "lo regenera el codegen del proveedor en cada build; corregirlo a mano se pierde"
+        }
+      ]
+    }
+  }
+}
