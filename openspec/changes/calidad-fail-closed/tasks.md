@@ -8,12 +8,12 @@ estado: pendiente-de-revision
 
 ## 0. Spike: medir antes de prometer
 
-- [ ] 0.1 Agregar el proveedor de cobertura a los dos paquetes del consumidor
+- [x] 0.1 Agregar el proveedor de cobertura a los dos paquetes del consumidor
       (dependencia nueva, ya aprobada) y emitir el reporte con las rutas
       relativas a la raíz del monorepo — sin esa raíz los dos paquetes emiten
       rutas indistinguibles entre sí e incomparables contra el diff. Evidencia:
       el reporte de ambos paquetes con rutas distinguibles.
-- [ ] 0.2 Medir la cobertura real de ambos paquetes, con la base de datos
+- [x] 0.2 Medir la cobertura real de ambos paquetes, con la base de datos
       levantada en CI para el de API. El mínimo del marco es 80% y esa decisión
       ya está tomada; lo que este paso fija es el **piso inicial** de cada
       paquete, que es su valor medido. Un piso inventado por encima de la
@@ -23,6 +23,11 @@ estado: pendiente-de-revision
       oráculo, en local y fuera del pipeline, sobre al menos tres formas de
       cambio: solo agrega, solo borra, y mixto. Evidencia: coinciden, o la
       diferencia está explicada.
+
+**Resultado del bloque 0, que cambió la forma del trabajo:** `api` medía **86,26%**
+y nunca estuvo por debajo del mínimo. Toda la deuda estaba en `web` (30,8%). Es
+la razón por la que el bloque 4 se concentró entero en el frontend, y por la que
+el número de `api` nunca hubo que negociarlo.
 
 ## 1. El banco de pruebas primero
 
@@ -89,18 +94,22 @@ en web y sin medir en API, así que llegar es trabajo de escribir pruebas, no de
 configuración. Se hace subiendo el piso por tandas: cada tanda sube el piso, y el
 piso impide que la ganancia se pierda.
 
-- [ ] 4.1 Priorizar las tandas por RIESGO, no por tamaño de archivo: primero el
+- [x] 4.1 Priorizar las tandas por RIESGO, no por tamaño de archivo: primero el
       flujo del colaborador y las reglas de negocio de asignaciones y cesiones,
       que es donde un defecto se paga caro. Las 17 unidades sin ejecutar una
       línea están enumeradas en el recon.
-- [ ] 4.2 Cada tanda escribe sus pruebas **contra los scenarios de los specs
+- [x] 4.2 Cada tanda escribe sus pruebas **contra los scenarios de los specs
       vivos**, que ya dicen qué tiene que pasar. No es una preferencia de
       estilo: es lo que impide que el 80% se alcance ejecutando líneas sin
       verificar nada, que es la tentación conocida de todo objetivo numérico.
-- [ ] 4.3 Cada tanda sube el piso del paquete en el mismo PR que agrega sus
+- [x] 4.3 Cada tanda sube el piso del paquete en el mismo PR que agrega sus
       pruebas. Sin eso la ganancia queda sin proteger.
-- [ ] 4.4 Al llegar a 80% en un paquete, su piso deja de ser provisional y pasa
-      a ser el mínimo del marco.
+- [x] 4.4 El piso de un paquete es `max(mínimo del marco, valor medido)`.
+      **Corrección de esta tarea:** estaba escrita como «al llegar a 80% el piso
+      pasa a ser el mínimo del marco», y aplicarla al pie de la letra bajaría el
+      piso de un paquete que ya supera el mínimo —de 80,9 a 80— perdiendo
+      justo la protección que el bloque agrega. El mínimo es el suelo del
+      contrato; el piso es la ganancia acumulada, y nunca es menor.
 
 ## 5. Cierre
 
