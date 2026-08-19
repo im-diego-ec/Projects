@@ -33,6 +33,81 @@ jobs:
     # justamente lo que hay que probar. Si un default no sirve para Projects,
     # tampoco sirve para los proyectos — se arregla el default, no este bloque.
 
+  # Banco de pruebas de las composite actions del marco.
+  #
+  # POR QUE ES UN JOB PROPIO Y NO UNA BUENA PRACTICA. El marco NO puede
+  # dogfoodear los checks que interrogan manifiestos de paquete: Projects no tiene
+  # ninguno, asi que sobre este repo el censo de fuentes no verifica nada (el
+  # mismo limite declarado que el check de marcadores del scaffold). La
+  # diferencia es que estas piezas traen codigo no trivial, y su unica evidencia
+  # posible son los casos sinteticos de aca mas la validacion contra un
+  # consumidor real. Sin este job, ese codigo llega a todos los consumidores sin
+  # que nada lo pruebe.
+  pruebas_actions:
+    name: pruebas-actions
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with: { node-version: "22" }
+
+      # Que actions quedan SIN banco, derivado del arbol y no de una lista que
+      # alguien tenga que acordarse de actualizar: toda action que traiga su
+      # propio script .mjs deberia traer sus pruebas al lado. Hoy no puede ser
+      # rojo (guardrail-deltas es anterior a esta regla y su puesta al dia es
+      # otro change), pero tampoco puede pasar mudo — un fail-open silencioso es
+      # justamente lo que el marco prohibe.
+      - name: Que actions quedan sin banco de pruebas
+        shell: bash
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+
+          SIN_BANCO=()
+          for ACCION in actions/*/; do
+            SCRIPTS=("${ACCION}"*.mjs)
+            if [ ${#SCRIPTS[@]} -eq 0 ]; then
+              continue
+            fi
+            BANCO=("${ACCION}pruebas/"*.test.mjs)
+            if [ ${#BANCO[@]} -eq 0 ]; then
+              SIN_BANCO+=("${ACCION%/}")
+            fi
+          done
+
+          if [ ${#SIN_BANCO[@]} -gt 0 ]; then
+            echo "::warning::estas actions traen script propio y ningun banco de pruebas: ${SIN_BANCO[*]}. Su codigo llega a todos los consumidores de @v1 sin haberse ejecutado nunca sobre un caso controlado. Arreglo: agregar <action>/pruebas/<nombre>.test.mjs, que el paso siguiente recoge solo"
+          else
+            echo "toda action con script propio trae su banco de pruebas"
+          fi
+
+      # node --test es el runner que trae Node 22: cero dependencias, igual que
+      # el resto del marco. Los archivos se pasan uno por uno a proposito:
+      # `node --test <directorio>` no resuelve el patron en las versiones nuevas
+      # de Node y el job quedaria rojo por una razon que no es la suya.
+      - name: Casos sinteticos de las composite actions
+        shell: bash
+        run: |
+          set -euo pipefail
+          shopt -s globstar nullglob
+
+          PRUEBAS=(actions/**/pruebas/*.test.mjs)
+
+          # "No encontre pruebas" JAMAS se reporta como exito: un renombrado de
+          # carpeta, un glob que deja de matchear o un checkout parcial dejarian
+          # este job en verde sin haber ejecutado una sola asercion, que es
+          # exactamente el fail-open mudo que el marco prohibe.
+          if [ ${#PRUEBAS[@]} -eq 0 ]; then
+            echo "::error::no se encontro ningun archivo de pruebas en actions/**/pruebas/*.test.mjs. Si moviste el banco de pruebas, actualiza este patron; si lo borraste, el codigo de las actions quedo sin cobertura"
+            exit 1
+          fi
+
+          echo "== bancos de pruebas encontrados (node $(node --version)) =="
+          printf '%s\n' "${PRUEBAS[@]}"
+
+          node --test "${PRUEBAS[@]}"
+
   # Check REQUERIDO por el ruleset main-protegida (nombre exacto: "ci-ok").
   #
   # if: always() no es opcional: si "marco" falla y este job se saltea, el check
@@ -44,7 +119,7 @@ jobs:
   # el veredicto lo cuenta como exito SOLO si la deteccion dijo solo-docs.
   ci_ok:
     name: ci-ok
-    needs: [marco]
+    needs: [marco, pruebas_actions]
     if: always()
     runs-on: ubuntu-latest
     steps:
@@ -55,5 +130,9 @@ jobs:
             echo "::error::el CI de marco termino en '${{ needs.marco.result }}'"
             exit 1
           }
+          [ "${{ needs.pruebas_actions.result }}" = "success" ] || {
+            echo "::error::el banco de pruebas de las actions termino en '${{ needs.pruebas_actions.result }}'"
+            exit 1
+          }
           echo "marco: OK (solo_docs=${{ needs.marco.outputs.solo_docs }}, deteccion_confiable=${{ needs.marco.outputs.deteccion_confiable }})"
-          echo "Projects no tiene build/test de producto: el veredicto es el del marco"
+          echo "Projects no tiene build/test de producto: el veredicto es el del marco mas su banco de pruebas"

@@ -75,7 +75,20 @@ cuál paquete corre en Node y cuál en el navegador.
 |---|---|---|---|
 | `{{PAQUETE_API}}` | Carpeta del backend | `api` | — |
 | `{{PAQUETE_WEB}}` | Carpeta del frontend | `web` | Borrar los bloques `[FRONT]` de `eslint.config.mjs` y sus imports |
-| `{{PAQUETE_E2E}}` | Carpeta de la suite E2E | `e2e` | Borrar esa entrada del glob de Node |
+| `{{PAQUETE_E2E}}` | Carpeta de la suite E2E | `e2e` | Borrar esa entrada del glob de Node **y las dos entradas `EXCEPCIONES` de `ci.yml`** (una excepción que no corresponde a ningún paquete es roja, a propósito) |
+
+### Generación de código previa a la verificación
+
+| Placeholder | Qué poner | Ejemplo | Si no existe |
+|---|---|---|---|
+| `{{GENERAR_CLIENTE_DATOS}}` | Comando que genera el cliente de la capa de datos, tal como se invoca **dentro** del paquete de backend | `prisma generate` | Borrar el paso "Generar el cliente de la capa de datos" de `.github/workflows/ci.yml` |
+
+El paso existe y va **antes** del lint por una razón concreta: el código de acceso a datos
+está tipado contra el cliente generado, así que si el cliente no está, las reglas
+type-aware no tienen tipos que mirar y cada acceso a datos vuelve a ser `any` silencioso —
+el lint pasa en verde sin haber verificado nada. Vale para cualquier artefacto generado del
+que dependa el tipado, no solo para el cliente de datos: si el proyecto tiene otro, se
+agrega junto a este.
 
 ### Personas, por ROL (nunca nombres propios en la prosa)
 
@@ -160,6 +173,15 @@ Un buscar-y-reemplazar no los resuelve: son decisiones.
 - **`dependabot.yml` → versiones ignoradas de node**. La lista filtra las **impares**
   (no-LTS, soporte corto); las pares llegan como PR automático. Ajustala si el proyecto
   arranca en otra mayor.
+- **`.github/workflows/ci.yml` → `SCRIPTS` y `EXCEPCIONES`** del paso "Todo paquete declara
+  los scripts de verificación". `SCRIPTS` es lo que el CI le exige a **cada** paquete
+  (`typecheck test build` por defecto); `EXCEPCIONES` es la lista —escrita, con su motivo al
+  lado— de los pares `<carpeta>:<script>` que legítimamente no corren. Vienen con las dos de
+  la suite E2E (su `test` levanta navegadores contra un ambiente desplegado y una suite no
+  produce artefacto). No hay que mantener ninguna lista de paquetes: esa se deriva de pnpm
+  en cada corrida. Las dos formas de equivocarse acá terminan en rojo, nunca en un verde
+  falso: si falta una excepción, el CI pide el script que falta; si sobra, falla por
+  excepción muerta.
 - **`.claude/settings.json`**. Es el allowlist del EQUIPO (por eso se versiona, a
   diferencia de `settings.local.json`, que es por máquina y está en `.gitignore`). Trae solo
   comandos de lectura/verificación: lint, typecheck, tests, `terraform validate`,
@@ -196,9 +218,7 @@ tolerado".
   "scripts": {
     "lint": "eslint . --max-warnings=0",
     "format": "prettier --write .",
-    "format:check": "prettier --check .",
-    "build": "pnpm -r build",
-    "test": "pnpm -r test"
+    "format:check": "prettier --check ."
   },
   "devDependencies": {
     "@eslint/js": "^9.17.0",
@@ -210,6 +230,15 @@ tolerado".
   }
 }
 ```
+
+**`typecheck`, `test` y `build` NO van en la raíz: los declara cada paquete.** El CI se los
+exige uno por uno y falla nombrando el `package.json` que no los tenga, así que un paquete
+nuevo queda cubierto sin que nadie lo agregue a ninguna lista. Y en la raíz no hay
+`"test": "pnpm -r test"` ni `"build": "pnpm -r build"` **a propósito**: `pnpm -r <script>`
+saltea en silencio todo paquete que no declara ese script —imprime `Scope: N of M workspace
+projects` y sale 0— y, en el caso de `test`, además dispararía la suite E2E con navegadores.
+Un agregador que miente en verde es peor que no tener agregador. Para correr una
+verificación local se usa la del paquete: `cd <paquete> && pnpm run typecheck`.
 
 Con frontend React, agregar además: `eslint-plugin-react-hooks`,
 `eslint-plugin-react-refresh` y —solo si se usa TanStack Query—
@@ -227,6 +256,9 @@ vez; después ninguno pide que alguien se acuerde de nada.
 - [ ] `grep -rnE "\{\{[A-Z0-9_]+\}\}" .` sin resultados (fuera de `node_modules` y `.git`)
 - [ ] Tabla de stack de `AGENTS.md` llena y sección "🕳️ Antes del primer commit" borrada
 - [ ] `pnpm lint` y `pnpm format:check` corren y pasan en el repo vacío
+- [ ] Cada paquete declara `typecheck`, `test` y `build` (o su excepción está escrita con el
+      motivo en `EXCEPCIONES` del `ci.yml`). No hace falta acordarse: el CI lo exige y falla
+      nombrando el `package.json` incompleto
 - [ ] `.github/workflows/ci.yml`: el job `build_test` refleja el stack real y el job `marco`
       apunta a `<org>/projects/.github/workflows/marco-ci.yml@v1`
 - [ ] Los tres handles de `.github/CODEOWNERS` existen en la org y tienen acceso de escritura
