@@ -77,12 +77,39 @@ existía y se declara como impacto, no se cuela como detalle.
 Su consecuencia real: un cambio mayor del analizador o del compilador puede mover
 la API de introspección y afectar a todos los consumidores a la vez.
 
-### D5 — Cobertura sobre el diff, con comparador propio
+### D5 — Cobertura en dos planos: el mínimo del marco y el diff sin holgura
 
-La propiedad no es «el número sube», es **«no existe un número que alguien deba
-bajar a mano»**. Todo umbral almacenado obliga, el día que se borra código bien
-cubierto, a que una persona lo baje por el mismo camino por el que pasa un
-cambio normal. Medir solo las líneas del cambio no almacena ninguno.
+**El mínimo acordado es 80% por paquete.** Decisión del DRI, tomada a sabiendas
+de las dos objeciones que se le hicieron y que quedan registradas acá para que
+nadie las vuelva a plantear como si fueran nuevas:
+
+1. *No existe un número estándar de la industria*; el 80% es una convención.
+2. *La cobertura mide qué líneas se ejecutaron, no si alguien verificó algo*: se
+   puede llegar al número con pruebas que no afirman nada, y cuando el número es
+   el objetivo esa es la tentación. Mitigación adoptada, barata y concreta: las
+   pruebas de la puesta al día se escriben **contra los scenarios de los specs
+   vivos**, que ya dicen qué tiene que pasar, de modo que el porcentaje sale de
+   verificar comportamiento especificado y no de ejecutar líneas.
+
+**Corrección de un error de razonamiento previo.** Una versión anterior de este
+diseño descartó todo umbral apoyándose en la regla «invariantes como propiedades,
+no como números». Esa regla está escrita para **migraciones de datos** —nació de
+una migración que un conteo esperado habría abortado por un falso fallo— y no
+para toda medición. Un piso de cobertura no está prohibido por la constitución.
+
+**Dos planos, porque cada uno tapa lo que el otro deja abierto.** Sobre el diff,
+sin holgura: código nuevo sin pruebas es rojo aunque el paquete tenga margen de
+sobra — sin esto, un paquete al 90% admite código sin pruebas hasta agotar el
+margen. Sobre el total, que no retrocede: sin esto, lo que ya está sin cubrir se
+queda así para siempre, porque nada lo exige mientras nadie lo toque. Es
+exactamente el hueco que tiene el enfoque por diff a solas.
+
+**El piso sube, y bajarlo es visible.** Mientras un paquete no llegue al mínimo,
+su total vigente hace de piso y la integración falla si retrocede. Se acepta el
+falso positivo conocido —borrar código bien cubierto baja el porcentaje sin que
+nadie empeore nada— con la misma lógica que las exclusiones del alcance: no se
+vuelve imposible, se vuelve **visible**. Bajar el piso es una línea de diff con
+su justificación, bajo review, y no un ajuste silencioso.
 
 El comparador se escribe acá en vez de adoptar una herramienta externa, por una
 razón que pesa más que las otras: la herramienta candidata **falla en verde**. Si
@@ -93,6 +120,20 @@ pero como oráculo de contraste en el spike, fuera del pipeline.
 
 La ausencia de datos habiendo líneas agregadas es **roja y ruidosa**, nunca un
 éxito silencioso.
+
+### D5b — El 80% se alcanza subiendo el piso, no encendiendo un interruptor
+
+El consumidor está hoy muy por debajo del mínimo: 31,44% en el paquete web, con
+17 de 38 archivos sin ejecutar una sola línea, y el paquete de API sin medir.
+Exigir 80% de golpe deja el pipeline en rojo durante todo el tiempo que lleve
+escribir las pruebas —semanas, no horas—, y un rojo permanente se convierte en
+un rojo que todos aprenden a ignorar, que es peor que no tener la compuerta.
+
+Por eso el mínimo entra por el plano del diff **desde el primer día** (no
+requiere trabajo previo: solo aplica a lo que se escriba de ahora en adelante) y
+por el plano del total **como piso que sube**. El destino es el mismo; la
+diferencia es que así la compuerta protege cada avance desde el principio en vez
+de estar apagada hasta que termine la puesta al día.
 
 ### D6 — El orden reemplaza al modo aviso, otra vez
 

@@ -13,9 +13,12 @@ estado: pendiente-de-revision
       relativas a la raíz del monorepo — sin esa raíz los dos paquetes emiten
       rutas indistinguibles entre sí e incomparables contra el diff. Evidencia:
       el reporte de ambos paquetes con rutas distinguibles.
-- [ ] 0.2 Obtener el número real de cobertura del paquete de API, que hoy nadie
-      conoce, con la base de datos levantada en CI. **Ningún número entra a un
-      spec antes de este paso**: escribirlo sin el dato es inventar el contrato.
+- [ ] 0.2 Medir la cobertura real de ambos paquetes, con la base de datos
+      levantada en CI para el de API. El mínimo del marco es 80% y esa decisión
+      ya está tomada; lo que este paso fija es el **piso inicial** de cada
+      paquete, que es su valor medido. Un piso inventado por encima de la
+      realidad deja el pipeline en rojo desde el día uno; uno por debajo no
+      protege nada.
 - [ ] 0.3 Contrastar el comparador propio contra la herramienta externa como
       oráculo, en local y fuera del pipeline, sobre al menos tres formas de
       cambio: solo agrega, solo borra, y mixto. Evidencia: coinciden, o la
@@ -47,9 +50,11 @@ estado: pendiente-de-revision
 - [ ] 2.3 La derivación del alcance como pieza referenciada, con su script
       viajando adentro —por la razón ya comprobada: el token de un consumidor no
       lee otro repositorio—. Emite el detalle al resumen de la corrida.
-- [ ] 2.4 El comparador de cobertura del diff como pieza referenciada, naciendo
-      **sin bloquear** (mínimo en cero). Que cada proyecto suba su mínimo es
-      decisión del proyecto; subir el default del marco sería línea mayor.
+- [ ] 2.4 El comparador de cobertura como pieza referenciada, con los dos
+      planos: el mínimo del marco (80%) sobre las líneas del diff, que bloquea
+      desde el día uno porque solo aplica a código nuevo; y el piso por paquete
+      sobre el total, que bloquea el retroceso. Bajar un piso exige declaración
+      explícita en el diff — visible y revisable, nunca silenciosa.
 - [ ] 2.5 Corregir el scaffold: hoy reparte tres recorridos de paquetes que
       saltean en silencio, y cada proyecto nuevo los hereda el día uno.
 - [ ] 2.6 Entrada de CHANGELOG en este mismo PR, diciendo qué tiene que hacer un
@@ -77,11 +82,31 @@ roto». Regenerando el consumidor primero, no hay repo roto ni línea mayor.
 - [ ] 3.4 En el consumidor: encender el gate de formato. El reformateo y las
       exclusiones de generados ya están; falta el paso.
 
-## 4. Cierre
+## 4. La puesta al día hasta el 80%
 
-- [ ] 4.1 Confirmar que ningún consumidor quedó rojo por el aterrizaje.
-- [ ] 4.2 Archivar el change y mover el tag mayor.
-- [ ] 4.3 Anotar en la lista de reglas no escritas del marco qué filas cierra
+El mínimo es 80% por paquete (decisión del DRI). El consumidor arranca en 31,44%
+en web y sin medir en API, así que llegar es trabajo de escribir pruebas, no de
+configuración. Se hace subiendo el piso por tandas: cada tanda sube el piso, y el
+piso impide que la ganancia se pierda.
+
+- [ ] 4.1 Priorizar las tandas por RIESGO, no por tamaño de archivo: primero el
+      flujo del colaborador y las reglas de negocio de asignaciones y cesiones,
+      que es donde un defecto se paga caro. Las 17 unidades sin ejecutar una
+      línea están enumeradas en el recon.
+- [ ] 4.2 Cada tanda escribe sus pruebas **contra los scenarios de los specs
+      vivos**, que ya dicen qué tiene que pasar. No es una preferencia de
+      estilo: es lo que impide que el 80% se alcance ejecutando líneas sin
+      verificar nada, que es la tentación conocida de todo objetivo numérico.
+- [ ] 4.3 Cada tanda sube el piso del paquete en el mismo PR que agrega sus
+      pruebas. Sin eso la ganancia queda sin proteger.
+- [ ] 4.4 Al llegar a 80% en un paquete, su piso deja de ser provisional y pasa
+      a ser el mínimo del marco.
+
+## 5. Cierre
+
+- [ ] 5.1 Confirmar que ningún consumidor quedó rojo por el aterrizaje.
+- [ ] 5.2 Archivar el change y mover el tag mayor.
+- [ ] 5.3 Anotar en la lista de reglas no escritas del marco qué filas cierra
       esto y cuáles quedan abiertas —con el punto de entrada único de
       verificación declarado como deuda, no como olvido: hoy no existe ningún
       comando local que reproduzca lo que hace el pipeline, y la regla de correr

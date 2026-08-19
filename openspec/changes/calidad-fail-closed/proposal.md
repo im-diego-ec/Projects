@@ -61,13 +61,22 @@ afirmación firmada en un manifiesto, dentro de un diff, bajo review cruzado.
 **Los scripts que enmascaran su fallo pasan a ser rojo**, implementando por fin
 un requirement que el contrato ya tenía.
 
-**La cobertura se mide sobre el diff, no sobre el total.** Esta es la decisión
-de fondo y merece decirse por qué: cualquier mecanismo basado en un umbral
-guarda un número, y un número guardado es un número que alguien va a tener que
-bajar a mano el día que borre código bien cubierto —por el mismo camino por el
-que pasa un cambio normal—. La propiedad que hay que hacer cumplir no es «el
-número sube», es **«no existe un número que alguien tenga que bajar a mano»**.
-Solo medir el diff no guarda ninguno. Nace sin bloquear a nadie: primero mide.
+**La cobertura de pruebas pasa a tener un mínimo exigido: 80% por paquete**, y se
+verifica en dos planos porque cada uno tapa lo que el otro deja abierto. Sobre
+**el diff**, sin holgura: código nuevo sin pruebas detiene la integración aunque
+el paquete tenga margen de sobra — sin esto, un paquete al 90% admite código sin
+pruebas hasta agotarlo. Sobre **el total**, que no retrocede — sin esto, lo que ya
+está sin cubrir se queda así para siempre, porque nada lo exige mientras nadie lo
+toque.
+
+El consumidor está hoy muy por debajo: 31,44% en el paquete web, con 17 de 38
+archivos que no ejecutan una sola línea bajo prueba, y el paquete de API sin
+medir. Por eso el mínimo **no se enciende como interruptor**: entra por el plano
+del diff desde el primer día —que no exige trabajo previo, porque solo aplica a
+lo que se escriba de ahora en adelante— y por el plano del total como piso que
+sube con cada tanda de pruebas. Exigirlo de golpe dejaría el pipeline en rojo
+durante semanas, y un rojo permanente termina siendo un rojo que todos aprenden a
+ignorar: peor que no tener la compuerta.
 
 ## Capabilities
 
@@ -75,8 +84,8 @@ Solo medir el diff no guarda ninguno. Nace sin bloquear a nadie: primero mide.
 
 - `calidad-codigo`: el alcance de la verificación deja de enunciarse por paquete
   y pasa a enunciarse por archivo; se agrega la detección del enmascaramiento en
-  integración; se agregan el formato y la cobertura del diff como verificaciones
-  de cada integración.
+  integración; y se agregan el formato y la cobertura de pruebas —con su mínimo
+  exigido— como verificaciones de cada integración.
 
 ## Impact
 
