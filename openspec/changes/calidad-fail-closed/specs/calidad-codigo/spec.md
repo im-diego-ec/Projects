@@ -114,30 +114,52 @@ permanente sobre un archivo que ninguna persona escribió ni puede corregir.
 - **WHEN** el repositorio versiona archivos que una herramienta genera y regenera
 - **THEN** la verificación de formato no los evalúa
 
-### Requirement: La cobertura de los cambios se mide en cada integración
+### Requirement: La cobertura de pruebas alcanza el mínimo acordado y no retrocede
 
-La cobertura de pruebas SHALL medirse en cada integración sobre **las líneas que
-el cambio agrega o modifica**, y NO contra un umbral global almacenado.
+Cada paquete verificable del repositorio SHALL alcanzar el mínimo de cobertura
+de pruebas acordado por el marco, y la integración SHALL fallar cuando la
+cobertura de un paquete quede por debajo de él.
 
-La razón es una propiedad, no una preferencia: todo mecanismo basado en un
-umbral almacenado obliga, el día que se borra código bien cubierto, a que una
-persona baje ese número a mano por el mismo camino por el que pasa un cambio
-normal. La propiedad a garantizar no es que la cobertura suba, sino que **no
-exista un número que alguien deba bajar a mano**. Medir únicamente el cambio no
-almacena ninguno.
+La verificación SHALL aplicarse en dos planos, porque cada uno tapa un hueco que
+el otro deja abierto:
+
+- **Sobre las líneas que el cambio agrega o modifica**, sin holgura: código nuevo
+  sin pruebas detiene la integración aunque el total del paquete siga por encima
+  del mínimo. Sin este plano, un paquete con margen admite código sin pruebas
+  hasta agotarlo.
+- **Sobre el total del paquete**, que NO SHALL retroceder. Sin este plano, el
+  código que ya existe sin pruebas puede quedarse así indefinidamente, porque
+  nada lo obliga a nadie mientras nadie lo toque.
+
+Mientras un paquete no alcance el mínimo, su total vigente SHALL funcionar como
+piso: la integración falla si baja de ahí. El piso SHALL subir a medida que se
+agregan pruebas, y descenderlo SHALL requerir una declaración explícita y
+revisable, no un ajuste silencioso.
 
 La medición SHALL distinguir «cubierto» de «no medido»: la ausencia de datos de
 cobertura habiendo líneas agregadas SHALL ser un fallo ruidoso y NO un éxito
 silencioso.
 
+Un paquete PUEDE excluir del cálculo el código que no le corresponde probar
+—generado por otra herramienta, o puro arranque de la aplicación— declarándolo
+con su motivo escrito, del mismo modo que las exclusiones del alcance.
+
 #### Scenario: Un cambio que agrega código sin pruebas
-- **WHEN** un cambio agrega líneas ejecutables y ninguna prueba las ejercita
-- **THEN** la integración lo reporta, indicando qué líneas quedaron sin cubrir
+- **WHEN** un cambio agrega líneas ejecutables y las pruebas no las ejercitan en la proporción mínima acordada
+- **THEN** la integración falla indicando qué líneas quedaron sin cubrir, aunque el total del paquete siga por encima del mínimo
+
+#### Scenario: Un paquete por debajo del mínimo acordado
+- **WHEN** la cobertura total de un paquete está por debajo del mínimo del marco
+- **THEN** la integración falla si además está por debajo del piso vigente de ese paquete, y en todo caso reporta cuánto falta para el mínimo
 
 #### Scenario: Un cambio que solo elimina código
 - **WHEN** un cambio únicamente elimina líneas, o renombra sin agregar código ejecutable
-- **THEN** la medición pasa sin producir ruido, porque no hay líneas nuevas que cubrir
+- **THEN** la medición del cambio pasa sin producir ruido, porque no hay líneas nuevas que cubrir
 
 #### Scenario: No hay datos de cobertura habiendo líneas agregadas
 - **WHEN** un cambio agrega líneas ejecutables y la medición no encuentra datos de cobertura que les correspondan
 - **THEN** la integración falla señalando el problema de configuración, en vez de reportar cobertura total
+
+#### Scenario: Código excluido del cálculo con su motivo declarado
+- **WHEN** un paquete declara, con su justificación escrita, que cierto código no le corresponde probar
+- **THEN** ese código no cuenta en el cálculo y la exclusión queda registrada en el resumen de la corrida
