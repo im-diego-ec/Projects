@@ -1,6 +1,5 @@
-# CODEOWNERS de PROJECTS — automatiza el REVIEW CRUZADO entre builders y el gate
-# del PO sobre los contratos del marco. Los roles y su alcance estan en
-# AGENTS.md.
+# CODEOWNERS de PROJECTS — automatiza el REVIEW CRUZADO entre builders y acota el
+# gate del PO a lo que de verdad le corresponde en el repo del marco.
 #
 # Mecanica clave: GitHub solicita review a todos los owners EXCEPTO el autor
 # del PR. Con el equipo de builders como owner de todo, el PR de un builder
@@ -20,20 +19,37 @@
 #
 # Enforcement duro (required_approving_review_count=1 +
 # require_code_owner_review en el ruleset que protege main): hoy DIFERIDO a
-# proposito. Estado real y motivo en .github/proteccion-main.md. Sin eso,
-# CODEOWNERS solo sugiere reviewers; con eso, el review cruzado es condicion
-# de merge.
+# proposito. Estado real y motivo en .github/proteccion-main.md.
 
 *                                  @im-diego-ec/builders
 
-# El PO es el UNICO owner de los contratos del marco: la ultima regla que
-# matchea REEMPLAZA a los owners (no suma), asi que en estas rutas el reviewer
-# auto-asignado es el PO — y con el enforcement duro activo, su aprobacion es
-# EL gate, sin que un builder pueda satisfacerlo por el. Por eso el PO no es
-# miembro del equipo de builders: si lo fuera, la separacion se caeria.
+# ---------------------------------------------------------------------------
+# POR QUE EL PO NO ES OWNER DE TODOS LOS CONTRATOS EN ESTE REPO
 #
-# Por que los specs y los proposals y no el resto: son el QUE y el POR QUE del
-# marco. El COMO (workflows, actions, plantilla) es territorio de builders.
-/openspec/specs/                   @im-diego-ec/po
-/openspec/changes/**/proposal.md   @im-diego-ec/po
-/openspec/changes/**/specs/        @im-diego-ec/po
+# En un repo de PRODUCTO el PO es owner de los proposals y de los specs, porque
+# ahi esos artefactos son el QUE y el POR QUE del negocio. Projects copio ese
+# reparto en su bootstrap, y estaba mal por una razon simple: aca no hay
+# producto. TODO change de este repo es tecnico del estandar de trabajo, asi
+# que la regla heredada convertia al PO en revisor obligatorio de cada
+# guardrail de ingenieria — un cuello de botella sin contrapartida, y un gate
+# que pide criterio sobre decisiones que no son suyas.
+#
+# El reparto acotado sigue la misma linea que el resto del marco: el PO es
+# dueño del QUE y el POR QUE, los builders del COMO. En el repo del marco eso
+# se traduce en que el PO gatea la gobernanza del TRABAJO —los roles, quien
+# aprueba que, como se revisa— porque ese es su modelo operativo; y no gatea la
+# MAQUINARIA —pipelines, guardrails, scaffold, plantillas—, que es territorio
+# de builders.
+#
+# El PO sigue informado de todo change (frontmatter `informado:`) y puede
+# revisar lo que quiera: acotar el gate le quita la obligacion, no el acceso.
+#
+# Ojo con el spec canonico "Definicion de propietarios de codigo": su segundo
+# escenario exige que el rol de producto quede asignado en los "artefactos de
+# decision de PRODUCTO". En Projects ese escenario no dispara porque no hay
+# producto — el spec describe lo que debe hacer el CODEOWNERS de un PROYECTO
+# adoptante, no el de este repo. Por eso acotar aca no contradice el contrato
+# y no necesita delta.
+# ---------------------------------------------------------------------------
+/openspec/specs/gobierno-contribucion/              @im-diego-ec/po
+/openspec/changes/**/specs/gobierno-contribucion/   @im-diego-ec/po
