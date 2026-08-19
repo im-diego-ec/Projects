@@ -26,10 +26,10 @@
 // si alguna herramienta no se pudo interrogar.
 
 import { spawnSync } from "node:child_process";
-import { existsSync, readFileSync, appendFileSync } from "node:fs";
+import { existsSync, readFileSync, appendFileSync, realpathSync } from "node:fs";
 import { createRequire } from "node:module";
-import { dirname, join, basename } from "node:path";
-import { pathToFileURL } from "node:url";
+import { dirname, join, basename, resolve } from "node:path";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
 // ---------------------------------------------------------------------------
 // LÍMITE DECLARADO DEL DISEÑO
@@ -735,6 +735,27 @@ export async function main() {
 }
 
 // Solo corre cuando se ejecuta como programa; importado desde las pruebas, no.
-if (process.argv[1] && pathToFileURL(process.argv[1]).href === import.meta.url) {
+//
+// La comparación pasa por realpath y, en Windows, ignora mayúsculas: la misma
+// ruta llega con nombres cortos (JSANTA~1), a través de un enlace de directorio
+// o con otra caja según quién invoque, y Node resuelve el enlace para
+// `import.meta.url` pero NO para `process.argv[1]`. Una comparación literal
+// contestaría "no soy el principal" y el proceso terminaría en exit 0 sin
+// censar nada ni decir una palabra: es el único fail-open posible de este
+// script, y por eso lo cubre una prueba que lo SPAWNEA por una ruta no
+// canónica. Copiada de medir-cobertura-diff.mjs, que cerró el mismo agujero.
+function mismaRuta(a, b) {
+  const real = (p) => {
+    try {
+      return realpathSync(p);
+    } catch {
+      return resolve(p);
+    }
+  };
+  const [x, y] = [real(a), real(b)];
+  return process.platform === "win32" ? x.toLowerCase() === y.toLowerCase() : x === y;
+}
+
+if (process.argv[1] && mismaRuta(process.argv[1], fileURLToPath(import.meta.url))) {
   process.exit(await main());
 }

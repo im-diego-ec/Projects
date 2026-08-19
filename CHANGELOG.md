@@ -73,6 +73,22 @@ consumidor: sin cablear el paso del censo, el check de cableado da rojo. Ver
   con éxito — o sea que cablearla mal deja el gate abierto. Por eso el
   comparador es propio.
 
+  «No hay datos» es rojo en las **cuatro** formas en que aparece, no solo en la
+  más visible: ninguna ruta `SF:` versionada; un archivo **fuente** del cambio
+  que ningún reporte reclama (qué es fuente sale de la lista de extensiones del
+  censo, no de las que casualmente traen los reportes); un reporte que reclama
+  el archivo pero no llega hasta donde el cambio escribió (`lcov` rancio: cache
+  de CI, suite no recorrida); y una ruta `SF:` que corresponde a dos archivos
+  versionados en un monorepo sin `projectRoot`. La válvula de escape legítima es
+  la exclusión declarada con motivo en `projects.cobertura.excluidos`, la misma
+  mecánica del censo.
+
+  El porcentaje **nunca** se publica solo: la salida `lineas_fuera_de_medicion`
+  dice cuántas líneas fuente quedaron fuera del denominador, porque una línea
+  cubierta y cincuenta sin dato dan "100.00" sobre una cobertura real del 2%. Y
+  un `minimo` por debajo del 80 del marco pasa, pero con un `::warning::` que
+  dice cuál es el del marco: bajarlo es decisión del consumidor, y es visible.
+
 - **Dos checks estáticos nuevos en el job `higiene` del workflow reusable.**
   Llegan solos a todo consumidor de `@v1`, sin nada que copiar del otro lado, y
   son independientes entre sí: un repo con los dos problemas los ve **los dos en
@@ -138,6 +154,64 @@ consumidor: sin cablear el paso del censo, el check de cableado da rojo. Ver
 Los tres puntos anteriores son **scaffold**: se copian una vez y quedan en el
 proyecto. No alcanzan a los repos ya creados, que se ponen al día por su propio
 change.
+
+### Corregido — diez fail-open, encontrados por una auditoría adversarial
+
+Antes de publicarse, las dos piezas pasaron por un crítico dedicado a buscar
+**caminos que terminan en verde sin haber verificado nada**. Encontró diez, todos
+reproducidos con casos ejecutables; los diez están cerrados y cada uno dejó su
+caso en el banco. Vale la pena que un consumidor sepa qué se corrigió, porque
+son exactamente los modos de falla que hacen que un gate dé confianza sin darla:
+
+- **Un reporte de cobertura desactualizado** hacía que las líneas nuevas se
+  leyeran como «no ejecutables» y el paso saliera en verde y mudo. Vector real:
+  una caché de CI que restaura `coverage/`. Peor: una línea *modificada* que
+  conserva su número heredaba el resultado viejo y contaba como cubierta.
+- **Un archivo cuya extensión ningún reporte medía** salía en silencio, y en un
+  cambio mixto el porcentaje publicado llegó a decir **100%** sobre una
+  cobertura real del 2%. Ahora la clasificación usa la definición de «código
+  fuente» del censo —la misma para las dos piezas— y el porcentaje **nunca** se
+  publica sin declarar cuántas líneas quedaron fuera del denominador.
+- **Un archivo fuente que ningún reporte reclama** avisaba y dejaba pasar,
+  cuando el contrato promete que la integración falla. Ahora es rojo, y para no
+  enrojecer lo legítimo se consultan las exclusiones declaradas con motivo, que
+  el comparador ignoraba.
+- **Un monorepo sin `projectRoot`** cuyas rutas colisionaban con homónimos de la
+  raíz pasaba en verde y con el diagnóstico equivocado. Ahora es rojo y nombra
+  la causa correcta.
+- **El detector de enmascaramiento** dejaba pasar cinco formas verificadas
+  —`|| echo`, `| tee`, `; echo`, un comentario al final, `|| true && echo`— y
+  encima afirmaba haber comprobado algo que no comprobó. Se reemplazó la
+  búsqueda de sufijos por un lector de la cadena de comandos.
+- **El check de «censo cableado» se satisfacía con un README** que contuviera la
+  línea del ejemplo — la misma línea que el propio mensaje de error imprime para
+  que la pegues. Ahora solo mira los archivos que el proveedor de CI ejecuta.
+- **Artefactos presentes sin versión declarada** contaban como «nada que
+  verificar», justo la clase más atrasada posible y la que motivó el check.
+- **Un `grep` sin permiso de lectura** devolvía error y el check lo tragaba.
+- **El guardia de módulo del censo** podía volverlo un no-op absoluto invocado
+  por una ruta no canónica: salida vacía, código 0.
+
+Una de las correcciones introdujo un **falso positivo** que también se cazó y se
+cerró antes de publicar: un archivo de puros tipos se volvía rojo, y ningún
+reporte de cobertura puede medirlo. Es el archivo más común del stack fijado.
+
+**Lo que esto deja como lección, más que como cambio:** el guardia de módulo ya
+había sido corregido en la acción hermana, con un comentario que lo llamaba «el
+único fail-open posible de este script». La lección estaba aprendida, escrita, y
+a un directorio de distancia — y no cruzó. Copiar una corrección no la propaga.
+
+### Límites declarados
+
+- **La plantilla no es lintable como plantilla.** El validador de workflows deja
+  hallazgos sobre los marcadores `{{...}}` dentro de un bloque de comandos. Sobre
+  el scaffold ya sustituido no deja ninguno. Lo exigible en CI es que el YAML
+  **parsee** y que el resultado sustituido linte limpio, no cero hallazgos sobre
+  la plantilla sin resolver.
+- **Los checks estáticos del job de marco no tienen banco de pruebas.** Son
+  comandos dentro del YAML y quedan fuera de las pruebas automatizadas de las
+  dos acciones. Se verifican a mano contra fixtures. Es deuda declarada, no un
+  olvido.
 
 ### Para consumidores
 

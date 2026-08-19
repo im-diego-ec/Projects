@@ -32,8 +32,24 @@ import { readFileSync, readdirSync, appendFileSync, realpathSync } from "node:fs
 import { execFileSync } from "node:child_process";
 import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+// La lista de extensiones de fuente y la lectura de exclusiones se TOMAN de la
+// action hermana, no se copian: son el mismo contrato ("que es codigo fuente",
+// "que se puede dejar fuera y con que motivo") y dos copias divergen. Las dos
+// actions viajan juntas en el mismo repositorio del marco, asi que el import
+// relativo existe siempre; si no existiera, este script no arranca y el paso
+// es rojo, nunca un verde sin medir.
+import {
+  EXTENSIONES_FUENTE,
+  globARegExp as globDelCenso,
+  leerPaquetes,
+  paqueteDe,
+} from "../censo-fuentes/censo-fuentes.mjs";
 
 const SHA_CERO = /^0{7,40}$/;
+
+// El numero del marco (decision D5 de calidad-fail-closed). Un consumidor puede
+// exigir MAS, y puede exigir menos — pero no en silencio.
+const MINIMO_DEL_MARCO = 80;
 
 // ---------------------------------------------------------------- resumen ---
 
@@ -50,11 +66,15 @@ function volcarResumen() {
   }
 }
 
-function publicar(porcentaje, medidas, sinCubrir) {
+// `fuera` NO es decorativo: un porcentaje publicado sin decir cuantas lineas
+// fuente quedaron fuera del denominador miente por omision. Una linea cubierta
+// y cincuenta sin dato dan "100.00" sobre una cobertura real del 2%.
+function publicar(porcentaje, medidas, sinCubrir, fuera = 0) {
   const pares = [
     `porcentaje=${porcentaje}`,
     `lineas_medidas=${medidas}`,
     `lineas_sin_cubrir=${sinCubrir}`,
+    `lineas_fuera_de_medicion=${fuera}`,
   ];
   console.log(`salidas: ${pares.join(" ")}`);
   const destino = process.env.GITHUB_OUTPUT;
@@ -89,11 +109,13 @@ export function normalizarRuta(p) {
 
 const esAbsoluta = (r) => /^(?:[A-Za-z]:)?\//.test(r);
 const nombreDeArchivo = (r) => r.slice(r.lastIndexOf("/") + 1);
-const extensionDe = (r) => {
-  const n = nombreDeArchivo(r);
-  const i = n.lastIndexOf(".");
-  return i <= 0 ? "" : n.slice(i);
-};
+// Hasta donde llega un reporte, en palabras. null es el caso degenerado: el
+// registro SF: existe pero no declara una sola linea.
+const hastaDonde = (u) =>
+  u === null
+    ? "el reporte no declara una sola linea de este archivo"
+    : `el reporte conoce este archivo hasta la linea ${u}`;
+
 const escaparRegExp = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
 // Los archivos de prueba APORTAN cobertura, no la reciben: todo proyecto los
@@ -102,6 +124,84 @@ const escaparRegExp = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 // de nombres, no una lista de archivos que alguien tenga que mantener.
 export const esArchivoDePrueba = (r) =>
   /(?:^|\/)__tests__\//.test(r) || /\.(?:test|spec)\.[cm]?[jt]sx?$/.test(r);
+
+// Que archivos son CODIGO FUENTE sale de la lista del censo, no de las
+// extensiones que casualmente traen los reportes presentes. Derivarlo de los
+// reportes era circular: un repositorio que mide .ts no decia una palabra sobre
+// un .tsx nuevo sin pruebas, porque .tsx no estaba entre lo medido.
+export const esFuente = (r) => EXTENSIONES_FUENTE.some((e) => r.endsWith(e));
+
+/**
+ * Si una linea del cambio PUEDE generar codigo. Una linea en blanco, un
+ * comentario, una llave de cierre o una declaracion de tipos nunca reciben una
+ * entrada `DA:` de ningun reporter, asi que su ausencia no prueba nada: sin
+ * este filtro, agregar un comentario al final de un archivo cubierto seria un
+ * rojo que ninguna prueba puede apagar. Es deliberadamente conservador — ante
+ * la duda, la linea CUENTA como contenido.
+ */
+export function pareceEjecutable(texto) {
+  const t = String(texto ?? "").trim();
+  if (!t) return false;
+  if (/^(?:\/\/|\/\*|\*\/|\*|#)/.test(t)) return false; // comentarios
+  if (/^[)\]}>;,]+$/.test(t)) return false; // cierres sueltos
+  if (/^(?:export\s+)?(?:declare\s+)?(?:type|interface)\b/.test(t)) return false;
+  if (/^import\s+type\b/.test(t)) return false;
+  return true;
+}
+
+// Lo que abre una declaracion de nivel de tipos. Es el MISMO patron que usa
+// `pareceEjecutable` para la primera linea, mas `declare` suelto (los
+// `declare module` / `declare global` de un .d.ts).
+const ABRE_TIPOS = /^(?:export\s+)?(?:declare\s+)?(?:type|interface)\b|^declare\b/;
+
+// Cadenas y comentario final fuera antes de contar llaves: sin esto, un
+// `type Llave = "{"` dejaba la cuenta abierta y el bloque se comia el codigo
+// de abajo, que es la direccion peligrosa de este filtro.
+const sinLiterales = (t) =>
+  t
+    .replace(/\\./g, "")
+    .replace(/"[^"]*"|'[^']*'|`[^`]*`/g, "")
+    .replace(/\/\/.*$/, "");
+
+/**
+ * Los numeros de linea (1-based) que caen DENTRO de una declaracion de tipos.
+ *
+ * `pareceEjecutable` mira una linea suelta, asi que descarta la que ABRE un
+ * `type` o una `interface` pero no su CUERPO: `id: string;` o `| "aprobado"`
+ * pasaban por codigo. Ningun reporter emite `DA:` para una declaracion de
+ * tipos, de modo que exigirle cobertura a un `tipos.ts` —el archivo mas comun
+ * del stack fijado— era un rojo que ninguna prueba podia apagar, y un check
+ * que se pone rojo en falso termina desactivado.
+ *
+ * La declaracion se lee como una sentencia: empieza en la palabra clave y
+ * termina cuando las llaves se cerraron y la linea acaba en `}` o en `;`. Si el
+ * archivo se acaba sin cerrarla, no se descarta NADA de ella: ante la duda, la
+ * linea cuenta como contenido.
+ */
+export function lineasDeTipos(lineas) {
+  const dentro = new Set();
+  let activo = false;
+  let abiertas = 0;
+  let desde = 0;
+  for (let i = 0; i < lineas.length; i++) {
+    const t = String(lineas[i] ?? "").trim();
+    if (!activo) {
+      if (!ABRE_TIPOS.test(t)) continue;
+      activo = true;
+      abiertas = 0;
+      desde = i;
+    }
+    const limpio = sinLiterales(t);
+    for (const c of limpio) {
+      if (c === "{") abiertas += 1;
+      else if (c === "}") abiertas -= 1;
+    }
+    dentro.add(i + 1);
+    if (abiertas <= 0 && (limpio.endsWith("}") || limpio.endsWith(";"))) activo = false;
+  }
+  if (activo) for (let i = desde; i < lineas.length; i++) dentro.delete(i + 1);
+  return dentro;
+}
 
 /**
  * Convierte un glob en expresion regular. Soporta lo que hace falta de verdad
@@ -386,6 +486,19 @@ function principal() {
   R(`Rango \`${BASE.slice(0, 12)}\` -> \`${cabezaCorta}\` · minimo exigido: **${minimo}%**`);
   R("");
 
+  // El minimo del consumidor no tiene piso duro (bajarlo es su decision), pero
+  // tampoco es invisible: `minimo: '0'` dejaba la compuerta abierta para
+  // siempre sin que el marco se enterara nunca.
+  if (minimo < MINIMO_DEL_MARCO) {
+    console.error(
+      `::warning::este paso exige ${minimo}% y el minimo del marco es ${MINIMO_DEL_MARCO}% (decision D5 de calidad-fail-closed): la compuerta esta pidiendo menos de lo acordado. Arreglo: sacale el input 'minimo' a la action para heredar el del marco, o deja escrito en el workflow por que este repositorio exige menos`
+    );
+    R(
+      `> ⚠️ El minimo recibido (**${minimo}%**) es menor que el del marco (**${MINIMO_DEL_MARCO}%**).`
+    );
+    R("");
+  }
+
   // 3) Nada que medir: el cambio solo borra, o solo renombra. Pasa sin ruido.
   if (totalAgregadas === 0) {
     console.log(
@@ -401,11 +514,25 @@ function principal() {
   // 4) Los reportes de cobertura.
   const rutasLcov = buscarLcov(raiz, GLOB_LCOV);
   const datos = new Map();
+  // De QUE reporte vino cada SF:. Sin esa procedencia no se puede ver la
+  // colision de rutas de un monorepo (punto 5 de mas abajo).
+  const origenes = new Map();
   for (const ruta of rutasLcov) {
+    let parcial;
     try {
-      parsearLcov(readFileSync(join(raiz, ruta), "utf8"), datos);
+      parcial = parsearLcov(readFileSync(join(raiz, ruta), "utf8"), new Map());
     } catch (e) {
       console.error(`::warning::no se pudo leer el reporte ${ruta}: ${e.message}`);
+      continue;
+    }
+    const dirLcov = ruta.includes("/") ? ruta.slice(0, ruta.lastIndexOf("/")) : "";
+    for (const [rutaSF, lineas] of parcial) {
+      let deDonde = origenes.get(rutaSF);
+      if (!deDonde) origenes.set(rutaSF, (deDonde = new Set()));
+      deDonde.add(dirLcov);
+      const previo = datos.get(rutaSF);
+      if (!previo) datos.set(rutaSF, lineas);
+      else for (const [l, h] of lineas) previo.set(l, Math.max(previo.get(l) ?? 0, h));
     }
   }
 
@@ -441,12 +568,14 @@ function principal() {
 
   const cobertura = new Map(); // ruta versionada -> Map<linea, hits>
   const sinResolver = [];
+  const resueltaPorSF = new Map();
   for (const [rutaSF, lineas] of datos) {
     const resuelta = resolverContraElRepo(rutaSF);
     if (!resuelta) {
       sinResolver.push(rutaSF);
       continue;
     }
+    resueltaPorSF.set(rutaSF, resuelta);
     const previo = cobertura.get(resuelta);
     if (!previo) cobertura.set(resuelta, lineas);
     else for (const [l, h] of lineas) previo.set(l, Math.max(previo.get(l) ?? 0, h));
@@ -494,6 +623,50 @@ function principal() {
   }
   const nombresSinResolver = new Set(sinResolver.map((r) => nombreDeArchivo(normalizarRuta(r))));
 
+  // 6b) LA COLISION DE RUTAS DEL MONOREPO. "SF:src/util.ts" emitido por el
+  //     paquete web/ resuelve contra el src/util.ts de la RAIZ: la ruta
+  //     RESUELVE, asi que esquiva todas las defensas de arriba, y la cobertura
+  //     de un archivo termina anotada en otro. El sintoma en el consumidor era
+  //     un verde con el diagnostico equivocado. Si una ruta del reporte
+  //     corresponde a DOS archivos versionados —el de la raiz y el que cuelga
+  //     del directorio del propio reporte— no dice a cual, y no se puede medir.
+  const ambiguos = [];
+  for (const [rutaSF, deDonde] of origenes) {
+    const resuelta = resueltaPorSF.get(rutaSF);
+    if (!resuelta) continue;
+    const relativa = normalizarRuta(rutaSF);
+    if (esAbsoluta(relativa)) continue;
+    for (const dirLcov of deDonde) {
+      const partes = dirLcov ? dirLcov.split("/") : [];
+      for (let i = partes.length; i > 0; i--) {
+        const candidato = `${partes.slice(0, i).join("/")}/${relativa}`;
+        if (candidato !== resuelta && rastreados.has(candidato)) {
+          ambiguos.push({ rutaSF, resuelta, otro: candidato, reporte: dirLcov });
+          break;
+        }
+      }
+    }
+  }
+  if (ambiguos.length) {
+    console.error(
+      `::error::${ambiguos.length} ruta(s) SF: de los reportes corresponden a DOS archivos versionados distintos —el de la raiz del repositorio y el que cuelga del paquete que emitio el reporte—, asi que la cobertura se anotaria en el archivo equivocado y no hay medicion confiable. Arreglo: configura el projectRoot del reporter lcov en la raiz del repositorio (vitest: reporter: [["lcov", { projectRoot: <raiz del monorepo> }]]) para que cada SF: diga a que archivo corresponde, y vuelve a correr las pruebas`
+    );
+    for (const a of ambiguos.slice(0, 10)) {
+      console.error(
+        `::error::  "${a.rutaSF}" (reporte en ${a.reporte || "."}/) puede ser ${a.resuelta} o ${a.otro}`
+      );
+    }
+    R("**Fallo** — las rutas de los reportes no dicen a que archivo corresponden.");
+    R("");
+    for (const a of ambiguos.slice(0, 10)) {
+      R(`- \`${a.rutaSF}\` (reporte en \`${a.reporte || "."}/\`): \`${a.resuelta}\` o \`${a.otro}\``);
+    }
+    R("");
+    R("Arreglo: configura el `projectRoot` del reporter lcov en la raiz del repositorio.");
+    publicar("n/a", 0, 0);
+    terminar(1);
+  }
+
   // 7) El cruce.
   let medidas = 0;
   let cubiertas = 0;
@@ -501,25 +674,111 @@ function principal() {
   const descubiertas = [];
   const noReclamados = [];
   const sospechosos = [];
+  const sinDato = []; // fuente del cambio que ningun reporte reclama: ROJO
+  const rancios = []; // reclamado, pero el reporte es anterior al cambio: ROJO
+  const desalineados = []; // lineas nuevas con contenido que el reporte no menciona
+  const excluidosDelCambio = [];
+  let lineasFueraDelDenominador = 0;
+
+  // El TEXTO de las lineas nuevas, leido del commit que se esta midiendo (no
+  // del working tree, que puede no ser la cabeza del rango). Sin el no se puede
+  // distinguir "el reporte no tiene dato para esta linea porque es un
+  // comentario" de "no lo tiene porque el reporte es viejo".
+  const textoPorArchivo = new Map();
+  const lineasConContenido = (archivo, numeros) => {
+    if (!textoPorArchivo.has(archivo)) {
+      const t = git(["show", `${CABEZA}:${archivo}`], { silencioso: true });
+      const lineas = t === null ? null : t.split(/\r?\n/);
+      textoPorArchivo.set(archivo, lineas === null ? null : { lineas, tipos: lineasDeTipos(lineas) });
+    }
+    const texto = textoPorArchivo.get(archivo);
+    // Si el archivo no se puede leer no se descarta nada: todas cuentan como
+    // contenido. Es el lado conservador — no verificar nunca es un verde.
+    if (!texto) return [...numeros];
+    // Dos filtros, y hacen falta los dos: uno mira la linea sola (blancos,
+    // comentarios, cierres) y el otro el BLOQUE de tipos que la contiene.
+    return [...numeros].filter((l) => pareceEjecutable(texto.lineas[l - 1]) && !texto.tipos.has(l));
+  };
+
+  // Las exclusiones declaradas, leidas con la misma mecanica del censo: el
+  // manifiesto del paquete que CONTIENE el archivo, patron + motivo escrito.
+  // Una exclusion sin motivo no excusa nada (y el censo la enrojece por su
+  // cuenta). Se arma perezosamente: la mayoria de los cambios no la necesita.
+  let paquetes = null;
+  const exclusionDe = (archivo) => {
+    if (paquetes === null) paquetes = leerPaquetes(raiz, [...rastreados]);
+    const paq = paqueteDe(paquetes, archivo);
+    if (!paq || paq.error) return null;
+    const prefijo = paq.dir ? `${paq.dir}/` : "";
+    const relativa = archivo.slice(prefijo.length);
+    for (const ex of paq.excluidos) {
+      const patron = typeof ex?.patron === "string" ? ex.patron.trim() : "";
+      const motivo = typeof ex?.motivo === "string" ? ex.motivo.trim() : "";
+      if (!patron || !motivo) continue;
+      if (globDelCenso(patron).test(relativa)) return { patron, motivo, manifiesto: paq.manifiesto };
+    }
+    return null;
+  };
 
   for (const [archivo, lineas] of [...agregadas].sort(([a], [b]) => a.localeCompare(b))) {
     const datosArchivo = cobertura.get(archivo);
     if (!datosArchivo) {
-      // Un archivo del cambio que ningun SF: reclama. Puede ser legitimo
-      // (markdown, YAML, JSON) o el sintoma de rutas desalineadas.
+      // Un archivo del cambio que ningun SF: reclama. Que sea legitimo o un
+      // agujero NO lo decide la extension de lo que los reportes miden —eso
+      // era circular—, sino la lista de extensiones de fuente del censo.
+      noReclamados.push(archivo);
+      if (!esFuente(archivo) || esArchivoDePrueba(archivo)) continue;
+      const contenido = lineasConContenido(archivo, lineas);
+      lineasFueraDelDenominador += contenido.length;
+      const exclusion = exclusionDe(archivo);
+      if (exclusion) {
+        excluidosDelCambio.push({ archivo, ...exclusion });
+        continue;
+      }
+      // Un archivo de puros comentarios o declaraciones de tipos no tiene nada
+      // que cubrir: exigirle cobertura seria un rojo que nadie puede apagar.
+      if (!contenido.length) continue;
       if (nombresSinResolver.has(nombreDeArchivo(archivo))) sospechosos.push(archivo);
-      else noReclamados.push(archivo);
+      else sinDato.push({ archivo, lineas: contenido.length, primera: contenido[0] });
       continue;
     }
     let m = 0;
     let c = 0;
     const sinCubrirAqui = [];
+    const sinDatoAqui = [];
     for (const linea of [...lineas].sort((a, b) => a - b)) {
       const hits = datosArchivo.get(linea);
-      if (hits === undefined) continue; // no ejecutable: blanco, comentario, tipo
+      if (hits === undefined) {
+        sinDatoAqui.push(linea); // puede ser no ejecutable... o lcov rancio
+        continue;
+      }
       m++;
       if (hits > 0) c++;
       else sinCubrirAqui.push(linea);
+    }
+    // EL LCOV RANCIO. Un reporte anterior al cambio reclama el archivo (asi que
+    // esquiva todas las defensas de rutas) y simplemente no tiene entrada para
+    // las lineas nuevas. Eso se leia como "no ejecutable" y el archivo
+    // desaparecia de la medicion entera, incluido el listado de no reclamados:
+    // exit 0 y MUDO. Vector real: un cache de CI que restaura coverage/.
+    if (esFuente(archivo) && !esArchivoDePrueba(archivo) && sinDatoAqui.length) {
+      const contenidoSinDato = lineasConContenido(archivo, sinDatoAqui);
+      lineasFueraDelDenominador += contenidoSinDato.length;
+      // Un registro SF: sin una sola entrada DA existe (el reporter emitio el
+      // archivo vacio): Math.max de nada da -Infinity y el diagnostico salia
+      // ilegible. null = el reporte no conoce ni una linea de este archivo.
+      const ultimaConocida = datosArchivo.size ? Math.max(...datosArchivo.keys()) : null;
+      const masAlla =
+        ultimaConocida === null
+          ? contenidoSinDato
+          : contenidoSinDato.filter((l) => l > ultimaConocida);
+      if (contenidoSinDato.length && m === 0 && masAlla.length) {
+        // Prueba dura: el reporte no mide NADA del cambio en este archivo y
+        // ademas ni siquiera llega hasta donde el cambio escribio.
+        rancios.push({ archivo, ultimaConocida, lineas: masAlla });
+      } else if (contenidoSinDato.length) {
+        desalineados.push({ archivo, ultimaConocida, lineas: contenidoSinDato });
+      }
     }
     if (!m) continue;
     medidas += m;
@@ -544,36 +803,87 @@ function principal() {
     }
     R("");
     R("Arreglo: configura el `projectRoot` del reporter lcov en la raiz del repositorio.");
-    publicar("n/a", medidas, descubiertas.length);
+    publicar("n/a", medidas, descubiertas.length, lineasFueraDelDenominador);
     terminar(1);
   }
 
-  // El aviso de fail-open se calcula ACA, antes de cualquier salida temprana.
-  // Estuvo mas abajo y era inalcanzable justo en el caso que mas importa: un
-  // cambio que toca SOLO archivos que ningun reporte reclama salia exit 0 y
-  // MUDO. Que el aviso dependiera de que en el mismo pull request viniera
-  // ademas un archivo medido es exactamente el fail-open silencioso que la
-  // regla del marco prohibe.
-  const extensionesMedidas = new Set([...cobertura.keys()].map(extensionDe));
-  const rarosPorExtension = noReclamados.filter(
-    (a) => extensionesMedidas.has(extensionDe(a)) && !esArchivoDePrueba(a)
-  );
-  const avisarRaros = () => {
-    if (!rarosPorExtension.length) return;
-    // Ruidoso a proposito, no rojo: la exclusion legitima (archivos de prueba,
-    // configuracion, generados) tiene exactamente esta forma, y un rojo aca
-    // seria un falso positivo en cada pull request que toca un test.
+  // 8b) EL SPEC PROMETE ROJO, Y ACA SE CUMPLE. "Un cambio agrega lineas
+  //     ejecutables y la medicion no encuentra datos que les correspondan ->
+  //     la integracion FALLA" (capability calidad-codigo). Esto salia como
+  //     ::warning:: con exit 0, y un ruleset solo mira el codigo de salida: el
+  //     modulo nuevo que ninguna prueba importa cruzaba la compuerta entero.
+  //     La valvula de escape no es bajar el aviso — es la exclusion declarada
+  //     con motivo, que el mismo spec contempla y que se consulta arriba.
+  if (rancios.length || sinDato.length) {
+    if (rancios.length) {
+      console.error(
+        `::error::el reporte de cobertura parece anterior al cambio: ${rancios.length} archivo(s) estan reclamados por un SF: pero no tienen dato para ninguna de sus lineas nuevas, y esas lineas caen mas alla de la ultima que el reporte conoce. "Sin dato" no es "no ejecutable". Arreglo: volve a correr las pruebas CON cobertura sobre este commit; si el pipeline cachea el directorio coverage/, sacalo del cache`
+      );
+      for (const x of rancios.slice(0, 10)) {
+        console.error(
+          `::error file=${x.archivo},line=${x.lineas[0]}::${hastaDonde(x.ultimaConocida)} y el cambio agrega contenido en la(s) ${x.lineas.slice(0, 20).join(", ")}`
+        );
+      }
+    }
+    if (sinDato.length) {
+      const cuantas = sinDato.reduce((a, x) => a + x.lineas, 0);
+      console.error(
+        `::error::${sinDato.length} archivo(s) fuente del cambio (${cuantas} linea(s) agregadas) no los reclama ningun reporte de cobertura: no hay con que medirlos, y "sin datos" no es "cubierto". Arreglo: corre las pruebas con cobertura sobre esos archivos —revisa 'all: true' en la configuracion de cobertura del paquete para que el reporte incluya los que ninguna prueba importa— o declara la exclusion con su motivo en projects.cobertura.excluidos del package.json de su paquete`
+      );
+      for (const x of sinDato.slice(0, MAX_ANOTACIONES)) {
+        console.error(
+          `::error file=${x.archivo},line=${x.primera}::archivo fuente del cambio sin ningun dato de cobertura (${x.lineas} linea(s) agregadas)`
+        );
+      }
+    }
+    R("**Fallo** — hay lineas fuente agregadas sin datos de cobertura que les correspondan.");
+    R("");
+    for (const x of rancios.slice(0, 20)) {
+      R(
+        `- \`${x.archivo}\`: ${hastaDonde(x.ultimaConocida)} y el cambio escribio en la(s) ${x.lineas.slice(0, 20).join(", ")} — el lcov es anterior al cambio`
+      );
+    }
+    for (const x of sinDato.slice(0, 20)) {
+      R(`- \`${x.archivo}\`: ${x.lineas} linea(s) agregadas y ningun reporte lo reclama`);
+    }
+    R("");
+    R("Arreglo: corre las pruebas **con cobertura** sobre esos archivos, o declara");
+    R("la exclusion con su motivo en `projects.cobertura.excluidos` del paquete.");
+    publicar("n/a", medidas, descubiertas.length, lineasFueraDelDenominador);
+    terminar(1);
+  }
+
+  // Ruidoso a proposito, no rojo: aca el reporte SI mide el archivo y solo
+  // faltan lineas sueltas. Puede ser un reporte viejo, o codigo que el reporter
+  // no considera ejecutable; un rojo con esa ambiguedad seria un falso positivo
+  // que nadie puede apagar.
+  if (desalineados.length) {
     console.error(
-      `::warning::${rarosPorExtension.length} archivo(s) del cambio comparten extension con lo que la cobertura mide y sin embargo ningun reporte los reclama. Si no son exclusiones deliberadas, revisa 'all: true' en la configuracion de cobertura del paquete: ${rarosPorExtension.slice(0, 5).join(", ")}`
+      `::warning::${desalineados.length} archivo(s) del cambio tienen lineas nuevas con contenido que el reporte no menciona (ni cubiertas ni sin cubrir): quedaron FUERA del denominador. Si no son declaraciones de tipos, el reporte puede ser anterior al cambio: ${desalineados
+        .slice(0, 5)
+        .map((x) => `${x.archivo} (${x.lineas.slice(0, 10).join(", ")})`)
+        .join("; ")}`
     );
+  }
+
+  const declararExcluidos = () => {
+    if (!excluidosDelCambio.length) return;
+    console.log(
+      `::notice::${excluidosDelCambio.length} archivo(s) del cambio quedaron fuera del calculo por una exclusion declarada con motivo`
+    );
+    R("");
+    R("Archivos del cambio excluidos del calculo, con su motivo declarado:");
+    for (const x of excluidosDelCambio.slice(0, 20)) {
+      R(`- \`${x.archivo}\` — ${x.motivo} (\`${x.manifiesto}\`, patron \`${x.patron}\`)`);
+    }
   };
 
   // 9) Ningun archivo medible en el cambio (solo markdown, YAML, JSON...).
   //    Pasa, y pasa CON FUNDAMENTO: el punto 6 ya probo que los reportes estan
-  //    bien cableados. Sin esa prueba previa esto seria un falso verde.
+  //    bien cableados, y el 8b que ningun archivo fuente quedo sin dato.
   if (medidas === 0) {
     console.log(
-      `OK  el cambio no toca ningun archivo que la cobertura mida (${noReclamados.length} archivo(s) fuera de la medicion): nada que medir`
+      `OK  el cambio no toca ningun archivo que la cobertura mida (${noReclamados.length} archivo(s) fuera de la medicion, ${lineasFueraDelDenominador} linea(s) fuente fuera del denominador): nada que medir`
     );
     R("**Pasa** — ningun archivo del cambio esta dentro de lo que mide la cobertura.");
     R("");
@@ -586,22 +896,23 @@ function principal() {
       for (const a of noReclamados.slice(0, 20)) R(`- \`${a}\``);
       if (noReclamados.length > 20) R(`- ...y ${noReclamados.length - 20} mas`);
     }
-    avisarRaros();
-    publicar("n/a", 0, 0);
+    declararExcluidos();
+    publicar("n/a", 0, 0, lineasFueraDelDenominador);
     terminar(0);
   }
 
-  avisarRaros();
+  declararExcluidos();
 
   const porcentaje = (cubiertas / medidas) * 100;
   const porcentajeTexto = porcentaje.toFixed(2);
-  publicar(porcentajeTexto, medidas, descubiertas.length);
+  publicar(porcentajeTexto, medidas, descubiertas.length, lineasFueraDelDenominador);
 
   R("| | |");
   R("|---|---|");
   R(`| Lineas medidas del cambio | **${medidas}** |`);
   R(`| Cubiertas | **${cubiertas}** |`);
   R(`| Sin cubrir | **${descubiertas.length}** |`);
+  R(`| Lineas fuente fuera del denominador | **${lineasFueraDelDenominador}** |`);
   R(`| Cobertura del cambio | **${porcentajeTexto}%** (minimo ${minimo}%) |`);
   R("");
   R("| Archivo | Medidas | Cubiertas | % |");
@@ -640,7 +951,7 @@ function principal() {
   }
 
   console.log(
-    `OK  cobertura de las lineas del cambio: ${porcentajeTexto}% (${cubiertas}/${medidas}), minimo ${minimo}%`
+    `OK  cobertura de las lineas del cambio: ${porcentajeTexto}% (${cubiertas}/${medidas}), minimo ${minimo}% · ${lineasFueraDelDenominador} linea(s) fuente fuera del denominador`
   );
   R(`**Pasa** — ${porcentajeTexto}% >= ${minimo}%.`);
   if (descubiertas.length) {

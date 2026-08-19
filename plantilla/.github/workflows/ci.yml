@@ -279,7 +279,7 @@ jobs:
       # de SU paquete, bajo projects.cobertura.excluidos, con su motivo escrito.
       # La exclusion no vuelve imposible la evasion: la vuelve visible, en un
       # diff, bajo review.
-      - uses: {{ORG}}/Projects/actions/censo-fuentes@v1
+      - uses: "{{ORG}}/Projects/actions/censo-fuentes@v1"
 
       # Cobertura de las lineas que el cambio agrega o modifica. Sin holgura:
       # codigo nuevo sin pruebas es rojo aunque el paquete tenga margen de
@@ -289,7 +289,7 @@ jobs:
       # No mide nada en un push a main —ahi no hay rango— y lo dice en vez de
       # simular un 100%. Y si no encuentra reportes habiendo lineas
       # agregadas, es ROJO: "sin datos" no es "todo cubierto".
-      - uses: {{ORG}}/Projects/actions/cobertura-diff@v1
+      - uses: "{{ORG}}/Projects/actions/cobertura-diff@v1"
 
   # EL CHECK REQUERIDO POR EL RULESET DE main ES ESTE (nombre exacto: "ci-ok").
   #

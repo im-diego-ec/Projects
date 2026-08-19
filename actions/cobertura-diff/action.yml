@@ -90,6 +90,13 @@ outputs:
   lineas_sin_cubrir:
     description: Cantidad de esas líneas que ninguna prueba ejercita.
     value: ${{ steps.medir.outputs.lineas_sin_cubrir }}
+  lineas_fuera_de_medicion:
+    description: >-
+      Líneas fuente del cambio que quedaron FUERA del denominador porque
+      ningún reporte tiene dato para ellas. Un porcentaje publicado sin este
+      número miente por omisión: una línea cubierta y cincuenta sin dato dan
+      "100.00" sobre una cobertura real del 2%.
+    value: ${{ steps.medir.outputs.lineas_fuera_de_medicion }}
 
 runs:
   using: composite
