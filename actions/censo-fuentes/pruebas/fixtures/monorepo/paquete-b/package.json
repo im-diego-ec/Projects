@@ -1,0 +1,14 @@
+{
+  "name": "fixture-paquete-b",
+  "private": true,
+  "projects": {
+    "cobertura": {
+      "excluidos": [
+        {
+          "patron": "src/borrado-hace-meses.ts",
+          "motivo": "era un experimento que nadie mantiene"
+        }
+      ]
+    }
+  }
+}

@@ -56,7 +56,9 @@ elección del proyecto: Terraform como IaC, GitHub Actions como pipeline y pnpm 
 workspaces los fija el marco. Todo lo demás lo decide el proyecto una vez, acá.
 
 pnpm está fijado porque el CI que trae el scaffold lo ejecuta directamente
-(`corepack enable`, `pnpm -r`) y porque el marco depende de una propiedad concreta
+(`corepack enable`, `pnpm install --frozen-lockfile`, y `pnpm list -r` para derivar
+de pnpm —y no de una lista escrita a mano— qué paquetes hay que verificar) y porque
+el marco depende de una propiedad concreta
 del workspace: **un único lockfile, en la raíz**. Un lockfile suelto dentro de un
 paquete hace que local y CI resuelvan dependencias distinto; por eso el `.gitignore`
 del scaffold los bloquea. Cambiar de package manager no es sustituir un comando: es

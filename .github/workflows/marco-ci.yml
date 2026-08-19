@@ -9,7 +9,9 @@ name: Marco CI (reusable)
 #   2. openspec  -> guardrail de deltas + validacion estricta de changes y specs
 #   3. higiene   -> lo que el marco AFIRMA y hasta hoy nadie verificaba:
 #                   artefactos regenerados al dia, definiciones de pipeline
-#                   validas y cero marcadores del scaffold sin resolver
+#                   validas, cero marcadores del scaffold sin resolver,
+#                   scripts de verificacion que no enmascaran su fallo y el
+#                   censo de fuentes efectivamente cableado
 #   4. marco-ok  -> veredicto agregado de los tres jobs anteriores
 #
 # El proyecto consumidor NO copia estos jobs: los referencia. Un arreglo aca
@@ -433,6 +435,228 @@ jobs:
           fi
 
           echo "sin marcadores del scaffold pendientes"
+
+      # HUECO 4 — el marco EXIGE desde su primera version que los scripts de
+      # verificacion declarados en los manifiestos propaguen su codigo de salida
+      # real, y hasta hoy nada lo comprobaba: era un requirement del contrato
+      # que nadie ejecutaba. Es la promesa mas barata de romper y la mas cara de
+      # detectar — un script que termina en "|| true" convierte cualquier rojo
+      # en verde y CI lo celebra. Por construccion, el enmascaramiento es
+      # INVISIBLE para todo lo que dependa del codigo de salida (incluido este
+      # pipeline), asi que la unica forma de atraparlo es LEER el script, no
+      # ejecutarlo.
+      #
+      # La regla es sobre la FORMA DEL SUFIJO, no sobre una lista de nombres de
+      # script: un "lint", un "typecheck" y un "verificar-todo" que nadie
+      # anticipo caen igual, y no queda ninguna lista que alguien tenga que
+      # acordarse de actualizar cuando aparezca el nombre siguiente. Una lista
+      # de nombres seria, otra vez, un guardrail que depende de la memoria.
+      - name: Scripts de verificacion sin enmascaramiento
+        if: '!cancelled()'
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          # Node pelado, sin dependencias, como el resto de los guardrails. Si
+          # no esta, no se puede verificar — y lo que no se puede verificar es
+          # rojo, nunca un exito mudo.
+          if ! command -v node > /dev/null 2>&1; then
+            echo "::error::no hay 'node' en el PATH y sin el no se pueden leer los manifiestos. Arreglo: agrega 'uses: actions/setup-node@v7' a este job, antes de este paso"
+            exit 1
+          fi
+
+          # Solo lo RASTREADO: un manifiesto sin versionar no es contrato de
+          # nadie, y node_modules queda afuera por construccion en vez de por
+          # una exclusion que haya que mantener a mano. core.quotePath=false
+          # para que una ruta con acentos salga tal cual y no escapada en
+          # octal: escapada, el paso siguiente no la encontraria y la reportaria
+          # como manifiesto ilegible (rojo, pero por el motivo equivocado).
+          git -c core.quotePath=false ls-files -- '*package.json' > "${RUNNER_TEMP}/manifiestos.txt"
+
+          # El script va inline y no en un archivo aparte: un heredoc no puede
+          # cerrar dentro de un bloque de YAML indentado —su terminador tendria
+          # que ir en la columna 0, y ahi termina el bloque—.
+          node -e '
+            const { readFileSync } = require("node:fs");
+
+            // La propiedad, no una lista. Lo que se busca es la FORMA del
+            // sufijo: un separador que NO corta la ejecucion (|| o ;) seguido
+            // de un comando que siempre sale 0. Un cuerpo que ES exactamente
+            // "true", ":" o "exit 0" no enmascara nada —no hay comando previo
+            // cuyo fallo tapar— y por eso el patron EXIGE el separador
+            // delante: un "prepare": "true" es legitimo y no se marca.
+            const SUFIJO = /(\|\||;)[ \t]*(true|:|exit[ \t]+0)[ \t]*;?[ \t]*$/;
+
+            // Un comando de workflow termina en el salto de linea y trata "%"
+            // como escape: sin normalizar, un script con "%" adentro mutila su
+            // propio mensaje de error.
+            const escapar = (valor) =>
+              String(valor).replace(/%/g, "%25").replace(/\r/g, "%0D").replace(/\n/g, "%0A");
+
+            // Linea de la declaracion dentro del bloque "scripts".
+            // Aproximacion honesta: en un manifiesto normal da la linea exacta
+            // y en el peor caso la anotacion cae unas lineas mas arriba.
+            // Parsear JSON conservando posiciones costaria una dependencia,
+            // que es justo lo que el marco no se permite.
+            function lineaDeclaracion(texto, nombre) {
+              const lineas = texto.split(/\r?\n/);
+              const clave = "\"" + nombre + "\"";
+              let inicio = lineas.findIndex((linea) => linea.includes("\"scripts\""));
+              if (inicio < 0) inicio = 0;
+              for (let i = inicio; i < lineas.length; i += 1) {
+                if (lineas[i].includes(clave)) return i + 1;
+              }
+              return inicio + 1;
+            }
+
+            const manifiestos = readFileSync(process.argv[1], "utf8").split(/\r?\n/).filter(Boolean);
+
+            if (manifiestos.length === 0) {
+              // "No hay datos" no se reporta como exito mudo: se dice en voz
+              // alta. Projects cae justo aca (no tiene manifiestos propios) igual
+              // que en el check de marcadores, y el dia que tenga uno el check
+              // se enciende solo.
+              console.log("::notice::no hay ningun package.json rastreado: no hay scripts que puedan enmascarar un fallo — verificacion omitida");
+              process.exit(0);
+            }
+
+            const hallazgos = [];
+            const ilegibles = [];
+            let revisados = 0;
+
+            for (const ruta of manifiestos) {
+              let texto;
+              let manifiesto;
+              try {
+                texto = readFileSync(ruta, "utf8");
+                manifiesto = JSON.parse(texto);
+              } catch (error) {
+                ilegibles.push({ ruta, detalle: error.message });
+                continue;
+              }
+
+              const scripts = manifiesto && manifiesto.scripts;
+              if (!scripts || typeof scripts !== "object") continue;
+
+              for (const [nombre, cuerpo] of Object.entries(scripts)) {
+                if (typeof cuerpo !== "string") continue;
+                revisados += 1;
+                const limpio = cuerpo.trim();
+                const encontrado = limpio.match(SUFIJO);
+                if (encontrado === null) continue;
+                hallazgos.push({
+                  ruta: ruta,
+                  nombre: nombre,
+                  linea: lineaDeclaracion(texto, nombre),
+                  sufijo: encontrado[0].trim(),
+                  arreglado: limpio.slice(0, encontrado.index).trim(),
+                });
+              }
+            }
+
+            for (const item of ilegibles) {
+              // No se pudo leer = no se pudo verificar. Rojo, jamas silencio.
+              console.log("::error file=" + escapar(item.ruta) + "::no se pudo leer el manifiesto (" + escapar(item.detalle) + "), asi que no se puede afirmar que sus scripts propaguen su codigo de salida. Arreglo: corregi el JSON de " + escapar(item.ruta) + " hasta que parsee");
+            }
+
+            for (const hallazgo of hallazgos) {
+              // El mensaje trae el ARREGLO, no el diagnostico: el cuerpo ya
+              // viene escrito sin el sufijo, listo para pegar en el manifiesto.
+              console.log("::error file=" + escapar(hallazgo.ruta) + ",line=" + hallazgo.linea + "::el script \"" + escapar(hallazgo.nombre) + "\" termina en \"" + escapar(hallazgo.sufijo) + "\" y con ese sufijo un fallo llega a CI como exito. Arreglo: en " + escapar(hallazgo.ruta) + " deja el cuerpo en \"" + escapar(hallazgo.arreglado) + "\". Si ese comando TIENE que poder fallar sin detener la integracion, eso se decide en el paso que lo invoca (continue-on-error), no escondiendo su codigo de salida dentro del script");
+            }
+
+            if (hallazgos.length > 0 || ilegibles.length > 0) {
+              console.log("== resumen == " + hallazgos.length + " script(s) enmascarando su fallo y " + ilegibles.length + " manifiesto(s) ilegible(s), sobre " + manifiestos.length + " manifiesto(s) rastreado(s)");
+              process.exit(1);
+            }
+
+            console.log(revisados + " script(s) de " + manifiestos.length + " manifiesto(s) propagan su codigo de salida");
+          ' "${RUNNER_TEMP}/manifiestos.txt"
+
+      # HUECO 5 — el censo de fuentes (la derivacion que le pregunta a cada
+      # herramienta que archivos mira de verdad) NO puede correr en este job:
+      # necesita las dependencias del consumidor ya instaladas para interrogar
+      # a su toolchain, asi que vive en el job del propio proyecto. Eso abre un
+      # hueco que si es de aca: un repo puede tener el contrato escrito y no
+      # invocar el paso en ningun flujo, y entonces un archivo que ninguna
+      # herramienta mira no produce rojo en ningun lado. El repo que DECLARA la
+      # verificacion pero no la EJECUTA es rojo, y esa es la unica parte del
+      # alcance que se puede comprobar estaticamente desde el marco.
+      #
+      # El grep es exacto y ANCLADO, no heuristico, y puede serlo porque GitHub
+      # PROHIBE expresiones en el campo "uses": la referencia a una action es
+      # siempre literal, nunca calculada — el propio marco lo tiene documentado
+      # en el job de openspec. El ancla ^\s*(- )?uses: descarta las lineas
+      # comentadas, que son la forma mas facil de "cablear" algo sin cablearlo.
+      #
+      # Se busca el SEGMENTO DE RUTA de la action y no "@v1": la validacion
+      # contra un consumidor real exige apuntar a la rama del change antes de
+      # que el tag movil se mueva, y un grep atado a @v1 declararia "sin
+      # cablear" justo la corrida que prueba el cableado.
+      - name: Censo de fuentes cableado
+        if: '!cancelled()'
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          # SKIP POR PROPIEDAD, no por input. El censo interroga al toolchain
+          # de un repo de Node; sin manifiesto en la raiz no hay toolchain que
+          # interrogar. Projects cae justo aca —igual que en el check de
+          # marcadores— y el dia que tenga su propio manifiesto el check se
+          # enciende SOLO, sin que nadie se acuerde de encenderlo. Un input
+          # seria una perilla que un consumidor puede apagar por descuido.
+          if [ -z "$(git ls-files -- package.json)" ]; then
+            echo "::notice::este repo no versiona un package.json en la raiz: no hay toolchain que censar — verificacion omitida"
+            exit 0
+          fi
+
+          if [ ! -d .github/workflows ]; then
+            echo "::error::el repo no tiene .github/workflows — no hay donde cablear el censo de fuentes"
+            exit 1
+          fi
+
+          # La identidad estable de la pieza dentro del "uses":
+          #   <org>/<repo>/actions/<nombre>@<ref>
+          ACTION="actions/censo-fuentes"
+          PATRON='^[[:space:]]*(-[[:space:]]+)?uses:[[:space:]]*[^[:space:]]*'"${ACTION}"'([^A-Za-z0-9_-]|$)'
+
+          CABLEADO="${RUNNER_TEMP}/cableado.txt"
+          set +e
+          grep -rnE "${PATRON}" .github/workflows > "${CABLEADO}"
+          RC=$?
+          set -e
+          if [ "${RC}" -gt 1 ]; then
+            # grep devuelve >1 solo por error real. No se pudo mirar, asi que
+            # no se declara verde: lo no verificable es rojo.
+            echo "::error::no se pudo inspeccionar .github/workflows (grep rc=${RC}) — sin poder mirar, el cableado del censo no se da por bueno"
+            exit 1
+          fi
+
+          if [ ! -s "${CABLEADO}" ]; then
+            echo "::error::este repo no invoca el censo de fuentes en ningun flujo: sin ese paso, un archivo que ninguna herramienta mira no produce rojo en ningun lado y la verificacion de alcance queda declarada pero apagada. Arreglo: pega el paso de abajo en el job que ya corre lint y typecheck, DESPUES de instalar dependencias (el censo interroga al toolchain ya instalado)"
+            echo "== paso a agregar =="
+            echo "      - name: Ningun archivo fuera del alcance de la verificacion"
+            echo "        uses: im-diego-ec/Projects/actions/censo-fuentes@v1"
+            exit 1
+          fi
+
+          echo "== cableado del censo de fuentes =="
+          cat "${CABLEADO}"
+
+          # Aviso, no rojo: un continue-on-error en el mismo archivo NO prueba
+          # que aplique al paso del censo, y enrojecer por eso bloquearia
+          # integraciones legitimas. Se avisa porque el limite ya esta declarado
+          # en el design ("cableado vivo pero paso inofensivo") y un limite que
+          # no se dice en la corrida es un limite que nadie recuerda.
+          ARCHIVOS="${RUNNER_TEMP}/archivos-cableado.txt"
+          cut -d: -f1 "${CABLEADO}" | sort -u > "${ARCHIVOS}"
+          while IFS= read -r ARCHIVO; do
+            if grep -qE '^[[:space:]]*(-[[:space:]]+)?continue-on-error:' "${ARCHIVO}"; then
+              echo "::warning file=${ARCHIVO}::${ARCHIVO} cablea el censo de fuentes y ademas usa continue-on-error: si ese modificador cae sobre el paso del censo, su rojo no detiene nada y el cableado queda vivo pero inofensivo. Verifica a que paso aplica"
+            fi
+          done < "${ARCHIVOS}"
+
+          echo "el censo de fuentes esta cableado"
 
   # Veredicto agregado DEL MARCO. Reporta siempre (docs o codigo). No conoce el
   # build/test del producto: ese lo agrega el ci-ok del repo consumidor, que es
