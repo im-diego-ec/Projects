@@ -464,6 +464,17 @@ una tarde entre todos y cierran las clases de error más caras.
 | 10 | Cobertura por diff (líneas nuevas sin test) | 1 | alto | 🔴 |
 | 11 | Plantilla de migración con invariantes de propiedad + lint de literales | 5 | alto | 🔴 |
 | 12 | Contador de fail-open activados por corrida | 3 | medio | 🔴 |
+| 13 | Un cambio a la definición del pipeline NO puede viajar por el carril rápido | — | bajo | 🔴 |
+
+> **Sobre la fila 13**, que nació de un incidente doble el 2026-08-19: el carril
+> rápido trata la definición del pipeline como "no se sirve en runtime" y la
+> deja pasar sin ejecutar nada. Consecuencia: **un cambio a cómo corre la
+> verificación viaja por el carril que no corre la verificación**. Pasó dos
+> veces el mismo día —el arreglo del job de E2E y después sus dos correcciones—
+> y las dos veces el defecto se descubrió recién con un disparo manual. No es
+> un caso raro: es estructural, y el síntoma es siempre el mismo, un verde que
+> no verificó nada. La corrección probable es acotar el patrón del carril para
+> que la definición del pipeline quede fuera, no agregar un check nuevo.
 
 **Cómo se cierra una fila**: el check se construye en Projects (referenciado,
 para que llegue a todos los proyectos de una), la regla cambia de estado en
