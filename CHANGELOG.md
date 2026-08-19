@@ -35,6 +35,12 @@ mueve sobre un cambio incompatible.
 
 ## [No publicado]
 
+Nada todavía.
+
+---
+
+## [1.2.0] — 2026-08-19
+
 **El alcance de la verificación deja de declararse y pasa a derivarse, y el
 código nuevo llega con pruebas.** Dos composite actions nuevas más dos checks
 estáticos que cierran huecos donde el marco afirmaba algo y nada lo verificaba.
