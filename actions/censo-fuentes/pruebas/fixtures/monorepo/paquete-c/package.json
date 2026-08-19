@@ -1,0 +1,13 @@
+{
+  "name": "fixture-paquete-c",
+  "private": true,
+  "projects": {
+    "cobertura": {
+      "excluidos": [
+        {
+          "patron": "src/sin-motivo.ts"
+        }
+      ]
+    }
+  }
+}

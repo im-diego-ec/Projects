@@ -1,0 +1,125 @@
+name: Cobertura de las lineas del cambio
+description: >-
+  Mide qué proporción de las líneas que el pull request agrega o modifica
+  ejercitan las pruebas, cruzando los reportes lcov del repositorio con el
+  diff. Sin datos habiendo líneas agregadas es ROJO, nunca cobertura total.
+author: la organización
+
+# ---------------------------------------------------------------------------
+# PERMISOS MINIMOS QUE DEBE CONCEDER EL CONSUMIDOR
+#
+#   permissions:
+#     contents: read   # el checkout previo y el fetch de la base
+#
+# No llama a la API de GitHub: todo sale de git y de archivos del checkout.
+#
+# REQUISITOS DEL JOB QUE LA USA
+#   1. actions/checkout ANTES de esta action.
+#      fetch-depth: 0 es lo recomendado. Con el default (1) la action intenta
+#      traer sola el commit base con un fetch acotado; si el remoto no se lo
+#      permite, el paso FALLA con el arreglo escrito, no pasa en verde.
+#   2. Las pruebas CON cobertura ya corridas, emitiendo lcov. Sin reportes y
+#      con lineas agregadas, este paso es rojo a proposito.
+#   3. Las rutas SF: de los lcov tienen que ser relativas a la RAIZ del
+#      repositorio. En un monorepo eso significa configurar el projectRoot del
+#      reporter: sin eso, dos paquetes emiten "src/..." indistinguibles entre
+#      si e incomparables contra el diff.
+#
+# POR QUE UN COMPARADOR PROPIO Y NO UNA HERRAMIENTA EXTERNA (design D5)
+#   La candidata FALLA EN VERDE: si las rutas de su entrada no coinciden con
+#   las del diff, no encuentra lineas que medir, reporta cobertura total y sale
+#   con exito. Cablearla mal deja el gate abierto. Este comparador hace lo
+#   contrario: "no hay datos" habiendo lineas agregadas es rojo ruidoso.
+# ---------------------------------------------------------------------------
+
+inputs:
+  lcov:
+    description: >-
+      Patrones glob de los reportes lcov, uno por línea. Se admiten líneas en
+      blanco y comentarios con "#". Soporta `**`, `*`, `?` y `{a,b}`, y no
+      entra nunca a `node_modules` ni a `.git`.
+    required: false
+    default: "**/coverage/lcov.info"
+  base:
+    description: >-
+      Commit base del rango. Vacío significa que el paso NO APLICA (no hay
+      rango que medir) y lo dice en el resumen, en vez de simular un 100%.
+      El default lo deja vacío fuera de un pull request.
+    required: false
+    default: ${{ github.event.pull_request.base.sha }}
+  cabeza:
+    description: >-
+      Commit final del rango. El default (`HEAD`) es lo correcto casi siempre:
+      es lo que dejó el checkout y lo que midieron las pruebas.
+    required: false
+    default: HEAD
+  minimo:
+    description: >-
+      Porcentaje mínimo de cobertura exigido sobre las líneas del cambio. El
+      mínimo del marco es 80 (decisión D5 del change calidad-fail-closed).
+    required: false
+    default: "80"
+  max-anotaciones:
+    description: >-
+      Tope de anotaciones `::error file=...` que se emiten sobre líneas sin
+      cubrir. El listado completo va siempre al resumen de la corrida.
+    required: false
+    default: "20"
+  instalar-node:
+    description: >-
+      "true" para instalar Node con actions/setup-node. Ponlo en "false" si el
+      job ya hizo su propio setup-node y no quieres pagarlo dos veces (el caso
+      normal: para llegar acá el job ya corrió las pruebas).
+    required: false
+    default: "false"
+  version-node:
+    description: Versión de Node a instalar cuando instalar-node es "true".
+    required: false
+    default: "22"
+
+outputs:
+  porcentaje:
+    description: >-
+      Porcentaje de líneas del cambio cubiertas, con dos decimales. Vale
+      "n/a" cuando no hubo nada que medir (paso no aplicable, cambio que solo
+      borra, o cambio sin archivos que la cobertura mida).
+    value: ${{ steps.medir.outputs.porcentaje }}
+  lineas_medidas:
+    description: Cantidad de líneas agregadas o modificadas con dato de cobertura.
+    value: ${{ steps.medir.outputs.lineas_medidas }}
+  lineas_sin_cubrir:
+    description: Cantidad de esas líneas que ninguna prueba ejercita.
+    value: ${{ steps.medir.outputs.lineas_sin_cubrir }}
+  lineas_fuera_de_medicion:
+    description: >-
+      Líneas fuente del cambio que quedaron FUERA del denominador porque
+      ningún reporte tiene dato para ellas. Un porcentaje publicado sin este
+      número miente por omisión: una línea cubierta y cincuenta sin dato dan
+      "100.00" sobre una cobertura real del 2%.
+    value: ${{ steps.medir.outputs.lineas_fuera_de_medicion }}
+
+runs:
+  using: composite
+  steps:
+    # El comparador es un script sin dependencias: alcanza con un Node moderno.
+    - name: Node para el comparador
+      if: inputs.instalar-node == 'true'
+      uses: actions/setup-node@v7
+      with:
+        node-version: ${{ inputs.version-node }}
+
+    - name: Cobertura de las lineas del cambio
+      id: medir
+      shell: bash
+      env:
+        COBERTURA_LCOV: ${{ inputs.lcov }}
+        COBERTURA_BASE: ${{ inputs.base }}
+        COBERTURA_CABEZA: ${{ inputs.cabeza }}
+        COBERTURA_MINIMO: ${{ inputs.minimo }}
+        COBERTURA_MAX_ANOTACIONES: ${{ inputs.max-anotaciones }}
+      # GITHUB_ACTION_PATH apunta a la copia de ESTA action (projects), no al repo
+      # del consumidor: por eso el script viaja con la action y el proyecto no
+      # vendora ninguna copia que se pueda quedar vieja. Un checkout del repo
+      # del marco daria 404 — el GITHUB_TOKEN del consumidor no lee otro repo
+      # (comprobado el 2026-08-14).
+      run: node "${GITHUB_ACTION_PATH}/medir-cobertura-diff.mjs"
