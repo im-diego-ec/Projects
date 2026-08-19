@@ -402,8 +402,11 @@ roja y ruidosa**, y el mensaje trae el arreglo.
    y uno de Linux `web/src/App.tsx`; git siempre habla con barras normales. Sin
    esto el cruce da cero coincidencias y la compuerta pasa en verde por la razón
    equivocada.
-4. Cruza: de las líneas agregadas mide solo las que el reporte declara
-   ejecutables (`DA:`), y calcula el porcentaje cubierto.
+4. Cruza: de las líneas agregadas mide las que el reporte declara con `DA:`, y
+   calcula el porcentaje cubierto. Una línea agregada **sin** `DA:` no se
+   descarta por las buenas: se lee su texto en el commit medido y, si tiene
+   contenido ejecutable, cuenta como línea fuera del denominador —y si el
+   reporte ni siquiera llega hasta ahí, es rojo por `lcov` rancio—.
 
 ### Requisito no negociable: las rutas del reporte
 
@@ -421,10 +424,13 @@ coverage: {
 
 `all: true` importa igual: un archivo sin ninguna prueba tiene que aparecer en el
 reporte con sus líneas en cero. Con `all: false` desaparece del reporte, la
-compuerta lo cuenta como "no medido" y el archivo menos probado del repo termina
-siendo justo el que no molesta a nadie. La action avisa (`::warning::`) cuando un
-archivo del cambio comparte extensión con lo que la cobertura sí mide y ningún
-reporte lo reclama.
+compuerta lo contaría como "no medido" y el archivo menos probado del repo
+terminaría siendo justo el que no molesta a nadie. Por eso un **archivo fuente**
+del cambio que ningún reporte reclama es **rojo**, y qué cuenta como fuente sale
+de la lista de extensiones del censo —no de las extensiones que casualmente
+traen los reportes presentes, que era circular: un repo que mide `.ts` no decía
+una palabra sobre un `.tsx` nuevo sin pruebas—. La salida es declarar la
+exclusión con su motivo en `projects.cobertura.excluidos`.
 
 ### Qué pasa en cada caso
 
@@ -436,6 +442,11 @@ reporte lo reclama.
 | El cambio no toca archivos que la cobertura mida (markdown, YAML) | Pasa, y deja constancia de por qué |
 | No hay `lcov`, o ninguna ruta `SF:` corresponde a un archivo versionado | **Rojo ruidoso** con el arreglo |
 | Un archivo del cambio quedó sin medir y su cobertura llegó con otra raíz | **Rojo**: rutas desalineadas |
+| Un archivo **fuente** del cambio que ningún reporte reclama | **Rojo**: sin datos no es cubierto; se apaga con la exclusión declarada |
+| El reporte reclama el archivo pero no llega hasta donde el cambio escribió | **Rojo**: el `lcov` es anterior al cambio (cache de CI, suite no recorrida) |
+| Una ruta `SF:` que corresponde a dos archivos versionados (monorepo sin `projectRoot`) | **Rojo**: no dice a cuál, y la cobertura se anotaría en el archivo equivocado |
+| Una exclusión declarada **con motivo** cubre ese archivo | Pasa, y el motivo queda escrito en el resumen |
+| El `minimo` recibido es menor que el del marco | Pasa, con `::warning::` que dice cuál es el del marco |
 | No hay commit base (push a `main`, dispatch) | **No aplicable**, y lo dice. Nunca simula un 100% |
 | El commit base no está en el clon y no se puede traer | **Rojo**: falta `fetch-depth: 0` |
 
@@ -463,6 +474,7 @@ saltea el job entero.
 | `porcentaje` | Porcentaje con dos decimales, o `n/a` cuando no hubo nada que medir |
 | `lineas_medidas` | Líneas agregadas con dato de cobertura |
 | `lineas_sin_cubrir` | Cuántas de esas no las ejercita ninguna prueba |
+| `lineas_fuera_de_medicion` | Líneas fuente del cambio sin dato de cobertura, fuera del denominador |
 
 ### Límites declarados
 
@@ -473,8 +485,26 @@ saltea el job entero.
   que salió el pull request: aparecen líneas que el cambio no introdujo.
   Sobrecontar es el lado conservador, y es el precio de funcionar en un clon
   superficial.
-- **El aviso de `all: false` es un aviso, no un rojo**, porque la exclusión
-  legítima (pruebas, configuración, generados) tiene exactamente la misma forma.
+- **Un archivo fuente del cambio sin ningún dato de cobertura es ROJO**, no un
+  aviso: es lo que promete el spec. La válvula de escape legítima no es bajar
+  el color, es la exclusión declarada con su motivo en
+  `projects.cobertura.excluidos` del manifiesto de su paquete — la misma mecánica
+  del censo, visible en el diff y bajo review.
+- **Una línea MODIFICADA que conserva su número hereda el dato viejo.** El
+  comparador detecta el lcov rancio cuando el reporte no llega hasta donde el
+  cambio escribió; no puede detectarlo cuando el cambio reescribe una línea que
+  el reporte ya conocía como cubierta, porque el formato lcov no trae ninguna
+  huella del código que midió. Ese caso sale verde. Cerrarlo exigiría datos de
+  frescura que hoy no existen en la entrada (un checksum por línea, que los
+  reporters no emiten), así que se declara en vez de fingir que está cubierto.
+- **Líneas nuevas sin dato en un archivo que el reporte SÍ mide son un aviso
+  ruidoso, no un rojo**: ahí la ausencia puede ser código que el reporter no
+  considera ejecutable, y un rojo con esa ambigüedad no lo puede apagar nadie.
+  Quedan fuera del denominador y el número sale publicado en
+  `lineas_fuera_de_medicion`.
+- **El `minimo` del consumidor no tiene piso duro.** El mínimo del marco es 80
+  (decisión D5); un repositorio puede pedir menos, pero el paso lo grita con un
+  `::warning::` que dice cuál es el del marco. Es visible, no imposible.
 
 ### Correrlo en local
 

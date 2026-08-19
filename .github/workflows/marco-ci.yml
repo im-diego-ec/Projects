@@ -309,6 +309,12 @@ jobs:
       # seria sensible a cualquier diferencia cosmetica de entorno y convertiria
       # un check de segundos en uno fragil. Limite asumido y declarado: detecta
       # divergencia de VERSION, no edicion manual del contenido.
+      #
+      # El unico dato con el que este check trabaja es la cabecera. Por eso los
+      # dos casos en que ese dato no esta o no se pudo leer NO salen en verde
+      # mudo: si los artefactos existen y ninguno declara version (tipicamente
+      # un CLI anterior al estampado de "generatedBy", la clase mas atrasada
+      # posible) sale un ::warning; y si grep no pudo mirar, es rojo.
       - name: Artefactos regenerados al dia
         shell: bash
         env:
@@ -324,13 +330,38 @@ jobs:
             exit 0
           fi
 
-          grep -rn 'generatedBy:' "${DIRS[@]}" > declarados.txt || true
+          # grep sale 1 cuando no encontro nada y >1 cuando NO PUDO MIRAR (un
+          # artefacto ilegible, por ejemplo). El "|| true" los confundia: un
+          # rc=2 dejaba declarados.txt vacio y el paso lo leia como "no hay
+          # nada que verificar". Lo no verificable es rojo, nunca exito mudo.
+          set +e
+          grep -rn 'generatedBy:' "${DIRS[@]}" > declarados.txt
+          RC=$?
+          set -e
+          if [ "${RC}" -gt 1 ]; then
+            echo "::error::no se pudieron inspeccionar los artefactos generados (${DIRS[*]}, grep rc=${RC}) — sin poder leerlos, no se declara que esten al dia"
+            exit 1
+          fi
+
           if [ ! -s declarados.txt ]; then
-            echo "no hay artefactos con version declarada: nada que verificar"
+            # Artefactos presentes y CERO declaraciones de version. Aviso y no
+            # rojo porque el marco no puede exigir una cabecera que la version
+            # vieja del CLI no emitia; pero callarse era declarar sano al repo
+            # mas atrasado de todos, que es justo el incidente que motivo el
+            # check.
+            echo "::warning::hay artefactos del CLI en ${DIRS[*]} pero ninguno declara con que version se genero, asi que este check no puede afirmar que esten al dia (suele ser un CLI anterior al estampado de 'generatedBy'). Arreglo: regeneralos con npx --yes @fission-ai/openspec@${PIN} update --force"
             exit 0
           fi
 
-          grep -v "generatedBy: \"${PIN}\"" declarados.txt > divergentes.txt || true
+          set +e
+          grep -v "generatedBy: \"${PIN}\"" declarados.txt > divergentes.txt
+          RC=$?
+          set -e
+          if [ "${RC}" -gt 1 ]; then
+            echo "::error::no se pudieron comparar las versiones declaradas contra el pin (grep rc=${RC}) — sin poder mirar, no se declara que los artefactos esten al dia"
+            exit 1
+          fi
+
           if [ -s divergentes.txt ]; then
             # El mensaje trae el ARREGLO, no el diagnostico: un artefacto viejo
             # es un problema con solucion conocida, y obligar a redescubrirla
@@ -419,18 +450,36 @@ jobs:
           # inicial descarta las expresiones que el proveedor de CI resuelve en
           # cada corrida (needs.build_test.result y companía), que ademas llevan
           # puntos y minusculas.
-          git ls-files -z | xargs -0 grep -nIE '(^|[^$])\{\{[A-Z0-9_]+\}\}' > pendientes.txt || true
+          # xargs colapsa "grep no encontro nada" (rc=1) y "grep no pudo leer"
+          # (rc=2) en el mismo rc=123, asi que el codigo de salida no alcanza
+          # para distinguirlos: el discriminante es lo que grep escribio en
+          # stderr. Sin esto, un archivo rastreado ilegible dejaba pendientes.txt
+          # vacio y el paso declaraba "sin marcadores" sobre una lectura que
+          # nunca ocurrio.
+          ERRORES="${RUNNER_TEMP}/marcadores-errores.txt"
+          : > "${ERRORES}"
+
+          git ls-files -z | xargs -0 grep -nIE '(^|[^$])\{\{[A-Z0-9_]+\}\}' > pendientes.txt 2>> "${ERRORES}" || true
 
           # El hueco de decision del scaffold. Se arma por codepoint (U+1F573)
           # en vez de pegar el emoji: asi matchea lo mismo lleve o no el
           # selector de variacion, y no depende del locale del runner.
           HUECO=$(printf '\xf0\x9f\x95\xb3')
-          git ls-files -z | xargs -0 grep -nIF "${HUECO}" >> pendientes.txt || true
+          git ls-files -z | xargs -0 grep -nIF "${HUECO}" >> pendientes.txt 2>> "${ERRORES}" || true
 
           if [ -s pendientes.txt ]; then
             echo "::error::quedaron marcadores del scaffold sin resolver — el bootstrap del repo esta a medias y hay promesas del marco que no se estan cumpliendo (revisa sobre todo el archivo de propietarios de codigo)"
             echo "== marcadores pendientes =="
             cat pendientes.txt
+          fi
+
+          if [ -s "${ERRORES}" ]; then
+            echo "::error::no se pudieron inspeccionar todos los archivos rastreados, asi que la AUSENCIA de marcadores del scaffold no se puede afirmar"
+            echo "== lo que no se pudo leer =="
+            cat "${ERRORES}"
+          fi
+
+          if [ -s pendientes.txt ] || [ -s "${ERRORES}" ]; then
             exit 1
           fi
 
@@ -446,11 +495,30 @@ jobs:
       # pipeline), asi que la unica forma de atraparlo es LEER el script, no
       # ejecutarlo.
       #
-      # La regla es sobre la FORMA DEL SUFIJO, no sobre una lista de nombres de
+      # La regla es sobre la FORMA DEL CUERPO, no sobre una lista de nombres de
       # script: un "lint", un "typecheck" y un "verificar-todo" que nadie
       # anticipo caen igual, y no queda ninguna lista que alguien tenga que
       # acordarse de actualizar cuando aparezca el nombre siguiente. Una lista
       # de nombres seria, otra vez, un guardrail que depende de la memoria.
+      #
+      # La propiedad que se evalua es: "el estado final del cuerpo NO es el del
+      # comando de verificacion". Se resuelve leyendo el cuerpo como lo lee sh
+      # —secuencia, lista and-or, pipeline— en vez de con un patron de sufijo:
+      # el patron anterior solo cazaba "|| true", "|| :" y "exit 0" pegados al
+      # final, y dejaba pasar por lo menos cinco formas equivalentes
+      # ("|| echo", "; echo", "| tee", un comentario final que corre el ancla,
+      # y "|| true && echo"), todas verificadas dando exit 0 con el comando
+      # fallando.
+      #
+      # LIMITES DECLARADOS de la lectura (no de la ejecucion, que no ocurre):
+      #   - Un pipe final a un comando que NO es pass-through ("| jq", "| grep")
+      #     tambien reemplaza el estado y no se marca: decidir si ese comando
+      #     puede fallar exige conocerlo.
+      #   - Sustitucion de comandos y subshells se tratan como texto opaco.
+      #   - Un "&" de fondo no se interpreta (partirlo rompe "2>&1").
+      #   - El comentario final se descarta antes de leer; un "#" pegado al
+      #     final de un argumento entrecomillado podria recortar de mas, y eso
+      #     solo puede producir un falso POSITIVO, nunca un falso negativo.
       - name: Scripts de verificacion sin enmascaramiento
         if: '!cancelled()'
         shell: bash
@@ -479,13 +547,106 @@ jobs:
           node -e '
             const { readFileSync } = require("node:fs");
 
-            // La propiedad, no una lista. Lo que se busca es la FORMA del
-            // sufijo: un separador que NO corta la ejecucion (|| o ;) seguido
-            // de un comando que siempre sale 0. Un cuerpo que ES exactamente
-            // "true", ":" o "exit 0" no enmascara nada —no hay comando previo
-            // cuyo fallo tapar— y por eso el patron EXIGE el separador
-            // delante: un "prepare": "true" es legitimo y no se marca.
-            const SUFIJO = /(\|\||;)[ \t]*(true|:|exit[ \t]+0)[ \t]*;?[ \t]*$/;
+            // Comandos que salen 0 pase lo que pase, en cualquier posicion.
+            const SIEMPRE_CERO = /^(true|:|exit[ \t]+0|echo|printf)([ \t]|$)/;
+
+            // Pass-through: consumen la entrada y salen 0. Solo cuentan cuando
+            // RECIBEN un pipe, que es donde reemplazan el estado del comando
+            // de la izquierda; sueltos ("cat archivo") si pueden fallar.
+            const PASA_A_TRAVES = /^(tee|cat|head|tail)([ \t]|$)/;
+
+            // Corta el cuerpo en [comando, separador, comando, ...] de nivel
+            // superior, respetando comillas y descartando el comentario final.
+            // Un "&" suelto NO es separador: partiria "2>&1" al medio.
+            function tokenizar(cuerpo) {
+              const partes = [];
+              let actual = "";
+              let comilla = null;
+              for (let i = 0; i < cuerpo.length; i += 1) {
+                const c = cuerpo[i];
+                if (comilla !== null) {
+                  actual += c;
+                  if (c === comilla) comilla = null;
+                  continue;
+                }
+                // La comilla simple va como \u0027 y no literal: el programa
+                // entero viaja dentro de comillas simples de shell.
+                if (c === "\"" || c === "\u0027") { comilla = c; actual += c; continue; }
+                if (c === "\\") { actual += c + (cuerpo[i + 1] || ""); i += 1; continue; }
+                if (c === "#" && (actual === "" || /[ \t]$/.test(actual))) break;
+                const dos = cuerpo.slice(i, i + 2);
+                if (dos === "||" || dos === "&&") { partes.push(actual, dos); actual = ""; i += 1; continue; }
+                if (c === ";" || c === "|") { partes.push(actual, c); actual = ""; continue; }
+                actual += c;
+              }
+              partes.push(actual);
+              return partes;
+            }
+
+            // Agrupa la lista plana por los separadores dados, devolviendo
+            // [grupo, separador, grupo, ...]. Los separadores que no estan en
+            // la lista quedan dentro de su grupo.
+            function agrupar(partes, separadores) {
+              const grupos = [];
+              let actual = [partes[0]];
+              for (let i = 1; i < partes.length; i += 2) {
+                if (separadores.indexOf(partes[i]) >= 0) {
+                  grupos.push(actual, partes[i]);
+                  actual = [partes[i + 1]];
+                } else {
+                  actual.push(partes[i], partes[i + 1]);
+                }
+              }
+              grupos.push(actual);
+              return grupos;
+            }
+
+            // El estado de un pipeline es el de su ULTIMO comando.
+            function pipelineSiempreCero(grupo) {
+              const ultimo = grupo[grupo.length - 1].trim();
+              const recibePipe = grupo.length > 1;
+              return SIEMPRE_CERO.test(ultimo) || (recibePipe && PASA_A_TRAVES.test(ultimo));
+            }
+
+            // Lee el cuerpo como lo lee sh: ";" separa una secuencia y el
+            // estado es el del ultimo elemento; dentro, "&&" y "||" arman una
+            // lista asociativa por izquierda donde
+            //   A || B sale 0 si A sale 0 O si B sale 0
+            //   A && B sale 0 solo si los DOS salen 0
+            function siempreCero(partes) {
+              const secuencia = agrupar(partes, [";"]);
+              const lista = agrupar(secuencia[secuencia.length - 1], ["||", "&&"]);
+              let estado = pipelineSiempreCero(lista[0]);
+              for (let i = 1; i < lista.length; i += 2) {
+                const derecha = pipelineSiempreCero(lista[i + 1]);
+                estado = lista[i] === "||" ? (estado || derecha) : (estado && derecha);
+              }
+              return estado;
+            }
+
+            // Sin un comando que pueda fallar no hay nada que tapar: un
+            // "prepare": "true" o un "saludo": "echo a && echo b" salen 0 por
+            // naturaleza y no enmascaran nada.
+            function hayComandoQuePuedeFallar(partes) {
+              for (let i = 0; i < partes.length; i += 2) {
+                const comando = partes[i].trim();
+                if (comando === "") continue;
+                if (SIEMPRE_CERO.test(comando) || PASA_A_TRAVES.test(comando)) continue;
+                return true;
+              }
+              return false;
+            }
+
+            // El cuerpo sin la cola que enmascara: se sacan pares (separador,
+            // comando) del final hasta que el estado vuelve a ser el del
+            // comando de verificacion. Eso es el arreglo, listo para pegar.
+            function sinLaCola(partes) {
+              let restante = partes.slice();
+              while (restante.length > 1 && siempreCero(restante)) {
+                restante = restante.slice(0, -2);
+              }
+              return restante.join("");
+            }
 
             // Un comando de workflow termina en el salto de linea y trata "%"
             // como escape: sin normalizar, un script con "%" adentro mutila su
@@ -541,15 +702,19 @@ jobs:
               for (const [nombre, cuerpo] of Object.entries(scripts)) {
                 if (typeof cuerpo !== "string") continue;
                 revisados += 1;
-                const limpio = cuerpo.trim();
-                const encontrado = limpio.match(SUFIJO);
-                if (encontrado === null) continue;
+                const partes = tokenizar(cuerpo.trim());
+                // Un solo comando: su estado ES el del cuerpo, nada que tapar.
+                if (partes.length === 1) continue;
+                if (!siempreCero(partes)) continue;
+                if (!hayComandoQuePuedeFallar(partes)) continue;
+                const completo = partes.join("");
+                const arreglado = sinLaCola(partes);
                 hallazgos.push({
                   ruta: ruta,
                   nombre: nombre,
                   linea: lineaDeclaracion(texto, nombre),
-                  sufijo: encontrado[0].trim(),
-                  arreglado: limpio.slice(0, encontrado.index).trim(),
+                  sufijo: completo.slice(arreglado.length).trim(),
+                  arreglado: arreglado.trim(),
                 });
               }
             }
@@ -570,7 +735,13 @@ jobs:
               process.exit(1);
             }
 
-            console.log(revisados + " script(s) de " + manifiestos.length + " manifiesto(s) propagan su codigo de salida");
+            // La verdad de lo que se probo, ni una palabra mas. Este paso LEE
+            // el texto del cuerpo, no ejecuta nada: no puede afirmar que los
+            // scripts propaguen su codigo de salida, solo que ninguno cae en
+            // las formas de enmascaramiento que sabe reconocer. Decirlo de
+            // mas convertia el check en la fuente de la falsa tranquilidad que
+            // vino a eliminar.
+            console.log(revisados + " script(s) de " + manifiestos.length + " manifiesto(s) leidos: ninguno cae en una forma de enmascaramiento conocida (una secuencia, lista and-or o pipeline cuyo estado final sale 0 pase lo que pase). Es lectura de forma y no ejecucion: NO prueba que el codigo de salida se propague");
           ' "${RUNNER_TEMP}/manifiestos.txt"
 
       # HUECO 5 — el censo de fuentes (la derivacion que le pregunta a cada
@@ -600,13 +771,35 @@ jobs:
           set -euo pipefail
 
           # SKIP POR PROPIEDAD, no por input. El censo interroga al toolchain
-          # de un repo de Node; sin manifiesto en la raiz no hay toolchain que
+          # de un repo de Node; sin NINGUN manifiesto no hay toolchain que
           # interrogar. Projects cae justo aca —igual que en el check de
           # marcadores— y el dia que tenga su propio manifiesto el check se
           # enciende SOLO, sin que nadie se acuerde de encenderlo. Un input
           # seria una perilla que un consumidor puede apagar por descuido.
-          if [ -z "$(git ls-files -- package.json)" ]; then
-            echo "::notice::este repo no versiona un package.json en la raiz: no hay toolchain que censar — verificacion omitida"
+          #
+          # QUE CUENTA COMO "repo de Node" PARA ESTE PASO, y por que NO es el
+          # mismo pathspec que el del paso de enmascaramiento.
+          #
+          # Aca la pregunta es "este REPOSITORIO es un proyecto de Node que
+          # tiene que censar sus fuentes?", y eso lo contesta el manifiesto de
+          # la RAIZ (o el del workspace). Alla la pregunta es otra: "que
+          # manifiestos existen, para leerles los scripts?", y ahi si hay que
+          # barrer todos. Dos preguntas distintas, dos pathspecs distintos: no
+          # es una inconsistencia, es que no preguntan lo mismo.
+          #
+          # Se probo con '*package.json' y el resultado fue exactamente el
+          # error que esa distincion evita: los package.json de los FIXTURES de
+          # prueba de este repo lo convertian en "repo de Node", Projects dejaba
+          # de tomar el skip y el paso le exigia cablear el censo en sus
+          # propios workflows. Un archivo de prueba no hace de un repo un
+          # proyecto de Node.
+          #
+          # Se incluye pnpm-workspace.yaml por el caso que motivo la revision:
+          # un monorepo cuyo codigo vive todo en subdirectorios. Con pnpm ese
+          # caso igual exige manifiesto en la raiz, asi que es cinturon y
+          # tirantes, no redundancia inutil.
+          if [ -z "$(git ls-files -- package.json pnpm-workspace.yaml)" ]; then
+            echo "::notice::este repo no versiona un manifiesto de Node en la raiz: no hay toolchain que censar — verificacion omitida"
             exit 0
           fi
 
@@ -620,9 +813,14 @@ jobs:
           ACTION="actions/censo-fuentes"
           PATRON='^[[:space:]]*(-[[:space:]]+)?uses:[[:space:]]*[^[:space:]]*'"${ACTION}"'([^A-Za-z0-9_-]|$)'
 
+          # --include acota la busqueda a lo que GitHub EJECUTA. Sin el, el
+          # recorrido barria tambien la documentacion del directorio, y un
+          # README con el snippet pegado —el mismo snippet que el rojo de mas
+          # abajo imprime para copiar— alcanzaba para declarar "cableado" un
+          # censo que nunca se invoco: el mensaje de error ensenaba a evadirlo.
           CABLEADO="${RUNNER_TEMP}/cableado.txt"
           set +e
-          grep -rnE "${PATRON}" .github/workflows > "${CABLEADO}"
+          grep -rnE --include='*.yml' --include='*.yaml' "${PATRON}" .github/workflows > "${CABLEADO}"
           RC=$?
           set -e
           if [ "${RC}" -gt 1 ]; then

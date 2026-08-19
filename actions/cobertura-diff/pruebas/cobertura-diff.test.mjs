@@ -181,6 +181,10 @@ test("un archivo del cambio medido con otra raiz es ROJO aunque otros SF: resuel
   assert.equal(r.codigo, 1, r.todo);
   assert.match(r.stderr, /no estan alineadas/);
   assert.match(r.stderr, /sin medir por rutas desalineadas: web\/src\/suma\.ts/);
+  // Tambien en el camino ROJO la salida declara cuantas lineas fuente
+  // quedaron fuera: publicar 0 mientras el archivo del cambio no se pudo
+  // medir es la misma mentira por omision que en el camino verde.
+  assert.notEqual(r.salidas.lineas_fuera_de_medicion, "0", r.todo);
 });
 
 // ── Caso borde 4: rango degenerado (push a main) ────────────────────────────
@@ -240,9 +244,16 @@ test("fuera de un repositorio git el paso es ROJO, no un exito silencioso", () =
   assert.notEqual(r.codigo, 0, r.todo);
 });
 
-// ── Ruido util, no rojo ─────────────────────────────────────────────────────
+// ── Un archivo fuente sin datos es ROJO, como promete el spec ───────────────
+//
+// El scenario vive en la capability calidad-codigo: "un cambio agrega lineas
+// ejecutables y la medicion no encuentra datos de cobertura que les
+// correspondan -> la integracion FALLA". Esto salia como ::warning:: con exit
+// 0, y un ruleset solo mira el codigo de salida: el archivo nuevo sin una sola
+// prueba cruzaba la compuerta igual. La valvula de escape no es bajar el
+// aviso: es la exclusion declarada con motivo, que el mismo spec contempla.
 
-test("un archivo con la misma extension que lo medido, sin reclamar, avisa fuerte", () => {
+test("un archivo fuente que ningun reporte reclama es ROJO, no un aviso", () => {
   const { dir, base } = repoConBase();
   escribir(dir, "web/src/suma.ts", fixture("suma-v2.ts"));
   escribir(dir, "web/src/nuevo-sin-medir.ts", "export const x = 1;\n");
@@ -251,10 +262,11 @@ test("un archivo con la misma extension que lo medido, sin reclamar, avisa fuert
 
   const r = correr(dir, { COBERTURA_BASE: base });
 
-  // Pasa (lo medido esta cubierto) pero deja el aviso: podria ser all:false.
-  assert.equal(r.codigo, 0, r.todo);
-  assert.match(r.stderr, /::warning::.*comparten extension con lo que la cobertura mide/);
+  assert.equal(r.codigo, 1, r.todo);
+  assert.match(r.stderr, /nuevo-sin-medir\.ts/);
+  // El mensaje trae las DOS salidas legitimas, no solo el diagnostico.
   assert.match(r.stderr, /all: true/);
+  assert.match(r.stderr, /projects\.cobertura\.excluidos/);
 });
 
 // REGRESION. El aviso vivia DESPUES de la salida temprana de "no medi nada", asi
@@ -264,7 +276,7 @@ test("un archivo con la misma extension que lo medido, sin reclamar, avisa fuert
 // silencioso que el marco prohibe. No es hipotetico: los scripts sueltos y los
 // .ts de e2e del consumidor son exactamente esos archivos, y basta meterlos en
 // un tsconfig —sin una sola prueba— para que el censo se de por satisfecho.
-test("un cambio que toca SOLO archivos sin medir avisa igual: nunca sale mudo", () => {
+test("un cambio que toca SOLO archivos sin medir nunca sale mudo", () => {
   const { dir, base } = repoConBase();
   escribir(dir, "web/src/nuevo-sin-medir.ts", "export const x = 1;\nexport const y = 2;\n");
   commit(dir, "agrega un archivo que ningun reporte reclama, y NADA mas");
@@ -272,10 +284,63 @@ test("un cambio que toca SOLO archivos sin medir avisa igual: nunca sale mudo", 
 
   const r = correr(dir, { COBERTURA_BASE: base });
 
-  // Pasa —no hay nada medido que juzgar— pero NO en silencio.
-  assert.equal(r.codigo, 0, r.todo);
-  assert.match(r.stderr, /::warning::.*comparten extension con lo que la cobertura mide/);
+  assert.equal(r.codigo, 1, r.todo);
   assert.match(r.stderr, /nuevo-sin-medir\.ts/);
+});
+
+// REGRESION DEL ENDURECIMIENTO. Al volver ROJO el archivo fuente sin datos hubo
+// que decidir que linea "tiene contenido", y el filtro solo miraba la linea que
+// ABRE una declaracion de tipos: el CUERPO de un type o de una interface
+// —"id: string;", '| "aprobado"', "buscar(id): Promise<void>;"— contaba como
+// codigo. Un tipos.ts, el archivo mas comun del stack fijado, quedaba rojo sin
+// prueba posible que lo apagara: ningun reporter emite DA: para una declaracion
+// de tipos. Un check que se pone rojo en falso termina desactivado, y vale cero.
+test("un archivo de PUROS TIPOS no enrojece: ningun reporter puede medirlo", () => {
+  const { dir, base } = repoConBase();
+  escribir(
+    dir,
+    "web/src/tipos.ts",
+    "// Los tipos del dominio.\n" +
+      "export type Usuario = {\n  id: string;\n  nombre: string;\n};\n\n" +
+      'export type Estado =\n  | "pendiente"\n  | "aprobado";\n\n' +
+      "export interface RepositorioUsuarios {\n" +
+      "  buscar(id: string): Promise<Usuario | null>;\n" +
+      "  guardar(u: Usuario): Promise<void>;\n}\n"
+  );
+  escribir(
+    dir,
+    "web/src/global.d.ts",
+    'declare module "*.svg" {\n  const contenido: string;\n  export default contenido;\n}\n'
+  );
+  commit(dir, "agrega los tipos del dominio");
+  copiarFixture(dir, "lcov-cubierto-windows.info", "web/coverage/lcov.info");
+
+  const r = correr(dir, { COBERTURA_BASE: base });
+
+  assert.equal(r.codigo, 0, r.todo);
+  assert.doesNotMatch(r.stderr, /sin ningun dato de cobertura/);
+  // Y no se cuelan al denominador por la puerta de atras.
+  assert.equal(r.salidas.lineas_fuera_de_medicion, "0", r.todo);
+});
+
+// El otro lado de la misma moneda: el filtro de tipos NO puede tragarse codigo
+// de verdad que venga despues en el mismo archivo, porque eso seria el
+// fail-open que todo este lote vino a cerrar.
+test("codigo ejecutable DESPUES de un bloque de tipos sigue enrojeciendo", () => {
+  const { dir, base } = repoConBase();
+  escribir(
+    dir,
+    "web/src/mixto.ts",
+    "export interface Config {\n  puerto: number;\n}\n\n" +
+      "export function crear(c: Config) {\n  return c.puerto + 1;\n}\n"
+  );
+  commit(dir, "tipos y codigo en el mismo archivo, sin pruebas");
+  copiarFixture(dir, "lcov-cubierto-windows.info", "web/coverage/lcov.info");
+
+  const r = correr(dir, { COBERTURA_BASE: base });
+
+  assert.equal(r.codigo, 1, r.todo);
+  assert.match(r.stderr, /mixto\.ts/);
 });
 
 test("los archivos de prueba no disparan ese aviso: no reclamarlos es lo normal", () => {
@@ -390,4 +455,202 @@ test("el glob por defecto encuentra el lcov en la raiz y en cualquier paquete", 
   assert.ok(re.test("web/coverage/lcov.info"));
   assert.ok(re.test("paquetes/api/coverage/lcov.info"));
   assert.ok(!re.test("web/coverage/lcov-report/index.html"));
+});
+
+// ── Fail-open reproducidos por la revision adversarial ──────────────────────
+//
+// Cada uno de estos casos SALIA EN VERDE (algunos MUDOS) antes del arreglo.
+// La regla que violaban es la misma: ningun camino puede terminar en exito
+// silencioso cuando la verificacion no se pudo hacer.
+
+// 1. El lcov RANCIO. El archivo esta reclamado por un SF:, asi que esquiva
+// todas las defensas de rutas; pero el reporte es ANTERIOR al cambio y no
+// tiene una sola entrada DA para las lineas nuevas. Antes del arreglo el
+// archivo desaparecia de TODO —ni siquiera caia en noReclamados— y el paso
+// salia exit 0 MUDO. Vector real: un cache de CI que restaura coverage/, una
+// suite que no se volvio a correr, o el lcov comiteado.
+test("lcov rancio: el archivo esta reclamado pero sus lineas nuevas no tienen dato — ROJO", () => {
+  const { dir } = repoConBase();
+  escribir(dir, "web/src/a.ts", "export const a = 1;\nexport const b = 2;\n");
+  escribir(
+    dir,
+    "web/coverage/lcov.info",
+    "TN:\nSF:web/src/a.ts\nDA:1,1\nDA:2,1\nLF:2\nLH:2\nend_of_record\n"
+  );
+  const base = commit(dir, "a.ts con su cobertura al dia");
+
+  escribir(
+    dir,
+    "web/src/a.ts",
+    [
+      "export const a = 1;",
+      "export const b = 2;",
+      "export const c = 3;",
+      "export const d = 4;",
+      "export const e = 5;",
+      "export const f = 6;",
+      "export const g = 7;",
+      "",
+    ].join("\n")
+  );
+  commit(dir, "agrega 5 lineas ejecutables y NO regenera la cobertura");
+
+  const r = correr(dir, { COBERTURA_BASE: base });
+
+  assert.equal(r.codigo, 1, r.todo);
+  assert.notEqual(r.salidas.porcentaje, "100.00");
+  assert.match(r.stderr, /anterior al cambio/);
+  assert.match(r.stderr, /web\/src\/a\.ts/);
+});
+
+// 1b. El caso degenerado del rancio: un registro SF: SIN una sola entrada
+// DA (el reporter emitio el archivo vacio, o lo dejo fuera de all: true).
+// Sigue siendo rojo, pero el diagnostico decia "hasta la linea -Infinity":
+// un mensaje roto es un mensaje que el consumidor no puede accionar, y la
+// regla del marco pide el ORIGEN PRECISO, no solo el color.
+test("un registro SF: sin ninguna entrada DA es ROJO y lo dice sin -Infinity", () => {
+  const dir = repoNuevo();
+  escribir(dir, "web/src/a.ts", "export const a = 1;\n");
+  const base = commit(dir, "base");
+  escribir(dir, "web/src/a.ts", "export const a = 1;\nexport const b = 2;\n");
+  commit(dir, "agrega una linea ejecutable");
+  escribir(
+    dir,
+    "web/coverage/lcov.info",
+    "TN:\nSF:web/src/a.ts\nLF:0\nLH:0\nend_of_record\n"
+  );
+
+  const r = correr(dir, { COBERTURA_BASE: base });
+
+  assert.equal(r.codigo, 1, r.todo);
+  assert.ok(r.stderr.includes("web/src/a.ts"), r.todo);
+  assert.ok(!r.todo.includes("-Infinity"), r.todo);
+});
+
+// 2. Una extension que NINGUN reporte mide. El aviso se calculaba contra las
+// extensiones que casualmente traian los lcov presentes, asi que un repo que
+// mide .ts no decia una palabra sobre un .tsx nuevo sin pruebas.
+test("una extension que ningun reporte mide no puede salir en silencio", () => {
+  const { dir, base } = repoConBase();
+  escribir(
+    dir,
+    "web/src/Boton.tsx",
+    [
+      "export function Boton(props: { texto: string }) {",
+      "  const etiqueta = props.texto.trim();",
+      "  if (!etiqueta) {",
+      "    return null;",
+      "  }",
+      "  return etiqueta;",
+      "}",
+      "",
+    ].join("\n")
+  );
+  commit(dir, "agrega un componente .tsx sin una sola prueba");
+  copiarFixture(dir, "lcov-cubierto-windows.info", "web/coverage/lcov.info");
+
+  const r = correr(dir, { COBERTURA_BASE: base });
+
+  assert.equal(r.codigo, 1, r.todo);
+  assert.match(r.stderr, /Boton\.tsx/);
+});
+
+// 3. La dilucion a 100%: una linea cubierta y cincuenta sin dato publican
+// "porcentaje=100.00" sobre una cobertura real de ~2%.
+test("el porcentaje jamas se publica sin declarar las lineas fuente fuera del denominador", () => {
+  const { dir, base } = repoConBase();
+  escribir(dir, "api/src/index.ts", "export const arranca = 1;\n");
+  escribir(
+    dir,
+    "web/src/App.tsx",
+    Array.from({ length: 50 }, (_, i) => `export const v${i} = ${i};`).join("\n") + "\n"
+  );
+  commit(dir, "una linea medida y cincuenta sin dato");
+  escribir(
+    dir,
+    "api/coverage/lcov.info",
+    "TN:\nSF:api/src/index.ts\nDA:1,1\nLF:1\nLH:1\nend_of_record\n"
+  );
+
+  const r = correr(dir, { COBERTURA_BASE: base });
+
+  assert.notEqual(r.salidas.porcentaje, "100.00", r.todo);
+  assert.equal(r.codigo, 1, r.todo);
+  assert.match(r.stderr, /50 linea/);
+  assert.match(r.stderr, /App\.tsx/);
+  assert.equal(r.salidas.lineas_fuera_de_medicion, "50", r.todo);
+});
+
+// 4. La exclusion declarada con motivo: el unico camino legitimo para que un
+// archivo fuente del cambio quede fuera de la medicion sin enrojecerla.
+test("una exclusion declarada con motivo devuelve ese archivo a verde, y queda en el resumen", () => {
+  const { dir, base } = repoConBase();
+  escribir(
+    dir,
+    "web/package.json",
+    JSON.stringify(
+      {
+        name: "web",
+        projects: {
+          cobertura: {
+            excluidos: [{ patron: "src/generado.ts", motivo: "lo genera el codegen del cliente" }],
+          },
+        },
+      },
+      null,
+      2
+    ) + "\n"
+  );
+  escribir(dir, "web/src/generado.ts", "export const generado = 1;\nexport const otro = 2;\n");
+  commit(dir, "agrega un archivo generado, excluido con motivo");
+  copiarFixture(dir, "lcov-cubierto-windows.info", "web/coverage/lcov.info");
+
+  const r = correr(dir, { COBERTURA_BASE: base });
+
+  assert.equal(r.codigo, 0, r.todo);
+  assert.match(r.resumen, /generado\.ts/);
+  assert.match(r.resumen, /lo genera el codegen/);
+});
+
+// 5. Colision de rutas en un monorepo sin projectRoot: "SF:src/util.ts"
+// emitido por el paquete web resuelve contra el src/util.ts de la RAIZ, asi
+// que sinResolver queda vacio y el detector de sospechosos —que solo mira
+// basenames de rutas NO resueltas— queda ciego. Es el modo de falla del design
+// D5 entrando por otra puerta.
+test("colision de rutas en monorepo: un SF: relativo que tambien resuelve dentro del paquete es ROJO", () => {
+  const dir = repoNuevo();
+  escribir(dir, "src/util.ts", "export const raiz = 1;\n");
+  escribir(dir, "web/src/util.ts", "export const web = 1;\n");
+  const base = commit(dir, "base con dos util.ts");
+  escribir(
+    dir,
+    "web/src/util.ts",
+    "export const web = 1;\nexport const a = 2;\nexport const b = 3;\nexport const c = 4;\n"
+  );
+  commit(dir, "agrega 3 lineas al util del paquete web, sin pruebas");
+  escribir(dir, "web/coverage/lcov.info", "TN:\nSF:src/util.ts\nDA:1,5\nLF:1\nLH:1\nend_of_record\n");
+
+  const r = correr(dir, { COBERTURA_BASE: base });
+
+  assert.equal(r.codigo, 1, r.todo);
+  assert.match(r.stderr, /projectRoot/);
+  // El diagnostico EQUIVOCADO: sugerir all: true cuando el problema es que la
+  // ruta del reporte no dice a que archivo corresponde.
+  assert.doesNotMatch(r.stderr, /all: true/);
+});
+
+// 6. El minimo no tiene piso: un consumidor puede pasar minimo: '0' y el gate
+// pasa siempre, sin que el marco se entere nunca.
+test("un minimo por debajo del minimo del marco avisa fuerte", () => {
+  const { dir, base } = repoConBase();
+  escribir(dir, "web/src/suma.ts", fixture("suma-v2.ts"));
+  commit(dir, "agrega resta sin pruebas");
+  copiarFixture(dir, "lcov-sin-cubrir.info", "web/coverage/lcov.info");
+
+  const r = correr(dir, { COBERTURA_BASE: base, COBERTURA_MINIMO: "0" });
+
+  // Sigue pasando —el consumidor manda sobre su propio umbral— pero NO en
+  // silencio: el marco dice cual es su minimo.
+  assert.equal(r.codigo, 0, r.todo);
+  assert.match(r.stderr, /::warning::.*minimo del marco/);
 });

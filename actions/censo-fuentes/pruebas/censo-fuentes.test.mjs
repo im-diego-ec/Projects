@@ -17,6 +17,9 @@
 
 import test from "node:test";
 import assert from "node:assert/strict";
+import { spawnSync } from "node:child_process";
+import { mkdtempSync, rmSync, symlinkSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import {
@@ -240,6 +243,73 @@ test("repo de otro stack: ni analizador ni compilador resolubles (skip honesto)"
   assert.equal(resolverTsc(raiz), null, "no hay typescript instalado en el fixture");
   // Con las dos sondas en falso, main() emite ::warning:: y sale 0: ni rojo
   // sobre un repo sano de otro stack, ni un verde mudo que diga "verificado".
+});
+
+// ---------------------------------------------------------------------------
+// El guardia de módulo principal: la única rama que este banco NO puede
+// ejercitar importando el módulo, porque importar es justamente lo que el
+// guardia tiene que distinguir de ejecutar.
+//
+// Estas dos pruebas SPAWNEAN el script como lo spawnea la action. La segunda es
+// la que importa: invoca el mismo archivo por una ruta que NO es su ruta
+// canónica (un enlace de directorio: junction en Windows, symlink en POSIX),
+// que es como llega argv[1] cuando el checkout, el runner o el propio
+// desarrollador pasan por un enlace, un nombre corto de Windows (JSANTA~1) o
+// una unidad mapeada. Node resuelve el enlace para `import.meta.url` pero NO
+// para `process.argv[1]`, así que un guardia por comparación literal decide
+// "no soy el principal" y el proceso termina en exit 0 sin haber censado nada
+// ni haber dicho una palabra: el fail-open exacto que la constitución prohíbe.
+// ---------------------------------------------------------------------------
+
+const SCRIPT_DIR = join(import.meta.dirname, "..");
+const SIN_TOOLCHAIN = join(FIXTURES, "sin-toolchain");
+
+/** Corre el script como proceso aparte y devuelve todo lo observable. */
+function spawnear(rutaDelScript) {
+  const r = spawnSync(process.execPath, [rutaDelScript], {
+    encoding: "utf8",
+    // Fixture sin analizador ni compilador: el censo toma la rama del skip
+    // honesto, que es barata y ruidosa. Alcanza para probar que CORRIÓ.
+    // GITHUB_STEP_SUMMARY vacío aísla la prueba del resumen real del runner.
+    env: { ...process.env, CENSO_RAIZ: SIN_TOOLCHAIN, GITHUB_STEP_SUMMARY: "" },
+  });
+  return { codigo: r.status, todo: `${r.stdout ?? ""}\n${r.stderr ?? ""}` };
+}
+
+test("spawneado por su ruta canónica, el censo corre y se hace oír", () => {
+  const r = spawnear(join(SCRIPT_DIR, "censo-fuentes.mjs"));
+  assert.equal(r.codigo, 0);
+  assert.match(r.todo, /::warning::censo de fuentes OMITIDO/, "el control del banco: por la ruta canónica el script sí corre");
+});
+
+test("spawneado por una ruta NO canónica, el censo TAMBIÉN corre (el guardia no puede ser un exit 0 mudo)", () => {
+  const temporal = mkdtempSync(join(tmpdir(), "projects-censo-guardia-"));
+  try {
+    const enlace = join(temporal, "accion");
+    try {
+      // "junction" es el único tipo de enlace de directorio que Windows crea
+      // sin privilegios de administrador; en POSIX el tipo se ignora.
+      symlinkSync(SCRIPT_DIR, enlace, "junction");
+    } catch (e) {
+      // Sin enlace no hay prueba, y una prueba que no pudo verificar nada no se
+      // reporta como verde: el guardia quedaría sin cubrir y en silencio.
+      assert.fail(`no se pudo crear el enlace de directorio, el guardia quedó SIN cubrir: ${e.message}`);
+    }
+
+    const r = spawnear(join(enlace, "censo-fuentes.mjs"));
+    assert.match(
+      r.todo,
+      /::warning::censo de fuentes OMITIDO/,
+      "invocado por una ruta no canónica el script no dijo NADA: el guardia lo desactivó y el paso terminó en verde sin censar"
+    );
+    assert.equal(r.codigo, 0);
+  } finally {
+    try {
+      rmSync(temporal, { recursive: true, force: true, maxRetries: 5 });
+    } catch {
+      // Basura en el temporal del sistema, no un fallo de la prueba.
+    }
+  }
 });
 
 // ---------------------------------------------------------------------------
