@@ -289,6 +289,150 @@ descubrirse cuando alguien lo cobre.
     "linea": "      - run: npx :::",
     "exit": 0,
     "por_que": "fuera de un allowlist lo indeterminado sigue siendo ::warning::, que es ruidoso y no bloqueante"
+  },
+  {
+    "id": "valor-entrecomillado-doble",
+    "origen": "refutacion",
+    "archivo": "flujo.yml",
+    "linea": "      - run: pnpm -C \"./mi dir\" dlx openspec update",
+    "exit": 1,
+    "por_que": "medido exit 0 con el mensaje 'no hay nada que pinar': el token de valor era [^-\\s][^ \\t]* en el lector y su equivalente en el prefiltro, asi que un valor entrecomillado CON ESPACIO cegaba a los dos a la vez"
+  },
+  {
+    "id": "valor-entrecomillado-simple",
+    "origen": "refutacion",
+    "archivo": "flujo.yml",
+    "linea": "      - run: pnpm -C './mi dir' dlx openspec update",
+    "exit": 1,
+    "por_que": "misma ceguera con comilla simple; la mutacion de control de la ronda anterior solo cubria la comilla doble, que es como el eje quedo abierto"
+  },
+  {
+    "id": "allowlist-valor-entrecomillado-doble",
+    "origen": "refutacion",
+    "archivo": ".claude/settings.json",
+    "linea": "      \"Bash(npm --prefix \\\"./mi dir\\\" exec openspec:*)\",",
+    "exit": 1,
+    "por_que": "medido exit 0: la severidad partida del allowlist no se sostenia contra la clase, porque el valor con espacio cegaba tambien al allowlist. Aca el comando vive DENTRO de un string de JSON, asi que hace falta desenvolver un nivel antes de tokenizar"
+  },
+  {
+    "id": "allowlist-valor-entrecomillado-simple",
+    "origen": "refutacion",
+    "archivo": ".claude/settings.json",
+    "linea": "      \"Bash(npm --prefix './mi dir' exec openspec:*)\",",
+    "exit": 1,
+    "por_que": "misma ceguera del allowlist con comilla simple adentro del string de JSON"
+  },
+  {
+    "id": "valor-con-espacio-escapado",
+    "origen": "refutacion",
+    "archivo": "flujo.yml",
+    "linea": "      - run: pnpm -C ./mi\\ dir dlx openspec update",
+    "exit": 1,
+    "por_que": "tercera ortografia del mismo eje: el espacio escapado con barra no lleva comillas y rompia igual el token de valor"
+  },
+  {
+    "id": "yarn-dlx-valor-entrecomillado",
+    "origen": "refutacion",
+    "archivo": "flujo.yml",
+    "linea": "      - run: yarn --cwd \"/tmp/a b\" dlx openspec update",
+    "exit": 1,
+    "por_que": "el mismo eje en el otro alfabeto de banderas (yarn --cwd sale de la doc, no esta instalado aca)"
+  },
+  {
+    "id": "bun-x-valor-entrecomillado-simple",
+    "origen": "refutacion",
+    "archivo": "flujo.yml",
+    "linea": "      - run: bun --cwd '/tmp/a b' x openspec",
+    "exit": 1,
+    "por_que": "el mismo eje en bun (bun --cwd sale de la doc, no esta instalado aca)"
+  },
+  {
+    "id": "invocacion-partida-en-dos-lineas",
+    "origen": "refutacion",
+    "archivo": "flujo.sh",
+    "linea": "pnpm \\\n  dlx openspec update",
+    "exit": 1,
+    "por_que": "era un LIMITE DECLARADO del enfoque anterior ('una invocacion partida en varias lineas con barra no se lee'), y con el prefiltro por archivo el lector ve el archivo entero, asi que el limite se cierra en vez de declararse"
+  },
+  {
+    "id": "ejecutor-invocado-con-ruta",
+    "origen": "refutacion",
+    "archivo": "flujo.sh",
+    "linea": "./node_modules/.bin/npx openspec update",
+    "exit": 1,
+    "por_que": "descarga igual, y el limite de palabra del regex anterior excluia a proposito todo lo precedido por barra o punto, asi que esta forma salia verde"
+  },
+  {
+    "id": "comando-anidado-en-json",
+    "origen": "refutacion",
+    "archivo": "tareas.json",
+    "linea": "      \"cmd\": \"pnpm -C \\\"./mi dir\\\" dlx openspec update\",",
+    "exit": 1,
+    "por_que": "el texto que este check lee no es de un solo lenguaje: un comando de shell viaja adentro de un string de JSON, y un tokenizador plano no puede porque el entrecomillado de afuera apaga el de adentro"
+  },
+  {
+    "id": "apostrofo-suelto-no-come-la-linea",
+    "origen": "control",
+    "archivo": "flujo.sh",
+    "linea": "echo don't && npx openspec update",
+    "exit": 1,
+    "por_que": "riesgo NUEVO del tokenizador: una comilla sin pareja podria abrir un entrecomillado que se coma el resto de la linea y esconda la invocacion. Sin pareja se trata como caracter literal"
+  },
+  {
+    "id": "llaves-no-son-separador",
+    "origen": "control",
+    "archivo": "flujo.yml",
+    "linea": "      - run: npx --yes @fission-ai/openspec@${PIN} update --force",
+    "exit": 0,
+    "por_que": "riesgo NUEVO del tokenizador: si la llave separara palabras, un pin por variable se leeria partido y el check se pondria rojo sobre la forma correcta. Medido: con llaves entre los separadores, el arbol de Projects se ponia rojo en dos lineas"
+  },
+  {
+    "id": "residuo-subcomando-por-variable",
+    "origen": "limite",
+    "archivo": "flujo.sh",
+    "linea": "pnpm $SUB openspec update",
+    "exit": 0,
+    "por_que": "RESIDUO IRREDUCIBLE declarado: si el gestor o su subcomando llegan por indireccion, el texto de la linea no contiene la invocacion y ninguna lectura estatica la puede ver. Cerrarlo pide ejecutar, que es lo que este paso no hace"
+  },
+  {
+    "id": "paquete-por-bandera-package",
+    "origen": "control",
+    "archivo": "flujo.sh",
+    "linea": "npx -p openspec cmd",
+    "exit": 1,
+    "por_que": "-p y --package mueven el paquete de lugar: lo que sigue a la bandera ES el paquete, y sin version sigue sin pinar"
+  },
+  {
+    "id": "paquete-por-bandera-package-pinado",
+    "origen": "control",
+    "archivo": "flujo.sh",
+    "linea": "npx -p openspec@1.9.0 cmd",
+    "exit": 0,
+    "por_que": "el mismo camino con version exacta no puede ponerse rojo: si lo hiciera, la forma correcta seria inalcanzable"
+  },
+  {
+    "id": "separador-tabulador",
+    "origen": "control",
+    "archivo": "flujo.sh",
+    "linea": "npx\topenspec update",
+    "exit": 1,
+    "por_que": "el tabulador separa palabras igual que el espacio en la gramatica de shell; un tokenizador que solo mirara el espacio lo perderia"
+  },
+  {
+    "id": "ruta-con-separador-de-windows",
+    "origen": "control",
+    "archivo": "flujo.sh",
+    "linea": ".\\node_modules\\.bin\\npx openspec update",
+    "exit": 1,
+    "por_que": "la barra invertida es escape para el tokenizador, asi que el nombre del gestor se busca tambien en la forma CRUDA del token; si no, una ruta de Windows lo esconderia"
+  },
+  {
+    "id": "anidado-en-dos-niveles",
+    "origen": "control",
+    "archivo": "tareas.json",
+    "linea": "      \"cmd\": \"sh -c \\\"npx openspec update\\\"\",",
+    "exit": 1,
+    "por_que": "el desenvuelto anidado tiene que aguantar mas de un nivel: aca el comando esta dentro de un sh -c que a su vez esta dentro de un string de JSON"
   }
 ]
 ```

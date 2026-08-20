@@ -109,3 +109,46 @@ export function logOptsDelPaso(script, desde, hasta) {
     .split(/\s+/)
     .filter(Boolean);
 }
+
+/**
+ * El ERE del prefiltro de git grep, leido del YAML.
+ *
+ * Se lee y no se copia porque el banco tiene que poder afirmar la relacion
+ * "el prefiltro NO es mas angosto que el lector" sobre el patron que corre de
+ * verdad. Una copia del patron en el banco desincroniza en el primer arreglo y
+ * la afirmacion pasa a valer sobre un patron que ya no existe, que es la forma
+ * exacta en la que un banco empieza a mentir en verde.
+ */
+export function patronDelPrefiltro(script, nombrePaso = "(script)") {
+  const marca = script.match(/git\b[^\n]*\bgrep\b[^\n]*-E '([^']*)'/);
+  if (!marca) {
+    throw new Error(`el script de "${nombrePaso}" no trae ningun prefiltro "git grep -E"`);
+  }
+  return marca[1];
+}
+
+/**
+ * El alfabeto de ejecutores que el lector usa, leido de su propio codigo.
+ *
+ * Devuelve pares { gestor, sub }, con sub vacio para los ejecutores directos.
+ * Es lo que permite GENERAR el corpus del banco en vez de enumerarlo: si manana
+ * entra un gestor nuevo al alfabeto, las entradas generadas lo cubren solas. Una
+ * lista escrita a mano en el banco solo puede recorrer los casos que alguien ya
+ * penso, y por eso no puede encontrar un miembro nuevo de la clase.
+ */
+export function alfabetoDelPaso(programa, nombrePaso = "(programa)") {
+  const marca = programa.match(/const ALFABETO = "([^"]*)"/);
+  if (!marca) {
+    throw new Error(`el programa de "${nombrePaso}" no declara ningun ALFABETO`);
+  }
+  const pares = marca[1]
+    .split(",")
+    .filter(Boolean)
+    .map((par) => {
+      const corte = par.indexOf("=");
+      if (corte === -1) throw new Error(`el par "${par}" del ALFABETO no tiene la forma gestor=subcomando`);
+      return { gestor: par.slice(0, corte), sub: par.slice(corte + 1) };
+    });
+  if (pares.length === 0) throw new Error("el ALFABETO quedo vacio");
+  return pares;
+}

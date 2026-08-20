@@ -974,6 +974,34 @@ jobs:
       # squatter de "openspec" publica 0.0.0 y no tiene la version que uno
       # pina, asi que la invocacion muere en vez de resolver en silencio.
       #
+      # DE REGEX A TOKENIZADOR, y por que se tiro el enfoque anterior. Hasta la
+      # ronda del 2026-08-20 este paso decidia con DOS regex —una en el prefiltro
+      # de git grep y otra en el lector— que intentaban seguir la gramatica de
+      # una linea de comando. Las dos llevaban ya varios parches (banderas
+      # pegadas, banderas con valor separado) y las dos volvieron a caer con la
+      # ortografia siguiente: medido exit 0 con el mensaje "no hay nada que
+      # pinar" sobre `pnpm -C "./mi dir" dlx openspec update`, y lo mismo con
+      # comilla simple, porque el token de valor era [^-\s][^ \t]* y un valor
+      # ENTRECOMILLADO CON ESPACIO ciega a los dos a la vez. Eso ya no es un caso
+      # que falte: es que el enfoque no puede cerrar la clase, porque comillas y
+      # escapes no se describen con un regex de linea plana.
+      #
+      # Asi que el lector ahora TOKENIZA respetando la gramatica de entrecomillado
+      # de POSIX shell (seccion 2.2: comilla simple literal, comilla doble con
+      # barra invertida que escapa, barra invertida suelta que escapa el
+      # caracter siguiente) mas la puntuacion estructural de los formatos donde
+      # aparecen estas invocaciones (coma y corchete de un array JSON, parentesis
+      # y punto y coma de shell). La clase se cierra por DERIVACION —una palabra
+      # es una palabra— y no por una lista de ortografias que envejece.
+      #
+      # Y el PREFILTRO dejo de intentar parsear: ahora solo pregunta que ARCHIVOS
+      # mencionan el nombre de un gestor y el lector recorre el archivo completo.
+      # Mencionar el nombre es condicion NECESARIA de toda la clase (no hay forma
+      # de invocar uno de estos ejecutores sin escribir su nombre), asi que el
+      # prefiltro es mas ancho que el lector por construccion y no por revision:
+      # la vieja pregunta "el prefiltro se quedo mas angosto que el lector?" no
+      # puede volver a tener respuesta afirmativa.
+      #
       # LIMITES DECLARADOS (esto LEE texto, no ejecuta nada):
       #   - Los .md quedan fuera. Son prosa, y la documentacion del propio
       #     marco cita la forma incorrecta como CONTRAEJEMPLO. Consecuencia
@@ -981,7 +1009,6 @@ jobs:
       #     cubierto por este check.
       #   - No verifica que el nombre sea el paquete que uno queria. El pin
       #     hace ruidoso el error de nombre; no lo hace imposible.
-      #   - Una invocacion partida en varias lineas con "\" no se lee.
       #   - Las lineas que ARRANCAN en comentario (#, // o *) no se leen: un
       #     comentario no se ejecuta, y sin esta regla el check se pone rojo a
       #     si mismo, porque el bloque que estas leyendo NOMBRA los ejecutores
@@ -992,6 +1019,37 @@ jobs:
       #   - Un repo que no versiona el allowlist de su agente (.claude entero
       #     en el .gitignore) esconde de este check justo el archivo donde
       #     aparecio el problema. Lo rastreado es lo unico que se puede mirar.
+      #   - Los archivos BINARIOS quedan fuera (git grep -I). Un comando metido
+      #     en un blob binario rastreado no se lee.
+      #   - Un argumento que no tiene forma de nombre de paquete y es el UNICO
+      #     que sigue al ejecutor (un tarball local, una ruta) queda
+      #     indeterminado, no rojo: no es un nombre de npm, asi que no hay
+      #     version que exigirle.
+      #
+      # RESIDUOS, y son dos. Que esten escritos no los cierra: estan escritos
+      # para que la proxima ronda no tenga que volver a descubrirlos.
+      #   1. IRREDUCIBLE — si el nombre del gestor o su subcomando llegan por
+      #      INDIRECCION (`pnpm $SUB pkg`, `$PM dlx pkg`, `eval "$CMD"`, un
+      #      alias de shell, dos mitades concatenadas), el texto de la linea no
+      #      contiene la invocacion y ninguna lectura estatica la puede ver.
+      #      Cerrarlo pide EJECUTAR, que es justo lo que este paso no hace. Fijado
+      #      en el banco como caso "limite", no como caso que pasa.
+      #   2. ABIERTO Y NO CERRADO EN ESTA RONDA — la familia de scaffolding
+      #      descarga igual y NO esta en el alfabeto: `npm init <pkg>` resuelve
+      #      `create-<pkg>` desde npm, `npm create` es su alias, y `pnpm create`,
+      #      `yarn create` y `bun create` hacen lo mismo (los `init` de pnpm,
+      #      yarn y bun, en cambio, andamian LOCAL y no descargan, asi que
+      #      meterlos seria puro falso rojo). No se agrego aca a proposito, y el
+      #      motivo es que cerrarlo bien pide una distincion NUEVA que este paso
+      #      todavia no tiene: para `exec`/`x`/`dlx`, un ejecutor sin argumento es
+      #      indeterminado —el paquete puede venir por una bandera que este lector
+      #      no sabe leer— mientras que para `init`/`create` sin argumento
+      #      significa que NO descarga nada. Sin esa distincion, `npm init -y`
+      #      —local e inofensivo— saldria rojo dentro de un allowlist. Medido hoy:
+      #      cero ocurrencias de esa familia en el arbol de Projects y cero en el
+      #      consumidor real, asi que declararlo no deja ningun hallazgo sin
+      #      reportar hoy; cerrarlo es un cambio de comportamiento propio y va en
+      #      su propio change.
       #
       # SEVERIDAD PARTIDA, y por que. "No pude determinar que paquete corre" es
       # ::warning:: en general —puede ser prosa que parece una invocacion— pero
@@ -1002,9 +1060,15 @@ jobs:
       # 'Bash(npx --yes openspec:*)' —la entrada citada literal en el riesgo—
       # caia en indeterminado y salia exit 0, y un warning no pone rojo ningun
       # job. Ademas el comodin del allowlist (":*", o sea "con cualquier
-      # argumento") ahora se recorta antes de leer el paquete, asi que esa misma
+      # argumento") se recorta antes de leer el paquete, asi que esa misma
       # entrada ya no queda indeterminada: se lee "openspec" sin version y el
-      # error dice exactamente que arreglar.
+      # error dice exactamente que arreglar. La ronda anterior dejo esa
+      # severidad partida a medias: medido exit 0 sobre
+      # 'Bash(npm --prefix "./mi dir" exec openspec:*)', porque el valor con
+      # espacio cegaba tambien al allowlist. Con el tokenizador esa entrada se
+      # lee entera, y ademas se lee ANIDADA: el comando vive dentro de un string
+      # de JSON, asi que el lector desenvuelve el token entrecomillado y lo
+      # vuelve a tokenizar (hasta tres niveles) en vez de rendirse.
       - name: Ejecutores de paquetes pinados
         if: '!cancelled()'
         shell: bash
@@ -1016,27 +1080,26 @@ jobs:
             exit 1
           fi
 
-          # Prefiltro barato y DELIBERADAMENTE amplio: su unica obligacion es
-          # no perderse nada. Quien decide es el lector de abajo, que pone el
-          # limite de palabra en serio (asi "npx-wrapper" y "mynpx" no entran).
+          # PREFILTRO: que ARCHIVOS mirar, no que lineas. Su unica obligacion es
+          # no perderse ninguno, y la cumple por derivacion: toda invocacion de
+          # la clase escribe el nombre de su gestor, asi que basta con pedir el
+          # nombre como SUBCADENA. Quien decide es el lector, que exige el nombre
+          # como PALABRA (asi "npx-wrapper" y "mynpx" no entran).
+          #
+          # El patron se escribe con una clase de caracteres y no con la lista
+          # completa de nombres por dos motivos, los dos deliberados:
+          #   · Cobertura derivada: "pnpm" contiene "npm" y "bunx" contiene
+          #     "bun", asi que np[mx] cubre npm, npx y pnpm, y bun cubre bun y
+          #     bunx. Queda yarn. La lista larga seria redundante.
+          #   · Inmunidad a su propia definicion: este paso se lee a si mismo, y
+          #     con la lista larga los nombres quedarian como tokens vecinos
+          #     ("npx" seguido de "bunx") y el paso se marcaria a si mismo. Con
+          #     la clase de caracteres los tokens que salen son "np", "mx",
+          #     "yarn" y "bun", que no forman ninguna invocacion.
           # Los .md salen por pathspec: ver el limite declarado arriba.
-          #
-          # El prefiltro NO puede ser mas angosto que el lector: si lo es, el
-          # paso sale exit 0 diciendo "no hay nada que pinar" sobre una linea
-          # que si trae un ejecutor, y eso es un verde que afirma haber mirado.
-          # Por eso acepta cualquier gestor + banderas + subcomando (exec, dlx,
-          # x) y deja que el lector descarte los que fallan cerrado.
-          #
-          # "banderas" incluye las que se llevan su VALOR en el argumento
-          # SIGUIENTE ("pnpm -C . dlx"): el grupo repetido acepta una bandera y,
-          # opcional, un token que no arranca con guion. Sin esa parte opcional
-          # el prefiltro quedaba mas angosto que el lector nuevo y el paso volvia
-          # a salir exit 0 con "no hay nada que pinar" — el mismo verde que la
-          # auditoria del 2026-08-20 midio y que este banco fija por codigo de
-          # salida.
           CANDIDATOS="${RUNNER_TEMP}/ejecutores.txt"
           set +e
-          git -c core.quotePath=false grep -I -n -E '(npx|bunx|(npm|pnpm|yarn|bun)([[:space:]]+-+[^[:space:]]+([[:space:]]+[^-[:space:]][^[:space:]]*)?)*[[:space:]]+(exec|dlx|x))' -- ':!*.md' > "${CANDIDATOS}"
+          git -c core.quotePath=false grep -I -l -z -E 'np[mx]|yarn|bun' -- ':!*.md' > "${CANDIDATOS}"
           RC=$?
           set -e
           if [ "${RC}" -gt 1 ]; then
@@ -1045,10 +1108,15 @@ jobs:
           fi
 
           if [ ! -s "${CANDIDATOS}" ]; then
-            echo "ningun archivo rastreado fuera de los .md invoca un ejecutor de paquetes: no hay nada que pinar"
+            echo "ningun archivo rastreado fuera de los .md menciona un gestor de paquetes: no hay nada que pinar"
             exit 0
           fi
 
+          # La lista viaja NUL-separada (-z) a proposito: la version anterior
+          # leia "ruta:linea:contenido" y lo partia con un regex que empezaba en
+          # [^:]+, asi que una ruta con dos puntos se leia mal. Con -z no hay
+          # nada que partir.
+          #
           # Inline y no en un archivo aparte por el mismo motivo que el paso de
           # enmascaramiento: un heredoc no puede cerrar dentro de un bloque de
           # YAML indentado. El programa viaja entre comillas simples de shell,
@@ -1058,179 +1126,319 @@ jobs:
           node -e '
             const { readFileSync } = require("node:fs");
 
-            // Los ejecutores que DESCARGAN. El limite por delante descarta
-            // "mynpx"; el lookahead de atras acepta el separador real de una
-            // invocacion, incluidas las comillas de un array JSON
-            // ("command": ["npx","prisma","migrate","deploy"]).
+            // ALFABETO. Los ejecutores que DESCARGAN, como pares
+            // "gestor=subcomando" en un unico string. Sale de la documentacion
+            // de cada gestor: npm resuelve "exec" y su alias "x"; pnpm y yarn
+            // (berry) usan "dlx"; bun usa "x"; los dos ejecutores directos no
+            // llevan subcomando y por eso su par queda con el lado derecho
+            // vacio. "pnpm exec" y "yarn exec" no estan, a proposito: fallan
+            // CERRADO y son la salida recomendada.
             //
-            // BANDERAS entre el gestor y su subcomando: "pnpm --silent dlx"
-            // descarga igual que "pnpm dlx", y exigirlos pegados cegaba el
-            // check con cualquier bandera global (medido: exit 0). Se toleran
-            // banderas, y solo ahi: la tolerancia NO puede arrastrar a los
-            // ejecutores que fallan cerrado, asi que "pnpm exec" y "yarn exec"
-            // siguen fuera del alfabeto con banderas y sin ellas.
-            //
-            // Y la bandera puede llevarse su VALOR en el argumento SIGUIENTE.
-            // La primera vuelta de este arreglo solo toleraba las banderas que
-            // traen el valor pegado ("--loglevel=error") o ninguno
-            // ("--silent"), asi que la mitad de la clase seguia siendo punto
-            // ciego: medido el 2026-08-20, "pnpm -C . dlx openspec update",
-            // "npm --prefix ./x exec openspec" y "yarn --cwd . dlx openspec
-            // update" salian los tres exit 0, y no por el lector sino ya por el
-            // prefiltro, imprimiendo "no hay nada que pinar".
-            //
-            // QUE BANDERAS SON. La lista sale de la DOCUMENTACION de cada
-            // gestor y de su propio --help, no de la intuicion, y son dos
-            // alfabetos distintos:
-            //   · npm resuelve CUALQUIER clave de config como "--clave <valor>"
-            //     antes del subcomando (--prefix / -C, --loglevel, --registry,
-            //     --workspace / -w, --userconfig, --cache). Verificado en esta
-            //     maquina con npm 11: "npm --prefix . exec --help",
-            //     "npm --loglevel error --registry <url> x --help" y
-            //     "npm -C . -w foo exec --help" devuelven exit 0.
-            //   · pnpm, yarn y bun tienen un conjunto acotado de globales con
-            //     valor separado: pnpm -C / --dir, --filter, --loglevel,
-            //     --reporter, --store-dir, --workspace-concurrency (verificado
-            //     con pnpm 11: los seis dan exit 0 delante de "dlx --help");
-            //     yarn --cwd; bun --cwd y -c / --config. yarn y bun NO estan
-            //     instalados aca, asi que de esos dos la forma viene de la doc y
-            //     lo medido es el check, no el binario.
-            //
-            // POR ESO EL ALFABETO SE ESCRIBE GENERAL Y NO COMO LISTA CERRADA:
-            // una bandera y, opcional, un token que no arranca con guion. Con
-            // lista cerrada el defecto es de CLASE y vuelve con la bandera
-            // siguiente —npm admite claves de config arbitrarias, o sea que la
-            // lista no se puede terminar— y volveria como FALSO VERDE mudo.
-            // Costo asumido, fijado en el banco como caso "limite": sin lista no
-            // hay forma de saber que "--silent" es booleana, asi que
-            // "npm --silent run x algo" se lee como bandera + valor + ejecutor y
-            // cae del lado del ejecutor. Es un falso ROJO legible en un check de
-            // seguridad, que es el lado conservador; el falso verde no lo es.
-            //
-            // VA EN UN SOLO LITERAL, largo y todo, y no armado por pedazos en un
-            // array de strings. El motivo es el mismo que el de la regla de los
-            // comentarios: este bloque NOMBRA los ejecutores para definirlos, y
-            // el check se lee a si mismo. Como lista de strings, cada "npx"
-            // queda seguido de una comilla y una coma —separadores que el
-            // lookahead acepta— y el paso avisaba sobre sus PROPIAS lineas en
-            // cada corrida (medido: 2 ::warning:: sobre marco-ci.yml). En el
-            // literal cada nombre queda seguido de "|" o de "(", que no son
-            // separadores de invocacion, asi que el check es inmune a su propia
-            // definicion por construccion y no por suerte.
-            const EJECUTOR = /(^|[^A-Za-z0-9_.\/@-])(npx|bunx|npm(?:[ \t]+-{1,2}[A-Za-z][^ \t]*(?:[ \t]+[^-\s][^ \t]*)?)*[ \t]+(?:exec|x)|bun(?:[ \t]+-{1,2}[A-Za-z][^ \t]*(?:[ \t]+[^-\s][^ \t]*)?)*[ \t]+x|pnpm(?:[ \t]+-{1,2}[A-Za-z][^ \t]*(?:[ \t]+[^-\s][^ \t]*)?)*[ \t]+dlx|yarn(?:[ \t]+-{1,2}[A-Za-z][^ \t]*(?:[ \t]+[^-\s][^ \t]*)?)*[ \t]+dlx)(?=[ \t"\x27,]|$)/g;
+            // LA FORMA "gestor=subcomando" NO ES CAPRICHO: este paso se lee a si
+            // mismo, asi que el nombre de un gestor no puede quedar como token
+            // suelto seguido de un token que parezca su subcomando. Con el "="
+            // adentro cada par es UN token para el propio lector, asi que el
+            // check es inmune a su definicion por construccion y no por suerte.
+            // Escrito como array de strings, cada nombre seria un token propio y
+            // el paso se marcaria a si mismo — medido: es exactamente lo que
+            // pasaba con las dos regex que este bloque reemplaza.
+            const ALFABETO = "npx=,bunx=,npm=exec,npm=x,pnpm=dlx,yarn=dlx,bun=x";
 
-            // El allowlist de un agente escribe "Bash(<comando>:*)" para decir
-            // "con cualquier argumento". Ese ":*" no puede ser parte de un
-            // nombre de paquete, y sin recortarlo la entrada que ORIGINO este
-            // check —"Bash(npx --yes openspec:*)", citada literal en el
-            // riesgo— caia en "no pude determinar el paquete" y degradaba a
-            // ::warning:: con exit 0. Recortado, el paquete es "openspec", sin
-            // version, y el error dice exactamente que arreglar.
+            const DESCARGA = new Map();
+            for (const par of ALFABETO.split(",")) {
+              const corte = par.indexOf("=");
+              const gestor = par.slice(0, corte);
+              const sub = par.slice(corte + 1);
+              if (!DESCARGA.has(gestor)) DESCARGA.set(gestor, new Set());
+              if (sub !== "") DESCARGA.get(gestor).add(sub);
+            }
+            // Derivado del alfabeto y no escrito a mano: si manana entra un
+            // gestor nuevo, esto lo cubre solo.
+            const MENCIONA = new RegExp([...DESCARGA.keys()].join("|"));
+
+            // Puntuacion que separa palabras cuando NO esta entrecomillada. El
+            // espacio y el tabulador vienen de la gramatica de shell; la coma y
+            // el corchete, de un array JSON ("command": ["npx","prisma"]); el
+            // parentesis, el punto y coma, la barra y el ampersand, de shell.
+            // Las llaves NO estan: partirlas rompe ${VAR} y ${{ inputs.x }},
+            // que son la forma legitima de un pin por variable.
+            const SEPARADOR = /[\s,;|&<>()[\]`]/;
+            const BANDERA = /^-{1,2}[A-Za-z]/;
+            const TOMA_VALOR = /^(-p|--package|-c|--call)$/;
             const COMODIN_ALLOWLIST = /:\*$/;
-
-            // Donde lo indeterminado es ROJO y no aviso: ver la severidad
-            // partida en el comentario de arriba.
-            const ALLOWLIST = /(^|\/)\.claude\/settings(\.[A-Za-z0-9_-]+)?\.json$/;
-
-            // [@scope/]nombre[@loquesea]
             const SPEC = /^(@[a-z0-9][a-z0-9._~-]*\/)?[a-z0-9][a-z0-9._~-]*(@(.*))?$/i;
             const EXACTA = /^\d+\.\d+\.\d+([-+][0-9A-Za-z.-]+)?$/;
-            // Un pin puede llegar por variable: el pin canonico del marco es
-            // un input de este mismo workflow. Cuenta como pinado, y se
-            // informa por separado para que se vea que existe esa indireccion.
             const REFERENCIA = /^(\$\{\{?[^}]+\}?\}|\$[A-Za-z_][A-Za-z0-9_]*|\{\{[^}]+\}\})$/;
-            const TOMA_VALOR = /^(-p|--package|-c|--call)$/;
-            const ABRE = /^["\x27`([,]+/;
-            const CIERRA = /["\x27`)\],;]+$/;
+            const ALLOWLIST = /(^|\/)\.claude\/settings(\.[A-Za-z0-9_-]+)?\.json$/;
+            const COMENTARIO = /^[ \t]*(#|\/\/|\*)/;
+            // Continuacion de linea: numero IMPAR de barras al final.
+            const CONTINUA = /(^|[^\\])(\\\\)*\\$/;
+            const COMILLAS = "\x27\"";
 
-            const escapar = (valor) =>
-              String(valor).replace(/%/g, "%25").replace(/\r/g, "%0D").replace(/\n/g, "%0A");
+            // Cierre de un entrecomillado. Devuelve -1 si no hay pareja, y ahi
+            // la comilla se trata como caracter literal: sin eso un apostrofo de
+            // prosa ("don\x27t") abriria una comilla que se come el resto de la
+            // linea y el lector dejaria de ver invocaciones reales.
+            function cierreDe(texto, desde, comilla) {
+              for (let i = desde + 1; i < texto.length; i += 1) {
+                if (texto[i] === "\\" && comilla === "\"") { i += 1; continue; }
+                if (texto[i] === comilla) return i;
+              }
+              return -1;
+            }
 
-            const limpiar = (token) =>
-              token.replace(ABRE, "").replace(CIERRA, "").replace(COMODIN_ALLOWLIST, "");
+            function desescapar(dentro) {
+              let salida = "";
+              for (let i = 0; i < dentro.length; i += 1) {
+                if (dentro[i] === "\\" && i + 1 < dentro.length) { salida += dentro[i + 1]; i += 1; continue; }
+                salida += dentro[i];
+              }
+              return salida;
+            }
 
-            // El primer argumento que NO es bandera es el paquete. --package y
-            // -p lo mueven de lugar, y --no-install vuelve la invocacion
-            // inofensiva porque ahi el ejecutor ya no puede descargar nada.
-            function paqueteDe(resto) {
-              const brutos = resto.split(/[\s,]+/).filter(Boolean);
-              let esperaValor = false;
-              for (const bruto of brutos) {
-                if (esperaValor) { esperaValor = false; return limpiar(bruto); }
-                if (/^--?[A-Za-z]/.test(bruto)) {
-                  if (/^--no-install(=|$)/.test(bruto)) return { exento: true };
-                  const conValor = bruto.match(/^(?:-p|--package|-c|--call)=(.*)$/);
-                  if (conValor) return limpiar(conValor[1]);
-                  if (TOMA_VALOR.test(bruto)) esperaValor = true;
-                  continue;
+            // EL TOKENIZADOR. Parte en palabras respetando entrecomillado, que
+            // es lo que ninguna de las dos regex anteriores podia hacer. De cada
+            // palabra guarda su texto DESENVUELTO, su forma cruda y si hubo algo
+            // entrecomillado o escapado: lo ultimo es lo que habilita el
+            // desenvuelto anidado de mas abajo.
+            function tokenizar(texto) {
+              const tokens = [];
+              let actual = "";
+              let crudo = "";
+              let citado = false;
+              let abierto = false;
+              const cerrar = () => {
+                if (abierto) tokens.push({ texto: actual, crudo: crudo, citado: citado });
+                actual = ""; crudo = ""; citado = false; abierto = false;
+              };
+              for (let i = 0; i < texto.length; i += 1) {
+                const c = texto[i];
+                if (c === "\\") {
+                  if (i + 1 >= texto.length) { crudo += c; abierto = true; break; }
+                  actual += texto[i + 1]; crudo += c + texto[i + 1]; citado = true; abierto = true; i += 1; continue;
                 }
-                const token = limpiar(bruto);
-                if (token === "" || token === "--") continue;
-                return token;
+                if (COMILLAS.indexOf(c) !== -1) {
+                  const fin = cierreDe(texto, i, c);
+                  if (fin === -1) { actual += c; crudo += c; abierto = true; continue; }
+                  const dentro = texto.slice(i + 1, fin);
+                  actual += c === "\x27" ? dentro : desescapar(dentro);
+                  crudo += texto.slice(i, fin + 1);
+                  citado = true; abierto = true; i = fin; continue;
+                }
+                if (SEPARADOR.test(c)) { cerrar(); continue; }
+                actual += c; crudo += c; abierto = true;
+              }
+              cerrar();
+              return tokens;
+            }
+
+            // El nombre puede venir con ruta ("./node_modules/.bin/npx"): esa
+            // forma descarga igual, asi que cuenta. Se mira el texto y el crudo
+            // para que un separador de Windows no la esconda.
+            function gestorDe(token) {
+              for (const candidato of [token.texto, token.crudo]) {
+                const hoja = candidato.split("/").pop().split("\\").pop();
+                if (DESCARGA.has(hoja)) return hoja;
               }
               return null;
             }
 
-            // Una linea que ARRANCA en comentario no se ejecuta. Se descarta
-            // antes de leerla: sin esto el propio bloque que documenta el
-            // check lo pone en rojo, y un guardrail que el marco no puede
-            // aplicarse a si mismo no sirve para ningun consumidor.
-            const COMENTARIO = /^[ \t]*(#|\/\/|\*)/;
+            // Donde arranca el argumento de cada ejecutor de la linea.
+            //
+            // Entre el gestor y su subcomando puede haber BANDERAS GLOBALES, y
+            // una bandera puede llevarse su valor pegado ("--loglevel=error") o
+            // en el argumento SIGUIENTE ("-C ./x"). Saber cual de las dos es
+            // exige saber si la bandera es booleana, y eso pide una lista de
+            // banderas por gestor que no se puede terminar: npm resuelve
+            // CUALQUIER clave de config como bandera. Asi que no se elige: se
+            // exploran LAS DOS LECTURAS y alcanza con que una encuentre el
+            // subcomando. La union es el lado conservador (encuentra mas
+            // ejecutores, nunca menos) y el costo asumido es un falso ROJO
+            // legible: "npm --silent run x algo" se lee tambien como
+            // bandera+valor+ejecutor. Un falso rojo en un check de seguridad se
+            // discute; un falso verde no se ve.
+            function ocurrencias(tokens) {
+              const inicios = [];
+              for (let i = 0; i < tokens.length; i += 1) {
+                const gestor = gestorDe(tokens[i]);
+                if (gestor === null) continue;
+                const subs = DESCARGA.get(gestor);
+                if (subs.size === 0) { inicios.push(i + 1); continue; }
+                const pendientes = [i + 1];
+                const vistos = new Set();
+                while (pendientes.length > 0 && vistos.size < 64) {
+                  const j = pendientes.pop();
+                  if (j >= tokens.length || vistos.has(j)) continue;
+                  vistos.add(j);
+                  const t = tokens[j].texto;
+                  if (subs.has(t)) { inicios.push(j + 1); continue; }
+                  if (!BANDERA.test(t)) continue;
+                  pendientes.push(j + 1);
+                  if (t.indexOf("=") === -1 && j + 1 < tokens.length && !BANDERA.test(tokens[j + 1].texto)) {
+                    pendientes.push(j + 2);
+                  }
+                }
+              }
+              return inicios;
+            }
 
-            const lineas = readFileSync(process.argv[1], "utf8").split(/\r?\n/).filter(Boolean);
-            const sueltos = [];
-            const dudosos = [];
+            // El allowlist de un agente escribe "Bash(<comando>:*)" para decir
+            // "con cualquier argumento". Ese ":*" no puede ser parte de un
+            // nombre de paquete, y sin recortarlo la entrada que ORIGINO este
+            // check caia en "no pude determinar el paquete" y degradaba a
+            // ::warning:: con exit 0.
+            const limpiar = (token) => token.replace(COMODIN_ALLOWLIST, "");
+
+            // El primer argumento CON FORMA DE PAQUETE es el paquete. --package
+            // y -p lo mueven de lugar, y --no-install vuelve la invocacion
+            // inofensiva porque ahi el ejecutor ya no puede descargar nada.
+            //
+            // "CON FORMA DE PAQUETE" y no "el primero que no es bandera": esa era
+            // la version anterior, y el corpus generado del banco la tumbo en su
+            // primera corrida. Una bandera con valor separado que este lector no
+            // puede reconocer como tal —y no puede, porque npm resuelve cualquier
+            // clave de config como bandera— deja su valor justo donde iria el
+            // paquete. Si ese valor no tiene forma de paquete (una URL de
+            // registro, una ruta, cualquier cosa con dos puntos), la version
+            // anterior se rendia con "no pude determinar que paquete corre", que
+            // es ::warning:: y exit 0 fuera de un allowlist: un falso verde sobre
+            // una invocacion real y sin pinar. Ahora el valor ilegible se saltea
+            // y la busqueda sigue; solo si NINGUN token tiene forma de paquete se
+            // reporta el primero ilegible como indeterminado. Cambio de dueño el
+            // lado conservador: antes lo dudoso tapaba el hallazgo, ahora el
+            // hallazgo gana.
+            function paqueteDe(tokens, desde) {
+              let esperaValor = false;
+              let ilegible = null;
+              for (let k = desde; k < tokens.length; k += 1) {
+                const t = tokens[k].texto;
+                if (esperaValor) return { paquete: limpiar(t) };
+                if (t === "" || t === "--") continue;
+                if (BANDERA.test(t)) {
+                  if (/^--no-install(=|$)/.test(t)) return { exento: true };
+                  const conValor = t.match(/^(?:-p|--package|-c|--call)=(.*)$/);
+                  if (conValor) return { paquete: limpiar(conValor[1]) };
+                  if (TOMA_VALOR.test(t)) esperaValor = true;
+                  continue;
+                }
+                const candidato = limpiar(t);
+                if (SPEC.test(candidato)) return { paquete: candidato };
+                if (ilegible === null) ilegible = candidato;
+              }
+              return { paquete: ilegible };
+            }
+
+            // DESENVUELTO ANIDADO. El texto que este paso lee no es de un solo
+            // lenguaje: un comando de shell viaja adentro de un string de JSON o
+            // de YAML. Un tokenizador plano no puede con eso —el entrecomillado
+            // de afuera apaga el de adentro— asi que cuando una palabra salio
+            // entrecomillada y su contenido menciona un gestor, se la vuelve a
+            // tokenizar. Eso es lo que lee
+            // la entrada de allowlist que la ronda anterior no podia leer, dentro de su
+            // string de JSON, que la ronda anterior medio en exit 0. Tres
+            // niveles alcanzan y acotan; el contenido tiene que traer algun
+            // separador, porque una palabra sola no es un comando.
+            function analizar(texto, profundidad, ver) {
+              const tokens = tokenizar(texto);
+              for (const desde of ocurrencias(tokens)) ver(paqueteDe(tokens, desde));
+              if (profundidad >= 3) return;
+              for (const token of tokens) {
+                if (!token.citado) continue;
+                if (token.texto === texto || token.texto === "") continue;
+                if (!MENCIONA.test(token.texto)) continue;
+                if (!SEPARADOR.test(token.texto)) continue;
+                analizar(token.texto, profundidad + 1, ver);
+              }
+            }
+
+            const escapar = (valor) =>
+              String(valor).replace(/%/g, "%25").replace(/\r/g, "%0D").replace(/\n/g, "%0A");
+
+            const sueltos = new Map();
+            const dudosos = new Map();
             const archivos = new Set();
             let literal = 0;
             let porVariable = 0;
             let exentos = 0;
 
-            for (const linea of lineas) {
-              const partido = linea.match(/^([^:]+):(\d+):(.*)$/);
-              if (!partido) {
-                // El prefiltro escribio algo sin la forma ruta:linea:contenido.
-                // No se pudo leer, asi que no se declara verde sobre eso.
-                dudosos.push({ ruta: "(salida del prefiltro)", linea: 0, motivo: "resultado con formato inesperado" });
+            const anotar = (mapa, clave, item) => { if (!mapa.has(clave)) mapa.set(clave, item); };
+
+            const rutas = readFileSync(process.argv[1], "utf8").split("\0").filter(Boolean);
+
+            for (const ruta of rutas) {
+              let contenido;
+              try {
+                contenido = readFileSync(ruta, "utf8");
+              } catch (error) {
+                // No se pudo leer: no se declara verde sobre eso, y en un
+                // allowlist es rojo.
+                anotar(dudosos, ruta + "|0|ilegible", { ruta: ruta, linea: 0, motivo: "no se pudo leer el archivo (" + error.code + ")", critico: true });
                 continue;
               }
-              const ruta = partido[1];
-              const numero = partido[2];
-              const texto = partido[3];
-              if (COMENTARIO.test(texto)) continue;
-              EJECUTOR.lastIndex = 0;
-              let encontrado;
-              while ((encontrado = EJECUTOR.exec(texto)) !== null) {
-                archivos.add(ruta);
-                const paquete = paqueteDe(texto.slice(encontrado.index + encontrado[0].length));
-                if (paquete && paquete.exento) { exentos += 1; continue; }
-                if (paquete === null) {
-                  dudosos.push({ ruta: ruta, linea: numero, motivo: "no le sigue ningun argumento", critico: ALLOWLIST.test(ruta) });
-                  continue;
+              const fisicas = contenido.split(/\r?\n/);
+              // Se miran las lineas FISICAS y ademas las LOGICAS (unidas por la
+              // barra de continuacion). Las dos, no solo las unidas: si una
+              // linea de comentario terminara en barra, unir borraria la linea
+              // siguiente del analisis. Unir solo AGREGA lo que se ve.
+              const candidatas = [];
+              for (let i = 0; i < fisicas.length; i += 1) {
+                if (fisicas[i] === "") continue;
+                candidatas.push({ linea: i + 1, texto: fisicas[i] });
+                if (!CONTINUA.test(fisicas[i])) continue;
+                let unida = fisicas[i].replace(/\\$/, "");
+                let j = i + 1;
+                while (j < fisicas.length) {
+                  unida += fisicas[j];
+                  if (!CONTINUA.test(fisicas[j])) break;
+                  unida = unida.replace(/\\$/, "");
+                  j += 1;
                 }
-                const partes = paquete.match(SPEC);
-                if (!partes) {
-                  dudosos.push({ ruta: ruta, linea: numero, motivo: "lo que sigue (" + paquete + ") no tiene forma de nombre de paquete", critico: ALLOWLIST.test(ruta) });
-                  continue;
-                }
-                const version = partes[3];
-                if (version === undefined || version === "") {
-                  sueltos.push({ ruta: ruta, linea: numero, paquete: paquete, motivo: "va sin version" });
-                  continue;
-                }
-                if (REFERENCIA.test(version)) { porVariable += 1; continue; }
-                if (!EXACTA.test(version)) {
-                  sueltos.push({ ruta: ruta, linea: numero, paquete: paquete, motivo: "lleva una version que no es exacta (" + version + "), asi que flota" });
-                  continue;
-                }
-                literal += 1;
+                candidatas.push({ linea: i + 1, texto: unida });
+              }
+              for (const candidata of candidatas) {
+                if (COMENTARIO.test(candidata.texto)) continue;
+                analizar(candidata.texto, 0, (hallazgo) => {
+                  archivos.add(ruta);
+                  if (hallazgo.exento) { exentos += 1; return; }
+                  const paquete = hallazgo.paquete;
+                  const donde = ruta + "|" + candidata.linea;
+                  if (paquete === null) {
+                    anotar(dudosos, donde + "|sin-argumento", { ruta: ruta, linea: candidata.linea, motivo: "no le sigue ningun argumento", critico: ALLOWLIST.test(ruta) });
+                    return;
+                  }
+                  const partes = paquete.match(SPEC);
+                  if (!partes) {
+                    anotar(dudosos, donde + "|forma|" + paquete, { ruta: ruta, linea: candidata.linea, motivo: "lo que sigue (" + paquete + ") no tiene forma de nombre de paquete", critico: ALLOWLIST.test(ruta) });
+                    return;
+                  }
+                  const version = partes[3];
+                  if (version === undefined || version === "") {
+                    anotar(sueltos, donde + "|" + paquete, { ruta: ruta, linea: candidata.linea, paquete: paquete, motivo: "va sin version" });
+                    return;
+                  }
+                  if (REFERENCIA.test(version)) { porVariable += 1; return; }
+                  if (!EXACTA.test(version)) {
+                    anotar(sueltos, donde + "|" + paquete, { ruta: ruta, linea: candidata.linea, paquete: paquete, motivo: "lleva una version que no es exacta (" + version + "), asi que flota" });
+                    return;
+                  }
+                  literal += 1;
+                });
               }
             }
 
             // El mensaje trae el ARREGLO y las DOS salidas, porque cual de las
             // dos sirve depende de algo que este check no puede saber: si el
             // binario ya lo trae una dependencia declarada del repo.
-            for (const item of sueltos) {
+            for (const item of sueltos.values()) {
               console.log("::error file=" + escapar(item.ruta) + ",line=" + item.linea + "::la invocacion de \"" + escapar(item.paquete) + "\" " + escapar(item.motivo) + ", y corre por un ejecutor que DESCARGA el paquete de npm si no esta instalado. En npm hay nombres pelados ocupados por placeholders ajenos, asi que esto puede terminar ejecutando otra cosa y \"funcionando\" sin hacer nada. Arreglo, una de dos: si el binario ya lo trae una dependencia declarada del repo, corrilo con \"pnpm exec <comando>\", que lee node_modules y falla si no esta en vez de salir a buscarlo; si de verdad hay que traerlo de npm, escribi el argumento completo —con su scope si lo tiene y su version exacta— en la forma <paquete>@<X.Y.Z>, en vez del nombre pelado");
+            }
+
+            // Si en la MISMA linea ya se reporto una invocacion concreta, lo
+            // indeterminado de esa linea es ruido de la lectura doble (fisica y
+            // unida por continuacion) y no informacion nueva.
+            const ubicados = new Set([...sueltos.values()].map((item) => item.ruta + "|" + item.linea));
+            for (const [clave, item] of dudosos) {
+              if (ubicados.has(item.ruta + "|" + item.linea)) dudosos.delete(clave);
             }
 
             // Lo indeterminado avisa en general y ES ROJO dentro de un
@@ -1238,8 +1446,8 @@ jobs:
             // alguien vaya a revisar cuando falle, es un permiso permanente
             // para descargar y ejecutar, y un ::warning:: no pone rojo ningun
             // job.
-            const criticos = dudosos.filter((item) => item.critico);
-            for (const item of dudosos) {
+            const criticos = [...dudosos.values()].filter((item) => item.critico);
+            for (const item of dudosos.values()) {
               const nivel = item.critico ? "error" : "warning";
               const cola = item.critico
                 ? ". Esta linea vive en un ALLOWLIST de agente: no es una invocacion que alguien vaya a revisar cuando falle, es un permiso permanente para descargar y ejecutar sin preguntar, asi que aca lo que no se puede leer es rojo y no aviso. Arreglo: escribi la entrada con el paquete completo y su version exacta (<paquete>@<X.Y.Z>); si lo que querias era permitir cualquier argumento, el comodin va DESPUES del paquete pinado"
@@ -1247,8 +1455,8 @@ jobs:
               console.log("::" + nivel + " file=" + escapar(item.ruta) + ",line=" + item.linea + "::hay un ejecutor de paquetes en esta linea y no se pudo determinar que paquete corre (" + escapar(item.motivo) + ")" + cola);
             }
 
-            if (sueltos.length > 0 || criticos.length > 0) {
-              console.log("== resumen == " + sueltos.length + " invocacion(es) sin version exacta y " + criticos.length + " indeterminada(s) en un allowlist de agente, sobre " + archivos.size + " archivo(s) rastreado(s) con ejecutor");
+            if (sueltos.size > 0 || criticos.length > 0) {
+              console.log("== resumen == " + sueltos.size + " invocacion(es) sin version exacta y " + criticos.length + " indeterminada(s) en un allowlist de agente, sobre " + archivos.size + " archivo(s) rastreado(s) con ejecutor");
               process.exit(1);
             }
 

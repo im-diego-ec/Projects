@@ -66,15 +66,68 @@ mueve sobre un cambio incompatible.
   `0.0.0` y no tiene la versión que uno pina, así que la invocación muere en vez
   de resolver en silencio.
 
+  **La decisión la toma un tokenizador, no un regex.** Las dos primeras versiones
+  del check leían la línea con dos expresiones regulares —una en el prefiltro de
+  `git grep` y otra en el lector— que intentaban seguir la gramática de una línea
+  de comando. Las dos acumularon parches y las dos volvieron a caer con la
+  ortografía siguiente: medido en `exit 0` con el mensaje *"no hay nada que
+  pinar"* sobre `pnpm -C "./mi dir" dlx openspec update`, y lo mismo con comilla
+  simple, porque un valor **entrecomillado con espacio** cegaba a las dos a la vez.
+  El lector ahora parte la línea en palabras respetando el entrecomillado de POSIX
+  shell (comilla simple literal, comilla doble con escapes, barra invertida suelta)
+  más la puntuación de los formatos donde estas líneas viven de verdad (coma y
+  corchete de un array JSON, paréntesis y punto y coma de shell); y cuando una
+  palabra salió entrecomillada y su contenido menciona un gestor, la **desenvuelve
+  y la vuelve a tokenizar**, que es lo que hace legible un comando que viaja dentro
+  de un string de JSON — la forma exacta que tiene una entrada de allowlist de
+  agente. El prefiltro dejó de intentar parsear: ahora pregunta qué **archivos**
+  mencionan el nombre de un gestor, y el lector recorre el archivo completo.
+  Mencionar el nombre es condición necesaria de toda la clase, así que el prefiltro
+  es más ancho que el lector por construcción y no por revisión.
+
   Límites declarados en el propio paso, porque esto **lee texto y no ejecuta
   nada**: los `.md` quedan fuera (son prosa, y la documentación del marco cita la
   forma incorrecta como contraejemplo, así que un comando de runbook escrito en un
   README no queda cubierto); las líneas que arrancan en comentario quedan fuera
   (un comentario no se ejecuta — y sin esa regla el check se pone rojo a sí mismo
-  al documentarse); una invocación partida con `\` no se lee; y el pin no prueba
-  que el nombre sea el paquete que uno quería: hace ruidoso el error, no lo hace
-  imposible. Un pin que llega por variable —el pin canónico del marco es un
-  `input` de este mismo workflow— cuenta como pinado y se informa aparte.
+  al documentarse); y el pin no prueba que el nombre sea el paquete que uno quería:
+  hace ruidoso el error, no lo hace imposible. Un pin que llega por variable —el pin
+  canónico del marco es un `input` de este mismo workflow— cuenta como pinado y se
+  informa aparte. Una invocación partida con `\` **sí** se lee, desde que el
+  prefiltro selecciona archivos en vez de líneas.
+
+  **Residuos, y son dos.** (1) *Irreducible*: si el nombre del gestor o su
+  subcomando llegan por indirección (`pnpm $SUB pkg`, `eval "$CMD"`, un alias de
+  shell, dos mitades concatenadas), el texto de la línea no contiene la invocación
+  y ninguna lectura estática la puede ver — cerrarlo pediría ejecutar, que es justo
+  lo que este paso no hace, y queda fijado en el banco como caso *límite* y no como
+  caso que pasa. (2) *Abierto y no cerrado en esta ronda*: la familia de
+  scaffolding descarga igual y no está en el alfabeto — `npm init <pkg>` resuelve
+  `create-<pkg>` desde npm, `npm create` es su alias, y `pnpm create`, `yarn
+  create` y `bun create` hacen lo mismo (los `init` de pnpm, yarn y bun andamian
+  **local** y no descargan, así que meterlos sería puro falso rojo). Se declara en
+  vez de cerrarse porque cerrarlo bien pide una distinción nueva que este paso no
+  tiene: para `exec`/`x`/`dlx` un ejecutor sin argumento es *indeterminado*,
+  mientras que para `init`/`create` sin argumento significa que **no descarga
+  nada** — y sin esa distinción `npm init -y`, local e inofensivo, saldría rojo
+  dentro de un allowlist. Medido: cero ocurrencias de esa familia en el árbol de
+  Projects y cero en el consumidor real, así que declararlo no deja ningún hallazgo
+  sin reportar hoy; cerrarlo es un cambio de comportamiento propio y va en su
+  propio change.
+
+  **El banco tiene dos mitades y hacen cosas distintas.** Los casos concretos de
+  `pruebas/marco-ci/casos/ejecutores.md` son regresión: fijan por código de salida
+  lo que ya se sostiene. El **corpus generado** (`pruebas/marco-ci/generar.mjs`) es
+  el que puede encontrar algo nuevo: cruza los ejes de la gramática de
+  entrecomillado, de banderas y de envoltorio contra el alfabeto de ejecutores que
+  **lee del propio paso**, y hoy son 2191 entradas. La versión anterior del banco
+  afirmaba el invariante del prefiltro iterando la lista escrita a mano, y por eso
+  no podía, por construcción, cazar un miembro nuevo de la clase. El corpus
+  encontró uno en su primera corrida: una bandera con valor separado que no tiene
+  forma de paquete (`npx --registry <url> openspec`) hacía que el lector se rindiera
+  con un `::warning::` —que no pone rojo ningún job— sobre una invocación real y sin
+  pinar. Medido contra el paso de la ronda anterior: **500 de 1252** entradas sin
+  pinar salían sin un solo `::error::`; con el tokenizador, 0.
 
 - **Aviso de versión a los consumidores** — `.github/workflows/aviso-version.yml`
   (workflow propio de Projects) más `actions/aviso-version` (referenciada). Al
