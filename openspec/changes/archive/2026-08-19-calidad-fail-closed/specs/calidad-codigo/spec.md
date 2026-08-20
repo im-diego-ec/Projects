@@ -117,8 +117,11 @@ permanente sobre un archivo que ninguna persona escribió ni puede corregir.
 ### Requirement: La cobertura de pruebas alcanza el mínimo acordado y no retrocede
 
 Cada paquete verificable del repositorio SHALL alcanzar el mínimo de cobertura
-de pruebas acordado por el marco, y la integración SHALL fallar cuando la
-cobertura de un paquete quede por debajo de él.
+de pruebas acordado por el marco. El mínimo es el DESTINO de cada paquete y no un
+promedio que se negocie corrida a corrida: mientras un paquete no lo alcance, la
+distancia que le falta SHALL estar declarada y con fecha, y la integración SHALL
+fallar cuando esa declaración no exista, cuando su fecha venza sin que el paquete
+haya llegado, o cuando la cobertura ya conseguida retroceda.
 
 La verificación SHALL aplicarse en dos planos, porque cada uno tapa un hueco que
 el otro deja abierto:
@@ -131,10 +134,45 @@ el otro deja abierto:
   código que ya existe sin pruebas puede quedarse así indefinidamente, porque
   nada lo obliga a nadie mientras nadie lo toque.
 
-Mientras un paquete no alcance el mínimo, su total vigente SHALL funcionar como
-piso: la integración falla si baja de ahí. El piso SHALL subir a medida que se
-agregan pruebas, y descenderlo SHALL requerir una declaración explícita y
-revisable, no un ajuste silencioso.
+**El piso es el mecanismo de TRANSICIÓN hacia el mínimo, y no un sustituto de
+él.** Mientras un paquete no alcance el mínimo, su total vigente SHALL funcionar
+como piso y la integración SHALL fallar si baja de ahí. El piso de un paquete
+SHALL ser el total que ya consiguió, y desde el día en que alcanza el mínimo SHALL
+ser el mayor entre el mínimo del marco y ese total, para que un paquete que lo
+superó no reciba licencia para volver a bajar hasta él. Estar por encima del piso
+y por debajo del mínimo NO SHALL contar como cumplimiento: es una deuda, y en este
+marco una deuda se declara con su fecha o pone rojo.
+
+Esa declaración SHALL vivir en el manifiesto del propio paquete, junto a sus
+exclusiones declaradas, y SHALL llevar dos datos: el motivo escrito y la fecha en
+la que el paquete alcanza el mínimo. En consecuencia la integración SHALL fallar
+en tres casos, y el tercero es el que distingue esta garantía de un piso a secas:
+
+1. cuando el total de un paquete cae por debajo de su piso vigente, esté ese piso
+   arriba o abajo del mínimo;
+2. cuando un paquete está por debajo del mínimo y no declara motivo ni fecha;
+3. cuando la fecha declarada ya pasó y el paquete sigue por debajo del mínimo. A
+   partir de ese día la comparación SHALL ser contra el mínimo del marco y no
+   contra el piso, porque el plazo es lo único que impide que el piso se convierta
+   en el mínimo de hecho.
+
+Correr la fecha SHALL ser una declaración explícita y revisable: una línea de diff,
+con su motivo y con el avance conseguido desde la fecha anterior, y jamás un ajuste
+silencioso. Descender el piso, lo mismo.
+
+Cada corrida SHALL reportar, por cada paquete que esté por debajo del mínimo,
+cuánto le falta y cuánto plazo le queda. Una deuda que no se nombra en cada corrida
+es una deuda que nadie mira hasta el día en que vence.
+
+**Alternativa descartada: exigir que el piso suba en cada PR que toque el
+paquete.** Ata el avance al tránsito por el código en vez de a una fecha, y falla
+en las dos direcciones. Bloquea integraciones legítimas, porque un cambio que toca
+solo archivos ya cubiertos no puede subir nada y quedaría rojo sin defecto que
+arreglar; y admite el avance nominal, porque subir el piso una centésima satisface
+la letra y deja la deuda intacta durante años. La fecha, en cambio, se verifica con
+el día de la corrida en lugar del historial de quién tocó qué, y se declara donde
+ya se declaran las exclusiones: en el manifiesto del paquete, dentro de un diff y
+bajo revisión.
 
 La medición SHALL distinguir «cubierto» de «no medido»: la ausencia de datos de
 cobertura habiendo líneas agregadas SHALL ser un fallo ruidoso y NO un éxito
@@ -148,9 +186,21 @@ con su motivo escrito, del mismo modo que las exclusiones del alcance.
 - **WHEN** un cambio agrega líneas ejecutables y las pruebas no las ejercitan en la proporción mínima acordada
 - **THEN** la integración falla indicando qué líneas quedaron sin cubrir, aunque el total del paquete siga por encima del mínimo
 
-#### Scenario: Un paquete por debajo del mínimo acordado
-- **WHEN** la cobertura total de un paquete está por debajo del mínimo del marco
-- **THEN** la integración falla si además está por debajo del piso vigente de ese paquete, y en todo caso reporta cuánto falta para el mínimo
+#### Scenario: Un paquete por debajo del mínimo con su plazo declarado y vigente
+- **WHEN** la cobertura total de un paquete está por debajo del mínimo del marco, no retrocedió respecto de su piso vigente, y el paquete declara el motivo y la fecha en la que alcanza el mínimo
+- **THEN** la integración pasa y reporta cuánto falta para el mínimo y cuánto plazo queda, de modo que la deuda se vea en cada corrida y no el día en que vence
+
+#### Scenario: Un paquete por debajo del mínimo sin plazo declarado
+- **WHEN** la cobertura total de un paquete está por debajo del mínimo del marco y el paquete no declara el motivo y la fecha en la que lo alcanza
+- **THEN** la integración falla comparando contra el mínimo del marco, y nombra el paquete y la distancia que le falta: un paquete por debajo del mínimo sin plazo escrito no está en transición, está incumpliendo
+
+#### Scenario: El plazo declarado venció y el paquete sigue por debajo del mínimo
+- **WHEN** la fecha que el paquete declaró ya pasó y su cobertura total sigue por debajo del mínimo del marco
+- **THEN** la integración falla comparando contra el mínimo y no contra el piso vigente, aunque el paquete no haya retrocedido
+
+#### Scenario: La cobertura total de un paquete retrocede
+- **WHEN** el total de un paquete cae por debajo de su piso vigente
+- **THEN** la integración falla aunque el total siga por encima del mínimo del marco, porque el piso es la ganancia acumulada y no vuelve atrás
 
 #### Scenario: Un cambio que solo elimina código
 - **WHEN** un cambio únicamente elimina líneas, o renombra sin agregar código ejecutable

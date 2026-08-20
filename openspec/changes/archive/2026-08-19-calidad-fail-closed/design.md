@@ -135,6 +135,53 @@ por el plano del total **como piso que sube**. El destino es el mismo; la
 diferencia es que así la compuerta protege cada avance desde el principio en vez
 de estar apagada hasta que termine la puesta al día.
 
+### D5c — La transición lleva fecha, porque sin fecha el piso se vuelve el mínimo
+
+**Corrección posterior, hallazgo B1 de la auditoría de cierre de v1 (2026-08-20).**
+El spec de este change decía las dos cosas a la vez: el párrafo normativo prometía
+que la integración falla cuando la cobertura de un paquete queda por debajo del
+mínimo del marco, y su propio scenario prometía lo contrario, que falla solo si
+además está por debajo del piso vigente. Lo implementado cumplía la versión débil,
+y la medición sobre el consumidor real lo mostró: `web` a 70,69% de funciones con
+`EXIT = 0`, 9,4 puntos por debajo del mínimo declarado de 80, en verde, contra un
+piso que se había fijado en el número medido (`functions: 70.6`) con un comentario
+al lado que afirmaba que el paquete ya lo superaba.
+
+La decisión del dueño del área es que **el 80 por paquete se mantiene**: no se baja
+la promesa para que cuadre con lo medido. Lo que faltaba no era el número, era el
+final de la transición. D5b eligió llegar al 80 subiendo el piso, y eso está bien,
+pero un piso que sube «a medida que se agregan pruebas» no obliga a nadie a
+agregarlas: si nadie las escribe, el piso se queda donde está y el mínimo pasa de
+destino a decoración. El piso sin fecha ES el mínimo de hecho.
+
+Por eso ahora la deuda se declara **con motivo y con fecha**, en el manifiesto del
+propio paquete, junto a las exclusiones. El piso sigue siendo el mecanismo de
+transición y protege cada avance; la fecha es lo que la termina. Un paquete por
+debajo del mínimo sin fecha declarada es rojo, y el día en que la fecha vence la
+comparación pasa a ser contra el mínimo y no contra el piso. Correr la fecha se
+puede, pero es una línea de diff con su motivo y con el avance conseguido desde la
+anterior, bajo review, que es la misma mecánica que las exclusiones del alcance:
+no se vuelve imposible, se vuelve visible.
+
+**Alternativa descartada: exigir que el piso suba en cada PR que toque el
+paquete.** Ata el avance al tránsito por el código en vez de a una fecha, y falla
+en las dos direcciones. Bloquea integraciones legítimas —un cambio que toca solo
+archivos ya cubiertos no puede subir nada y quedaría rojo sin defecto que
+arreglar—, que es el rojo permanente que D5b existe para evitar; y admite el
+avance nominal, porque subir el piso una centésima satisface la letra y deja la
+deuda intacta durante años. La fecha, además, es un mecanismo que este marco ya
+opera: es la misma forma de la ventana de gracia con la que se estrena un check
+nuevo, y se verifica con la fecha de la corrida en lugar del historial de quién
+tocó qué.
+
+**Consecuencia inmediata, y es deliberada:** con esta redacción el estado de hoy
+del consumidor real queda descrito como lo que es, un incumplimiento. `web` está
+por debajo del mínimo en `functions` y no declara ni motivo ni fecha, así que la
+salida no es aflojar el umbral ni excluir archivos para llegar: es subir la
+cobertura de funciones a 80 con pruebas que verifiquen scenarios de los specs
+vivos, o declarar la deuda con su fecha. La primera es la buena; la segunda existe
+para que la transición sea honesta y no eterna.
+
 ### D6 — El orden reemplaza al modo aviso, otra vez
 
 El consumidor da rojo el día del estreno. La constitución define eso como

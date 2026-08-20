@@ -369,6 +369,16 @@ código nuevo, y no exige ninguna puesta al día previa. El otro plano —el tot
 del paquete, que no retrocede— vive en la configuración de cobertura del
 proyecto, no acá.
 
+Ese otro plano tiene una condición que este action no verifica y conviene leer
+antes de cablearlo: el piso del total es el mecanismo de **transición** hacia el
+mínimo del marco, no un sustituto de él, así que un paquete por debajo del mínimo
+declara en su manifiesto el motivo y la **fecha** en la que llega, y el día en que
+esa fecha vence la comparación pasa a ser contra el mínimo (spec
+`calidad-codigo`, requirement de cobertura; design `D5c`). Cablear solo este
+action deja la mitad del diff cubierta y la del total en manos del proyecto: es
+correcto por diseño, y también el motivo por el que un paquete puede estar en
+verde acá y en deuda con el mínimo.
+
 ```yaml
 jobs:
   build_test:
