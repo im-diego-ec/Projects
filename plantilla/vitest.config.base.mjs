@@ -30,6 +30,14 @@
 //       "deuda": { "motivo": "heredado del piloto; el plan esta en el issue N",
 //                  "fecha": "AAAA-MM-DD" } } }
 //
+// OJO CON EL PISO: solo se declaran las metricas que el reporte de este paquete
+// EMITE. Un piso sobre una metrica que llega sin un solo dato es ROJO, y a
+// proposito: el piso es un ratchet y un ratchet que no tiene contra que comparar
+// dejo de proteger la ganancia acumulada. Antes de esa regla, apagar el ratchet
+// de un paquete costaba lo mismo que cambiar el reporter o apagar `all: true`, y
+// la corrida seguia en verde imprimiendo "n/a". Un paquete sin ramas no declara
+// "ramas".
+//
 // POR QUE .mjs Y NO .ts, que seria lo esperable en este stack: un .ts en la
 // raiz del monorepo no cae bajo el tsconfig de ningun paquete, asi que el censo
 // de fuentes lo marcaria como archivo sin programa de tipos y el repo nuevo

@@ -677,6 +677,27 @@ export function veredictoDePaquete({
     // el resumen en vez de callarse: un salteo mudo es indistinguible de una
     // metrica que nadie mide.
     if (!m || !m.encontradas) {
+      // ...con UNA excepcion, y es la que cierra el ultimo fail-open silencioso
+      // de esta compuerta. Si el paquete DECLARO un piso para esta metrica, el
+      // "n/a" no es una metrica que no aplica: es un ratchet que se quedo sin
+      // nada contra lo que comparar. Salia EXIT 0, con la fila impresa como
+      // n/a y sin un solo ::warning::, asi que apagar la ganancia acumulada de
+      // un paquete costaba lo mismo que cambiar el reporter o apagar
+      // `all: true`. El arreglo es una linea de diff bajo review —borrar el
+      // piso con su motivo, o arreglar el reporter— y por eso esto es ROJO y no
+      // un aviso: un aviso lo habria tapado igual que antes.
+      const pisoHuerfano = typeof piso[clave] === "number" ? piso[clave] : null;
+      if (pisoHuerfano !== null) {
+        filas.push({
+          clave,
+          etiqueta,
+          medible: false,
+          pisoDeclarado: pisoHuerfano,
+          veredicto: "piso-sin-datos",
+        });
+        rojo = true;
+        continue;
+      }
       filas.push({ clave, etiqueta, medible: false });
       continue;
     }
@@ -950,12 +971,21 @@ function compuertaDelTotal({ paquetes, exclusionDe, cobertura, minimoLocal, ambi
     "sin-plazo-en-gracia": "AMARILLO · ventana de estreno",
     "plazo-vencido": "ROJO · plazo vencido",
     "en-plazo": "AMARILLO · en plazo",
+    "piso-sin-datos": "ROJO · piso sin datos",
   };
   for (const { paq, veredicto } of veredictos) {
     for (const fila of veredicto.filas) {
       const nombre = `\`${paq.dir || "."}\``;
       if (!fila.medible) {
-        RT(`| ${nombre} | ${fila.etiqueta} | n/a | ${minimo}% | — | sin datos de esa metrica |`);
+        RT(
+          `| ${nombre} | ${fila.etiqueta} | n/a | ${minimo}% | ${
+            fila.pisoDeclarado == null ? "—" : `${fila.pisoDeclarado}%`
+          } | ${
+            fila.veredicto === "piso-sin-datos"
+              ? etiquetaDeEstado["piso-sin-datos"]
+              : "sin datos de esa metrica"
+          } |`
+        );
         continue;
       }
       RT(
@@ -1004,6 +1034,18 @@ function compuertaDelTotal({ paquetes, exclusionDe, cobertura, minimoLocal, ambi
     const vencidos = veredicto.filas.filter((f) => f.veredicto === "plazo-vencido");
     const enPlazo = veredicto.filas.filter((f) => f.veredicto === "en-plazo");
     const enGracia = veredicto.filas.filter((f) => f.veredicto === "sin-plazo-en-gracia");
+    const pisosHuerfanos = veredicto.filas.filter((f) => f.veredicto === "piso-sin-datos");
+
+    // UN PISO QUE SE QUEDO SIN DATOS. Es rojo por la misma razon que una
+    // declaracion invalida: lo escrito se sostiene. La diferencia con el
+    // retroceso es que aca no hay numero con el que comparar, asi que el
+    // mensaje no puede decir cuanto falto — tiene que decir que la comparacion
+    // DESAPARECIO, que es la unica informacion util.
+    for (const f of pisosHuerfanos) {
+      console.error(
+        `::error file=${paq.manifiesto}::el paquete "${nombre}" declara un piso de ${f.etiqueta} de ${f.pisoDeclarado}% y su cobertura llego sin un solo dato de esa metrica: el piso no se pudo comparar contra nada y dejo de proteger la ganancia acumulada. Un piso que no compara es una compuerta apagada en verde. Arreglo: revisa el reporter de cobertura del paquete (que emita esa metrica, y con 'all: true'); si esa metrica de verdad no aplica a este paquete, saca projects.cobertura.piso.${f.clave} de ${paq.manifiesto} en una linea de diff con su motivo escrito`
+      );
+    }
 
     for (const f of retrocesos) {
       console.error(
@@ -1043,6 +1085,62 @@ function compuertaDelTotal({ paquetes, exclusionDe, cobertura, minimoLocal, ambi
           .join(", ")} · minimo ${minimo}%`
       );
     }
+  }
+
+  // UNA DECLARACION QUE NO SE PUEDE COMPARAR CONTRA NINGUN DATO. Cierra el
+  // ultimo agujero de la clase, y los dos veredictos salen del mismo principio:
+  //
+  //   · un PISO sobre un paquete que no aporto una sola metrica medible es
+  //     ROJO, porque desaparecio una comparacion que existia. Es el mismo caso
+  //     del piso huerfano de `veredictoDePaquete`, con el reporte del paquete
+  //     ENTERO perdido en vez de una sola metrica: apagar el ratchet de un
+  //     paquete no puede costar menos que dejar de emitir su lcov.
+  //   · una DEUDA en la misma situacion es AMARILLO ruidoso: no apago nada,
+  //     pero una deuda que ninguna corrida nombra envejece en el manifiesto y
+  //     se paga sola sin que nadie sepa que estaba.
+  //
+  // LO QUE PROTEGE AL CARRIL SIN PRUEBAS no es una guarda de aca: es el retorno
+  // temprano de mas arriba ("No medido", EXIT 0), que se dispara cuando NINGUN
+  // reporte reclama nada. Este bloque solo se alcanza con datos en la mano.
+  // Vale decirlo porque la primera version traia ademas un `if (porPaquete.size)`
+  // que ninguna prueba podia matar: era una guarda inalcanzable custodiando una
+  // compuerta, o sea codigo que nadie verifica. Un control negativo la encontro
+  // (sobrevivio a mutarla a `if (true)`) y se fue.
+  const medidos = new Set([...porPaquete.keys()].map((p) => p.manifiesto));
+  const conMetricaMedible = new Set(
+    veredictos.filter((v) => v.veredicto.filas.some((f) => f.medible)).map((v) => v.paq.manifiesto)
+  );
+  // Los paquetes cuyo piso ya enrojecio metrica por metrica: `veredictoDePaquete`
+  // ya hablo por ellos, y decirlo dos veces convierte un diagnostico en ruido.
+  const yaRojosPorPiso = new Set(
+    veredictos
+      .filter((v) => v.veredicto.filas.some((f) => f.veredicto === "piso-sin-datos"))
+      .map((v) => v.paq.manifiesto)
+  );
+  for (const p of paquetes) {
+    if (p.error) continue;
+    const clavesDePiso = Object.keys(p.piso ?? {});
+    if (!p.deuda && !clavesDePiso.length) continue;
+    if (conMetricaMedible.has(p.manifiesto) || yaRojosPorPiso.has(p.manifiesto)) continue;
+    const razon = medidos.has(p.manifiesto)
+      ? "sus archivos llegaron al reporte sin un solo item medible"
+      : "ningun reporte de cobertura reclama archivos suyos, y la corrida SI midio otros paquetes";
+    if (clavesDePiso.length) {
+      codigo = 1;
+      console.error(
+        `::error file=${p.manifiesto}::el paquete "${p.dir || "."}" declara un piso de cobertura (${clavesDePiso.join(", ")}) y no aporto ninguna metrica medible en esta corrida: ${razon}. El piso no se pudo comparar contra nada, asi que dejo de proteger la ganancia acumulada. Arreglo: revisa que las pruebas de este paquete emitan cobertura (con 'all: true') y que el projectRoot del reporter lcov apunte a la raiz del repositorio; si el paquete ya no se mide, saca projects.cobertura.piso de ${p.manifiesto} en una linea de diff con su motivo escrito`
+      );
+      RT(
+        `- \`${p.manifiesto}\`: piso declarado (${clavesDePiso.join(", ")}) sobre un paquete sin ninguna metrica medible en esta corrida.`
+      );
+      continue;
+    }
+    console.error(
+      `::warning file=${p.manifiesto}::el paquete "${p.dir || "."}" declara una deuda de cobertura (${p.deuda.fecha}: ${p.deuda.motivo}) y no aporto ninguna metrica medible en esta corrida: ${razon}, asi que la deuda no esta excusando nada. Arreglo: si el paquete ya no necesita el plazo, borra projects.cobertura.deuda de ${p.manifiesto}; si deberia estar midiendose, revisa que sus pruebas emitan cobertura con 'all: true'`
+    );
+    RT(
+      `- \`${p.manifiesto}\`: deuda declarada (${p.deuda.fecha}) sobre un paquete sin ninguna metrica medible en esta corrida.`
+    );
   }
 
   for (const p of malDeclarados) {

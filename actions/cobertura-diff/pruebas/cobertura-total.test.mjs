@@ -16,6 +16,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { after } from "node:test";
+import { readFileSync } from "node:fs";
 
 import { commit, correr, escribir, limpiar, repoNuevo } from "./ayuda.mjs";
 import {
@@ -67,11 +68,26 @@ function lcov(archivo, { lineas = [], funciones = [], ramas = [] }) {
  * proposito: asi el plano del diff pasa y el codigo de salida de la corrida
  * habla unicamente del plano del total. Sin esa separacion, un rojo no diria
  * cual de las dos compuertas lo produjo.
+ *
+ * `enLaBase` escribe archivos ANTES del commit base, asi que el plano del diff
+ * no los ve. Es la unica forma de agregar un SEGUNDO paquete sin que sus lineas
+ * cuenten como agregadas: la primera version de estas pruebas lo escribio
+ * DESPUES del base y su `EXIT 1` venia del plano del diff, no del total —o sea
+ * que la prueba pasaba sin medir lo que decia medir, que es la falla que un
+ * control negativo existe para encontrar.
  */
-function repoConTotal({ lineas, manifiesto = { name: "web" }, funciones, ramas, extras = {} }) {
+function repoConTotal({
+  lineas,
+  manifiesto = { name: "web" },
+  funciones,
+  ramas,
+  extras = {},
+  enLaBase = {},
+}) {
   const dir = repoNuevo();
   escribir(dir, "package.json", JSON.stringify({ name: "raiz", private: true }) + "\n");
   escribir(dir, "web/package.json", JSON.stringify(manifiesto, null, 2) + "\n");
+  for (const [archivo, contenido] of Object.entries(enLaBase)) escribir(dir, archivo, contenido);
   const cuerpoBase = lineas
     .slice(0, -1)
     .map((_, i) => `export const f${i} = (x) => x + ${i};`)
@@ -530,4 +546,202 @@ test("COBERTURA_HOY no puede correr un plazo en silencio", () => {
   const r = correrTotal(dir, base, { COBERTURA_HOY: "2025-06-01" });
   assert.equal(r.codigo, 0);
   assert.match(r.stderr, /la fecha de la corrida esta forzada a 2025-06-01 por COBERTURA_HOY/);
+});
+
+// ---------------------------------------------------------------------------
+// UNA DECLARACION QUE NO SE PUEDE COMPARAR CON NINGUN DATO
+//
+// El hueco que la verificacion adversarial de esta rama encontro, y es de la
+// misma clase que todo lo de arriba: no un caso mas, sino la forma en que la
+// compuerta DESAPARECE sin que nada lo diga.
+//
+// Medido: un paquete que declara `piso: { funciones: 90 }` y cuyo reporte deja
+// de emitir `FN:` salia EXIT 0, con la metrica impresa como `n/a` y sin un solo
+// ::warning::. El piso es un ratchet, y un ratchet que dejo de comparar contra
+// algo no protege nada: bastaba con que alguien cambiara el reporter, apagara
+// `all: true` o subiera de mayor de vitest para que la ganancia acumulada
+// quedara sin custodia, en verde. Es fail-open, y la constitucion del marco
+// pide que todo fail-open sea RUIDOSO.
+//
+// La regla que lo cierra, derivada de ese principio y no de este ejemplo:
+//   · piso declarado + esa metrica SIN DATOS  -> ROJO (el arreglo es una linea
+//     de diff: borrar el piso con su motivo, o arreglar el reporter)
+//   · deuda declarada + el paquete no aporto NINGUNA metrica medible ->
+//     AMARILLO ruidoso (la deuda no tapa nada, pero sobra y hay que borrarla)
+//
+// El caso "no hay NINGUN reporte en la corrida" NO cambia: sigue siendo el
+// aviso que ya era. Ahi no desaparecio una compuerta, no se emitio cobertura,
+// y enrojecerlo pondria en rojo permanente cualquier carril que no corra
+// pruebas.
+// ---------------------------------------------------------------------------
+
+test("un piso declarado cuya metrica se queda SIN DATOS es ROJO, no un n/a en verde", () => {
+  const { dir, base } = repoConTotal({
+    lineas: [1, 1, 1, 1, 1, 1], // 100% de lineas: nada mas puede enrojecer
+    funciones: [], //             el reporte dejo de emitir FN:
+    manifiesto: { name: "web", projects: { cobertura: { piso: { funciones: 90 } } } },
+  });
+  const r = correrTotal(dir, base);
+  assert.equal(r.codigo, 1, r.todo);
+  assert.match(r.stderr, /::error file=web\/package\.json::/);
+  assert.match(r.stderr, /declara un piso de funciones de 90%/);
+  assert.match(r.stderr, /sin un solo dato de esa metrica/);
+  assert.match(r.resumen, /ROJO · piso sin datos/);
+});
+
+test("el piso de una metrica que SI tiene datos sigue comparandose como siempre", () => {
+  // El control del caso de arriba: la rama nueva no puede enrojecer a un
+  // paquete cuyo piso se puede comparar y se cumple.
+  const { dir, base } = repoConTotal({
+    lineas: [1, 1, 1, 1, 1, 1],
+    funciones: [1, 1, 1, 1],
+    manifiesto: { name: "web", projects: { cobertura: { piso: { funciones: 90 } } } },
+  });
+  assert.equal(correrTotal(dir, base).codigo, 0);
+});
+
+test("una metrica con denominador CERO se declara n/a: no es 0% ni 100%", () => {
+  // Este caso no fallaba antes del arreglo, y se agrega igual porque el control
+  // negativo lo pedia: mutar `!m || !m.encontradas` a `!m` SOBREVIVIA al banco
+  // entero. La unica prueba de n/a que habia pasaba la metrica AUSENTE (la
+  // clave no estaba en el objeto), nunca una presente con encontradas = 0, que
+  // es la que un lcov real produce.
+  const v = veredictoDePaquete({
+    metricas: { lineas: { encontradas: 10, cubiertas: 10 }, ramas: { encontradas: 0, cubiertas: 0 } },
+    minimo: 80,
+    hoy: HOY,
+  });
+  const ramas = v.filas.find((f) => f.clave === "ramas");
+  assert.equal(ramas.medible, false);
+  assert.equal(ramas.pct, undefined);
+  assert.equal(v.estado, "verde");
+});
+
+test("un paquete SIN ramas no inventa un 100% en el resumen", () => {
+  const { dir, base } = repoConTotal({
+    lineas: [1, 1, 1, 1, 1, 1],
+    funciones: [1, 1],
+    ramas: [], // el paquete no tiene ni una rama
+  });
+  const r = correrTotal(dir, base);
+  assert.equal(r.codigo, 0, r.todo);
+  assert.match(r.resumen, /ramas \| n\/a/);
+  assert.doesNotMatch(r.resumen, /ramas \| \*\*100\.00%\*\*/);
+});
+
+/** El segundo paquete, entero en el commit BASE para que el diff no lo vea. */
+const segundoPaquete = (declaracion) => ({
+  "otro/package.json": JSON.stringify({ name: "otro", projects: { cobertura: declaracion } }, null, 2) + "\n",
+  "otro/src/x.js": "export const x = 1;\n",
+});
+
+test("una deuda declarada en un paquete sin nada que medir se nombra, no se calla", () => {
+  // Un segundo paquete que declara deuda y al que ningun reporte reclama: la
+  // deuda no excusa nada porque no hay nada medido, y callarla la deja
+  // envejeciendo en el manifiesto para siempre.
+  const { dir, base } = repoConTotal({
+    lineas: [1, 1, 1, 1, 1, 1],
+    enLaBase: segundoPaquete({ deuda: { motivo: "vieja", fecha: "2027-01-01" } }),
+  });
+  const r = correrTotal(dir, base);
+  assert.equal(r.codigo, 0, r.todo);
+  assert.match(r.stderr, /::warning file=otro\/package\.json::/);
+  assert.match(r.stderr, /no aporto ninguna metrica medible/);
+});
+
+test("un PISO declarado en un paquete que NINGUN reporte reclama es ROJO", () => {
+  // El mismo agujero que el piso huerfano de arriba, con el reporte del paquete
+  // ENTERO perdido en vez de una sola metrica: apagar el ratchet de un paquete
+  // no puede costar menos que dejar de emitir su lcov. Y la corrida SI midio
+  // otro paquete, asi que esto no es "no se midio cobertura": es un reporte que
+  // se perdio, y son dos diagnosticos distintos.
+  const { dir, base } = repoConTotal({
+    lineas: [1, 1, 1, 1, 1, 1],
+    enLaBase: segundoPaquete({ piso: { lineas: 70 } }),
+  });
+  const r = correrTotal(dir, base);
+  assert.equal(r.codigo, 1, r.todo);
+  assert.match(r.stderr, /::error file=otro\/package\.json::/);
+  assert.match(r.stderr, /declara un piso de cobertura \(lineas\)/);
+  assert.match(r.stderr, /la corrida SI midio otros paquetes/);
+});
+
+test("el piso huerfano se nombra UNA vez: por metrica o por paquete, nunca las dos", () => {
+  // Control de ruido, y el unico caso donde las dos ramas compiten: un paquete
+  // que SI esta en el reporte pero cuyo registro llega sin un solo item de
+  // ninguna metrica. Ahi habla `veredictoDePaquete` (mensaje por metrica) y la
+  // compuerta tiene que callarse. Dos lineas que dicen lo mismo convierten un
+  // diagnostico en ruido, y el que las lee deja de leerlas.
+  const { dir, base } = repoConTotal({
+    lineas: [1, 1, 1, 1, 1, 1],
+    enLaBase: segundoPaquete({ piso: { lineas: 70 } }),
+    // El registro existe (el reporte lo reclama) y no trae ni una linea.
+    extras: { "otro/src/x.js": { lineas: [] } },
+  });
+  const r = correrTotal(dir, base);
+  assert.equal(r.codigo, 1, r.todo);
+  const porMetrica = (r.stderr.match(/declara un piso de líneas/g) ?? []).length;
+  const porPaquete = (r.stderr.match(/declara un piso de cobertura/g) ?? []).length;
+  assert.equal(porMetrica, 1, r.stderr);
+  assert.equal(porPaquete, 0, r.stderr);
+});
+
+test("sin NINGUN reporte, un piso declarado NO enrojece el total: ahi no desaparecio nada", () => {
+  // La frontera que decide si la regla es usable: un carril que no corre
+  // pruebas no puede quedar en rojo permanente por una declaracion correcta.
+  // La diferencia medible es si la corrida midio ALGUN paquete.
+  const dir = repoNuevo();
+  escribir(dir, "package.json", JSON.stringify({ name: "raiz", private: true }) + "\n");
+  escribir(
+    dir,
+    "web/package.json",
+    JSON.stringify({ name: "web", projects: { cobertura: { piso: { lineas: 70 } } } }, null, 2) + "\n"
+  );
+  escribir(dir, "web/src/mod.js", "export const f = (x) => x;\n");
+  commit(dir, "base");
+
+  // SIN commit base a proposito: el plano del diff queda NO APLICABLE, asi que
+  // el codigo de salida habla unicamente del total. Con un rango el diff
+  // enrojeceria por su cuenta ("hay lineas agregadas y ningun reporte") y el
+  // 1 no diria nada sobre la regla que esta prueba mide.
+  const r = correr(dir, { COBERTURA_MINIMO: "80", COBERTURA_HOY: CERRADA });
+  assert.equal(r.codigo, 0, r.todo);
+  assert.match(r.resumen, /\*\*No medido\*\*/);
+  assert.doesNotMatch(r.stderr, /declara un piso de cobertura/);
+});
+
+// ---------------------------------------------------------------------------
+// LA VENTANA DE ESTRENO TIENE QUE ESTAR EN EL CONTRATO, NO SOLO EN EL CODIGO
+//
+// Es la leccion de la afirmacion A07 aplicada a esta misma rama. A07 decia
+// "la integracion FALLA cuando un paquete queda por debajo del minimo" y la
+// compuerta no existia. Esta rama la construyo, y la estreno con una ventana de
+// gracia que NADIE habia escrito en el spec: medido contra el espejo del
+// consumidor real, el caso central del requirement —un paquete a 70,70% de
+// funciones sin deuda declarada— salia EXIT 0. El scenario del spec vivo decia
+// "la integracion falla". El comentario del codigo explicaba la ventana; el
+// contrato, no.
+//
+// Un comentario no es el contrato. Esta prueba ata la constante al texto del
+// spec, asi que mover la fecha sin actualizar el spec es rojo — que es la unica
+// forma de que la coherencia no dependa de que alguien se acuerde.
+// ---------------------------------------------------------------------------
+
+test("la fecha de la ventana de estreno esta escrita en el spec vivo", () => {
+  const raiz = new URL("../../../", import.meta.url);
+  const comparador = readFileSync(new URL("../medir-cobertura-diff.mjs", import.meta.url), "utf8");
+  const m = comparador.match(/const VENTANA_DE_GRACIA_HASTA = "(\d{4}-\d{2}-\d{2})"/);
+  assert.ok(m, "no se encontro la constante VENTANA_DE_GRACIA_HASTA en el comparador");
+
+  for (const ruta of [
+    "openspec/specs/calidad-codigo/spec.md",
+    "openspec/changes/archive/2026-08-19-calidad-fail-closed/specs/calidad-codigo/spec.md",
+  ]) {
+    const spec = readFileSync(new URL(ruta, raiz), "utf8");
+    assert.match(
+      spec,
+      new RegExp(m[1]),
+      `${ruta} no menciona la fecha ${m[1]} en la que la ventana de estreno se cierra`
+    );
+  }
 });

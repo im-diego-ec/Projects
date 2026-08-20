@@ -382,6 +382,8 @@ nada obliga a nadie mientras nadie lo toque.
 | Por debajo del mínimo, con la fecha declarada **ya vencida** | **rojo** |
 | Por debajo del mínimo, con motivo y fecha **vigente** | amarillo, y la corrida reporta cuánto falta y cuánto plazo queda |
 | Por debajo de su propio **piso declarado**, esté ese piso arriba o abajo del mínimo | **rojo** (retroceso: el piso es ganancia acumulada) |
+| Con un **piso declarado para una métrica que llegó SIN DATOS** | **rojo** — el piso no se pudo comparar contra nada, y un ratchet que no compara es una compuerta apagada en verde |
+| Con una **deuda declarada** y ninguna métrica medible en la corrida | amarillo con `::warning::` — la deuda no excusa nada, y una deuda que ninguna corrida nombra envejece en el manifiesto |
 | Con la declaración de cobertura mal escrita | **rojo** — una declaración inválida no cuenta como declarada |
 
 > **Ventana de estreno, hasta el 2026-09-30.** Mientras dure, un paquete por
@@ -560,6 +562,8 @@ saltea el job entero.
 | La fecha declarada está vigente | Pasa en amarillo, y el resumen dice cuánto falta y cuántos días quedan |
 | El total cayó por debajo del piso declarado | **Rojo**: retroceso, esté el piso arriba o abajo del mínimo |
 | `piso` o `deuda` mal declarados (fecha inexistente, clave desconocida, motivo vacío) | **Rojo**: una declaración inválida no cuenta como declarada |
+| Un `piso` declarado para una métrica que llegó sin un solo dato | **Rojo**: la comparación desapareció. Arreglo: que el reporter emita esa métrica, o sacar esa clave del piso con su motivo |
+| Una `deuda` declarada en un paquete sin ninguna métrica medible | Pasa con `::warning::` sobre su `package.json`: la deuda sobra y hay que borrarla |
 | El `minimo` del paso es menor que el del marco | El total se sigue comparando contra el del marco |
 | Ningún reporte reclama archivos de un paquete | **No medido**, con `::warning::`. El plano del diff ya enrojece si hay líneas agregadas |
 | Todo lo que los reportes reclaman está excluido con su motivo | Pasa, y los motivos quedan escritos en el resumen |

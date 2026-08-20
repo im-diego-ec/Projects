@@ -168,6 +168,38 @@ Correr la fecha SHALL ser una declaración explícita y revisable: una línea de
 con su motivo y con el avance conseguido desde la fecha anterior, y jamás un ajuste
 silencioso. Descender el piso, lo mismo.
 
+**Un piso declarado cuya métrica llega SIN DATOS SHALL fallar.** Un piso es un
+ratchet, y un ratchet que no tiene contra qué comparar dejó de proteger la ganancia
+acumulada: no es una métrica que no aplica, es una compuerta apagada. Sin esta
+regla, apagar el ratchet de un paquete cuesta lo mismo que cambiar el reporter de
+cobertura o dejar de emitir una métrica, y la corrida sigue en verde imprimiendo
+«n/a». Simétricamente, una deuda declarada sobre un paquete que no aportó ninguna
+métrica medible NO SHALL fallar —no apagó ninguna comparación que existiera— pero
+SHALL nombrarse en la corrida: una deuda que nadie nombra envejece en el manifiesto
+y se paga sola sin que nadie sepa que estaba.
+
+**El estreno de la verificación del total lleva VENTANA DE GRACIA, con su fecha
+escrita.** El marco se consume por un tag móvil, así que una verificación nueva
+aparece en el pipeline de cada proyecto sin que nadie la haya leído: por eso se
+estrena en modo aviso. Hasta la fecha de cierre —**2026-09-30**— un paquete por
+debajo del mínimo que NO declara nada SHALL avisar en vez de detener, y la corrida
+SHALL nombrar el día desde el cual el mismo estado es rojo. La ventana SHALL
+cerrarse por el paso del tiempo y no por una edición: pasada esa fecha, el mismo
+repositorio falla sin que nadie toque una línea.
+
+Y la ventana SHALL aflojar ÚNICAMENTE la falta de declaración. Una deuda declarada
+y vencida, un retroceso por debajo del piso, un piso sin datos y una declaración
+inválida SHALL fallar dentro de la ventana igual que fuera: en esos cuatro casos
+alguien escribió algo, y lo escrito se sostiene desde el día en que se escribió.
+
+La fecha de cierre SHALL estar escrita acá y no solo en el código. La medición que
+lo obliga: la primera implementación de esta verificación puso la ventana en un
+comentario del comparador, y contra el consumidor real —un paquete a 70,70% de
+funciones sin deuda declarada— la integración salía en verde mientras el escenario
+de este mismo requirement prometía que fallaba. Un comentario no es el contrato, y
+una amnistía que el contrato no nombra es indistinguible de la verificación que no
+existe.
+
 **El umbral que el proyecto configure para su propia herramienta SHALL poder
 exigir MÁS que el mínimo del marco, y nunca menos.** Sobre las líneas del cambio,
 bajarlo es una decisión del proyecto y alcanza con que la corrida lo diga; sobre
@@ -232,6 +264,26 @@ con su motivo escrito, del mismo modo que las exclusiones del alcance.
 #### Scenario: Una declaración de deuda o de piso mal escrita
 - **WHEN** un paquete por debajo del mínimo declara su deuda sin motivo, con una fecha que no existe en el calendario, o con una métrica que el marco no reconoce
 - **THEN** la integración falla nombrando el manifiesto y el error: una declaración inválida no es una declaración, y no compra plazo
+
+#### Scenario: Un piso declarado cuya métrica llega sin datos
+- **WHEN** un paquete declara un piso para una métrica y su cobertura llega sin un solo dato de esa métrica
+- **THEN** la integración falla nombrando el manifiesto y la métrica: un piso que no se puede comparar contra nada dejó de proteger la ganancia acumulada, y reportarlo como «n/a» en verde es indistinguible de no tener piso
+
+#### Scenario: Una deuda declarada sobre un paquete sin nada que medir
+- **WHEN** un paquete declara una deuda y no aporta ninguna métrica medible en la corrida
+- **THEN** la integración pasa y nombra el manifiesto: la deuda no excusa nada porque no hay nada medido, y una deuda que ninguna corrida nombra envejece sin que nadie la vea
+
+#### Scenario: El estreno de la verificación del total, antes de que su ventana cierre
+- **WHEN** la verificación del total se estrena y un paquete queda por debajo del mínimo sin declarar motivo ni fecha, antes de la fecha de cierre de la ventana de gracia
+- **THEN** la integración pasa avisando y nombra el día desde el cual el mismo estado es rojo, para que el proyecto se entere por un aviso con fecha y no por un rojo que llegó de un cambio del marco
+
+#### Scenario: La ventana de estreno ya cerró
+- **WHEN** pasó la fecha de cierre de la ventana de gracia y un paquete sigue por debajo del mínimo sin declarar motivo ni fecha
+- **THEN** la integración falla sin que nadie haya editado nada, porque la ventana se cierra por el paso del tiempo y no por una decisión que alguien tenga que recordar
+
+#### Scenario: Un caso que la ventana de estreno NO afloja
+- **WHEN** dentro de la ventana de gracia un paquete tiene una deuda declarada y vencida, o retrocede por debajo de su piso, o declara un piso para una métrica sin datos, o su declaración es inválida
+- **THEN** la integración falla igual que fuera de la ventana: la ventana perdona la ausencia de declaración, nunca una declaración que el paquete escribió y rompió
 
 #### Scenario: Un paquete nuevo creado desde el andamio del marco
 - **WHEN** un proyecto se crea copiando el andamio que el marco reparte
