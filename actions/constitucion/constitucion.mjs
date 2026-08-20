@@ -495,7 +495,53 @@ export function cubreItemDelPiso(entrada, item) {
   if (programaRecomendado === "" || programaDe(comandoDe(entrada)) !== programaRecomendado) return false;
   const comando = comandoDe(entrada).toLowerCase();
   if (comando === "") return false;
-  return new RegExp(`(^|[^a-z0-9])${escaparRegex(cubre)}([^a-z0-9]|$)`).test(comando);
+  return llevaLaPropiedadSinDesplazarla(comando, cubre);
+}
+
+/**
+ * ¿El comando lleva la propiedad SIN QUE OTRA COSA la desplace del lugar donde se
+ * ejecuta?
+ *
+ * LA CUARTA CONDICIÓN, y la mide el bypass de la ronda 3. Con las tres anteriores
+ * puestas —misma herramienta, mismo programa, la propiedad con bordes de palabra— el
+ * refutador satisfizo el piso entero al 100% con `["Bash(pnpm echo lint)", ...]`: mismo
+ * `Bash`, mismo `pnpm`, la palabra `lint` presente, y lo que corre es `echo`. Costo del
+ * bypass respecto de la ronda anterior: cinco caracteres.
+ *
+ * LA PROPIEDAD, y por qué es esta. Lo que un programa EJECUTA lo elige una palabra
+ * pelada (el subcomando o el script); una opción solo cambia CÓMO lo ejecuta. Así que
+ * entre el programa y el token que lleva la propiedad no puede haber ninguna palabra
+ * pelada: solo opciones (`-x`, `--filter`) y el valor de la opción que las precede. Con
+ * eso `pnpm --filter api lint` sigue cubriendo `lint` —el filtro de paquete de un
+ * monorepo, que es la forma legítima que había que no romper— y `npx --yes
+ * @fission-ai/openspec@1.9.0 validate *` sigue cubriendo `openspec`, que es la propia
+ * recomendación del manifiesto; `pnpm echo lint` no cubre nada, porque `echo` desplazó
+ * al script.
+ *
+ * RESIDUO DECLARADO, y es lo que esta función NO puede: no sabe la aridad de las
+ * opciones de un CLI ajeno, así que no distingue `pnpm --silent lint` (corre el linter)
+ * de `pnpm --help lint` (imprime la ayuda). Las dos pasan. Cerrarlo pediría una lista de
+ * flags por herramienta escrita acá, que es exactamente lo que este archivo evita: el
+ * programa se DERIVA del manifiesto justamente para que no haya una lista que envejezca.
+ * Y del otro lado, `pnpm run lint` sale como «sin cubrir» aunque corra el linter, porque
+ * `run` es una palabra pelada indistinguible de `echo`: es un ::warning:: con la entrada
+ * recomendada escrita —`Bash(pnpm lint)`— y jamás un rojo.
+ */
+export function llevaLaPropiedadSinDesplazarla(comando, cubre) {
+  const tokens = String(comando).trim().split(/\s+/).filter(Boolean);
+  const patron = new RegExp(`(^|[^a-z0-9])${escaparRegex(cubre)}([^a-z0-9]|$)`);
+  // El programa es tokens[0] (y las asignaciones de entorno que lo preceden ya las
+  // saltea `programaDe`, así que acá se saltean igual para no leerlas como palabras).
+  let inicio = 0;
+  while (inicio < tokens.length && /^[a-z_][a-z0-9_]*=/.test(tokens[inicio])) inicio++;
+  const esOpcion = (t) => t !== undefined && t.startsWith("-");
+  for (let i = inicio + 1; i < tokens.length; i++) {
+    if (patron.test(tokens[i])) return true;
+    // Este token no lleva la propiedad: para poder seguir buscando más allá tiene que
+    // ser una opción, o el valor de la opción que lo precede.
+    if (!esOpcion(tokens[i]) && !esOpcion(tokens[i - 1])) return false;
+  }
+  return false;
 }
 
 /**
@@ -1172,7 +1218,19 @@ export function verificar({
     // rojo: no hay explicacion, no hay pin.
     if (comparacion > 0) {
       const selloDeEstaCopia = String(cab.sha ?? "") === canonico.sha;
-      const refs = [...new Set((pins ?? []).map((p) => String(p.ref)))];
+      // LOS DOS CONJUNTOS, y hacen falta los dos. Escritores: las invocaciones en modo
+      // ESCRIBIR que GitHub ejecuta —las unicas que emiten un artefacto—. Verificadores:
+      // las que solo lo miran. La causa benigna existe cuando algun ESCRITOR corre con
+      // una ref que NINGUN verificador usa: ahi, y solo ahi, el que escribio puede ser
+      // una copia del marco mas nueva que la que esta corriendo este check. Comparar los
+      // escritores entre si no alcanza (un repo con un solo escritor pinado distinto
+      // seria un rojo falso) y comparar todas las refs entre si tampoco (un verificador
+      // viejo suelto compraba el aviso, que es el bypass del senuelo).
+      const escritores = (pins ?? []).filter((p) => p.escribe === true);
+      const refsQueVerifican = new Set(
+        (pins ?? []).filter((p) => p.escribe !== true).map((p) => String(p.ref)),
+      );
+      const divergentes = escritores.filter((p) => !refsQueVerifican.has(String(p.ref)));
       const comun = `${definicion.ruta} declara la version ${cab.version} y esta copia del marco es la ${canonico.version}, asi que el cuerpo NO se pudo comparar contra el re-render`;
       if (selloDeEstaCopia) {
         hallazgos.push({
@@ -1182,14 +1240,16 @@ export function verificar({
         });
         continue;
       }
-      if (refs.length <= 1) {
+      if (divergentes.length === 0) {
         hallazgos.push({
           nivel: "error",
           codigo: "artefacto-adelantado",
-          mensaje: `${comun}. Y ninguna invocacion de este repo pudo haberlo escrito: ${
-            refs.length === 0
-              ? "no hay NINGUNA invocacion de esta action en los workflows rastreados del primer nivel, asi que no existe pin que explique un artefacto mas nuevo (la ausencia de pin no es un pin)"
-              : `todos los workflows la invocan con la MISMA ref (${refs[0]}), asi que el modo escribir corre el mismo codigo que este verificador y no puede emitir una version mas nueva que la suya`
+          mensaje: `${comun}. Y ningun ESCRITOR de este repo pudo haberlo escrito: ${
+            escritores.length === 0
+              ? "no hay NINGUNA invocacion de esta action en modo escribir que GitHub pueda ejecutar (rastreada, en el primer nivel de .github/workflows, con un on: que dispare y sin un if constante falso que la apague), asi que no existe pin que explique un artefacto mas nuevo — la ausencia de pin no es un pin, y una invocacion en modo VERIFICAR no escribe nada por mas vieja o mas nueva que sea su ref"
+              : `cada escritor (${escritores
+                  .map((p) => `${p.ruta}#${p.job} -> ${p.ref}`)
+                  .join(", ")}) corre con una ref que este repo tambien usa para VERIFICAR, asi que el modo escribir corre el mismo codigo que este verificador y no puede emitir una version mas nueva que la suya`
           }. Arreglo: regenera el artefacto con el modo escribir. Si en cambio el marco movio la ref hacia atras, este rojo es correcto — el artefacto lleva reglas que el marco retiro`,
         });
         continue;
@@ -1197,9 +1257,9 @@ export function verificar({
       hallazgos.push({
         nivel: "warning",
         codigo: "artefacto-adelantado",
-        mensaje: `${comun}. Queda como AVISO porque la causa benigna es posible: este repo invoca la action con refs DISTINTAS (${pins
+        mensaje: `${comun}. Queda como AVISO porque la causa benigna es posible: este repo ESCRIBE el artefacto con una ref que no usa para verificarlo (${divergentes
           .map((p) => `${p.ruta}#${p.job} -> ${p.ref}`)
-          .join(", ")}), asi que el que escribio el artefacto puede ser una copia del marco mas nueva que la que verifica. Arreglo: dejalas en la misma ref —el tag movil del marco— y regenera el artefacto con el modo escribir; mientras esten distintas, el cuerpo de este artefacto no lo compara nadie`,
+          .join(", ")}), asi que el que lo escribio puede ser una copia del marco mas nueva que la que verifica. Arreglo: dejalas en la misma ref —el tag movil del marco— y regenera el artefacto con el modo escribir; mientras esten distintas, el cuerpo de este artefacto no lo compara nadie`,
       });
       continue;
     }
@@ -1395,18 +1455,44 @@ export function main(env = process.env) {
     allowlist = Array.isArray(permitidos) ? permitidos.filter((x) => typeof x === "string") : [];
   }
 
-  // Con que ref invoca este repo la action. Es lo que separa «el pipeline corre una
-  // copia vieja del marco» de «alguien subio la version de la cabecera a mano», y se
-  // lee del arbol y no de una variable de entorno indocumentada.
+  // Con que ref invoca este repo la action EN MODO ESCRIBIR. Es lo que separa «el
+  // pipeline corre una copia vieja del marco» de «alguien subio la version de la
+  // cabecera a mano», y se lee del arbol y no de una variable de entorno indocumentada.
   //
-  // Se descartan las invocaciones que GitHub NUNCA ejecuta —las de un subdirectorio de
-  // .github/workflows y las que git no rastrea—: un archivo que no corre no pudo
-  // escribir ningun artefacto, asi que tampoco puede explicar uno mas nuevo.
+  // EL CRITERIO ES UNO Y AHORA SE APLICA COMPLETO: solo cuenta una invocacion que PUDO
+  // HABER ESCRITO este artefacto. Hasta el 2026-08-20 el comentario de aca ya decia el
+  // criterio correcto —«se descartan las invocaciones que GitHub NUNCA ejecuta»— y lo
+  // aplicaba a DOS dimensiones de las cinco que tiene. El refutador lo midio con un
+  // senuelo de once lineas: un `.github/workflows/senuelo.yml` rastreado, de primer
+  // nivel, `on: workflow_dispatch`, con el job en `if: false` y la action en
+  // `modo: verificar` pinada a `@v0.0.1`. Nada de ese archivo se ejecuta jamas y nada de
+  // ese archivo escribe un artefacto, y bastaba para que un artefacto amputado con
+  // `version=9.9.9` pasara de exit 1 a exit 0: la segunda ref compraba el AVISO.
+  //
+  // Las tres dimensiones que faltaban, cada una con su motivo:
+  //   · `!apagado` — un `if` constante falso (en el job o en el paso) o un `needs` a un
+  //     job que nunca corre: el paso no se ejecuta en ninguna corrida;
+  //   · `disparable` — sin `on:` no hay corrida. Y aca la pregunta NO es la de la
+  //     compuerta: un escritor corre por `schedule` o `workflow_dispatch` —es lo que
+  //     reparte el scaffold en actualizar-marco.yml—, asi que exigirle `pull_request`
+  //     descartaria justamente al escritor legitimo;
+  //   · `escribe` — el MODO, la dimension decisiva, que hasta hoy `invocacionesDe` ya
+  //     calculaba y este map no transportaba. No filtra: ETIQUETA. Los verificadores se
+  //     necesitan igual, porque la causa benigna se mide comparando la ref con la que se
+  //     ESCRIBE contra las refs con las que se VERIFICA (ver el veredicto del sello).
   let pins = [];
   try {
     pins = invocacionesDe(leerWorkflows(raiz), (env.CONSTITUCION_RAMA_POR_DEFECTO || "main").trim() || "main")
-      .filter((invocacion) => invocacion.primerNivel && invocacion.rastreado !== false)
-      .map((invocacion) => ({ ruta: invocacion.ruta, job: invocacion.job, ref: invocacion.ref }));
+      .filter(
+        (invocacion) =>
+          invocacion.primerNivel && invocacion.rastreado !== false && !invocacion.apagado && invocacion.disparable,
+      )
+      .map((invocacion) => ({
+        ruta: invocacion.ruta,
+        job: invocacion.job,
+        ref: invocacion.ref,
+        escribe: invocacion.modo === "escribir",
+      }));
   } catch (error) {
     console.log(
       `::warning::no se pudieron leer los workflows de este repo (${error.message}), asi que si el artefacto declara una version mas nueva que esta copia del marco no se va a poder decir si hay un pin que lo explique. Eso deja ese caso en AVISO, no en verde`,

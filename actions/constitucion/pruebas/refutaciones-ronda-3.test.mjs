@@ -175,18 +175,29 @@ test("(1) push filtrado por paths tampoco cuenta, y un push solo de tags menos",
   }
 });
 
-test("(1) y el camino sano sigue contando: pull_request pelado, o push a la rama por defecto", () => {
+test("(1) y el camino sano sigue contando: siempre que haya pull_request", () => {
   for (const on of [
     "on:\n  pull_request:\n",
     "on: [pull_request]\n",
     "on:\n  pull_request:\n    types: [opened, synchronize, reopened, ready_for_review]\n",
     "on:\n  pull_request:\n    branches: [main, 'release/**']\n",
-    "on:\n  push:\n    branches: ['**']\n",
-    "on:\n  push:\n    branches-ignore: [gh-pages]\n",
+    "on:\n  push:\n    branches: ['**']\n  pull_request:\n",
   ]) {
     const ci = mutar(CI_SANO, "on:\n  push:\n    branches: [main]\n  pull_request:\n", on);
     const corrida = correrCableado(repo(conValores(ci)));
     assert.equal(corrida.status, 0, `${on}\n${corrida.stdout}`);
+  }
+});
+
+test("(1 bis) H1: un push, aunque su filtro de ramas sea generoso, no es una compuerta del PR", () => {
+  // Las dos formas que la ronda 3 midio como VERDES y no deberian: un `push` cuyo
+  // filtro de ramas admite todo sigue corriendo despues del merge. La generosidad del
+  // filtro no cambia el momento.
+  for (const on of ["on:\n  push:\n    branches: ['**']\n", "on:\n  push:\n    branches-ignore: [gh-pages]\n"]) {
+    const ci = mutar(CI_SANO, "on:\n  push:\n    branches: [main]\n  pull_request:\n", on);
+    const corrida = correrCableado(repo(conValores(ci)));
+    assert.equal(corrida.status, 1, `${on}\n${corrida.stdout}`);
+    assert.match(corrida.stdout, /DESPUES del merge/);
   }
 });
 
@@ -294,7 +305,7 @@ test("(3) ci-ok con always() que NO consulta el resultado: el rojo no llega al c
   );
   const corrida = correrCableado(repo(conValores(ci)));
   assert.equal(corrida.status, 1, corrida.stdout);
-  assert.match(corrida.stdout, /resultado/);
+  assert.match(corrida.stdout, /NINGUN paso vivo suyo consulta/);
 });
 
 test("(3) ci-ok sin always(): la constitucion en rojo lo saltea, y un job salteado reporta Success", () => {
@@ -487,8 +498,13 @@ test("(5) la causa benigna DE VERDAD sigue siendo aviso: el escritor corre con o
     superficies: ["claude-code"],
     hoy: new Date("2026-09-01T00:00:00Z"),
     pins: [
-      { ruta: `${DIR_WORKFLOWS}/ci.yml`, job: "constitucion", ref: "0123456789abcdef0123456789abcdef01234567" },
-      { ruta: `${DIR_WORKFLOWS}/actualizar-marco.yml`, job: "actualizar", ref: "v1" },
+      {
+        ruta: `${DIR_WORKFLOWS}/ci.yml`,
+        job: "constitucion",
+        ref: "0123456789abcdef0123456789abcdef01234567",
+        escribe: false,
+      },
+      { ruta: `${DIR_WORKFLOWS}/actualizar-marco.yml`, job: "actualizar", ref: "v1", escribe: true },
     ],
     leer: (ruta) => ({ ...CADENA_SANA, ".projects/AGENTS-marco.md": artefactoAdelantado(canonico) })[ruta] ?? null,
   });
@@ -583,12 +599,39 @@ function referenciasPropias() {
 const existeEn = (ref, camino) =>
   spawnSync("git", ["cat-file", "-e", `${ref}:${camino}/action.yml`], { cwd: RAIZ_REPO }).status === 0;
 
+/** ¿Este clon TIENE la ref? No es lo mismo que «la ref no trae la action», y confundir
+ *  las dos cosas es lo que rompio esta prueba en el CI: `actions/checkout` clona con
+ *  `fetch-depth: 1` y SIN tags, asi que ahi `v1` no se resuelve y `cat-file` falla para
+ *  TODO. La prueba pasaba local (donde los tags estan) y en el CI daba un rojo falso
+ *  sobre `guardrail-deltas@v1`, que si esta publicada en `v1` — mientras que para las
+ *  refs que de verdad hay que vigilar no medía nada, porque todas «no existian». */
+const refResoluble = (ref) =>
+  spawnSync("git", ["rev-parse", "--verify", "--quiet", `${ref}^{commit}`], { cwd: RAIZ_REPO }).status === 0;
+
 test("(7) una action propia nombrada por ref remota en un job que SI corre aca existe en esa ref", () => {
   // El bug exacto: el paso vivia en `higiene`, que corre siempre, apuntando a una ref
   // que no tiene la action. GitHub resuelve y DESCARGA las actions de un job en
   // «Set up job», antes de correr un solo paso y sin mirar el if de ningun paso: eso no
   // da un paso rojo, da el job entero muerto y los otros catorce checks con el.
-  const rotas = referenciasPropias().filter((r) => r.corre && !existeEn(r.ref, r.camino));
+  const candidatas = referenciasPropias().filter((r) => r.corre);
+  assert.ok(candidatas.length > 0, "no quedo ninguna referencia remota que vigilar: se borro lo que esta prueba mide");
+
+  // EL FAIL-OPEN, DECLARADO Y RUIDOSO, como el marco exige: lo que no se puede medir se
+  // dice, no se calla ni se convierte en rojo. Con los tags presentes (local, o un CI con
+  // fetch-tags) la propiedad se verifica de verdad; sin ellos queda escrito que no se
+  // verifico y por que, con el arreglo.
+  const medibles = [];
+  for (const r of candidatas) {
+    if (refResoluble(r.ref)) {
+      medibles.push(r);
+      continue;
+    }
+    console.log(
+      `::warning::no se pudo verificar ${r.ruta}#${r.job}: la ref "${r.ref}" no se resuelve en este clon, asi que no se puede distinguir «esa ref no trae ${r.camino}» de «este checkout no bajo la ref». NO se verifico que la action exista ahi. Arreglo: que el checkout de este job traiga los tags (fetch-tags), o correrlo en un clon completo`,
+    );
+  }
+
+  const rotas = medibles.filter((r) => !existeEn(r.ref, r.camino));
   assert.deepEqual(
     rotas.map((r) => `${r.ruta}#${r.job}: ${r.camino}@${r.ref}`),
     [],
