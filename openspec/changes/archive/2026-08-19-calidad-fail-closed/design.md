@@ -182,6 +182,112 @@ cobertura de funciones a 80 con pruebas que verifiquen scenarios de los specs
 vivos, o declarar la deuda con su fecha. La primera es la buena; la segunda existe
 para que la transición sea honesta y no eterna.
 
+### D5d — La compuerta del total existe, y vive donde ya vivían sus datos
+
+**Segunda corrección del mismo hallazgo (2026-08-20).** D5c arregló la
+contradicción en prosa y no construyó nada, así que la auditoría volvió a medir lo
+mismo y encontró algo peor: el requirement había pasado de **una** promesa sin
+implementar a **cuatro**. Un paquete sintético al 33,3% (`lcov` con `LF:6 LH:2`),
+sin motivo ni fecha declarados y con las líneas del diff bien cubiertas, salía
+`EXIT 0` con `COBERTURA_MINIMO=80`; con la deuda declarada y la fecha vencida en
+1999-01-01, `EXIT 0`; con los cuatro umbrales del consumidor bajados a 40,
+`EXIT 0`; y el deber de reporte por corrida no aparecía en ningún resumen.
+Archivar eso habría congelado como contrato vigente algo que nadie implementaba:
+el defecto original multiplicado por cuatro.
+
+La decisión del dueño se mantuvo —**el 80 por paquete no se baja**—, así que la
+salida era construir la compuerta.
+
+**Dónde vive, y por qué no en una action nueva.** El plano del total quedó DENTRO
+de `cobertura-diff`, no en una pieza aparte, y la razón es la que ya obligó a
+importar el censo en vez de copiarlo: los dos planos leen **los mismos** reportes
+`lcov`, resuelven **las mismas** rutas `SF:` contra el control de versiones y
+consultan **las mismas** exclusiones declaradas. Una action aparte habría
+duplicado por tercera vez la resolución de rutas —la parte del código que existe
+precisamente porque cablearla mal produce un falso verde— y habría dejado dos
+piezas midiendo cosas distintas con el mismo nombre. La contrapartida honesta es
+que el nombre de la action ya no describe todo lo que hace; es un tag `v1` y
+renombrar la ruta rompería a los consumidores, así que se corrigieron su `name`,
+su descripción y su documentación en lugar de su ubicación.
+
+**Qué cambió en el orden de la corrida.** La lectura de los reportes y de los
+manifiestos subió por encima de los controles del rango del diff. No es
+cosmético: el total de un paquete no depende de ningún rango, así que en un push a
+`main` —donde el plano del diff *no aplica* y salía 0— el total quedaba sin medir.
+Y el veredicto del total no cortocircuita: se guarda en un piso de salida que
+`terminar()` respeta, de modo que el plano del diff sigue imprimiendo su
+diagnóstico completo y ningún `exit 0` de los que ya existían puede tapar un total
+en falta.
+
+**Las métricas salen de los registros por ítem, no de los resúmenes del `lcov`.**
+`DA`, `FN`/`FNDA` y `BRDA` se pueden fusionar cuando dos suites miden el mismo
+archivo; `LF`/`LH`, `FNF`/`FNH` y `BRF`/`BRH` no —sumarlos cuenta el denominador
+dos veces—, y ese es justamente el error que infla un total sin que nadie lo note.
+Consecuencia declarada: un reporter que no emita `FN`/`FNDA` deja la métrica de
+funciones sin denominador, y entonces sale como `n/a` en el resumen en vez de
+callarse.
+
+**La asimetría del umbral local es deliberada.** Sobre las líneas del cambio el
+proyecto puede pedir menos que el marco, y alcanza con que la corrida lo grite;
+sobre el total, el mínimo del marco es piso duro y el umbral local solo puede
+subirlo. Con la regla simétrica, apagar la compuerta del total costaba bajar un
+número — que es exactamente lo que la auditoría hizo para demostrar que no
+existía.
+
+**Y el marco ahora reparte el umbral.** El andamio trae `vitest.config.base.mjs`
+con las cuatro métricas en el mínimo del marco, `all: true` y el `projectRoot` del
+reporter en la raíz del monorepo. Como eso son dos copias del mismo número en dos
+archivos, un check del `marco-ci` las compara: dos números que tienen que
+coincidir y que nadie compara son un número que va a divergir.
+
+**El estreno lleva ventana, y la ventana se cierra sola.** Medido contra un
+espejo del consumidor real —`un-proyecto-anterior` en `main`, con sus dos reportes
+`lcov` del 2026-08-20— el plano del total da **rojo**: `web` está en 70,70% de
+funciones, 9,30 puntos por debajo del mínimo, y no declara ni motivo ni fecha. El
+arreglo existe y está medido, pero vive en una rama sin mergear
+(`feat/cobertura-web-funciones-80`, con umbrales de 93,6 en funciones), así que el
+orden importa: si la compuerta aterriza antes que esa rama, el consumidor amanece
+rojo por un cambio del marco y no por un defecto propio. Y con `v1` como tag móvil
+eso llega solo, sin que nadie lo lea — pasó el 2026-08-19.
+
+D6 resolvió el caso anterior con el orden en lugar del modo aviso («el consumidor
+se pone al día primero, el check aterriza después»), y esa salida sirve cuando se
+controla el momento del aterrizaje. Acá no: la publicación del marco y el merge de
+la rama del consumidor son dos repositorios distintos. Así que el estreno lleva una
+**ventana con fecha**, escrita en una constante del comparador
+(`VENTANA_DE_GRACIA_HASTA = "2026-09-30"`, 41 días desde la medición):
+
+- afloja **una sola** cosa: un paquete por debajo del mínimo que **no declara**
+  deuda pasa en amarillo, con un `::warning::` que nombra el día en que será rojo;
+- **no** afloja lo que el paquete escribió y rompió —una deuda declarada y
+  vencida, un retroceso por debajo de un piso declarado, una declaración
+  inválida—, porque esos tres exigen que alguien haya escrito algo;
+- **se cierra sola**: pasada la fecha, el mismo estado es rojo sin que nadie toque
+  una línea. Una ventana que hay que acordarse de cerrar no se cierra nunca; esta
+  se borra después, en un PR de limpieza, y borrarla no cambia el comportamiento.
+
+Verificado en las dos direcciones sobre el mismo repositorio sintético: dentro de
+la ventana, `EXIT 0` con el aviso; con la ventana cerrada, `EXIT 1`.
+
+**Lo que sigue sin verificarse, y se declara.** Ningún check compara el delta que
+un change archiva contra el spec vivo. Los dos se editaron con un solo script y se
+comprobaron iguales por md5 en la sección completa del requirement, pero eso es
+disciplina de la sesión y no una propiedad del repositorio: mañana alguien edita
+uno solo y nada lo delata.
+
+Y el check que falta **no es** una comparación byte a byte permanente entre
+`changes/archive/**/specs/` y `openspec/specs/`: eso sería incorrecto por diseño.
+El archive es historia inmutable y el spec vivo evoluciona, así que un change
+posterior que toque el mismo requirement hace divergir a los dos **con razón**; un
+check así daría rojo para siempre y enseñaría a arreglarlo reescribiendo la
+historia. Lo que hay que verificar es más angosto: **mientras el PR que archiva un
+change está abierto**, su delta y el spec vivo son dos caras del mismo cambio y
+tienen que coincidir en los requirements que toca. Eso es exactamente la situación
+de este change —su PR de archive todavía no está mergeado— y es la razón por la que
+acá se editaron los dos. Un check con ese alcance sí es correcto, y es el que queda
+pendiente; dejar constancia de la forma correcta vale más que dejar el pendiente a
+secas, porque el pendiente escrito mal se implementa mal.
+
 ### D6 — El orden reemplaza al modo aviso, otra vez
 
 El consumidor da rojo el día del estreno. La constitución define eso como
@@ -225,6 +331,8 @@ controlemos, la regla vuelve a aplicar sin discusión y el estreno es en aviso.
 | Scripts sin enmascaramiento | job de marco (estático) | un script de verificación convierte un fallo en éxito |
 | Formato verificado | job del consumidor | el formato diverge del acordado |
 | Cobertura del cambio | job del consumidor | hay líneas agregadas sin datos de cobertura que les correspondan |
+| Cobertura total por paquete | job del consumidor, mismo paso | un paquete está por debajo del mínimo del marco sin motivo ni fecha declarados, con la fecha vencida, en retroceso respecto de su piso, o con su declaración mal escrita |
+| El marco reparte el umbral del total | job de marco (estático) | el andamio no trae la configuración de cobertura, o su número no coincide con el del comparador |
 
 ## Riesgos y límites declarados
 

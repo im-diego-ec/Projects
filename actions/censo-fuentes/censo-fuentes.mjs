@@ -385,25 +385,120 @@ export function sondarTipos(raiz, rastreados) {
 }
 
 // ---------------------------------------------------------------------------
-// Los paquetes y sus exclusiones declaradas.
+// Los paquetes: sus exclusiones, su piso y su deuda declarada.
 // ---------------------------------------------------------------------------
+
+// Las métricas del total que un lcov permite reconstruir a partir de sus
+// registros por ítem (DA, FN/FNDA, BRDA) y no de sus líneas de resumen. La
+// distinción tiene consecuencia: los resúmenes (LF/LH, FNF/FNH, BRF/BRH) no se
+// pueden fusionar cuando dos suites miden el mismo archivo, y ahí es donde un
+// total sale inflado sin que nadie lo note.
+//
+// Los nombres son los del marco, en castellano, igual que `excluidos`,
+// `patron` y `motivo`. Una clave desconocida del piso NO se ignora: un
+// `functions: 80` escrito por costumbre de vitest no declararía nada, y el
+// paquete quedaría sin piso creyendo tenerlo.
+export const METRICAS_DE_COBERTURA = [
+  { clave: "lineas", etiqueta: "líneas" },
+  { clave: "funciones", etiqueta: "funciones" },
+  { clave: "ramas", etiqueta: "ramas" },
+];
+
+const CLAVES_DE_METRICA = METRICAS_DE_COBERTURA.map((m) => m.clave);
+
+const esObjetoPlano = (v) => typeof v === "object" && v !== null && !Array.isArray(v);
+
+/**
+ * Valida `projects.cobertura.piso`: el piso declarado del total, por métrica.
+ * Devuelve `{ piso }` o `{ error }`.
+ */
+export function validarPiso(declarado) {
+  if (!esObjetoPlano(declarado)) {
+    return {
+      error: `projects.cobertura.piso debe ser un objeto con las claves ${CLAVES_DE_METRICA.join(", ")}`,
+    };
+  }
+  const piso = {};
+  for (const [clave, valor] of Object.entries(declarado)) {
+    if (!CLAVES_DE_METRICA.includes(clave)) {
+      return {
+        error: `projects.cobertura.piso tiene la clave desconocida "${clave}": las válidas son ${CLAVES_DE_METRICA.join(", ")}`,
+      };
+    }
+    if (typeof valor !== "number" || !Number.isFinite(valor) || valor < 0 || valor > 100) {
+      return { error: `projects.cobertura.piso.${clave} debe ser un porcentaje entre 0 y 100` };
+    }
+    piso[clave] = valor;
+  }
+  return { piso };
+}
+
+const FECHA_ISO = /^\d{4}-\d{2}-\d{2}$/;
+
+/** Una fecha ISO que además EXISTE en el calendario (2026-02-31 no existe). */
+export function esFechaIso(texto) {
+  if (typeof texto !== "string" || !FECHA_ISO.test(texto)) return false;
+  const d = new Date(`${texto}T00:00:00Z`);
+  return !Number.isNaN(d.getTime()) && d.toISOString().slice(0, 10) === texto;
+}
+
+/**
+ * Valida `projects.cobertura.deuda`: el motivo escrito y la FECHA en la que el
+ * paquete alcanza el mínimo del marco. Devuelve `{ deuda }` o `{ error }`.
+ *
+ * Una deuda a medio declarar no es una deuda declarada: sin motivo no hay nada
+ * que revisar, y sin fecha el piso termina siendo el mínimo de hecho, que es
+ * exactamente el agujero que este campo existe para cerrar.
+ */
+export function validarDeuda(declarado) {
+  if (!esObjetoPlano(declarado)) {
+    return { error: 'projects.cobertura.deuda debe ser un objeto con "motivo" y "fecha"' };
+  }
+  const motivo = typeof declarado.motivo === "string" ? declarado.motivo.trim() : "";
+  if (!motivo) return { error: 'projects.cobertura.deuda: falta "motivo" (cadena no vacía)' };
+  if (!esFechaIso(declarado.fecha)) {
+    return {
+      error: `projects.cobertura.deuda: "fecha" debe ser una fecha real en formato AAAA-MM-DD (llegó ${JSON.stringify(declarado.fecha)})`,
+    };
+  }
+  return { deuda: { motivo, fecha: declarado.fecha } };
+}
+
 export function leerPaquetes(raiz, rastreados) {
   const manifiestos = rastreados.filter((p) => p === "package.json" || p.endsWith("/package.json"));
   return manifiestos.map((manifiesto) => {
     const dir = manifiesto === "package.json" ? "" : manifiesto.slice(0, -"/package.json".length);
     let excluidos = [];
+    let piso = {};
+    let deuda = null;
     let error = "";
     try {
       const json = leerJsonc(join(raiz, manifiesto));
-      const declarado = json?.projects?.cobertura?.excluidos;
+      const cobertura = json?.projects?.cobertura;
+      const declarado = cobertura?.excluidos;
       if (declarado !== undefined) {
         if (!Array.isArray(declarado)) error = "projects.cobertura.excluidos debe ser un arreglo";
         else excluidos = declarado;
       }
+      // El piso y la deuda del TOTAL viven acá, al lado de las exclusiones,
+      // porque es donde el spec de calidad-codigo los pone: en el manifiesto
+      // del propio paquete, dentro de un diff y bajo review.
+      const problemas = [];
+      if (cobertura?.piso !== undefined) {
+        const r = validarPiso(cobertura.piso);
+        if (r.error) problemas.push(r.error);
+        else piso = r.piso;
+      }
+      if (cobertura?.deuda !== undefined) {
+        const r = validarDeuda(cobertura.deuda);
+        if (r.error) problemas.push(r.error);
+        else deuda = r.deuda;
+      }
+      if (problemas.length) error = [error, ...problemas].filter(Boolean).join("; ");
     } catch (e) {
       error = `no se pudo leer el manifiesto: ${e.message}`;
     }
-    return { dir, manifiesto, excluidos, error };
+    return { dir, manifiesto, excluidos, piso, deuda, error };
   });
 }
 
