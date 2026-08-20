@@ -2,13 +2,18 @@
   "nota": "Ledger de versiones de la PORCION DEL MARCO de la constitucion. La version es la del release de Projects que la publica: si el release sale con otro numero, se corrige esta entrada en el MISMO PR del release. Las secciones se derivan del arbol (NN-*.md), no de una lista aca.",
   "presupuesto_lineas": 700,
   "piso_permisos": [
-    "Bash(pnpm lint)",
-    "Bash(pnpm format:check)",
-    "Bash(pnpm typecheck)",
-    "Bash(pnpm test)",
-    "Bash(pnpm build)"
+    { "nombre": "el linter", "entrada": "Bash(pnpm lint)", "cubre": "lint" },
+    { "nombre": "el chequeo de formato", "entrada": "Bash(pnpm format:check)", "cubre": "format" },
+    { "nombre": "el chequeo de tipos", "entrada": "Bash(pnpm typecheck)", "cubre": "typecheck" },
+    { "nombre": "las pruebas", "entrada": "Bash(pnpm test)", "cubre": "test" },
+    { "nombre": "el build", "entrada": "Bash(pnpm build)", "cubre": "build" },
+    {
+      "nombre": "la validacion estricta de las specs",
+      "entrada": "Bash(npx --yes @fission-ai/openspec@1.9.0 validate *)",
+      "cubre": "openspec"
+    }
   ],
-  "piso_permisos_nota": "Piso RECOMENDADO, no exigido: son los comandos que la regla `suite-local-antes-del-push` obliga a correr. Un permiso de menos es friccion (un prompt), no riesgo, asi que su ausencia es ::warning:: y jamas rojo, y el marco no lo escribe en el settings.json de nadie.",
+  "piso_permisos_nota": "Piso RECOMENDADO, no exigido: son los comandos que las reglas `suite-local-antes-del-push` y `openspec-validar-tras-editar` obligan a correr. Un permiso de menos es friccion (un prompt), no riesgo, asi que su ausencia es ::warning:: y jamas rojo, y el marco no lo escribe en el settings.json de nadie. ESTA ES LA UNICA DECLARACION DEL PISO, y la mide quien la transporta (`actions/constitucion`): hasta el 2026-08-20 el paso de permisos del workflow reusable llevaba su propia copia literal y las dos ya habian divergido en las DOS direcciones — el manifiesto declaraba `Bash(pnpm build)` que el paso no miraba, y el paso exigia `openspec` que el manifiesto no declaraba. Cada item declara `entrada` (la que el marco recomienda pegar) y `cubre` (la propiedad que se busca en el allowlist, porque el nombre del script es del proyecto: un filtro de paquete, un monorepo, otro runner), y `cubre` tiene que estar DENTRO de `entrada` o el manifiesto es invalido — es lo unico que impide que las dos mitades de la misma declaracion deriven entre si.",
   "versiones": [
     {
       "version": "1.3.0",

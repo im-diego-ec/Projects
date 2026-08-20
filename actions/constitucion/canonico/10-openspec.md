@@ -29,11 +29,19 @@ operativa se mantiene: **toda escritura en producción exige el OK explícito de
 <!-- projects:regla id=openspec-validar-tras-editar -->
 
 - Tras editar CUALQUIER archivo de `openspec/`: `openspec validate --strict` **más**
-  relectura de coherencia entre proposal/specs/design/tasks antes de commitear. Las
-  herramientas verdes no bastan para specs que cambian contrato: un delta `MODIFIED`
-  debe reproducir **todos** los escenarios vigentes del requirement o el archive los
-  borra en silencio, y el guardrail de deltas tiene un hueco conocido — si el
-  **título de un requirement** del delta no existe en el spec vivo, no avisa.
+  relectura de coherencia entre proposal/specs/design/tasks antes de commitear.
+  **Lo que el CI ya caza solo** y no hay que revisar a mano: un delta `MODIFIED` que
+  no reproduce todos los escenarios vigentes del requirement, y uno cuyo **título** no
+  existe en el spec vivo —que al archivar se agregaría como requirement nuevo, sin
+  reemplazar nada. Las dos las cierra el guardrail de deltas, con las salidas
+  legítimas escritas en el mensaje (moverlo a `ADDED`, o declarar el retitulado en
+  `RENAMED`).
+  **Lo que ninguna herramienta ve**, y por eso la relectura sigue siendo obligatoria:
+  el guardrail compara el delta contra el spec vivo, así que solo dice la verdad
+  ANTES del archive —corrido después sale verde porque el spec vivo ya es el delta— y
+  el archive cuenta las operaciones **declaradas**, no los cambios efectivos: un
+  `MODIFIED` que repite el título con el cuerpo vacío sale «1 operación aplicada» y
+  deja el requirement sin un solo escenario.
 
 <!-- projects:regla id=openspec-ciclo-de-vida -->
 

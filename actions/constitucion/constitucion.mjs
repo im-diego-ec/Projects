@@ -26,11 +26,28 @@
 // sería recomputar el hash y volver a estampar. La autoridad sobre el cuerpo es el
 // RE-RENDER, que no se puede falsificar sin cambiar el canónico.
 //
+// ESTA ES LA ÚNICA PIEZA QUE VERIFICA LA CONSTITUCIÓN, desde el 2026-08-20. Había
+// además un paso inline en el `marco-ci.yml` que heredan todos los consumidores, y una
+// auditoría adversarial midió que las dos verdades ya discrepaban en esquema, en
+// severidad y en formato de sello: el paso exigía 64 hex del cuerpo mientras acá se
+// emiten 12 hex del canónico, así que rechazaba artefactos recién generados por este
+// mismo código con un mensaje que mandaba a correr el escritor que los había generado.
+// Sobrevive esta pieza y no la otra por el párrafo de arriba: comparar contra el
+// re-render es estrictamente más fuerte que comparar contra el sello, porque recomputar
+// un sello es un `git commit` y cambiar el canónico no.
+//
 // DÓNDE ESTÁ EL ROJO Y DÓNDE EL AVISO
 //   · artefacto ausente o atrasado -> ::warning:: hasta el `exigible_desde` de la
 //     versión pendiente más vieja, ::error:: desde esa fecha. Nunca verde mudo (D7):
 //     el vecino de este check sale por `exit 0` con «nada que verificar» y eso lo
 //     dejaría pasando justo donde el problema es peor.
+//   · `.projects-valores.json` ausente -> en modo VERIFICAR entra por la misma ventana
+//     que el artefacto faltante: es un atraso de adopción, no una manipulación, y un
+//     rojo seco el primer día es un endurecimiento estrenado sin modo aviso. En modo
+//     ESCRIBIR sigue siendo rojo, porque sin valores no hay con qué renderizar. La
+//     asimetría es la propiedad, no una excepción.
+//   · marcador del scaffold sin resolver -> ::error::, y en modo escribir no se emite
+//     nada. Un valor cuyo TEXTO es el propio marcador no cuenta como valor.
 //   · cuerpo distinto del re-render -> ::error:: siempre, con el diff. La ventana de
 //     gracia es para reglas NUEVAS, no para ediciones a mano.
 //   · cadena de carga rota -> ::error::. Un import que no resuelve no emite ninguna
@@ -39,6 +56,12 @@
 //     el motivo que tenía escrito en el mensaje).
 //   · desvío válido -> ::notice:: en CADA corrida, para que un motivo que envejeció
 //     mal quede a la vista en vez de fosilizarse.
+//   · ítem del piso recomendado de permisos sin cubrir -> ::warning::, JAMÁS rojo. Un
+//     permiso de más es riesgo, uno de menos es fricción, y bajo fricción la salida
+//     más barata es el `settings.local.json` que el `.gitignore` excluye: un rojo acá
+//     empujaría el allowlist fuera de la revisión cruzada.
+//   · allowlist ausente -> ::notice::. «No había nada que mirar» no es «está sano»,
+//     y callarse sería declararlo sano.
 //   · fin de línea, espacios al final de línea y líneas en blanco al final del
 //     archivo -> NO son divergencia. Un reflujo de prosa del formateador SÍ lo es:
 //     el mecanismo para eso es `.projects/` en el `.prettierignore` del proyecto, el
@@ -54,6 +77,10 @@
 //                             valores y, si el archivo NO declara la clave, el
 //                             default del marco. Declararla vacía NO es un default:
 //                             es rojo (`sin-superficies`)
+//   CONSTITUCION_ALLOWLIST  default: .claude/settings.json. De ahí se mide el piso
+//                           recomendado de permisos que declara el manifiesto. Es la
+//                           ÚNICA medición de ese piso: el paso de permisos del
+//                           workflow reusable tenía su copia y las dos divergieron
 //   CONSTITUCION_SALIDA_CORREGIDA  dónde deja el artefacto al día en modo verificar
 //
 // No hay variable para «hoy». La ventana de gracia se decide con la fecha del
@@ -264,9 +291,25 @@ export function leerCanonico(dir) {
  * una regla nueva el mismo día que la publica pone en rojo a un consumidor que no
  * hizo nada. Esa garantía viaja acá, dentro de la action, y no en un paso de CI
  * aparte: así se verifica sola en cada corrida de cada repo.
+ *
+ * ESTE ES EL ÚNICO CALENDARIO. Hubo un segundo, embebido en el `marco-ci.yml` que
+ * heredan todos los consumidores, y la auditoría del 2026-08-20 midió que no tenía
+ * verificación ninguna: una entrada con CERO días de gracia y `urgente: false`
+ * —publicada = exigible = hoy— se aceptaba sin una queja y salía roja el mismo día,
+ * mientras el comentario de arriba afirmaba «verificada por el CI de Projects». Y
+ * `grep -rn 'manifiesto.json' .github/workflows/` no daba una coincidencia: ningún
+ * workflow leía este archivo. La copia se borró; queda el calendario que sí se mide.
+ *
+ * LÍMITE DECLARADO, y quedó medido: la ventana se calcula entre dos campos
+ * DECLARADOS, no contra el día real en que `v1` se mueve. Un release que se corre una
+ * semana sin refrescar `publicada` deja la ventana efectiva en 21 días y esta función
+ * sigue en verde, porque los dos números que compara siguen a 28. Por eso quien mueve
+ * el tag refresca las fechas EN EL MISMO PR: no hay check que pueda suplirlo desde
+ * acá, y decirlo es mejor que afirmar una garantía que la función no da.
  */
 export function validarManifiesto(manifiesto) {
   const problemas = [];
+  problemas.push(...validarPiso(manifiesto?.piso_permisos));
   const versiones = manifiesto?.versiones;
   if (!Array.isArray(versiones) || versiones.length === 0) {
     problemas.push("el manifiesto no declara ninguna version en `versiones`");
@@ -301,6 +344,92 @@ export function validarManifiesto(manifiesto) {
   return problemas;
 }
 
+/**
+ * Valida el PISO RECOMENDADO de permisos del agente que declara el manifiesto.
+ *
+ * POR QUÉ EL PISO VIVE ACÁ Y SE MIDE ACÁ. Hasta el 2026-08-20 el marco lo declaraba
+ * en este manifiesto y lo VERIFICABA con un `const PISO = [...]` literal, escrito a
+ * mano dentro del paso de permisos del workflow reusable. Cero derivación, y las dos
+ * contabilidades ya habían divergido en las DOS direcciones: el canónico declaraba
+ * `Bash(pnpm build)` que el paso no miraba, y el paso exigía `openspec` que el
+ * canónico no declaraba. Medido: mutando este piso a `["Bash(echo piso-mutado)"]` y
+ * satisfaciéndolo al 100%, el paso seguía diciendo «5 item(s) del piso recomendado
+ * sin cubrir», o sea seguía midiendo su propio arreglo. Es textualmente la doble
+ * contabilidad que la propia constitución nombra, y ahí la declaración siempre
+ * pierde contra el check: por eso ahora hay una sola fuente y el que la lee es el que
+ * la transporta.
+ *
+ * CADA ÍTEM DECLARA TRES COSAS Y LAS TRES SON OBLIGATORIAS:
+ *   · `nombre`  — cómo se lo nombra en el aviso ("el linter").
+ *   · `entrada` — la entrada de allowlist que el marco RECOMIENDA, para pegar.
+ *   · `cubre`   — la propiedad que se busca en el allowlist del proyecto. Se busca
+ *                 la propiedad y no la línea exacta porque el nombre del script es
+ *                 del proyecto (un filtro de paquete, un monorepo, otro runner).
+ *
+ * Y `cubre` tiene que estar DENTRO de `entrada`: es el único invariante que impide
+ * que las dos mitades de la misma declaración deriven entre sí, que es la forma
+ * chica del mismo problema que este arreglo vino a cerrar.
+ */
+export function validarPiso(piso) {
+  if (piso === undefined) return [];
+  if (!Array.isArray(piso)) {
+    return ["`piso_permisos` del manifiesto no es una lista"];
+  }
+  const problemas = [];
+  for (const [indice, item] of piso.entries()) {
+    const donde = `el item #${indice + 1} de \`piso_permisos\``;
+    if (!item || typeof item !== "object" || Array.isArray(item)) {
+      problemas.push(
+        `${donde} no es un objeto { "nombre", "entrada", "cubre" }. Una lista de cadenas sueltas no dice QUE propiedad buscar en el allowlist del proyecto, y ahi es donde el piso declarado y el piso verificado se separaron`,
+      );
+      continue;
+    }
+    for (const campo of ["nombre", "entrada", "cubre"]) {
+      if (typeof item[campo] !== "string" || item[campo].trim() === "") {
+        problemas.push(`${donde} no declara \`${campo}\``);
+      }
+    }
+    const entrada = String(item.entrada ?? "").toLowerCase();
+    const cubre = String(item.cubre ?? "")
+      .trim()
+      .toLowerCase();
+    if (cubre !== "" && entrada !== "" && !entrada.includes(cubre)) {
+      problemas.push(
+        `${donde} declara \`cubre\` = "${item.cubre}" y recomienda "${item.entrada}", que no lo contiene: el marco estaria recomendando una entrada distinta de la que verifica, que es la misma divergencia que este campo existe para cerrar`,
+      );
+    }
+  }
+  return problemas;
+}
+
+/**
+ * Los ítems del piso que el allowlist del proyecto NO cubre.
+ *
+ * Se busca la PROPIEDAD (`cubre`) con bordes de palabra y no la línea exacta: el
+ * nombre del script es del proyecto, así que `Bash(pnpm --filter api typecheck)`
+ * cubre `typecheck` igual que `Bash(pnpm typecheck)`. Los bordes importan —un
+ * `includes` pelado tomaría `eslint` por `lint` y devolvería un verde falso.
+ *
+ * El resultado es SIEMPRE aviso y jamás rojo, y la asimetría está escrita en el
+ * propio manifiesto: un permiso de más es riesgo, uno de menos es fricción, y bajo
+ * fricción la salida más barata es el `settings.local.json` que todos los repos
+ * ignoran — o sea que un rojo acá empujaría el allowlist FUERA de la revisión
+ * cruzada, causando la evasión que el mecanismo quiere evitar.
+ */
+export function revisarPiso(piso, allowlist) {
+  const todo = (Array.isArray(allowlist) ? allowlist : [])
+    .filter((entrada) => typeof entrada === "string")
+    .join("\n")
+    .toLowerCase();
+  return (Array.isArray(piso) ? piso : []).filter((item) => {
+    const cubre = String(item?.cubre ?? "")
+      .trim()
+      .toLowerCase();
+    if (cubre === "") return true;
+    return !new RegExp(`(^|[^a-z0-9])${escaparRegex(cubre)}([^a-z0-9]|$)`).test(todo);
+  });
+}
+
 /** Los ids de regla del cuerpo, en orden de aparición. */
 export function idsDeReglas(cuerpo) {
   const ids = [];
@@ -327,6 +456,33 @@ export function versionPendienteMasVieja(versiones, versionDeclarada) {
 // Render
 // ---------------------------------------------------------------------------
 
+/** Un marcador del scaffold sin resolver, en cualquier parte de un texto. */
+export const MARCADOR_SIN_RESOLVER = /\{\{([A-Z0-9_]+)\}\}/;
+
+/**
+ * ¿El valor declarado FALTA de verdad?
+ *
+ * Vacío, nulo, cadena en blanco... y el caso que se comió esta guarda durante toda
+ * su primera versión: **un valor cuyo texto es el propio marcador**. Es exactamente
+ * lo que `plantilla/.projects-valores.json` entrega tal cual, en 15 entradas
+ * (`"PROYECTO": "{{PROYECTO}}"`), o sea el estado normal de un proyecto recién
+ * scaffoldeado. Medido el 2026-08-20 antes de este arreglo: copiando ese archivo sin
+ * tocarlo, el modo escribir salía **exit 0** y el artefacto quedaba con 27 líneas de
+ * dobles llaves, el título incluido, y el modo verificar afirmaba «está al día en 2
+ * superficie(s)». El rojo llegaba igual, pero de OTRO check («Sin marcadores del
+ * scaffold sin resolver»): la propiedad estaba cubierta por casualidad de vecindad y
+ * no por el guardrail que la declara, y la evidencia que el `tasks.md` pide
+ * (`grep -cE '\{\{[A-Z0-9_]+\}\}'` → 0) daba 27.
+ *
+ * Se rechaza el marcador en CUALQUIER posición del valor y no solo cuando el valor es
+ * el marcador entero: `"org-{{ORG}}-sufijo"` deja el artefacto igual de a medias.
+ */
+export function valorFaltante(valor) {
+  if (valor === undefined || valor === null) return true;
+  const texto = String(valor).trim();
+  return texto === "" || MARCADOR_SIN_RESOLVER.test(texto);
+}
+
 /**
  * Sustituye `{{PLACEHOLDER}}` por su valor. El render es obligatorio, no cosmético:
  * sin él el artefacto llevaría dobles llaves y pondría rojo el check «Sin marcadores
@@ -341,7 +497,7 @@ export function sustituir(texto, valores) {
   const faltantes = new Set();
   const salida = String(texto ?? "").replace(/\{\{([A-Z0-9_]+)\}\}/g, (marca, nombre) => {
     const valor = valores?.[nombre];
-    if (valor === undefined || valor === null || String(valor).trim() === "") {
+    if (valorFaltante(valor)) {
       faltantes.add(nombre);
       return marca;
     }
@@ -350,6 +506,17 @@ export function sustituir(texto, valores) {
   });
   const sinUsar = Object.keys(valores ?? {}).filter((nombre) => /^[A-Z0-9_]+$/.test(nombre) && !usados.has(nombre));
   return { texto: salida, faltantes: [...faltantes].sort(), sinUsar: sinUsar.sort() };
+}
+
+/** Los marcadores que quedaron sin resolver en un texto ya renderizado, ordenados y
+ *  sin repetir. Es el CINTURÓN de la guarda de arriba: la contabilidad de faltantes
+ *  puede aflojarse con un cambio de una línea, y esto vuelve a mirar el cuerpo que
+ *  está a punto de sellarse. La propiedad prometida es «el artefacto nunca sale con
+ *  dobles llaves», no «la contabilidad dio bien». */
+export function marcadoresDe(texto) {
+  const encontrados = new Set();
+  for (const [, nombre] of String(texto ?? "").matchAll(/\{\{([A-Z0-9_]+)\}\}/g)) encontrados.add(nombre);
+  return [...encontrados].sort();
 }
 
 /** Sangría con la que se imprime el desvío: pegado a la regla, y anidado dentro de la
@@ -449,11 +616,20 @@ export function artefactoDe({ superficie, cuerpo, version, sha }) {
 }
 
 /** Render completo: sustituye valores y después imprime los desvíos. Ese orden
- *  importa: el texto de un desvío es del proyecto y no se toca. */
+ *  importa: el texto de un desvío es del proyecto y no se toca.
+ *
+ *  `marcadoresSinResolver` se mide sobre el texto YA SUSTITUIDO y antes de insertar
+ *  los desvíos, a propósito: el motivo de un desvío es prosa del proyecto y si
+ *  alguien escribe dobles llaves ahí no es asunto del marco. */
 export function renderizar({ canonico, valores, desvios }) {
   const sustituido = sustituir(canonico.cuerpo, valores);
   const cuerpo = normalizar(insertarDesvios(sustituido.texto, desvios));
-  return { cuerpo, faltantes: sustituido.faltantes, sinUsar: sustituido.sinUsar };
+  return {
+    cuerpo,
+    faltantes: sustituido.faltantes,
+    sinUsar: sustituido.sinUsar,
+    marcadoresSinResolver: marcadoresDe(sustituido.texto),
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -481,12 +657,29 @@ export function importa(texto, ruta) {
 
 /**
  * Clasifica los desvíos declarados. Un desvío es legal —la rigidez sin salida no
- * produce cumplimiento, produce evasión— pero tiene que nombrar su regla, su
+ * produce cumplimiento, produce evasión— pero tiene que nombrar QUÉ anula, su
  * aprobador, su fecha y su motivo escrito. Y **un desvío cuya regla ya no existe es
  * rojo**: es la doctrina de la excepción muerta del marco, aplicada acá.
+ *
+ * DOS CLASES, Y RECONOCERLAS ES LO QUE PERMITIÓ CABLEAR ESTA ACTION. Un
+ * `.projects-desvios.json` real declara desvíos de `regla` (un id del canónico) y de
+ * `permiso` (una entrada exacta del allowlist del agente). Esta función solo conocía
+ * la primera clase, así que un desvío de permiso perfectamente formado salía
+ * `desvio-sin-regla`: enchufar la action a un carril del consumidor la habría puesto
+ * roja sobre un archivo correcto, y ese falso rojo era el último obstáculo para que
+ * el camino rojo del desvío muerto —que acá SÍ funciona, medido— fuera alcanzable en
+ * el CI de alguien.
+ *
+ * EL REPARTO CON EL PASO DEL ALLOWLIST, y es una frontera y no un solapamiento: acá
+ * se valida la FORMA de las dos clases (que nombre una sola cosa, con motivo,
+ * aprobador y fecha) y el VENCIMIENTO de las de regla, porque el canónico está acá.
+ * Que un desvío de permiso absorba un hallazgo de verdad —y el rojo si no absorbe
+ * nada— lo decide el paso «Permisos del agente sin escritura», que es el único que
+ * ve el allowlist y sus hallazgos. La forma se valida en UN solo lado a propósito.
  */
 export function clasificarDesvios(declarados, idsDelCanonico) {
   const validos = [];
+  const permisos = [];
   const problemas = [];
   const vistos = new Set();
   const conocidos = new Set(idsDelCanonico);
@@ -494,16 +687,53 @@ export function clasificarDesvios(declarados, idsDelCanonico) {
   for (const [indice, bruto] of (declarados ?? []).entries()) {
     const desvio = {
       regla: String(bruto?.regla ?? "").trim(),
+      permiso: String(bruto?.permiso ?? "").trim(),
       fecha: String(bruto?.fecha ?? "").trim(),
       aprobado_por: String(bruto?.aprobado_por ?? "").trim(),
       motivo: String(bruto?.motivo ?? "").trim(),
     };
-    const donde = desvio.regla ? `el desvio de \`${desvio.regla}\`` : `el desvio #${indice + 1}`;
+    const donde = desvio.regla
+      ? `el desvio de \`${desvio.regla}\``
+      : desvio.permiso
+        ? `el desvio del permiso \`${desvio.permiso}\``
+        : `el desvio #${indice + 1}`;
 
-    if (!desvio.regla) {
-      problemas.push({ nivel: "error", codigo: "desvio-sin-regla", mensaje: `${donde} no nombra ninguna regla` });
+    if (!desvio.regla && !desvio.permiso) {
+      problemas.push({
+        nivel: "error",
+        codigo: "desvio-sin-objeto",
+        mensaje: `${donde} no nombra que anula. Cada entrada nombra UNA cosa: \`regla\` (un id del canonico del marco) o \`permiso\` (una entrada exacta del allowlist del agente)`,
+      });
       continue;
     }
+    if (desvio.regla && desvio.permiso) {
+      problemas.push({
+        nivel: "error",
+        codigo: "desvio-ambiguo",
+        mensaje: `${donde} nombra tambien un permiso: una entrada anula UNA cosa, si no el motivo escrito deja de decir de que es. Arreglo: partilo en dos entradas`,
+      });
+      continue;
+    }
+
+    // Los de PERMISO se validan en su forma y se pasan al paso del allowlist. No van
+    // al artefacto: anulan una entrada de configuración, no una regla que un agente
+    // lea, así que imprimirlos pegados a una regla no tendría dónde.
+    if (desvio.permiso) {
+      const faltante = !desvio.motivo
+        ? { codigo: "desvio-sin-motivo", que: "no tiene motivo escrito. Un desvio sin motivo es un permiso ancho sin razon escrita" }
+        : !desvio.aprobado_por
+          ? { codigo: "desvio-sin-aprobador", que: "no dice quien lo aprobo" }
+          : !esFecha(desvio.fecha)
+            ? { codigo: "desvio-sin-fecha", que: "no tiene fecha AAAA-MM-DD" }
+            : null;
+      if (faltante) {
+        problemas.push({ nivel: "error", codigo: faltante.codigo, mensaje: `${donde} ${faltante.que}` });
+        continue;
+      }
+      permisos.push(desvio);
+      continue;
+    }
+
     if (!conocidos.has(desvio.regla)) {
       problemas.push({
         nivel: "error",
@@ -546,7 +776,7 @@ export function clasificarDesvios(declarados, idsDelCanonico) {
     vistos.add(desvio.regla);
     validos.push(desvio);
   }
-  return { validos, problemas };
+  return { validos, permisos, problemas };
 }
 
 // ---------------------------------------------------------------------------
@@ -570,8 +800,17 @@ export function diffLineas(esperado, actual, tope = 12) {
  * Verifica el repositorio consumidor contra el canónico. Función pura sobre un lector
  * inyectable: el banco de pruebas la ejercita sin tocar el disco del repo y `hoy`
  * entra por parámetro (nunca por entorno).
+ *
+ * `valoresPresentes: false` es el caso del repo QUE TODAVÍA NO ADOPTÓ, y tiene su
+ * propia rama porque las dos formas de equivocarse son simétricas y las dos ya
+ * pasaron. Sin el archivo de valores no hay render posible, así que la verificación
+ * completa no se puede hacer; pero devolver un rojo seco el primer día es el mismo
+ * error que el verde mudo, con el signo cambiado: estrena un endurecimiento sin la
+ * ventana de aviso que el propio marco exige. Acá la ausencia entra por la MISMA
+ * puerta que el artefacto faltante: aviso hasta el `exigible_desde` de la versión
+ * pendiente más vieja, rojo desde esa fecha, y nunca silencio.
  */
-export function verificar({ canonico, valores, desvios, superficies, hoy, leer }) {
+export function verificar({ canonico, valores, desvios, superficies, hoy, leer, valoresPresentes = true, allowlist = null }) {
   const hallazgos = [];
   const artefactos = [];
 
@@ -586,6 +825,69 @@ export function verificar({ canonico, valores, desvios, superficies, hoy, leer }
         mensaje: `la version ${entrada.version} del canonico acorto la ventana de gracia con "urgente": true (exigible desde ${entrada.exigible_desde}). La puerta de atras existe y se nombra: su justificacion esta en la seccion "Para consumidores" del CHANGELOG de Projects`,
       });
     }
+  }
+
+  // EL PISO RECOMENDADO DE PERMISOS DEL AGENTE, medido acá porque acá está su única
+  // declaración (el manifiesto del canónico, que viaja con esta action). El paso del
+  // workflow reusable tenía su propia copia literal y las dos ya habían divergido en
+  // las dos direcciones; ahora el que declara es el que mide.
+  //
+  // Va ANTES de cualquier salida temprana a propósito: el allowlist del agente no
+  // depende de que el proyecto haya llenado su archivo de valores, así que saltearlo
+  // en la rama del repo sin adoptar sería otra medición que no se hace y no se dice.
+  //
+  // El allowlist ausente no se declara sano: sale ::notice:: en vez de callarse. El
+  // aviso por «este repo no versiona el allowlist de su agente» es del paso «Permisos
+  // del agente sin escritura», que es el único que puede preguntarle a git si el
+  // archivo está rastreado.
+  let pisoSinCubrir = [];
+  if (allowlist === null) {
+    hallazgos.push({
+      nivel: "notice",
+      codigo: "piso-no-medible",
+      mensaje:
+        "no se pudo leer .claude/settings.json, asi que el piso recomendado de permisos del agente no se midio en esta corrida. No es un veredicto sobre el allowlist: es que no habia allowlist para mirar",
+    });
+  } else {
+    pisoSinCubrir = revisarPiso(canonico.piso_permisos, allowlist);
+    for (const item of pisoSinCubrir) {
+      hallazgos.push({
+        nivel: "warning",
+        codigo: "piso-sin-cubrir",
+        mensaje: `el allowlist del agente no autoriza ${item.nombre}: es uno de los comandos que las propias reglas del marco exigen correr ANTES de cada push, asi que el agente los va a pedir de a uno en cada sesion. Es AVISO y nunca fallo, a proposito: un permiso de mas es riesgo, uno de menos es friccion, y bajo friccion la salida mas barata es el settings.local.json que el .gitignore excluye — un rojo aca empujaria el allowlist FUERA de la revision cruzada. Arreglo: agrega la entrada del comando que este repo usa, p. ej. "${item.entrada}"`,
+      });
+    }
+  }
+
+  const veredicto = () => {
+    const rojos = hallazgos.filter((h) => h.nivel === "error");
+    const avisos = hallazgos.filter((h) => h.nivel === "warning");
+    return {
+      hallazgos,
+      artefactos,
+      pisoSinCubrir,
+      rojos: rojos.length,
+      avisos: avisos.length,
+      estado: rojos.length > 0 ? "rojo" : avisos.length > 0 ? "aviso" : "al-dia",
+    };
+  };
+
+  // EL REPO QUE TODAVÍA NO ADOPTÓ. Se sale acá y no más abajo porque sin valores todo
+  // placeholder faltaría y el resultado sería una lluvia de rojos secos que dicen lo
+  // mismo una vez por marcador, tapando el único hallazgo que importa y sin la ventana
+  // que le corresponde.
+  if (!valoresPresentes) {
+    hallazgos.push(
+      hallazgoPorFecha({
+        codigo: "valores-faltantes",
+        ruta: ".projects-valores.json",
+        pendiente: versionPendienteMasVieja(canonico.versiones, null),
+        hoy,
+        mensaje:
+          "falta .projects-valores.json: sin los valores de este proyecto el marco no puede renderizar su porcion de la constitucion, asi que los agentes de este repo estan trabajando sin las reglas del area. Es un archivo de ESTE repo y vive fuera de .projects/ a proposito (.projects/ es desechable y el modo escribir lo reemplaza entero)",
+      }),
+    );
+    return veredicto();
   }
 
   const declaradas = superficies.filter((nombre) => {
@@ -617,13 +919,32 @@ export function verificar({ canonico, valores, desvios, superficies, hoy, leer }
       mensaje: `desvio vigente sobre \`${desvio.regla}\` (aprobado por ${desvio.aprobado_por} el ${desvio.fecha}): ${desvio.motivo}`,
     });
   }
+  for (const desvio of clasificados.permisos) {
+    hallazgos.push({
+      nivel: "notice",
+      codigo: "desvio-de-permiso",
+      mensaje: `desvio vigente sobre el permiso \`${desvio.permiso}\` (aprobado por ${desvio.aprobado_por} el ${desvio.fecha}): ${desvio.motivo}. Su forma se valida aca; que absorba un hallazgo de verdad —y el rojo si no absorbe ninguno— lo decide el paso "Permisos del agente sin escritura", que es el que ve el allowlist`,
+    });
+  }
 
   const render = renderizar({ canonico, valores, desvios: clasificados.validos });
   if (render.faltantes.length > 0) {
     hallazgos.push({
       nivel: "error",
       codigo: "placeholder-sin-valor",
-      mensaje: `.projects-valores.json no tiene valor para: ${render.faltantes.join(", ")}. Sin eso el artefacto sale con dobles llaves y pone rojo el check "Sin marcadores del scaffold sin resolver" de este mismo repo`,
+      mensaje: `.projects-valores.json no tiene valor para: ${render.faltantes.join(", ")}. Sin eso el artefacto sale con dobles llaves. Un valor cuyo TEXTO es el propio marcador —lo que el scaffold entrega tal cual— NO cuenta como valor: hay que reemplazarlo por el del proyecto`,
+    });
+  }
+  // CINTURÓN, no redundancia: la contabilidad de faltantes se aflojó una vez con un
+  // cambio de una línea y el artefacto salió con 27 marcadores en verde. Esto vuelve a
+  // mirar el cuerpo que está a punto de sellarse, así que la propiedad prometida («el
+  // artefacto nunca sale con dobles llaves») se sostiene incluso si la contabilidad
+  // miente.
+  if (render.marcadoresSinResolver.length > 0) {
+    hallazgos.push({
+      nivel: "error",
+      codigo: "artefacto-con-marcadores",
+      mensaje: `el cuerpo renderizado todavia lleva marcadores del scaffold sin resolver: ${render.marcadoresSinResolver.map((n) => `{{${n}}}`).join(", ")}. El artefacto no se emite asi: un artefacto a medias pone rojo el check "Sin marcadores del scaffold sin resolver" del propio consumidor y entrega reglas con agujeros a sus agentes`,
     });
   }
   if (render.sinUsar.length > 0) {
@@ -740,15 +1061,7 @@ export function verificar({ canonico, valores, desvios, superficies, hoy, leer }
     }
   }
 
-  const rojos = hallazgos.filter((h) => h.nivel === "error");
-  const avisos = hallazgos.filter((h) => h.nivel === "warning");
-  return {
-    hallazgos,
-    artefactos,
-    rojos: rojos.length,
-    avisos: avisos.length,
-    estado: rojos.length > 0 ? "rojo" : avisos.length > 0 ? "aviso" : "al-dia",
-  };
+  return veredicto();
 }
 
 /**
@@ -819,6 +1132,7 @@ export function main(env = process.env) {
   const raiz = resolve(env.CONSTITUCION_RAIZ || process.cwd());
   const rutaValores = resolve(raiz, env.CONSTITUCION_VALORES || ".projects-valores.json");
   const rutaDesvios = resolve(raiz, env.CONSTITUCION_DESVIOS || ".projects-desvios.json");
+  const rutaAllowlist = resolve(raiz, env.CONSTITUCION_ALLOWLIST || ".claude/settings.json");
 
   if (modo !== "verificar" && modo !== "escribir") {
     console.log(`::error::modo desconocido "${modo}": los modos son "verificar" y "escribir"`);
@@ -841,7 +1155,16 @@ export function main(env = process.env) {
       return 1;
     }
   }
-  if (!valoresLeidos.presente) {
+  // ASIMÉTRICO, y la asimetría es la propiedad. En modo ESCRIBIR la ausencia del
+  // archivo de valores es un rojo seco y tiene que serlo: no hay con qué renderizar, y
+  // un artefacto con dobles llaves sin resolver es peor que ninguno. En modo
+  // VERIFICAR la ausencia es un ATRASO DE ADOPCIÓN y entra por la ventana de gracia,
+  // igual que el artefacto faltante: hasta el 2026-08-20 esta rama abortaba con exit 1
+  // ANTES de ramificar por modo, así que el repo que todavía no adoptó recibía un rojo
+  // seco el primer día —un endurecimiento estrenado sin modo aviso, contra la regla
+  // del propio marco— y, en el otro extremo, el escritor que debería depositar el
+  // artefacto por primera vez también fallaba.
+  if (!valoresLeidos.presente && modo === "escribir") {
     console.log(
       `::error::falta ${relative(raiz, rutaValores) || rutaValores}: sin los valores del proyecto no hay render posible, y un artefacto con dobles llaves sin resolver es peor que ninguno. Es un archivo de ESTE repo y vive fuera de .projects/ a proposito: .projects/ es desechable y el modo escribir lo reemplaza entero`,
     );
@@ -872,11 +1195,26 @@ export function main(env = process.env) {
   salida("piso_permisos", JSON.stringify(canonico.piso_permisos));
   salida("superficies", superficies.join(","));
 
+  // El allowlist del agente. `null` significa «no había nada que mirar» y NO «está
+  // sano»: `verificar()` lo dice con un ::notice:: en vez de callarse.
+  const allowlistLeido = leerJson(rutaAllowlist, "el allowlist del agente");
+  let allowlist = null;
+  if (allowlistLeido.error) {
+    console.log(
+      `::warning::${allowlistLeido.error}. El rojo por el JSON roto lo da el paso "Permisos del agente sin escritura"; aca solo se pierde la medicion del piso recomendado`,
+    );
+  } else if (allowlistLeido.presente) {
+    const permitidos = allowlistLeido.datos?.permissions?.allow;
+    allowlist = Array.isArray(permitidos) ? permitidos.filter((x) => typeof x === "string") : [];
+  }
+
   const resultado = verificar({
     canonico,
     valores,
+    valoresPresentes: valoresLeidos.presente,
     desvios,
     superficies,
+    allowlist,
     hoy: new Date(),
     leer: (ruta) => {
       const completa = join(raiz, ruta);
@@ -889,8 +1227,25 @@ export function main(env = process.env) {
     // `CLAUDE.md` del proyecto —esos son del proyecto— y no borra `.projects/`: el
     // directorio es desechable por contrato, pero borrar de verdad convierte un
     // render en una operación destructiva. Lo que sobra se avisa.
+    // `artefacto-con-marcadores` está en la lista y es el cinturón que faltaba: la
+    // razón por la que el modo escribir emitía artefactos con 27 dobles llaves en
+    // verde era que ningún hallazgo lo bloqueaba.
     const bloqueantes = resultado.hallazgos.filter(
-      (h) => h.nivel === "error" && ["canonico-invalido", "placeholder-sin-valor", "desvio-muerto", "desvio-sin-motivo", "desvio-sin-regla", "desvio-sin-aprobador", "desvio-sin-fecha", "superficie-desconocida", "sin-superficies"].includes(h.codigo),
+      (h) =>
+        h.nivel === "error" &&
+        [
+          "canonico-invalido",
+          "placeholder-sin-valor",
+          "artefacto-con-marcadores",
+          "desvio-muerto",
+          "desvio-sin-motivo",
+          "desvio-sin-objeto",
+          "desvio-ambiguo",
+          "desvio-sin-aprobador",
+          "desvio-sin-fecha",
+          "superficie-desconocida",
+          "sin-superficies",
+        ].includes(h.codigo),
     );
     for (const hallazgo of bloqueantes) emitir(hallazgo);
     if (bloqueantes.length > 0) {

@@ -116,11 +116,33 @@ contramedidas son obligatorias y esta es la primera.
 
 ## 3. El check, con su ventana de gracia
 
-- [ ] 3.1 Paso nuevo en el job de marco del workflow reusable: artefacto ausente,
-      atrasado, divergente del re-render de la versión que declara, o no cargado
-      por una superficie declarada. **La ausencia es roja, nunca `exit 0` mudo**
-      (D7): amarillo hasta la fecha de exigibilidad, rojo después. Evidencia: los
-      fixtures de 1.1 en verde y los cuatro modos de falla en rojo.
+- [ ] 3.1 El check corre como **job del `ci.yml` del consumidor**, invocando
+      `actions/constitucion@v1` en modo verificar y colgado de `ci-ok`: artefacto
+      ausente, atrasado, divergente del re-render de la versión que declara, o no
+      cargado por una superficie declarada. **La ausencia es roja, nunca `exit 0`
+      mudo** (D7): amarillo hasta la fecha de exigibilidad, rojo después.
+      Evidencia: los fixtures de 1.1 en verde y los cuatro modos de falla en rojo.
+      **Corregido el 2026-08-20 y por medición**: esto se había implementado como
+      un paso inline del workflow reusable, y ese paso salía `exit 0` MUDO contra
+      el único esquema de `superficies` que el scaffold emite —cero `::error::`,
+      cero `::warning::`, también con la versión ya exigible— mientras rechazaba
+      los artefactos que la propia action acababa de generar, porque exigía un
+      sello de 64 hex del cuerpo y la action emite 12 hex del canónico. Solo la
+      action compara contra el RE-RENDER, que es estrictamente más fuerte que
+      comparar contra el sello: recomputar un sello es un `git commit` y cambiar el
+      canónico no. El paso se borró; el reemplazo es el job, y que el consumidor lo
+      cablee lo comprueba estáticamente el paso «Constitucion del marco cableada»
+      (3.6).
+- [ ] 3.6 El marco comprueba que el consumidor CABLEE la verificación, porque una
+      action que nadie invoca no verifica nada y ese fue el estado real hasta el
+      2026-08-20 (su única invocación era el workflow de actualización, en modo
+      escribir, que declara no verificar nada y delegaba en el paso inline
+      apagado: circularidad completa). Asimétrico y sin calendario propio —el
+      calendario vive en el manifiesto, que viaja con la action y no con el
+      workflow—: repo que no versiona `.projects-valores.json`, **aviso** (todavía no
+      adoptó); repo que sí lo versiona y no cablea, **rojo** (tiene la maquinaria y
+      se saltea el check, y se arregla en el mismo PR que adopta). Evidencia: las
+      dos ramas medidas por código de salida.
 - [ ] 3.2 Comparación con fin de línea normalizado y fuera del alcance del
       formateador. Evidencia: el mismo artefacto en CRLF y en LF dando el mismo
       veredicto.
@@ -149,6 +171,16 @@ contramedidas son obligatorias y esta es la primera.
       menos es fricción, y la salida más barata bajo fricción es el archivo local
       que el repositorio ignora. Evidencia: fixture con el piso incompleto
       saliendo amarillo.
+      **Lo declara y lo mide UNA sola pieza**: el manifiesto del canónico declara
+      cada ítem con la `entrada` que recomienda y la propiedad que `cubre`, y lo
+      mide `actions/constitucion`, que es quien lo transporta. Corregido el
+      2026-08-20 y por medición: se había implementado declarándolo en el
+      manifiesto y verificándolo con una lista literal en el paso del workflow, y
+      las dos copias ya habían divergido en las DOS direcciones (el manifiesto
+      declaraba `Bash(pnpm build)` que el paso no miraba; el paso exigía `openspec`
+      que el manifiesto no declaraba), con el agravante de que mutar el manifiesto
+      no movía el veredicto del paso: seguía midiendo su propio arreglo. En una
+      doble contabilidad la declaración siempre pierde contra el check.
 - [ ] 4.3 Repositorio que no versiona el allowlist de su agente: **aviso
       ruidoso**, nunca verde mudo. Es el caso real de `intranet`, que hoy no tiene
       `.claude/` en absoluto (verificado: la ruta da 404 en la rama de adopción).
