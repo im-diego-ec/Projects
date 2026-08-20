@@ -51,7 +51,9 @@
 //   CONSTITUCION_VALORES   default: .projects-valores.json
 //   CONSTITUCION_DESVIOS   default: .projects-desvios.json
 //   CONSTITUCION_SUPERFICIES  lista separada por comas; vacío = lo que declaren los
-//                             valores, y si tampoco, el default del marco
+//                             valores y, si el archivo NO declara la clave, el
+//                             default del marco. Declararla vacía NO es un default:
+//                             es rojo (`sin-superficies`)
 //   CONSTITUCION_SALIDA_CORREGIDA  dónde deja el artefacto al día en modo verificar
 //
 // No hay variable para «hoy». La ventana de gracia se decide con la fecha del
@@ -832,10 +834,17 @@ export function main(env = process.env) {
 
   const valores = valoresLeidos.datos ?? {};
   const desvios = Array.isArray(desviosLeidos.datos?.desvios) ? desviosLeidos.datos.desvios : [];
+  // La clave AUSENTE y la clave DECLARADA VACÍA no son lo mismo, y confundirlas
+  // volvía inalcanzable desde la action el hallazgo `sin-superficies`: un repo que
+  // escribía `"superficies": []` caía al default del marco, así que el opt-out
+  // explícito quedaba indistinguible de «todavía no llené el archivo». Ausente =
+  // default del marco (el repo no dijo nada todavía). Declarada vacía = lo que el
+  // repo dijo, y lo dicho es rojo: cero superficies es declarar que las reglas del
+  // marco no llegan a ninguna parte.
   const superficies = (
     env.CONSTITUCION_SUPERFICIES
       ? env.CONSTITUCION_SUPERFICIES.split(",")
-      : Array.isArray(valores.superficies) && valores.superficies.length > 0
+      : Array.isArray(valores.superficies)
         ? valores.superficies
         : SUPERFICIES_POR_DEFECTO
   )
