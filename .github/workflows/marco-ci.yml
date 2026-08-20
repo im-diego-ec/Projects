@@ -387,8 +387,7 @@ jobs:
           # rc=2 dejaba declarados.txt vacio y el paso lo leia como "no hay
           # nada que verificar". Lo no verificable es rojo, nunca exito mudo.
           set +e
-          printf '%s
-' "${ARTEFACTOS}" | xargs -r grep -n 'generatedBy:' > declarados.txt
+          echo "${ARTEFACTOS}" | xargs -r grep -n 'generatedBy:' > declarados.txt
           RC=$?
           set -e
           if [ "${RC}" -gt 1 ]; then
