@@ -10,8 +10,12 @@ name: Marco CI (reusable)
 #   3. higiene   -> lo que el marco AFIRMA y hasta hoy nadie verificaba:
 #                   artefactos regenerados al dia, definiciones de pipeline
 #                   validas, cero marcadores del scaffold sin resolver,
-#                   scripts de verificacion que no enmascaran su fallo y el
-#                   censo de fuentes efectivamente cableado
+#                   scripts de verificacion que no enmascaran su fallo, el
+#                   censo de fuentes efectivamente cableado, CERO SECRETOS
+#                   en el arbol del repo o en los commits del cambio, y
+#                   ningun ejecutor de paquetes corriendo algo sin version
+#                   exacta (el nombre pelado de un paquete lo puede tener
+#                   otro)
 #   4. marco-ok  -> veredicto agregado de los tres jobs anteriores
 #
 # El proyecto consumidor NO copia estos jobs: los referencia. Un arreglo aca
@@ -80,9 +84,12 @@ on:
         description: >-
           Version pineada del CLI de OpenSpec. OJO: el paquete es
           @fission-ai/openspec; el nombre pelado "openspec" en npm es un
-          placeholder ajeno (0.0.0, squatting). Dependabot NO ve este pin
-          porque mira manifests, no un npx inline: se sube a mano aca y todos
-          los repos del marco lo heredan.
+          placeholder ajeno (0.0.0, squatting), asi que una invocacion sin
+          version exacta puede descargar y ejecutar otra cosa. El check
+          "Ejecutores de paquetes pinados" del job higiene lo verifica solo,
+          en este repo y en todos los consumidores. Dependabot NO ve este pin
+          porque mira manifests, no una invocacion inline: se sube a mano aca
+          y todos los repos del marco lo heredan.
         type: string
         required: false
         default: "1.9.0"
@@ -102,6 +109,30 @@ on:
         type: string
         required: false
         default: "1.7.12"
+      version_gitleaks:
+        description: >-
+          Version pineada de gitleaks, el detector de secretos. Se descarga del
+          release oficial y se verifica el sha256 contra el archivo de checksums
+          del MISMO release, igual que actionlint y con el mismo alcance: cubre
+          descarga corrupta o asset cambiado, no un release comprometido de
+          raiz. Se eligio gitleaks y no el detector con verificacion en linea
+          porque este REDACTA por defecto y no manda el candidato a la API del
+          proveedor: el marco prohibe que el valor de un secreto salga hacia un
+          tercero, aunque sea para confirmarlo. Dependabot no lo ve (no es un
+          manifest): se sube a mano aca y llega a todos los repos.
+        type: string
+        required: false
+        default: "8.30.1"
+      archivo_falsos_positivos:
+        description: >-
+          Ruta del archivo donde el repo declara los falsos positivos del
+          detector de secretos, cada uno con su motivo escrito. Es la UNICA via
+          de excepcion admitida; los canales propios de la herramienta
+          (.gitleaks.toml, .gitleaksignore, comentarios "gitleaks:allow") estan
+          cerrados a proposito porque callan sin dejar motivo ni rastro.
+        type: string
+        required: false
+        default: ".projects-falsos-positivos.json"
       rutas_carril_docs:
         description: >-
           Patrones (ERE de grep, uno por linea) de las rutas que NO alteran lo
@@ -296,7 +327,17 @@ jobs:
     name: higiene
     runs-on: ${{ inputs.runner }}
     steps:
+      # fetch-depth 0 lo pide UN solo paso: el PLANO DE LA HISTORIA del
+      # detector de secretos. Sin los objetos del rango del cambio ese plano no
+      # puede correr, y entonces un secreto introducido y borrado en el commit
+      # siguiente pasa invisible: el arbol queda limpio y la credencial sigue
+      # comprometida en la historia. El costo es un clon completo en vez de uno
+      # de profundidad 1, y se declara en vez de colarse: en los repos del area
+      # es despreciable (el mayor son 2,6 MiB de pack, 421 commits) y en un repo
+      # con historia pesada se nota. Si algun dia pesa mas que lo que compra, la
+      # salida es acotar el fetch al rango, no apagar el plano.
       - uses: actions/checkout@v7
+        with: { fetch-depth: 0 }
 
       # HUECO 1 — "regenerado" era la unica forma de distribucion del marco que
       # se apoyaba solo en que alguien se acordara de ejecutarla. El marco pina
@@ -322,10 +363,21 @@ jobs:
         run: |
           set -euo pipefail
 
-          DIRS=()
-          if [ -d .claude ]; then DIRS+=(.claude); fi
-          if [ -d .agents ]; then DIRS+=(.agents); fi
-          if [ ${#DIRS[@]} -eq 0 ]; then
+          # QUE CUENTA COMO ARTEFACTO DEL CLI, y por que no alcanza el directorio.
+          # El CLI genera dentro de .claude/skills y .claude/commands, pero AHI
+          # MISMO viven skills y comandos ESCRITOS A MANO. Acotar por directorio
+          # no los distingue: se probo, y el paso empezo a avisar en cada corrida
+          # del propio Projects por tener skills propias. Un aviso que sale siempre
+          # deja de leerse, y por la regla del marco un fail-open que se activa
+          # siempre es un bug disfrazado de tolerancia.
+          #
+          # El discriminante es el NOMBRE que el generador impone, no la carpeta:
+          # sus skills se llaman openspec-* y sus comandos viven bajo opsx/. Un
+          # archivo escrito a mano no cae ahi salvo que alguien lo bautice
+          # exactamente como el generador, y eso ya seria pisarle el espacio.
+          ARTEFACTOS=$(git ls-files --             '.claude/skills/openspec-*/SKILL.md'             '.claude/commands/opsx/*'             '.agents/skills/openspec-*/SKILL.md'             '.agents/skills/source-command-opsx-*/SKILL.md' || true)
+
+          if [ -z "${ARTEFACTOS}" ]; then
             echo "este repo no tiene artefactos generados por el CLI: nada que verificar"
             exit 0
           fi
@@ -335,11 +387,12 @@ jobs:
           # rc=2 dejaba declarados.txt vacio y el paso lo leia como "no hay
           # nada que verificar". Lo no verificable es rojo, nunca exito mudo.
           set +e
-          grep -rn 'generatedBy:' "${DIRS[@]}" > declarados.txt
+          printf '%s
+' "${ARTEFACTOS}" | xargs -r grep -n 'generatedBy:' > declarados.txt
           RC=$?
           set -e
           if [ "${RC}" -gt 1 ]; then
-            echo "::error::no se pudieron inspeccionar los artefactos generados (${DIRS[*]}, grep rc=${RC}) — sin poder leerlos, no se declara que esten al dia"
+            echo "::error::no se pudieron inspeccionar los artefactos generados (grep rc=${RC}) — sin poder leerlos, no se declara que esten al dia"
             exit 1
           fi
 
@@ -855,6 +908,655 @@ jobs:
           done < "${ARCHIVOS}"
 
           echo "el censo de fuentes esta cableado"
+
+      # HUECO 6 — el marco declara desde su primera version que el paquete del
+      # CLI es @fission-ai/openspec y que el nombre pelado "openspec" en npm es
+      # un placeholder ajeno, y la guia de upgrade lo lleva ademas como item de
+      # checklist ("sin restos de openspec a secas"). Un item de checklist NO es
+      # un guardrail: depende de que alguien se acuerde. Nada lo verificaba, y
+      # en el consumidor real el allowlist del agente autorizaba, con --yes,
+      # descargar y EJECUTAR el paquete del squatter sin preguntar nada.
+      #
+      # La propiedad es sobre el EJECUTOR, no sobre una lista de paquetes
+      # prohibidos que alguien tendria que mantener: npx, bunx, npm exec,
+      # pnpm dlx y yarn dlx DESCARGAN de npm cuando el binario no esta
+      # instalado, asi que su argumento tiene que quedar clavado a una version
+      # exacta. "pnpm exec" y "yarn exec" quedan fuera A PROPOSITO: leen
+      # node_modules y fallan si el binario no esta —fallan CERRADO— y por eso
+      # son la salida recomendada cuando el binario ya lo trae una dependencia
+      # declarada del repo.
+      #
+      # POR QUE LA VERSION Y NO EL SCOPE. El scope no se puede exigir siempre
+      # (prettier, eslint o vitest no tienen ninguno, y pedirlo seria un check
+      # imposible de satisfacer). La version exacta si se puede exigir siempre,
+      # y es la que convierte un nombre equivocado en un fallo RUIDOSO: el
+      # squatter de "openspec" publica 0.0.0 y no tiene la version que uno
+      # pina, asi que la invocacion muere en vez de resolver en silencio.
+      #
+      # LIMITES DECLARADOS (esto LEE texto, no ejecuta nada):
+      #   - Los .md quedan fuera. Son prosa, y la documentacion del propio
+      #     marco cita la forma incorrecta como CONTRAEJEMPLO. Consecuencia
+      #     honesta: un comando de runbook escrito en un README no queda
+      #     cubierto por este check.
+      #   - No verifica que el nombre sea el paquete que uno queria. El pin
+      #     hace ruidoso el error de nombre; no lo hace imposible.
+      #   - Una invocacion partida en varias lineas con "\" no se lee.
+      #   - Las lineas que ARRANCAN en comentario (#, // o *) no se leen: un
+      #     comentario no se ejecuta, y sin esta regla el check se pone rojo a
+      #     si mismo, porque el bloque que estas leyendo NOMBRA los ejecutores
+      #     para explicarlos. Un guardrail que el marco no puede aplicarse a si
+      #     mismo no sirve para nadie. Limite del limite: un comentario al
+      #     FINAL de una linea con codigo si se lee, que es el lado
+      #     conservador.
+      #   - Un repo que no versiona el allowlist de su agente (.claude entero
+      #     en el .gitignore) esconde de este check justo el archivo donde
+      #     aparecio el problema. Lo rastreado es lo unico que se puede mirar.
+      - name: Ejecutores de paquetes pinados
+        if: '!cancelled()'
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if ! command -v node > /dev/null 2>&1; then
+            echo "::error::no hay 'node' en el PATH y sin el no se pueden leer las invocaciones. Arreglo: agrega 'uses: actions/setup-node@v7' a este job, antes de este paso"
+            exit 1
+          fi
+
+          # Prefiltro barato y DELIBERADAMENTE amplio: su unica obligacion es
+          # no perderse nada. Quien decide es el lector de abajo, que pone el
+          # limite de palabra en serio (asi "npx-wrapper" y "mynpx" no entran).
+          # Los .md salen por pathspec: ver el limite declarado arriba.
+          CANDIDATOS="${RUNNER_TEMP}/ejecutores.txt"
+          set +e
+          git -c core.quotePath=false grep -I -n -E '(npx|bunx|npm[[:space:]]+exec|pnpm[[:space:]]+dlx|yarn[[:space:]]+dlx)' -- ':!*.md' > "${CANDIDATOS}"
+          RC=$?
+          set -e
+          if [ "${RC}" -gt 1 ]; then
+            echo "::error::no se pudieron inspeccionar los archivos rastreados (git grep rc=${RC}) — sin poder mirar, no se declara que las invocaciones esten pinadas"
+            exit 1
+          fi
+
+          if [ ! -s "${CANDIDATOS}" ]; then
+            echo "ningun archivo rastreado fuera de los .md invoca un ejecutor de paquetes: no hay nada que pinar"
+            exit 0
+          fi
+
+          # Inline y no en un archivo aparte por el mismo motivo que el paso de
+          # enmascaramiento: un heredoc no puede cerrar dentro de un bloque de
+          # YAML indentado. El programa viaja entre comillas simples de shell,
+          # asi que adentro la comilla simple va por su escape hexadecimal
+          # (\x27) y jamas literal: una sola literal cierra el programa a la
+          # mitad y el error que da no menciona las comillas por ningun lado.
+          node -e '
+            const { readFileSync } = require("node:fs");
+
+            // Los ejecutores que DESCARGAN. El limite por delante descarta
+            // "mynpx"; el lookahead de atras acepta el separador real de una
+            // invocacion, incluidas las comillas de un array JSON
+            // ("command": ["npx","prisma","migrate","deploy"]).
+            const EJECUTOR = /(^|[^A-Za-z0-9_.\/@-])(npx|bunx|npm[ \t]+exec|pnpm[ \t]+dlx|yarn[ \t]+dlx)(?=[ \t"\x27,]|$)/g;
+
+            // [@scope/]nombre[@loquesea]
+            const SPEC = /^(@[a-z0-9][a-z0-9._~-]*\/)?[a-z0-9][a-z0-9._~-]*(@(.*))?$/i;
+            const EXACTA = /^\d+\.\d+\.\d+([-+][0-9A-Za-z.-]+)?$/;
+            // Un pin puede llegar por variable: el pin canonico del marco es
+            // un input de este mismo workflow. Cuenta como pinado, y se
+            // informa por separado para que se vea que existe esa indireccion.
+            const REFERENCIA = /^(\$\{\{?[^}]+\}?\}|\$[A-Za-z_][A-Za-z0-9_]*|\{\{[^}]+\}\})$/;
+            const TOMA_VALOR = /^(-p|--package|-c|--call)$/;
+            const ABRE = /^["\x27`([,]+/;
+            const CIERRA = /["\x27`)\],;]+$/;
+
+            const escapar = (valor) =>
+              String(valor).replace(/%/g, "%25").replace(/\r/g, "%0D").replace(/\n/g, "%0A");
+
+            const limpiar = (token) => token.replace(ABRE, "").replace(CIERRA, "");
+
+            // El primer argumento que NO es bandera es el paquete. --package y
+            // -p lo mueven de lugar, y --no-install vuelve la invocacion
+            // inofensiva porque ahi el ejecutor ya no puede descargar nada.
+            function paqueteDe(resto) {
+              const brutos = resto.split(/[\s,]+/).filter(Boolean);
+              let esperaValor = false;
+              for (const bruto of brutos) {
+                if (esperaValor) { esperaValor = false; return limpiar(bruto); }
+                if (/^--?[A-Za-z]/.test(bruto)) {
+                  if (/^--no-install(=|$)/.test(bruto)) return { exento: true };
+                  const conValor = bruto.match(/^(?:-p|--package|-c|--call)=(.*)$/);
+                  if (conValor) return limpiar(conValor[1]);
+                  if (TOMA_VALOR.test(bruto)) esperaValor = true;
+                  continue;
+                }
+                const token = limpiar(bruto);
+                if (token === "" || token === "--") continue;
+                return token;
+              }
+              return null;
+            }
+
+            // Una linea que ARRANCA en comentario no se ejecuta. Se descarta
+            // antes de leerla: sin esto el propio bloque que documenta el
+            // check lo pone en rojo, y un guardrail que el marco no puede
+            // aplicarse a si mismo no sirve para ningun consumidor.
+            const COMENTARIO = /^[ \t]*(#|\/\/|\*)/;
+
+            const lineas = readFileSync(process.argv[1], "utf8").split(/\r?\n/).filter(Boolean);
+            const sueltos = [];
+            const dudosos = [];
+            const archivos = new Set();
+            let literal = 0;
+            let porVariable = 0;
+            let exentos = 0;
+
+            for (const linea of lineas) {
+              const partido = linea.match(/^([^:]+):(\d+):(.*)$/);
+              if (!partido) {
+                // El prefiltro escribio algo sin la forma ruta:linea:contenido.
+                // No se pudo leer, asi que no se declara verde sobre eso.
+                dudosos.push({ ruta: "(salida del prefiltro)", linea: 0, motivo: "resultado con formato inesperado" });
+                continue;
+              }
+              const ruta = partido[1];
+              const numero = partido[2];
+              const texto = partido[3];
+              if (COMENTARIO.test(texto)) continue;
+              EJECUTOR.lastIndex = 0;
+              let encontrado;
+              while ((encontrado = EJECUTOR.exec(texto)) !== null) {
+                archivos.add(ruta);
+                const paquete = paqueteDe(texto.slice(encontrado.index + encontrado[0].length));
+                if (paquete && paquete.exento) { exentos += 1; continue; }
+                if (paquete === null) {
+                  dudosos.push({ ruta: ruta, linea: numero, motivo: "no le sigue ningun argumento" });
+                  continue;
+                }
+                const partes = paquete.match(SPEC);
+                if (!partes) {
+                  dudosos.push({ ruta: ruta, linea: numero, motivo: "lo que sigue (" + paquete + ") no tiene forma de nombre de paquete" });
+                  continue;
+                }
+                const version = partes[3];
+                if (version === undefined || version === "") {
+                  sueltos.push({ ruta: ruta, linea: numero, paquete: paquete, motivo: "va sin version" });
+                  continue;
+                }
+                if (REFERENCIA.test(version)) { porVariable += 1; continue; }
+                if (!EXACTA.test(version)) {
+                  sueltos.push({ ruta: ruta, linea: numero, paquete: paquete, motivo: "lleva una version que no es exacta (" + version + "), asi que flota" });
+                  continue;
+                }
+                literal += 1;
+              }
+            }
+
+            // El mensaje trae el ARREGLO y las DOS salidas, porque cual de las
+            // dos sirve depende de algo que este check no puede saber: si el
+            // binario ya lo trae una dependencia declarada del repo.
+            for (const item of sueltos) {
+              console.log("::error file=" + escapar(item.ruta) + ",line=" + item.linea + "::la invocacion de \"" + escapar(item.paquete) + "\" " + escapar(item.motivo) + ", y corre por un ejecutor que DESCARGA el paquete de npm si no esta instalado. En npm hay nombres pelados ocupados por placeholders ajenos, asi que esto puede terminar ejecutando otra cosa y \"funcionando\" sin hacer nada. Arreglo, una de dos: si el binario ya lo trae una dependencia declarada del repo, corrilo con \"pnpm exec <comando>\", que lee node_modules y falla si no esta en vez de salir a buscarlo; si de verdad hay que traerlo de npm, escribi el argumento completo —con su scope si lo tiene y su version exacta— en la forma <paquete>@<X.Y.Z>, en vez del nombre pelado");
+            }
+
+            for (const item of dudosos) {
+              console.log("::warning file=" + escapar(item.ruta) + ",line=" + item.linea + "::hay un ejecutor de paquetes en esta linea y no se pudo determinar que paquete corre (" + escapar(item.motivo) + "), asi que este check NO la esta cubriendo. Arreglo: si es prosa, reescribila para que no parezca una invocacion; si es una invocacion real, dejala en la forma que el check sabe leer: el ejecutor, despues sus banderas, y despues el paquete escrito <nombre>@<X.Y.Z>");
+            }
+
+            if (sueltos.length > 0) {
+              console.log("== resumen == " + sueltos.length + " invocacion(es) sin version exacta, sobre " + archivos.size + " archivo(s) rastreado(s) con ejecutor");
+              process.exit(1);
+            }
+
+            // La verdad de lo que se probo, ni una palabra mas.
+            console.log((literal + porVariable) + " invocacion(es) de un ejecutor que descarga, en " + archivos.size + " archivo(s): todas con version exacta (" + literal + " literal, " + porVariable + " por variable) y " + exentos + " con --no-install. Es lectura de texto y no ejecucion: NO prueba que el paquete pinado sea el que se quiso, solo que un nombre equivocado fallaria en vez de resolver en silencio");
+          ' "${CANDIDATOS}"
+
+      # HUECO 7 — la regla MAS DURA del marco ("nunca poner secrets en codigo,
+      # contexto ni logs") era la unica sin un solo mecanismo que la hiciera
+      # cumplir: disciplina pura. Y la disciplina no escala a builders nuevos,
+      # que es justo el problema que Projects existe para no repetir.
+      #
+      # Es PORTABLE por obligacion: el marco le exige esta regla a TODO
+      # proyecto, asi que el mecanismo no puede depender de que la organizacion
+      # pague un producto de la plataforma (el escaneo de secretos y la
+      # proteccion de push son de pago en repos privados, y los repos del area
+      # son todos privados). Binario pineado + checksum, el mismo patron de
+      # actionlint, y corre igual en cualquier plan.
+      #
+      # DOS PLANOS, la misma forma que la cobertura y por la misma razon —cada
+      # uno tapa lo que el otro deja abierto— pero con un reparto distinto:
+      #
+      #   · ARBOL COMPLETO, sin tolerancia y sin piso que suba. Con cobertura el
+      #     total admite deuda y por eso el piso sube de a poco; con secretos NO
+      #     hay deuda tolerable: una credencial en el arbol no es trabajo
+      #     pendiente, es un incidente vivo, y no se amortiza. Un detector
+      #     solo-diff jamas veria lo que ya esta adentro, que es exactamente
+      #     donde vive la fuga que a nadie le consta.
+      #   · HISTORIA DEL CAMBIO, que NO es redundante con el anterior: el arbol
+      #     solo ve el contenido de HOY, asi que "commiteo el .env, lo saco en
+      #     el commit siguiente" deja el arbol impecable y la credencial igual
+      #     de comprometida. Esa es la forma mas comun en que un secreto entra a
+      #     un repo, y este es el unico plano que la ve. Tambien es el plano que
+      #     le da sentido al orden del arreglo: rotar primero.
+      #
+      # El estreno en rojo se resuelve como en calidad-fail-closed (D6): el
+      # consumidor se pone al dia PRIMERO —declara sus falsos positivos— y el
+      # check aterriza despues. El numero esta medido, no estimado: con la
+      # configuracion por defecto del detector son 3 hallazgos en el consumidor
+      # real (385 archivos rastreados) y 0 en este repo. Un barrido de regex a
+      # mano sobre el mismo arbol daba 17; esa diferencia es la que decide si el
+      # check sobrevive al tercer PR o alguien lo apaga.
+      #
+      # LIMITES DECLARADOS (no olvidos):
+      #   - Detecta FORMA, no validez: no prueba la credencial contra su
+      #     proveedor. Esa verificacion existe en otra herramienta y se descarto
+      #     a proposito, porque manda el candidato a un tercero desde el runner
+      #     — exactamente lo que el marco prohibe.
+      #   - Un secreto sin forma reconocible (una clave corta, una frase) no se
+      #     detecta. Ninguna herramienta de esta clase lo hace.
+      #   - Un archivo ignorado del control de versiones queda fuera del
+      #     universo. Es la misma evasion limpia que ya declara el censo de
+      #     fuentes, y la misma defensa: ignorar algo propio es una linea de
+      #     diff que no se justifica sola.
+      #   - El plano de la historia mira el RANGO del cambio, no la historia
+      #     entera del repo. Un secreto anterior a la adopcion del check solo
+      #     aparece si todavia esta en el arbol.
+      - name: Sin secretos en el repo (arbol y historia del cambio)
+        if: '!cancelled()'
+        shell: bash
+        env:
+          VERSION_GITLEAKS: ${{ inputs.version_gitleaks }}
+          DECLARACIONES: ${{ inputs.archivo_falsos_positivos }}
+          BASE_PR: ${{ github.event.pull_request.base.sha }}
+          HEAD_PR: ${{ github.event.pull_request.head.sha }}
+          ANTES: ${{ github.event.before }}
+          # CUARTO Y QUINTO CANAL de excepcion de la herramienta, y los unicos
+          # que no dejan rastro NI en el repo: la configuracion tambien entra
+          # por entorno. La precedencia es
+          #   --config > GITLEAKS_CONFIG > GITLEAKS_CONFIG_TOML > <destino>/.gitleaks.toml
+          # y con cualquiera de las dos variables apuntando a una config que
+          # vacia las reglas, el detector sale VERDE Y MUDO sobre un repo con
+          # secretos adentro (comprobado). El runner lo elige el consumidor
+          # (input "runner"): en uno propio esas variables pueden venir de la
+          # maquina, y ningun archivo del repo lo delataria. Vaciarlas aca las
+          # neutraliza sin romper nada — con valor vacio la herramienta usa su
+          # config por defecto, tambien comprobado.
+          GITLEAKS_CONFIG: ""
+          GITLEAKS_CONFIG_TOML: ""
+        run: |
+          set -euo pipefail
+
+          if ! command -v node > /dev/null 2>&1; then
+            echo "::error::no hay 'node' en el PATH y sin el no se puede clasificar el reporte del detector. Arreglo: agrega 'uses: actions/setup-node@v7' a este job, antes de este paso"
+            exit 1
+          fi
+
+          # UNA SOLA VIA DE EXCEPCION, y es la que exige motivo escrito.
+          # El detector trae tres canales propios para callar un hallazgo, y los
+          # tres callan sin motivo y sin dejar rastro en la corrida:
+          #   .gitleaks.toml   -> puede VACIAR todas las reglas. Comprobado: un
+          #                       repo con un secreto sintetico sale en verde.
+          #   .gitleaksignore  -> lista de huellas.
+          #   "gitleaks:allow" -> comentario al final de la linea. Comprobado:
+          #                       baja el hallazgo a cero en silencio.
+          # Los dos archivos son rojo si estan versionados; el comentario se
+          # desactiva con --ignore-gitleaks-allow. Queda un unico canal, el del
+          # marco, y ese exige archivo exacto + regla + motivo.
+          for PROPIA in .gitleaks.toml .gitleaksignore; do
+            if git ls-files --error-unmatch "${PROPIA}" > /dev/null 2>&1; then
+              echo "::error file=${PROPIA}::este repo versiona ${PROPIA}, que puede apagar el detector entero sin motivo escrito y sin que aparezca en ninguna corrida. El marco admite UNA sola via de excepcion. Arreglo: borra ${PROPIA} y declara cada falso positivo en ${DECLARACIONES}, con su motivo"
+              exit 1
+            fi
+          done
+
+          # La salida del detector NO se vuelca cruda al log de CI. Se usa en
+          # una sola rama —la de "no pudo correr"— y esa es justo la rama en la
+          # que la herramienta se comporto de forma inesperada: asumir ahi que
+          # la redaccion actuo es asumir precisamente lo que acaba de fallar, y
+          # el log de una corrida es publico para todo el que ve el repo.
+          # Pasan solo las lineas con la forma de su log estructurado (hora +
+          # nivel), que es donde viven los diagnosticos que sirven (config
+          # ilegible, archivo inaccesible); un volcado de panico o un buffer no
+          # tienen esa forma y quedan afuera. Se dice cuantas lineas se
+          # omitieron para que la omision no sea a su vez silenciosa.
+          diagnostico() {
+            TOTAL=$(wc -l < "$1" | tr -d ' ')
+            PASAN=$(grep -aE '^[^ ]*[0-9]{1,2}:[0-9]{2}(AM|PM)[^ ]* +[^ ]*(TRC|DBG|INF|WRN|ERR|FTL)' "$1" | cut -c1-200 | head -20 || true)
+            if [ -n "${PASAN}" ]; then echo "${PASAN}"; fi
+            echo "(salida del detector: ${TOTAL} linea(s); solo se imprimen las de su log estructurado y recortadas — el resto se omite porque en esta rama no se puede asumir que la redaccion haya actuado)"
+          }
+
+          TMP=$(mktemp -d)
+          URL="https://github.com/gitleaks/gitleaks/releases/download/v${VERSION_GITLEAKS}"
+          TAR="gitleaks_${VERSION_GITLEAKS}_linux_x64.tar.gz"
+
+          if ! curl -fsSL -o "${TMP}/${TAR}" "${URL}/${TAR}" \
+             || ! curl -fsSL -o "${TMP}/checksums.txt" "${URL}/gitleaks_${VERSION_GITLEAKS}_checksums.txt"; then
+            echo "::error::no se pudo descargar el detector de secretos ${VERSION_GITLEAKS} del release oficial. Sin detector NO se declara que el repo este limpio: este paso es rojo a proposito, no uno que se saltee. Arreglo: reintenta la corrida; si persiste, verifica que la version pineada siga publicada"
+            exit 1
+          fi
+          # Mismo patron y MISMO alcance que actionlint: se verifica el asset
+          # contra los checksums del propio release. Cubre descarga corrupta o
+          # asset cambiado, no un release comprometido de raiz.
+          if ! ( cd "${TMP}" && sha256sum --check --ignore-missing checksums.txt ); then
+            echo "::error::el binario descargado NO coincide con el checksum de su release: no se ejecuta. Un binario que no se puede verificar no corre en el pipeline de nadie"
+            exit 1
+          fi
+          tar -xzf "${TMP}/${TAR}" -C "${TMP}" gitleaks
+          GITLEAKS="${TMP}/gitleaks"
+          "${GITLEAKS}" version
+
+          # Directorio vacio: neutraliza el .gitleaksignore que la herramienta
+          # busca sola en el directorio de trabajo. Cinturon del rojo de arriba.
+          SIN_IGNORES="${TMP}/sin-ignores"
+          mkdir -p "${SIN_IGNORES}"
+
+          # --- PLANO 1: el arbol rastreado de HEAD ---------------------------
+          # Se materializa aparte en vez de barrer el workspace, por dos razones
+          # concretas: los pasos anteriores de ESTE job dejan archivos de
+          # trabajo en el workspace (declarados.txt, pendientes.txt) y el
+          # detector los leeria como si fueran del repo; y asi el universo es
+          # "lo rastreado", el mismo de todos los guardrails del marco, sin
+          # depender de como interprete .gitignore una herramienta ajena.
+          ARBOL="${TMP}/arbol"
+          mkdir -p "${ARBOL}"
+          if ! git archive HEAD | tar -x -C "${ARBOL}"; then
+            echo "::error::no se pudo materializar el arbol rastreado de HEAD, asi que la ausencia de secretos no se puede afirmar. Lo no verificable es rojo"
+            exit 1
+          fi
+
+          REPORTE_ARBOL="${RUNNER_TEMP}/secretos-arbol.json"
+          set +e
+          ( cd "${ARBOL}" && "${GITLEAKS}" dir . \
+              --redact --no-banner --no-color \
+              --ignore-gitleaks-allow --gitleaks-ignore-path "${SIN_IGNORES}" \
+              --report-format json --report-path "${REPORTE_ARBOL}" \
+              --exit-code 2 ) > "${TMP}/arbol.log" 2>&1
+          RC=$?
+          set -e
+          # 0 = limpio, 2 = hallazgos. El 2 se fija a proposito con --exit-code
+          # para poder distinguir "encontro algo" de "no pudo correr": con el
+          # default (1) los dos casos se confunden y un fallo de la herramienta
+          # se leeria como una fuga, o peor, al reves.
+          if [ "${RC}" -ne 0 ] && [ "${RC}" -ne 2 ]; then
+            echo "::error::el detector no pudo completar el barrido del arbol (rc=${RC}). Sin barrido no se declara que el repo este limpio. Arreglo: reintenta la corrida; si persiste, reproducilo local con gitleaks ${VERSION_GITLEAKS} y los mismos flags que usa este paso"
+            diagnostico "${TMP}/arbol.log"
+            exit 1
+          fi
+
+          # --- PLANO 2: los commits que introduce este cambio ----------------
+          REPORTE_HISTORIA=""
+          HISTORIA_CORRIO=false
+          if [ "${GITHUB_EVENT_NAME}" = "pull_request" ] || [ "${GITHUB_EVENT_NAME}" = "pull_request_target" ]; then
+            DESDE="${BASE_PR}"
+            HASTA="${HEAD_PR}"
+          elif [ -n "${ANTES}" ] && [ "${ANTES}" != "0000000000000000000000000000000000000000" ]; then
+            DESDE="${ANTES}"
+            HASTA="${GITHUB_SHA}"
+          else
+            DESDE=""
+            HASTA=""
+          fi
+
+          # Fail-open RUIDOSO, jamas mudo: el plano del arbol sigue cerrando la
+          # compuerta sobre lo que hay hoy, pero se dice en voz alta que el otro
+          # no miro. Un fail-open silencioso fue el incidente del 2026-08-05 y
+          # no se repite.
+          if [ -z "${DESDE}" ] || [ -z "${HASTA}" ]; then
+            echo "::warning::sin rango de commits comparable (push inicial, rama nueva o dispatch manual): el PLANO DE LA HISTORIA no corrio. El del arbol si, asi que lo que hay hoy en el repo esta verificado — pero un secreto que este cambio haya introducido y borrado despues no se ve en esta corrida"
+          elif ! git cat-file -e "${DESDE}^{commit}" 2> /dev/null || ! git cat-file -e "${HASTA}^{commit}" 2> /dev/null; then
+            echo "::warning::faltan objetos del rango ${DESDE}..${HASTA} en este clon: el PLANO DE LA HISTORIA no corrio. Arreglo: el job del marco ya pide fetch-depth 0; si el consumidor hace su propio checkout antes, tiene que pedirlo tambien"
+          else
+            REPORTE_HISTORIA="${RUNNER_TEMP}/secretos-historia.json"
+            set +e
+            "${GITLEAKS}" git . --log-opts="${DESDE}..${HASTA}" \
+              --redact --no-banner --no-color \
+              --ignore-gitleaks-allow --gitleaks-ignore-path "${SIN_IGNORES}" \
+              --report-format json --report-path "${REPORTE_HISTORIA}" \
+              --exit-code 2 > "${TMP}/historia.log" 2>&1
+            RC=$?
+            set -e
+            if [ "${RC}" -ne 0 ] && [ "${RC}" -ne 2 ]; then
+              echo "::error::el detector no pudo completar el barrido de la historia del cambio (rc=${RC}, rango ${DESDE}..${HASTA}). Arreglo: reintenta la corrida; si persiste, reproducilo local con gitleaks ${VERSION_GITLEAKS} sobre ese mismo rango"
+              diagnostico "${TMP}/historia.log"
+              exit 1
+            fi
+            HISTORIA_CORRIO=true
+          fi
+
+          # --- Cruce con las declaraciones y reporte -------------------------
+          # El programa va inline y no en un archivo aparte, misma razon que el
+          # paso de enmascaramiento. Va sin comillas simples porque el programa
+          # entero viaja dentro de comillas simples de shell.
+          ARCHIVO_DECLARACIONES="${DECLARACIONES}" \
+          REPORTE_ARBOL="${REPORTE_ARBOL}" \
+          REPORTE_HISTORIA="${REPORTE_HISTORIA}" \
+          HISTORIA_CORRIO="${HISTORIA_CORRIO}" \
+          node -e '
+            const { readFileSync, existsSync, appendFileSync } = require("node:fs");
+
+            // ESTE PROGRAMA NUNCA LEE EL VALOR. De cada hallazgo toma archivo,
+            // linea, regla y descripcion. Los campos que CONTIENEN el secreto
+            // (Secret, Match) y los que identifican a una persona (Author,
+            // Email, Message) no se tocan nunca. Que el detector redacte es el
+            // cinturon; no leerlos son los tirantes: si manana la redaccion
+            // cambiara de comportamiento, este paso seguiria sin poder
+            // imprimir un valor, porque no lo tiene a mano.
+            const CAMPOS = (f, plano) => ({
+              plano: plano,
+              archivo: String(f.File || "").split("\\").join("/"),
+              regla: String(f.RuleID || "") || "(sin regla)",
+              linea: Number.isFinite(Number(f.StartLine)) ? Number(f.StartLine) : 0,
+              commit: String(f.Commit || "").slice(0, 12),
+              descripcion: String(f.Description || ""),
+            });
+
+            const escapar = (valor) =>
+              String(valor).replace(/%/g, "%25").replace(/\r/g, "%0D").replace(/\n/g, "%0A");
+
+            const ARCHIVO_DECL = process.env.ARCHIVO_DECLARACIONES;
+            const HISTORIA_CORRIO = process.env.HISTORIA_CORRIO === "true";
+            const FORMA = "{ \"archivo\": \"<ruta exacta relativa a la raiz>\", \"regla\": \"<id de la regla>\", \"motivo\": \"<por que no es un secreto>\" }";
+
+            let salida = 0;
+            const morir = (mensaje) => {
+              console.log("::error title=Deteccion de secretos::" + escapar(mensaje));
+              process.exit(1);
+            };
+
+            function leerReporte(ruta, plano) {
+              if (!ruta) return [];
+              let crudo;
+              try {
+                crudo = readFileSync(ruta, "utf8").trim();
+              } catch (error) {
+                morir("no se pudo leer el reporte del plano " + plano + " (" + error.message + "). Sin reporte no se declara que el repo este limpio");
+              }
+              let datos;
+              try {
+                datos = JSON.parse(crudo === "" ? "[]" : crudo);
+              } catch (error) {
+                morir("el reporte del plano " + plano + " no es JSON valido (" + error.message + "). Lo no verificable es rojo, nunca exito mudo");
+              }
+              if (!Array.isArray(datos)) morir("el reporte del plano " + plano + " no es una lista de hallazgos");
+              return datos.map((f) => CAMPOS(f, plano));
+            }
+
+            // --- Declaraciones de falso positivo ---------------------------
+            const declaraciones = [];
+            const invalidas = [];
+
+            if (existsSync(ARCHIVO_DECL)) {
+              let doc;
+              try {
+                doc = JSON.parse(readFileSync(ARCHIVO_DECL, "utf8"));
+              } catch (error) {
+                morir(ARCHIVO_DECL + " no parsea como JSON (" + error.message + "). Mientras no parsee NINGUNA declaracion aplica y todo hallazgo queda sin declarar. Arreglo: corregi el JSON");
+              }
+              const lista = doc && Array.isArray(doc.secretos) ? doc.secretos : null;
+              if (lista === null) {
+                morir(ARCHIVO_DECL + " no tiene la forma esperada. Arreglo: dejalo como { \"secretos\": [ " + FORMA + " ] }");
+              }
+              for (const cruda of lista) {
+                const archivo = typeof cruda?.archivo === "string" ? cruda.archivo.trim().split("\\").join("/") : "";
+                const regla = typeof cruda?.regla === "string" ? cruda.regla.trim() : "";
+                const motivo = typeof cruda?.motivo === "string" ? cruda.motivo.trim() : "";
+                if (!archivo) {
+                  invalidas.push({ archivo: "(vacio)", regla: regla, problema: "falta \"archivo\" (cadena no vacia)" });
+                  continue;
+                }
+                // Sin comodines, a proposito. Un patron amplio convierte una
+                // excepcion puntual en un permiso general sobre un arbol
+                // entero, y con secretos ese es el error que no se puede
+                // cometer: la declaracion nombra UN archivo.
+                if (/[*?\[\]]/.test(archivo)) {
+                  invalidas.push({ archivo: archivo, regla: regla, problema: "no se admiten comodines: una declaracion nombra un archivo exacto" });
+                  continue;
+                }
+                if (archivo.startsWith("/") || archivo.includes("..") || /^[A-Za-z]:/.test(archivo)) {
+                  invalidas.push({ archivo: archivo, regla: regla, problema: "la ruta debe ser relativa a la raiz del repo" });
+                  continue;
+                }
+                if (!regla) {
+                  invalidas.push({ archivo: archivo, regla: "(vacia)", problema: "falta \"regla\": es el id que imprime el error, p. ej. generic-api-key" });
+                  continue;
+                }
+                if (!motivo) {
+                  invalidas.push({ archivo: archivo, regla: regla, problema: "falta \"motivo\" (cadena no vacia): una excepcion sin razon escrita no es una excepcion, es un agujero" });
+                  continue;
+                }
+                // CUANTOS hallazgos cubre. Por defecto UNO, que es lo que es
+                // un falso positivo: una linea concreta que alguien miro. Sin
+                // esta cuenta la declaracion es un permiso abierto sobre el par
+                // (archivo, regla), y entonces el dia que alguien agrega un
+                // secreto DE VERDAD de esa misma regla a ese mismo archivo, la
+                // entrada se lo traga y el paso sale VERDE (comprobado). El
+                // numero se sube a mano, que es justo el momento en que alguien
+                // vuelve a mirar lo que esta perdonando.
+                let esperados = 1;
+                if (cruda?.hallazgos !== undefined) {
+                  if (!Number.isInteger(cruda.hallazgos) || cruda.hallazgos < 1) {
+                    invalidas.push({ archivo: archivo, regla: regla, problema: "\"hallazgos\" tiene que ser un entero >= 1 (o no estar, y entonces vale 1)" });
+                    continue;
+                  }
+                  esperados = cruda.hallazgos;
+                }
+                declaraciones.push({ archivo: archivo, regla: regla, motivo: motivo, esperados: esperados, arbol: 0, historia: 0, absorbidos: 0 });
+              }
+            }
+
+            // --- Cruce -----------------------------------------------------
+            const hallazgos = leerReporte(process.env.REPORTE_ARBOL, "arbol")
+              .concat(leerReporte(process.env.REPORTE_HISTORIA, "historia"));
+
+            const sinDeclarar = [];
+            for (const h of hallazgos) {
+              const d = declaraciones.find((x) => x.archivo === h.archivo && x.regla === h.regla);
+              if (d) { d[h.plano] += 1; continue; }
+              sinDeclarar.push(h);
+            }
+
+            // Se cuenta por plano y se toma el mayor: un falso positivo que
+            // ademas entra en los commits de este cambio aparece en los DOS
+            // planos, y contarlo dos veces obligaria a declarar un numero que
+            // cambia solo cuando el rango del PR pasa.
+            for (const d of declaraciones) d.absorbidos = Math.max(d.arbol, d.historia);
+
+            const muertas = declaraciones.filter((d) => d.absorbidos === 0);
+            const desajustadas = declaraciones.filter((d) => d.absorbidos > 0 && d.absorbidos !== d.esperados);
+            const vivas = declaraciones.filter((d) => d.absorbidos > 0 && d.absorbidos === d.esperados);
+
+            // --- Reporte ---------------------------------------------------
+            const filas = [];
+
+            for (const d of vivas) {
+              // Cada excepcion viva se imprime en CADA corrida y va al resumen
+              // del job. Una excepcion que nadie vuelve a ver es una excepcion
+              // que nadie vuelve a discutir.
+              console.log("::notice file=" + escapar(d.archivo) + ",title=Falso positivo declarado::" + escapar(d.motivo) + " (regla " + escapar(d.regla) + ")");
+              filas.push("| `" + d.archivo + "` | `" + d.regla + "` | " + d.absorbidos + " | " + d.motivo.split("|").join("\\|") + " |");
+            }
+
+            for (const h of sinDeclarar) {
+              salida = 1;
+              const donde = h.plano === "arbol"
+                ? "esta HOY en el arbol del repo"
+                : "entro en el commit " + h.commit + " de este cambio (aunque un commit posterior lo haya borrado: el valor quedo en la historia)";
+              // El mensaje trae el ARREGLO, y trae el ORDEN — que en esto es la
+              // mitad del arreglo: rotar primero. Y no trae el valor.
+              console.log(
+                "::error file=" + escapar(h.archivo) + ",line=" + h.linea + ",title=Secreto detectado (" + escapar(h.regla) + ")::" +
+                escapar(
+                  h.archivo + ":" + h.linea + " coincide con la regla \"" + h.regla + "\" (" + h.descripcion + ") y " + donde +
+                  ". El valor NO se imprime a proposito. Arreglo, EN ESTE ORDEN: (1) ROTA la credencial en su proveedor AHORA — un secreto que llego a un commit esta comprometido aunque lo borres, porque queda en la historia, en los clones, en los forks y en las cachas de la plataforma, y sacarlo del ultimo commit NO lo desactiva; (2) recien despues sacalo del codigo y hacelo viajar por referencia al gestor de secretos, como manda el marco; (3) la limpieza de la historia se coordina con una persona, no se resuelve sola en este PR. Si es un FALSO POSITIVO, declaralo en " +
+                  ARCHIVO_DECL + " con su motivo escrito: { \"archivo\": \"" + h.archivo + "\", \"regla\": \"" + h.regla + "\", \"motivo\": \"por que no es un secreto\" }. Un secreto REAL no se declara ahi ni se describe en el PR: se escala a una persona"
+                )
+              );
+            }
+
+            for (const i of invalidas) {
+              salida = 1;
+              console.log(
+                "::error file=" + escapar(ARCHIVO_DECL) + ",title=Declaracion invalida::" +
+                escapar("\"" + i.archivo + "\" / \"" + i.regla + "\": " + i.problema + ". Forma esperada: " + FORMA)
+              );
+            }
+
+            for (const d of muertas) {
+              salida = 1;
+              // Muerta = sobrevivio al hallazgo que la justificaba. Roja, igual
+              // que en el censo de fuentes: si no, queda repartiendo permiso
+              // sobre la nada, y el dia que ese archivo tenga un secreto de
+              // verdad de esa misma regla se lo traga en silencio.
+              const detalle = HISTORIA_CORRIO
+                ? "ya no corresponde a ningun hallazgo"
+                : "no corresponde a ningun hallazgo del arbol, y el plano de la historia no pudo correr en esta corrida";
+              console.log(
+                "::error file=" + escapar(ARCHIVO_DECL) + ",title=Declaracion muerta::" +
+                escapar("la declaracion de \"" + d.archivo + "\" / \"" + d.regla + "\" " + detalle + ", asi que esta repartiendo permiso sobre la nada. Arreglo: borra esa entrada de " + ARCHIVO_DECL + " (motivo que tenia escrito: " + d.motivo + ")")
+              );
+            }
+
+            for (const d of desajustadas) {
+              salida = 1;
+              // El caso que esto cierra, y que es el peor de todos porque sale
+              // en VERDE: la declaracion cubria UN falso positivo, y despues
+              // alguien agrego a ESE archivo otra coincidencia de ESA regla. Si
+              // la declaracion fuera un permiso abierto sobre el par (archivo,
+              // regla), el secreto nuevo entraria sin que nadie lo mire.
+              console.log(
+                "::error file=" + escapar(ARCHIVO_DECL) + ",title=La declaracion ya no cubre lo que decia::" +
+                escapar(
+                  "la declaracion de \"" + d.archivo + "\" / \"" + d.regla + "\" declara " + d.esperados +
+                  " hallazgo(s) y ese archivo ahora tiene " + d.absorbidos + ". Una declaracion cubre una cantidad EXACTA a proposito: sin eso queda como permiso abierto sobre el par archivo+regla, y una coincidencia NUEVA de esa misma regla en ese mismo archivo entraria en verde sin que nadie la mire. Arreglo: revisa las " +
+                  d.absorbidos + " coincidencias una por una. Si TODAS son falsos positivos, subi el numero con \"hallazgos\": " + d.absorbidos +
+                  " en esa entrada. Si alguna es un secreto REAL, no toques el numero: rota la credencial y escala a una persona. (motivo que tenia escrito: " + d.motivo + ")"
+                )
+              );
+            }
+
+            // La verdad de lo que se probo, ni una palabra mas: el detector
+            // reconoce FORMAS conocidas de credencial. "Cero hallazgos" no es
+            // "no hay secretos".
+            console.log(
+              "== deteccion de secretos == " + hallazgos.length + " hallazgo(s): " +
+              sinDeclarar.length + " sin declarar, " + vivas.length + " declarado(s) con motivo" +
+              (muertas.length ? ", " + muertas.length + " declaracion(es) muerta(s)" : "") +
+              (desajustadas.length ? ", " + desajustadas.length + " declaracion(es) que ya no cubren lo que decian" : "") +
+              (invalidas.length ? ", " + invalidas.length + " declaracion(es) invalida(s)" : "") +
+              (HISTORIA_CORRIO ? " (arbol + historia del cambio)" : " (SOLO arbol: ver el aviso de arriba)") +
+              ". Reconoce formas conocidas de credencial: cero hallazgos NO prueba que no haya secretos"
+            );
+
+            if (process.env.GITHUB_STEP_SUMMARY && filas.length) {
+              appendFileSync(
+                process.env.GITHUB_STEP_SUMMARY,
+                ["", "### Falsos positivos declarados del detector de secretos", "",
+                  "| Archivo | Regla | Hallazgos absorbidos | Motivo |", "|---|---|---|---|",
+                  ...filas, ""].join("\n")
+              );
+            }
+
+            process.exit(salida);
+          '
 
   # Veredicto agregado DEL MARCO. Reporta siempre (docs o codigo). No conoce el
   # build/test del producto: ese lo agrega el ci-ok del repo consumidor, que es
