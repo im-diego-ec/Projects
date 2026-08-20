@@ -813,24 +813,21 @@ jobs:
 
             if (hallazgos.length > 0 || ilegibles.length > 0) {
               console.log("== resumen == " + hallazgos.length + " script(s) enmascarando su fallo y " + ilegibles.length + " manifiesto(s) ilegible(s), sobre " + manifiestos.length + " manifiesto(s) rastreado(s)");
-              // Misma razon que en el paso de ejecutores, y por eso se arregla
-              // en los dos: process.exit() no espera el vaciado del stdout
-              // cuando la salida es un pipe, asi que en un repo con muchos
-              // hallazgos las anotaciones que pasan los 64 KiB del buffer se
-              // pierden. Aca todavia no se midio un corte porque ningun repo del
-              // area llega a esa cantidad de scripts, pero es el mismo defecto y
-              // no se deja plantado esperando al repo que si llegue.
+              // Misma razon que en el paso de ejecutores y por eso se arregla en
+              // los dos: process.exit() no espera el vaciado del stdout cuando la
+              // salida es un pipe, asi que en un repo con muchos hallazgos las
+              // anotaciones que pasan el buffer se pierden. Aca todavia no se
+              // midio un corte —ningun repo del area tiene tantos scripts— pero es
+              // el mismo defecto y no se deja plantado.
               process.exitCode = 1;
             } else {
               // La verdad de lo que se probo, ni una palabra mas. Este paso LEE
               // el texto del cuerpo, no ejecuta nada: no puede afirmar que los
               // scripts propaguen su codigo de salida, solo que ninguno cae en
-              // las formas de enmascaramiento que sabe reconocer. Decirlo de
-              // mas convertia el check en la fuente de la falsa tranquilidad que
-              // vino a eliminar. Va en el "else" y no suelto al final: con
-              // process.exitCode el programa NO corta en el rojo, asi que una
-              // linea suelta aca imprimiria "ninguno cae" abajo de la lista de
-              // los que si caen.
+              // las formas de enmascaramiento que sabe reconocer. Va en el "else"
+              // porque con process.exitCode el programa NO corta en el rojo, y una
+              // linea suelta al final imprimiria "ninguno cae" abajo de la lista
+              // de los que si caen.
               console.log(revisados + " script(s) de " + manifiestos.length + " manifiesto(s) leidos: ninguno cae en una forma de enmascaramiento conocida (una secuencia, lista and-or o pipeline cuyo estado final sale 0 pase lo que pase). Es lectura de forma y no ejecucion: NO prueba que el codigo de salida se propague");
             }
           ' "${RUNNER_TEMP}/manifiestos.txt"
@@ -1247,25 +1244,13 @@ jobs:
               return tokens;
             }
 
-            // LO QUE APORTA EL LENGUAJE ANFITRION, y no el comando. Un allowlist
-            // de agente escribe "Bash(<comando>:*)" para decir "con cualquier
-            // argumento": ese ":*" es puntuacion del formato donde vive la linea,
-            // no parte de ningun nombre. Va junto al sufijo de ejecutable porque
-            // las dos cosas son lo mismo desde la vereda del alfabeto: ruido que
-            // hay que sacar ANTES de comparar.
-            //
-            // POR QUE ESTA ACA ARRIBA Y NO PEGADO A paqueteDe, que era su unico
-            // usuario. El alfabeto se compara por IGUALDAD EXACTA en TRES sitios
-            // —el gestor, su subcomando y el paquete— y hasta la ronda del
-            // 2026-08-20 se limpiaba en uno. Medido sobre el paso de 61d604c,
-            // archivo por archivo y por codigo de salida: "Bash(npx openspec:*)"
-            // salia exit 1 (limpia en paqueteDe) y "Bash(npx:*)",
-            // "Bash(pnpm dlx:*)", "Bash(npm x:*)", "Bash(bunx:*)",
-            // "Bash(yarn dlx:*)", "Bash(bun x:*)" y "Bash(npm exec:*)" salian
-            // exit 0 SIN UNA SOLA LINEA de salida: misma herramienta, una
-            // ortografia de diferencia, 7 permisos permanentes de descargar y
-            // ejecutar que el check no veia. El comodin pegado al EJECUTOR en vez
-            // de al paquete lo cegaba entero.
+            // LO QUE APORTA EL LENGUAJE ANFITRION, y no el comando: el ":*" de una
+            // entrada de allowlist es puntuacion del formato donde vive la linea,
+            // no parte de ningun nombre. Se saca ANTES de comparar, y en LOS TRES
+            // sitios que comparan contra el alfabeto (gestor, subcomando,
+            // paquete). Hasta el 2026-08-20 se limpiaba en uno: diez ortografias
+            // salian exit 0 sin una sola linea de salida. El detalle medido esta
+            // en el CHANGELOG y fijado en pruebas/marco-ci/casos/ejecutores.md.
             const limpiar = (token) => token.replace(COMODIN_ALLOWLIST, "");
 
             // El nombre puede venir con ruta ("./node_modules/.bin/npx") y con
@@ -1320,25 +1305,15 @@ jobs:
                     pendientes.push(j + 2);
                   }
                 }
-                // EL GESTOR CON EL COMODIN PEGADO Y SIN SUBCOMANDO. Lo encontro
-                // el corpus con alfabeto propio en su primera corrida, y no yo:
-                // "Bash(npm:*)" autoriza CUALQUIER subcomando de npm, incluido
-                // "exec", asi que es el permiso mas ancho que se puede escribir
-                // para descargar y ejecutar, y salia exit 0 sin una sola linea.
-                //
-                // La condicion es angosta a proposito, y la angostura es lo que
-                // la hace usable: hace falta que el comodin del anfitrion este
-                // pegado AL GESTOR. Sin eso habria que tratar todo gestor sin
-                // subcomando reconocido como hallazgo, y entonces "npm ci",
-                // "npm run build" y "pnpm install" —cada linea de cada pipeline
-                // del area— saldrian marcadas. Un check que marca eso se apaga en
-                // el tercer PR y deja de proteger nada. Con el comodin pegado al
-                // gestor, "Bash(npm run build:*)" no dice nada (el comodin esta en
-                // otro token) y "Bash(npm:*)" si.
-                //
-                // Se empuja tokens.length: paqueteDe no encuentra argumento,
-                // sale "no le sigue ningun argumento" y la severidad la decide el
-                // mismo criterio de siempre — rojo en un allowlist, aviso afuera.
+                // EL GESTOR CON EL COMODIN PEGADO Y SIN SUBCOMANDO: autoriza
+                // CUALQUIER subcomando, "exec" incluido, o sea el permiso mas
+                // ancho que se puede escribir. Lo encontro el corpus, no una
+                // persona. La condicion exige el comodin pegado AL GESTOR y esa
+                // angostura es lo que la hace usable: sin ella habria que marcar
+                // todo gestor sin subcomando reconocido, o sea cada "npm ci" y
+                // cada "npm run build" del area. Se empuja tokens.length para que
+                // caiga en "no le sigue ningun argumento", con la severidad de
+                // siempre: rojo en un allowlist, aviso afuera.
                 if (!encontrado && COMODIN_ALLOWLIST.test(tokens[i].texto)) {
                   inicios.push(tokens.length);
                 }
@@ -1515,17 +1490,10 @@ jobs:
             if (sueltos.size > 0 || criticos.length > 0) {
               console.log("== resumen == " + sueltos.size + " invocacion(es) sin version exacta y " + criticos.length + " indeterminada(s) en un allowlist de agente, sobre " + archivos.size + " archivo(s) rastreado(s) con ejecutor");
               // process.exitCode y NO process.exit(): con process.exit() Node no
-              // espera a que se vacie el stdout cuando la salida es un pipe, y
-              // Actions siempre pone un pipe. Todo lo que pase el buffer del pipe
-              // se pierde. Medido en la corrida 32412180384 (ubuntu, node 24):
-              // de 1252 anotaciones llegaron 90, y 90 x 739 bytes = 66510, o sea
-              // el corte cae exactamente en los 65536 del buffer, y las vistas
-              // son un PREFIJO exacto de las esperadas (un defecto de lectura
-              // agrupa por forma, no por posicion). En Windows no se reproduce
-              // porque ahi el stdout de Node es sincronico: el banco de esta
-              // maquina daba verde sobre un reporte que en CI llegaba mutilado.
-              // El job igual quedaba rojo; lo que se perdia era el reporte que
-              // dice QUE arreglar, o sea el 93% de la utilidad del check.
+              // espera el vaciado del stdout cuando la salida es un pipe, que es
+              // lo que pone Actions, y lo que pase el buffer se pierde. Medido en
+              // la corrida 32412180384: de 1252 anotaciones llegaron 90, o sea
+              // 66510 bytes, el corte justo en los 65536 del buffer del pipe.
               process.exitCode = 1;
             } else {
               // La verdad de lo que se probo, ni una palabra mas.
