@@ -265,10 +265,56 @@ comparación es la comprobación de la tarea 0.7.
 |---|---|
 | Paquete y versión pinada | `bmad-method@6.11.0` (investigado el 2026-08-19 contra el repositorio y el registro de paquetes, según `design.md`) |
 | Licencia | MIT, con reserva de marcas de un tercero. Se la nombra por su nombre y no se la presenta como propia |
-| Comando de instalación, copiado verbatim del ensayo | PENDIENTE (decide: quien corra la tarea 1.4) |
-| Código de salida de la instalación | PENDIENTE (tarea 1.4) |
-| Qué pidió de verdad la instalación | PENDIENTE (tarea 1.4) |
+| Comando de instalación, copiado verbatim del ensayo | `npx --yes bmad-method@6.11.0 install --yes --modules bmm --tools claude-code --directory .` |
+| Código de salida de la instalación | **0**. Ensayado el 2026-08-20 en la máquina de @builder-uno, en un directorio desechable |
+| Qué pidió de verdad la instalación | **`uv`, la cadena de Python.** Ver el detalle abajo |
 
+**Lo que el ensayo midió, el 2026-08-20.** La tarea 1.1 la aprobó @builder-uno ese
+día; sin ese OK este ensayo no se podía correr, porque instalar la herramienta ES usar
+la dependencia de terceros.
+
+- **La respuesta a la pregunta que abría esta sección es SÍ: la herramienta necesita un
+  intérprete.** El instalador imprime `🐍 REQUIRED: uv` y explica que `uv` corre los
+  scripts de Python de los que dependen sus skills (`uv run <script>`) y provisiona el
+  intérprete él mismo. El alcance está acotado y es lo que hace que esto NO tumbe el
+  piloto: sin `uv`, lo que se cae son `bmad-build` y `bmad-build-auto` **al activarse**,
+  no la instalación ni las skills de elicitación. El paquete trae **31 scripts `.py`**, de
+  los que **27** aterrizan bajo `*/scripts/*`.
+- **Esta máquina ya tenía `uv 0.12.0`**, así que el chequeo del instalador pasó
+  (`✅ Python UV check pass`). **Lo que NO se midió es el comportamiento sin `uv`**, porque
+  no se desinstaló nada para averiguarlo. Ese es el hueco que queda y por eso la tarea 1.4
+  sigue exigiendo el ensayo **en la máquina que va a correr el brazo B**: si esa máquina no
+  es esta, el resultado de arriba no la representa.
+- **Lo que se descartó, comprobándolo:** los archivos `.pyc` que aparecen tras la
+  instalación **vienen en el paquete** (9, incluidos los de pytest), así que NO son prueba
+  de que Python haya corrido durante la instalación. La prueba de la dependencia es el
+  chequeo del instalador, no el caché.
+- **La instalación escribe 49 skills** en `.claude/skills/`, más `_bmad/` y
+  `_bmad-output/`. Unos 2,9 MB.
+- **Aviso de seguridad en cada corrida:** `npm warn deprecated glob@11.1.0: Old versions of
+  glob are not supported, and contain widely publicized security vulnerabilities`. Es una
+  dependencia transitiva de la herramienta, no del marco, y no se puede arreglar desde acá.
+
+**Dos colisiones con las compuertas del marco, medidas, que hay que resolver antes de que
+un repo commitee lo que la herramienta instala.** Ninguna tumba el piloto, porque el piloto
+corre en un espacio desechable; las dos muerden el día que Supply Chain sea un repo.
+
+1. **El paso «Sin marcadores del scaffold sin resolver» daría ROJO.** Reproduje el check
+   tal como corre (`git ls-files -z | xargs -0 grep -nIE '(^|[^$])\{\{[A-Z0-9_]+\}\}'`)
+   sobre 265 archivos rastreados: **2 archivos** de la herramienta traen marcadores
+   —`{{BODY}}`, `{{CHIPS}}`, `{{GOALBAR}}`, `{{M}}`, `{{N}}`, `{{TOTAL}}`— en
+   `.claude/skills/bmad-brainstorming/scripts/brain.py` y en
+   `.claude/skills/bmad-create-epics-and-stories/templates/epics-template.md`. Es la misma
+   forma del problema que el marco ya tiene escrita para el formateador: un rojo permanente
+   sobre archivos que ninguna persona escribió ni puede arreglar.
+2. **`git add` falla con `Filename too long`** en los `__pycache__` de la herramienta a una
+   profundidad de ruta normal en Windows. Se resuelve con `__pycache__/` y `*.pyc` en el
+   `.gitignore`, y con eso el índice se armó sin problemas (265 archivos).
+
+**Y una que salió bien, que vale anotar porque fue por diseño:** la herramienta escribe 49
+skills y **ninguna** con el prefijo `openspec-`, así que el check de artefactos regenerados
+—acotado a `.claude/skills/openspec-*/SKILL.md`, por nombre del generador y no por
+directorio— no las mira. Si ese check se hubiera acotado por carpeta, hoy estaría en rojo.
 **La forma del comando no es opcional.** Cualquier invocación que corra por un
 ejecutor que descarga se escribe con el paquete completo y su versión exacta. El
 nombre pelado de un paquete en npm lo puede tener otro, y el marco ya tiene el
@@ -311,10 +357,10 @@ bloqueantes duras para el lunes.
 
 | | Decisión | Quién | Cuándo | Estado |
 |---|---|---|---|---|
-| 1.1 | Usar una dependencia de terceros en el piloto, con su versión y su alcance de módulos. El OK para que el pin entre al carril de todos los consumidores es **otro** OK, y solo si el veredicto es verde | Builder 1 | antes de la primera sesión | PENDIENTE. **Bloqueante** |
+| 1.1 | Usar una dependencia de terceros en el piloto, con su versión y su alcance de módulos. El OK para que el pin entre al carril de todos los consumidores es **otro** OK, y solo si el veredicto es verde | Builder 1 | antes de la primera sesión | **RESUELTA: la tomó @builder-uno el 2026-08-20.** Alcance: `bmad-method@6.11.0`, módulo `bmm`, herramienta `claude-code`, en espacio desechable. El OK para que el pin entre al carril de los consumidores sigue PENDIENTE y es otro |
 | 1.2 | Dónde viven las transcripciones y si pueden pasar por un modelo. El repositorio no es su custodio (D3) | Builder 1, con el PO | antes de abrir el material | PENDIENTE. **Bloqueante**: sin esto no se abre el material el lunes |
 | 1.3 | Correr el piloto: reserva de tiempo del PO y de dos builders, y confirmación del reparto de roles de la sección 2 | Builder 1, PO (PO), Builder 2 | antes de la primera sesión | PENDIENTE |
-| 1.4 | Cadena de herramientas: instalación ensayada en la máquina del brazo B, con lo que pidió de verdad | quien corra el brazo B | antes de la primera sesión | PENDIENTE |
+| 1.4 | Cadena de herramientas: instalación ensayada en la máquina del brazo B, con lo que pidió de verdad | quien corra el brazo B | antes de la primera sesión | **PARCIAL**: ensayada el 2026-08-20 en la máquina de @builder-uno (exit 0, pide `uv`; sección 6). Sigue PENDIENTE si el brazo B corre en otra máquina, y PENDIENTE el caso sin `uv` |
 
 Cuando una se resuelve, se escribe acá **quién la tomó y en qué fecha**. Una
 decisión sin autor es una decisión que nadie va a poder discutir en seis meses.
