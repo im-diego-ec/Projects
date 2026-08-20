@@ -386,12 +386,36 @@ jobs:
           # artefacto ilegible, por ejemplo). El "|| true" los confundia: un
           # rc=2 dejaba declarados.txt vacio y el paso lo leia como "no hay
           # nada que verificar". Lo no verificable es rojo, nunca exito mudo.
-          set +e
-          echo "${ARTEFACTOS}" | xargs -r grep -n 'generatedBy:' > declarados.txt
-          RC=$?
-          set -e
-          if [ "${RC}" -gt 1 ]; then
-            echo "::error::no se pudieron inspeccionar los artefactos generados (grep rc=${RC}) — sin poder leerlos, no se declara que esten al dia"
+          #
+          # UN ARCHIVO POR ITERACION, y no "xargs grep". xargs COLAPSA los dos
+          # codigos: sale 123 si CUALQUIER hijo salio entre 1 y 125, asi que
+          # "no encontre nada" y "no pude leer" llegan con el mismo numero. Con
+          # la guarda RC>1 eso dejaba la rama del aviso en CODIGO MUERTO —el
+          # paso no podia salir amarillo nunca— y el repo SIN cabeceras, que es
+          # la clase mas atrasada y justo la que este check dice proteger,
+          # recibia un rojo que mentia sobre la causa y ofrecia el arreglo
+          # equivocado (medido el 2026-08-20: PIN=1.9.0 sobre un artefacto sin
+          # cabecera daba "grep rc=123" y exit 1).
+          #
+          # Y NO se arregla ignorando el 123: eso habria apagado el "no pude
+          # leer", que es el caso que TIENE que ser rojo. Los dos casos estan en
+          # pruebas/marco-ci/artefactos.test.mjs justamente para que ese parche
+          # no pase.
+          : > declarados.txt
+          ILEGIBLES=""
+          while IFS= read -r ARTEFACTO; do
+            [ -n "${ARTEFACTO}" ] || continue
+            set +e
+            grep -Hn 'generatedBy:' "${ARTEFACTO}" >> declarados.txt
+            RC=$?
+            set -e
+            if [ "${RC}" -gt 1 ]; then
+              ILEGIBLES="${ILEGIBLES}${ARTEFACTO} (grep rc=${RC}) "
+            fi
+          done <<< "${ARTEFACTOS}"
+
+          if [ -n "${ILEGIBLES}" ]; then
+            echo "::error::no se pudieron inspeccionar estos artefactos generados: ${ILEGIBLES}— sin poder leerlos, no se declara que esten al dia"
             exit 1
           fi
 
@@ -401,7 +425,12 @@ jobs:
             # vieja del CLI no emitia; pero callarse era declarar sano al repo
             # mas atrasado de todos, que es justo el incidente que motivo el
             # check.
-            echo "::warning::hay artefactos del CLI en ${DIRS[*]} pero ninguno declara con que version se genero, asi que este check no puede afirmar que esten al dia (suele ser un CLI anterior al estampado de 'generatedBy'). Arreglo: regeneralos con npx --yes @fission-ai/openspec@${PIN} update --force"
+            # El aviso NOMBRA los artefactos. Interpolaba ${DIRS[*]}, un array
+            # que un cambio anterior habia borrado: el mensaje salia mutilado y
+            # sin decir sobre que archivos hablaba, o sea el unico dato que el
+            # lector necesita para actuar.
+            LISTA=$(echo "${ARTEFACTOS}" | tr '\n' ' ')
+            echo "::warning::hay artefactos del CLI en este repo (${LISTA}) pero ninguno declara con que version se genero, asi que este check no puede afirmar que esten al dia (suele ser un CLI anterior al estampado de 'generatedBy'). Arreglo: regeneralos con npx --yes @fission-ai/openspec@${PIN} update --force"
             exit 0
           fi
 
@@ -918,12 +947,25 @@ jobs:
       #
       # La propiedad es sobre el EJECUTOR, no sobre una lista de paquetes
       # prohibidos que alguien tendria que mantener: npx, bunx, npm exec,
-      # pnpm dlx y yarn dlx DESCARGAN de npm cuando el binario no esta
-      # instalado, asi que su argumento tiene que quedar clavado a una version
-      # exacta. "pnpm exec" y "yarn exec" quedan fuera A PROPOSITO: leen
+      # npm x, bun x, pnpm dlx y yarn dlx DESCARGAN de npm cuando el binario no
+      # esta instalado, asi que su argumento tiene que quedar clavado a una
+      # version exacta. "pnpm exec" y "yarn exec" quedan fuera A PROPOSITO: leen
       # node_modules y fallan si el binario no esta —fallan CERRADO— y por eso
       # son la salida recomendada cuando el binario ya lo trae una dependencia
       # declarada del repo.
+      #
+      # EL ALFABETO SE COMPLETO POR MEDICION, no por lectura de la doc. La
+      # auditoria del 2026-08-20 encontro tres formas que descargan igual y que
+      # el check no veia, ninguna de ellas entre sus limites declarados: "npm x"
+      # (alias documentado de npm exec, probado por codigo de salida:
+      # `npm x --help` sale 0 y `npm zzzz --help` sale 1), "bun x" (bunx es su
+      # forma pegada) y cualquier BANDERA GLOBAL entre el gestor y su
+      # subcomando, porque el regex los exigia pegados y "pnpm --silent dlx" lo
+      # cegaba entero. Las tres median exit 0 con el mensaje "no hay nada que
+      # pinar", que es el peor verde posible: uno que afirma haber mirado. El
+      # banco de pruebas de este paso vive en pruebas/marco-ci/ y las tres
+      # formas estan ahi como casos, para que el alfabeto no se vuelva a quedar
+      # corto en silencio.
       #
       # POR QUE LA VERSION Y NO EL SCOPE. El scope no se puede exigir siempre
       # (prettier, eslint o vitest no tienen ninguno, y pedirlo seria un check
@@ -950,6 +992,19 @@ jobs:
       #   - Un repo que no versiona el allowlist de su agente (.claude entero
       #     en el .gitignore) esconde de este check justo el archivo donde
       #     aparecio el problema. Lo rastreado es lo unico que se puede mirar.
+      #
+      # SEVERIDAD PARTIDA, y por que. "No pude determinar que paquete corre" es
+      # ::warning:: en general —puede ser prosa que parece una invocacion— pero
+      # es ::error:: dentro del allowlist de un agente. Ahi la linea no es una
+      # invocacion que alguien vaya a revisar cuando falle: es un PERMISO
+      # permanente para descargar y ejecutar sin preguntar, que es exactamente
+      # la forma en que el problema aparecio de verdad. Medido el 2026-08-20:
+      # 'Bash(npx --yes openspec:*)' —la entrada citada literal en el riesgo—
+      # caia en indeterminado y salia exit 0, y un warning no pone rojo ningun
+      # job. Ademas el comodin del allowlist (":*", o sea "con cualquier
+      # argumento") ahora se recorta antes de leer el paquete, asi que esa misma
+      # entrada ya no queda indeterminada: se lee "openspec" sin version y el
+      # error dice exactamente que arreglar.
       - name: Ejecutores de paquetes pinados
         if: '!cancelled()'
         shell: bash
@@ -965,9 +1020,15 @@ jobs:
           # no perderse nada. Quien decide es el lector de abajo, que pone el
           # limite de palabra en serio (asi "npx-wrapper" y "mynpx" no entran).
           # Los .md salen por pathspec: ver el limite declarado arriba.
+          #
+          # El prefiltro NO puede ser mas angosto que el lector: si lo es, el
+          # paso sale exit 0 diciendo "no hay nada que pinar" sobre una linea
+          # que si trae un ejecutor, y eso es un verde que afirma haber mirado.
+          # Por eso acepta cualquier gestor + banderas + subcomando (exec, dlx,
+          # x) y deja que el lector descarte los que fallan cerrado.
           CANDIDATOS="${RUNNER_TEMP}/ejecutores.txt"
           set +e
-          git -c core.quotePath=false grep -I -n -E '(npx|bunx|npm[[:space:]]+exec|pnpm[[:space:]]+dlx|yarn[[:space:]]+dlx)' -- ':!*.md' > "${CANDIDATOS}"
+          git -c core.quotePath=false grep -I -n -E '(npx|bunx|(npm|pnpm|yarn|bun)([[:space:]]+-+[^[:space:]]+)*[[:space:]]+(exec|dlx|x))' -- ':!*.md' > "${CANDIDATOS}"
           RC=$?
           set -e
           if [ "${RC}" -gt 1 ]; then
@@ -993,7 +1054,38 @@ jobs:
             // "mynpx"; el lookahead de atras acepta el separador real de una
             // invocacion, incluidas las comillas de un array JSON
             // ("command": ["npx","prisma","migrate","deploy"]).
-            const EJECUTOR = /(^|[^A-Za-z0-9_.\/@-])(npx|bunx|npm[ \t]+exec|pnpm[ \t]+dlx|yarn[ \t]+dlx)(?=[ \t"\x27,]|$)/g;
+            //
+            // BANDERAS entre el gestor y su subcomando: "pnpm --silent dlx"
+            // descarga igual que "pnpm dlx", y exigirlos pegados cegaba el
+            // check con cualquier bandera global (medido: exit 0). Se toleran
+            // banderas, y solo ahi: la tolerancia NO puede arrastrar a los
+            // ejecutores que fallan cerrado, asi que "pnpm exec" y "yarn exec"
+            // siguen fuera del alfabeto con banderas y sin ellas.
+            //
+            // VA EN UN SOLO LITERAL, largo y todo, y no armado por pedazos en un
+            // array de strings. El motivo es el mismo que el de la regla de los
+            // comentarios: este bloque NOMBRA los ejecutores para definirlos, y
+            // el check se lee a si mismo. Como lista de strings, cada "npx"
+            // queda seguido de una comilla y una coma —separadores que el
+            // lookahead acepta— y el paso avisaba sobre sus PROPIAS lineas en
+            // cada corrida (medido: 2 ::warning:: sobre marco-ci.yml). En el
+            // literal cada nombre queda seguido de "|" o de "(", que no son
+            // separadores de invocacion, asi que el check es inmune a su propia
+            // definicion por construccion y no por suerte.
+            const EJECUTOR = /(^|[^A-Za-z0-9_.\/@-])(npx|bunx|npm(?:[ \t]+-{1,2}[A-Za-z][^ \t]*)*[ \t]+(?:exec|x)|bun(?:[ \t]+-{1,2}[A-Za-z][^ \t]*)*[ \t]+x|pnpm(?:[ \t]+-{1,2}[A-Za-z][^ \t]*)*[ \t]+dlx|yarn(?:[ \t]+-{1,2}[A-Za-z][^ \t]*)*[ \t]+dlx)(?=[ \t"\x27,]|$)/g;
+
+            // El allowlist de un agente escribe "Bash(<comando>:*)" para decir
+            // "con cualquier argumento". Ese ":*" no puede ser parte de un
+            // nombre de paquete, y sin recortarlo la entrada que ORIGINO este
+            // check —"Bash(npx --yes openspec:*)", citada literal en el
+            // riesgo— caia en "no pude determinar el paquete" y degradaba a
+            // ::warning:: con exit 0. Recortado, el paquete es "openspec", sin
+            // version, y el error dice exactamente que arreglar.
+            const COMODIN_ALLOWLIST = /:\*$/;
+
+            // Donde lo indeterminado es ROJO y no aviso: ver la severidad
+            // partida en el comentario de arriba.
+            const ALLOWLIST = /(^|\/)\.claude\/settings(\.[A-Za-z0-9_-]+)?\.json$/;
 
             // [@scope/]nombre[@loquesea]
             const SPEC = /^(@[a-z0-9][a-z0-9._~-]*\/)?[a-z0-9][a-z0-9._~-]*(@(.*))?$/i;
@@ -1009,7 +1101,8 @@ jobs:
             const escapar = (valor) =>
               String(valor).replace(/%/g, "%25").replace(/\r/g, "%0D").replace(/\n/g, "%0A");
 
-            const limpiar = (token) => token.replace(ABRE, "").replace(CIERRA, "");
+            const limpiar = (token) =>
+              token.replace(ABRE, "").replace(CIERRA, "").replace(COMODIN_ALLOWLIST, "");
 
             // El primer argumento que NO es bandera es el paquete. --package y
             // -p lo mueven de lugar, y --no-install vuelve la invocacion
@@ -1066,12 +1159,12 @@ jobs:
                 const paquete = paqueteDe(texto.slice(encontrado.index + encontrado[0].length));
                 if (paquete && paquete.exento) { exentos += 1; continue; }
                 if (paquete === null) {
-                  dudosos.push({ ruta: ruta, linea: numero, motivo: "no le sigue ningun argumento" });
+                  dudosos.push({ ruta: ruta, linea: numero, motivo: "no le sigue ningun argumento", critico: ALLOWLIST.test(ruta) });
                   continue;
                 }
                 const partes = paquete.match(SPEC);
                 if (!partes) {
-                  dudosos.push({ ruta: ruta, linea: numero, motivo: "lo que sigue (" + paquete + ") no tiene forma de nombre de paquete" });
+                  dudosos.push({ ruta: ruta, linea: numero, motivo: "lo que sigue (" + paquete + ") no tiene forma de nombre de paquete", critico: ALLOWLIST.test(ruta) });
                   continue;
                 }
                 const version = partes[3];
@@ -1095,12 +1188,22 @@ jobs:
               console.log("::error file=" + escapar(item.ruta) + ",line=" + item.linea + "::la invocacion de \"" + escapar(item.paquete) + "\" " + escapar(item.motivo) + ", y corre por un ejecutor que DESCARGA el paquete de npm si no esta instalado. En npm hay nombres pelados ocupados por placeholders ajenos, asi que esto puede terminar ejecutando otra cosa y \"funcionando\" sin hacer nada. Arreglo, una de dos: si el binario ya lo trae una dependencia declarada del repo, corrilo con \"pnpm exec <comando>\", que lee node_modules y falla si no esta en vez de salir a buscarlo; si de verdad hay que traerlo de npm, escribi el argumento completo —con su scope si lo tiene y su version exacta— en la forma <paquete>@<X.Y.Z>, en vez del nombre pelado");
             }
 
+            // Lo indeterminado avisa en general y ES ROJO dentro de un
+            // allowlist de agente: alla la linea no es una invocacion que
+            // alguien vaya a revisar cuando falle, es un permiso permanente
+            // para descargar y ejecutar, y un ::warning:: no pone rojo ningun
+            // job.
+            const criticos = dudosos.filter((item) => item.critico);
             for (const item of dudosos) {
-              console.log("::warning file=" + escapar(item.ruta) + ",line=" + item.linea + "::hay un ejecutor de paquetes en esta linea y no se pudo determinar que paquete corre (" + escapar(item.motivo) + "), asi que este check NO la esta cubriendo. Arreglo: si es prosa, reescribila para que no parezca una invocacion; si es una invocacion real, dejala en la forma que el check sabe leer: el ejecutor, despues sus banderas, y despues el paquete escrito <nombre>@<X.Y.Z>");
+              const nivel = item.critico ? "error" : "warning";
+              const cola = item.critico
+                ? ". Esta linea vive en un ALLOWLIST de agente: no es una invocacion que alguien vaya a revisar cuando falle, es un permiso permanente para descargar y ejecutar sin preguntar, asi que aca lo que no se puede leer es rojo y no aviso. Arreglo: escribi la entrada con el paquete completo y su version exacta (<paquete>@<X.Y.Z>); si lo que querias era permitir cualquier argumento, el comodin va DESPUES del paquete pinado"
+                : ", asi que este check NO la esta cubriendo. Arreglo: si es prosa, reescribila para que no parezca una invocacion; si es una invocacion real, dejala en la forma que el check sabe leer: el ejecutor, despues sus banderas, y despues el paquete escrito <nombre>@<X.Y.Z>";
+              console.log("::" + nivel + " file=" + escapar(item.ruta) + ",line=" + item.linea + "::hay un ejecutor de paquetes en esta linea y no se pudo determinar que paquete corre (" + escapar(item.motivo) + ")" + cola);
             }
 
-            if (sueltos.length > 0) {
-              console.log("== resumen == " + sueltos.length + " invocacion(es) sin version exacta, sobre " + archivos.size + " archivo(s) rastreado(s) con ejecutor");
+            if (sueltos.length > 0 || criticos.length > 0) {
+              console.log("== resumen == " + sueltos.length + " invocacion(es) sin version exacta y " + criticos.length + " indeterminada(s) en un allowlist de agente, sobre " + archivos.size + " archivo(s) rastreado(s) con ejecutor");
               process.exit(1);
             }
 
@@ -1196,15 +1299,42 @@ jobs:
           #   .gitleaksignore  -> lista de huellas.
           #   "gitleaks:allow" -> comentario al final de la linea. Comprobado:
           #                       baja el hallazgo a cero en silencio.
-          # Los dos archivos son rojo si estan versionados; el comentario se
-          # desactiva con --ignore-gitleaks-allow. Queda un unico canal, el del
-          # marco, y ese exige archivo exacto + regla + motivo.
+          # Los dos archivos son rojo si ESTAN; el comentario se desactiva con
+          # --ignore-gitleaks-allow. Queda un unico canal, el del marco, y ese
+          # exige archivo exacto + regla + motivo.
+          #
+          # PRESENCIA EN DISCO, no en el indice. Esto se decidia con
+          # "git ls-files --error-unmatch", que solo ve lo RASTREADO, y la
+          # auditoria del 2026-08-20 midio el agujero: un .gitleaks.toml SIN
+          # RASTREAR con useDefault = false dejaba el plano de la historia en
+          # exit 0 —VERDE, imprimiendo "(arbol + historia del cambio)"— y un
+          # .gitleaksignore sin rastrear con la huella del hallazgo, lo mismo.
+          # El consumidor elige el runner (input "runner") y en un runner propio
+          # actions/checkout NO limpia lo no rastreado, asi que "no esta en el
+          # indice" no significa "no esta ahi cuando el detector corre". Se dice
+          # ademas si esta versionado o no, porque el arreglo es distinto:
+          # borrarlo del repo, o limpiar el runner.
           for PROPIA in .gitleaks.toml .gitleaksignore; do
-            if git ls-files --error-unmatch "${PROPIA}" > /dev/null 2>&1; then
-              echo "::error file=${PROPIA}::este repo versiona ${PROPIA}, que puede apagar el detector entero sin motivo escrito y sin que aparezca en ninguna corrida. El marco admite UNA sola via de excepcion. Arreglo: borra ${PROPIA} y declara cada falso positivo en ${DECLARACIONES}, con su motivo"
+            if [ -e "${PROPIA}" ]; then
+              COMO="sin rastrear (quedo en el runner, no en el repo)"
+              if git ls-files --error-unmatch "${PROPIA}" > /dev/null 2>&1; then
+                COMO="versionado"
+              fi
+              echo "::error file=${PROPIA}::este repo tiene ${PROPIA} ${COMO}, y ese archivo puede apagar el detector entero sin motivo escrito y sin que aparezca en ninguna corrida. El marco admite UNA sola via de excepcion. Arreglo: saca ${PROPIA} y declara cada falso positivo en ${DECLARACIONES}, con su motivo"
               exit 1
             fi
           done
+
+          # SEXTO CANAL, el ultimo eslabon de la precedencia y el que quedaba
+          # abierto. La precedencia documentada de la herramienta es
+          #   --config > GITLEAKS_CONFIG > GITLEAKS_CONFIG_TOML > <destino>/.gitleaks.toml
+          # y este paso no pasaba --config, asi que el archivo del DESTINO
+          # seguia decidiendo las reglas. Pasando una config propia del marco,
+          # ese eslabon sale de la cadena: el rojo por presencia de arriba es la
+          # puerta y esto es el cerrojo. La config no inventa reglas —extiende
+          # las que trae el binario— asi que el universo detectado no cambia.
+          CONFIG="${RUNNER_TEMP}/gitleaks-marco.toml"
+          printf '%s\n' '[extend]' 'useDefault = true' > "${CONFIG}"
 
           # La salida del detector NO se vuelca cruda al log de CI. Se usa en
           # una sola rama —la de "no pudo correr"— y esa es justo la rama en la
@@ -1243,8 +1373,14 @@ jobs:
           GITLEAKS="${TMP}/gitleaks"
           "${GITLEAKS}" version
 
-          # Directorio vacio: neutraliza el .gitleaksignore que la herramienta
-          # busca sola en el directorio de trabajo. Cinturon del rojo de arriba.
+          # Directorio vacio para el .gitleaksignore que la herramienta busca
+          # sola. Se mantiene porque no cuesta nada, pero NO es un cinturon y el
+          # comentario que lo llamaba asi era falso: medido sobre 8.30.1 con los
+          # flags exactos de este paso, un .gitleaksignore en el directorio de
+          # trabajo sigue callando el hallazgo con --gitleaks-ignore-path
+          # apuntando a un directorio vacio (exit 0 con el archivo, exit 2 sin
+          # el). El cierre real de ese canal es el rojo por presencia en disco de
+          # arriba.
           SIN_IGNORES="${TMP}/sin-ignores"
           mkdir -p "${SIN_IGNORES}"
 
@@ -1265,6 +1401,7 @@ jobs:
           REPORTE_ARBOL="${RUNNER_TEMP}/secretos-arbol.json"
           set +e
           ( cd "${ARBOL}" && "${GITLEAKS}" dir . \
+              --config "${CONFIG}" \
               --redact --no-banner --no-color \
               --ignore-gitleaks-allow --gitleaks-ignore-path "${SIN_IGNORES}" \
               --report-format json --report-path "${REPORTE_ARBOL}" \
@@ -1306,7 +1443,27 @@ jobs:
           else
             REPORTE_HISTORIA="${RUNNER_TEMP}/secretos-historia.json"
             set +e
-            "${GITLEAKS}" git . --log-opts="${DESDE}..${HASTA}" \
+            # --diff-merges NO es cosmetico y es el agujero mas caro que la
+            # auditoria del 2026-08-20 encontro en este paso: "gitleaks git"
+            # corre "git log -p", y git log SUPRIME los diffs de los merges por
+            # defecto. Un secreto que entra en la RESOLUCION de un merge y se
+            # borra en el commit siguiente salia exit 0, 0 hallazgos,
+            # imprimiendo "(arbol + historia del cambio)" — o sea afirmando una
+            # cobertura que no tuvo. Medido sobre el fixture:
+            # "git log -p A..H | grep -c" da 0 y con el diff de merge da 2. Y
+            # traer main a la rama de trabajo es EL flujo diario de este marco
+            # (la historia de un-proyecto-anterior ya tiene "Merge branch main
+            # into feat/consumir-projects"), asi que el agujero estaba justo en el
+            # camino mas transitado. Un fail-open que dice que corrio es el
+            # incidente del 2026-08-05 otra vez.
+            #
+            # first-parent y no -m: el diff contra el padre de la rama de trabajo
+            # ya contiene la resolucion, y -m repetiria cada merge una vez por
+            # padre. Consecuencia asumida: el diff de un merge de main tambien
+            # muestra lo que main trae, que es contenido que el plano del arbol
+            # ya cubre, asi que suma ruido y no falsos rojos nuevos.
+            "${GITLEAKS}" git . --log-opts="--diff-merges=first-parent ${DESDE}..${HASTA}" \
+              --config "${CONFIG}" \
               --redact --no-banner --no-color \
               --ignore-gitleaks-allow --gitleaks-ignore-path "${SIN_IGNORES}" \
               --report-format json --report-path "${REPORTE_HISTORIA}" \
@@ -1443,30 +1600,62 @@ jobs:
                   }
                   esperados = cruda.hallazgos;
                 }
-                declaraciones.push({ archivo: archivo, regla: regla, motivo: motivo, esperados: esperados, arbol: 0, historia: 0, absorbidos: 0 });
+                declaraciones.push({ archivo: archivo, regla: regla, motivo: motivo, esperados: esperados, arbol: 0, historia: 0, absorbidos: 0, lineasArbol: new Set() });
               }
             }
 
             // --- Cruce -----------------------------------------------------
-            const hallazgos = leerReporte(process.env.REPORTE_ARBOL, "arbol")
-              .concat(leerReporte(process.env.REPORTE_HISTORIA, "historia"));
+            const delArbol = leerReporte(process.env.REPORTE_ARBOL, "arbol");
+            const deLaHistoria = leerReporte(process.env.REPORTE_HISTORIA, "historia");
+            const hallazgos = delArbol.concat(deLaHistoria);
+
+            const declaracionDe = (h) =>
+              declaraciones.find((x) => x.archivo === h.archivo && x.regla === h.regla);
 
             const sinDeclarar = [];
-            for (const h of hallazgos) {
-              const d = declaraciones.find((x) => x.archivo === h.archivo && x.regla === h.regla);
-              if (d) { d[h.plano] += 1; continue; }
-              sinDeclarar.push(h);
+
+            // EL CRUCE NO SE HACE POR CANTIDAD, y ese era el agujero. Antes se
+            // contaba cada plano y se tomaba absorbidos = max(arbol, historia).
+            // Medido el 2026-08-20: un archivo con 2 falsos positivos
+            // declarados (hallazgos: 2) ABSORBIA una coincidencia NUEVA de la
+            // MISMA regla que entraba y se borraba dentro del PR —arbol 2,
+            // historia 1, max 2, igual a lo declarado— y el paso salia exit 0
+            // diciendo "3 hallazgo(s): 0 sin declarar". Un archivo con falsos
+            // positivos declarados se volvia punto ciego para su propia regla,
+            // en verde, en un check de seguridad.
+            //
+            // El plano del ARBOL sigue siendo una cantidad exacta: es la unica
+            // estable (es lo que hay HOY en el archivo) y es la que alguien
+            // puede mirar linea por linea. El plano de la HISTORIA no se cuenta
+            // contra nada: un hallazgo suyo lo absorbe la declaracion solo si
+            // cae en una de las lineas que la declaracion ya cubre en el arbol.
+            // Asi la coincidencia que entro y se borro —que por definicion NO
+            // esta en el arbol— no tiene donde entrar, y al mismo tiempo un
+            // falso positivo que el PR toca de nuevo no obliga a declarar un
+            // numero que cambia cuando el rango del PR pasa.
+            //
+            // Limite declarado: si la linea de un falso positivo declarado se
+            // MUEVE dentro del rango, el plano de la historia lo reporta como
+            // no cubierto. Es rojo del lado conservador en un check de
+            // seguridad, con el mensaje diciendo exactamente eso.
+            for (const h of delArbol) {
+              const d = declaracionDe(h);
+              if (!d) { sinDeclarar.push(h); continue; }
+              d.arbol += 1;
+              d.lineasArbol.add(h.linea);
             }
 
-            // Se cuenta por plano y se toma el mayor: un falso positivo que
-            // ademas entra en los commits de este cambio aparece en los DOS
-            // planos, y contarlo dos veces obligaria a declarar un numero que
-            // cambia solo cuando el rango del PR pasa.
-            for (const d of declaraciones) d.absorbidos = Math.max(d.arbol, d.historia);
+            for (const h of deLaHistoria) {
+              const d = declaracionDe(h);
+              if (d && d.lineasArbol.has(h.linea)) { d.historia += 1; continue; }
+              sinDeclarar.push(d ? Object.assign({}, h, { declaradaPero: d }) : h);
+            }
 
-            const muertas = declaraciones.filter((d) => d.absorbidos === 0);
-            const desajustadas = declaraciones.filter((d) => d.absorbidos > 0 && d.absorbidos !== d.esperados);
-            const vivas = declaraciones.filter((d) => d.absorbidos > 0 && d.absorbidos === d.esperados);
+            for (const d of declaraciones) d.absorbidos = d.arbol;
+
+            const muertas = declaraciones.filter((d) => d.arbol === 0);
+            const desajustadas = declaraciones.filter((d) => d.arbol > 0 && d.arbol !== d.esperados);
+            const vivas = declaraciones.filter((d) => d.arbol > 0 && d.arbol === d.esperados);
 
             // --- Reporte ---------------------------------------------------
             const filas = [];
@@ -1484,13 +1673,20 @@ jobs:
               const donde = h.plano === "arbol"
                 ? "esta HOY en el arbol del repo"
                 : "entro en el commit " + h.commit + " de este cambio (aunque un commit posterior lo haya borrado: el valor quedo en la historia)";
+              // Cuando hay una declaracion para ese par archivo+regla y aun asi
+              // el hallazgo no queda cubierto, decirlo es la mitad del mensaje:
+              // si no, el lector va a mirar la declaracion, ver el numero que
+              // "coincide" y creer que el check se equivoco.
+              const pese = h.declaradaPero
+                ? " OJO: hay una declaracion de falso positivo para \"" + h.declaradaPero.archivo + "\" / \"" + h.declaradaPero.regla + "\" y NO cubre esta coincidencia. Una declaracion cubre las coincidencias que ese archivo tiene HOY, una por una y por linea, no una cantidad que se pueda llenar con cualquier hallazgo: sin eso, el dia que entra un secreto de verdad de esa misma regla en ese mismo archivo la declaracion se lo traga y el paso sale en verde. Si esta coincidencia es el MISMO falso positivo y su linea se movio dentro del rango del cambio, revisala igual y decilo en el PR; si es un secreto real, rota primero."
+                : "";
               // El mensaje trae el ARREGLO, y trae el ORDEN — que en esto es la
               // mitad del arreglo: rotar primero. Y no trae el valor.
               console.log(
                 "::error file=" + escapar(h.archivo) + ",line=" + h.linea + ",title=Secreto detectado (" + escapar(h.regla) + ")::" +
                 escapar(
-                  h.archivo + ":" + h.linea + " coincide con la regla \"" + h.regla + "\" (" + h.descripcion + ") y " + donde +
-                  ". El valor NO se imprime a proposito. Arreglo, EN ESTE ORDEN: (1) ROTA la credencial en su proveedor AHORA — un secreto que llego a un commit esta comprometido aunque lo borres, porque queda en la historia, en los clones, en los forks y en las cachas de la plataforma, y sacarlo del ultimo commit NO lo desactiva; (2) recien despues sacalo del codigo y hacelo viajar por referencia al gestor de secretos, como manda el marco; (3) la limpieza de la historia se coordina con una persona, no se resuelve sola en este PR. Si es un FALSO POSITIVO, declaralo en " +
+                  h.archivo + ":" + h.linea + " coincide con la regla \"" + h.regla + "\" (" + h.descripcion + ") y " + donde + "." + pese +
+                  " El valor NO se imprime a proposito. Arreglo, EN ESTE ORDEN: (1) ROTA la credencial en su proveedor AHORA — un secreto que llego a un commit esta comprometido aunque lo borres, porque queda en la historia, en los clones, en los forks y en las cachas de la plataforma, y sacarlo del ultimo commit NO lo desactiva; (2) recien despues sacalo del codigo y hacelo viajar por referencia al gestor de secretos, como manda el marco; (3) la limpieza de la historia se coordina con una persona, no se resuelve sola en este PR. Si es un FALSO POSITIVO, declaralo en " +
                   ARCHIVO_DECL + " con su motivo escrito: { \"archivo\": \"" + h.archivo + "\", \"regla\": \"" + h.regla + "\", \"motivo\": \"por que no es un secreto\" }. Un secreto REAL no se declara ahi ni se describe en el PR: se escala a una persona"
                 )
               );
@@ -1541,7 +1737,8 @@ jobs:
             // reconoce FORMAS conocidas de credencial. "Cero hallazgos" no es
             // "no hay secretos".
             console.log(
-              "== deteccion de secretos == " + hallazgos.length + " hallazgo(s): " +
+              "== deteccion de secretos == " + hallazgos.length + " hallazgo(s) (" +
+              delArbol.length + " en el arbol, " + deLaHistoria.length + " en la historia del cambio): " +
               sinDeclarar.length + " sin declarar, " + vivas.length + " declarado(s) con motivo" +
               (muertas.length ? ", " + muertas.length + " declaracion(es) muerta(s)" : "") +
               (desajustadas.length ? ", " + desajustadas.length + " declaracion(es) que ya no cubren lo que decian" : "") +
@@ -1554,7 +1751,7 @@ jobs:
               appendFileSync(
                 process.env.GITHUB_STEP_SUMMARY,
                 ["", "### Falsos positivos declarados del detector de secretos", "",
-                  "| Archivo | Regla | Hallazgos absorbidos | Motivo |", "|---|---|---|---|",
+                  "| Archivo | Regla | Coincidencias en el arbol | Motivo |", "|---|---|---|---|",
                   ...filas, ""].join("\n")
               );
             }
