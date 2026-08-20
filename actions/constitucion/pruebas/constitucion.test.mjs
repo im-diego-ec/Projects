@@ -139,8 +139,16 @@ const VERSIONES_DOS = [
 const DENTRO_DE_LA_VENTANA = new Date("2026-09-01T00:00:00Z");
 const PASADO_EL_PLAZO = new Date("2026-10-01T00:00:00Z");
 
-function correr({ canonico, archivos, hoy, desvios = [], superficies = ["claude-code"], valores = VALORES_SINTETICOS }) {
-  return verificar({ canonico, valores, desvios, superficies, hoy, leer: lector(archivos) });
+function correr({
+  canonico,
+  archivos,
+  hoy,
+  desvios = [],
+  superficies = ["claude-code"],
+  valores = VALORES_SINTETICOS,
+  pins = [],
+}) {
+  return verificar({ canonico, valores, desvios, superficies, hoy, pins, leer: lector(archivos) });
 }
 
 function artefactoAlDia(canonico, { desvios = [], superficie = "claude-code", valores = VALORES_SINTETICOS } = {}) {
@@ -200,19 +208,18 @@ test("atrasado por una version en ventana: aviso", () => {
   assert.equal(de(resultado, "artefacto-divergente").length, 0);
 });
 
-// HUECO CONOCIDO, fijado por prueba a proposito. Reproducido por codigo de salida el
-// 2026-08-19 por el verificador de la tanda: subir a mano la version de la cabecera a
-// una que esta copia del marco no conoce hace que el cuerpo NO se compare contra nada.
-// O sea: se borra cualquier regla del artefacto y el check queda VERDE para siempre,
-// con una linea de diff.
+// EL HUECO QUE ESTABA FIJADO ACA COMO HUECO, ahora cerrado. Esta prueba decia, con
+// todas las letras, que subir a mano la version de la cabecera dejaba el cuerpo sin
+// comparar y salia AVISO: se podia borrar cualquier regla del artefacto y el check
+// quedaba verde. Reproducido por codigo de salida el 2026-08-19 y de nuevo el
+// 2026-08-20 (cuerpo amputado + version 9.9.9 -> exit 0 con 2 avisos). Con la action
+// convertida en el UNICO verificador del contenido, ese era el ultimo bypass, y el
+// cierre no es una decision pendiente: es aritmetica del sello.
 //
-// Esta prueba NO bendice el hueco: lo vuelve explicito y hace que cerrarlo sea un
-// cambio de prueba deliberado en vez de un descubrimiento. Sigue siendo aviso porque
-// la causa benigna existe (un consumidor pinado a un SHA viejo corre una copia del
-// marco anterior al artefacto, y ahi «no puedo verificar» no es «alguien violo la
-// regla»). El cierre propuesto, que es decision humana: con `GITHUB_ACTION_REF` = el
-// tag movil no hay pin que explique un artefacto mas nuevo, asi que ahi va rojo.
-test("HUECO: version adelantada a mano deja el cuerpo sin comparar (aviso, no rojo)", () => {
+// El sello cubre `version + secciones`, asi que el sha de la 1.3.0 no puede ser el sha
+// de ninguna otra version. Una cabecera que declara 9.9.9 y trae el sha que ESTA copia
+// calcula para su 1.3.0 se contradice sola: no hay marco mas nuevo en el medio.
+test("version adelantada a mano con el sello de esta copia: ROJO, no aviso", () => {
   const canonico = canonicoTemporal({ versiones: VERSIONES_UNA_EN_VENTANA });
   const alDia = artefactoAlDia(canonico);
   const manipulado = alDia
@@ -226,15 +233,60 @@ test("HUECO: version adelantada a mano deja el cuerpo sin comparar (aviso, no ro
     hoy: DENTRO_DE_LA_VENTANA,
   });
 
-  const adelantado = de(resultado, "artefacto-adelantado");
-  assert.equal(adelantado.length, 1);
-  assert.equal(adelantado[0].nivel, "warning");
-  // El mensaje tiene que nombrar la manipulacion, no solo ofrecer la explicacion
+  const incoherente = de(resultado, "artefacto-sello-incoherente");
+  assert.equal(incoherente.length, 1, JSON.stringify(resultado.hallazgos));
+  assert.equal(incoherente[0].nivel, "error");
+  // El mensaje tiene que explicar POR QUE es rojo y no ofrecer la explicacion
   // tranquila del pin: un revisor que lee "¿un pin a un SHA?" cierra la pestaña.
-  assert.match(adelantado[0].mensaje, /a mano/);
-  // Y acá está el hueco, escrito: el cuerpo editado NO se reporta como divergente.
-  assert.equal(de(resultado, "artefacto-divergente").length, 0);
-  assert.equal(resultado.rojos, 0);
+  assert.match(incoherente[0].mensaje, /a mano/);
+  assert.match(incoherente[0].mensaje, /sha/);
+  assert.ok(resultado.rojos > 0);
+  assert.equal(resultado.estado, "rojo");
+});
+
+// LA CAUSA BENIGNA SIGUE SIENDO AVISO, que es la otra mitad de la propiedad. Un
+// consumidor pinado a un SHA viejo corre una copia del marco anterior al artefacto: el
+// sello no coincide con el de esta copia y hay un pin fijo que lo explica, asi que «no
+// puedo verificar» no es «alguien violo la regla».
+test("artefacto mas nuevo con un pin fijo que lo explica: aviso, y dice que no comparo", () => {
+  const canonico = canonicoTemporal({ versiones: VERSIONES_UNA_EN_VENTANA });
+  const deOtroMarco = artefactoAlDia(canonico).replace(
+    cabecera({ version: "1.3.0", sha: canonico.sha, superficie: "claude-code" }),
+    cabecera({ version: "9.9.9", sha: "abcabcabcabc", superficie: "claude-code" }),
+  );
+  const resultado = correr({
+    canonico,
+    archivos: { ...CADENA_SANA, ".projects/AGENTS-marco.md": deOtroMarco },
+    hoy: DENTRO_DE_LA_VENTANA,
+    pins: [{ ruta: ".github/workflows/ci.yml", job: "constitucion", ref: "0123456789abcdef0123456789abcdef01234567" }],
+  });
+  const adelantado = de(resultado, "artefacto-adelantado");
+  assert.equal(adelantado.length, 1, JSON.stringify(resultado.hallazgos));
+  assert.equal(adelantado[0].nivel, "warning");
+  assert.match(adelantado[0].mensaje, /pin/);
+  assert.equal(de(resultado, "artefacto-sello-incoherente").length, 0);
+});
+
+// Y SIN PIN QUE LO EXPLIQUE, ROJO. Con el tag movil el consumidor corre siempre la
+// copia mas nueva del marco: un artefacto mas nuevo que ella no tiene explicacion
+// inocente, ni siquiera cuando el sello no delata nada.
+test("artefacto mas nuevo invocado solo con el tag movil: ROJO", () => {
+  const canonico = canonicoTemporal({ versiones: VERSIONES_UNA_EN_VENTANA });
+  const deOtroMarco = artefactoAlDia(canonico).replace(
+    cabecera({ version: "1.3.0", sha: canonico.sha, superficie: "claude-code" }),
+    cabecera({ version: "9.9.9", sha: "abcabcabcabc", superficie: "claude-code" }),
+  );
+  const resultado = correr({
+    canonico,
+    archivos: { ...CADENA_SANA, ".projects/AGENTS-marco.md": deOtroMarco },
+    hoy: DENTRO_DE_LA_VENTANA,
+    pins: [{ ruta: ".github/workflows/ci.yml", job: "constitucion", ref: "v1" }],
+  });
+  const adelantado = de(resultado, "artefacto-adelantado");
+  assert.equal(adelantado.length, 1, JSON.stringify(resultado.hallazgos));
+  assert.equal(adelantado[0].nivel, "error");
+  assert.match(adelantado[0].mensaje, /tag movil/);
+  assert.equal(resultado.estado, "rojo");
 });
 
 test("resellar la cabecera NO tapa una edicion del cuerpo", () => {

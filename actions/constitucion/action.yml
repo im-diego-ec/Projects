@@ -78,9 +78,14 @@ author: la organización
 #     archivo no son divergencia. Un reflujo de prosa del formateador SI lo es: el
 #     mecanismo para eso es .projects/ en el .prettierignore del proyecto, igual que
 #     los artefactos del CLI de OpenSpec.
-#   · Si el consumidor borra el artefacto Y el uses: del workflow, esto no lo caza.
-#     Eso lo cierra el ruleset de main exigiendo ci-ok con review de code owner
-#     sobre .github/workflows/.
+#   · Si el consumidor borra el artefacto Y el uses: del workflow, lo caza el modo
+#     "cableado" de esta misma action, que corre desde el marco-ci.yml —el carril que
+#     el consumidor hereda por llamar al workflow reusable— y PARSEA los workflows en
+#     vez de grepearlos: un job con `if: false`, una invocacion en modo escribir, un
+#     archivo en un subdirectorio que GitHub no ejecuta o un job que el ci-ok no
+#     espera cuentan como NO cableado, cada uno con su motivo impreso. Lo que sigue
+#     fuera de alcance es un cableado que llegue por un workflow reusable de terceros:
+#     haria falta leer otro repositorio.
 #   · El motivo de un desvio se verifica que EXISTA, no que sea sincero, y nada
 #     limita cuantos declara un proyecto.
 # ---------------------------------------------------------------------------
@@ -91,8 +96,25 @@ inputs:
       "verificar" (default) compara lo presente contra lo que el marco publica y
       falla segun la tabla de arriba. "escribir" renderiza los artefactos en el
       arbol de trabajo y no falla por estar atrasado, porque justamente lo arregla.
+      "cableado" no mira el artefacto: PARSEA los workflows del repo y verifica que
+      alguno invoque de verdad el modo verificar (en el primer nivel de
+      .github/workflows, disparado en pull_request o en push a la rama por defecto,
+      en modo verificar, sin un if constante falso ni continue-on-error, y colgado
+      del veredicto agregado ci-ok por needs). Lo invoca el marco-ci.yml, que es el
+      carril INDEPENDIENTE: borrar el job de la constitucion no apaga al que
+      denuncia que falta.
     required: false
     default: verificar
+  rama_por_defecto:
+    description: >-
+      Nombre de la rama por defecto del repositorio, para decidir si un workflow que
+      corre en "push" se dispara en el camino del cambio. Lo usa el modo "cableado" y
+      la deteccion de pins del modo verificar. Vacio = "main", la unica rama
+      permanente que el marco admite. Se pasa
+      ${{ github.event.repository.default_branch }} en vez de cablear una constante:
+      cual es esa rama lo sabe GitHub, no el marco.
+    required: false
+    default: main
   valores:
     description: >-
       Ruta del JSON con los valores del proyecto (los placeholders de dobles
@@ -194,6 +216,7 @@ runs:
       env:
         CONSTITUCION_MODO: ${{ inputs.modo }}
         CONSTITUCION_RAIZ: ${{ inputs.raiz }}
+        CONSTITUCION_RAMA_POR_DEFECTO: ${{ inputs.rama_por_defecto }}
         CONSTITUCION_VALORES: ${{ inputs.valores }}
         CONSTITUCION_DESVIOS: ${{ inputs.desvios }}
         CONSTITUCION_SUPERFICIES: ${{ inputs.superficies }}
