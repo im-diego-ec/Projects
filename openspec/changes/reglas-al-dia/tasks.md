@@ -176,6 +176,73 @@ contramedidas son obligatorias y esta es la primera.
       cinco casos con su fixture en `pruebas/cableado.test.mjs`, los cinco
       corridos contra el paso anterior dando `exit 0`, y las doce mutaciones del
       código nuevo matando a su prueba.
+      **Y corregido una TERCERA vez el 2026-08-20, que es el dato importante de
+      esta tarea**: las cinco condiciones cerraron los casos NOMBRADOS y se
+      declaró la clase cerrada; el refutador encontró la misma clase una
+      ortografía más adentro y midió VEINTE configuraciones más, todas `exit 0` y
+      todas mudas. Los cuatro huecos, con su arreglo derivado de la referencia de
+      GitHub Actions y no de los fixtures:
+      (a) **los filtros de disparo no se miraban**. La condición era «la clave
+      `pull_request` aparece en `on:`», así que pasaban `paths-ignore: ['**']`,
+      `paths-ignore` con los archivos que el check protege, `paths: [docs/**]`,
+      `branches: [gh-pages]`, `branches-ignore: [main]`, `types: [closed]` y
+      `types: [opened]` — y era una asimetría del propio código, que de `push` sí
+      comparaba `branches`. Ahora se evalúan TODAS las claves de filtro que la
+      referencia permite por evento, con un matcher escrito desde la hoja de
+      patrones (donde `?` y `+` son cuantificadores del carácter anterior, no
+      comodines) y con la regla de orden de los `!`. Cualquier filtro de `paths`
+      descalifica, por dos razones: el artefacto vence por FECHA —así que el PR
+      que no lo toca es justo donde el rojo tiene que salir— y un workflow
+      filtrado no reporta el check requerido en los PRs que saltea, que es el
+      error que ya costó una semana de ruleset.
+      (b) **`continue-on-error` se comparaba con identidad estricta contra
+      `true`**, así que `${{ true }}` y `"true"` tapaban el rojo en silencio. La
+      pregunta se invirtió: tapa todo lo que no se pueda demostrar FALSO. La
+      cadena `"false"` tapa, porque la referencia de expresiones dice que toda
+      cadena no vacía se castea a `true`.
+      (c) **la quinta condición medía la ARISTA del `needs`, no que el rojo
+      bloquee**, y ésta es la refutación profunda: la propiedad estaba mal
+      elegida. La doc de checks requeridos dice que un job salteado por un
+      condicional «reports Success» y «may not block merging», así que un `ci-ok`
+      con `needs` y sin `if: always()` sale VERDE con la compuerta en rojo; y con
+      `always()` sale verde igual si su `run:` no consulta `needs.<job>.result`.
+      Ahora se exigen las dos mitades, más que ningún job del `needs` de la
+      compuerta esté apagado (un job que cuelga de otro que nunca corre se saltea
+      siempre, y un salteado reporta Success).
+      (d) **la perilla del rastreo seguía enchufada un archivo más allá**:
+      `leerWorkflows` y `revisarScaffold` leían el directorio con `readdirSync`,
+      así que un `zz.yml` sin `git add` movía el veredicto de `exit 1` a `exit 0`
+      y el notice encima mentía nombrando `ci.yml`. Ahora el universo es
+      `git ls-files`, lo que no se pudo determinar NO cuenta, y el mensaje nombra
+      el archivo que cablea de verdad.
+      **RESIDUO DECLARADO**, no cerrado, y por qué es irreducible: el check lee
+      que el veredicto CONSULTA el resultado, no lo que su `run:` hace con el
+      valor; un script que lo lea, lo imprima y salga 0 pasaría. Cerrarlo exige
+      decidir el comportamiento de un shell arbitrario. La salida estructural es
+      que el veredicto lo emita una action del marco en vez del `run:` de cada
+      consumidor, y eso es un change propio y no un parche de este archivo.
+      Evidencia: las 20 configuraciones con su fixture en
+      `pruebas/refutaciones-ronda-3.test.mjs`, medidas en `exit 0` contra el
+      código de la ronda 2 y en `exit 1` después, más 14 mutaciones del código
+      nuevo matando a su prueba.
+- [ ] 3.8 La compuerta se EJERCITA como compuerta, y no sólo parsea. El paso
+      del carril independiente se había escrito como
+      `uses: im-diego-ec/Projects/actions/constitucion@v1`, y esa action no
+      existe todavía en el tag móvil ni en `main` (verificado con `git ls-tree`):
+      GitHub resuelve y DESCARGA las actions de un job en «Set up job», antes de
+      correr un solo paso y sin mirar el `if` de ningún paso, así que el job de
+      higiene del propio Projects moría antes de evaluar nada y toda la evidencia de
+      la compuerta era local. Como `uses:` no admite expresiones y una ruta local
+      dentro de un workflow reusable se resuelve contra el repo de QUIEN LLAMA, un
+      mismo paso no puede servir a los dos: la compuerta quedó partida en dos
+      caminos totales —el consumidor la hereda por `marco-ci.yml` con la ref
+      publicada, y el marco la corre en su propio `ci.yml` por
+      `./actions/constitucion`— y el veredicto `marco-ok` COBRA el salteo: un
+      `skipped` sólo es válido en el repo que distribuye el marco. Evidencia: el
+      `git ls-tree` de la ref, la corrida del comando exacto del paso sobre el
+      árbol del marco (`exit 0`, con el notice del skip del distribuidor), y dos
+      pruebas que resuelven toda referencia propia contra la base de objetos de
+      git.
 - [ ] 3.7 El sello NO es evadible subiéndole la versión a mano. Medido el
       2026-08-20: `version=1.3.0` -> `version=9.9.9` sobre un cuerpo amputado daba
       `exit 0` con avisos de `artefacto-adelantado`, porque el cuerpo no se
@@ -183,13 +250,28 @@ contramedidas son obligatorias y esta es la primera.
       ése era el último bypass. Dos discriminadores independientes, cada uno
       suficiente: el `sha` cubre `version + secciones`, así que una cabecera que
       declara una versión más nueva y trae el sha que esta copia calcula para la
-      suya se contradice sola; y si los workflows del repo invocan la action sólo
-      con el tag móvil, no hay pin que explique un artefacto más nuevo. La causa
-      benigna (un pin a un SHA o a un tag viejo) sigue siendo aviso. Se lee el
-      árbol y NO `GITHUB_ACTION_REF`: esa variable no está en la referencia de
-      variables de GitHub, verificado el 2026-08-20, y una garantía no se apoya en
-      algo indocumentado. Evidencia: `exit 0` antes y `exit 1` después sobre el
-      mismo fixture, más la rama del pin fijo quedando en aviso.
+      suya se contradice sola; y si ninguna invocación del repo pudo haber escrito
+      el artefacto, tampoco hay explicación inocente. Se lee el árbol y NO
+      `GITHUB_ACTION_REF`: esa variable no está en la referencia de variables de
+      GitHub, verificado el 2026-08-20, y una garantía no se apoya en algo
+      indocumentado.
+      **El segundo discriminador estaba mal medido, corregido el 2026-08-20 en la
+      ronda 3**: preguntaba «¿la ref es el tag móvil?», o sea una lista de UNA
+      ortografía, y el refutador la evadió con doce caracteres — con `@main`
+      `exit 0`, con `@refs/heads/main` `exit 0`, con `@v1.3.0` `exit 0`, con un pin
+      a SHA de 40 hex `exit 0` y SIN NINGUNA invocación `exit 0` (la ausencia de
+      pin se tomaba como pin). Sólo `@v1` exacto daba rojo, y `@main` corre la copia
+      más nueva igual que `v1`, así que la explicación inocente era falsa; encima el
+      marco RECOMIENDA pinar por SHA, o sea que el bypass lo premiaban otras
+      reglas. La pregunta correcta no es qué ortografía tiene la ref, es si en el
+      repo pueden correr DOS copias del marco: el artefacto lo escribe el modo
+      escribir de esta misma action, invocado por un workflow del propio repo, así
+      que si todas las invocaciones usan la MISMA ref el escritor corre el mismo
+      código que el verificador y no pudo emitir una versión más nueva. La causa
+      benigna es que el escritor y el verificador estén pinados DISTINTO, y eso se
+      ve en el árbol sin enumerar nada. Evidencia: los cinco `exit 0` de antes
+      contra los cinco `error` de después con el mismo cuerpo amputado, y la rama de
+      dos refs distintas quedando en aviso.
 - [ ] 3.2 Comparación con fin de línea normalizado y fuera del alcance del
       formateador. Evidencia: el mismo artefacto en CRLF y en LF dando el mismo
       veredicto.
@@ -228,6 +310,21 @@ contramedidas son obligatorias y esta es la primera.
       que el manifiesto no declaraba), con el agravante de que mutar el manifiesto
       no movía el veredicto del paso: seguía midiendo su propio arreglo. En una
       doble contabilidad la declaración siempre pierde contra el check.
+      **Y el piso se medía con palabras, corregido en dos pasos**: primero se
+      cerró el relleno de cadenas sueltas (`["lint", "test", ...]` se declaraba
+      100% cubierto porque la medición era una búsqueda en el archivo
+      concatenado), y se dejó declarado como límite que `Bash(echo lint)` contara
+      igual. La ronda 3 midió la consecuencia de ese límite: seis entradas
+      `Bash(echo <palabra>)` daban CERO avisos, o sea el piso entero satisfecho
+      por entradas que no corren ninguna verificación. Un límite declarado no deja
+      de ser un agujero. Ahora la entrada tiene que ejecutar el mismo PROGRAMA que
+      el ítem recomienda, y ese programa se DERIVA de la `entrada` del manifiesto
+      —no hay lista de programas escrita en el código, ni una blocklist de `echo`,
+      `true` y `printf` que envejecería—: `Bash(pnpm --filter api lint)` cubre
+      `lint` y `Bash(echo lint)` no cubre nada. Evidencia: 6 de 6 ítems sin cubrir
+      con el relleno ejecutable donde antes eran 0 de 6, el allowlist real del
+      scaffold seguido en verde, y la mutación que saca la comparación de programa
+      matando a su prueba.
       **Corregido otra vez el 2026-08-20 y por medición**: la propiedad se buscaba
       sobre el allowlist ENTERO concatenado, así que un allowlist de puro relleno
       —seis cadenas que no son entrada de permiso de nada:

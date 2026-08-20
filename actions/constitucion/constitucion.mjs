@@ -106,7 +106,7 @@ import { fileURLToPath } from "node:url";
 // para saber con que ref la invoca —que es lo que distingue un pin legitimo de una
 // cabecera editada a mano—. Una sola pieza lee YAML en esta action, por el mismo
 // motivo por el que hay un solo verificador del artefacto.
-import { esTagMovil, invocacionesDe, leerWorkflows, main as mainCableado } from "./cableado.mjs";
+import { invocacionesDe, leerWorkflows, main as mainCableado } from "./cableado.mjs";
 
 /** Días mínimos entre `publicada` y `exigible_desde`. Es `AGENTS.md` de Projects («un
  *  endurecimiento se estrena en modo aviso») convertido en campo obligatorio: el rojo
@@ -429,6 +429,29 @@ export function comandoDe(entrada) {
 }
 
 /**
+ * El PROGRAMA que un comando ejecuta: su primera palabra, salteando las asignaciones
+ * de entorno que la preceden (`AWS_PROFILE=x terraform plan` -> `terraform`), que es
+ * una forma que el propio allowlist del scaffold usa.
+ *
+ * POR QUÉ HACE FALTA. Sin esto, el piso se satisface con relleno EJECUTABLE. La ronda
+ * anterior cerró el relleno de palabras sueltas (`["lint", "test", ...]`) y declaró
+ * como límite que `Bash(echo lint)` contara igual. El refutador midió la consecuencia:
+ * `["Bash(echo lint)", "Bash(echo format:check)", ...]` daba CERO avisos, o sea el
+ * piso 100% cubierto con seis entradas que no corren ninguna verificación. Un límite
+ * declarado no deja de ser un agujero.
+ */
+export function programaDe(comando) {
+  for (const palabra of String(comando ?? "")
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean)) {
+    if (/^[A-Za-z_][A-Za-z0-9_]*=/.test(palabra)) continue;
+    return palabra.toLowerCase();
+  }
+  return "";
+}
+
+/**
  * ¿ESTA entrada del allowlist cubre ESTE ítem del piso?
  *
  * DOS CONDICIONES, y la segunda es la que faltaba. La propiedad (`cubre`) se busca
@@ -445,11 +468,21 @@ export function comandoDe(entrada) {
  * puede correr el linter sin pedir permiso», decía «en algún lugar del archivo
  * aparece la palabra lint». Un piso que se satisface con palabras no es un piso.
  *
- * LÍMITE DECLARADO, de la misma clase que el del paso de permisos: esto lee la FORMA
- * de la entrada, no ejecuta nada. Un `Bash(echo lint)` cuenta como cubierto porque
- * autoriza a `Bash` y lleva la palabra, y decirlo es mejor que insinuar que el check
- * distingue un comando de verdad de uno que sólo imprime. Lo que sí garantiza es que
- * la entrada autorice la MISMA herramienta que el ítem recomienda.
+ * TRES CONDICIONES, y la tercera es la de la ronda 3. La entrada tiene que autorizar
+ * la misma HERRAMIENTA que el ítem recomienda (`Bash`), llevar la propiedad con bordes
+ * de palabra, y ejecutar el MISMO PROGRAMA que el ítem recomienda (`pnpm`, `npx`). El
+ * programa NO es una lista escrita acá: se DERIVA de la `entrada` que el manifiesto
+ * recomienda, así que el día que el marco recomiende otro runner el check lo sigue sin
+ * que nadie edite esta función. Con eso, `Bash(pnpm --filter api lint)` cubre `lint`
+ * igual que `Bash(pnpm lint)` —el nombre del script es del proyecto— y
+ * `Bash(echo lint)` no cubre nada, porque `echo` no es `pnpm`.
+ *
+ * LÍMITE DECLARADO, y ahora es estrecho de verdad: esto lee la FORMA de la entrada, no
+ * ejecuta nada. Un proyecto que corra sus verificaciones con OTRO programa que el que
+ * el manifiesto recomienda va a salir como «sin cubrir» aunque las corra: es un
+ * ::warning:: con la entrada recomendada escrita, jamás un rojo, y el arreglo es una
+ * línea en el manifiesto del marco (una `entrada` por runner) en vez de un agujero por
+ * el que pasa cualquier cosa.
  */
 export function cubreItemDelPiso(entrada, item) {
   const cubre = String(item?.cubre ?? "")
@@ -458,6 +491,8 @@ export function cubreItemDelPiso(entrada, item) {
   if (cubre === "") return false;
   const recomendada = herramientaDe(item?.entrada);
   if (recomendada === "" || herramientaDe(entrada) !== recomendada) return false;
+  const programaRecomendado = programaDe(comandoDe(item?.entrada));
+  if (programaRecomendado === "" || programaDe(comandoDe(entrada)) !== programaRecomendado) return false;
   const comando = comandoDe(entrada).toLowerCase();
   if (comando === "") return false;
   return new RegExp(`(^|[^a-z0-9])${escaparRegex(cubre)}([^a-z0-9]|$)`).test(comando);
@@ -1112,22 +1147,32 @@ export function verificar({
     //      declara una version mas nueva y trae EXACTAMENTE el sha que esta copia
     //      calcula para la suya, no hay marco mas nuevo en el medio: hay una cabecera
     //      editada a mano. Es el bypass medido, atrapado por aritmetica.
-    //   2. NO HAY PIN QUE LO EXPLIQUE. `pins` son las refs con las que los workflows
-    //      del propio consumidor invocan esta action, leidas del arbol (ver
-    //      `cableado.mjs`). Con el tag movil el consumidor corre siempre la copia mas
-    //      nueva, asi que un artefacto mas nuevo que ella no tiene explicacion
-    //      inocente. Se usa el arbol y no `GITHUB_ACTION_REF` a proposito: esa
-    //      variable NO esta en la referencia de variables de GitHub —se verifico el
-    //      2026-08-20— y una garantia no se apoya en algo indocumentado.
+    //   2. NINGUNA INVOCACION DE ESTE REPO PUDO ESCRIBIRLO. `pins` son las refs con
+    //      las que los workflows del propio consumidor invocan esta action, leidas del
+    //      arbol (ver `cableado.mjs`). Se usa el arbol y no `GITHUB_ACTION_REF` a
+    //      proposito: esa variable NO esta en la referencia de variables de GitHub —se
+    //      verifico el 2026-08-20— y una garantia no se apoya en algo indocumentado.
     //
-    // Si NINGUNO de los dos se puede afirmar (sello distinto y algun pin fijo, o los
-    // workflows ilegibles), sigue siendo AVISO y el mensaje dice cual de las dos
-    // mediciones no se pudo hacer. Un rollback del tag movil cae del lado rojo, y esta
-    // bien que caiga: el artefacto lleva reglas que el marco ya retiro.
+    // COMO SE MIDE EL SEGUNDO DISCRIMINADOR, y por que la ronda 2 lo tenia mal. Ahi la
+    // pregunta era «¿la ref es el tag movil?», o sea una lista de UNA ortografia. El
+    // refutador la evadio con doce caracteres: con `@main` exit 0, con `@refs/heads/main`
+    // exit 0, con `@v1.3.0` exit 0, con un pin a SHA exit 0 y SIN NINGUNA invocacion
+    // exit 0 —la ausencia de pin se tomaba como pin—. Solo `@v1` exacto daba rojo. Y
+    // `@main` corre siempre la copia mas nueva igual que `v1`, asi que la explicacion
+    // inocente era falsa; encima el marco RECOMIENDA pinar por SHA, o sea que el bypass
+    // lo premiaban otras reglas.
+    //
+    // La pregunta correcta no es que ORTOGRAFIA tiene la ref: es si en este repo puede
+    // haber DOS copias del marco corriendo. El artefacto lo escribe el modo escribir de
+    // esta misma action, invocado por un workflow de ESTE repo; si todas las
+    // invocaciones del arbol usan la MISMA ref, el escritor corre exactamente el mismo
+    // codigo que este verificador y no pudo producir una version mas nueva que la suya.
+    // La causa benigna existe solo cuando el escritor y el verificador estan pinados
+    // DISTINTO, y eso se ve en el arbol sin enumerar nada. Cero invocaciones tambien es
+    // rojo: no hay explicacion, no hay pin.
     if (comparacion > 0) {
       const selloDeEstaCopia = String(cab.sha ?? "") === canonico.sha;
-      const fijos = (pins ?? []).filter((pin) => !esTagMovil(pin.ref));
-      const soloTagMovil = (pins ?? []).length > 0 && fijos.length === 0;
+      const refs = [...new Set((pins ?? []).map((p) => String(p.ref)))];
       const comun = `${definicion.ruta} declara la version ${cab.version} y esta copia del marco es la ${canonico.version}, asi que el cuerpo NO se pudo comparar contra el re-render`;
       if (selloDeEstaCopia) {
         hallazgos.push({
@@ -1137,22 +1182,24 @@ export function verificar({
         });
         continue;
       }
-      if (soloTagMovil) {
+      if (refs.length <= 1) {
         hallazgos.push({
           nivel: "error",
           codigo: "artefacto-adelantado",
-          mensaje: `${comun}. Los workflows de este repo invocan esta action solo con el tag movil (${[...new Set(pins.map((p) => p.ref))].join(", ")}), o sea que el pipeline corre SIEMPRE la copia mas nueva del marco: no hay pin que explique un artefacto mas nuevo que ella. Arreglo: regenera el artefacto con el modo escribir. Si en cambio el marco movio el tag hacia atras, este rojo es correcto — el artefacto lleva reglas que el marco retiro`,
+          mensaje: `${comun}. Y ninguna invocacion de este repo pudo haberlo escrito: ${
+            refs.length === 0
+              ? "no hay NINGUNA invocacion de esta action en los workflows rastreados del primer nivel, asi que no existe pin que explique un artefacto mas nuevo (la ausencia de pin no es un pin)"
+              : `todos los workflows la invocan con la MISMA ref (${refs[0]}), asi que el modo escribir corre el mismo codigo que este verificador y no puede emitir una version mas nueva que la suya`
+          }. Arreglo: regenera el artefacto con el modo escribir. Si en cambio el marco movio la ref hacia atras, este rojo es correcto — el artefacto lleva reglas que el marco retiro`,
         });
         continue;
       }
       hallazgos.push({
         nivel: "warning",
         codigo: "artefacto-adelantado",
-        mensaje: `${comun}. Queda como AVISO porque las dos mediciones que lo volverian rojo no dan: el sello no coincide con el de esta copia, y ${
-          (pins ?? []).length === 0
-            ? "no se pudo leer con que ref los workflows de este repo invocan la action, asi que no se sabe si hay un pin que lo explique"
-            : `hay invocaciones pinadas a una ref fija (${fijos.map((p) => `${p.ruta}#${p.job} -> ${p.ref}`).join(", ")}), y un pin viejo explica un artefacto mas nuevo`
-        }. Arreglo: revisa el pin del uses: de este job y, si esta en el tag movil, regenera el artefacto con el modo escribir`,
+        mensaje: `${comun}. Queda como AVISO porque la causa benigna es posible: este repo invoca la action con refs DISTINTAS (${pins
+          .map((p) => `${p.ruta}#${p.job} -> ${p.ref}`)
+          .join(", ")}), asi que el que escribio el artefacto puede ser una copia del marco mas nueva que la que verifica. Arreglo: dejalas en la misma ref —el tag movil del marco— y regenera el artefacto con el modo escribir; mientras esten distintas, el cuerpo de este artefacto no lo compara nadie`,
       });
       continue;
     }
@@ -1351,11 +1398,15 @@ export function main(env = process.env) {
   // Con que ref invoca este repo la action. Es lo que separa «el pipeline corre una
   // copia vieja del marco» de «alguien subio la version de la cabecera a mano», y se
   // lee del arbol y no de una variable de entorno indocumentada.
+  //
+  // Se descartan las invocaciones que GitHub NUNCA ejecuta —las de un subdirectorio de
+  // .github/workflows y las que git no rastrea—: un archivo que no corre no pudo
+  // escribir ningun artefacto, asi que tampoco puede explicar uno mas nuevo.
   let pins = [];
   try {
-    pins = invocacionesDe(leerWorkflows(raiz), (env.CONSTITUCION_RAMA_POR_DEFECTO || "main").trim() || "main").map(
-      (invocacion) => ({ ruta: invocacion.ruta, job: invocacion.job, ref: invocacion.ref }),
-    );
+    pins = invocacionesDe(leerWorkflows(raiz), (env.CONSTITUCION_RAMA_POR_DEFECTO || "main").trim() || "main")
+      .filter((invocacion) => invocacion.primerNivel && invocacion.rastreado !== false)
+      .map((invocacion) => ({ ruta: invocacion.ruta, job: invocacion.job, ref: invocacion.ref }));
   } catch (error) {
     console.log(
       `::warning::no se pudieron leer los workflows de este repo (${error.message}), asi que si el artefacto declara una version mas nueva que esta copia del marco no se va a poder decir si hay un pin que lo explique. Eso deja ese caso en AVISO, no en verde`,
