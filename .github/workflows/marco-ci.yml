@@ -1562,6 +1562,880 @@ jobs:
             process.exit(salida);
           '
 
+      # HUECO 8 — de las cuatro formas de distribucion del marco, *scaffold*
+      # dice textualmente "No se actualiza solo", y ahi viven los AGENTS.md: o
+      # sea LAS REGLAS QUE EL AGENTE LEE. En un area que implementa con agentes
+      # eso no es un detalle de documentacion — una regla que no entra al
+      # contexto de la sesion no existe, por bien escrita que este en otro repo.
+      # La divergencia ya corre en las dos direcciones: un consumidor perdio la
+      # mitad de una regla que era la leccion de un incidente, y otro llego a
+      # decir lo contrario de la regla que nacio de otro.
+      #
+      # Este paso verifica la porcion REGENERADA de la constitucion: el marco la
+      # emite sellada, una salida por cada superficie de instrucciones que el
+      # repo DECLARA, y aca se comprueba que este, que este al dia, que su
+      # cuerpo sea el que el sello dice y que alguien la cargue de verdad.
+      #
+      # LA VENTANA DE GRACIA ES EL CORAZON DEL PASO, no una cortesia. Cada
+      # version del canonico declara "publicada" y "exigible_desde", con 28 dias
+      # entre las dos (el CI de Projects verifica ese hueco). Entre las dos fechas
+      # un artefacto atrasado sale ::warning::; desde exigible_desde, ::error::.
+      # Sin eso, publicar una regla enrojece a TODOS los consumidores el mismo
+      # dia — y la consecuencia real no es el rojo de ese dia, es que la regla
+      # SIGUIENTE no se publica nunca. Si el repo acumulo varias versiones sin
+      # adoptar, manda la fecha de la MAS VIEJA pendiente: saltearse tres
+      # releases no regala ventana nueva por cada uno.
+      #
+      # DONDE NO HAY GRACIA, y por que: la ventana cubre la ADOPCION, no la
+      # manipulacion. Con el artefacto ya en la version exigible, un cuerpo que
+      # no coincide con su sello o una cadena de carga rota son rojos secos.
+      #
+      # LA AUSENCIA NO ES "no aplica". Un repo consumidor sin artefacto sale
+      # amarillo hasta su fecha y rojo despues; nunca verde mudo. Es deliberado
+      # contra la forma del paso de artefactos regenerados, que sale por exit 0
+      # cuando no encuentra nada: repetir esa forma aca haria que el check pase
+      # justo en el repo donde el problema es peor.
+      #
+      # LIMITES DECLARADOS (esto LEE bytes: no ejecuta ni renderiza nada):
+      #   - El cuerpo se compara contra el SELLO que trae el propio artefacto,
+      #     no contra un re-render del canonico. El texto canonico viaja DENTRO
+      #     de la composite action y el GITHUB_TOKEN de un consumidor no puede
+      #     leer otro repositorio (comprobado el 2026-08-14: da 404), asi que
+      #     desde este workflow no hay con que re-renderizar. Caza la edicion a
+      #     mano, que es el caso observado; no caza a quien edite y vuelva a
+      #     sellar. El diff byte a byte contra el canonico vive en la action de
+      #     la constitucion, en modo verificar, que si lo tiene a mano.
+      #   - Que el texto LLEGUE no dice nada sobre que el agente lo OBEDEZCA.
+      #     Esto cierra el hueco de DISTRIBUCION y ninguno de comportamiento.
+      #   - El marco cubre las superficies que el repo DECLARA. Una herramienta
+      #     que alguien enchufe sin declararla queda fuera y no se puede ver.
+      #   - Del motivo de un desvio se verifica que exista, no que sea sincero.
+      - name: Constitucion del marco al dia
+        if: '!cancelled()'
+        shell: bash
+        env:
+          # EL CALENDARIO DEL CANONICO. Es dato DEL MARCO y viaja aca por el
+          # mismo carril que el pin del CLI: se sube a mano en este archivo y
+          # todos los consumidores lo heredan cuando "v1" se mueve. NO es un
+          # input a proposito — una fecha que el consumidor pueda correr es una
+          # perilla para apagar el vencimiento, y el vencimiento es todo el
+          # mecanismo. Vale la misma regla que el paso del censo: skip por
+          # propiedad, nunca por perilla.
+          #
+          # Regla del schema, verificada por el CI de Projects:
+          #   exigible_desde >= publicada + 28 dias   (salvo "urgente": true)
+          #
+          # QUIEN MUEVE "v1" CONFIRMA ESTAS FECHAS EN EL MISMO PR: si el release
+          # se corre, "publicada" se corre con el y la ventana vuelve a medir 28
+          # dias desde el dia real de publicacion. Una fecha vieja aca es una
+          # ventana que se acorto sola.
+          CALENDARIO: |
+            [
+              {
+                "version": "1.3.0",
+                "publicada": "2026-08-19",
+                "exigible_desde": "2026-09-16",
+                "urgente": false
+              }
+            ]
+          # Los dos archivos que son DEL PROYECTO viven fuera del directorio que
+          # el marco regenera, con el mismo nombre que el marco ya usa para las
+          # excepciones del consumidor. El invariante queda sin asterisco: todo
+          # lo de adentro de .projects/ es desechable, todo lo de afuera es del
+          # proyecto.
+          RUTA_VALORES: .projects-valores.json
+          RUTA_DESVIOS: .projects-desvios.json
+        run: |
+          set -euo pipefail
+
+          # SKIP POR PROPIEDAD, y con la MISMA propiedad que ya usa el paso de
+          # marcadores: el repo que DISTRIBUYE el scaffold es el marco, y el
+          # marco no es consumidor de su propia porcion — su AGENTS.md es la
+          # constitucion DEL MARCO, no la de un proyecto. Consecuencia honesta,
+          # declarada en el design: aca este paso no verifica nada, y lo que lo
+          # cubre son los fixtures de la action y la validacion contra un
+          # consumidor real antes de mover "v1".
+          if [ -f plantilla/.github/workflows/ci.yml ]; then
+            echo "::notice::este repo distribuye el marco (plantilla/): su constitucion es la del marco y no la porcion que reciben los proyectos — verificacion omitida"
+            exit 0
+          fi
+
+          if ! command -v node > /dev/null 2>&1; then
+            echo "::error::no hay 'node' en el PATH y sin el no se puede leer el artefacto ni su sello. Arreglo: agrega 'uses: actions/setup-node@v7' a este job, antes de este paso"
+            exit 1
+          fi
+
+          # Lo RASTREADO es el universo, igual que en el resto de los
+          # guardrails: un artefacto sin versionar no lo carga nadie mas que la
+          # maquina donde se escribio. core.quotePath=false para que una ruta
+          # con acentos salga tal cual y no escapada en octal.
+          git -c core.quotePath=false ls-files > "${RUNNER_TEMP}/rastreados-constitucion.txt"
+
+          # El programa va inline y no en un archivo aparte por el mismo motivo
+          # que los pasos hermanos: un heredoc no puede cerrar dentro de un
+          # bloque de YAML indentado. Viaja entre comillas SIMPLES de shell, asi
+          # que adentro no hay ni una comilla simple literal (va por
+          # String.fromCharCode) y los $ de sus expresiones regulares son del
+          # lenguaje, no del shell: expandirlos romperia el programa.
+          # shellcheck disable=SC2016
+          node -e '
+            const { readFileSync, existsSync, appendFileSync } = require("node:fs");
+            const { createHash } = require("node:crypto");
+
+            const HOY = new Date().toISOString().slice(0, 10);
+            const RUTA_VALORES = process.env.RUTA_VALORES;
+            const RUTA_DESVIOS = process.env.RUTA_DESVIOS;
+            const MARCA = "projects:constitucion";
+            const MARCA_REGLA = /projects:regla[ \t]+id=([A-Za-z0-9._:-]+)/g;
+            const RE_VERSION = /^([0-9]+)\.([0-9]+)\.([0-9]+)$/;
+            const RE_FECHA = /^[0-9]{4}-[0-9]{2}-[0-9]{2}$/;
+            const COMILLA = String.fromCharCode(39);
+            const BARRA_INV = String.fromCharCode(92);
+
+            // Un comando de workflow termina en el salto de linea y trata "%"
+            // como escape: sin normalizar, un mensaje con "%" se mutila solo.
+            const escapar = (valor) =>
+              String(valor).replace(/%/g, "%25").replace(/\r/g, "%0D").replace(/\n/g, "%0A");
+
+            // Lo que no se puede verificar es rojo, nunca exito mudo.
+            const morir = (mensaje) => {
+              console.log("::error title=Constitucion del marco::" + escapar(mensaje));
+              process.exit(1);
+            };
+
+            const leer = (ruta) => readFileSync(ruta, "utf8");
+
+            // Una referencia dentro de un bloque de codigo o entre comillas
+            // invertidas NO se resuelve: es un ejemplo, no una carga. Se
+            // descartan antes de buscar.
+            function sinCodigo(texto) {
+              const salida = [];
+              let dentro = false;
+              for (const linea of texto.split(/\r?\n/)) {
+                if (/^[ \t]*(```|~~~)/.test(linea)) { dentro = !dentro; continue; }
+                if (dentro) continue;
+                salida.push(linea.replace(/`[^`]*`/g, " "));
+              }
+              return salida.join("\n");
+            }
+
+            // La forma de import es "@<ruta>", y el arroba se exige a
+            // proposito: mencionar el archivo en prosa no lo carga, y contar
+            // una mencion como cadena intacta seria el peor error posible de
+            // este paso — un verde sobre reglas que ningun agente lee.
+            const BORDE_IZQ = " \t\r\n(>-*";
+            const BORDE_DER = " \t\r\n)>,;." + COMILLA + "\"";
+            function importa(texto, destino) {
+              const limpio = sinCodigo(texto);
+              const aguja = "@" + destino;
+              let desde = 0;
+              for (;;) {
+                const i = limpio.indexOf(aguja, desde);
+                if (i < 0) return false;
+                const antes = i === 0 ? " " : limpio.charAt(i - 1);
+                const despues = i + aguja.length >= limpio.length ? " " : limpio.charAt(i + aguja.length);
+                if (BORDE_IZQ.indexOf(antes) >= 0 && BORDE_DER.indexOf(despues) >= 0) return true;
+                desde = i + 1;
+              }
+            }
+
+            // El archivo de valores es del proyecto y su anidamiento puede
+            // variar: se busca en la raiz y en los dos contenedores razonables.
+            // Es una LECTURA, no una propiedad de seguridad; ser tolerante aca
+            // evita un rojo por una diferencia de forma.
+            function buscar(doc, nombre) {
+              if (!doc || typeof doc !== "object") return undefined;
+              if (doc[nombre] !== undefined) return doc[nombre];
+              if (doc.marco && typeof doc.marco === "object" && doc.marco[nombre] !== undefined) return doc.marco[nombre];
+              if (doc.valores && typeof doc.valores === "object" && doc.valores[nombre] !== undefined) return doc.valores[nombre];
+              return undefined;
+            }
+
+            // --- el calendario del canonico (dato del marco) ----------------
+            let calendario;
+            try {
+              calendario = JSON.parse(process.env.CALENDARIO);
+            } catch (error) {
+              morir("el calendario del canonico que trae este paso no parsea (" + error.message + "). Es un dato DEL MARCO: el arreglo va en marco-ci.yml, no en este repo");
+            }
+            if (!Array.isArray(calendario) || calendario.length === 0) {
+              morir("el calendario del canonico que trae este paso esta vacio: sin ninguna version publicada no hay nada exigible y este check no podria decir si algo es aviso o fallo. Es un dato DEL MARCO");
+            }
+            for (const fila of calendario) {
+              const bien = fila
+                && RE_VERSION.test(String(fila.version))
+                && RE_FECHA.test(String(fila.publicada))
+                && RE_FECHA.test(String(fila.exigible_desde));
+              if (!bien) {
+                morir("hay una entrada del calendario del canonico sin version X.Y.Z, sin publicada o sin exigible_desde en AAAA-MM-DD. Es un dato DEL MARCO");
+              }
+            }
+
+            const clave = (version) => {
+              const p = String(version).match(RE_VERSION);
+              return (Number(p[1]) * 1000000) + (Number(p[2]) * 1000) + Number(p[3]);
+            };
+            const ordenado = calendario.slice().sort((a, b) => clave(a.version) - clave(b.version));
+            const EXIGIBLE = ordenado[ordenado.length - 1];
+
+            // Manda la version MAS VIEJA pendiente, o sea la de fecha mas
+            // temprana entre las que el repo todavia no adopto.
+            function ventana(adoptada) {
+              const pendientes = ordenado.filter((f) => adoptada === null || clave(f.version) > clave(adoptada));
+              if (pendientes.length === 0) return null;
+              let manda = pendientes[0];
+              for (const f of pendientes) if (f.exigible_desde < manda.exigible_desde) manda = f;
+              return manda;
+            }
+
+            // clase "atraso" = el repo todavia no adopto: aviso hasta la fecha
+            // y rojo desde ella. clase "roja" = ya adopto y algo esta roto o
+            // editado: la ventana cubre la adopcion, no la manipulacion.
+            const hallazgos = [];
+            const avisos = [];
+            const notas = [];
+            const filas = [];
+            const atraso = (adoptada, archivo, mensaje) =>
+              hallazgos.push({ clase: "atraso", adoptada: adoptada, archivo: archivo, mensaje: mensaje });
+            const roja = (archivo, mensaje) =>
+              hallazgos.push({ clase: "roja", adoptada: null, archivo: archivo, mensaje: mensaje });
+
+            const rastreados = new Set(
+              leer(process.env.RUNNER_TEMP + "/rastreados-constitucion.txt").split(/\r?\n/).filter(Boolean)
+            );
+
+            // --- las superficies que el repo declara ------------------------
+            let valores = null;
+            if (existsSync(RUTA_VALORES)) {
+              try {
+                valores = JSON.parse(leer(RUTA_VALORES));
+              } catch (error) {
+                morir(RUTA_VALORES + " no parsea como JSON (" + error.message + "). Mientras no parsee, el render del marco no puede correr y este paso no puede afirmar nada sobre las reglas que cargan los agentes. Arreglo: corregi el JSON");
+              }
+            }
+
+            const declaradas = valores === null ? undefined : buscar(valores, "superficies");
+            const superficies = Array.isArray(declaradas) ? declaradas : [];
+
+            if (superficies.length === 0) {
+              atraso(null, RUTA_VALORES, "este repo no declara ninguna superficie de instrucciones para sus agentes, asi que la porcion del marco no llega a ninguna. Arreglo: declara en " + RUTA_VALORES + " la lista \"superficies\", cada una con su cadena de carga, p. ej. { \"superficies\": [ { \"nombre\": \"Claude Code\", \"cadena\": [\"CLAUDE.md\", \"AGENTS.md\", \".projects/AGENTS-marco.md\"] } ] }, y corre el escritor del marco para emitir el artefacto");
+            }
+
+            const cuerpos = [];
+            const idsReglas = new Set();
+            let artefactosLeidos = 0;
+
+            // DOS ESQUEMAS EN VUELO, y este paso no es el dueno del contrato.
+            // Este paso se escribio esperando objetos { nombre, cadena }: la cadena
+            // de carga declarada por el consumidor. `actions/constitucion` —el que
+            // RENDERIZA, o sea el que manda— lee la misma clave como lista de
+            // NOMBRES ("claude-code", "cursor") y se guarda la cadena en su propio
+            // catalogo, con el argumento correcto: pedirle la cadena a cada
+            // consumidor duplica en N repos un dato que el marco ya tiene.
+            // Verificado el 2026-08-19 por codigo de salida: con el esquema de la
+            // action, la action da 0 y ESTE paso daba 1, y el rojo NO lo cubre la
+            // ventana de gracia. O sea: el estreno de v1 dejaba rojo a todo
+            // consumidor migrado, por una diferencia de forma y no de contenido.
+            // Un nombre suelto se toma por lo que es —una superficie cuyo contrato
+            // pertenece a la action— y se reporta como ::notice::, no como rojo:
+            // este paso no puede resolver la cadena sin copiarse el catalogo del
+            // marco, y esa copia es justo la doble contabilidad que el change
+            // existe para matar. Queda cubierto igual, y mas fuerte, por el job
+            // que corre `actions/constitucion` en el propio repo del consumidor
+            // (compara contra el RE-RENDER, no solo contra el sello).
+            // PENDIENTE DE DECISION HUMANA: cual de los dos esquemas queda, y si
+            // este paso sobrevive o se borra por redundante. Hasta entonces, lo
+            // que no es suyo lo avisa fuerte y no lo pone en rojo.
+            for (const cruda of superficies) {
+              if (typeof cruda === "string" && cruda.trim()) {
+                notas.push("la superficie \"" + cruda.trim() + "\" viene declarada como nombre suelto: es el esquema de actions/constitucion, que se guarda la cadena de carga en el catalogo del marco. Este paso no la puede verificar sin copiarse ese catalogo, asi que no la verifica y lo dice: la cubre el job que corre actions/constitucion en este repo, comparando contra el re-render. Los dos esquemas tienen que reconciliarse ANTES de mover v1");
+                continue;
+              }
+
+              const nombre = cruda && typeof cruda.nombre === "string" && cruda.nombre.trim()
+                ? cruda.nombre.trim()
+                : "(superficie sin nombre)";
+              const cadena = cruda && Array.isArray(cruda.cadena)
+                ? cruda.cadena.filter((x) => typeof x === "string" && x.trim()).map((x) => x.trim())
+                : [];
+
+              if (cadena.length === 0) {
+                roja(RUTA_VALORES, "la superficie \"" + nombre + "\" no declara su cadena de carga, asi que no hay forma de saber que archivo lleva la porcion del marco ni quien la carga. Arreglo: \"cadena\" es la lista ORDENADA de archivos, del que la herramienta lee sola hasta el artefacto: [\"CLAUDE.md\", \"AGENTS.md\", \".projects/AGENTS-marco.md\"]");
+                continue;
+              }
+
+              const artefacto = cadena[cadena.length - 1];
+
+              if (!rastreados.has(artefacto)) {
+                atraso(null, artefacto, "la superficie \"" + nombre + "\" declara su porcion del marco en " + artefacto + " y ese archivo no esta rastreado en el repo, asi que esa superficie no carga ninguna regla del marco. Arreglo: corre el escritor del marco (el PR semanal lo corre solo) y versiona el artefacto");
+                continue;
+              }
+
+              let texto;
+              try {
+                texto = leer(artefacto);
+              } catch (error) {
+                roja(artefacto, "no se pudo leer " + artefacto + " (" + error.message + "), asi que no se puede afirmar que la porcion del marco este al dia. Lo no verificable es rojo");
+                continue;
+              }
+
+              const lineas = texto.split(/\r?\n/);
+              let indice = -1;
+              for (let i = 0; i < Math.min(lineas.length, 20); i += 1) {
+                if (lineas[i].indexOf(MARCA) >= 0) { indice = i; break; }
+              }
+              if (indice < 0) {
+                atraso(null, artefacto, artefacto + " no trae el sello del marco en sus primeras lineas, asi que no declara de que version es su contenido y no hay con que compararlo. Arreglo: no lo escribas a mano — corre el escritor del marco y deja que lo emita con su cabecera");
+                continue;
+              }
+
+              const sello = lineas[indice].match(/version=([0-9]+\.[0-9]+\.[0-9]+)[ \t]+sha=([0-9a-f]{64})/);
+              if (!sello) {
+                atraso(null, artefacto, "el sello de " + artefacto + " (linea " + (indice + 1) + ") no tiene la forma que el marco emite. Arreglo: corre el escritor del marco; la cabecera es un comentario HTML con version=X.Y.Z y sha=<sha256 del cuerpo>");
+                continue;
+              }
+
+              const adoptada = sello[1];
+              const declarado = sello[2];
+              const alDia = clave(adoptada) >= clave(EXIGIBLE.version);
+
+              // NORMALIZACION DEL CUERPO, y es CONTRATO con el escritor: todo
+              // lo que sigue al sello, fines de linea a LF y una sola linea
+              // vacia final. Asi una diferencia de CRLF —o el newline que
+              // agrega un formateador— no se reporta como divergencia, que es
+              // exactamente el escenario "una diferencia que no es divergencia".
+              const cuerpo = lineas.slice(indice + 1).join("\n").replace(/\n+$/, "") + "\n";
+              const calculado = createHash("sha256").update(cuerpo, "utf8").digest("hex");
+
+              artefactosLeidos += 1;
+              cuerpos.push({ nombre: nombre, artefacto: artefacto, adoptada: adoptada, sha: calculado, alDia: alDia });
+
+              MARCA_REGLA.lastIndex = 0;
+              let encontrado;
+              while ((encontrado = MARCA_REGLA.exec(texto)) !== null) idsReglas.add(encontrado[1]);
+
+              if (!alDia) {
+                atraso(adoptada, artefacto, "la porcion del marco de la superficie \"" + nombre + "\" declara la version " + adoptada + " y el marco ya publico la " + EXIGIBLE.version + ", asi que a esa superficie le faltan reglas. Arreglo: corre el escritor del marco (o merguea el PR que lo corre solo cada semana) para regenerar " + artefacto);
+              }
+
+              if (calculado !== declarado) {
+                const mensaje = "el cuerpo de " + artefacto + " no coincide con el sello que el propio archivo declara (sello " + declarado.slice(0, 12) + ", cuerpo " + calculado.slice(0, 12) + "): alguien lo edito despues de que el marco lo emitiera. Lo propio del proyecto va en SU archivo, no aca; y una diferencia legitima con el marco se declara como desvio con su motivo en " + RUTA_DESVIOS + ", que lo imprime pegado a la regla que anula. Arreglo: corre el escritor del marco para reemitirlo. El cuerpo se sella normalizado (fines de linea LF y una sola linea vacia al final), asi que un CRLF o el newline de un formateador NO son la causa";
+                if (alDia) { roja(artefacto, mensaje); } else { atraso(adoptada, artefacto, mensaje); }
+              }
+
+              // --- la cadena de carga, eslabon por eslabon ------------------
+              if (cadena.length === 1) {
+                notas.push("la superficie \"" + nombre + "\" declara que su herramienta lee " + artefacto + " directo: no hay cadena que verificar mas alla de que el archivo este");
+              }
+              for (let i = 0; i < cadena.length - 1; i += 1) {
+                const origen = cadena[i];
+                const destino = cadena[i + 1];
+                if (!rastreados.has(origen)) {
+                  const m1 = "la cadena de carga de \"" + nombre + "\" nombra " + origen + " y ese archivo no esta rastreado, asi que la porcion del marco no llega a ningun agente por esa superficie";
+                  if (alDia) { roja(origen, m1); } else { atraso(adoptada, origen, m1); }
+                  continue;
+                }
+                let textoOrigen;
+                try {
+                  textoOrigen = leer(origen);
+                } catch (error) {
+                  roja(origen, "no se pudo leer " + origen + " (" + error.message + "), asi que no se puede afirmar que la cadena de carga este intacta. Lo no verificable es rojo");
+                  continue;
+                }
+                if (!importa(textoOrigen, destino)) {
+                  const m2 = "la cadena de carga de \"" + nombre + "\" esta rota: " + origen + " no importa " + destino + " fuera de comillas y bloques de codigo. Un eslabon roto no emite ninguna senal por si mismo y es indistinguible de que la regla nunca hubiera existido. Arreglo: agrega la linea \"@" + destino + "\" en " + origen + ", fuera de todo bloque de codigo";
+                  if (alDia) { roja(origen, m2); } else { atraso(adoptada, origen, m2); }
+                }
+              }
+            }
+
+            // Una fuente, N salidas: la divergencia ENTRE superficies queda
+            // imposible por check y no por disciplina.
+            const distintos = new Set(cuerpos.map((c) => c.adoptada + " " + c.sha));
+            if (distintos.size > 1) {
+              const detalle = cuerpos.map((c) => c.artefacto + " (v" + c.adoptada + ", cuerpo " + c.sha.slice(0, 12) + ")").join("; ");
+              const mensaje = "las superficies declaradas no llevan el MISMO cuerpo del marco: " + detalle + ". Una sola fuente emite todas las salidas, asi que una difiriendo de otra significa que a alguna herramienta le llegan reglas distintas. Arreglo: corre el escritor del marco, que las reemite todas juntas";
+              if (cuerpos.every((c) => c.alDia)) {
+                roja(RUTA_VALORES, mensaje);
+              } else {
+                const masVieja = cuerpos.slice().sort((a, b) => clave(a.adoptada) - clave(b.adoptada))[0].adoptada;
+                atraso(masVieja, RUTA_VALORES, mensaje);
+              }
+            }
+
+            // --- desvios declarados -----------------------------------------
+            // ESTE paso valida la FORMA del archivo entero (las dos clases de
+            // desvio) y el vencimiento de los que nombran una regla. Los que
+            // nombran un permiso los consume el paso siguiente, "Permisos del
+            // agente sin escritura": la forma se valida en UN solo lado a
+            // proposito — en una doble contabilidad la declaracion siempre
+            // pierde contra el check.
+            const FORMA = "{ \"regla\": \"<id de la regla del canonico>\", \"motivo\": \"<por que este proyecto se aparta>\", \"aprobado_por\": \"<quien>\", \"fecha\": \"AAAA-MM-DD\" }";
+            let desvios = [];
+            if (existsSync(RUTA_DESVIOS)) {
+              let doc;
+              try {
+                doc = JSON.parse(leer(RUTA_DESVIOS));
+              } catch (error) {
+                morir(RUTA_DESVIOS + " no parsea como JSON (" + error.message + "). Mientras no parsee NINGUN desvio aplica, asi que el proyecto se queda sin la excepcion que creia tener y los agentes leen la regla completa. Arreglo: corregi el JSON");
+              }
+              const lista = doc && Array.isArray(doc.desvios) ? doc.desvios : null;
+              if (lista === null) {
+                morir(RUTA_DESVIOS + " no tiene la forma esperada. Arreglo: dejalo como { \"desvios\": [ " + FORMA + " ] }");
+              }
+              desvios = lista;
+            }
+
+            let vivos = 0;
+            for (const cruda of desvios) {
+              const regla = cruda && typeof cruda.regla === "string" ? cruda.regla.trim() : "";
+              const permiso = cruda && typeof cruda.permiso === "string" ? cruda.permiso.trim() : "";
+              const motivo = cruda && typeof cruda.motivo === "string" ? cruda.motivo.trim() : "";
+              const quien = cruda && typeof cruda.aprobado_por === "string" ? cruda.aprobado_por.trim() : "";
+              const fecha = cruda && typeof cruda.fecha === "string" ? cruda.fecha.trim() : "";
+              const etiqueta = regla
+                ? "la regla \"" + regla + "\""
+                : (permiso ? "el permiso \"" + permiso + "\"" : "(sin regla ni permiso)");
+
+              if (!regla && !permiso) {
+                roja(RUTA_DESVIOS, "hay un desvio que no nombra que anula. Arreglo: cada entrada nombra UNA cosa, o \"regla\" (un id del canonico) o \"permiso\" (una entrada exacta del allowlist del agente). Forma esperada: " + FORMA);
+                continue;
+              }
+              if (regla && permiso) {
+                roja(RUTA_DESVIOS, "el desvio de " + etiqueta + " nombra tambien un permiso: una entrada anula UNA cosa, si no el motivo escrito deja de decir de que es. Arreglo: partilo en dos entradas");
+                continue;
+              }
+              if (!motivo) {
+                roja(RUTA_DESVIOS, "el desvio de " + etiqueta + " no trae motivo escrito. Una excepcion sin razon escrita no es una excepcion, es un agujero: el motivo se imprime pegado a la regla que anula DENTRO del artefacto que cargan los agentes, y se reimprime en el resumen de cada corrida. Arreglo: agrega \"motivo\"");
+                continue;
+              }
+              if (!quien || !fecha) {
+                // Aviso y no rojo: el rojo que el design decide sobre el desvio
+                // es el del motivo. Quien aprobo y cuando son para el humano
+                // que lo relee en la revision trimestral.
+                const que = !quien && !fecha ? "quien lo aprobo ni cuando" : (!quien ? "quien lo aprobo" : "cuando se aprobo");
+                avisos.push({ archivo: RUTA_DESVIOS, mensaje: "el desvio de " + etiqueta + " no dice " + que + ", asi que no se puede revisar quien se hizo cargo. Arreglo: agrega \"aprobado_por\" y \"fecha\" (AAAA-MM-DD)" });
+              }
+
+              // Los desvios de permiso son del paso siguiente.
+              if (permiso) continue;
+
+              if (artefactosLeidos === 0) {
+                avisos.push({ archivo: RUTA_DESVIOS, mensaje: "no se pudo verificar si " + etiqueta + " sigue existiendo: en este repo no hay ningun artefacto del marco legible donde buscarla (ver el hallazgo de arriba). Mientras eso siga asi, este desvio no se esta verificando" });
+                continue;
+              }
+              if (!idsReglas.has(regla)) {
+                roja(RUTA_DESVIOS, "el desvio nombra " + etiqueta + ", que ya no existe en la porcion del marco que este repo carga: esta repartiendo permiso sobre la nada y su motivo quedo impreso al lado de ninguna regla. Arreglo: borra esa entrada de " + RUTA_DESVIOS + " (motivo que tenia escrito: " + motivo + ")");
+                continue;
+              }
+              vivos += 1;
+              // Cada desvio vivo se reimprime en CADA corrida y va al resumen:
+              // un motivo que envejecio mal tiene que quedar a la vista en vez
+              // de fosilizarse en un JSON que nadie vuelve a abrir.
+              console.log("::notice title=Desvio declarado del marco::" + escapar(motivo + " (regla " + regla + (quien ? ", aprobado por " + quien : "") + (fecha ? ", " + fecha : "") + ")"));
+              filas.push("| `" + regla + "` | " + (quien || "(sin declarar)") + " | " + (fecha || "(sin declarar)") + " | " + motivo.split("|").join(BARRA_INV + "|") + " |");
+            }
+
+            // --- emision: la ventana de gracia decide el color ---------------
+            let salida = 0;
+            let atrasos = 0;
+            for (const h of hallazgos) {
+              if (h.clase === "roja") {
+                salida = 1;
+                console.log("::error file=" + escapar(h.archivo) + ",title=Constitucion del marco::" + escapar(h.mensaje));
+                continue;
+              }
+              atrasos += 1;
+              const v = ventana(h.adoptada);
+              // Sin version pendiente no puede haber hallazgo de atraso; si
+              // igual llegara uno, se trata como rojo antes que como silencio.
+              const desde = v === null ? HOY : v.exigible_desde;
+              const cola = v === null
+                ? ""
+                : " (version " + v.version + " del canonico, publicada el " + v.publicada + (v.urgente === true ? ", declarada URGENTE" : "") + ")";
+              if (HOY >= desde) {
+                salida = 1;
+                console.log("::error file=" + escapar(h.archivo) + ",title=Constitucion del marco (exigible desde " + desde + ")::" + escapar(h.mensaje + ". Esto fue un aviso hasta el " + desde + " y desde esa fecha es un fallo" + cola));
+              } else {
+                console.log("::warning file=" + escapar(h.archivo) + ",title=Constitucion del marco (pasa a fallo el " + desde + ")::" + escapar(h.mensaje + ". Hoy es " + HOY + " y esto es un AVISO; el " + desde + " pasa a ser un fallo" + cola));
+              }
+            }
+            for (const a of avisos) {
+              console.log("::warning file=" + escapar(a.archivo) + ",title=Constitucion del marco::" + escapar(a.mensaje));
+            }
+            for (const n of notas) {
+              console.log("::notice::" + escapar(n));
+            }
+
+            if (process.env.GITHUB_STEP_SUMMARY && filas.length) {
+              appendFileSync(
+                process.env.GITHUB_STEP_SUMMARY,
+                ["", "### Desvios declarados de la constitucion del marco", "",
+                  "| Regla | Aprobado por | Fecha | Motivo |", "|---|---|---|---|",
+                  ...filas, ""].join("\n")
+              );
+            }
+
+            // La verdad de lo que se probo, ni una palabra mas.
+            console.log(
+              "== constitucion del marco == exigible la version " + EXIGIBLE.version +
+              " (publicada " + EXIGIBLE.publicada + ", exigible desde " + EXIGIBLE.exigible_desde + "); " +
+              superficies.length + " superficie(s) declarada(s), " + artefactosLeidos + " artefacto(s) sellado(s) leido(s), " +
+              vivos + " desvio(s) vigente(s), " + atrasos + " hallazgo(s) de atraso. " +
+              "Se comparan BYTES contra el sello que trae el propio artefacto, no contra un re-render del canonico: caza la edicion a mano, NO prueba que el texto sea el que el marco publica. Y que el texto llegue no dice nada sobre que el agente lo obedezca"
+            );
+            process.exit(salida);
+          '
+
+      # HUECO 9 — el allowlist del agente es la unica parte del scaffold que NO
+      # se regenera, y a proposito: la asimetria es lo que ordena la decision.
+      # UN PERMISO DE MAS ES UN RIESGO; UNO DE MENOS ES FRICCION. Un mecanismo
+      # no puede fallar cerrado en las dos direcciones, asi que el de mas es
+      # rojo y el de menos es aviso — y ninguno de los dos se resuelve pisando
+      # el archivo, porque igualar borraria entradas legitimas del proyecto (el
+      # identificador de un servidor MCP es de instalacion) y porque la salida
+      # mas barata bajo friccion es settings.local.json, que el .gitignore
+      # excluye: el marco estaria CAUSANDO la evasion que quiere evitar, y
+      # sacando el allowlist de la revision cruzada.
+      #
+      # LA PROPIEDAD ES SOBRE EL VERBO, no sobre una lista de comandos
+      # prohibidos que alguien tendria que acordarse de ampliar cuando aparezca
+      # la herramienta siguiente. Es el mismo criterio del paso vecino de
+      # ejecutores pinados, que mira el EJECUTOR y no el paquete. Y se suma un
+      # segundo caso que ninguna lista de verbos veria: un comodin en la
+      # posicion del subcomando ("terraform *") autoriza TODOS los subcomandos
+      # de esa herramienta, apply incluido.
+      #
+      # POR QUE EL PERFIL DE PRODUCCION NO ES ROJO POR SI SOLO. La constitucion
+      # AUTORIZA expresamente leer produccion por CLI (validate, plan,
+      # describe-*), y la plantilla del marco trae esas entradas: hacerlas rojas
+      # seria un check que contradice la regla que dice defender, y de los que
+      # alguien apaga al tercer PR. Lo que hace este paso con ellas es dejarlas
+      # a la VISTA en cada corrida (::notice::) y exigir que el subcomando este
+      # clavado — con el perfil de prod, un subcomando abierto es exactamente la
+      # entrada que puede terminar en un apply, y escribir en produccion exige
+      # el OK explicito de una persona en esa sesion.
+      #
+      # LO QUE NO SE MIRA ACA, porque ya tiene dueno: que la invocacion de un
+      # ejecutor que descarga lleve version exacta lo caza "Ejecutores de
+      # paquetes pinados" sobre los archivos rastreados. Meterlo tambien aca
+      # seria doble contabilidad, y en una doble contabilidad la declaracion
+      # siempre pierde contra el check.
+      #
+      # LIMITES DECLARADOS (esto LEE la forma de las entradas, no ejecuta nada):
+      #   - No se modela la precedencia de "deny" ni de "ask". Una entrada de
+      #     allow que autoriza una escritura es el hallazgo, y el arreglo es
+      #     ACOTARLA (un allowlist es una lista blanca: acotar siempre esta
+      #     disponible) o declarar el desvio con su motivo. Taparla con un deny
+      #     deja el permiso ancho y la excepcion sin motivo escrito.
+      #   - Las tools que escriben en el ARBOL de trabajo quedan fuera a
+      #     proposito: el arbol es revisable por diff y CI es su compuerta. La
+      #     frontera que importa es el estado que vive FUERA del arbol (una
+      #     nube, un remoto, un tercero, una persona real).
+      #   - settings.local.json esta en el .gitignore de todos los repos del
+      #     area, asi que queda fuera del universo. Es la misma evasion limpia
+      #     que ya declara el censo de fuentes.
+      #   - Reconoce verbos que escriben; no prueba que el resto no pueda.
+      - name: Permisos del agente sin escritura
+        if: '!cancelled()'
+        shell: bash
+        env:
+          RUTA_ALLOWLIST: .claude/settings.json
+          RUTA_VALORES: .projects-valores.json
+          RUTA_DESVIOS: .projects-desvios.json
+        run: |
+          set -euo pipefail
+
+          # SIN SKIP POR SCAFFOLD, a diferencia del paso de la constitucion: el
+          # marco tambien tiene un agente y la propiedad le aplica igual. Este
+          # es el unico de los dos pasos que Projects SI se puede comer, y hoy se
+          # lo come diciendo la verdad incomoda — su .claude no esta rastreado,
+          # asi que sale el aviso de abajo en su propio repo.
+          if ! command -v node > /dev/null 2>&1; then
+            echo "::error::no hay 'node' en el PATH y sin el no se puede leer el allowlist del agente. Arreglo: agrega 'uses: actions/setup-node@v7' a este job, antes de este paso"
+            exit 1
+          fi
+
+          # Lo NO RASTREADO no se puede mirar, y callarse seria declararlo sano.
+          # Es el mismo limite que ya declara el paso de ejecutores pinados: un
+          # repo con .claude entero fuera del control de versiones esconde de
+          # los dos checks justo el archivo donde aparecio el problema.
+          if ! git ls-files --error-unmatch "${RUTA_ALLOWLIST}" > /dev/null 2>&1; then
+            echo "::warning file=${RUTA_ALLOWLIST}::este repo no rastrea ${RUTA_ALLOWLIST}: el allowlist de su agente no esta versionado, no pasa por la revision cruzada y este check no tiene nada que mirar. Es AVISO y no fallo porque el marco no puede exigir el archivo de una herramienta que el proyecto quizas no use; lo que no hace es callarse y declararlo sano. Arreglo: versiona el allowlist del agente — si en cambio los permisos se acumulan en settings.local.json, ese archivo esta en el .gitignore y queda fuera de la revision de todos"
+            exit 0
+          fi
+
+          # El programa va inline por el mismo motivo que los pasos hermanos, y
+          # viaja entre comillas SIMPLES de shell: adentro no hay ni una comilla
+          # simple literal (va por String.fromCharCode) y los $ de sus
+          # expresiones regulares son del lenguaje, no del shell.
+          # shellcheck disable=SC2016
+          node -e '
+            const { readFileSync, existsSync } = require("node:fs");
+
+            const RUTA = process.env.RUTA_ALLOWLIST;
+            const RUTA_VALORES = process.env.RUTA_VALORES;
+            const RUTA_DESVIOS = process.env.RUTA_DESVIOS;
+
+            const escapar = (valor) =>
+              String(valor).replace(/%/g, "%25").replace(/\r/g, "%0D").replace(/\n/g, "%0A");
+
+            const morir = (mensaje) => {
+              console.log("::error title=Permisos del agente::" + escapar(mensaje));
+              process.exit(1);
+            };
+
+            // EL VOCABULARIO DE VERBOS QUE ESCRIBEN. Las formas con guion
+            // cubren el dialecto de los CLI de nube (create-*, put-*,
+            // terminate-*) sin enumerar un solo servicio: ahi el verbo va
+            // pegado al sustantivo y una lista de comandos envejeceria en cada
+            // release del proveedor.
+            const VERBOS = /^(apply|destroy|push|merge|create|delete|remove|rm|put|update|modify|write|upload|publish|deploy|drop|truncate|terminate|revoke|rotate|send|invite|migrate|seed|(create|delete|put|update|modify|set|start|stop|terminate|run|send|invoke|attach|detach|associate|disassociate|register|deregister|enable|disable|tag|untag|copy|restore|reboot|import|export)-[a-z0-9-]+)$/;
+
+            // Cuando la invocacion habla HTTP (el CLI de la plataforma, curl),
+            // el verbo no viaja en la posicion del subcomando sino en la
+            // bandera del metodo.
+            const METODOS = /^(POST|PUT|PATCH|DELETE)$/i;
+
+            // Las tools de un servidor MCP no tienen subcomandos: el verbo es
+            // un segmento de su nombre. "read", "list", "get" y "search" no
+            // estan aca a proposito.
+            const VERBOS_MCP = /^(send|create|update|delete|trash|write|post|share|schedule|invite|remove|add|set|archive|move|upload|copy|respond|react|draft|publish|resolve|assign|snooze|label|pin)$/;
+
+            let ajustes;
+            try {
+              ajustes = JSON.parse(readFileSync(RUTA, "utf8"));
+            } catch (error) {
+              morir(RUTA + " esta rastreado y no se pudo leer o no parsea (" + error.message + "), asi que no se puede afirmar que el allowlist del agente no autorice una escritura. Lo no verificable es rojo, nunca exito mudo. Arreglo: corregi el JSON");
+            }
+
+            const permisos = ajustes && typeof ajustes === "object" ? ajustes.permissions : null;
+            const allow = permisos && Array.isArray(permisos.allow)
+              ? permisos.allow.filter((x) => typeof x === "string").map((x) => x.trim()).filter(Boolean)
+              : [];
+
+            // El perfil de produccion es un valor DEL PROYECTO: sale de su
+            // archivo de valores y nunca esta escrito en el marco (los handles
+            // y las cuentas reales viven del lado del consumidor).
+            function buscar(doc, nombre) {
+              if (!doc || typeof doc !== "object") return undefined;
+              if (doc[nombre] !== undefined) return doc[nombre];
+              if (doc.marco && typeof doc.marco === "object" && doc.marco[nombre] !== undefined) return doc.marco[nombre];
+              if (doc.valores && typeof doc.valores === "object" && doc.valores[nombre] !== undefined) return doc.valores[nombre];
+              return undefined;
+            }
+
+            let PERFIL_PROD = "";
+            if (existsSync(RUTA_VALORES)) {
+              try {
+                const valores = JSON.parse(readFileSync(RUTA_VALORES, "utf8"));
+                const crudo = buscar(valores, "PERFIL_PROD");
+                if (typeof crudo === "string") PERFIL_PROD = crudo.trim();
+              } catch (error) {
+                // El rojo por el JSON roto lo da el paso de la constitucion:
+                // repetirlo aca seria contar dos veces el mismo problema.
+                console.log("::warning file=" + escapar(RUTA_VALORES) + "::" + escapar(RUTA_VALORES + " no parsea (" + error.message + "), asi que este paso no sabe cual es el perfil de produccion del proyecto y no puede senalar las entradas que corren con el"));
+              }
+            }
+
+            // Los desvios los VALIDA el paso de la constitucion (forma, motivo,
+            // vencimiento). Aca solo se consumen los que nombran un permiso, y
+            // se exige lo unico que este paso necesita: que el motivo este.
+            const declarados = new Map();
+            if (existsSync(RUTA_DESVIOS)) {
+              let doc = null;
+              try {
+                doc = JSON.parse(readFileSync(RUTA_DESVIOS, "utf8"));
+              } catch (error) {
+                console.log("::warning file=" + escapar(RUTA_DESVIOS) + "::" + escapar(RUTA_DESVIOS + " no parsea (" + error.message + "), asi que en este paso ningun desvio absorbe nada. El rojo por el JSON roto lo da el paso de la constitucion del marco"));
+              }
+              const lista = doc && Array.isArray(doc.desvios) ? doc.desvios : [];
+              for (const cruda of lista) {
+                const permiso = cruda && typeof cruda.permiso === "string" ? cruda.permiso.trim() : "";
+                const motivo = cruda && typeof cruda.motivo === "string" ? cruda.motivo.trim() : "";
+                const quien = cruda && typeof cruda.aprobado_por === "string" ? cruda.aprobado_por.trim() : "";
+                if (!permiso || !motivo) continue;
+                declarados.set(permiso, { motivo: motivo, quien: quien, usado: false });
+              }
+            }
+
+            const hallazgos = [];
+            const absorbidos = [];
+            const aLaVista = [];
+
+            function marcar(entrada, porque, conPerfilProd) {
+              const d = declarados.get(entrada);
+              if (d) {
+                d.usado = true;
+                absorbidos.push({ entrada: entrada, porque: porque, motivo: d.motivo, quien: d.quien });
+                return;
+              }
+              hallazgos.push({ entrada: entrada, porque: porque, prod: conPerfilProd === true });
+            }
+
+            // El allowlist admite "cmd args *" y "cmd args:*": las dos formas
+            // significan "y lo que siga". Solo se normaliza el separador del
+            // FINAL, para no tocar los dos puntos de una URL o de una ruta.
+            // Las asignaciones de entorno del principio se apartan porque no
+            // son el comando (AWS_PROFILE=... terraform plan).
+            function partir(interno) {
+              const plano = String(interno).replace(/:[ \t]*\*[ \t]*$/, " *");
+              const brutos = plano.split(/[ \t]+/).filter(Boolean);
+              const entorno = [];
+              let i = 0;
+              while (i < brutos.length && /^[A-Za-z_][A-Za-z0-9_]*=/.test(brutos[i])) {
+                entorno.push(brutos[i]);
+                i += 1;
+              }
+              return { entorno: entorno, palabras: brutos.slice(i) };
+            }
+
+            for (const entrada of allow) {
+              const bash = entrada.match(/^Bash(\((.*)\))?$/);
+              if (bash) {
+                const interno = bash[2] === undefined ? "*" : bash[2];
+                const partido = partir(interno);
+                const palabras = partido.palabras;
+                const prod = PERFIL_PROD !== "" && partido.entorno.some((e) => e.slice(e.indexOf("=") + 1) === PERFIL_PROD);
+
+                if (palabras.length === 0 || palabras[0].indexOf("*") >= 0) {
+                  marcar(entrada, "autoriza cualquier comando de shell sin acotar la herramienta, y cualquiera incluye los que escriben", prod);
+                  continue;
+                }
+                const herramienta = palabras[0];
+
+                // Primer token que no es bandera ni asignacion: ahi va el
+                // subcomando. Un comodin en ESA posicion autoriza todos los
+                // subcomandos de la herramienta, los que escriben incluidos.
+                let posicion = null;
+                for (let i = 1; i < palabras.length; i += 1) {
+                  const p = palabras[i];
+                  if (p.charAt(0) === "-" || p.indexOf("=") > 0) continue;
+                  posicion = p;
+                  break;
+                }
+                if (posicion !== null && posicion.indexOf("*") >= 0) {
+                  marcar(entrada, "deja el subcomando de \"" + herramienta + "\" en comodin, asi que autoriza TODOS sus subcomandos y entre ellos los que escriben", prod);
+                  continue;
+                }
+
+                let verbo = null;
+                for (let i = 1; i < palabras.length && verbo === null; i += 1) {
+                  const limpio = palabras[i].toLowerCase().replace(/[^a-z0-9-]/g, "");
+                  if (limpio !== "" && VERBOS.test(limpio)) verbo = palabras[i];
+                }
+                if (verbo === null) {
+                  for (let i = 1; i < palabras.length && verbo === null; i += 1) {
+                    const p = palabras[i];
+                    const pegado = p.match(/^(?:-X|--method)=(.*)$/);
+                    if (pegado && METODOS.test(pegado[1])) { verbo = p; continue; }
+                    if (/^(-X|--method)$/.test(p) && i + 1 < palabras.length && METODOS.test(palabras[i + 1])) {
+                      verbo = p + " " + palabras[i + 1];
+                    }
+                  }
+                }
+                if (verbo !== null) {
+                  marcar(entrada, "autoriza \"" + herramienta + " ... " + verbo + "\" sin preguntar, y ese verbo ESCRIBE", prod);
+                  continue;
+                }
+                if (prod) {
+                  aLaVista.push(entrada);
+                }
+                continue;
+              }
+
+              const mcp = entrada.match(/^mcp__(.+?)__(.+)$/);
+              if (mcp) {
+                const tool = mcp[2];
+                let verbo = null;
+                for (const segmento of tool.toLowerCase().split("_")) {
+                  if (segmento !== "" && VERBOS_MCP.test(segmento) && verbo === null) verbo = segmento;
+                }
+                if (verbo !== null) {
+                  marcar(entrada, "autoriza la tool \"" + tool + "\" de un servidor MCP y su verbo (\"" + verbo + "\") escribe fuera del repo: actuar sobre un sistema de terceros o contactar a una persona real es una frontera del marco, no un detalle de configuracion", false);
+                }
+                continue;
+              }
+              // El resto de las tools (lectura y edicion del arbol de trabajo)
+              // queda fuera del alcance declarado arriba.
+            }
+
+            let salida = 0;
+
+            for (const h of hallazgos) {
+              salida = 1;
+              const cola = h.prod
+                ? " Ademas corre con el perfil de PRODUCCION: escribir en produccion exige el OK explicito de una persona en esa sesion, y un permiso pre-aprobado es exactamente lo contrario de pedirlo."
+                : "";
+              console.log(
+                "::error file=" + escapar(RUTA) + ",title=Permiso de escritura sin desvio declarado::" +
+                escapar(
+                  "la entrada \"" + h.entrada + "\" del allowlist " + h.porque + ", asi que el agente puede hacerlo sin que nadie confirme." + cola +
+                  " Arreglo, una de dos: ACOTALA a las operaciones de lectura que el trabajo necesita de verdad (un allowlist es una lista blanca: siempre se puede escribir el subcomando exacto en vez del comodin), o si esa autorizacion es deliberada declarala como desvio en " + RUTA_DESVIOS +
+                  " con su motivo escrito: { \"permiso\": \"" + h.entrada + "\", \"motivo\": \"por que este proyecto la necesita\", \"aprobado_por\": \"<quien>\", \"fecha\": \"AAAA-MM-DD\" }. Taparla con una entrada de \"deny\" no cuenta: deja el permiso ancho y la excepcion sin motivo escrito"
+                )
+              );
+            }
+
+            for (const a of absorbidos) {
+              // El desvio vivo se reimprime en CADA corrida: una excepcion que
+              // nadie vuelve a ver es una excepcion que nadie vuelve a
+              // discutir.
+              console.log("::notice title=Permiso de escritura con desvio declarado::" + escapar(a.motivo + " (permiso \"" + a.entrada + "\"" + (a.quien ? ", aprobado por " + a.quien : "") + ")"));
+            }
+
+            // Un desvio de permiso que ya no absorbe nada esta repartiendo
+            // permiso sobre la nada, igual que una declaracion muerta del
+            // detector de secretos: si se queda, el dia que alguien vuelva a
+            // agregar esa entrada se la traga en silencio.
+            for (const [permiso, d] of declarados) {
+              if (d.usado) continue;
+              salida = 1;
+              const detalle = allow.indexOf(permiso) >= 0
+                ? "esa entrada sigue en el allowlist pero ya no autoriza ninguna escritura, asi que el desvio no hace falta"
+                : "esa entrada ya no esta en el allowlist";
+              console.log(
+                "::error file=" + escapar(RUTA_DESVIOS) + ",title=Desvio de permiso muerto::" +
+                escapar("el desvio del permiso \"" + permiso + "\" no absorbe ningun hallazgo: " + detalle + ". Arreglo: borra esa entrada de " + RUTA_DESVIOS + " (motivo que tenia escrito: " + d.motivo + ")")
+              );
+            }
+
+            for (const entrada of aLaVista) {
+              console.log("::notice title=Permiso con el perfil de produccion::" + escapar("la entrada \"" + entrada + "\" corre con el perfil de produccion. El marco autoriza LEER produccion por CLI, asi que no es un hallazgo — se imprime en cada corrida para que quede a la vista y no se descubra el dia que importa"));
+            }
+
+            // EL PISO RECOMENDADO: los comandos que las propias reglas del
+            // marco exigen correr ANTES de cada push. Se busca por propiedad y
+            // no por la linea exacta, porque el nombre del script es del
+            // proyecto (un filtro de paquete, un monorepo, otro runner).
+            const PISO = [
+              { nombre: "el linter", prueba: /(^|[^a-z])lint([^a-z]|$)/ },
+              { nombre: "el chequeo de tipos", prueba: /(^|[^a-z])(typecheck|tsc)([^a-z]|$)/ },
+              { nombre: "las pruebas", prueba: /(^|[^a-z])(test|vitest|playwright)([^a-z]|$)/ },
+              { nombre: "el chequeo de formato", prueba: /(^|[^a-z])(format|prettier)/ },
+              { nombre: "la validacion estricta de las specs", prueba: /openspec/ }
+            ];
+            const todo = allow.join(String.fromCharCode(10)).toLowerCase();
+            const faltan = PISO.filter((p) => !p.prueba.test(todo)).map((p) => p.nombre);
+            if (faltan.length > 0) {
+              console.log(
+                "::warning file=" + escapar(RUTA) + ",title=Piso de permisos recomendado::" +
+                escapar(
+                  "el allowlist no autoriza " + faltan.join(", ") + ": son los comandos que las propias reglas del marco exigen correr ANTES de cada push, asi que el agente los va a pedir de a uno en cada sesion. Es AVISO y nunca fallo, a proposito: un permiso de mas es un riesgo, uno de menos es friccion — un rojo aca seria un falso positivo molesto. Arreglo: agrega la entrada del comando que este repo usa para cada uno"
+                )
+              );
+            }
+
+            // La verdad de lo que se probo, ni una palabra mas.
+            console.log(
+              "== permisos del agente == " + allow.length + " entrada(s) del allowlist leidas: " +
+              hallazgos.length + " autoriza(n) una escritura sin desvio declarado, " + absorbidos.length + " con desvio y motivo escrito, " +
+              aLaVista.length + " corre(n) con el perfil de produccion, " + faltan.length + " item(s) del piso recomendado sin cubrir. " +
+              "Es lectura de la FORMA de las entradas y no ejecucion: reconoce verbos que escriben y comodines en la posicion del subcomando, NO prueba que el resto de las entradas no pueda escribir"
+            );
+            process.exit(salida);
+          '
+
   # Veredicto agregado DEL MARCO. Reporta siempre (docs o codigo). No conoce el
   # build/test del producto: ese lo agrega el ci-ok del repo consumidor, que es
   # el check requerido por el ruleset.
