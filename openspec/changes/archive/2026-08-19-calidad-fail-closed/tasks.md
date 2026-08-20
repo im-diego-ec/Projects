@@ -168,20 +168,45 @@ excluyendo archivos para llegar— o declarar la deuda con su motivo y su fecha.
       del monorepo, más un check del `marco-ci` que compara ese número contra la
       constante del comparador. Evidencia: el check en verde y sus tres rojos
       demostrados (archivo ausente, números divergentes, `all: true` sacado).
-- [ ] 4.7 **Pendiente, con su motivo escrito: nada verifica que el delta de un
-      change y el spec vivo coincidan mientras ese change se archiva.** Las tres
-      ediciones de este requirement mantuvieron los dos archivos iguales a mano
-      —esta última con un solo script para los dos y comprobación por md5 de la
-      sección completa—, pero eso es disciplina de cada sesión y no una propiedad
-      del repositorio. **Ojo con la forma del check**, porque escrito mal se
-      implementa mal: NO es una comparación permanente entre `changes/archive/`
-      y `openspec/specs/`. El archive es historia inmutable y el spec vivo
-      evoluciona, así que un change posterior sobre el mismo requirement los hace
-      divergir con razón, y un check así daría rojo para siempre enseñando a
-      arreglarlo reescribiendo la historia. El alcance correcto es: mientras el PR
-      que archiva un change está abierto, su delta y el spec vivo son dos caras
-      del mismo cambio y tienen que coincidir en los requirements que toca. No se
-      hizo acá para no agrandar el arreglo, y queda como change de Projects.
+- [x] 4.5e **Verificación adversarial independiente del bloque 4.5 (2026-08-20).**
+      Era la única de las tres ramas del cierre de v1 sin refutador (el suyo murió
+      por un 529), así que sus números eran los del implementador. Medidos de
+      nuevo con fábrica propia, sin compartir un solo helper con el banco de la
+      rama: los cuatro casos afirmados **se sostienen**, y también sus vecinos
+      (fecha ausente, motivo vacío, fecha fuera del calendario, dos paquetes con
+      un culpable, `lcov` sin funciones, paquete sin ramas). Contra un espejo de
+      solo lectura del consumidor real, bajar los cuatro umbrales a 40 **y** el
+      `minimo` de la action a 40 no vuelve verde nada (`EXIT 1`). Dos hallazgos,
+      los dos arreglados acá y los dos de la misma clase —la compuerta desaparece
+      sin que nada lo diga—: (a) la ventana de estreno no estaba en el contrato,
+      así que con la fecha REAL de la corrida el caso central del requirement
+      salía `EXIT 0` mientras su escenario decía «falla»; (b) un piso declarado
+      cuya métrica llega sin datos dejaba de exigirse en verde y sin un
+      `::warning::`. Evidencia: `EXIT 1 → 0` en los tres casos nuevos del banco
+      (medidos primero contra el código anterior), la ventana escrita en el
+      requirement con cuatro escenarios, una prueba que ata la constante del
+      comparador al texto del spec vivo y del delta archivado, y el espejo del
+      consumidor que sigue pasando hoy con su aviso.
+- [x] 4.7 **El delta ARCHIVADO se compara contra el spec vivo (2026-08-20).** Lo
+      que este bloque dejó pendiente, cerrado con un alcance distinto del que
+      proponía y con la razón escrita en D5f: el PR-scoped exige leer el diff del
+      PR, ata el script a git y además no protege a `main`, que es donde el daño
+      queda. El alcance implementado: todo requirement que un delta archivado
+      declara en ADDED o MODIFIED tiene que estar en el spec vivo con todos sus
+      escenarios, salvo que algún delta archivado lo declare REMOVED o RENAMED
+      —las dos únicas formas legítimas y, las dos, declaradas—. La medición que lo
+      originó: en esta misma rama el guardrail salía `EXIT 0` diciendo «ningún
+      MODIFIED perdería requirements ni escenarios» habiendo comparado **cero**
+      deltas, porque su recorrido excluía `archive` y no quedaba ningún change
+      activo. Evidencia: sobre el repo real, 9 requirements comparados en 2 deltas
+      archivados con `EXIT 0`; con un escenario sacado a mano del spec vivo,
+      `EXIT 1` nombrando change, requirement y escenario, y restaurado a `EXIT 0`;
+      el verde ya no es mudo (imprime cuántos comparó); y `guardrail-deltas` tiene
+      por fin banco propio, 13 casos, incluidos los dos falsos positivos que
+      harían inservible al check. **Residuo declarado:** la comparación es de
+      subconjunto, no de igualdad, así que no ve un archive que además le agregó
+      al spec vivo algo que ningún delta declara. Para eso haría falta el alcance
+      PR-scoped, con git, y queda como change de Projects.
 
 ## 5. Cierre
 

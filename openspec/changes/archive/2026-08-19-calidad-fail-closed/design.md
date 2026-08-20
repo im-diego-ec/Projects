@@ -288,6 +288,134 @@ acá se editaron los dos. Un check con ese alcance sí es correcto, y es el que 
 pendiente; dejar constancia de la forma correcta vale más que dejar el pendiente a
 secas, porque el pendiente escrito mal se implementa mal.
 
+### D5e — La amnistía se escribe en el contrato, y el piso sin datos es rojo
+
+**Verificación adversarial independiente de D5d (2026-08-20).** D5d fue la única de
+las tres ramas del cierre de v1 que quedó sin refutador —el suyo murió por un error
+529 del servidor—, así que sus números eran los del implementador. Esta ronda los
+midió de cero, con fábrica propia: ni un helper compartido con el banco de la rama,
+porque si el banco y el verificador comparten el andamio, un defecto del andamio se
+esconde dos veces. Los cuatro casos que D5d afirma **se sostienen**, y también sus
+vecinos: fecha ausente, motivo vacío, fecha fuera del calendario, dos paquetes con
+un solo culpable, `lcov` sin funciones, paquete sin ramas. Y sobre un espejo de
+solo lectura del consumidor real, bajar los cuatro umbrales a 40 y el `minimo` de
+la action a 40 **no vuelve verde nada**.
+
+Aparecieron dos huecos, y los dos son de la misma clase: **la compuerta desaparece
+sin que nada lo diga.**
+
+**1. La ventana de estreno no estaba en el contrato.** Con la fecha REAL de la
+corrida —la que tiene el pipeline de un consumidor— el caso central del
+requirement salía `EXIT 0`. Un paquete al 33,33% sin deuda declarada: amarillo. El
+espejo del consumidor real: amarillo. Y el escenario del spec vivo decía, textual,
+«la integración **falla**». El banco de D5d era honesto (corre el régimen con la
+ventana cerrada y tiene dos pruebas propias para la ventana), y el comentario del
+comparador explicaba todo; el **contrato**, no. Es la afirmación A07 regenerada una
+ortografía más adentro: A07 prometía rojo sin compuerta, y D5d construyó la
+compuerta con una amnistía que el contrato no nombraba. Un comentario no es el
+contrato: una amnistía que el spec no dice es indistinguible de la verificación que
+no existe.
+
+La ventana **se mantiene** —la medición que la justifica sigue en pie: contra el
+`main` del consumidor la compuerta da rojo y su arreglo vive en una rama sin
+mergear—, y lo que se corrige es la coherencia. La fecha de cierre, qué afloja y
+qué no, y que se cierra por el paso del tiempo, quedaron escritos en el requirement
+con cuatro escenarios nuevos. Y para que la coherencia no dependa de que alguien se
+acuerde, una prueba lee la constante del comparador y exige que esa fecha esté en
+el spec vivo **y** en el delta archivado: mover la constante sin tocar el contrato
+es rojo.
+
+**Alternativa descartada: sacar la ventana y que el consumidor amanezca rojo.**
+Deja el contrato verdadero sin escribir una línea de spec, y es peor por dos
+razones. El rojo lo cobra quien pase por ahí, no quien lo causó —el defecto está en
+un repositorio y el rojo aparece en otro—, y sobre todo enseña la lección
+equivocada: que un cambio del marco puede detener a un consumidor que no tocó nada.
+Ese es el incidente del 2026-08-19 al mover `v1` la primera vez, y repetirlo a
+propósito para ahorrar treinta líneas de spec sería cambiar contrato por comodidad.
+
+**2. Un piso declarado cuya métrica llega sin datos dejaba de exigirse, en verde.**
+Medido: un paquete que declara `piso: { funciones: 90 }` y cuyo reporte deja de
+emitir `FN:` salía `EXIT 0`, con la fila impresa como `n/a` y sin un solo
+`::warning::`. El piso es la única defensa de la **ganancia acumulada**, y apagarla
+costaba lo mismo que cambiar el reporter, apagar `all: true` o subir de mayor de
+vitest. Es fail-open, y la constitución del marco pide que todo fail-open sea
+ruidoso.
+
+La regla que lo cierra está derivada del principio y no del ejemplo: **una
+declaración que no se puede comparar contra ningún dato no protege nada, y decirlo
+es obligatorio.** Piso sin datos → rojo, porque desapareció una comparación que
+existía y el arreglo es una línea de diff bajo review. Deuda sobre un paquete sin
+ninguna métrica medible → amarillo ruidoso, porque no apagó nada, pero una deuda
+que ninguna corrida nombra envejece en el manifiesto y se paga sola sin que nadie
+sepa que estaba.
+
+**Lo que a propósito NO cambió:** el caso «no hay ningún reporte en la corrida»
+sigue siendo el aviso que ya era. Ahí no desapareció ninguna compuerta —no se
+emitió cobertura— y enrojecerlo pondría en rojo permanente cualquier carril que no
+corra pruebas, que es el rojo que D5b existe para evitar.
+
+**El control negativo que lo pidió.** Mutar `!m || !m.encontradas` a `!m` sobrevivía
+al banco entero. La única prueba de `n/a` que había pasaba la métrica **ausente**
+(la clave no estaba en el objeto), nunca una presente con `encontradas = 0`, que es
+la que un `lcov` real produce. Una prueba que no distingue esos dos casos no estaba
+midiendo el que importa.
+
+**3. El banco estaba rojo por el fin de línea del disco.** 90 de 91 pruebas verdes,
+y la única roja lo era porque este repositorio no versiona `.gitattributes`: con
+`core.autocrlf=true` (el default de Git para Windows) los fixtures llegan en CRLF,
+las pruebas escriben LF y el diff ve el archivo entero reescrito. Las dos rondas
+anteriores lo trataron como ruido del entorno y lo rodearon a mano. Ahora el helper
+`fixture()` normaliza a LF: un banco que necesita un rito manual antes de creerle
+deja al que lo mira decidiendo si el rojo cuenta, y esa decisión es exactamente lo
+que un código de salida existe para no tener que tomar.
+
+### D5f — El delta archivado se compara contra el spec vivo
+
+**El pendiente que D5d declaró, cerrado, y con un alcance distinto del que D5d
+proponía.** D5d dejó escrito que el check correcto era el PR-scoped: «mientras el PR
+que archiva un change está abierto, su delta y el spec vivo tienen que coincidir».
+Ese alcance es correcto y **no se implementó**, porque exige leer el diff del PR y
+eso convierte un script de sistema de archivos en un script que depende de git, de
+la profundidad del clon y del contexto del evento. Un check que solo funciona
+dentro de un PR además no protege a `main`, que es donde el daño queda.
+
+El alcance que se implementó es más ancho y sigue siendo sano: **todo requirement
+que un delta archivado declara en ADDED o MODIFIED tiene que estar en el spec vivo,
+con todos sus escenarios, salvo que algún delta archivado lo declare REMOVED o
+RENAMED.** El falso positivo que D5d temía —el archive es historia y un change
+posterior hace divergir a los dos con razón— se evita justamente con esa
+resolución: las dos únicas formas legítimas de que un requirement archivado no esté
+vivo son la baja y el retitulado, y las dos son **declaradas**. Y la invariante que
+lo hace sano ya la garantizaba este mismo script en su primer plano: un MODIFIED
+debe reproducir todos los escenarios vigentes, así que los títulos de escenario no
+desaparecen en silencio.
+
+Medido: sobre el repositorio real el check compara **9 requirements en 2 deltas
+archivados** y sale `EXIT 0` —o sea que no es un check que da rojo sobre historia
+correcta— y con un escenario sacado a mano del spec vivo sale `EXIT 1` nombrando el
+change, el requirement y el escenario. La medición que lo originó: en esta misma
+rama, donde el único cambio de spec vive dentro de `changes/archive/`, el guardrail
+salía `EXIT 0` diciendo «ningún MODIFIED perdería requirements ni escenarios»
+habiendo comparado **cero** deltas. La coherencia entre el delta archivado y el
+spec vivo estaba sostenida por un md5 que alguien corrió a mano una vez.
+
+**Y el verde dejó de ser mudo.** Toda corrida imprime cuántos deltas y cuántos
+requirements comparó, y un árbol sin deltas lo dice con esas palabras.
+
+**Residuo declarado, y es irreducible con este alcance:** lo que este check **no**
+puede ver es un archive que aplicó el delta al spec vivo y además le agregó algo
+que ningún delta declara. La comparación es de **subconjunto** (todo lo archivado
+está vivo), no de igualdad, y no puede ser de igualdad sin volverse el check
+permanente byte a byte que D5d ya descartó por diseño. Para cerrar eso haría falta
+el alcance PR-scoped, con git.
+
+**Una consecuencia lateral que vale nombrar:** `guardrail-deltas` llegó a la v1 sin
+un solo caso sintético, y el propio `ci.yml` del marco lo estaba avisando en cada
+corrida (`::warning::` de «actions con script propio y ningún banco»). El aviso
+existía, era correcto, y nadie lo cobró: un fail-open ruidoso solo sirve si alguien
+lee el ruido. Ahora tiene banco, con 13 casos, incluidos los dos falsos positivos
+que harían inservible al check.
+
 ### D6 — El orden reemplaza al modo aviso, otra vez
 
 El consumidor da rojo el día del estreno. La constitución define eso como
