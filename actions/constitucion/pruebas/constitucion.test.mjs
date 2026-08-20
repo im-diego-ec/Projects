@@ -263,23 +263,33 @@ test("artefacto mas nuevo con DOS refs distintas que lo explican: aviso, y dice 
     hoy: DENTRO_DE_LA_VENTANA,
     pins: [
       // el verificador, pinado viejo...
-      { ruta: ".github/workflows/ci.yml", job: "constitucion", ref: "0123456789abcdef0123456789abcdef01234567" },
-      // ...y el escritor, en el tag movil: por ahi entra un artefacto mas nuevo.
-      { ruta: ".github/workflows/actualizar-marco.yml", job: "actualizar", ref: "v1" },
+      {
+        ruta: ".github/workflows/ci.yml",
+        job: "constitucion",
+        ref: "0123456789abcdef0123456789abcdef01234567",
+        escribe: false,
+      },
+      // ...y el ESCRITOR, en el tag movil: por ahi entra un artefacto mas nuevo. Que
+      // cual de los dos escribe sea un dato del pin es la correccion de la ronda 4: el
+      // veredicto compara la ref del escritor contra las del verificador, y hasta hoy
+      // comparaba todas las refs entre si — por eso un verificador viejo suelto, o un
+      // senuelo que no corre, alcanzaba para comprar este aviso.
+      { ruta: ".github/workflows/actualizar-marco.yml", job: "actualizar", ref: "v1", escribe: true },
     ],
   });
   const adelantado = de(resultado, "artefacto-adelantado");
   assert.equal(adelantado.length, 1, JSON.stringify(resultado.hallazgos));
   assert.equal(adelantado[0].nivel, "warning");
-  assert.match(adelantado[0].mensaje, /refs DISTINTAS/);
+  assert.match(adelantado[0].mensaje, /ESCRIBE el artefacto con una ref que no usa para verificarlo/);
+  assert.match(adelantado[0].mensaje, /actualizar-marco\.yml#actualizar -> v1/);
   assert.equal(de(resultado, "artefacto-sello-incoherente").length, 0);
 });
 
-// Y CON UNA SOLA REF, ROJO, sea la que sea. Si todas las invocaciones del repo corren
-// la misma copia del marco, el modo escribir corre el MISMO codigo que este
-// verificador: no puede haber emitido una version mas nueva que la suya. La ortografia
-// de la ref no entra en la cuenta, que es exactamente lo que la volvia evadible.
-test("artefacto mas nuevo con una sola ref: ROJO, y da igual como se escriba la ref", () => {
+// Y CON EL ESCRITOR EN LA MISMA REF QUE EL VERIFICADOR, ROJO, sea la que sea. Si el modo
+// escribir corre el MISMO codigo que este verificador, no puede haber emitido una version
+// mas nueva que la suya. La ortografia de la ref no entra en la cuenta, que es
+// exactamente lo que la volvia evadible en la ronda 2.
+test("artefacto mas nuevo con el escritor en la ref del verificador: ROJO, y da igual como se escriba", () => {
   for (const ref of ["v1", "main", "refs/heads/main", "v1.3.0", "0123456789abcdef0123456789abcdef01234567"]) {
     const canonico = canonicoTemporal({ versiones: VERSIONES_UNA_EN_VENTANA });
     const deOtroMarco = artefactoAlDia(canonico).replace(
@@ -290,14 +300,43 @@ test("artefacto mas nuevo con una sola ref: ROJO, y da igual como se escriba la 
       canonico,
       archivos: { ...CADENA_SANA, ".projects/AGENTS-marco.md": deOtroMarco },
       hoy: DENTRO_DE_LA_VENTANA,
-      pins: [{ ruta: ".github/workflows/ci.yml", job: "constitucion", ref }],
+      pins: [
+        { ruta: ".github/workflows/ci.yml", job: "constitucion", ref, escribe: false },
+        { ruta: ".github/workflows/actualizar-marco.yml", job: "actualizar", ref, escribe: true },
+      ],
     });
     const adelantado = de(resultado, "artefacto-adelantado");
     assert.equal(adelantado.length, 1, `${ref}: ${JSON.stringify(resultado.hallazgos)}`);
     assert.equal(adelantado[0].nivel, "error", ref);
-    assert.match(adelantado[0].mensaje, /MISMA ref/);
+    assert.match(adelantado[0].mensaje, /ref que este repo tambien usa para VERIFICAR/);
     assert.equal(resultado.estado, "rojo", ref);
   }
+});
+
+// Y EL CASO QUE EL SEÑUELO EXPLOTABA: un VERIFICADOR pinado distinto no explica nada,
+// porque el modo verificar no emite ningun artefacto. Antes de la ronda 4 esta era la
+// forma de bajar el rojo a aviso con un archivo de once lineas.
+test("un verificador pinado a otra ref no compra el aviso: verificar no escribe nada", () => {
+  const canonico = canonicoTemporal({ versiones: VERSIONES_UNA_EN_VENTANA });
+  const deOtroMarco = artefactoAlDia(canonico).replace(
+    cabecera({ version: "1.3.0", sha: canonico.sha, superficie: "claude-code" }),
+    cabecera({ version: "9.9.9", sha: "abcabcabcabc", superficie: "claude-code" }),
+  );
+  const resultado = correr({
+    canonico,
+    archivos: { ...CADENA_SANA, ".projects/AGENTS-marco.md": deOtroMarco },
+    hoy: DENTRO_DE_LA_VENTANA,
+    pins: [
+      { ruta: ".github/workflows/ci.yml", job: "constitucion", ref: "v1", escribe: false },
+      { ruta: ".github/workflows/actualizar-marco.yml", job: "actualizar", ref: "v1", escribe: true },
+      // el señuelo: otra ref, pero solo VERIFICA
+      { ruta: ".github/workflows/senuelo.yml", job: "nunca", ref: "v0.0.1", escribe: false },
+    ],
+  });
+  const adelantado = de(resultado, "artefacto-adelantado");
+  assert.equal(adelantado.length, 1, JSON.stringify(resultado.hallazgos));
+  assert.equal(adelantado[0].nivel, "error");
+  assert.equal(resultado.estado, "rojo");
 });
 
 test("resellar la cabecera NO tapa una edicion del cuerpo", () => {

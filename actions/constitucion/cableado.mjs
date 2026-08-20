@@ -79,12 +79,24 @@
 // constitución no necesita adivinarse acá: si ese `if` lo saltea, el resultado que el
 // veredicto lee es `skipped`, y un veredicto que compara contra `success` lo cobra.
 //
-// EL RESIDUO IRREDUCIBLE, declarado y no escondido: este check lee que el veredicto
-// CONSULTA el resultado, no lo que su script hace con el valor. Un `run:` que lea
-// `needs.constitucion.result`, lo imprima y salga 0 pasaría. Cerrarlo exigiría decidir
-// el comportamiento de un script de shell arbitrario, que no es decidible; la salida
-// estructural sería que el veredicto lo emita el marco (otra action) en vez de cada
-// consumidor en su `run:`, y eso es un change, no un parche de este archivo.
+// EL RESIDUO IRREDUCIBLE, declarado, no escondido y —esto es lo que cambió en la ronda
+// 4— UBICADO DONDE DE VERDAD ESTÁ. La ronda 3 lo escribió como «este check lee que el
+// veredicto CONSULTA el resultado, no lo que su script hace con el valor», y el
+// refutador midió que esa frase abarcaba mucho más de lo irreducible: bajo ella entraban
+// el `name` decorativo, el `env` que nadie lee, la línea comentada del `run`, el
+// `.outputs` que no transporta el fallo, el paso amortiguado con `continue-on-error` y el
+// eslabón intermedio que lava el rojo. Nada de eso era indecidible: los seis se cerraron.
+//
+// Lo que QUEDA es estrictamente más chico: solo lo que el shell hace con el valor que YA
+// LEYÓ. Se verifica que la lectura exista, que sea de `.result` (el único campo que
+// transporta el fallo), que ocurra en un paso VIVO y no amortiguado, y que cada eslabón
+// del camino hasta el check run del ruleset transporte el rojo. Lo que no se verifica es
+// la comparación: un `[ "${{ needs.constitucion.result }}" = "banana" ]` lee el valor,
+// nunca coincide y pasa. Cerrarlo exigiría decidir el comportamiento de un script de
+// shell arbitrario, que no es decidible; la salida estructural sería que el veredicto lo
+// emita el marco (otra action) en vez de cada consumidor en su `run:`, y eso es un
+// change, no un parche de este archivo. Está medido como prueba —no como promesa— en
+// `pruebas/refutaciones-ronda-4.test.mjs`, grupo (R).
 //
 // EL SKIP DEL DISTRIBUIDOR, como PROPIEDAD POSITIVA y no como ausencia. El marco
 // reparte el scaffold y no es consumidor de su propia porción, así que su `AGENTS.md`
@@ -677,6 +689,35 @@ function tapaElRojoEn(mapa) {
  * esperando una señal que no llegaba. Ningún filtro de rutas puede demostrarse seguro
  * acá, así que ninguno cuenta.
  */
+/**
+ * Por qué `push` SOLO no es «disparada en el camino del cambio». Un push a la rama por
+ * defecto ocurre DESPUÉS del merge: el check corre sobre un commit que ya está en main,
+ * nunca sobre la cabeza del PR, así que en el PR no hay ningún check run que el ruleset
+ * pueda exigir. Es la misma clase de error que el ruleset esperando `build-test`: una
+ * señal que llega tarde es indistinguible de una que no llega. Con `pull_request`
+ * presente el `push` es un extra sano (y es la forma que reparte el scaffold); sin
+ * `pull_request` no hay compuerta.
+ */
+const SOLO_PUSH =
+  "el unico disparo que sirve es push, y un push a la rama por defecto corre DESPUES del merge: el check nunca se publica sobre la cabeza del PR, asi que el ruleset no tiene ningun check run que exigir mientras el PR esta abierto. Arreglo: agregar `pull_request:` al `on:` de ese workflow";
+
+/**
+ * ¿Este workflow declara ALGÚN disparo que GitHub pueda ejecutar? Es una pregunta más
+ * débil que `correEnVerificacion` a propósito, y las dos hacen falta por separado: una
+ * COMPUERTA tiene que correr sobre la cabeza del PR (solo `pull_request`), pero un
+ * ESCRITOR del artefacto corre por `schedule` o `workflow_dispatch` y es perfectamente
+ * legítimo. Lo único que descalifica acá es un `on:` ausente, vacío o ilegible: sin él
+ * el workflow no corre nunca y no pudo escribir nada.
+ */
+export function declaraDisparo(doc) {
+  const on = doc?.on;
+  if (on === null || on === undefined) return false;
+  if (typeof on === "string") return on.trim() !== "";
+  if (Array.isArray(on)) return on.filter((e) => String(e ?? "").trim() !== "").length > 0;
+  if (typeof on !== "object") return false;
+  return Object.keys(on).length > 0;
+}
+
 export function correEnVerificacion(doc, ramaPorDefecto = "main") {
   const on = doc?.on;
   if (on === null || on === undefined) return { corre: false, porque: "el workflow no declara `on:`" };
@@ -685,7 +726,7 @@ export function correEnVerificacion(doc, ramaPorDefecto = "main") {
     // La forma de lista o de cadena no admite filtros: si el evento está, corre.
     const eventos = comoLista(on).map((e) => String(e));
     if (eventos.includes("pull_request")) return { corre: true, evento: "pull_request" };
-    if (eventos.includes("push")) return { corre: true, evento: "push" };
+    if (eventos.includes("push")) return { corre: false, porque: SOLO_PUSH };
     return { corre: false, porque: `solo corre en ${eventos.join(", ") || "(nada)"}` };
   }
   if (typeof on !== "object") return { corre: false, porque: "el `on:` del workflow no se pudo leer" };
@@ -697,9 +738,10 @@ export function correEnVerificacion(doc, ramaPorDefecto = "main") {
     motivos.push(`en pull_request ${veredicto.porque}`);
   }
   if ("push" in on) {
+    // El `push` se sigue evaluando con todos sus filtros, pero YA NO ALCANZA SOLO. Ver
+    // SOLO_PUSH: un push a la rama por defecto corre DESPUÉS del merge.
     const veredicto = evaluarPush(on.push, ramaPorDefecto);
-    if (veredicto.corre) return { corre: true, evento: "push" };
-    motivos.push(`en push ${veredicto.porque}`);
+    motivos.push(veredicto.corre ? SOLO_PUSH : `en push ${veredicto.porque}`);
   }
   if (motivos.length > 0) return { corre: false, porque: motivos.join("; y ") };
   return { corre: false, porque: `solo corre en ${Object.keys(on).join(", ") || "(nada)"}` };
@@ -768,15 +810,72 @@ function evaluarPush(cfg, ramaPorDefecto) {
   return { corre: true };
 }
 
-/** La clave del job que es el veredicto agregado. Se acepta por `name` o por la clave
- *  con guiones bajos (el scaffold usa la clave `ci_ok` con `name: ci-ok`). */
+/**
+ * El NOMBRE DEL CHECK RUN que este job va a publicar, que es lo único que el ruleset
+ * mira. No es la clave del job y no es una cuestión de estilo: la referencia de
+ * `jobs.<id>.name` dice que ese nombre es el que aparece en la UI, y la de
+ * `strategy.matrix` que el nombre de cada job de la matriz se compone con los valores
+ * de la combinación —«ci-ok (a)», «ci-ok (b)»—, así que un job con matriz NO publica
+ * ningún check llamado `ci-ok`.
+ *
+ * Devuelve `{ nombre, conMatriz }`: el nombre efectivo (el `name` si está, la clave si
+ * no) y si la matriz lo va a sufijar.
+ */
+export function nombreDelCheck(clave, job) {
+  const declarado = typeof job?.name === "string" ? job.name.trim() : "";
+  const matriz = job?.strategy?.matrix;
+  return {
+    nombre: (declarado !== "" ? declarado : String(clave)).toLowerCase(),
+    conMatriz: matriz !== undefined && matriz !== null,
+  };
+}
+
+/**
+ * La clave del job que publica el check run que el ruleset exige, con el nombre EXACTO.
+ *
+ * POR QUÉ SE ENDURECIÓ. La versión anterior aceptaba el job por su `name` o por su
+ * clave normalizada (`ci_ok` -> `ci-ok`), y eso confundía dos cosas distintas: cómo se
+ * llama el job en el YAML y cómo se llama el check run que el ruleset espera. Dos
+ * mutaciones medidas pasaban por ahí:
+ *   · clave `ci_ok` con `name: veredicto-final` -> el check se publica como
+ *     «veredicto-final» y el ruleset sigue esperando `ci-ok`, una señal que no llega
+ *     nunca (es el error que ya costó una semana de ruleset en otro repo);
+ *   · `name: ci-ok` con `strategy.matrix` -> se publican «ci-ok (a)» y «ci-ok (b)», y
+ *     ningún check se llama `ci-ok`.
+ * La clave normalizada se dejó de aceptar por lo mismo: un job `ci_ok` SIN `name`
+ * publica un check llamado `ci_ok`, con guión bajo, que tampoco es el que el ruleset
+ * nombra.
+ *
+ * `casiElVeredicto` existe para que el fallo diga QUÉ pasó en vez de «no hay veredicto
+ * agregado»: un near-miss es más difícil de ver que una ausencia.
+ */
 export function jobDelVeredicto(jobs) {
   for (const [clave, job] of Object.entries(jobs ?? {})) {
-    const nombre = typeof job?.name === "string" ? job.name.trim().toLowerCase() : "";
-    if (nombre === VEREDICTO_AGREGADO) return clave;
-    if (clave.replace(/_/g, "-").toLowerCase() === VEREDICTO_AGREGADO) return clave;
+    const check = nombreDelCheck(clave, job);
+    if (check.nombre === VEREDICTO_AGREGADO && !check.conMatriz) return clave;
   }
   return null;
+}
+
+/** Los jobs que se PARECEN al veredicto agregado sin publicar su check, cada uno con el
+ *  motivo. Es lo que separa «falta el veredicto» de «el veredicto está, mal nombrado». */
+export function casiElVeredicto(jobs) {
+  const casi = [];
+  for (const [clave, job] of Object.entries(jobs ?? {})) {
+    const check = nombreDelCheck(clave, job);
+    if (check.nombre === VEREDICTO_AGREGADO && check.conMatriz) {
+      casi.push(
+        `el job "${clave}" se llama "${VEREDICTO_AGREGADO}" pero declara strategy.matrix, asi que publica un check por combinacion ("${VEREDICTO_AGREGADO} (...)") y ninguno se llama exactamente "${VEREDICTO_AGREGADO}": el ruleset espera para siempre una senal que no llega. Arreglo: el veredicto agregado no lleva matriz`,
+      );
+      continue;
+    }
+    if (check.nombre === VEREDICTO_AGREGADO) continue;
+    if (clave.replace(/_/g, "-").toLowerCase() !== VEREDICTO_AGREGADO) continue;
+    casi.push(
+      `el job "${clave}" es el candidato obvio al veredicto agregado y el check run que publica se llama "${check.nombre}", no "${VEREDICTO_AGREGADO}" (GitHub usa el "name" del job si esta declarado, y la clave si no): el ruleset exige el nombre exacto. Arreglo: name: ${VEREDICTO_AGREGADO}`,
+    );
+  }
+  return casi;
 }
 
 /** ¿`desde` depende de `buscado` por `needs`, directa o transitivamente? */
@@ -829,51 +928,180 @@ export function correAunConFallo(job) {
   return /^(always\(\)|!\s*cancelled\(\)|success\(\)\s*\|\|\s*failure\(\)|failure\(\)\s*\|\|\s*success\(\))$/i.test(t);
 }
 
-/** Todo el texto que vive dentro de un valor de YAML, aplanado. Es donde puede estar
- *  la referencia al resultado: en un `run:`, en un `if:`, en un `env:` o en un `with:`. */
-function textosDe(valor, acumulado = []) {
-  if (typeof valor === "string") acumulado.push(valor);
-  else if (Array.isArray(valor)) for (const v of valor) textosDe(v, acumulado);
-  else if (valor && typeof valor === "object") for (const v of Object.values(valor)) textosDe(v, acumulado);
-  return acumulado;
+/**
+ * El texto de los pasos que DE VERDAD se ejecutan, y solo el que puede hacer fallar al
+ * job: el `run` y el `if` de cada paso VIVO, con los comentarios de shell recortados.
+ *
+ * POR QUÉ SE ESTRECHÓ TANTO. La versión anterior aplanaba TODAS las cadenas del job, y
+ * eso compraba la condición con texto que no decide nada. Tres mutaciones medidas
+ * pasaban por ahí, las tres con el veredicto en verde:
+ *   · `name: 'mira needs.constitucion.result (miente)'` — un rótulo de UI;
+ *   · un `env:` que declara la referencia y ningún paso la lee;
+ *   · la línea correcta COMENTADA dentro del `run:` (`# [ "..." ] || exit 1`).
+ * Un paso apagado por su `if` o con `continue-on-error` tampoco cuenta: consultar el
+ * resultado en un paso que no corre, o cuyo rojo el runner descarta, es exactamente no
+ * consultarlo. Y `with:`/`env:` quedaron afuera porque un valor pasado a otra action no
+ * es una comparación que falle: lo que hace fallar al job es el shell del `run` o el
+ * salteo del `if`.
+ *
+ * LÍMITE DECLARADO Y ES EL RESIDUO REAL de la condición 5: esto verifica que el shell
+ * LEA el valor, no lo que hace con él. Un `run` que lo compare contra algo que nunca va
+ * a coincidir —`[ "${{ needs.x.result }}" = "banana" ]`— lee el valor y no cobra el
+ * rojo. Es irreducible sin interpretar shell, y es estrictamente más chico que «no
+ * verificamos qué hace el run»: la lectura sí se verifica, y también que el paso que
+ * lee esté vivo y no amortiguado.
+ */
+export function textosVivosDe(job) {
+  const trozos = [];
+  for (const paso of Array.isArray(job?.steps) ? job.steps : []) {
+    if (paso === null || typeof paso !== "object") continue;
+    if (ifApagado(paso.if)) continue;
+    if (tapaElRojoEn(paso)) continue;
+    for (const clave of ["run", "if"]) {
+      const valor = paso[clave];
+      if (typeof valor !== "string") continue;
+      for (const linea of valor.split("\n")) trozos.push(sinComentario(linea));
+    }
+  }
+  return trozos.join("\n");
+}
+
+/** ¿Este texto CONSULTA el resultado de `eslabon`? Solo `.result`: es el único campo
+ *  del contexto `needs` que transporta el fallo. `.outputs` lleva lo que el job
+ *  imprimió —y un job que falló antes de imprimir deja el output VACÍO, que es
+ *  indistinguible de un job verde sin outputs—, así que leer `.outputs` no es cobrar el
+ *  rojo. Las formas son las de la referencia de expresiones, no ortografías de shell. */
+export function consultaElResultado(texto, eslabon) {
+  const t = String(texto ?? "");
+  if (/needs\s*\.\s*\*\s*\.\s*result|to_?json\s*\(\s*needs\s*\)/i.test(t)) return true;
+  const nombre = escaparRegex(eslabon);
+  return new RegExp(`needs\\s*(?:\\.\\s*${nombre}|\\[\\s*['"]${nombre}['"]\\s*\\])\\s*\\.\\s*result`, "i").test(t);
 }
 
 /**
- * ¿El veredicto agregado MIRA el resultado del job de la compuerta?
+ * ¿El `result` de este nodo deja de ser `success` cuando la compuerta falla?
  *
- * La condición vieja preguntaba si existía una arista de `needs` y con eso declaraba
- * «el rojo bloquea». No bloquea: con `if: always()` —que el marco EXIGE para que el
- * check reporte en los dos carriles— el veredicto corre igual y sale verde si su
- * script no mira nada. Medido: `ci-ok` con `needs: [constitucion]`, `if: always()` y un
- * único paso `run: echo ok` daba exit 0 y en la práctica dejaba pasar el merge con la
- * constitución en rojo.
+ * ACÁ ESTABA EL ERROR ESTRUCTURAL de la condición 5. Lo que se prometía —«un rojo de
+ * este job impide que el veredicto agregado salga verde»— es una propiedad de un
+ * CAMINO: del job de la compuerta, por cada eslabón intermedio de `needs`, hasta el
+ * check run cuyo nombre exige el ruleset. Lo que se verificaba era un patrón sintáctico
+ * sobre UN nodo. Y cada nodo del camino tiene el MISMO juego de neutralizadores, que
+ * sale de la referencia de `jobs.<id>` y no de una lista de fixtures:
+ * `continue-on-error`, un `if` constante falso, y —si corre igual con `always()`— no
+ * consultar el `result` de su propio eslabón.
  *
- * Lo que se busca es una referencia al contexto `needs` del ESLABÓN por el que el rojo
- * viaja: el `needs` directo del veredicto que lleva hasta la compuerta (si el veredicto
- * mira `needs.intermedio.result` y `intermedio` cuelga de la constitución, un rojo de la
- * constitución saltea a `intermedio` y el veredicto lo cobra). Las formas son las que
- * ofrece la referencia de expresiones —`needs.<job>.result`, `needs['<job>'].result`,
- * `needs.*.result`, `toJSON(needs)`—, no una lista de ortografías de shell.
+ * La mutación que lo midió: un job `intermedio` con `needs: [constitucion]`,
+ * `if: always()` y `continue-on-error: true`, y un `ci-ok` que compara
+ * `needs.intermedio.result`. Cada nodo pasaba su chequeo local y el rojo se LAVABA en
+ * el medio, porque la referencia dice que un job con `continue-on-error` en true
+ * concluye en `success`.
+ *
+ * Las dos formas de transportar fielmente, y son las dos que la referencia deja:
+ *   · el nodo NO corre con `always()`: cuando su `needs` falla queda `skipped`, y
+ *     `skipped` no es `success`, así que el eslabón siguiente lo cobra al comparar;
+ *   · el nodo SÍ corre con `always()`: entonces tiene que consultar él mismo el
+ *     `result` de un eslabón fiel en un paso vivo, y fallar.
+ * En los dos casos `continue-on-error` rompe la cadena: reescribe la conclusión a
+ * `success` y no hay nada que el siguiente pueda leer.
+ */
+export function transportaElRojo(jobs, nodo, compuerta, vistos = new Set()) {
+  if (nodo === compuerta) return { transporta: true, como: `"${nodo}" ES la compuerta` };
+  if (vistos.has(nodo)) return { transporta: false, porque: `el needs de "${nodo}" es circular` };
+  vistos.add(nodo);
+  const job = jobs?.[nodo];
+  if (job === undefined) {
+    return { transporta: false, porque: `el job "${nodo}" no esta definido en este workflow` };
+  }
+  if (!dependeDe(jobs, nodo, compuerta)) {
+    return { transporta: false, porque: `"${nodo}" no depende de "${compuerta}" por needs` };
+  }
+  if (tapaElRojoEn(job)) {
+    return {
+      transporta: false,
+      porque: `el eslabon "${nodo}" lleva continue-on-error: ${JSON.stringify(job["continue-on-error"])}, que no se puede demostrar falso: un job con continue-on-error concluye en SUCCESS aunque falle, asi que su needs.${nodo}.result vale "success" con la compuerta en rojo y el eslabon LAVA el rojo en el medio del camino`,
+    };
+  }
+  if (ifApagado(job.if)) {
+    return {
+      transporta: false,
+      porque: `el eslabon "${nodo}" esta apagado por su if (${JSON.stringify(job.if)}): un job que nunca corre no transporta nada`,
+    };
+  }
+  // No corre con always(): cuando la compuerta falla, este nodo queda `skipped`, y
+  // `skipped` no es `success`. El rojo viaja como un resultado que el siguiente cobra.
+  if (!correAunConFallo(job)) {
+    return { transporta: true, como: `"${nodo}" queda skipped cuando "${compuerta}" falla` };
+  }
+  // Corre igual, así que tiene que cobrar el rojo por su cuenta.
+  const texto = textosVivosDe(job);
+  const propios = comoLista(job.needs)
+    .map((n) => String(n))
+    .filter((n) => dependeDe(jobs, n, compuerta));
+  for (const eslabon of propios) {
+    if (!consultaElResultado(texto, eslabon)) continue;
+    const adentro = transportaElRojo(jobs, eslabon, compuerta, new Set(vistos));
+    if (adentro.transporta) return { transporta: true, como: `"${nodo}" cobra needs.${eslabon}.result` };
+  }
+  return {
+    transporta: false,
+    porque: `el eslabon "${nodo}" corre aunque su needs falle (${JSON.stringify(job.if)}) y ningun paso VIVO suyo consulta el needs.<job>.result de un eslabon que lleve a "${compuerta}"${
+      propios.length > 0 ? ` (cuelga de ${propios.join(", ")})` : ""
+    }: corre, sale VERDE, y el rojo se pierde ahi`,
+  };
+}
+
+/**
+ * ¿El rojo de la compuerta llega al check run que el ruleset exige?
+ *
+ * Es el RECORRIDO DE ARISTAS completo, y reemplaza al patrón sobre un solo nodo. El
+ * veredicto agregado es el último nodo del camino y no está exento de nada: se le
+ * aplican los mismos neutralizadores que a cualquier eslabón —`continue-on-error` en el
+ * job, `if` constante falso, y en sus pasos lo mismo— y además las dos obligaciones que
+ * lo hacen el final del camino: correr aunque su dependencia falle (o queda `skipped`, y
+ * la doc de checks requeridos dice que un salteado «reports Success») y consultar el
+ * `result` de un eslabón FIEL.
  */
 export function vigilaElResultado(jobs, veredicto, compuerta) {
   const job = jobs?.[veredicto];
+  if (tapaElRojoEn(job)) {
+    return {
+      vigila: false,
+      porque: `"${veredicto}" lleva continue-on-error: ${JSON.stringify(job["continue-on-error"])}, que no se puede demostrar falso: el check requerido concluye en SUCCESS aunque su paso de veredicto falle, asi que el rojo de "${compuerta}" no impide el merge`,
+    };
+  }
+  if (ifApagado(job?.if)) {
+    return {
+      vigila: false,
+      porque: `"${veredicto}" esta apagado por su if (${JSON.stringify(job.if)}): el check requerido nunca corre y el ruleset espera una senal que no llega`,
+    };
+  }
   const eslabones = comoLista(job?.needs)
     .map((n) => String(n))
     .filter((n) => dependeDe(jobs, n, compuerta));
   if (eslabones.length === 0) {
     return { vigila: false, porque: `"${veredicto}" no tiene ningun needs que lleve a "${compuerta}"` };
   }
-  const texto = textosDe(job).join("\n");
-  const comodin = /needs\s*\.\s*\*\s*\.\s*result|to_?json\s*\(\s*needs\s*\)/i.test(texto);
-  if (comodin) return { vigila: true, como: "el comodin sobre todos los needs" };
-  for (const eslabon of eslabones) {
-    const nombre = escaparRegex(eslabon);
-    const patron = new RegExp(`needs\\s*(?:\\.\\s*${nombre}|\\[\\s*['"]${nombre}['"]\\s*\\])\\s*\\.\\s*(result|outputs)`, "i");
-    if (patron.test(texto)) return { vigila: true, como: `mira needs.${eslabon}.result` };
+  const texto = textosVivosDe(job);
+  const consultados = eslabones.filter((eslabon) => consultaElResultado(texto, eslabon));
+  if (consultados.length === 0) {
+    return {
+      vigila: false,
+      porque: `"${veredicto}" cuelga de "${eslabones.join(
+        ", ",
+      )}" y NINGUN paso vivo suyo consulta needs.<job>.result: con if: always() el veredicto corre igual y sale VERDE, y la doc de checks requeridos dice que un job salteado reporta Success. Solo cuenta el run o el if de un paso que corra y cuyo rojo no este amortiguado: un name, un env que nadie lee o la linea comentada dentro del run no consultan nada, y .outputs tampoco transporta el fallo (un job que fallo antes de imprimir deja el output vacio, indistinguible de un verde sin outputs)`,
+    };
+  }
+  const motivos = [];
+  for (const eslabon of consultados) {
+    const camino = transportaElRojo(jobs, eslabon, compuerta, new Set());
+    if (camino.transporta) return { vigila: true, como: `mira needs.${eslabon}.result, y ${camino.como}` };
+    motivos.push(camino.porque);
   }
   return {
     vigila: false,
-    porque: `"${veredicto}" cuelga de "${eslabones.join(", ")}" y no consulta su resultado (needs.<job>.result) en ningun paso: con if: always() el veredicto corre igual y sale VERDE, y la doc de checks requeridos dice que un job salteado reporta Success — asi que sin esa consulta el rojo de "${compuerta}" no llega al check requerido`,
+    porque: `"${veredicto}" consulta needs.${consultados.join(
+      ".result, needs.",
+    )}.result, pero por ese camino el rojo de "${compuerta}" no llega: ${motivos.join("; y ")}`,
   };
 }
 
@@ -909,6 +1137,7 @@ export function invocacionesDe(archivos, ramaPorDefecto = "main") {
       doc === null
         ? { corre: false, porque: "el archivo no se pudo leer como YAML" }
         : correEnVerificacion(doc, ramaPorDefecto);
+    const disparable = doc !== null && declaraDisparo(doc);
     const jobs = doc && typeof doc.jobs === "object" && doc.jobs !== null ? doc.jobs : {};
     const veredicto = jobDelVeredicto(jobs);
     for (const [clave, job] of Object.entries(jobs)) {
@@ -949,8 +1178,11 @@ export function invocacionesDe(archivos, ramaPorDefecto = "main") {
         const cadena = cadenaApagada(jobs, clave);
         if (cadena) motivos.push(`el job "${clave}" ${cadena}`);
         if (veredicto === null) {
+          const casi = casiElVeredicto(jobs);
           motivos.push(
-            `este workflow no tiene el veredicto agregado "${VEREDICTO_AGREGADO}", así que ningún check requerido espera al job "${clave}"`,
+            `este workflow no publica ningun check run llamado "${VEREDICTO_AGREGADO}", así que ningún check requerido espera al job "${clave}"${
+              casi.length > 0 ? `: ${casi.join("; ")}` : ""
+            }`,
           );
         } else if (!dependeDe(jobs, veredicto, clave)) {
           motivos.push(
@@ -974,6 +1206,11 @@ export function invocacionesDe(archivos, ramaPorDefecto = "main") {
           uses: String(paso.uses),
           ref: refDe(paso.uses),
           modo,
+          // Las dos dimensiones que faltaban para poder preguntar «¿GitHub EJECUTA esta
+          // invocación?» sin confundirla con «¿es una compuerta del PR?». Un escritor
+          // corre por schedule o dispatch y no es compuerta de nada, y aun así ejecuta.
+          disparable,
+          apagado: ifApagado(job?.if) || ifApagado(paso?.if) || cadena !== null,
           motivos,
           cuenta: motivos.length === 0,
         });
