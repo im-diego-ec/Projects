@@ -105,7 +105,15 @@ function canonicoTemporal({ versiones, seccion = SECCION, presupuesto = 500 }) {
   const dir = temporal("projects-canonico-");
   writeFileSync(
     join(dir, "manifiesto.json"),
-    JSON.stringify({ presupuesto_lineas: presupuesto, piso_permisos: ["Bash(pnpm test)"], versiones }),
+    // El piso va en la forma que el manifiesto declara desde el 2026-08-20: cada
+    // ítem con `nombre`, la `entrada` que el marco recomienda y la propiedad que
+    // `cubre` en el allowlist. La forma vieja (cadenas sueltas) no decía QUÉ buscar,
+    // y ese vacío es donde el piso declarado y el piso verificado se separaron.
+    JSON.stringify({
+      presupuesto_lineas: presupuesto,
+      piso_permisos: [{ nombre: "las pruebas", entrada: "Bash(pnpm test)", cubre: "test" }],
+      versiones,
+    }),
     "utf8",
   );
   writeFileSync(join(dir, "10-reglas.md"), seccion, "utf8");
@@ -707,7 +715,12 @@ test("el canonico real no filtra valores de ningun proyecto concreto", () => {
 test("el piso de permisos que publica el canonico real no lleva placeholders", () => {
   const canonico = leerCanonico(CANONICO_REAL);
   assert.ok(canonico.piso_permisos.length > 0);
-  for (const entrada of canonico.piso_permisos) assert.equal(/\{\{/.test(entrada), false);
+  // El piso NO pasa por el render: es una recomendación del marco, igual para todos
+  // los proyectos, así que un placeholder ahí quedaría literal en el aviso.
+  for (const item of canonico.piso_permisos) {
+    assert.equal(/\{\{/.test(item.entrada), false, `la entrada de "${item.nombre}" lleva un marcador sin resolver`);
+    assert.equal(/\{\{/.test(item.cubre), false, `la propiedad que cubre "${item.nombre}" lleva un marcador sin resolver`);
+  }
 });
 
 // ---------------------------------------------------------------------------
@@ -771,11 +784,19 @@ test("modo escribir con un desvio muerto no escribe nada", () => {
   assert.match(corrida.stdout, /no se escribio nada/);
 });
 
-test("sin el archivo de valores no hay render: rojo con el arreglo escrito", () => {
+// La versión anterior de esta prueba exigía exit 1 en modo VERIFICAR y así fijaba un
+// rojo seco el primer día para el repo que todavía no adoptó: un endurecimiento
+// estrenado sin modo aviso, que es la regla que el propio `AGENTS.md` de Projects
+// impone. La propiedad correcta es asimétrica y las dos mitades están en
+// `pruebas/regresiones-auditoria.test.mjs`: en verificar la ausencia entra por la
+// ventana de gracia (aviso, después rojo) y en escribir sigue siendo rojo porque no
+// hay con qué renderizar. Acá queda la mitad de escribir, que es la que este archivo
+// venía cubriendo.
+test("sin el archivo de valores no hay render: el modo escribir es rojo con el arreglo escrito", () => {
   const raiz = temporal("projects-repo-vacio-");
   const corrida = spawnSync(process.execPath, [SCRIPT], {
     encoding: "utf8",
-    env: { ...process.env, CONSTITUCION_RAIZ: raiz },
+    env: { ...process.env, CONSTITUCION_MODO: "escribir", CONSTITUCION_RAIZ: raiz },
   });
   assert.equal(corrida.status, 1);
   assert.match(corrida.stdout, /::error::falta \.projects-valores\.json/);

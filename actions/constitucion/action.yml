@@ -31,11 +31,32 @@ author: la organización
 # del consumidor es justamente lo que reemplaza al scaffold copiado a mano. La
 # convencion de dobles llaves es la misma del scaffold, sin dialecto nuevo.
 #
+# ESTA ES LA UNICA PIEZA QUE VERIFICA LA CONSTITUCION, desde el 2026-08-20. Habia
+# tambien un paso inline en el marco-ci.yml que heredan todos los consumidores, y la
+# auditoria de cierre de v1 midio que las dos verdades ya discrepaban en esquema
+# (objetos {nombre,cadena} contra nombres sueltos), en severidad (atraso con ventana
+# contra error seco) y en formato de sello (64 hex del cuerpo contra los 12 hex del
+# canonico que esta action emite) — o sea que un artefacto recien generado por este
+# codigo salia rechazado por el otro carril, con un mensaje que mandaba a correr el
+# escritor que acababa de generarlo. El paso se borro y esta action se cableo al
+# ci.yml del scaffold. La razon de que sobreviva ESTA y no el paso: es la unica que
+# compara el artefacto contra el RE-RENDER del canonico. Verificar contra la fuente es
+# estrictamente mas fuerte que verificar contra el sello que trae el propio archivo,
+# porque recomputar un sello es un `git commit` y cambiar el canonico no.
+#
 # DONDE ESTA EL ROJO Y DONDE EL AVISO (regla 3 del marco: fail-open ruidoso)
 #   · artefacto ausente o atrasado -> ::warning:: hasta el exigible_desde de la
 #     version pendiente mas vieja, ::error:: desde esa fecha. NUNCA verde mudo: no
 #     hay rama de "este repo no aplica", porque el repo que no lo tiene es
 #     exactamente el que hay que avisar.
+#   · .projects-valores.json ausente -> en modo verificar entra por la MISMA ventana que
+#     el artefacto faltante (aviso, despues rojo): es un atraso de adopcion, no una
+#     manipulacion, y un rojo seco el primer dia es un endurecimiento estrenado sin
+#     modo aviso. En modo escribir sigue siendo rojo: no hay con que renderizar.
+#   · marcador del scaffold sin resolver -> ::error::, y en modo escribir NO se emite
+#     nada. Un valor cuyo TEXTO es el propio marcador (lo que la plantilla entrega tal
+#     cual) no cuenta como valor: medido, antes de este arreglo el artefacto salia con
+#     27 lineas de dobles llaves y exit 0 en los dos modos.
 #   · cuerpo distinto del re-render de su version -> ::error:: siempre, con el
 #     diff. La ventana de gracia es para reglas nuevas, no para ediciones a mano.
 #   · cadena de carga rota (el archivo existe y ningun agente lo importa) ->
@@ -82,8 +103,14 @@ inputs:
     default: .projects-valores.json
   desvios:
     description: >-
-      Ruta del JSON con los desvios declarados: {"desvios":[{"regla","fecha",
-      "aprobado_por","motivo"}]}. Ausente equivale a cero desvios.
+      Ruta del JSON con los desvios declarados. DOS CLASES, y cada entrada nombra UNA
+      sola: {"regla": "<id del canonico>"} o {"permiso": "<entrada exacta del
+      allowlist>"}, las dos con "motivo", "aprobado_por" y "fecha". Aca se valida la
+      FORMA de las dos y el VENCIMIENTO de las de regla (un desvio cuya regla ya no
+      existe es rojo, con el motivo que tenia escrito). Que un desvio de permiso
+      absorba un hallazgo de verdad lo decide el paso "Permisos del agente sin
+      escritura", que es el unico que ve el allowlist y sus hallazgos. Ausente
+      equivale a cero desvios.
     required: false
     default: .projects-desvios.json
   superficies:
@@ -96,6 +123,17 @@ inputs:
       parte, y eso no puede ser indistinguible de no haber llenado el archivo.
     required: false
     default: ""
+  allowlist:
+    description: >-
+      Ruta del allowlist del agente. De ahi se mide el PISO RECOMENDADO de permisos
+      que declara el manifiesto del canonico, y se mide ACA porque aca esta su UNICA
+      declaracion: hasta el 2026-08-20 el paso de permisos del workflow reusable
+      llevaba una copia literal del piso y las dos contabilidades ya habian divergido
+      en las dos direcciones. Si el archivo no esta, el piso no se mide y se DICE
+      (::notice::): "no habia allowlist para mirar" no es "el allowlist esta sano". Un
+      item sin cubrir es SIEMPRE ::warning:: y jamas rojo.
+    required: false
+    default: .claude/settings.json
   raiz:
     description: Raiz del repo consumidor, relativa al working directory del job.
     required: false
@@ -129,9 +167,13 @@ outputs:
     value: ${{ steps.constitucion.outputs.corregidos }}
   piso_permisos:
     description: >-
-      JSON con el piso RECOMENDADO de permisos del agente que publica el canonico.
-      Lo consume el paso que revisa el allowlist, para que la lista no quede
-      escrita dos veces: en una doble contabilidad la declaracion siempre pierde.
+      JSON con el piso RECOMENDADO de permisos del agente que publica el canonico,
+      como lista de { nombre, entrada, cubre }. La MEDICION contra el allowlist la
+      hace esta misma action (ver el input "allowlist"): esta salida queda para que un
+      consumidor lo lea si lo necesita, no como una segunda contabilidad. Cuando el
+      piso se declaraba aca y se verificaba en un const literal de marco-ci.yml, las
+      dos copias divergieron en las dos direcciones, y en una doble contabilidad la
+      declaracion siempre pierde contra el check.
     value: ${{ steps.constitucion.outputs.piso_permisos }}
   rojos:
     description: Cantidad de hallazgos que fallan el job.
@@ -155,6 +197,7 @@ runs:
         CONSTITUCION_VALORES: ${{ inputs.valores }}
         CONSTITUCION_DESVIOS: ${{ inputs.desvios }}
         CONSTITUCION_SUPERFICIES: ${{ inputs.superficies }}
+        CONSTITUCION_ALLOWLIST: ${{ inputs.allowlist }}
         CONSTITUCION_SALIDA_CORREGIDA: ${{ inputs.salida_corregida }}
       run: |
         set -euo pipefail
