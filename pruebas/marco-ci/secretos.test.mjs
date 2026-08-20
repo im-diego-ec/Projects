@@ -14,12 +14,19 @@
 //   3. Que las banderas que el paso le pasa a `git log` destapen el diff de un
 //      merge. Se corre git de verdad sobre un fixture con la resolucion del
 //      merge; no prueba que el detector lo marque, prueba que el texto llega.
+//   4. La FORMA de las dos cosas que dependen del binario y por eso quedaron
+//      declaradas sin medir: el valor de --log-opts y la config
+//      `[extend] useDefault = true`. La forma se puede cerrar sin la
+//      herramienta, y es donde vive el modo de fallar barato —se rompe en
+//      silencio, el detector arranca igual y mira menos de lo que dice—. Esos
+//      dos tests miden el binario si esta en el PATH y anuncian con
+//      t.diagnostic cuando no esta, en vez de saltar callados.
 //
-// Ninguna de las tres reemplaza una corrida real con el binario, y eso se dice
+// Ninguna de las cuatro reemplaza una corrida real con el binario, y eso se dice
 // aca en vez de dejarlo sobreentendido.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { execFileSync, spawnSync } from "node:child_process";
 import { join } from "node:path";
 
@@ -359,5 +366,155 @@ test("secretos · control · las banderas del paso no esconden una rama lateral"
   assert.ok(
     agregadasConLaMarca(raiz, opts, marca) > 0,
     `con las banderas del paso (${opts.join(" ")}) el secreto que entro por una rama lateral y se borro despues quedo invisible`,
+  );
+});
+
+// ---------------------------------------------------------------------------
+// 4. Lo que quedo NO MEDIDO por falta del binario, fijado por su FORMA
+// ---------------------------------------------------------------------------
+//
+// La ronda anterior declaro dos cosas sin medir, y las dos dependen de que el
+// binario del detector acepte lo que el paso le pasa:
+//
+//   · que gitleaks acepte --log-opts y le reenvie a git el
+//     --diff-merges=first-parent (lo medido fue que GIT lo respeta);
+//   · que gitleaks acepte "[extend] useDefault = true" y con eso cargue sus
+//     reglas por defecto (la mitad de A12).
+//
+// gitleaks no esta en esta maquina y el banco no baja binarios, asi que las dos
+// SIGUEN sin medir contra la herramienta y el nombre de cada test lo dice. Lo que
+// si se puede cerrar sin el binario es la FORMA del argumento, que es donde vive
+// el modo de fallar barato: la forma se rompe en silencio (el detector arranca,
+// no protesta y mira menos de lo que dice) y el rojo aparece meses despues, si
+// aparece. Estos tests la fijan por codigo de salida donde se puede medir con
+// git, y por comparacion byte a byte donde el archivo lo escribe el propio paso.
+//
+// Y si el dia que alguien corra el banco en una maquina CON gitleaks, los dos
+// tests dejan de conformarse con la forma y miden el binario. La ausencia se
+// anuncia con t.diagnostic: un salto silencioso seria el fail-open del 2026-08-05
+// otra vez, y este banco existe para no repetirlo.
+
+/** La ruta del binario si esta en el PATH, o null. Sin bajar nada. */
+function gitleaksDisponible() {
+  const cual = spawnSync(process.platform === "win32" ? "where" : "which", ["gitleaks"], {
+    encoding: "utf8",
+  });
+  if (cual.status !== 0) return null;
+  const ruta = String(cual.stdout ?? "").split(/\r?\n/).find(Boolean);
+  return ruta ? ruta.trim() : null;
+}
+
+test("secretos · forma del --log-opts (que el BINARIO lo acepte no se midio: gitleaks ausente)", (t) => {
+  // gitleaks recibe --log-opts como UN solo argv y adentro lo parte por
+  // espacios para armarle la linea a git. De ahi salen las dos formas de
+  // romperlo sin que nada proteste:
+  //
+  //   · sin comillas en el paso, el shell parte primero y el detector recibe
+  //     solo "--diff-merges=first-parent": el rango A..H se le va como
+  //     argumento posicional y el barrido cambia de alcance sin avisar;
+  //   · con dos espacios seguidos, el split naive del detector produce un
+  //     token vacio, y un argumento vacio para git log no es lo mismo que
+  //     ninguno.
+  //
+  // Las dos se fijan sobre el TEXTO del paso, que es donde se escriben. Se
+  // mira solo lo EJECUTABLE del paso: este workflow comenta mucho a proposito,
+  // y contar las menciones en prosa haria que agregar un comentario que nombra
+  // la bandera pusiera rojo un test que no habla de eso.
+  const ejecutable = script
+    .split("\n")
+    .filter((linea) => !/^[ \t]*#/.test(linea))
+    .join("\n");
+  const ocurrencias = ejecutable.match(/--log-opts/g) ?? [];
+  assert.equal(ocurrencias.length, 1, "el paso tiene que pasar --log-opts exactamente una vez");
+  assert.match(
+    ejecutable,
+    /--log-opts="[^"]+"/,
+    "el valor de --log-opts tiene que viajar como UN solo argumento (entre comillas dobles): sin comillas el shell lo parte antes que el detector y el rango se le va como posicional",
+  );
+
+  const crudo = ejecutable.match(/--log-opts="([^"]+)"/)[1];
+  assert.ok(!/\t/.test(crudo), "un tabulador dentro del valor no lo parte el split por espacios del detector");
+  assert.ok(!/ {2}/.test(crudo), "dos espacios seguidos le dan al detector un token vacio");
+  assert.ok(!/['\x60]/.test(crudo), "el valor no puede traer comillas: el detector no las desarma, se las pasa a git como parte del token");
+  assert.deepEqual(
+    crudo.split(" ").filter((t) => t.startsWith("--")),
+    ["--diff-merges=first-parent"],
+    "la unica bandera del valor tiene que ser --diff-merges=first-parent, escrita con = y en un token propio: partida en dos tokens el split del detector le da a git una bandera sin su valor",
+  );
+
+  // Y que la lista de tokens sea una linea de git log VALIDA se mide con git,
+  // que si esta. Es la mitad que ya estaba medida, aca con exit code y sobre el
+  // mismo fixture del merge.
+  const { raiz, base, cabeza } = repoConSecretoEnUnMerge();
+  const opts = logOptsDelPaso(script, base, cabeza);
+  const corrida = spawnSync("git", ["-C", raiz, "log", "-p", ...opts], { encoding: "utf8" });
+  assert.equal(
+    corrida.status,
+    0,
+    `git rechazo la linea que el paso le manda al detector (${opts.join(" ")}):\n${corrida.stderr}`,
+  );
+
+  const binario = gitleaksDisponible();
+  if (!binario) {
+    t.diagnostic(
+      "NO MEDIDO: gitleaks no esta en el PATH de esta maquina, asi que que la herramienta ACEPTE --log-opts y le reenvie el --diff-merges=first-parent a git sigue sin medir. Lo medido aca es la forma del argumento y que git la acepta.",
+    );
+    return;
+  }
+  // Con el binario presente esto deja de ser forma y pasa a ser medicion: el
+  // detector tiene que salir 0 (limpio) o 2 (hallazgos), nunca un error de
+  // parseo de la bandera.
+  const conBinario = spawnSync(
+    binario,
+    ["git", ".", `--log-opts=${opts.join(" ")}`, "--no-banner", "--no-color", "--exit-code", "2"],
+    { cwd: raiz, encoding: "utf8" },
+  );
+  assert.ok(
+    conBinario.status === 0 || conBinario.status === 2,
+    `el detector no acepto --log-opts="${opts.join(" ")}" (rc=${conBinario.status}):\n${conBinario.stdout}${conBinario.stderr}`,
+  );
+});
+
+test("secretos · forma de la config [extend] (que el BINARIO la acepte no se midio: gitleaks ausente)", (t) => {
+  // El archivo lo escribe el paso, asi que se compara byte a byte con la unica
+  // forma que documenta la herramienta. La clave es camelCase y el valor es un
+  // booleano DESNUDO: "usedefault", "use_default" o "true" entre comillas no
+  // son la misma cosa, y el modo de fallar es el barato de todos —el detector
+  // arranca igual, sin las reglas por defecto, y un barrido sin reglas sale
+  // exit 0 sobre cualquier repo—. Ese verde es indistinguible de un repo
+  // limpio, que es exactamente la clase de fail-open que este paso existe para
+  // no tener.
+  const { runnerTemp } = correrPasoHasta({}, { rastrear: false });
+  const config = join(runnerTemp, "gitleaks-marco.toml");
+  assert.ok(existsSync(config), "el paso no escribio su config antes de usar el detector");
+  assert.deepEqual(
+    readFileSync(config, "utf8").split(/\r?\n/).filter(Boolean),
+    ["[extend]", "useDefault = true"],
+    "la config del marco tiene que ser exactamente la tabla [extend] con useDefault = true, sin nada mas: cualquier otra grafia la ignora el detector en silencio y se queda sin reglas por defecto",
+  );
+
+  const binario = gitleaksDisponible();
+  if (!binario) {
+    t.diagnostic(
+      "NO MEDIDO: gitleaks no esta en el PATH de esta maquina, asi que que la herramienta ACEPTE [extend] useDefault = true y cargue con eso sus reglas por defecto sigue sin medir. Lo medido aca es la forma del archivo que el paso escribe.",
+    );
+    return;
+  }
+  // Con el binario presente se mide lo unico que importa de useDefault = true:
+  // que las reglas por defecto QUEDEN cargadas. Se le da un secreto de ejemplo
+  // y se exige el 2: si la config no cargara reglas, el barrido saldria 0 y
+  // este assert lo cazaria.
+  const marca = `${"AKIA"}${"IOSFODNN7EXAMPLE"}`;
+  const suelo = carpetaTemporal("config-real-");
+  writeFileSync(join(suelo, "app.env"), `AWS_ACCESS_KEY_ID=${marca}\n`);
+  const corrida = spawnSync(
+    binario,
+    ["dir", ".", "--config", config, "--no-banner", "--no-color", "--redact", "--exit-code", "2"],
+    { cwd: suelo, encoding: "utf8" },
+  );
+  assert.equal(
+    corrida.status,
+    2,
+    `con la config del marco el detector no marco un secreto de ejemplo (rc=${corrida.status}): useDefault = true no dejo cargadas las reglas por defecto\n${corrida.stdout}${corrida.stderr}`,
   );
 });
