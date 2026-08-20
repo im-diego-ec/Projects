@@ -98,6 +98,18 @@ contramedidas son obligatorias y esta es la primera.
       no cosmético: sin render el artefacto lleva dobles llaves y pone rojo el
       check de marcadores del propio consumidor. Evidencia: artefacto renderizado
       sin una sola doble llave (`grep -cE "\{\{[A-Z0-9_]+\}\}"` → 0).
+      **Corregido otra vez el 2026-08-20 y por medición**: los marcadores se medían
+      sobre el texto ya sustituido y ANTES de insertar los desvíos, con el argumento
+      de que el motivo de un desvío es prosa del proyecto. El argumento era cierto y
+      la conclusión estaba al revés: un motivo que dice «lo aprobó {{PO}} para
+      {{PROYECTO}}» viajaba al artefacto tal cual y el modo escribir lo emitía en
+      verde (`exit 0`, dos marcadores en el archivo), mientras el rojo lo cobraba el
+      check vecino del propio consumidor sobre un archivo generado que el marco
+      escribió y que nadie de ese repo puede arreglar sin tocar el JSON de desvíos.
+      Ahora la medición es sobre el CUERPO FINAL y el hallazgo propio
+      `desvio-con-marcadores` manda a arreglar `.projects-desvios.json` en vez de a
+      buscar un valor que no falta. Evidencia: `exit 0` con 2 marcadores antes,
+      `exit 1` sin emitir nada después, sobre el mismo fixture.
 - [ ] 2.4 Las entradas del render **fuera** del directorio regenerado
       (`.projects-valores.json` y `.projects-desvios.json` en la raíz), para que
       `rm -rf .projects && render` no borre un desvío del proyecto dejando todo
@@ -143,6 +155,41 @@ contramedidas son obligatorias y esta es la primera.
       adoptó); repo que sí lo versiona y no cablea, **rojo** (tiene la maquinaria y
       se saltea el check, y se arregla en el mismo PR que adopta). Evidencia: las
       dos ramas medidas por código de salida.
+      **Corregido otra vez el 2026-08-20 y por medición**: el reemplazo se había
+      implementado como un `grep -rE 'uses:.*actions/constitucion'`, o sea que
+      exigía que la LÍNEA existiera en cualquier archivo bajo
+      `.github/workflows`. Cinco configuraciones medidas donde nada verifica y el
+      paso sale `exit 0` —cuatro de ellas MUDAS—: el `ci.yml` viejo más el
+      `actualizar-marco.yml` que el propio marco reparte (modo escribir, y su
+      encabezado dice que no verifica); un job con `if: false`; la única
+      invocación en un `on: workflow_dispatch`; el archivo en un subdirectorio de
+      `.github/workflows`, que GitHub Actions no ejecuta pero `grep -r` recorre; y
+      la perilla, un `plantilla/.github/workflows/ci.yml` vacío y SIN RASTREAR que
+      apagaba el check entero porque el skip se decidía con `test -f`. Ahora el
+      check PARSEA el YAML (`actions/constitucion/cableado.mjs`, modo `cableado`)
+      y un cableado cuenta sólo si está en el primer nivel del directorio, corre
+      en `pull_request` o en `push` a la rama por defecto, invoca en modo
+      verificar, no está apagado por un `if` constante falso ni tapado con
+      `continue-on-error`, y cuelga de `ci-ok` por `needs`. El skip del
+      distribuidor pasó a ser una propiedad POSITIVA con tres candados
+      (rastreado + no adoptado + el scaffold cablea de verdad). Evidencia: los
+      cinco casos con su fixture en `pruebas/cableado.test.mjs`, los cinco
+      corridos contra el paso anterior dando `exit 0`, y las doce mutaciones del
+      código nuevo matando a su prueba.
+- [ ] 3.7 El sello NO es evadible subiéndole la versión a mano. Medido el
+      2026-08-20: `version=1.3.0` -> `version=9.9.9` sobre un cuerpo amputado daba
+      `exit 0` con avisos de `artefacto-adelantado`, porque el cuerpo no se
+      comparaba contra nada. Con esta action como único verificador del contenido
+      ése era el último bypass. Dos discriminadores independientes, cada uno
+      suficiente: el `sha` cubre `version + secciones`, así que una cabecera que
+      declara una versión más nueva y trae el sha que esta copia calcula para la
+      suya se contradice sola; y si los workflows del repo invocan la action sólo
+      con el tag móvil, no hay pin que explique un artefacto más nuevo. La causa
+      benigna (un pin a un SHA o a un tag viejo) sigue siendo aviso. Se lee el
+      árbol y NO `GITHUB_ACTION_REF`: esa variable no está en la referencia de
+      variables de GitHub, verificado el 2026-08-20, y una garantía no se apoya en
+      algo indocumentado. Evidencia: `exit 0` antes y `exit 1` después sobre el
+      mismo fixture, más la rama del pin fijo quedando en aviso.
 - [ ] 3.2 Comparación con fin de línea normalizado y fuera del alcance del
       formateador. Evidencia: el mismo artefacto en CRLF y en LF dando el mismo
       veredicto.
@@ -181,6 +228,29 @@ contramedidas son obligatorias y esta es la primera.
       que el manifiesto no declaraba), con el agravante de que mutar el manifiesto
       no movía el veredicto del paso: seguía midiendo su propio arreglo. En una
       doble contabilidad la declaración siempre pierde contra el check.
+      **Corregido otra vez el 2026-08-20 y por medición**: la propiedad se buscaba
+      sobre el allowlist ENTERO concatenado, así que un allowlist de puro relleno
+      —seis cadenas que no son entrada de permiso de nada:
+      `["lint", "format", "typecheck", "test", "build", "openspec"]`— se declaraba
+      100% cubierto, `exit 0` y cero avisos. La medición no decía «el agente puede
+      correr el linter sin pedir permiso», decía «en algún lugar del archivo
+      aparece la palabra lint». Ahora se busca dentro de UNA entrada y exigiendo la
+      misma herramienta que el ítem recomienda; el límite queda declarado: esto lee
+      la FORMA de la entrada, así que un `Bash(echo lint)` cuenta. Evidencia: el
+      mismo allowlist de relleno, 0 de 6 sin cubrir antes y 6 de 6 después.
+- [ ] 4.5 El recorte del comodín del allowlist (`cmd sub:*` -> `cmd sub *`) tiene
+      prueba. El allowlist admite las dos formas y las dos significan «y lo que
+      siga», y sólo se normaliza el separador FINAL para no tocar los dos puntos de
+      una URL o de una ruta. No había ninguna prueba: borrándolo el banco quedaba
+      entero en verde mientras se creaba un FALSO ROJO sobre
+      `Bash(terraform validate:*)` —la entrada que el propio scaffold reparte—,
+      denunciada como si dejara el subcomando en comodín, o sea como si autorizara
+      `terraform apply`. El programa de ese paso va inline en el YAML (un heredoc no
+      puede cerrar dentro de un bloque indentado), así que la prueba lo EXTRAE del
+      workflow y lo corre: es la única forma de que ese código, que llega a todos
+      los consumidores por `@v1`, pase por un caso controlado. Evidencia: las dos
+      formas dando `exit 0` sobre un subcomando de lectura y `exit 1` sobre el
+      comodín de subcomando, y la mutación que borra el recorte matando la prueba.
 - [ ] 4.3 Repositorio que no versiona el allowlist de su agente: **aviso
       ruidoso**, nunca verde mudo. Es el caso real de `intranet`, que hoy no tiene
       `.claude/` en absoluto (verificado: la ruta da 404 en la rama de adopción).
