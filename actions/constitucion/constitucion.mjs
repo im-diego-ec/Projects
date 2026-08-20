@@ -101,6 +101,13 @@ import {
 import { dirname, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
+// El lector de workflows vive al lado y se comparte: el modo `cableado` lo usa para
+// decir si el consumidor invoca esta action de verdad, y el modo `verificar` lo usa
+// para saber con que ref la invoca —que es lo que distingue un pin legitimo de una
+// cabecera editada a mano—. Una sola pieza lee YAML en esta action, por el mismo
+// motivo por el que hay un solo verificador del artefacto.
+import { esTagMovil, invocacionesDe, leerWorkflows, main as mainCableado } from "./cableado.mjs";
+
 /** Días mínimos entre `publicada` y `exigible_desde`. Es `AGENTS.md` de Projects («un
  *  endurecimiento se estrena en modo aviso») convertido en campo obligatorio: el rojo
  *  lo dispara una fecha, no el release. */
@@ -402,13 +409,62 @@ export function validarPiso(piso) {
   return problemas;
 }
 
+/** La HERRAMIENTA que autoriza una entrada de allowlist: lo que va antes del
+ *  paréntesis (`Bash(pnpm lint)` -> `bash`). Sin paréntesis, la entrada entera es la
+ *  herramienta y no declara comando: `Bash` a secas autoriza cualquier cosa y
+ *  `mcp__x__y` autoriza una tool de un servidor MCP. */
+export function herramientaDe(entrada) {
+  const t = String(entrada ?? "").trim();
+  const corte = t.indexOf("(");
+  return (corte >= 0 ? t.slice(0, corte) : t).trim().toLowerCase();
+}
+
+/** El COMANDO que autoriza una entrada: lo de adentro del paréntesis. Vacío cuando la
+ *  entrada no declara ninguno. */
+export function comandoDe(entrada) {
+  const t = String(entrada ?? "").trim();
+  const abre = t.indexOf("(");
+  const cierra = t.lastIndexOf(")");
+  return abre >= 0 && cierra > abre ? t.slice(abre + 1, cierra).trim() : "";
+}
+
+/**
+ * ¿ESTA entrada del allowlist cubre ESTE ítem del piso?
+ *
+ * DOS CONDICIONES, y la segunda es la que faltaba. La propiedad (`cubre`) se busca
+ * con bordes de palabra —el nombre del script es del proyecto, así que
+ * `Bash(pnpm --filter api typecheck)` cubre `typecheck` igual que
+ * `Bash(pnpm typecheck)`, y los bordes evitan que `eslint` pase por `lint`— pero se
+ * busca DENTRO DE UNA SOLA ENTRADA y exigiendo la MISMA HERRAMIENTA que el marco
+ * recomienda.
+ *
+ * POR QUÉ. Hasta el 2026-08-20 esto concatenaba el allowlist entero en un texto y
+ * buscaba ahí. Medido: un allowlist de PURO RELLENO —seis cadenas que no son entrada
+ * de permiso de nada: `["lint", "format", "typecheck", "test", "build", "openspec"]`—
+ * se declaraba 100% cubierto, exit 0 y cero avisos. La medición no decía «el agente
+ * puede correr el linter sin pedir permiso», decía «en algún lugar del archivo
+ * aparece la palabra lint». Un piso que se satisface con palabras no es un piso.
+ *
+ * LÍMITE DECLARADO, de la misma clase que el del paso de permisos: esto lee la FORMA
+ * de la entrada, no ejecuta nada. Un `Bash(echo lint)` cuenta como cubierto porque
+ * autoriza a `Bash` y lleva la palabra, y decirlo es mejor que insinuar que el check
+ * distingue un comando de verdad de uno que sólo imprime. Lo que sí garantiza es que
+ * la entrada autorice la MISMA herramienta que el ítem recomienda.
+ */
+export function cubreItemDelPiso(entrada, item) {
+  const cubre = String(item?.cubre ?? "")
+    .trim()
+    .toLowerCase();
+  if (cubre === "") return false;
+  const recomendada = herramientaDe(item?.entrada);
+  if (recomendada === "" || herramientaDe(entrada) !== recomendada) return false;
+  const comando = comandoDe(entrada).toLowerCase();
+  if (comando === "") return false;
+  return new RegExp(`(^|[^a-z0-9])${escaparRegex(cubre)}([^a-z0-9]|$)`).test(comando);
+}
+
 /**
  * Los ítems del piso que el allowlist del proyecto NO cubre.
- *
- * Se busca la PROPIEDAD (`cubre`) con bordes de palabra y no la línea exacta: el
- * nombre del script es del proyecto, así que `Bash(pnpm --filter api typecheck)`
- * cubre `typecheck` igual que `Bash(pnpm typecheck)`. Los bordes importan —un
- * `includes` pelado tomaría `eslint` por `lint` y devolvería un verde falso.
  *
  * El resultado es SIEMPRE aviso y jamás rojo, y la asimetría está escrita en el
  * propio manifiesto: un permiso de más es riesgo, uno de menos es fricción, y bajo
@@ -417,17 +473,10 @@ export function validarPiso(piso) {
  * cruzada, causando la evasión que el mecanismo quiere evitar.
  */
 export function revisarPiso(piso, allowlist) {
-  const todo = (Array.isArray(allowlist) ? allowlist : [])
-    .filter((entrada) => typeof entrada === "string")
-    .join("\n")
-    .toLowerCase();
-  return (Array.isArray(piso) ? piso : []).filter((item) => {
-    const cubre = String(item?.cubre ?? "")
-      .trim()
-      .toLowerCase();
-    if (cubre === "") return true;
-    return !new RegExp(`(^|[^a-z0-9])${escaparRegex(cubre)}([^a-z0-9]|$)`).test(todo);
-  });
+  const entradas = (Array.isArray(allowlist) ? allowlist : []).filter((entrada) => typeof entrada === "string");
+  return (Array.isArray(piso) ? piso : []).filter(
+    (item) => !entradas.some((entrada) => cubreItemDelPiso(entrada, item)),
+  );
 }
 
 /** Los ids de regla del cuerpo, en orden de aparición. */
@@ -615,20 +664,40 @@ export function artefactoDe({ superficie, cuerpo, version, sha }) {
   return normalizar(`${definicion.preambulo}${sello}\n\n${cuerpo}`);
 }
 
-/** Render completo: sustituye valores y después imprime los desvíos. Ese orden
- *  importa: el texto de un desvío es del proyecto y no se toca.
+/**
+ * Render completo: sustituye valores y después imprime los desvíos. Ese orden
+ * importa: el texto de un desvío es del proyecto y no se toca.
  *
- *  `marcadoresSinResolver` se mide sobre el texto YA SUSTITUIDO y antes de insertar
- *  los desvíos, a propósito: el motivo de un desvío es prosa del proyecto y si
- *  alguien escribe dobles llaves ahí no es asunto del marco. */
+ * `marcadoresSinResolver` se mide sobre el CUERPO FINAL, con los desvíos ya
+ * insertados. Hasta el 2026-08-20 se medía sobre el texto sustituido y ANTES de
+ * insertarlos, con el argumento de que el motivo de un desvío es prosa del proyecto:
+ * el argumento es cierto y la conclusión estaba al revés. Medido ese día: un desvío
+ * cuyo motivo dice «{{PO}} lo aprobó para {{PROYECTO}}» salía en el artefacto TAL
+ * CUAL, con las dobles llaves adentro, y el modo escribir lo emitía en verde. El que
+ * cobraba el rojo era el check vecino del propio consumidor («Sin marcadores del
+ * scaffold sin resolver»), sobre un archivo generado que el marco declara suyo y que
+ * ninguna persona de ese repo escribió ni puede arreglar sin tocar el JSON de
+ * desvíos. La propiedad prometida es «el artefacto NUNCA sale con dobles llaves», sin
+ * asterisco sobre quién las puso.
+ *
+ * `marcadoresDeDesvios` separa la CULPA de la propiedad: dice qué desvío las trajo,
+ * para que el mensaje mande a arreglar el `.projects-desvios.json` y no a buscar un valor
+ * que no falta.
+ */
 export function renderizar({ canonico, valores, desvios }) {
   const sustituido = sustituir(canonico.cuerpo, valores);
   const cuerpo = normalizar(insertarDesvios(sustituido.texto, desvios));
+  const deDesvios = [];
+  for (const desvio of desvios ?? []) {
+    const marcas = marcadoresDe(`${desvio?.motivo ?? ""}\n${desvio?.aprobado_por ?? ""}`);
+    if (marcas.length > 0) deDesvios.push({ regla: desvio?.regla ?? "(sin regla)", marcadores: marcas });
+  }
   return {
     cuerpo,
     faltantes: sustituido.faltantes,
     sinUsar: sustituido.sinUsar,
-    marcadoresSinResolver: marcadoresDe(sustituido.texto),
+    marcadoresSinResolver: marcadoresDe(cuerpo),
+    marcadoresDeDesvios: deDesvios,
   };
 }
 
@@ -810,7 +879,19 @@ export function diffLineas(esperado, actual, tope = 12) {
  * puerta que el artefacto faltante: aviso hasta el `exigible_desde` de la versión
  * pendiente más vieja, rojo desde esa fecha, y nunca silencio.
  */
-export function verificar({ canonico, valores, desvios, superficies, hoy, leer, valoresPresentes = true, allowlist = null }) {
+export function verificar({
+  canonico,
+  valores,
+  desvios,
+  superficies,
+  hoy,
+  leer,
+  valoresPresentes = true,
+  allowlist = null,
+  // Las refs con las que los workflows del consumidor invocan ESTA action, leidas del
+  // arbol. Lista vacia = no se pudieron leer, y eso NO es «no hay pin»: se dice.
+  pins = [],
+}) {
   const hallazgos = [];
   const artefactos = [];
 
@@ -935,11 +1016,24 @@ export function verificar({ canonico, valores, desvios, superficies, hoy, leer, 
       mensaje: `.projects-valores.json no tiene valor para: ${render.faltantes.join(", ")}. Sin eso el artefacto sale con dobles llaves. Un valor cuyo TEXTO es el propio marcador —lo que el scaffold entrega tal cual— NO cuenta como valor: hay que reemplazarlo por el del proyecto`,
     });
   }
+  // LA CULPA, separada de la propiedad. Un marcador que entra por el MOTIVO de un
+  // desvío no se arregla llenando un valor que no falta: se arregla en el
+  // `.projects-desvios.json`, y el mensaje tiene que decir eso o manda a buscar donde no
+  // está. Medido el 2026-08-20: un motivo con `{{PO}}` y `{{PROYECTO}}` viajaba al
+  // artefacto tal cual, en verde, porque los marcadores se contaban ANTES de insertar
+  // los desvíos.
+  for (const conMarcadores of render.marcadoresDeDesvios) {
+    hallazgos.push({
+      nivel: "error",
+      codigo: "desvio-con-marcadores",
+      mensaje: `el desvio de \`${conMarcadores.regla}\` lleva marcadores del scaffold sin resolver en su motivo o en su aprobador: ${conMarcadores.marcadores.map((n) => `{{${n}}}`).join(", ")}. El motivo de un desvio es prosa de ESTE proyecto y el marco lo imprime tal cual dentro del artefacto, asi que las dobles llaves terminan en un archivo generado que el consumidor no escribio y no puede arreglar sin tocar .projects-desvios.json — y el rojo lo cobra su check vecino "Sin marcadores del scaffold sin resolver". Arreglo: escribi el texto en .projects-desvios.json, no el marcador`,
+    });
+  }
   // CINTURÓN, no redundancia: la contabilidad de faltantes se aflojó una vez con un
   // cambio de una línea y el artefacto salió con 27 marcadores en verde. Esto vuelve a
-  // mirar el cuerpo que está a punto de sellarse, así que la propiedad prometida («el
-  // artefacto nunca sale con dobles llaves») se sostiene incluso si la contabilidad
-  // miente.
+  // mirar el CUERPO FINAL —desvíos incluidos— que está a punto de sellarse, así que la
+  // propiedad prometida («el artefacto nunca sale con dobles llaves») se sostiene
+  // incluso si la contabilidad miente y sin importar quién puso las llaves.
   if (render.marcadoresSinResolver.length > 0) {
     hallazgos.push({
       nivel: "error",
@@ -1000,27 +1094,65 @@ export function verificar({ canonico, valores, desvios, superficies, hoy, leer, 
       }));
       continue;
     }
-    // ESTA RAMA ES LA EVASION CONOCIDA, y el mensaje tiene que decirlo. Subir a mano
-    // la version de la cabecera a una que esta copia del marco no conoce hace que el
-    // cuerpo NO se compare contra nada: se puede borrar cualquier regla del artefacto
-    // y el check queda verde para siempre. Reproducido por codigo de salida el
-    // 2026-08-19 (cuerpo editado + `version=9.9.9` -> exit 0).
+    // LA EVASION CONOCIDA, Y COMO QUEDO CERRADA. Subir a mano la version de la
+    // cabecera a una que esta copia del marco no conoce hacia que el cuerpo NO se
+    // comparara contra nada: se podia borrar cualquier regla del artefacto y el check
+    // quedaba verde para siempre. Reproducido por codigo de salida el 2026-08-19 y de
+    // nuevo el 2026-08-20 (cuerpo amputado + `version=1.3.0` -> `9.9.9` = exit 0 con
+    // 2 avisos). Ahora que esta action es el UNICO verificador del contenido, ese era
+    // el unico bypass que quedaba.
     //
-    // Sigue siendo AVISO y no rojo porque la causa benigna existe de verdad: un
-    // consumidor pinado a un SHA viejo corre una copia del marco anterior al
-    // artefacto, y ahi «no puedo verificar» no es «alguien violo la regla».
+    // NO SE CIERRA CON UN ABSOLUTO, porque la causa benigna existe de verdad: un
+    // consumidor pinado a un SHA o a un tag viejo corre una copia del marco anterior
+    // al artefacto, y ahi «no puedo verificar» no es «alguien violo la regla». Se
+    // cierra con DOS discriminadores independientes, y cada uno alcanza solo:
     //
-    // COMO SE CIERRA, y es decision humana pendiente (no la tomo yo): `GITHUB_ACTION_REF`
-    // dice con que ref se resolvio ESTA action. Si se resolvio con el tag movil (`v1`)
-    // no hay pin que explique un artefacto mas nuevo, asi que ahi el caso es rojo; con
-    // un SHA o un tag viejo, sigue siendo aviso. Es una linea de env en el action.yml
-    // mas una rama aca. Hasta entonces, el mensaje NO ofrece la explicacion tranquila
-    // como si fuera la unica.
+    //   1. EL SELLO SE CONTRADICE. El `sha` cubre `version + secciones`, asi que el
+    //      sha de la 1.3.0 NO puede ser el sha de ninguna otra version. Si la cabecera
+    //      declara una version mas nueva y trae EXACTAMENTE el sha que esta copia
+    //      calcula para la suya, no hay marco mas nuevo en el medio: hay una cabecera
+    //      editada a mano. Es el bypass medido, atrapado por aritmetica.
+    //   2. NO HAY PIN QUE LO EXPLIQUE. `pins` son las refs con las que los workflows
+    //      del propio consumidor invocan esta action, leidas del arbol (ver
+    //      `cableado.mjs`). Con el tag movil el consumidor corre siempre la copia mas
+    //      nueva, asi que un artefacto mas nuevo que ella no tiene explicacion
+    //      inocente. Se usa el arbol y no `GITHUB_ACTION_REF` a proposito: esa
+    //      variable NO esta en la referencia de variables de GitHub —se verifico el
+    //      2026-08-20— y una garantia no se apoya en algo indocumentado.
+    //
+    // Si NINGUNO de los dos se puede afirmar (sello distinto y algun pin fijo, o los
+    // workflows ilegibles), sigue siendo AVISO y el mensaje dice cual de las dos
+    // mediciones no se pudo hacer. Un rollback del tag movil cae del lado rojo, y esta
+    // bien que caiga: el artefacto lleva reglas que el marco ya retiro.
     if (comparacion > 0) {
+      const selloDeEstaCopia = String(cab.sha ?? "") === canonico.sha;
+      const fijos = (pins ?? []).filter((pin) => !esTagMovil(pin.ref));
+      const soloTagMovil = (pins ?? []).length > 0 && fijos.length === 0;
+      const comun = `${definicion.ruta} declara la version ${cab.version} y esta copia del marco es la ${canonico.version}, asi que el cuerpo NO se pudo comparar contra el re-render`;
+      if (selloDeEstaCopia) {
+        hallazgos.push({
+          nivel: "error",
+          codigo: "artefacto-sello-incoherente",
+          mensaje: `${comun}. Y la cabecera se contradice: trae sha=${cab.sha}, que es EXACTAMENTE el sha que esta copia del marco calcula para su version ${canonico.version}. El sha cubre la version mas las secciones, asi que ninguna version distinta puede tener ese sha: la version de la cabecera se subio a mano sobre el canonico que esta copia ya tiene, y subirla es lo que hace que el cuerpo deje de compararse. Arreglo: regenera el artefacto con el modo escribir en vez de editar su primera linea`,
+        });
+        continue;
+      }
+      if (soloTagMovil) {
+        hallazgos.push({
+          nivel: "error",
+          codigo: "artefacto-adelantado",
+          mensaje: `${comun}. Los workflows de este repo invocan esta action solo con el tag movil (${[...new Set(pins.map((p) => p.ref))].join(", ")}), o sea que el pipeline corre SIEMPRE la copia mas nueva del marco: no hay pin que explique un artefacto mas nuevo que ella. Arreglo: regenera el artefacto con el modo escribir. Si en cambio el marco movio el tag hacia atras, este rojo es correcto — el artefacto lleva reglas que el marco retiro`,
+        });
+        continue;
+      }
       hallazgos.push({
         nivel: "warning",
         codigo: "artefacto-adelantado",
-        mensaje: `${definicion.ruta} declara la version ${cab.version} y esta copia del marco es la ${canonico.version}: no se puede verificar el contenido contra un canonico que no se tiene, asi que el cuerpo NO se comparo. Dos causas posibles y hay que distinguirlas a ojo: el pipeline corre una copia del marco mas vieja que el artefacto (un pin a un SHA o a un tag viejo), o alguien subio la version de la cabecera a mano para que el cuerpo dejara de compararse. Arreglo: revisa el pin del uses: de este job y, si esta en el tag movil, regenera el artefacto con el modo escribir`,
+        mensaje: `${comun}. Queda como AVISO porque las dos mediciones que lo volverian rojo no dan: el sello no coincide con el de esta copia, y ${
+          (pins ?? []).length === 0
+            ? "no se pudo leer con que ref los workflows de este repo invocan la action, asi que no se sabe si hay un pin que lo explique"
+            : `hay invocaciones pinadas a una ref fija (${fijos.map((p) => `${p.ruta}#${p.job} -> ${p.ref}`).join(", ")}), y un pin viejo explica un artefacto mas nuevo`
+        }. Arreglo: revisa el pin del uses: de este job y, si esta en el tag movil, regenera el artefacto con el modo escribir`,
       });
       continue;
     }
@@ -1134,8 +1266,16 @@ export function main(env = process.env) {
   const rutaDesvios = resolve(raiz, env.CONSTITUCION_DESVIOS || ".projects-desvios.json");
   const rutaAllowlist = resolve(raiz, env.CONSTITUCION_ALLOWLIST || ".claude/settings.json");
 
+  // EL MODO `cableado` NO LEE EL CANONICO, y por eso sale antes: lo que verifica es si
+  // el consumidor INVOCA esta action de verdad, no si su artefacto esta al dia. Vive
+  // en la misma action a proposito —comparte el lector de YAML con la deteccion de
+  // pins— y lo invoca el `marco-ci.yml`, que es el carril independiente: si viviera
+  // solo en el ci.yml del consumidor, borrar el job apagaria tambien al que denuncia
+  // que el job falta, y eso es exactamente la circularidad que la auditoria midio.
+  if (modo === "cableado") return mainCableado(env);
+
   if (modo !== "verificar" && modo !== "escribir") {
-    console.log(`::error::modo desconocido "${modo}": los modos son "verificar" y "escribir"`);
+    console.log(`::error::modo desconocido "${modo}": los modos son "verificar", "escribir" y "cableado"`);
     return 1;
   }
 
@@ -1208,6 +1348,20 @@ export function main(env = process.env) {
     allowlist = Array.isArray(permitidos) ? permitidos.filter((x) => typeof x === "string") : [];
   }
 
+  // Con que ref invoca este repo la action. Es lo que separa «el pipeline corre una
+  // copia vieja del marco» de «alguien subio la version de la cabecera a mano», y se
+  // lee del arbol y no de una variable de entorno indocumentada.
+  let pins = [];
+  try {
+    pins = invocacionesDe(leerWorkflows(raiz), (env.CONSTITUCION_RAMA_POR_DEFECTO || "main").trim() || "main").map(
+      (invocacion) => ({ ruta: invocacion.ruta, job: invocacion.job, ref: invocacion.ref }),
+    );
+  } catch (error) {
+    console.log(
+      `::warning::no se pudieron leer los workflows de este repo (${error.message}), asi que si el artefacto declara una version mas nueva que esta copia del marco no se va a poder decir si hay un pin que lo explique. Eso deja ese caso en AVISO, no en verde`,
+    );
+  }
+
   const resultado = verificar({
     canonico,
     valores,
@@ -1215,6 +1369,7 @@ export function main(env = process.env) {
     desvios,
     superficies,
     allowlist,
+    pins,
     hoy: new Date(),
     leer: (ruta) => {
       const completa = join(raiz, ruta);
@@ -1237,6 +1392,7 @@ export function main(env = process.env) {
           "canonico-invalido",
           "placeholder-sin-valor",
           "artefacto-con-marcadores",
+          "desvio-con-marcadores",
           "desvio-muerto",
           "desvio-sin-motivo",
           "desvio-sin-objeto",

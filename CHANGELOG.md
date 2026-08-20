@@ -259,6 +259,96 @@ mueve sobre un cambio incompatible.
   por el solo hecho de usar el perfil de prod contradiría a `AGENTS.md`, que
   autoriza expresamente **leer** producción por CLI.
 
+### Corregido — el cableado de la constitución se comprobaba con un `grep`
+
+La segunda corrida de la auditoría, el mismo 2026-08-20, midió la otra mitad de la
+afirmación A01. La primera mitad era cierta: el paso mudo se había borrado y el
+scaffold cablea la action de verdad. La segunda —«y `marco-ci` comprueba
+estáticamente ESE cableado»— era falsa: el check era un
+`grep -rE 'uses:.*actions/constitucion' .github/workflows`, o sea que exigía que la
+**línea** existiera en cualquier archivo bajo ese directorio. Se midieron **cinco**
+configuraciones donde nada verifica nada y el paso sale `exit 0`, cuatro de ellas
+**mudas** (cero anotaciones):
+
+- **el caso que el propio marco reparte**: un consumidor con el `ci.yml` del scaffold
+  anterior (sin el job) más `plantilla/.github/workflows/actualizar-marco.yml` tal
+  cual, que invoca la action en modo **escribir** y cuyo encabezado dice, textual,
+  «este workflow no verifica: solo propone el arreglo». Circularidad completa
+  declarada sana;
+- un job con `if: false` cableando la action;
+- la única invocación en un workflow `on: workflow_dispatch`, en modo escribir;
+- la action cableada sólo en `.github/workflows/archivo/viejo.yml` — GitHub Actions
+  **no ejecuta subdirectorios** de `.github/workflows` («workflows must be defined at
+  the top level of the .github/workflows/ directory», y la doc de reusables lo repite:
+  «subdirectories of the workflows directory are not supported»), pero `grep -r` entra
+  igual;
+- **la perilla**: un `plantilla/.github/workflows/ci.yml` vacío y **sin rastrear**
+  apagaba el check entero en un repo adoptado, porque el skip del distribuidor se
+  decidía con `test -f`.
+
+Lo que cambia:
+
+- **`actions/constitucion` tiene un tercer modo, `cableado`, y PARSEA el YAML.** Un
+  cableado cuenta sólo si, en un workflow del **primer nivel** de
+  `.github/workflows` que corre en `pull_request` o en `push` a la rama por defecto,
+  la invocación está en **modo verificar**, el job y el paso no están apagados por un
+  `if` constante falso ni tapados con `continue-on-error: true`, y el job **cuelga de
+  `ci-ok` por `needs`**, directa o transitivamente. El lector de YAML va sin
+  dependencias (`actions/constitucion/cableado.mjs`, Node pelado) y **cuando ninguna
+  invocación cuenta, cada candidata sale con el motivo exacto**: el pecado del paso
+  anterior no era el color, era el silencio.
+- **El paso del `marco-ci.yml` dejó de ser un `grep` y es un `uses:`** de ese modo.
+  Corre en el carril que el consumidor hereda por llamar al workflow reusable, así que
+  borrar su job de la constitución no apaga al que denuncia que falta.
+- **El skip del distribuidor es una propiedad POSITIVA con tres candados**: el
+  `plantilla/.github/workflows/ci.yml` tiene que estar **rastreado**, el repo **no**
+  puede versionar `.projects-valores.json`, y el scaffold que reparte tiene que **cablear**
+  la verificación con las cinco condiciones. Un repo adoptado no se apaga agregando un
+  archivo, y un distribuidor que reparte un scaffold sin el cableado es **rojo** en vez
+  de silencio.
+- **El sello dejó de ser evadible.** Subir a mano `version=1.3.0` a `version=9.9.9`
+  sobre un cuerpo amputado daba **exit 0** con avisos de `artefacto-adelantado`: el
+  cuerpo no se comparaba contra nada y se podía borrar cualquier regla. Con esta action
+  como único verificador del contenido, ese era el último bypass. Ahora hay **dos
+  discriminadores independientes** y cada uno alcanza solo: el `sha` cubre
+  `version + secciones`, así que una cabecera que declara una versión más nueva y trae
+  **el sha que esta copia calcula para la suya** se contradice sola (`exit 1`); y si los
+  workflows del repo invocan la action **sólo con el tag móvil**, no hay pin que
+  explique un artefacto más nuevo que la copia que corre (`exit 1`). La causa benigna
+  —un pin a un SHA o a un tag viejo— sigue siendo **aviso**. Se lee el árbol y no
+  `GITHUB_ACTION_REF`: esa variable **no** está en la referencia de variables de GitHub,
+  y una garantía no se apoya en algo indocumentado.
+- **El artefacto ya no sale con dobles llaves que vienen de un desvío.** Los marcadores
+  se medían sobre el texto sustituido y **antes** de insertar los desvíos, con el
+  argumento de que el motivo de un desvío es prosa del proyecto: el argumento era cierto
+  y la conclusión estaba al revés. Medido: un motivo que dice «lo aprobó {{PO}} para
+  {{PROYECTO}}» viajaba al artefacto tal cual y el modo escribir lo emitía en verde
+  (`exit 0`, 2 marcadores en el archivo), mientras el rojo lo cobraba el check vecino
+  del propio consumidor sobre un archivo que el marco escribió. Ahora la medición es
+  sobre el **cuerpo final** y hay un hallazgo propio, `desvio-con-marcadores`, que manda
+  a arreglar `.projects-desvios.json` en vez de a buscar un valor que no falta.
+- **El piso recomendado de permisos se mide por ENTRADA, no sobre la concatenación del
+  allowlist.** Medido: un allowlist de **puro relleno** —seis cadenas que no son entrada
+  de permiso de nada: `["lint", "format", "typecheck", "test", "build", "openspec"]`— se
+  declaraba **100% cubierto**, exit 0 y cero avisos. La medición no decía «el agente
+  puede correr el linter sin pedir permiso», decía «en algún lugar del archivo aparece
+  la palabra lint». Ahora la propiedad se busca dentro de **una** entrada y con la
+  **misma herramienta** que el ítem recomienda: el mismo allowlist da 6 de 6 sin cubrir.
+  Sigue siendo **aviso** y jamás rojo, por la razón que ya estaba escrita.
+- **Bancos nuevos y ampliados.** `actions/constitucion/pruebas/cableado.test.mjs` (27
+  casos, uno por cada una de las cinco configuraciones medidas más el lector de YAML), y
+  el banco de regresiones suma el sello, el desvío con marcadores, el piso de relleno y
+  **el recorte del comodín del allowlist**, que no tenía ninguna prueba: borrándolo el
+  banco quedaba entero en verde mientras se creaba un falso rojo sobre
+  `Bash(terraform validate:*)` —la entrada que el propio scaffold reparte—, denunciada
+  como si autorizara `terraform apply`. El programa de ese paso va inline en el YAML, así
+  que la prueba lo **extrae del workflow** y lo corre: es la única forma de que el código
+  que llega a todos los consumidores por `@v1` pase por un caso controlado.
+
+Las cinco configuraciones se corrieron contra el paso anterior antes de escribir el
+reemplazo (las cinco: `exit 0`; cuatro con cero anotaciones) y las doce mutaciones del
+código nuevo matan a su prueba, una por una.
+
 ### Corregido — la constitución del marco tenía dos verificadores y ninguno verificaba
 
 Una auditoría adversarial del 2026-08-20 puso a prueba por **código de salida** las

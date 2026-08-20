@@ -918,132 +918,78 @@ jobs:
       # contrario de la regla que nacio de otro.
       #
       # LO QUE VERIFICA ESTE PASO ES EL CABLEADO, no el artefacto. El artefacto
-      # lo verifica `actions/constitucion` en modo verificar, que es la unica
-      # pieza que lo compara contra el RE-RENDER del canonico: el texto viaja
-      # DENTRO de la composite action porque el GITHUB_TOKEN de un consumidor no
-      # lee otro repositorio (comprobado el 2026-08-14: da 404), asi que desde
-      # este workflow no hay con que re-renderizar.
+      # lo verifica el modo `verificar` de la misma action, que es la unica pieza
+      # que lo compara contra el RE-RENDER del canonico: el texto viaja DENTRO de
+      # la composite action porque el GITHUB_TOKEN de un consumidor no lee otro
+      # repositorio (comprobado el 2026-08-14: da 404).
       #
-      # POR QUE ESTO EXISTE, y es la refutacion mas cara de la auditoria del
-      # 2026-08-20: hasta ese dia habia ACA un paso que leia el artefacto y su
-      # sello, y ese paso salia exit 0 MUDO —cero ::error::, cero ::warning::,
-      # tambien con la version ya exigible— contra el unico esquema de
-      # `superficies` que el scaffold emite. Y cuando el artefacto SI estaba, lo
-      # rechazaba: exigia sha de 64 hex del cuerpo y la action emite 12 hex del
-      # canonico, asi que desde el 2026-09-16 era exit 1 sobre artefactos
-      # CORRECTOS. Mientras tanto la action no se invocaba en NINGUN carril de
-      # verificacion del consumidor: su unica invocacion era el workflow de
-      # actualizacion, en modo escribir, que declara no verificar nada y delega en
-      # este paso. Circularidad completa. El paso se borro y quedo esto, que es lo
-      # unico que este workflow puede afirmar de verdad sobre la constitucion.
+      # POR QUE ESTE PASO ES UN `uses:` Y NO UN `grep`, y es la refutacion mas
+      # cara de la auditoria del 2026-08-20. Hasta esa fecha aca habia dos cosas
+      # y las dos salian verdes sobre repos donde nada verificaba nada:
+      #
+      #   1. un paso que leia el artefacto y su sello, y salia exit 0 MUDO —cero
+      #      ::error::, cero ::warning::, tambien con la version ya exigible—
+      #      contra el unico esquema de `superficies` que el scaffold emite. Y
+      #      cuando el artefacto SI estaba, lo rechazaba: exigia sha de 64 hex del
+      #      cuerpo y la action emite 12 hex del canonico. Ese paso se borro.
+      #   2. su reemplazo: un `grep -rE 'uses:.*actions/constitucion'` sobre
+      #      .github/workflows, que afirmaba "la verificacion esta cableada" con
+      #      solo encontrar la linea. Se midieron CINCO configuraciones donde el
+      #      grep sale exit 0 y nada verifica: el consumidor que tiene el ci.yml
+      #      viejo mas el actualizar-marco.yml del propio marco (modo ESCRIBIR, y
+      #      su encabezado dice textual "este workflow no verifica"); un job con
+      #      `if: false`; la unica invocacion en un `on: workflow_dispatch`; el
+      #      archivo en un subdirectorio de .github/workflows, que GitHub Actions
+      #      NUNCA ejecuta ("workflows must be defined at the top level of the
+      #      .github/workflows/ directory") pero grep -r recorre igual; y la
+      #      perilla, un plantilla/.github/workflows/ci.yml vacio y SIN RASTREAR
+      #      que apagaba el check entero porque el skip se decidia con `test -f`.
+      #
+      # Un grep no puede distinguir ninguno de los cinco: los cinco tienen la
+      # linea. Lo que separa un cableado de su apariencia es la ESTRUCTURA —en que
+      # archivo esta, con que evento corre, con que modo se invoca, si el job esta
+      # apagado y si el veredicto agregado lo espera— y eso hay que parsearlo. El
+      # lector de YAML (sin dependencias, Node pelado) vive en la action, con su
+      # banco de pruebas y un caso por cada una de las cinco configuraciones.
+      #
+      # POR QUE VIVE EN LA ACTION Y SE INVOCA DESDE ACA. El programa necesita un
+      # archivo y un banco de pruebas, y un heredoc no puede cerrar dentro de un
+      # bloque de YAML indentado — de ahi los `node -e` inline de los pasos
+      # hermanos, que por eso mismo no tienen banco. Este paso corre en el carril
+      # INDEPENDIENTE: el consumidor lo hereda por llamar a este workflow, asi que
+      # borrar su job de la constitucion no apaga al que denuncia que falta. Eso
+      # es lo contrario de la circularidad medida, donde marco-ci delegaba en la
+      # action y la action se invocaba solo desde el workflow que declara no
+      # verificar.
       #
       # LA ASIMETRIA DEL VEREDICTO, y reemplaza a la ventana de gracia que este
-      # paso ya no puede leer (el calendario vive en el manifiesto del canonico,
-      # que viaja con la action y no con este workflow):
-      #   · repo que NO declara .projects-valores.json -> ::warning::. Todavia no
+      # carril no puede leer (el calendario vive en el manifiesto del canonico,
+      # que viaja con la action):
+      #   · repo que NO versiona .projects-valores.json -> ::warning::. Todavia no
       #     adopto la constitucion; el rojo por no haber adoptado no es de un
       #     check nuevo del pipeline, es del PR de migracion.
-      #   · repo que SI lo declara y NO cablea la verificacion -> ::error::. Tiene
-      #     la maquinaria y se saltea el check. No hace falta ventana: nunca tuvo
-      #     este check, asi que no hay nada que se le endurezca — es un rojo el
-      #     dia que adopta, y se arregla en el mismo PR que adopta.
+      #   · repo que SI lo versiona y no tiene un cableado que cuente -> ::error::,
+      #     y cada invocacion que no cuenta sale con el motivo exacto por el que no
+      #     cuenta. El pecado del paso anterior no era el color: era el silencio.
       #
-      # SKIP POR PROPIEDAD, con la MISMA propiedad que usa el paso de marcadores:
-      # el repo que DISTRIBUYE el scaffold es el marco, y el marco no es
-      # consumidor de su propia porcion — su AGENTS.md es la constitucion DEL
-      # MARCO. Nunca por perilla: una perilla es un boton para apagar el check.
+      # SKIP DEL DISTRIBUIDOR, ahora como PROPIEDAD POSITIVA y con tres candados:
+      # el repo que reparte el scaffold es el marco y no es consumidor de su propia
+      # porcion, pero para saltearse el check tiene que (1) RASTREAR
+      # plantilla/.github/workflows/ci.yml, (2) no versionar .projects-valores.json y
+      # (3) repartir un scaffold que SI cablea la verificacion. Un repo adoptado no
+      # se apaga agregando un archivo, y un distribuidor que reparte un scaffold sin
+      # el cableado es rojo en vez de silencio.
       - name: Constitucion del marco cableada
         if: '!cancelled()'
-        shell: bash
-        env:
-          RUTA_VALORES: .projects-valores.json
-        run: |
-          set -euo pipefail
-
-          if [ -f plantilla/.github/workflows/ci.yml ]; then
-            echo "::notice::este repo distribuye el marco (plantilla/): su constitucion es la del marco y no la porcion que reciben los proyectos — verificacion omitida"
-            exit 0
-          fi
-
-          if [ ! -d .github/workflows ]; then
-            echo "::error::el repo no tiene .github/workflows — no hay donde cablear la verificacion de la constitucion"
-            exit 1
-          fi
-
-          # Lo RASTREADO es el universo, igual que en el resto de los guardrails:
-          # un archivo de valores sin versionar no lo ve nadie mas que la maquina
-          # donde se escribio.
-          ADOPTO=no
-          if git ls-files --error-unmatch "${RUTA_VALORES}" > /dev/null 2>&1; then
-            ADOPTO=si
-          fi
-
-          # Misma forma anclada que el paso del censo, y puede serlo por el mismo
-          # motivo: GitHub PROHIBE expresiones en el campo "uses", asi que la
-          # referencia a una action es siempre literal. El ancla descarta las
-          # lineas comentadas, que son la forma mas facil de "cablear" algo sin
-          # cablearlo. Se busca el SEGMENTO DE RUTA y no "@v1", porque la
-          # validacion contra un consumidor real apunta a la rama del change
-          # antes de que el tag movil se mueva.
-          ACTION="actions/constitucion"
-          PATRON='^[[:space:]]*(-[[:space:]]+)?uses:[[:space:]]*[^[:space:]]*'"${ACTION}"'([^A-Za-z0-9_-]|$)'
-
-          CABLEADO="${RUNNER_TEMP}/cableado-constitucion.txt"
-          set +e
-          grep -rnE --include='*.yml' --include='*.yaml' "${PATRON}" .github/workflows > "${CABLEADO}"
-          RC=$?
-          set -e
-          if [ "${RC}" -gt 1 ]; then
-            # grep devuelve >1 solo por error real. No se pudo mirar, asi que no
-            # se declara verde: lo no verificable es rojo.
-            echo "::error::no se pudo inspeccionar .github/workflows (grep rc=${RC}) — sin poder mirar, el cableado de la constitucion no se da por bueno"
-            exit 1
-          fi
-
-          if [ -s "${CABLEADO}" ]; then
-            echo "== cableado de la constitucion del marco =="
-            cat "${CABLEADO}"
-
-            # Aviso y no rojo, igual que en el censo: un continue-on-error en el
-            # mismo archivo NO prueba que aplique a este paso, y enrojecer por eso
-            # bloquearia integraciones legitimas. Se avisa porque un limite que no
-            # se dice en la corrida es un limite que nadie recuerda.
-            cut -d: -f1 "${CABLEADO}" | sort -u > "${RUNNER_TEMP}/archivos-constitucion.txt"
-            while IFS= read -r ARCHIVO; do
-              if grep -qE '^[[:space:]]*(-[[:space:]]+)?continue-on-error:' "${ARCHIVO}"; then
-                echo "::warning file=${ARCHIVO}::${ARCHIVO} cablea la verificacion de la constitucion y ademas usa continue-on-error: si ese modificador cae sobre ese paso, su rojo no detiene nada y el cableado queda vivo pero inofensivo. Verifica a que paso aplica"
-              fi
-            done < "${RUNNER_TEMP}/archivos-constitucion.txt"
-
-            if [ "${ADOPTO}" = "no" ]; then
-              echo "::warning file=${RUTA_VALORES}::este repo cablea la verificacion de la constitucion del marco y no versiona ${RUTA_VALORES}, asi que el job va a decir que falta y no va a poder renderizar nada. Arreglo: declara los valores de este proyecto en ${RUTA_VALORES} (los que el canonico usa vienen listados en el mensaje del propio job)"
-            fi
-            echo "la verificacion de la constitucion del marco esta cableada"
-            exit 0
-          fi
-
-          # Sin cablear. El color depende de si el repo ya adopto.
-          if [ "${ADOPTO}" = "no" ]; then
-            echo "::warning file=${RUTA_VALORES}::este repo no cablea la verificacion de la constitucion del marco en ningun flujo y todavia no versiona ${RUTA_VALORES}, asi que sus agentes trabajan sin las reglas del area y nada lo delata en la sesion. Es AVISO y no fallo porque adoptar la constitucion es un PR de migracion y no algo que este check pueda exigir de un dia para otro; lo que no hace es callarse y declararlo sano"
-          else
-            echo "::error file=${RUTA_VALORES}::este repo versiona ${RUTA_VALORES} —o sea que ADOPTO la constitucion del marco— y no invoca su verificacion en ningun flujo: el artefacto puede faltar, estar atrasado, estar editado a mano o no estar cargado por ninguna superficie, y nada lo pondria en rojo. Arreglo: pega el job de abajo en .github/workflows/ci.yml y agregalo al needs de ci-ok"
-          fi
-          echo "== job a agregar =="
-          echo "  constitucion:"
-          echo "    name: constitucion"
-          echo "    runs-on: ubuntu-latest"
-          echo "    permissions:"
-          echo "      contents: read"
-          echo "    steps:"
-          echo "      - uses: actions/checkout@v7"
-          echo "      - uses: actions/setup-node@v7"
-          echo "        with:"
-          echo "          node-version: \"22\""
-          echo "      - uses: im-diego-ec/Projects/actions/constitucion@v1"
-          echo "        with:"
-          echo "          modo: verificar"
-          [ "${ADOPTO}" = "si" ] && exit 1
-          exit 0
+        uses: im-diego-ec/Projects/actions/constitucion@v1
+        with:
+          modo: cableado
+          # La rama por defecto sale del evento y no de una constante: un `push`
+          # que no dispara en la rama protegida no es una compuerta, y cual es esa
+          # rama lo sabe GitHub. Si el evento no la trae (un workflow_call sin
+          # repositorio en el payload) la action cae a "main", que es la unica rama
+          # permanente que el marco admite.
+          rama_por_defecto: ${{ github.event.repository.default_branch }}
 
       # HUECO 6 — el marco declara desde su primera version que el paquete del
       # CLI es @fission-ai/openspec y que el nombre pelado "openspec" en npm es

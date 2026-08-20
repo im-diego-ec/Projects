@@ -41,6 +41,7 @@ import {
   validarManifiesto,
   verificar,
 } from "../constitucion.mjs";
+import { invocacionesDe } from "../cableado.mjs";
 
 const SCRIPT = join(import.meta.dirname, "..", "constitucion.mjs");
 const CANONICO_REAL = join(import.meta.dirname, "..", "canonico");
@@ -516,20 +517,254 @@ test("el piso de permisos esta escrito UNA sola vez: ningun workflow lleva su co
   }
 });
 
-test("el scaffold cablea la verificacion de la constitucion, y el marco lo comprueba", () => {
-  // La refutación más cara de la tanda no fue un bug: la action no se invocaba en
-  // NINGÚN carril de verificación del consumidor. Su única invocación era el
-  // workflow de actualización, en modo escribir, cuyo encabezado declara «este
-  // workflow no verifica: solo propone el arreglo» y delega la verificación en el
-  // paso inline, que estaba apagado. Circularidad completa: marco-ci delegaba en la
-  // action, la action delegaba en marco-ci, y nadie verificaba.
-  const ci = leerDelRepo("plantilla/.github/workflows/ci.yml");
-  assert.match(ci, /uses:[^\n]*actions\/constitucion/, "el ci.yml del scaffold no invoca la action");
-  assert.match(ci, /modo:\s*verificar/, "la invoca y no en modo verificar");
-  assert.match(ci, /needs:\s*\[[^\]]*constitucion[^\]]*\]/, "el veredicto agregado no depende del job de la constitucion");
+test("el scaffold cablea la verificacion de la constitucion, con las cinco condiciones", () => {
+  // LA MITAD VERDADERA DE A01. La refutación más cara de la tanda no fue un bug: la
+  // action no se invocaba en NINGÚN carril de verificación del consumidor. Su única
+  // invocación era el workflow de actualización, en modo escribir, cuyo encabezado
+  // declara «este workflow no verifica: solo propone el arreglo». Circularidad
+  // completa: marco-ci delegaba en la action, la action delegaba en marco-ci.
+  //
+  // Y acá NO se greguea el texto del workflow: se lo PARSEA con el mismo lector que
+  // usa el check, así que lo que se afirma es la propiedad y no la presencia de una
+  // subcadena. La versión anterior de esta prueba hacía tres `assert.match` sobre el
+  // archivo entero, y por eso no distinguía «el needs nombra a constitucion» de «la
+  // palabra constitucion aparece en algún needs de algún job».
+  const invocaciones = invocacionesDe(
+    [{ ruta: ".github/workflows/ci.yml", texto: leerDelRepo("plantilla/.github/workflows/ci.yml") }],
+    "main",
+  );
+  const validas = invocaciones.filter((i) => i.cuenta);
+  assert.equal(validas.length, 1, JSON.stringify(invocaciones, null, 1));
+  assert.equal(validas[0].modo, "verificar");
+  assert.equal(validas[0].job, "constitucion");
+});
 
+// ---------------------------------------------------------------------------
+// A01, LA MITAD FALSA · «y marco-ci comprueba estáticamente ESE cableado»
+//
+// REFUTADA. El check era un `grep -rE 'uses:.*actions/constitucion'` sobre
+// `.github/workflows`, y se midieron CINCO configuraciones donde nada verifica nada y
+// el paso sale exit 0 —cuatro de ellas MUDAS, cero anotaciones—: el consumidor con el
+// ci.yml viejo más el `actualizar-marco.yml` del propio marco (modo ESCRIBIR); un job
+// con `if: false`; la única invocación en un `on: workflow_dispatch`; el archivo en un
+// subdirectorio de `.github/workflows`, que GitHub Actions no ejecuta; y la perilla,
+// un `plantilla/.github/workflows/ci.yml` vacío y SIN RASTREAR.
+//
+// Los cinco casos, cada uno con su fixture y medido por código de salida, viven en
+// `cableado.test.mjs`. Lo que se fija ACÁ es que el marco no vuelva a afirmar la
+// propiedad con un grep: el reemplazo tiene que PARSEAR, y el paso del workflow tiene
+// que ser una invocación de la pieza que parsea.
+// ---------------------------------------------------------------------------
+
+test("el cableado NO se comprueba con un grep: el paso del marco invoca al lector de YAML", () => {
   const marco = leerDelRepo(".github/workflows/marco-ci.yml");
-  assert.match(marco, /actions\/constitucion/, "el marco no comprueba estaticamente que el consumidor la cablee");
+  const paso = marco.slice(marco.indexOf("- name: Constitucion del marco cableada"));
+  const hastaElSiguiente = paso.slice(0, paso.indexOf("\n      # HUECO"));
+  assert.match(hastaElSiguiente, /uses:\s*im-diego-ec\/projects\/actions\/constitucion@v1/);
+  assert.match(hastaElSiguiente, /modo:\s*cableado/);
+  assert.equal(
+    /grep/.test(hastaElSiguiente),
+    false,
+    "el paso volvio a decidir el cableado con un grep: una linea `uses:` la tienen igual las cinco configuraciones donde nada verifica",
+  );
+
+  // Y el lector existe con su banco al lado, que es la condición que el propio CI del
+  // marco avisa cuando falta.
+  assert.ok(existsSync(join(RAIZ_REPO, "actions/constitucion/cableado.mjs")));
+  assert.ok(existsSync(join(RAIZ_REPO, "actions/constitucion/pruebas/cableado.test.mjs")));
+});
+
+// ---------------------------------------------------------------------------
+// RESIDUO 1 · «el artefacto nunca sale con dobles llaves»
+//
+// REFUTADA de nuevo el 2026-08-20, por el borde que el arreglo anterior dejó: los
+// marcadores se medían sobre el texto YA SUSTITUIDO y ANTES de insertar los desvíos,
+// con el argumento de que el motivo de un desvío es prosa del proyecto. El argumento
+// era cierto y la conclusión estaba al revés: un motivo que dice «{{PO}} lo aprobó
+// para {{PROYECTO}}» viajaba al artefacto tal cual, en verde, y el rojo lo cobraba el
+// check vecino del propio consumidor sobre un archivo que el marco escribió.
+// ---------------------------------------------------------------------------
+
+test("un desvio cuyo motivo lleva marcadores no sale al artefacto: rojo, y nombra el desvio", () => {
+  const canonico = canonicoTemporal();
+  const conMarcadores = { ...DESVIO, motivo: "{{PO}} lo aprobo para {{PROYECTO}} y no se toca" };
+  const render = renderizar({ canonico, valores: VALORES, desvios: [conMarcadores] });
+
+  // La propiedad, primero: el cuerpo que se va a sellar NO lleva dobles llaves — o si
+  // las lleva, la medición las ve.
+  assert.deepEqual(render.marcadoresSinResolver, ["PO", "PROYECTO"]);
+  assert.deepEqual(
+    render.marcadoresDeDesvios.map((d) => d.regla),
+    ["regla-dos"],
+  );
+
+  const resultado = verificar({
+    canonico,
+    valores: VALORES,
+    desvios: [conMarcadores],
+    superficies: ["claude-code"],
+    hoy: DENTRO_DE_LA_VENTANA,
+    leer: lector(CADENA_SANA),
+  });
+  const propio = resultado.hallazgos.filter((h) => h.codigo === "desvio-con-marcadores");
+  assert.equal(propio.length, 1, codigos(resultado).join(", "));
+  assert.equal(propio[0].nivel, "error");
+  assert.match(propio[0].mensaje, /\.projects-desvios\.json/);
+  assert.ok(resultado.rojos > 0);
+});
+
+test("y el modo escribir NO emite ese artefacto: un rojo que igual deja el archivo no sirve", () => {
+  const raiz = repoTemporal({
+    valores: VALORES_COMPLETOS,
+    desvios: [{ ...DESVIO, regla: "openspec-validar-tras-editar", motivo: "lo aprobo {{PO}}" }],
+  });
+  const corrida = spawnSync(process.execPath, [SCRIPT], {
+    encoding: "utf8",
+    env: {
+      ...process.env,
+      CONSTITUCION_MODO: "escribir",
+      CONSTITUCION_RAIZ: raiz,
+      GITHUB_OUTPUT: "",
+      GITHUB_STEP_SUMMARY: "",
+    },
+  });
+  assert.equal(corrida.status, 1, corrida.stdout);
+  assert.match(corrida.stdout, /::error::/);
+  assert.equal(existsSync(join(raiz, ".projects/AGENTS-marco.md")), false, "escribio el artefacto con marcadores adentro");
+});
+
+// ---------------------------------------------------------------------------
+// RESIDUO 2 · el piso recomendado de permisos, medido contra un allowlist de relleno
+//
+// REFUTADA el 2026-08-20: `revisarPiso` concatenaba el allowlist entero en un texto y
+// buscaba ahí la propiedad, así que un allowlist de PURO RELLENO —seis cadenas que no
+// son entrada de permiso de nada— se declaraba 100% cubierto, exit 0 y cero avisos. La
+// medición no decía «el agente puede correr el linter sin pedir permiso»: decía «en
+// algún lugar del archivo aparece la palabra lint». Y no tenía prueba.
+// ---------------------------------------------------------------------------
+
+test("un allowlist de PURO RELLENO no se declara 100% cubierto por el piso", () => {
+  const canonico = leerCanonico(CANONICO_REAL);
+  const relleno = canonico.piso_permisos.map((item) => item.cubre);
+  assert.ok(relleno.length >= 5, "el piso real quedo demasiado corto para que esta prueba mida algo");
+  assert.deepEqual(
+    revisarPiso(canonico.piso_permisos, relleno).map((item) => item.cubre),
+    relleno,
+    "seis cadenas que no autorizan ningun comando satisfacen el piso entero",
+  );
+});
+
+test("una entrada de OTRA herramienta no cubre un item que recomienda Bash", () => {
+  const piso = [{ nombre: "el linter", entrada: "Bash(pnpm lint)", cubre: "lint" }];
+  assert.deepEqual(revisarPiso(piso, ["mcp__x__lint_project", "WebFetch(domain:lint.example)"]).length, 1);
+  assert.deepEqual(revisarPiso(piso, ["Bash(pnpm --filter web lint)"]), []);
+  // Y `Bash` a secas no declara comando: no se puede decir que cubra este item.
+  assert.deepEqual(revisarPiso(piso, ["Bash"]).length, 1);
+});
+
+test("la propiedad se busca dentro de UNA entrada, no en la concatenacion del archivo", () => {
+  const piso = [{ nombre: "el chequeo de formato", entrada: "Bash(pnpm format:check)", cubre: "format" }];
+  // El borde de palabra ya estaba: `eslint` no pasa por `lint`. Lo nuevo es que la
+  // palabra tenga que estar en la MISMA entrada que autoriza el comando.
+  assert.deepEqual(revisarPiso(piso, ["Bash(pnpm eslint)"]).length, 1);
+  assert.deepEqual(revisarPiso(piso, ["Bash(prettier --check .)", "format"]).length, 1);
+  assert.deepEqual(revisarPiso(piso, ["Bash(pnpm format:check)"]), []);
+});
+
+// ---------------------------------------------------------------------------
+// RESIDUO 3 · el recorte del comodín del allowlist
+//
+// Medido el 2026-08-20: el paso «Permisos del agente sin escritura» normaliza el
+// separador FINAL de una entrada (`cmd sub:*` -> `cmd sub *`) porque el allowlist
+// admite las dos formas y las dos significan «y lo que siga». Ese recorte no tenía
+// ninguna prueba, y borrándolo el banco quedaba entero en verde mientras se creaba un
+// FALSO ROJO: sin normalizar, `Bash(terraform validate:*)` deja el token
+// `validate:*` en la posición del subcomando, así que el paso lo denuncia como «deja
+// el subcomando en comodín» —o sea como si autorizara `terraform apply`— sobre una
+// entrada que autoriza exactamente un subcomando de lectura. Es la entrada que el
+// propio scaffold reparte.
+//
+// El programa de ese paso va inline en el YAML (un heredoc no puede cerrar dentro de
+// un bloque indentado), así que la prueba lo EXTRAE del workflow y lo corre. Es la
+// única forma de que el código que llega a todos los consumidores por `@v1` pase por
+// un caso controlado.
+// ---------------------------------------------------------------------------
+
+/** Saca el programa inline del paso de permisos del `marco-ci.yml` y lo deja en un
+ *  archivo ejecutable. Se lee del workflow y no de una copia: una copia sería la
+ *  segunda contabilidad que este banco existe para impedir. */
+function programaDePermisos() {
+  const marco = leerDelRepo(".github/workflows/marco-ci.yml");
+  const lineas = marco.split("\n");
+  const inicio = lineas.findIndex((l) => l.includes("- name: Permisos del agente sin escritura"));
+  assert.ok(inicio >= 0, "no se encontro el paso de permisos en marco-ci.yml");
+  let i = inicio;
+  while (i < lineas.length && !/^\s*node -e '$/.test(lineas[i])) i++;
+  assert.ok(i < lineas.length, "el paso de permisos ya no lleva su programa inline: revisa esta prueba");
+  const sangria = (lineas[i].match(/^ */) ?? [""])[0].length;
+  const cuerpo = [];
+  for (let k = i + 1; k < lineas.length; k++) {
+    if (lineas[k].trim() === "'" && (lineas[k].match(/^ */) ?? [""])[0].length === sangria) break;
+    cuerpo.push(lineas[k].slice(sangria + 2));
+  }
+  const dir = temporal("projects-permisos-");
+  const ruta = join(dir, "permisos.cjs");
+  writeFileSync(ruta, `${cuerpo.join("\n")}\n`, "utf8");
+  return ruta;
+}
+
+function correrPermisos(allow) {
+  const programa = programaDePermisos();
+  const raiz = temporal("projects-allowlist-");
+  mkdirSync(join(raiz, ".claude"), { recursive: true });
+  writeFileSync(join(raiz, ".claude/settings.json"), JSON.stringify({ permissions: { allow } }), "utf8");
+  writeFileSync(join(raiz, ".projects-valores.json"), JSON.stringify({ PERFIL_PROD: "la organización-prod" }), "utf8");
+  return spawnSync(process.execPath, [programa], {
+    cwd: raiz,
+    encoding: "utf8",
+    env: {
+      ...process.env,
+      RUTA_ALLOWLIST: ".claude/settings.json",
+      RUTA_VALORES: ".projects-valores.json",
+      RUTA_DESVIOS: ".projects-desvios.json",
+    },
+  });
+}
+
+test("el recorte del comodin: `sub:*` y `sub *` son la misma cosa, y ninguna es un comodin de subcomando", () => {
+  // La entrada que el scaffold reparte, en sus dos formas. Las dos autorizan UN
+  // subcomando de lectura, asi que ninguna es hallazgo.
+  for (const entrada of ["Bash(terraform validate *)", "Bash(terraform validate:*)"]) {
+    const corrida = correrPermisos([entrada]);
+    assert.equal(corrida.status, 0, `${entrada} salio ${corrida.status}: ${corrida.stdout}`);
+    assert.equal(/::error/.test(corrida.stdout), false, `${entrada}: ${corrida.stdout}`);
+  }
+});
+
+/** Solo las ANOTACIONES de error: la línea de resumen del paso nombra la palabra
+ *  «comodines» siempre, así que buscarla en todo el stdout no distingue un hallazgo de
+ *  la explicación del propio check. */
+const erroresDe = (corrida) => String(corrida.stdout).split("\n").filter((l) => l.startsWith("::error"));
+
+test("el comodin en la posicion DEL SUBCOMANDO si es hallazgo, en las dos formas", () => {
+  for (const entrada of ["Bash(terraform *)", "Bash(terraform:*)"]) {
+    const corrida = correrPermisos([entrada]);
+    assert.equal(corrida.status, 1, `${entrada} salio ${corrida.status}: ${corrida.stdout}`);
+    const errores = erroresDe(corrida);
+    assert.equal(errores.length, 1, `${entrada}: ${corrida.stdout}`);
+    assert.match(errores[0], /comodin/, `${entrada}: ${errores[0]}`);
+    // Y con el nombre de la herramienta, no como «cualquier comando de shell»: la
+    // entrada SI acota la herramienta, y decir lo contrario es un diagnostico falso.
+    assert.match(errores[0], /"terraform"/, `${entrada}: ${errores[0]}`);
+  }
+});
+
+test("el recorte toca SOLO el separador final: los dos puntos de una ruta no se mueven", () => {
+  // Si el recorte fuera global, un `:` de una URL o de una ruta quedaria convertido en
+  // separador y el subcomando cambiaria de lugar.
+  const corrida = correrPermisos(["Bash(gh api repos/Ejemplo-Org/Projects/actions:read)"]);
+  assert.equal(corrida.status, 0, corrida.stdout);
+  assert.deepEqual(erroresDe(corrida), [], corrida.stdout);
 });
 
 // ---------------------------------------------------------------------------
