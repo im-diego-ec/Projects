@@ -13,6 +13,7 @@ uses: im-diego-ec/Projects/actions/<nombre>@v1
 | [`carril-docs`](carril-docs/) | Marca los cambios que no alteran lo que se sirve (`solo_docs`) | Nunca: fail-open ruidoso |
 | [`cobertura-diff`](cobertura-diff/) | Mide qué proporción de las líneas del cambio ejercitan las pruebas | Sí: bajo el mínimo, y también sin datos |
 | [`censo-fuentes`](censo-fuentes/) | Deriva el alcance real de la verificación y caza los archivos que no mira ninguna herramienta | Sí: agujeros y exclusiones muertas |
+| [`aviso-version`](aviso-version/) | Arma, desde el CHANGELOG, el mensaje que reciben los consumidores al publicarse una versión | Sí: solo si el CHANGELOG no tiene entrada para esa versión |
 
 ## Parametrización
 
@@ -524,6 +525,124 @@ node --test "actions/cobertura-diff/pruebas/*.test.mjs"
 
 ---
 
+## `aviso-version`
+
+El `CHANGELOG.md` y la página del release son superficie de **consulta**, y
+nadie consulta a tiempo. Con `v1` móvil, un consumidor recibe comportamiento
+nuevo —incluido un check que lo pone en rojo— sin haber leído nada; pasó el
+2026-08-19, al mover `v1` la primera vez. Esta action convierte la publicación
+de una versión en una **notificación**.
+
+**Arma el mensaje y no lo envía.** No conoce el destino, no lee ningún secret y
+no toca la red: lee el `CHANGELOG.md` del checkout, devuelve texto y escribe un
+payload JSON en disco. El envío —lo único que necesita la credencial— vive en el
+workflow que la usa, en unas líneas de `curl`.
+
+Esa separación es toda la estrategia de verificación: un paso que solo se puede
+probar disparándolo de verdad no se prueba nunca. Así se corre en cualquier
+máquina, sin credenciales, y muestra exactamente qué se enviaría:
+
+```bash
+AVISO_VERSION=1.2.0 node ruta/a/projects/actions/aviso-version/aviso-version.mjs
+```
+
+**El contenido no se escribe dos veces.** Sale de la sección `### Para
+consumidores` de la entrada de esa versión, que el `CHANGELOG.md` ya mantiene
+por convención propia y que dice exactamente qué tiene que hacer un consumidor.
+No hay un formato paralelo que alguien deba sincronizar: la única fuente que se
+edita es el changelog, en el mismo PR que introduce el cambio.
+
+```yaml
+on:
+  release:
+    types: [published]
+
+jobs:
+  aviso:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v7
+      - id: mensaje
+        uses: im-diego-ec/Projects/actions/aviso-version@v1
+        with:
+          version: ${{ github.event.release.tag_name }}
+      - shell: bash
+        env:
+          DESTINO: ${{ secrets.AVISO_VERSION_DESTINO }}
+          PAYLOAD: ${{ steps.mensaje.outputs.payload }}
+        run: |    # ...el envio, y la rama de "no hay destino"...
+```
+
+En el evento `release` el checkout cae en el commit del tag publicado, así que
+el changelog que se lee es el de **esa** versión.
+
+### Inputs
+
+| Input | Default | Para qué |
+| --- | --- | --- |
+| `version` | (obligatorio) | Versión a avisar, con o sin la `v` del tag (`1.2.0` o `v1.2.0`) |
+| `changelog` | `CHANGELOG.md` | Ruta del changelog, relativa al working directory |
+| `limite` | `3500` | Largo máximo del mensaje; por encima recorta y lo dice |
+| `campo` | `text` | Campo de texto del payload JSON (`content` para Discord) |
+| `salida` | `$RUNNER_TEMP/aviso-version.json` | Dónde escribir el payload |
+
+### Outputs
+
+| Output | Contenido |
+| --- | --- |
+| `payload` | Ruta del JSON listo para postear con `--data-binary @archivo` |
+| `version` | Versión normalizada, sin la `v` del tag |
+| `breaking` | `"true"` si la entrada declara cambios BREAKING |
+| `recortado` | `"true"` si el mensaje se recortó por el límite |
+| `sin_para_consumidores` | `"true"` si la entrada no traía la sección accionable |
+
+### Qué pasa en cada caso
+
+| Situación | Veredicto |
+| --- | --- |
+| Entrada con su sección «Para consumidores» | Mensaje completo, con los dos enlaces |
+| Entrada **sin** esa sección | `::warning::` y va el **cuerpo completo** de la versión: se manda de más, no de menos |
+| Entrada con líneas `BREAKING` | `::warning::` y el mensaje las pone **primero** |
+| Mensaje más largo que el límite | `::warning::`, recorta por línea y deja el enlace al release |
+| **No hay entrada para esa versión** | **Rojo**, con el arreglo: agregar la entrada y re-disparar el botón |
+| No se puede leer el changelog | **Rojo**: falta el `checkout` |
+
+El único rojo es "no hay entrada", y es deliberado: no existe una degradación
+honesta. Un aviso vacío, o uno armado con el texto de otra versión, sería
+justamente el formato paralelo que este diseño evita — y el modo de fallo más
+caro posible, porque le diría a un consumidor que haga algo que no corresponde.
+
+### Límites declarados
+
+- **El mensaje viaja como Markdown, tal cual lo escribe el CHANGELOG.** No hay
+  traducción al dialecto de ningún destino (Slack no renderiza `**negrita**`
+  igual que GitHub): hacerla sería cablear un proveedor, que es justo lo que
+  este diseño no hace. Lo que se gana es que el aviso y el changelog son el
+  mismo texto, verificable carácter por carácter.
+- **El payload es `{"<campo>": "<mensaje>"}` y nada más.** Sirve para Slack,
+  Google Chat y Teams con `text`, y para Discord con `content`. Un destino que
+  exija otra forma es un change del marco, no una configuración.
+- **«Para consumidores» es una convención del changelog, no un contrato que algo
+  verifique al escribirlo.** Su ausencia se detecta al avisar —cuando la versión
+  ya está publicada—, no en el PR que la introdujo. Cerrar ese hueco es otro
+  check y otra fila del backlog.
+- **Esta action no envía nada, así que no puede garantizar que el aviso llegue.**
+  Lo que el workflow que la consuma no puede hacer es callarse: sin destino
+  configurado, `::warning::` y el mensaje al resumen de la corrida.
+
+### Clasificación de distribución
+
+Es **referenciada**, y hoy tiene un solo consumidor: el propio Projects. Vive acá y
+no como un script suelto del repo por dos razones que se sostienen solas —el
+banco de pruebas del CI descubre `actions/*/pruebas/` sin que nadie cablee nada,
+y "changelog + versión → mensaje" es genérico para cualquier repo que publique
+releases—. La contrapartida es honesta: al publicarse bajo `@v1`, sus `inputs` y
+`outputs` son contrato, y cambiarlos sigue las mismas reglas que el resto.
+
+---
+
 ## Permisos mínimos
 
 Cada `action.yml` los trae escritos en su encabezado. En el repo de origen, cada
@@ -538,6 +657,7 @@ para no volver a pagarlo.
 | `carril-docs` | `push` | `contents: read` |
 | `censo-fuentes` | — | `contents: read` |
 | `cobertura-diff` | — | `contents: read` |
+| `aviso-version` | — | `contents: read` (el checkout; no llama a la API ni a la red) |
 
 Un bloque `permissions:` **reemplaza** los permisos por defecto del token: hay
 que listar `contents: read` explícitamente, no se hereda.

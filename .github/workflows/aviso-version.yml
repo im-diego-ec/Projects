@@ -1,0 +1,200 @@
+name: Aviso de version a consumidores
+
+# ---------------------------------------------------------------------------
+# QUE ES ESTO
+#
+# El CHANGELOG y la pagina del release son superficie de CONSULTA. Nadie los
+# consulta a tiempo: con un tag movil, un consumidor recibe comportamiento nuevo
+# —incluido un check que lo pone en rojo— SIN HABER LEIDO NADA. Paso el
+# 2026-08-19: al mover v1, el segundo consumidor quedo a un push de un rojo que
+# nadie le anuncio. Este workflow convierte la publicacion de una version en una
+# NOTIFICACION (fila 14 del backlog de docs/reglas-no-escritas.md).
+#
+# EL EVENTO ES LA VERSION, NO EL PUSH. Se dispara al publicar un release, no en
+# cada push a main: un consumidor no necesita enterarse de cada commit del marco,
+# necesita enterarse de lo que le llega por @v1, y eso ocurre exactamente cuando
+# se publica una version.
+#
+# EL CONTENIDO NO SE ESCRIBE DOS VECES. Sale del CHANGELOG.md, que ya se
+# mantiene por version diciendo que tiene que hacer un consumidor (seccion
+# "Para consumidores"). No hay un formato paralelo que alguien deba sincronizar:
+# la unica fuente que se edita es el CHANGELOG, en el mismo PR que introduce el
+# cambio, como manda AGENTS.md.
+#
+# EL DESTINO NO ESTA CABLEADO. Viaja por secret del repo (la URL del webhook ES
+# la credencial, asi que es secret y no var):
+#
+#   secret  AVISO_VERSION_DESTINO   URL del webhook del canal. OBLIGATORIO para
+#                                   que el aviso salga del repo.
+#   var     AVISO_VERSION_CAMPO     campo de texto del payload JSON. Default
+#                                   "text" (Slack, Google Chat, Teams);
+#                                   "content" para Discord.
+#
+# Ni el canal ni la URL aparecen en este archivo, y el valor del secreto no entra
+# al log: el paso de envio omite cualquier texto que lo contenga, incluso dentro
+# de un mensaje de error del propio curl.
+#
+# QUE PASA SI NO HAY DESTINO CONFIGURADO. No falla —el release ya esta publicado
+# y este workflow corre despues; ponerlo rojo no desharia nada y ensenaria a
+# ignorar los rojos— pero TAMPOCO SE CALLA: ::warning:: nombrando el secret que
+# falta, y el mensaje completo queda en el resumen de la corrida, que pasa a ser
+# el destino de ultima instancia. La distincion es la de la regla 6: "no hay
+# destino" es configuracion ausente y va a aviso; un destino configurado que
+# RECHAZA el aviso es configuracion rota y va a ROJO, porque un canal que dejo de
+# entregar en silencio es exactamente el agujero que este workflow cierra.
+#
+# COMO SE VERIFICA SIN ENVIAR NADA. El paso que arma el mensaje es una action
+# pura que no conoce el destino, asi que corre en cualquier maquina sin
+# credenciales:
+#
+#   AVISO_VERSION=1.2.0 node actions/aviso-version/aviso-version.mjs
+#
+# Y el boton de Actions trae `simulacro` MARCADO por defecto: arma el mensaje,
+# lo publica en el resumen de la corrida y no lo manda. Desmarcarlo es el acto
+# deliberado de reenviar de verdad (regla 4: toda accion manual sobre un ambiente
+# va por boton, no por curl).
+# ---------------------------------------------------------------------------
+
+on:
+  release:
+    types: [published]
+  # Reenvio manual. Sirve para tres cosas reales: probar el mensaje sin mandarlo,
+  # reenviar despues de arreglar una entrada del CHANGELOG que faltaba, y avisar
+  # de una version vieja a un destino recien configurado.
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Version a avisar, con o sin v (ej 1.2.0). Tiene que existir en el CHANGELOG.
+        required: true
+        type: string
+      simulacro:
+        description: Armar el mensaje y NO enviarlo. Desmarcalo para enviar de verdad.
+        required: false
+        type: boolean
+        default: true
+
+# Solo lectura: este workflow lee el CHANGELOG del checkout y postea a un
+# webhook externo. No escribe nada en GitHub, asi que no pide un solo permiso
+# mas (auditado accion por accion antes del estreno, regla 6).
+permissions:
+  contents: read
+
+# Sin cancel-in-progress: un aviso a medio enviar no se cancela. Dos releases
+# seguidos hacen cola y se avisan los dos.
+concurrency:
+  group: aviso-version-${{ github.event.release.tag_name || inputs.version }}
+  cancel-in-progress: false
+
+jobs:
+  aviso:
+    name: aviso
+    runs-on: ubuntu-latest
+    # Repetido a proposito. El bloque de arriba es el TECHO del workflow; este es
+    # la declaracion explicita del job, que es lo que pide la regla 6 ("ningun
+    # job hereda el default") y lo que un check de permisos por job va a leer.
+    permissions:
+      contents: read
+    steps:
+      # En el evento `release` el checkout cae en el commit del tag publicado:
+      # el CHANGELOG que se lee es el de ESA version, no el de main. En el
+      # dispatch cae en la rama elegida, y por eso el reenvio despues de
+      # arreglar una entrada faltante se dispara desde main.
+      - uses: actions/checkout@v7
+
+      # Local a proposito (./actions/...), no @v1: cada PR prueba la version del
+      # aviso que ESE PR propone, no la ya publicada. Mismo criterio que ci.yml.
+      - name: Armar el mensaje desde el CHANGELOG
+        id: mensaje
+        uses: ./actions/aviso-version
+        with:
+          version: ${{ github.event.release.tag_name || inputs.version }}
+          campo: ${{ vars.AVISO_VERSION_CAMPO || 'text' }}
+
+      # El unico paso que ve el secreto. Deliberadamente chico y sin logica de
+      # formato: todo lo que se puede probar sin credenciales vive en la action.
+      - name: Enviar el aviso al destino configurado
+        shell: bash
+        env:
+          DESTINO: ${{ secrets.AVISO_VERSION_DESTINO }}
+          PAYLOAD: ${{ steps.mensaje.outputs.payload }}
+          VERSION: ${{ steps.mensaje.outputs.version }}
+          # En el evento `release` no hay inputs, asi que esto queda en "false"
+          # y el aviso sale de verdad. El simulacro es del boton.
+          SIMULACRO: ${{ inputs.simulacro == true }}
+        run: |
+          set -euo pipefail
+
+          resumen() { printf '%s\n' "$@" >> "${GITHUB_STEP_SUMMARY}"; }
+
+          # El valor del secreto no entra al log NUNCA, ni siquiera adentro de un
+          # texto ajeno: GitHub enmascara el valor exacto, pero no una variante
+          # que un servidor devuelva recortada o escapada. Ante la duda, se omite
+          # el texto entero y se dice que se omitio.
+          #
+          # LIMITE DECLARADO: omite el texto que contiene el destino COMPLETO. Un
+          # error de transporte que solo nombra host y puerto
+          # ("curl: (7) Failed to connect to hooks.ejemplo.com:443") igual se
+          # imprime, y esta bien: la credencial de un webhook es el token del
+          # path, no el host — y sin ese detalle el fallo de red no se diagnostica.
+          mostrar_seguro() {
+            if [ ! -s "$1" ]; then
+              echo "(sin texto)"
+            elif grep -qF -- "${DESTINO}" "$1"; then
+              echo "(texto omitido: contenia el destino, que es un secreto)"
+            else
+              head -c 500 "$1"
+              echo
+            fi
+          }
+
+          if [ "${SIMULACRO}" = "true" ]; then
+            echo "::notice::simulacro: el mensaje quedo armado y NO se envio. Esta completo en el resumen de esta corrida"
+            echo "== payload que se habria enviado =="
+            cat "${PAYLOAD}"
+            resumen "### Envio: NO — simulacro" "" \
+              "El mensaje de arriba es el que se enviaria. Para mandarlo de verdad: volver a disparar el boton con \`simulacro\` desmarcado."
+            exit 0
+          fi
+
+          if [ -z "${DESTINO}" ]; then
+            # Fail-open RUIDOSO (regla 3): no rompe el release, pero no se calla.
+            # El mensaje trae el arreglo, no el diagnostico.
+            echo "::warning::AVISO NO ENVIADO: falta el secret AVISO_VERSION_DESTINO, asi que la version ${VERSION} se publico sin avisarle a ningun consumidor. El mensaje completo quedo en el resumen de esta corrida. Arreglo: Settings -> Secrets and variables -> Actions -> New repository secret, nombre AVISO_VERSION_DESTINO, valor la URL del webhook del canal; despues Actions -> Aviso de version a consumidores -> Run workflow con version=${VERSION} y simulacro desmarcado"
+            resumen "### Envio: NO — falta el destino" "" \
+              "Este repo no tiene el secret \`AVISO_VERSION_DESTINO\`. El aviso existe (arriba) pero no salio de la corrida." "" \
+              "Arreglo: crear el secret con la URL del webhook y re-disparar el boton con \`version=${VERSION}\` y \`simulacro\` desmarcado."
+            exit 0
+          fi
+
+          RESPUESTA="${RUNNER_TEMP}/aviso-respuesta.txt"
+          ERROR_CURL="${RUNNER_TEMP}/aviso-curl.txt"
+
+          # --data-binary @archivo: el mensaje sale del disco, no de una
+          # interpolacion. El CHANGELOG es texto arbitrario y jamas se pega
+          # dentro de un comando.
+          if ! CODIGO=$(curl --silent --show-error --location --max-time 20 \
+                --retry 2 --retry-all-errors \
+                --request POST --header 'Content-Type: application/json' \
+                --data-binary "@${PAYLOAD}" \
+                --output "${RESPUESTA}" --write-out '%{http_code}' \
+                "${DESTINO}" 2>"${ERROR_CURL}"); then
+            echo "::error::el POST al destino no llego a completarse. El release ${VERSION} ya esta publicado: lo que fallo es el aviso, no la version. Arreglo: revisar que el secret AVISO_VERSION_DESTINO siga siendo una URL de webhook alcanzable y re-disparar el boton con version=${VERSION} y simulacro desmarcado"
+            echo "== detalle de curl =="
+            mostrar_seguro "${ERROR_CURL}"
+            resumen "### Envio: FALLO — el destino no respondio"
+            exit 1
+          fi
+
+          case "${CODIGO}" in
+            2??)
+              echo "aviso de la version ${VERSION} enviado (HTTP ${CODIGO})"
+              resumen "### Envio: OK (HTTP ${CODIGO})"
+              ;;
+            *)
+              echo "::error::el destino rechazo el aviso (HTTP ${CODIGO}). El release ${VERSION} ya esta publicado: lo que fallo es el aviso, no la version. Arreglo: verificar que AVISO_VERSION_DESTINO sea la URL vigente del webhook (los webhooks se revocan) y que vars.AVISO_VERSION_CAMPO sea el campo que espera ese destino (text para Slack/Google Chat/Teams, content para Discord); despues re-disparar el boton con version=${VERSION} y simulacro desmarcado"
+              echo "== respuesta del destino =="
+              mostrar_seguro "${RESPUESTA}"
+              resumen "### Envio: FALLO (HTTP ${CODIGO})"
+              exit 1
+              ;;
+          esac
