@@ -39,8 +39,9 @@ mueve sobre un cambio incompatible.
 
 - **Check estático nuevo en el job `higiene`: *Ejecutores de paquetes pinados*.**
   Se pone rojo si un archivo rastreado del repo corre un paquete por un ejecutor
-  que **descarga** (`npx`, `bunx`, `npm exec`, `pnpm dlx`, `yarn dlx`) sin
-  clavarlo a una versión exacta.
+  que **descarga** (`npx`, `bunx`, `npm exec`, `npm x`, `bun x`, `pnpm dlx`,
+  `yarn dlx`, cada uno con o sin banderas globales entre el gestor y su
+  subcomando) sin clavarlo a una versión exacta.
 
   El agujero que cierra es concreto, no teórico. El marco documenta desde su
   primera versión que el paquete del CLI es `@fission-ai/openspec` y que
@@ -163,28 +164,41 @@ mueve sobre un cambio incompatible.
   `::notice::` en **cada** corrida y va al resumen del job: una excepción que
   nadie vuelve a ver es una excepción que nadie vuelve a discutir.
 
-  **Una sola vía de excepción, y las otras cinco están cerradas.** La herramienta
-  trae cinco canales propios para callar un hallazgo sin motivo y sin dejar
-  rastro, y los cinco se probaron: un `.gitleaks.toml` del repo puede **vaciar
+  **Una sola vía de excepción, y las otras seis están cerradas.** La herramienta
+  trae seis canales propios para callar un hallazgo sin motivo y sin dejar
+  rastro, y los seis se probaron: un `.gitleaks.toml` del repo puede **vaciar
   todas las reglas** (un repo con un secreto sintético sale en verde), un
   `.gitleaksignore` silencia por huella, un comentario `gitleaks:allow` al final
-  de la línea baja el hallazgo a cero, y la configuración **también entra por
-  entorno** con `GITLEAKS_CONFIG` o `GITLEAKS_CONFIG_TOML` — los dos únicos que no
+  de la línea baja el hallazgo a cero, la configuración **también entra por
+  entorno** con `GITLEAKS_CONFIG` o `GITLEAKS_CONFIG_TOML` —los dos únicos que no
   dejan rastro ni en el repo, y con los que el paso salía **verde y mudo** sobre
-  un repo con secretos adentro. Los dos archivos son rojo si están versionados; el
-  comentario se desactiva con `--ignore-gitleaks-allow`; las dos variables se
-  vacían en el `env:` del paso, porque el runner lo elige el consumidor y en uno
-  propio pueden venir de la máquina.
+  un repo con secretos adentro— y el archivo del **directorio del barrido** es el
+  último eslabón de la precedencia documentada
+  (`--config` > `GITLEAKS_CONFIG` > `GITLEAKS_CONFIG_TOML` >
+  `<destino>/.gitleaks.toml`). Los dos archivos son rojo **si están, rastreados o
+  no**, decidido con presencia en disco: el runner lo elige el consumidor y en uno
+  propio `actions/checkout` no limpia lo no rastreado, así que «no está en el
+  índice» no significa «no está ahí cuando el detector corre». El comentario se
+  desactiva con `--ignore-gitleaks-allow`; las dos variables se vacían en el
+  `env:` del paso; y el paso pasa su propia config (`[extend] useDefault = true`)
+  con `--config`, que saca de la cadena al archivo del destino sin cambiar el
+  universo de reglas.
 
-  **Una declaración cubre una cantidad exacta, no un permiso abierto.** El par
+  **Una declaración cubre coincidencias concretas, no un permiso abierto.** El par
   (archivo, regla) por sí solo perdona todo lo que ese archivo tenga de esa regla,
   hoy y siempre: con una declaración viva, un secreto **nuevo** agregado a ese
   mismo archivo entraba en verde (comprobado). Por eso cada entrada declara
-  cuántos hallazgos absorbe —uno por defecto, `"hallazgos": N` si de verdad son
-  varios— y cualquier desajuste es rojo, con el número que ahora corresponde y la
-  instrucción de revisar las coincidencias una por una antes de subirlo. Se cuenta
-  por plano y se toma el mayor, para que un falso positivo que además entra en los
-  commits del cambio no se cuente dos veces.
+  cuántos hallazgos absorbe **en el árbol** —uno por defecto, `"hallazgos": N` si
+  de verdad son varios— y cualquier desajuste es rojo, con el número que ahora
+  corresponde y la instrucción de revisar las coincidencias una por una antes de
+  subirlo. El plano de la **historia** no se cuenta contra ese número: una
+  coincidencia suya la absorbe la declaración solo si cae en una de las líneas que
+  ya cubre en el árbol. Así la coincidencia que entró y se borró dentro del cambio
+  —que por definición no está en el árbol— no tiene dónde entrar, y un falso
+  positivo que el cambio vuelve a tocar no obliga a declarar un número que cambia
+  cuando el rango del PR pasa. Límite declarado: si la línea de un falso positivo
+  declarado **se mueve** dentro del rango, la historia lo reporta como no cubierto
+  — rojo del lado conservador, con el mensaje diciendo exactamente eso.
 
   **La salida de la herramienta no se vuelca cruda al log.** En la rama de "no
   pudo correr" —justo aquella en la que se comportó de forma inesperada— asumir
@@ -206,6 +220,79 @@ mueve sobre un cambio incompatible.
   historia entera, así que un secreto anterior a la adopción solo aparece si
   todavía está en el árbol. El resumen de la corrida lo dice con todas las letras:
   cero hallazgos **no** prueba que no haya secretos.
+
+  El plano de la historia mira además los diffs de los **merges**
+  (`--diff-merges=first-parent` dentro de `--log-opts`), porque `git log -p` los
+  suprime por defecto y traer `main` a la rama de trabajo es el flujo diario de
+  este marco. Consecuencia asumida: el diff de un merge de `main` también muestra
+  lo que `main` trae, contenido que el plano del árbol ya cubre, así que suma
+  ruido y no rojos nuevos.
+
+- **Banco de pruebas de los pasos inline de `marco-ci.yml`** (`pruebas/marco-ci/`,
+  cableado en el `ci.yml` de Projects). Los guardrails que viven dentro de un bloque
+  `run:` no pueden salir de ahí —`marco-ci.yml` es reusable, así que cuando lo
+  llama un consumidor el árbol checkouteado es el **del consumidor** y ningún
+  archivo de Projects está presente—, y por eso eran el único código del marco sin
+  una sola aserción. El banco no copia ese código: lee `marco-ci.yml`, extrae el
+  script exacto del paso y lo corre contra fixtures, afirmando por **código de
+  salida**. Si un paso se renombra o pierde su `run:`, el extractor tira y el job
+  se pone rojo en vez de dejar de probar en silencio.
+
+  Límite declarado: `gitleaks` no se descarga en el banco, así que del detector de
+  secretos se prueban el cruce con las declaraciones, el rojo por presencia de los
+  archivos de excepción (con un stub de `curl` que deja una señal en disco, para
+  afirmar por existencia de archivo que el paso cortó **antes** del binario) y que
+  las banderas de `git log` destapen el diff de un merge. Ninguna de las tres
+  reemplaza una corrida real con el binario.
+
+### Corregido — cuatro defectos de estos checks, encontrados por la auditoría de cierre de v1
+
+Los cuatro salían **en verde** o mentían sobre la causa del rojo, los cuatro están
+medidos por código de salida en la auditoría del 2026-08-20, y cada arreglo entra
+con su caso en el banco nuevo (verificado: el banco se pone rojo contra el código
+anterior y verde con el arreglo).
+
+- **El cruce del detector de secretos tomaba `max(árbol, historia)`**, así que una
+  declaración de dos falsos positivos **absorbía una coincidencia nueva** de la
+  misma regla que entraba y se borraba dentro del PR: exit 0 diciendo «3
+  hallazgo(s): 0 sin declarar». Un archivo con falsos positivos declarados se
+  volvía punto ciego para su propia regla, en verde, en un check de seguridad.
+
+- **El plano de la historia no veía las resoluciones de merge.** `gitleaks git`
+  corre `git log -p`, que suprime los diffs de merge: un secreto que entraba en la
+  resolución y se borraba después salía exit 0, 0 hallazgos, **imprimiendo «(árbol
+  + historia del cambio)»** — afirmando una cobertura que no tuvo. Es el fail-open
+  silencioso del 2026-08-05 otra vez, y en el camino más transitado del marco.
+
+- **El rojo por los archivos de excepción se decidía con `git ls-files`**, o sea
+  solo sobre lo rastreado. Un `.gitleaks.toml` sin rastrear con
+  `useDefault = false` llevaba el plano de la historia de exit 1 a **exit 0**, y un
+  `.gitleaksignore` sin rastrear con la huella del hallazgo, lo mismo. Se corrige
+  el comentario que llamaba «cinturón» a `--gitleaks-ignore-path` sobre un
+  directorio vacío: medido en 8.30.1 **no neutraliza nada**.
+
+- **El check de ejecutores no veía tres formas que descargan igual**: `npm x`
+  (alias documentado de `npm exec`), `bun x` y cualquier bandera global entre el
+  gestor y su subcomando (`pnpm --silent dlx`). Las tres medían exit 0 con «no hay
+  nada que pinar», que es el peor verde posible: uno que afirma haber mirado. Y la
+  forma en que el problema apareció **de verdad** —`Bash(npx --yes openspec:*)` en
+  el allowlist de un agente— caía en «no pude determinar el paquete» y degradaba a
+  `::warning::` con exit 0. Ahora el comodín del allowlist se recorta antes de leer
+  el paquete (el error dice «openspec va sin versión», que es lo que hay que
+  arreglar) y lo indeterminado **dentro de un allowlist de agente** es rojo: ahí la
+  línea no es una invocación que alguien revise cuando falle, es un permiso
+  permanente para descargar y ejecutar.
+
+- **La rama del aviso de *Artefactos regenerados al día* era código muerto**: el
+  paso no podía salir amarillo nunca. `xargs` colapsa los códigos de `grep` —sale
+  123 si cualquier hijo salió entre 1 y 125—, así que «no encontré nada» caía en la
+  guarda del «no pude mirar» y el repo **sin cabeceras**, la clase más atrasada y
+  justo la que el check dice proteger, recibía un rojo que mentía sobre la causa y
+  ofrecía el arreglo equivocado. Se corrige con un archivo por iteración, no
+  ignorando el 123: eso habría apagado el «no pude leer», que es el caso que tiene
+  que ser rojo, y los dos casos están en el banco para que ese parche no pase. El
+  aviso interpolaba además `${DIRS[*]}`, un array que un cambio anterior había
+  borrado: salía mutilado y sin nombrar los archivos de los que hablaba.
 
 ### Cambiado
 
@@ -247,6 +334,19 @@ da rojo exactamente en las cinco líneas reales, sin un solo falso positivo — 
 `pnpm exec playwright` del deploy, el `pnpm exec prisma generate` del Dockerfile y
 los `tsc`/`vitest`/`eslint` de los `scripts` de cada `package.json` no se tocan,
 porque ninguno pasa por un ejecutor que descargue.
+
+Volver a medir después de completar el alfabeto (`npm x`, `bun x`, banderas
+intermedias, comodín del allowlist) **no movió esos números**: `projects` sigue en
+verde con las mismas 8 invocaciones y cero avisos, y `proyecto-origen` sigue en
+rojo con exactamente las mismas 5 líneas. El alfabeto nuevo no agrega hallazgos al
+consumidor real; cierra formas que hoy no usa y que habrían entrado en verde.
+
+**Del detector de secretos, una consecuencia para quien corre en runner propio.**
+El rojo por `.gitleaks.toml` o `.gitleaksignore` se decide ahora por **presencia en
+disco**, no por el índice. En un runner efímero de la plataforma no cambia nada; en
+uno propio, un archivo de esos que quedó de una corrida anterior pone el paso en
+rojo, y eso es a propósito: `actions/checkout` no limpia lo no rastreado, así que
+un archivo así **sí** apagaría el detector si el check no lo mirara.
 
 **Del detector de secretos hay una acción obligatoria y también tiene orden.** Un
 repo con falsos positivos sin declarar da rojo apenas el check aterrice, así que
