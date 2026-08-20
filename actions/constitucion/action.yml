@@ -123,9 +123,18 @@ inputs:
       Nombre de la rama por defecto del repositorio, para decidir si un workflow que
       corre en "push" se dispara en el camino del cambio. Lo usa el modo "cableado" y
       la deteccion de pins del modo verificar. Vacio = "main", la unica rama
-      permanente que el marco admite. Se pasa
-      ${{ github.event.repository.default_branch }} en vez de cablear una constante:
-      cual es esa rama lo sabe GitHub, no el marco.
+      permanente que el marco admite. El llamador pasa la expresion
+      "github.event.repository.default_branch" (entre dobles llaves, en SU workflow) en
+      vez de cablear una constante: cual es esa rama lo sabe GitHub, no el marco.
+
+      Y OJO CON LAS DOBLES LLAVES EN ESTE ARCHIVO, que es lo que costo el rojo del
+      2026-08-20: GitHub evalua las expresiones TAMBIEN dentro de las descriptions de
+      los inputs, y el contexto `github` NO existe en la metadata de una composite
+      action. Escribir la expresion aca no dio un aviso ni un paso rojo: tiro la action
+      entera en «Set up job», antes de correr un solo paso
+      (TemplateValidationException: Unrecognized named-value: 'github'), y con ella
+      todos los checks del PR. La expresion se NOMBRA en prosa aca; sus llaves viven en
+      el workflow que invoca.
     required: false
     default: main
   valores:

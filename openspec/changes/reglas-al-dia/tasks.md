@@ -215,16 +215,37 @@ contramedidas son obligatorias y esta es la primera.
       y el notice encima mentía nombrando `ci.yml`. Ahora el universo es
       `git ls-files`, lo que no se pudo determinar NO cuenta, y el mensaje nombra
       el archivo que cablea de verdad.
-      **RESIDUO DECLARADO**, no cerrado, y por qué es irreducible: el check lee
-      que el veredicto CONSULTA el resultado, no lo que su `run:` hace con el
-      valor; un script que lo lea, lo imprima y salga 0 pasaría. Cerrarlo exige
-      decidir el comportamiento de un shell arbitrario. La salida estructural es
-      que el veredicto lo emita una action del marco en vez del `run:` de cada
-      consumidor, y eso es un change propio y no un parche de este archivo.
-      Evidencia: las 20 configuraciones con su fixture en
-      `pruebas/refutaciones-ronda-3.test.mjs`, medidas en `exit 0` contra el
-      código de la ronda 2 y en `exit 1` después, más 14 mutaciones del código
-      nuevo matando a su prueba.
+      (e) **la condición 5 verificaba un NODO cuando la propiedad es de un
+      CAMINO** (ronda 4). Lo prometido —«un rojo de este job impide que el
+      veredicto agregado salga verde»— va del job de la compuerta, por cada
+      eslabón intermedio de `needs`, hasta el check run cuyo NOMBRE exige el
+      ruleset, y cada nodo del camino tiene el mismo juego de neutralizadores,
+      enumerado de la referencia de `jobs.<id>` y no de fixtures. Se cerraron 16
+      mutaciones que el banco de la ronda 3 dejaba pasar en VERDE: las seis
+      ortografías de `continue-on-error` sobre el veredicto, el paso del
+      veredicto amortiguado o apagado, la referencia que vive en un `name`, en un
+      `env` que nadie lee o en una línea comentada del `run`, leer `.outputs` en
+      vez de `.result`, el eslabón intermedio con `always()` +
+      `continue-on-error` que LAVA el rojo en el medio, el check run con otro
+      nombre o sufijado por `strategy.matrix`, y un `push` a `main` como único
+      disparo (corre DESPUÉS del merge, así que mientras el PR está abierto no hay
+      ningún check run que el ruleset pueda exigir).
+      **RESIDUO DECLARADO**, no cerrado, y ahora ubicado donde de verdad está: la
+      ronda 3 lo escribió más grande de lo que es —«el check lee que el veredicto
+      CONSULTA el resultado, no lo que su `run:` hace con el valor»—, y bajo esa
+      frase entraban seis cosas que sí eran decidibles y quedaron cerradas. Lo
+      irreducible es sólo lo que el shell hace con el valor que YA LEYÓ: que la
+      lectura exista, que sea de `.result`, que ocurra en un paso vivo y no
+      amortiguado, y que cada eslabón del camino transporte el rojo, SÍ se
+      verifican. Lo que no se verifica es la comparación: un
+      `[ "…result" = "banana" ]` lee el valor, nunca coincide y pasa. Cerrarlo
+      exige decidir el comportamiento de un shell arbitrario. La salida
+      estructural es que el veredicto lo emita una action del marco en vez del
+      `run:` de cada consumidor, y eso es un change propio y no un parche de este
+      archivo. Evidencia: `pruebas/refutaciones-ronda-4.test.mjs`, 42 pruebas, 28
+      en rojo contra el código de la ronda 3 (las 8 que pasan son los controles
+      positivos y 6 son white-box sobre helpers que entonces no existían), más 14
+      mutaciones del código nuevo matando cada una a su prueba.
 - [ ] 3.8 La compuerta se EJERCITA como compuerta, y no sólo parsea. El paso
       del carril independiente se había escrito como
       `uses: im-diego-ec/Projects/actions/constitucion@v1`, y esa action no

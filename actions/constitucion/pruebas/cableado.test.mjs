@@ -248,16 +248,35 @@ jobs:
   assert.match(corrida.stdout, /workflow_dispatch/);
 });
 
-test("(c bis) un push que no toca la rama por defecto tampoco es una compuerta; pull_request si", () => {
+test("(c bis) el UNICO disparo que pone un check sobre la cabeza del PR es pull_request", () => {
   assert.equal(correEnVerificacion(parsearYaml("on:\n  pull_request:\n"), "main").corre, true);
   assert.equal(correEnVerificacion(parsearYaml("on: [pull_request]\n"), "main").corre, true);
-  assert.equal(correEnVerificacion(parsearYaml("on:\n  push:\n    branches: [main]\n"), "main").corre, true);
-  assert.equal(correEnVerificacion(parsearYaml("on:\n  push:\n"), "main").corre, true);
-  assert.equal(correEnVerificacion(parsearYaml("on:\n  push:\n    branches: [release/*]\n"), "main").corre, false);
-  assert.equal(correEnVerificacion(parsearYaml("on:\n  schedule:\n    - cron: \"0 6 * * 1\"\n"), "main").corre, false);
-  // La rama por defecto NO es una constante del marco: si el repo se llama distinto,
-  // el veredicto cambia con el, y por eso entra por parametro.
-  assert.equal(correEnVerificacion(parsearYaml("on:\n  push:\n    branches: [troncal]\n"), "troncal").corre, true);
+  // Y el `push` de acompañante no molesta: es la forma que reparte el scaffold.
+  assert.equal(
+    correEnVerificacion(parsearYaml("on:\n  push:\n    branches: [main]\n  pull_request:\n"), "main").corre,
+    true,
+  );
+
+  // EL H1 DE LA RONDA 3, y hasta el 2026-08-20 estas mismas lineas afirmaban lo
+  // contrario. Un push a la rama por defecto corre DESPUES del merge: el check se
+  // publica sobre un commit que ya esta en main, nunca sobre la cabeza del PR, asi que
+  // mientras el PR esta abierto el ruleset no tiene ningun check run que exigir. Que la
+  // rama del filtro sea la correcta no arregla nada — el problema es CUANDO corre—, y
+  // por eso el caso de la rama que se llama distinto tambien cambio de veredicto.
+  for (const on of ["on:\n  push:\n    branches: [main]\n", "on:\n  push:\n", "on: [push]\n"]) {
+    const veredicto = correEnVerificacion(parsearYaml(on), "main");
+    assert.equal(veredicto.corre, false, on);
+    assert.match(veredicto.porque, /DESPUES del merge/);
+  }
+  assert.equal(correEnVerificacion(parsearYaml("on:\n  push:\n    branches: [troncal]\n"), "troncal").corre, false);
+
+  // Los filtros de push se siguen leyendo, y el motivo distingue las dos causas: «ese
+  // push no dispara» no es lo mismo que «dispara, pero tarde».
+  assert.match(
+    correEnVerificacion(parsearYaml("on:\n  push:\n    branches: [release/*]\n"), "main").porque,
+    /no admite la rama por defecto/,
+  );
+  assert.equal(correEnVerificacion(parsearYaml('on:\n  schedule:\n    - cron: "0 6 * * 1"\n'), "main").corre, false);
 });
 
 // ---------------------------------------------------------------------------
@@ -414,7 +433,8 @@ test("un veredicto agregado MUDO no cuenta: corre siempre y no mira a nadie", ()
     { ".projects-valores.json": VALORES_DEL_PROYECTO, [`${DIR_WORKFLOWS}/ci.yml`]: CI_CON_VEREDICTO_MUDO });
   const corrida = correrCableado(raiz);
   assert.equal(corrida.status, 1, corrida.stdout);
-  assert.match(corrida.stdout, /no consulta su resultado/);
+  assert.match(corrida.stdout, /NINGUN paso vivo suyo consulta/);
+  assert.match(corrida.stdout, /needs\.<job>\.result/);
   assert.match(corrida.stdout, /needs\.constitucion\.result/);
 });
 
