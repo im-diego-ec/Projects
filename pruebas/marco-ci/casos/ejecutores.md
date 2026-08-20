@@ -433,6 +433,54 @@ descubrirse cuando alguien lo cobre.
     "linea": "      \"cmd\": \"sh -c \\\"npx openspec update\\\"\",",
     "exit": 1,
     "por_que": "el desenvuelto anidado tiene que aguantar mas de un nivel: aca el comando esta dentro de un sh -c que a su vez esta dentro de un string de JSON"
+  },
+  {
+    "id": "comodin-pegado-al-ejecutor",
+    "origen": "refutacion",
+    "archivo": ".claude/settings.json",
+    "linea": "      \"Bash(npx:*)\",",
+    "exit": 1,
+    "por_que": "medido exit 0 con CERO lineas de salida en 61d604c: el alfabeto se comparaba por igualdad exacta y el token llegaba con el comodin del anfitrion pegado. Es un permiso permanente para descargar y ejecutar cualquier paquete"
+  },
+  {
+    "id": "comodin-pegado-al-subcomando",
+    "origen": "refutacion",
+    "archivo": ".claude/settings.json",
+    "linea": "      \"Bash(pnpm dlx:*)\",",
+    "exit": 1,
+    "por_que": "misma causa un token mas adentro: el subcomando es el SEGUNDO sitio que compara contra el alfabeto, y limpiar() solo estaba en el tercero (el paquete). Medido exit 0 antes"
+  },
+  {
+    "id": "comodin-pegado-al-gestor-sin-subcomando",
+    "origen": "refutacion",
+    "archivo": ".claude/settings.json",
+    "linea": "      \"Bash(npm:*)\",",
+    "exit": 1,
+    "por_que": "lo encontro el corpus con alfabeto propio, no una lista escrita a mano: autoriza CUALQUIER subcomando de npm, exec incluido, asi que es el permiso mas ancho posible para descargar y ejecutar. Medido exit 0 antes"
+  },
+  {
+    "id": "gestor-con-sufijo-de-ejecutable",
+    "origen": "refutacion",
+    "archivo": "flujo.yml",
+    "linea": "      - run: pnpm.cmd dlx openspec update",
+    "exit": 1,
+    "por_que": "npm y pnpm dejan el .cmd en el PATH de Windows y descarga igual; el alfabeto comparaba la hoja de la ruta sin sacarle el sufijo. Medido exit 0 antes"
+  },
+  {
+    "id": "comodin-en-otro-token-no-marca-al-gestor",
+    "origen": "control",
+    "archivo": ".claude/settings.json",
+    "linea": "      \"Bash(npm run build:*)\",",
+    "exit": 0,
+    "por_que": "EL control que hace usable la regla de arriba. Aca el comodin esta pegado a otro token, asi que la entrada no autoriza exec y no se marca. Sin esta angostura habria que marcar todo gestor sin subcomando reconocido, o sea npm ci, npm run y pnpm install: un check que marca eso se apaga en el tercer PR"
+  },
+  {
+    "id": "gestor-con-sufijo-y-pin-exacto",
+    "origen": "control",
+    "archivo": "flujo.yml",
+    "linea": "      - run: npx.cmd --yes @fission-ai/openspec@1.9.0 validate --all",
+    "exit": 0,
+    "por_que": "la ortografia con sufijo tiene que poder estar BIEN: si la forma correcta tambien saliera roja, cerrar el agujero seria dejar el check sin salida verde"
   }
 ]
 ```
