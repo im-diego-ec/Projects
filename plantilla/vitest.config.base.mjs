@@ -38,6 +38,16 @@
 // la corrida seguia en verde imprimiendo "n/a". Un paquete sin ramas no declara
 // "ramas".
 //
+// Y NO HACE FALTA DECLARAR NADA PARA QUE APAGAR UNA METRICA SEA ROJO. El marco
+// compara los items que llegan contra el denominador que el propio reporte
+// declara por registro (LF:, FNF:, BRF:), asi que "FNF:0" —el reporter diciendo
+// que midio funciones y no habia ninguna— pasa como n/a, y un reporte sin FNF: y
+// sin un solo FN: no pasa: eso es no medir. La medicion que lo obliga: sobre el
+// reporte real del consumidor, con su paquete a 70,70% de funciones, sacarle los
+// registros de funciones convertia el rojo en EXIT 0 sin un solo aviso, y
+// borrarle los registros sin cubrir dejando FNF: intacto publicaba 95,83% con la
+// fila en OK. Un denominador corto no baja la cobertura: la infla.
+//
 // POR QUE .mjs Y NO .ts, que seria lo esperable en este stack: un .ts en la
 // raiz del monorepo no cae bajo el tsconfig de ningun paquete, asi que el censo
 // de fuentes lo marcaria como archivo sin programa de tipos y el repo nuevo

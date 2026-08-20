@@ -398,10 +398,20 @@ export function sondarTipos(raiz, rastreados) {
 // `patron` y `motivo`. Una clave desconocida del piso NO se ignora: un
 // `functions: 80` escrito por costumbre de vitest no declararía nada, y el
 // paquete quedaría sin piso creyendo tenerlo.
+//
+// `contador` es la línea de RESUMEN con la que el propio tracefile declara el
+// denominador de esa métrica, registro por registro: `LF:` para líneas, `FNF:`
+// para funciones, `BRF:` para ramas. No es decorativa y no es una lista de
+// ortografías que envejece: es la parte del formato con la que el reporte se
+// AUTODESCRIBE, y es lo único que permite distinguir «esta métrica vale cero»
+// (contador presente valiendo 0) de «esta métrica no se midió» (contador
+// ausente). Sin esa distinción, apagar una métrica y no tenerla son el mismo
+// n/a en verde. Medido: los 75 registros de los dos reportes del consumidor
+// real declaran los tres contadores, 11 de ellos con `FNF:0` y 3 con `BRF:0`.
 export const METRICAS_DE_COBERTURA = [
-  { clave: "lineas", etiqueta: "líneas" },
-  { clave: "funciones", etiqueta: "funciones" },
-  { clave: "ramas", etiqueta: "ramas" },
+  { clave: "lineas", etiqueta: "líneas", contador: "LF" },
+  { clave: "funciones", etiqueta: "funciones", contador: "FNF" },
+  { clave: "ramas", etiqueta: "ramas", contador: "BRF" },
 ];
 
 const CLAVES_DE_METRICA = METRICAS_DE_COBERTURA.map((m) => m.clave);

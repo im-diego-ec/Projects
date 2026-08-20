@@ -745,3 +745,264 @@ test("la fecha de la ventana de estreno esta escrita en el spec vivo", () => {
     );
   }
 });
+
+// ---------------------------------------------------------------------------
+// EL DENOMINADOR, que es el dato que la regla LEE y que hasta hoy nadie
+// verificaba.
+//
+// LA MEDICION QUE ORIGINO ESTE BLOQUE, hecha sobre el reporte REAL del
+// consumidor (un-proyecto-anterior en main, web al 70,70% de funciones, el numero
+// del incidente). Tres transformaciones del lcov, las tres al alcance de la
+// configuracion del reporter, y las tres convertian ese ROJO en EXIT 0:
+//
+//   1. sacar FN/FNDA/FNF/FNH        -> "funciones n/a", EXIT 0, y MUDO
+//      (es lo que hace lcov_function_coverage=0, una opcion documentada)
+//   2. renombrar FN/FNDA a FNL/FNA  -> "funciones n/a", EXIT 0, y MUDO
+//      (es el formato de funciones de lcov 2.x: no hace falta mala fe, alcanza
+//      con actualizar la herramienta)
+//   3. borrar las FN/FNDA sin cubrir dejando FNF: intacto -> publicaba
+//      **95,83%** y la fila decia OK, con el propio reporte declarando 215
+//      funciones de las que solo llegaron 120.
+//
+// Las dos rondas anteriores endurecieron la REGLA (que la compuerta exista, que
+// el umbral local no pueda bajar el piso, que un piso sin datos sea rojo).
+// Ninguna endurecio la ENTRADA: el porcentaje es cubiertas/encontradas y
+// `encontradas` se reconstruye item por item de los registros que el reporter
+// decide emitir. La fabrica de fixtures de esta misma rama escribe SIEMPRE los
+// contadores de resumen, asi que ninguna prueba del banco podia llegar al
+// estado en que faltan.
+//
+// EL DISCRIMINADOR NO ES UNA LISTA DE ORTOGRAFIAS: es la gramatica del formato.
+// Un tracefile lcov declara su propio denominador por registro y por metrica
+// (LF/LH, FNF/FNH, BRF/BRH). Entonces:
+//   . contador PRESENTE con valor 0   -> el reporter midio y no habia nada: n/a
+//     legitimo (11 registros del consumidor real declaran FNF:0 y 3 BRF:0);
+//   . contador AUSENTE con cero items -> el reporter NO midio: eso es "no
+//     medido", y el spec ya exige distinguirlo de "cubierto";
+//   . items MENOS que el contador     -> el denominador llego corto y el
+//     porcentaje publicado esta inflado.
+// Comprobado sobre los 75 registros de los dos reportes reales: los items
+// contados coinciden EXACTO con LF/FNF/BRF en los 75, cero desajustes. La
+// comparacion es un invariante del formato, no una coincidencia.
+// ---------------------------------------------------------------------------
+
+/** Un repo con el paquete `web` y un lcov ESCRITO A MANO (contadores incluidos). */
+function repoConLcovCrudo(texto, { manifiesto = { name: "web" }, archivos = {} } = {}) {
+  const dir = repoNuevo();
+  escribir(dir, "package.json", JSON.stringify({ name: "raiz", private: true }) + "\n");
+  escribir(dir, "web/package.json", JSON.stringify(manifiesto, null, 2) + "\n");
+  escribir(dir, "web/src/mod.js", "export const f0 = (x) => x + 0;\n");
+  for (const [ruta, contenido] of Object.entries(archivos)) escribir(dir, ruta, contenido);
+  const base = commit(dir, "base");
+  escribir(dir, "web/coverage/lcov.info", texto);
+  commit(dir, "cambio");
+  return { dir, base };
+}
+
+// Las lineas SIEMPRE al 100% y con sus contadores: asi el rojo (o el verde) de
+// cada caso habla unicamente de la metrica que el caso maltrata.
+const LINEAS_OK = `${Array.from({ length: 10 }, (_, i) => `DA:${i + 1},1`).join("\n")}\nLF:10\nLH:10`;
+const RAMAS_OK = `${Array.from({ length: 10 }, (_, i) => `BRDA:1,0,${i},1`).join("\n")}\nBRF:10\nBRH:10`;
+
+test("una metrica sin un solo dato Y SIN su contador de resumen es NO MEDIDA, no n/a", () => {
+  // Esquive 1 medido sobre el consumidor real: sin FN/FNDA/FNF/FNH, el 70,70%
+  // de funciones que enrojecia desaparecia y la corrida salia 0 sin decir nada.
+  const { dir, base } = repoConLcovCrudo(
+    `TN:\nSF:web/src/mod.js\n${LINEAS_OK}\n${RAMAS_OK}\nend_of_record\n`
+  );
+  const r = correrTotal(dir, base);
+  assert.equal(r.codigo, 1, r.todo);
+  assert.match(r.todo, /::error[^\n]*funciones/);
+  assert.match(r.todo, /no la midio|no fue medida|sin medir/i);
+});
+
+test("el MISMO caso con el contador declarado en cero es n/a legitimo y pasa", () => {
+  // El discriminador tiene que cortar por el medio de la clase: FNF:0 es el
+  // reporter diciendo "medi funciones y no habia", y eso no es un esquive.
+  // 11 de los 38 registros del consumidor real declaran exactamente eso.
+  const { dir, base } = repoConLcovCrudo(
+    `TN:\nSF:web/src/mod.js\nFNF:0\nFNH:0\n${LINEAS_OK}\n${RAMAS_OK}\nend_of_record\n`
+  );
+  const r = correrTotal(dir, base);
+  assert.equal(r.codigo, 0, r.todo);
+  assert.match(r.resumen, /funciones \| n\/a/);
+});
+
+test("el reporte declara mas items de los que llegaron: el denominador vino CORTO", () => {
+  // Esquive 3 medido sobre el consumidor real: borrando las FN/FNDA sin cubrir
+  // y dejando FNF: intacto, la compuerta publicaba 95,83% con la fila en OK
+  // mientras el reporte declaraba 215 funciones y solo llegaban 120.
+  const { dir, base } = repoConLcovCrudo(
+    `TN:\nSF:web/src/mod.js\nFN:1,a\nFNDA:1,a\nFN:2,b\nFNDA:1,b\nFN:3,c\nFNDA:1,c\nFNF:10\nFNH:3\n${LINEAS_OK}\n${RAMAS_OK}\nend_of_record\n`
+  );
+  const r = correrTotal(dir, base);
+  assert.equal(r.codigo, 1, r.todo);
+  assert.match(r.todo, /declara 10 .*y llegaron 3|denominador/i);
+  // Y sobre todo: NO publica el 100% que saldria de dividir 3 sobre 3.
+  assert.doesNotMatch(r.resumen, /funciones \| \*\*100\.00%\*\* \| 80% \| . \| OK/);
+});
+
+test("el formato de funciones de lcov 2.x (FNL/FNA) no borra la metrica en silencio", () => {
+  // Esquive 2, y el mas barato de todos porque no necesita mala fe: alcanza con
+  // que el reporter se actualice. FNL:/FNA: reemplazan a FN:/FNDA: en lcov 2.x;
+  // este parser no los conoce, y no conocerlos no puede significar "cero
+  // funciones encontradas, metrica n/a, verde".
+  const { dir, base } = repoConLcovCrudo(
+    `TN:\nSF:web/src/mod.js\nFNL:0,1,4\nFNA:0,1,a\nFNL:1,6,9\nFNA:1,0,b\nFNF:2\nFNH:1\n${LINEAS_OK}\n${RAMAS_OK}\nend_of_record\n`
+  );
+  const r = correrTotal(dir, base);
+  assert.equal(r.codigo, 1, r.todo);
+});
+
+test("las tres metricas se defienden igual: tambien ramas y lineas", () => {
+  // La clase no es "funciones": es cualquier metrica cuyo denominador se pueda
+  // apagar. Sin contador de ramas y sin un solo BRDA, `ramas` desaparecia.
+  const sinRamas = repoConLcovCrudo(
+    `TN:\nSF:web/src/mod.js\n${LINEAS_OK}\nFNF:0\nFNH:0\nend_of_record\n`
+  );
+  assert.equal(correrTotal(sinRamas.dir, sinRamas.base).codigo, 1);
+  const sinLineas = repoConLcovCrudo(
+    `TN:\nSF:web/src/mod.js\nFNF:0\nFNH:0\n${RAMAS_OK}\nend_of_record\n`
+  );
+  assert.equal(correrTotal(sinLineas.dir, sinLineas.base).codigo, 1);
+});
+
+test("dos suites que miden el mismo archivo NO son un denominador corto", () => {
+  // El falso positivo que hay que no cometer. Cada reporte declara SU
+  // denominador; la fusion por item puede superar el de un registro suelto y
+  // eso es correcto, no un dato perdido. Por eso la comparacion es por
+  // REGISTRO, y el denominador del paquete se queda con el maximo declarado.
+  const dir = repoNuevo();
+  escribir(dir, "package.json", JSON.stringify({ name: "raiz", private: true }) + "\n");
+  escribir(dir, "web/package.json", JSON.stringify({ name: "web" }, null, 2) + "\n");
+  escribir(dir, "web/src/mod.js", "export const f0 = (x) => x + 0;\n");
+  const base = commit(dir, "base");
+  const registro = (hits) =>
+    `TN:\nSF:web/src/mod.js\nFN:1,a\nFNDA:${hits[0]},a\nFN:2,b\nFNDA:${hits[1]},b\nFNF:2\nFNH:${
+      hits.filter((h) => h > 0).length
+    }\nDA:1,${hits[0]}\nDA:2,${hits[1]}\nLF:2\nLH:${
+      hits.filter((h) => h > 0).length
+    }\nBRF:0\nBRH:0\nend_of_record\n`;
+  escribir(dir, "web/coverage/lcov.info", registro([1, 0]));
+  escribir(dir, "api/coverage/lcov.info", registro([0, 1]));
+  commit(dir, "cambio");
+  const r = correrTotal(dir, base);
+  assert.equal(r.codigo, 0, r.todo);
+  assert.match(r.resumen, /funciones \| \*\*100\.00%\*\*/);
+});
+
+test("dentro de la ventana de estreno el denominador apagado avisa, y dice el dia", () => {
+  // Un rojo nuevo del marco no puede aterrizar sin ventana: `v1` es un tag
+  // movil y el 2026-08-19 ya se cobro esa leccion una vez. Lo que SI cambia hoy
+  // es que deja de ser MUDO.
+  const { dir, base } = repoConLcovCrudo(
+    `TN:\nSF:web/src/mod.js\n${LINEAS_OK}\n${RAMAS_OK}\nend_of_record\n`
+  );
+  const r = correrTotal(dir, base, { COBERTURA_HOY: HOY });
+  assert.equal(r.codigo, 0, r.todo);
+  assert.match(r.todo, /::warning[^\n]*funciones/);
+  assert.match(r.todo, /2026-09-30/);
+});
+
+test("el parser guarda el denominador que el reporte declara, no solo los items", () => {
+  const mapa = parsearLcovDetallado(
+    "SF:a.js\nFN:1,uno\nFNDA:2,uno\nFNF:5\nFNH:1\nDA:1,1\nLF:1\nLH:1\nend_of_record\n"
+  );
+  const r = mapa.get("a.js");
+  assert.equal(r.declarado.funciones, 5, "FNF: es el denominador que el reporter declara");
+  assert.equal(r.cortos.funciones, 1, "llego 1 item de los 5 declarados");
+  assert.equal(r.cortos.lineas, 0);
+  assert.equal(r.sinContador.ramas, 1, "el registro no declaro BRF: en ninguna forma");
+});
+
+test("un SF: que no resuelve se nombra tambien en un push a main", () => {
+  // El plano del diff ya avisaba de las rutas sin resolver, pero su aviso vive
+  // DESPUES del retorno temprano de "no hay commit base": en un push a main el
+  // reporte podia nombrar archivos que el repositorio no tiene y la corrida no
+  // decia una palabra. Un archivo que se cae del denominador tiene que dejar
+  // rastro, sea cual sea el evento.
+  const { dir } = repoConLcovCrudo(
+    `TN:\nSF:web/src/no-existe.js\nFNF:0\nFNH:0\n${LINEAS_OK}\nBRF:0\nBRH:0\nend_of_record\n`
+  );
+  const r = correr(dir, { COBERTURA_MINIMO: "80", COBERTURA_HOY: CERRADA });
+  assert.match(r.todo, /no-existe\.js/);
+});
+
+test("los dos diagnosticos de 'no medida' no se confunden: uno manda al marco y el otro al proyecto", () => {
+  // Un rojo con el diagnostico cruzado manda a arreglar el lado que esta bien.
+  // Lo cometi al escribir esto: el primer mensaje decia «ninguno de sus 0
+  // registros declaro el contador» sobre un reporte que declaraba 215. Si el
+  // reporte DECLARA denominador y no llego un item, el reporter midio y esta
+  // action no supo leer el formato: el defecto es del MARCO. Si no declara
+  // nada, el reporter no midio: el defecto es del PROYECTO.
+  const delMarco = repoConLcovCrudo(
+    `TN:\nSF:web/src/mod.js\nFNL:0,1,4\nFNA:0,1,a\nFNF:2\nFNH:1\n${LINEAS_OK}\n${RAMAS_OK}\nend_of_record\n`
+  );
+  const a = correrTotal(delMarco.dir, delMarco.base);
+  assert.equal(a.codigo, 1, a.todo);
+  assert.match(a.todo, /DECLARAN 2 item\(s\) de funciones/);
+  assert.match(a.todo, /se corrige en el marco/);
+
+  const delProyecto = repoConLcovCrudo(
+    `TN:\nSF:web/src/mod.js\n${LINEAS_OK}\n${RAMAS_OK}\nend_of_record\n`
+  );
+  const b = correrTotal(delProyecto.dir, delProyecto.base);
+  assert.equal(b.codigo, 1, b.todo);
+  assert.match(b.todo, /ninguno de sus 1 registro\(s\) declaro el contador FNF/);
+  assert.doesNotMatch(b.todo, /se corrige en el marco/);
+});
+
+test("un contador declarado que los items SUPERAN no es un denominador corto", () => {
+  // El otro lado de la comparacion. Mas items que el contador desinfla el
+  // porcentaje, o sea que empuja hacia el rojo, y no puede fabricar un pase:
+  // por eso no es rojo. Hacerlo rojo habria sido enrojecer por prolijidad.
+  const { dir, base } = repoConLcovCrudo(
+    `TN:\nSF:web/src/mod.js\nFN:1,a\nFNDA:1,a\nFN:2,b\nFNDA:1,b\nFNF:1\nFNH:1\n${LINEAS_OK}\n${RAMAS_OK}\nend_of_record\n`
+  );
+  const r = correrTotal(dir, base);
+  assert.equal(r.codigo, 0, r.todo);
+});
+
+test("el contrato del denominador esta escrito en el spec vivo, no solo en el codigo", () => {
+  // Un veredicto rojo que el contrato no nombra es indistinguible de un bug del
+  // marco: es la misma leccion que dejo la ventana de estreno cuando vivia en
+  // un comentario. Los tres escenarios nuevos tienen que estar en el spec vivo,
+  // y los contadores del formato tienen que ser los que el codigo lee.
+  const raiz = new URL("../../../", import.meta.url);
+  const spec = readFileSync(new URL("openspec/specs/calidad-codigo/spec.md", raiz), "utf8");
+  for (const titulo of [
+    "#### Scenario: Una métrica que el reporte no midió",
+    "#### Scenario: Una métrica que el reporte declara en cero",
+    "#### Scenario: El denominador llega más corto que el que el reporte declara",
+  ]) {
+    assert.ok(spec.includes(titulo), `el spec vivo no declara el escenario: ${titulo}`);
+  }
+  const censo = readFileSync(new URL("actions/censo-fuentes/censo-fuentes.mjs", raiz), "utf8");
+  for (const contador of ["LF", "FNF", "BRF"]) {
+    assert.match(
+      censo,
+      new RegExp(`contador: "${contador}"`),
+      `la tabla de metricas perdio el contador ${contador}, que es con lo que el reporte declara su denominador`
+    );
+  }
+});
+
+test("un denominador cruzado solo a medias se dice, y no enrojece", () => {
+  // El caso intermedio: la metrica SI se midio (llegaron items), pero parte de
+  // los archivos no declararon su contador, asi que esa parte no se puede
+  // cruzar. No es rojo —la metrica existe y su numero sale— y callarlo si seria
+  // el fail-open mudo de siempre: la constitucion pide que todo fail-open grite.
+  const dir = repoNuevo();
+  escribir(dir, "package.json", JSON.stringify({ name: "raiz", private: true }) + "\n");
+  escribir(dir, "web/package.json", JSON.stringify({ name: "web" }, null, 2) + "\n");
+  escribir(dir, "web/src/mod.js", "export const f0 = (x) => x + 0;\n");
+  escribir(dir, "web/src/otro.js", "export const f1 = (x) => x + 1;\n");
+  const base = commit(dir, "base");
+  const reg = (sf, conContador) =>
+    `TN:\nSF:${sf}\nFN:1,f\nFNDA:1,f\n${conContador ? "FNF:1\nFNH:1\n" : ""}DA:1,1\nLF:1\nLH:1\nBRF:0\nBRH:0\nend_of_record\n`;
+  escribir(dir, "web/coverage/lcov.info", reg("web/src/mod.js", true) + reg("web/src/otro.js", false));
+  commit(dir, "cambio");
+  const r = correrTotal(dir, base);
+  assert.equal(r.codigo, 0, r.todo);
+  assert.match(r.todo, /::warning[^\n]*1 de sus registros de cobertura no declaran FNF/);
+});
