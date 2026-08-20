@@ -385,14 +385,38 @@ nada obliga a nadie mientras nadie lo toque.
 | Con un **piso declarado para una métrica que llegó SIN DATOS** | **rojo** — el piso no se pudo comparar contra nada, y un ratchet que no compara es una compuerta apagada en verde |
 | Con una **deuda declarada** y ninguna métrica medible en la corrida | amarillo con `::warning::` — la deuda no excusa nada, y una deuda que ninguna corrida nombra envejece en el manifiesto |
 | Con la declaración de cobertura mal escrita | **rojo** — una declaración inválida no cuenta como declarada |
+| Con una métrica **que el reporte no midió** (cero ítems y ningún `LF:`/`FNF:`/`BRF:` declarado) | **rojo** — es «no medido», no «no aplica» |
+| Con una métrica **que el reporte declara en cero** (`FNF:0`, `BRF:0`) | verde, y la fila sale como `n/a` — el reporter dice que midió y no había nada |
+| Con **menos ítems de los que su propio reporte declara** para esa métrica | **rojo** — el denominador llegó corto, y un denominador corto no baja la cobertura: la **infla** |
 
-> **Ventana de estreno, hasta el 2026-09-30.** Mientras dure, un paquete por
-> debajo del mínimo que **no declara** deuda pasa en amarillo con un `::warning::`
-> que nombra el día en que será rojo. La ventana existe porque `v1` es un tag
-> móvil: sin ella, la compuerta aparece en el pipeline de cada consumidor sin que
-> nadie la haya leído. No afloja lo que un paquete escribió y rompió —deuda
-> vencida, retroceso, declaración inválida—, y se cierra sola: pasada la fecha, el
-> mismo estado es rojo sin que nadie toque una línea.
+> **El denominador se verifica contra el que el reporte declara.** Un porcentaje
+> es cubiertas sobre encontradas, y «encontradas» se reconstruye ítem por ítem de
+> un archivo que el propio proyecto genera: apagar parte de la medición rinde más
+> que agregar pruebas. Medido sobre el reporte real del consumidor, con su paquete
+> a 70,70% de funciones: sacándole los registros de funciones el rojo pasaba a
+> `n/a` con EXIT 0 y **sin un solo aviso**, y borrándole los registros sin cubrir
+> dejando `FNF:` intacto la corrida publicaba **95,83%** con la fila en OK teniendo
+> el reporte declaradas 215 funciones de las que llegaban 120. El discriminador no
+> es una lista de ortografías, es la gramática del formato: un tracefile declara su
+> propio denominador por registro (`LF:`, `FNF:`, `BRF:`), y esa línea es la única
+> forma de separar «vale cero» de «no se midió». Los 75 registros de los dos
+> reportes reales lo declaran, 11 con `FNF:0` y 3 con `BRF:0`, y sus ítems coinciden
+> exacto con el contador en los 75.
+>
+> Si el reporter emitió la métrica en un formato que esta action **no lee** (lcov
+> 2.x usa `FNL:`/`FNA:` en vez de `FN:`/`FNDA:`), el rojo lo dice con esas palabras
+> y manda a arreglarlo **en el marco**, no en el manifiesto del proyecto: el
+> denominador declarado prueba que el reporter sí midió.
+
+> **Ventana de estreno, hasta el 2026-09-30.** Mientras dure, los dos veredictos
+> que **nadie escribió** —un paquete por debajo del mínimo que no declara deuda, y
+> una métrica que el reporte no midió— pasan en amarillo con un `::warning::` que
+> nombra el día en que serán rojos. La ventana existe porque `v1` es un tag móvil:
+> sin ella, la compuerta aparece en el pipeline de cada consumidor sin que nadie la
+> haya leído. No afloja lo que un paquete escribió y rompió —deuda vencida,
+> retroceso, piso sin datos, declaración inválida—, y se cierra sola: pasada la
+> fecha, el mismo estado es rojo sin que nadie toque una línea. La línea que separa
+> las dos mitades es la autoría del caso, no su gravedad.
 
 El piso es el mecanismo de **transición** hacia el mínimo, no un sustituto de él,
 y por eso lleva plazo. Sin fecha, el piso termina siendo el mínimo de hecho, y eso

@@ -273,10 +273,14 @@ SHALL nombrar el día desde el cual el mismo estado es rojo. La ventana SHALL
 cerrarse por el paso del tiempo y no por una edición: pasada esa fecha, el mismo
 repositorio falla sin que nadie toque una línea.
 
-Y la ventana SHALL aflojar ÚNICAMENTE la falta de declaración. Una deuda declarada
-y vencida, un retroceso por debajo del piso, un piso sin datos y una declaración
-inválida SHALL fallar dentro de la ventana igual que fuera: en esos cuatro casos
-alguien escribió algo, y lo escrito se sostiene desde el día en que se escribió.
+Y la ventana SHALL aflojar ÚNICAMENTE lo que nadie escribió: la falta de
+declaración y la métrica que el reporte no midió. Una deuda declarada y vencida,
+un retroceso por debajo del piso, un piso sin datos y una declaración inválida
+SHALL fallar dentro de la ventana igual que fuera: en esos cuatro casos alguien
+escribió algo, y lo escrito se sostiene desde el día en que se escribió. La línea
+que separa las dos mitades no es la gravedad del caso sino su autoría: la ventana
+existe para que un veredicto NUEVO del marco no aterrice en rojo sobre un
+proyecto que no lo leyó, y no para perdonar una promesa rota.
 
 La fecha de cierre SHALL estar escrita acá y no solo en el código. La medición que
 lo obliga: la primera implementación de esta verificación puso la ventana en un
@@ -319,6 +323,30 @@ La medición SHALL distinguir «cubierto» de «no medido»: la ausencia de dato
 cobertura habiendo líneas agregadas SHALL ser un fallo ruidoso y NO un éxito
 silencioso.
 
+**Y el DENOMINADOR del total SHALL verificarse contra el que el propio reporte
+declara.** Un porcentaje es cubiertas sobre encontradas, y «encontradas» se
+reconstruye ítem por ítem de un reporte que el proyecto genera: un denominador
+más corto que el real no baja la cobertura, la INFLA, así que apagar parte de la
+medición rinde más que agregar pruebas. Por eso la verificación SHALL comparar
+los ítems que llegaron contra el denominador que el reporte declara para esa
+métrica y ese archivo, y SHALL fallar cuando lleguen menos. Y SHALL distinguir
+«esta métrica vale cero» —el reporte declara su denominador en cero, y eso es un
+n/a legítimo— de «esta métrica no se midió» —el reporte no declara denominador
+alguno y no llegó ni un ítem—, que es «no medido» otra vez y NO SHALL pasar en
+verde ni en silencio. La medición que lo obliga: sobre el reporte real del
+consumidor, el paquete a 70,70% de funciones pasaba a EXIT 0 y a un «n/a» mudo
+con solo dejar de emitir los registros de funciones —una opción documentada del
+generador de reportes, y también lo que hace por su cuenta un generador de una
+versión más nueva—; y borrándole los registros sin cubrir dejando el denominador
+declarado intacto, la corrida publicaba 95,83% con la fila en OK teniendo el
+propio reporte declaradas 215 funciones de las que llegaban 120. Las dos rondas
+anteriores endurecieron la REGLA y ninguna la ENTRADA que la regla lee.
+
+Un archivo del reporte cuya ruta no corresponde a ningún archivo versionado
+queda fuera del total, y eso SHALL decirse en CUALQUIER evento del pipeline y no
+solo en los que miden el diff: un archivo que sale del denominador sin dejar
+rastro es la misma inflación por otra puerta.
+
 Un paquete PUEDE excluir del cálculo el código que no le corresponde probar
 —generado por otra herramienta, o puro arranque de la aplicación— declarándolo
 con su motivo escrito, del mismo modo que las exclusiones del alcance.
@@ -354,6 +382,18 @@ con su motivo escrito, del mismo modo que las exclusiones del alcance.
 #### Scenario: Un piso declarado cuya métrica llega sin datos
 - **WHEN** un paquete declara un piso para una métrica y su cobertura llega sin un solo dato de esa métrica
 - **THEN** la integración falla nombrando el manifiesto y la métrica: un piso que no se puede comparar contra nada dejó de proteger la ganancia acumulada, y reportarlo como «n/a» en verde es indistinguible de no tener piso
+
+#### Scenario: Una métrica que el reporte no midió
+- **WHEN** una métrica de un paquete llega sin un solo dato y el reporte no declara ningún denominador para ella
+- **THEN** la integración la trata como NO MEDIDA y no como una métrica que no aplica, porque apagar la métrica que enrojece costaría una línea de configuración del generador de reportes
+
+#### Scenario: Una métrica que el reporte declara en cero
+- **WHEN** una métrica de un paquete llega sin un solo dato y el reporte declara su denominador en cero
+- **THEN** la corrida la reporta como «n/a» y pasa: el reporte está diciendo que midió y no había nada que medir, y esa es la única forma de no aplicar que no se puede fabricar apagando la medición
+
+#### Scenario: El denominador llega más corto que el que el reporte declara
+- **WHEN** los ítems de una métrica que llegan al cálculo son menos que los que el propio reporte declara para ese archivo
+- **THEN** la integración falla diciendo cuántos declaró y cuántos llegaron, y NO publica el porcentaje como total: los ítems que faltan no están «sin cubrir», están fuera del denominador, y un denominador corto infla la cobertura
 
 #### Scenario: Una deuda declarada sobre un paquete sin nada que medir
 - **WHEN** un paquete declara una deuda y no aporta ninguna métrica medible en la corrida

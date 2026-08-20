@@ -473,6 +473,16 @@ export const registroVacio = () => ({
   // decorativo: sin emparejar, el denominador de funciones deja de ser exacto,
   // y eso hay que decirlo en vez de publicar un numero como si lo fuera.
   funcionesDesparejadas: 0,
+  // EL DENOMINADOR QUE EL PROPIO REPORTE DECLARA, por metrica (LF/FNF/BRF), y
+  // el mayor de los declarados si el archivo aparece en varios reportes.
+  // `null` = ningun registro de este archivo lo declaro.
+  declarado: { lineas: null, funciones: null, ramas: null },
+  // Cuantos REGISTROS de este archivo no declararon el contador de esa metrica.
+  sinContador: { lineas: 0, funciones: 0, ramas: 0 },
+  // Cuantos registros llegaron con MENOS items que los que su propio contador
+  // declara, y el peor caso de cada metrica para poder decirlo con numeros.
+  cortos: { lineas: 0, funciones: 0, ramas: 0 },
+  faltante: { lineas: null, funciones: null, ramas: null },
 });
 
 /**
@@ -517,12 +527,25 @@ export function parsearLcovDetallado(texto, acumulado = new Map()) {
   let ejecuciones = []; // [{ nombre, hits }] en el orden en que llegaron
   const maximo = (mapa, clave, hits) => mapa.set(clave, Math.max(mapa.get(clave) ?? 0, hits));
 
+  // Los items del REGISTRO que se esta leyendo, aparte de los del archivo. La
+  // separacion es lo que permite comparar contra el contador de resumen: si los
+  // items se acumularan directo en el archivo, un archivo medido por dos suites
+  // tendria mas items que el denominador de un registro suelto y la comparacion
+  // daria un falso corto.
+  let porRegistro = null;
+  const registroNuevo = () => ({
+    lineas: new Map(),
+    ramas: new Map(),
+    contadores: { lineas: null, funciones: null, ramas: null },
+  });
+
   const cerrarRegistro = () => {
     if (!actual) return;
-    for (const clave of declaradas) if (!actual.funciones.has(clave)) actual.funciones.set(clave, 0);
+    const funciones = new Map();
+    for (const clave of declaradas) if (!funciones.has(clave)) funciones.set(clave, 0);
     if (ejecuciones.length <= declaradas.length) {
       // El caso normal: emparejamiento por posicion, denominador exacto.
-      ejecuciones.forEach(({ hits }, i) => maximo(actual.funciones, declaradas[i], hits));
+      ejecuciones.forEach(({ hits }, i) => maximo(funciones, declaradas[i], hits));
     } else {
       // Mas ejecuciones que declaraciones: el reporte no respeta la convencion
       // y no hay con que emparejar. Se cae a los nombres, que es lo unico que
@@ -534,11 +557,37 @@ export function parsearLcovDetallado(texto, acumulado = new Map()) {
         if (!porNombre.has(nombre)) porNombre.set(nombre, clave);
       }
       for (const { nombre, hits } of ejecuciones) {
-        maximo(actual.funciones, porNombre.get(nombre) ?? `?,${nombre}`, hits);
+        maximo(funciones, porNombre.get(nombre) ?? `?,${nombre}`, hits);
       }
     }
+    // EL CRUCE CONTRA EL DENOMINADOR QUE EL REGISTRO DECLARA. Se hace ACA, con
+    // los items de este registro y su propio contador, y no despues de fusionar
+    // nada. Un contador ausente y un contador en cero son cosas distintas y por
+    // eso se cuentan aparte: el primero dice "no medi", el segundo "no habia".
+    const items = { lineas: porRegistro.lineas, funciones, ramas: porRegistro.ramas };
+    for (const { clave } of METRICAS_DE_COBERTURA) {
+      const declarado = porRegistro.contadores[clave];
+      const contados = items[clave].size;
+      if (declarado === null) {
+        actual.sinContador[clave]++;
+        continue;
+      }
+      actual.declarado[clave] = Math.max(actual.declarado[clave] ?? 0, declarado);
+      if (contados < declarado) {
+        actual.cortos[clave]++;
+        const falta = declarado - contados;
+        if (actual.faltante[clave] === null || falta > actual.faltante[clave].falta) {
+          actual.faltante[clave] = { declarado, contados, falta };
+        }
+      }
+    }
+    for (const clave of ["lineas", "ramas"]) {
+      for (const [k, h] of porRegistro[clave]) maximo(actual[clave], k, h);
+    }
+    for (const [k, h] of funciones) maximo(actual.funciones, k, h);
     declaradas = [];
     ejecuciones = [];
+    porRegistro = registroNuevo();
   };
 
   for (const linea of texto.split(/\r?\n/)) {
@@ -548,6 +597,7 @@ export function parsearLcovDetallado(texto, acumulado = new Map()) {
       const ruta = l.slice(3).trim();
       actual = acumulado.get(ruta);
       if (!actual) acumulado.set(ruta, (actual = registroVacio()));
+      porRegistro = registroNuevo();
       continue;
     }
     if (l === "end_of_record") {
@@ -556,12 +606,24 @@ export function parsearLcovDetallado(texto, acumulado = new Map()) {
       continue;
     }
     if (!actual) continue;
+    // Los contadores de resumen del registro: el reporte declarando su propio
+    // denominador. Se leen por la tabla de metricas, no por una lista escrita
+    // acá, para que agregar una metrica no deje su contador sin leer.
+    let esContador = false;
+    for (const { clave, contador } of METRICAS_DE_COBERTURA) {
+      if (!l.startsWith(`${contador}:`)) continue;
+      esContador = true;
+      const valor = Number(l.slice(contador.length + 1).trim());
+      if (Number.isFinite(valor) && valor >= 0) porRegistro.contadores[clave] = valor;
+      break;
+    }
+    if (esContador) continue;
     if (l.startsWith("DA:")) {
       const partes = l.slice(3).split(",");
       const numero = Number(partes[0]);
       const hits = Number(partes[1]);
       if (!Number.isFinite(numero) || !Number.isFinite(hits)) continue;
-      maximo(actual.lineas, numero, hits);
+      maximo(porRegistro.lineas, numero, hits);
     } else if (l.startsWith("FN:")) {
       const coma = l.indexOf(",");
       if (coma < 0) continue;
@@ -583,7 +645,7 @@ export function parsearLcovDetallado(texto, acumulado = new Map()) {
       const bruto = partes[3].trim();
       const tomada = bruto === "-" ? 0 : Number(bruto);
       if (!Number.isFinite(tomada)) continue;
-      maximo(actual.ramas, `${partes[0]},${partes[1]},${partes[2]}`, tomada);
+      maximo(porRegistro.ramas, `${partes[0]},${partes[1]},${partes[2]}`, tomada);
     }
   }
   // Un lcov sin el `end_of_record` final no pierde su ultimo registro.
@@ -599,6 +661,21 @@ export function fusionarRegistro(destino, origen) {
     }
   }
   destino.funcionesDesparejadas += origen.funcionesDesparejadas;
+  // El denominador declarado se queda con el MAYOR de los reportes: la union de
+  // items solo puede crecer, asi que el maximo es el unico que sigue siendo una
+  // cota valida. Los conteos de registros cortos y sin contador se SUMAN, porque
+  // cada registro es una observacion distinta.
+  for (const { clave } of METRICAS_DE_COBERTURA) {
+    if (origen.declarado[clave] !== null) {
+      destino.declarado[clave] = Math.max(destino.declarado[clave] ?? 0, origen.declarado[clave]);
+    }
+    destino.sinContador[clave] += origen.sinContador[clave];
+    destino.cortos[clave] += origen.cortos[clave];
+    const f = origen.faltante[clave];
+    if (f && (destino.faltante[clave] === null || f.falta > destino.faltante[clave].falta)) {
+      destino.faltante[clave] = f;
+    }
+  }
   return destino;
 }
 
@@ -698,6 +775,29 @@ export function veredictoDePaquete({
         rojo = true;
         continue;
       }
+      // NO MEDIDA vs VALE CERO. Cero items sin ningun contador declarado no es
+      // "esta metrica no aplica": es un reporte que no la midio, y el spec ya
+      // exige distinguir «cubierto» de «no medido». Medido sobre el reporte
+      // REAL del consumidor: sacandole FN/FNDA/FNF, su 70,70% de funciones
+      // —el numero del incidente— salia n/a con EXIT 0 y sin un solo aviso.
+      // Con `FNF:0` presente, en cambio, el reporter esta diciendo que midio y
+      // no habia nada, y eso sigue siendo un n/a legitimo (11 de los 38
+      // registros del consumidor declaran exactamente eso).
+      if (m && (m.cortos > 0 || (m.sinContador > 0 && !m.declaradas))) {
+        filas.push({
+          clave,
+          etiqueta,
+          medible: false,
+          veredicto: "no-medida",
+          declaradas: m.declaradas,
+          sinContador: m.sinContador,
+          faltante: m.faltante ?? null,
+          enGracia: enVentana,
+        });
+        if (enVentana) amarillo = true;
+        else rojo = true;
+        continue;
+      }
       filas.push({ clave, etiqueta, medible: false });
       continue;
     }
@@ -713,7 +813,26 @@ export function veredictoDePaquete({
       pisoDeclarado,
       veredicto: "verde",
       falta: 0,
+      sinContador: m.sinContador ?? 0,
     };
+    // EL DENOMINADOR LLEGO CORTO. El reporte declara N items de esta metrica y
+    // llegaron menos: los que faltan no estan "no cubiertos", estan FUERA del
+    // denominador, y un denominador corto INFLA el porcentaje. Se decide antes
+    // que el piso y que el minimo a proposito: comparar un numero que ya se
+    // sabe torcido contra un umbral es darle autoridad. Medido sobre el reporte
+    // real: borrandole las FN/FNDA sin cubrir y dejando FNF: intacto, la
+    // compuerta publicaba 95,83% con la fila en OK teniendo el propio reporte
+    // declaradas 215 funciones de las que llegaban 120.
+    if (m.cortos > 0) {
+      fila.veredicto = "denominador-corto";
+      fila.faltante = m.faltante ?? null;
+      fila.declaradas = m.declaradas;
+      fila.enGracia = enVentana;
+      if (enVentana) amarillo = true;
+      else rojo = true;
+      filas.push(fila);
+      continue;
+    }
     if (pisoDeclarado !== null && pct + EPSILON < pisoDeclarado) {
       fila.veredicto = "retroceso";
       rojo = true;
@@ -784,7 +903,19 @@ export function agregarPorPaquete({ cobertura, paquetes, exclusionDe }) {
     if (!acumulado) {
       acumulado = { archivos: 0, desparejados: 0, metricas: {} };
       for (const { clave } of METRICAS_DE_COBERTURA) {
-        acumulado.metricas[clave] = { encontradas: 0, cubiertas: 0 };
+        // `declaradas` es la suma de los denominadores que los propios reportes
+        // declararon; `cortos` y `sinContador`, cuantos archivos llegaron con
+        // menos items que su contador o sin contador alguno. Son la evidencia
+        // con la que el veredicto distingue "vale cero" de "no se midio", y por
+        // eso viajan pegadas a la metrica y no en un aparte que nadie mira.
+        acumulado.metricas[clave] = {
+          encontradas: 0,
+          cubiertas: 0,
+          declaradas: 0,
+          cortos: 0,
+          sinContador: 0,
+          faltante: null,
+        };
       }
       porPaquete.set(paq, acumulado);
     }
@@ -792,8 +923,16 @@ export function agregarPorPaquete({ cobertura, paquetes, exclusionDe }) {
     acumulado.desparejados += registro.funcionesDesparejadas ?? 0;
     for (const { clave } of METRICAS_DE_COBERTURA) {
       const items = registro[clave];
-      acumulado.metricas[clave].encontradas += items.size;
-      for (const hits of items.values()) if (hits > 0) acumulado.metricas[clave].cubiertas++;
+      const m = acumulado.metricas[clave];
+      m.encontradas += items.size;
+      for (const hits of items.values()) if (hits > 0) m.cubiertas++;
+      m.declaradas += registro.declarado?.[clave] ?? 0;
+      m.cortos += registro.cortos?.[clave] ?? 0;
+      m.sinContador += registro.sinContador?.[clave] ?? 0;
+      const f = registro.faltante?.[clave] ?? null;
+      if (f && (m.faltante === null || f.falta > m.faltante.falta)) {
+        m.faltante = { ...f, archivo };
+      }
     }
   }
 
@@ -852,7 +991,7 @@ const pct = (n) => `${n.toFixed(2)}%`;
  * cuanto plazo le queda". Una deuda que no se nombra en cada corrida es una
  * deuda que nadie mira hasta el dia en que vence.
  */
-function compuertaDelTotal({ paquetes, exclusionDe, cobertura, minimoLocal, ambiguos }) {
+function compuertaDelTotal({ paquetes, exclusionDe, cobertura, minimoLocal, ambiguos, sinResolver = [] }) {
   // El minimo del marco es PISO DURO del total: el umbral del consumidor solo
   // puede subirlo. Si pudiera bajarlo, la compuerta seria una sugerencia.
   const minimo = Math.max(MINIMO_DEL_MARCO, minimoLocal);
@@ -884,6 +1023,21 @@ function compuertaDelTotal({ paquetes, exclusionDe, cobertura, minimoLocal, ambi
     console.error(
       `::warning::${ambiguas.size} archivo(s) quedaron FUERA del total porque su ruta SF: corresponde a dos archivos versionados distintos y no se puede saber a que paquete atribuirlos: ${[...ambiguas].slice(0, 5).join(", ")}. Arreglo: configura el projectRoot del reporter lcov en la raiz del repositorio`
     );
+  }
+
+  // LAS RUTAS QUE NO RESOLVIERON, dichas ACA y no solo en el plano del diff. El
+  // aviso del otro plano vive DESPUES de su retorno temprano de "no hay commit
+  // base", asi que en un push a main un reporte cableado contra otro arbol se
+  // caia entero del denominador sin que la corrida dijera una palabra. Un
+  // archivo que sale del denominador tiene que dejar rastro en TODO evento.
+  if (sinResolver.length) {
+    console.error(
+      `::warning::${sinResolver.length} ruta(s) SF: de los reportes no corresponden a ningun archivo versionado y quedaron fuera del total (por ejemplo: ${sinResolver.slice(0, 3).join(", ")}). Arreglo: configura el projectRoot del reporter lcov en la raiz del repositorio`
+    );
+    RT(
+      `> ⚠️ ${sinResolver.length} ruta(s) SF: de los reportes no corresponden a ningun archivo versionado y quedaron fuera del total: \`${sinResolver.slice(0, 3).join("`, `")}\`.`
+    );
+    RT("");
   }
 
   const { porPaquete, excluidos, pruebas, sinPaquete } = agregarPorPaquete({
@@ -972,7 +1126,15 @@ function compuertaDelTotal({ paquetes, exclusionDe, cobertura, minimoLocal, ambi
     "plazo-vencido": "ROJO · plazo vencido",
     "en-plazo": "AMARILLO · en plazo",
     "piso-sin-datos": "ROJO · piso sin datos",
+    "no-medida": "ROJO · no medida",
+    "denominador-corto": "ROJO · denominador corto",
   };
+  // Un veredicto que la ventana de estreno afloja no puede imprimirse como
+  // ROJO: la fila y el codigo de salida tienen que decir lo mismo.
+  const etiqueta = (fila) =>
+    fila.enGracia
+      ? `AMARILLO · ${fila.veredicto === "no-medida" ? "no medida" : "denominador corto"} (ventana de estreno)`
+      : etiquetaDeEstado[fila.veredicto];
   for (const { paq, veredicto } of veredictos) {
     for (const fila of veredicto.filas) {
       const nombre = `\`${paq.dir || "."}\``;
@@ -981,17 +1143,25 @@ function compuertaDelTotal({ paquetes, exclusionDe, cobertura, minimoLocal, ambi
           `| ${nombre} | ${fila.etiqueta} | n/a | ${minimo}% | ${
             fila.pisoDeclarado == null ? "—" : `${fila.pisoDeclarado}%`
           } | ${
-            fila.veredicto === "piso-sin-datos"
-              ? etiquetaDeEstado["piso-sin-datos"]
+            fila.veredicto === "piso-sin-datos" || fila.veredicto === "no-medida"
+              ? etiqueta(fila)
               : "sin datos de esa metrica"
           } |`
         );
         continue;
       }
+      // El porcentaje de un denominador corto NO se imprime como si fuera el
+      // total: es el numero inflado que la compuerta acaba de rechazar, y
+      // publicarlo en negrita al lado de un OK es exactamente como se leia
+      // antes de que esto fuera rojo.
+      const total =
+        fila.veredicto === "denominador-corto"
+          ? `${pct(fila.pct)} sobre ${fila.encontradas} de ${fila.declaradas} declarados`
+          : `**${pct(fila.pct)}**`;
       RT(
-        `| ${nombre} | ${fila.etiqueta} | **${pct(fila.pct)}** | ${minimo}% | ${
+        `| ${nombre} | ${fila.etiqueta} | ${total} | ${minimo}% | ${
           fila.pisoDeclarado === null ? "—" : `${fila.pisoDeclarado}%`
-        } | ${etiquetaDeEstado[fila.veredicto]} |`
+        } | ${etiqueta(fila)} |`
       );
     }
   }
@@ -1035,6 +1205,55 @@ function compuertaDelTotal({ paquetes, exclusionDe, cobertura, minimoLocal, ambi
     const enPlazo = veredicto.filas.filter((f) => f.veredicto === "en-plazo");
     const enGracia = veredicto.filas.filter((f) => f.veredicto === "sin-plazo-en-gracia");
     const pisosHuerfanos = veredicto.filas.filter((f) => f.veredicto === "piso-sin-datos");
+    const noMedidas = veredicto.filas.filter((f) => f.veredicto === "no-medida");
+    const cortos = veredicto.filas.filter((f) => f.veredicto === "denominador-corto");
+    const parciales = veredicto.filas.filter((f) => f.medible && (f.sinContador ?? 0) > 0);
+
+    // UNA METRICA QUE EL REPORTE NO MIDIO. El nivel lo decide la ventana de
+    // estreno, igual que la falta de declaracion: un rojo nuevo del marco llega
+    // por un tag movil y no puede aterrizar sin aviso. Lo que ya NO es es mudo.
+    for (const f of noMedidas) {
+      const dato = METRICAS_DE_COBERTURA.find((m) => m.clave === f.clave)?.contador ?? "?";
+      const cola = f.enGracia
+        ? ` Esta corrida PASA por la ventana de estreno, que se cierra el ${veredicto.ventanaHasta} (quedan ${veredicto.diasDeVentana} dia(s)); desde ese dia el mismo estado es ROJO.`
+        : "";
+      // DOS DIAGNOSTICOS DISTINTOS, y decir el que no es vale menos que callarse.
+      // Si el reporte DECLARO un denominador y no llego ni un item, el reporter
+      // midio y esta action no supo leer lo que emitio (es el caso de lcov 2.x,
+      // que emite FNL:/FNA: en vez de FN:/FNDA:): el defecto es del marco. Si no
+      // declaro nada, el reporter directamente no midio: el defecto es del
+      // proyecto. Un mensaje que no distingue manda a arreglar el lado que esta
+      // bien, y eso ya es un rojo que nadie sabe cerrar.
+      const causa =
+        f.declaradas > 0
+          ? `sus reportes DECLARAN ${f.declaradas} item(s) de ${f.etiqueta} (${dato}:) y no llego ninguno: el reporter la midio y esta action no supo leer el formato en que la emitio. La causa conocida es lcov 2.x, que emite FNL:/FNA: donde antes iba FN:/FNDA:. Arreglo: esto se corrige en el marco (issue o change en Projects), NO en ${paq.manifiesto}`
+          : `no aporto un solo item de ${f.etiqueta} y ninguno de sus ${f.sinContador} registro(s) declaro el contador ${dato}: el reporte no la midio. Arreglo: que el reporter emita ${f.etiqueta} (y corra con 'all: true'); si de verdad no aplica a este paquete, declara la exclusion con su motivo en ${paq.manifiesto}`;
+      console.error(
+        `::${f.enGracia ? "warning" : "error"} file=${paq.manifiesto}::el total de ${f.etiqueta} del paquete "${nombre}" no se pudo medir: ${causa}. No medir una metrica no es lo mismo que no tenerla, y la diferencia esta en el propio formato: ${dato}:0 es el reporter diciendo que midio y no habia nada, y eso si pasa como n/a. Sin esa distincion, apagar la metrica que enrojece cuesta una linea de configuracion del reporter.${cola}`
+      );
+    }
+
+    // UN DENOMINADOR MAS CORTO QUE EL QUE EL REPORTE DECLARA.
+    for (const f of cortos) {
+      const dato = METRICAS_DE_COBERTURA.find((m) => m.clave === f.clave)?.contador ?? "?";
+      const ej = f.faltante;
+      const cola = f.enGracia
+        ? ` Esta corrida PASA por la ventana de estreno, que se cierra el ${veredicto.ventanaHasta} (quedan ${veredicto.diasDeVentana} dia(s)); desde ese dia el mismo estado es ROJO.`
+        : "";
+      console.error(
+        `::${f.enGracia ? "warning" : "error"} file=${paq.manifiesto}::el total de ${f.etiqueta} del paquete "${nombre}" se calculo sobre ${f.encontradas} item(s) y sus propios reportes declaran ${f.declaradas}: el denominador llego CORTO en ${f.cortos ?? 1} registro(s)${ej ? ` (el peor, ${ej.archivo}: declara ${dato}:${ej.declarado} y llegaron ${ej.contados})` : ""}. Los items que faltan no estan "sin cubrir": estan fuera del denominador, y un denominador corto INFLA el porcentaje — el ${pct(f.pct)} de esta fila esta calculado de menos. Arreglo: revisa el reporter lcov del paquete; si actualizo a un formato de funciones distinto (lcov 2.x emite FNL:/FNA: en vez de FN:/FNDA:), esta action todavia no lo lee y hay que arreglarla en el marco antes que en el proyecto.${cola}`
+      );
+    }
+
+    // Una metrica que SI se midio pero de la que parte de los archivos no
+    // declararon su contador: no se puede cruzar esa parte, y decirlo es lo
+    // maximo honesto. No es rojo — la metrica existe y su numero sale.
+    for (const f of parciales) {
+      const dato = METRICAS_DE_COBERTURA.find((m) => m.clave === f.clave)?.contador ?? "?";
+      console.error(
+        `::warning file=${paq.manifiesto}::el total de ${f.etiqueta} del paquete "${nombre}" (${pct(f.pct)}) sale de ${f.encontradas} item(s), y ${f.sinContador} de sus registros de cobertura no declaran ${dato}: en esa parte el denominador no se pudo cruzar contra lo que el reporte dice de si mismo. El numero sale, pero no verificado del todo. Arreglo: revisa el reporter lcov del paquete`
+      );
+    }
 
     // UN PISO QUE SE QUEDO SIN DATOS. Es rojo por la misma razon que una
     // declaracion invalida: lo escrito se sostiene. La diferencia con el
@@ -1338,7 +1557,14 @@ function principal() {
   // -----------------------------------------------------------------------
   salidaMinima = Math.max(
     salidaMinima,
-    compuertaDelTotal({ paquetes, exclusionDe, cobertura: coberturaDetallada, minimoLocal: minimo, ambiguos })
+    compuertaDelTotal({
+      paquetes,
+      exclusionDe,
+      cobertura: coberturaDetallada,
+      minimoLocal: minimo,
+      ambiguos,
+      sinResolver,
+    })
   );
 
   // 1) Rango degenerado: sin base no hay cambio que medir. NO APLICA, y lo
