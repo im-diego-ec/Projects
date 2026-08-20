@@ -679,11 +679,27 @@ export function verificar({ canonico, valores, desvios, superficies, hoy, leer }
       }));
       continue;
     }
+    // ESTA RAMA ES LA EVASION CONOCIDA, y el mensaje tiene que decirlo. Subir a mano
+    // la version de la cabecera a una que esta copia del marco no conoce hace que el
+    // cuerpo NO se compare contra nada: se puede borrar cualquier regla del artefacto
+    // y el check queda verde para siempre. Reproducido por codigo de salida el
+    // 2026-08-19 (cuerpo editado + `version=9.9.9` -> exit 0).
+    //
+    // Sigue siendo AVISO y no rojo porque la causa benigna existe de verdad: un
+    // consumidor pinado a un SHA viejo corre una copia del marco anterior al
+    // artefacto, y ahi «no puedo verificar» no es «alguien violo la regla».
+    //
+    // COMO SE CIERRA, y es decision humana pendiente (no la tomo yo): `GITHUB_ACTION_REF`
+    // dice con que ref se resolvio ESTA action. Si se resolvio con el tag movil (`v1`)
+    // no hay pin que explique un artefacto mas nuevo, asi que ahi el caso es rojo; con
+    // un SHA o un tag viejo, sigue siendo aviso. Es una linea de env en el action.yml
+    // mas una rama aca. Hasta entonces, el mensaje NO ofrece la explicacion tranquila
+    // como si fuera la unica.
     if (comparacion > 0) {
       hallazgos.push({
         nivel: "warning",
         codigo: "artefacto-adelantado",
-        mensaje: `${definicion.ruta} declara la version ${cab.version} y esta copia del marco es la ${canonico.version}: el pipeline esta corriendo una version del marco mas vieja que el artefacto (¿un pin a un SHA?). No se puede verificar el contenido contra un canonico que no se tiene`,
+        mensaje: `${definicion.ruta} declara la version ${cab.version} y esta copia del marco es la ${canonico.version}: no se puede verificar el contenido contra un canonico que no se tiene, asi que el cuerpo NO se comparo. Dos causas posibles y hay que distinguirlas a ojo: el pipeline corre una copia del marco mas vieja que el artefacto (un pin a un SHA o a un tag viejo), o alguien subio la version de la cabecera a mano para que el cuerpo dejara de compararse. Arreglo: revisa el pin del uses: de este job y, si esta en el tag movil, regenera el artefacto con el modo escribir`,
       });
       continue;
     }

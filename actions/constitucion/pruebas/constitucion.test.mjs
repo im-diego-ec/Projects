@@ -192,6 +192,59 @@ test("atrasado por una version en ventana: aviso", () => {
   assert.equal(de(resultado, "artefacto-divergente").length, 0);
 });
 
+// HUECO CONOCIDO, fijado por prueba a proposito. Reproducido por codigo de salida el
+// 2026-08-19 por el verificador de la tanda: subir a mano la version de la cabecera a
+// una que esta copia del marco no conoce hace que el cuerpo NO se compare contra nada.
+// O sea: se borra cualquier regla del artefacto y el check queda VERDE para siempre,
+// con una linea de diff.
+//
+// Esta prueba NO bendice el hueco: lo vuelve explicito y hace que cerrarlo sea un
+// cambio de prueba deliberado en vez de un descubrimiento. Sigue siendo aviso porque
+// la causa benigna existe (un consumidor pinado a un SHA viejo corre una copia del
+// marco anterior al artefacto, y ahi «no puedo verificar» no es «alguien violo la
+// regla»). El cierre propuesto, que es decision humana: con `GITHUB_ACTION_REF` = el
+// tag movil no hay pin que explique un artefacto mas nuevo, asi que ahi va rojo.
+test("HUECO: version adelantada a mano deja el cuerpo sin comparar (aviso, no rojo)", () => {
+  const canonico = canonicoTemporal({ versiones: VERSIONES_UNA_EN_VENTANA });
+  const alDia = artefactoAlDia(canonico);
+  const manipulado = alDia
+    .replace(cabecera({ version: "1.3.0", sha: canonico.sha, superficie: "claude-code" }), cabecera({ version: "9.9.9", sha: canonico.sha, superficie: "claude-code" }))
+    .replace("La primera regla", "BORRE LA PRIMERA REGLA");
+  assert.notEqual(manipulado, alDia, "la manipulacion no aplico: la prueba no probaria nada");
+
+  const resultado = correr({
+    canonico,
+    archivos: { ...CADENA_SANA, ".projects/AGENTS-marco.md": manipulado },
+    hoy: DENTRO_DE_LA_VENTANA,
+  });
+
+  const adelantado = de(resultado, "artefacto-adelantado");
+  assert.equal(adelantado.length, 1);
+  assert.equal(adelantado[0].nivel, "warning");
+  // El mensaje tiene que nombrar la manipulacion, no solo ofrecer la explicacion
+  // tranquila del pin: un revisor que lee "¿un pin a un SHA?" cierra la pestaña.
+  assert.match(adelantado[0].mensaje, /a mano/);
+  // Y acá está el hueco, escrito: el cuerpo editado NO se reporta como divergente.
+  assert.equal(de(resultado, "artefacto-divergente").length, 0);
+  assert.equal(resultado.rojos, 0);
+});
+
+test("resellar la cabecera NO tapa una edicion del cuerpo", () => {
+  const canonico = canonicoTemporal({ versiones: VERSIONES_UNA_EN_VENTANA });
+  const editado = artefactoAlDia(canonico).replace("La primera regla", "BORRE LA PRIMERA REGLA");
+  // El sello cubre el CANONICO, no el cuerpo: recomputarlo no compra nada, porque la
+  // autoridad sobre el cuerpo es el re-render. Es la razon por la que D1 descarto los
+  // bloques sellados por hash, y hay que poder demostrarla.
+  const resellado = editado.replace(/sha=[0-9a-f]+/, "sha=" + "f".repeat(12));
+  const resultado = correr({
+    canonico,
+    archivos: { ...CADENA_SANA, ".projects/AGENTS-marco.md": resellado },
+    hoy: DENTRO_DE_LA_VENTANA,
+  });
+  assert.equal(de(resultado, "artefacto-divergente").length, 1);
+  assert.equal(resultado.estado, "rojo");
+});
+
 test("dos versiones sin adoptar: manda la fecha de la mas vieja pendiente", () => {
   const canonico = canonicoTemporal({ versiones: VERSIONES_DOS });
   const muyViejo = artefactoAlDia(canonico).replace(
