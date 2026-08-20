@@ -1,7 +1,26 @@
 #!/usr/bin/env node
-// Cobertura de las LINEAS DEL CAMBIO: cruza los reportes lcov del repositorio
-// con las lineas que el diff agrega o modifica, y falla si la proporcion
-// cubierta queda por debajo del minimo del marco.
+// Cobertura de pruebas en LOS DOS PLANOS que el requirement de calidad-codigo
+// exige, porque cada uno tapa un hueco que el otro deja abierto:
+//
+//   1. LAS LINEAS DEL CAMBIO, sin holgura. Cruza los reportes lcov con las
+//      lineas que el diff agrega o modifica y falla si la proporcion cubierta
+//      queda por debajo del minimo. Sin este plano, un paquete con margen
+//      admite codigo sin pruebas hasta agotarlo.
+//
+//   2. EL TOTAL DE CADA PAQUETE. Falla cuando el total queda por debajo del
+//      minimo del marco sin una deuda declarada con motivo y FECHA, cuando esa
+//      fecha vence sin que el paquete haya llegado, o cuando la cobertura ya
+//      conseguida retrocede por debajo de su piso declarado. Sin este plano, el
+//      codigo que ya existe sin pruebas se queda asi indefinidamente, porque
+//      nada obliga a nadie mientras nadie lo toque.
+//
+// POR QUE EL PLANO 2 SE AGREGO DESPUES, y con que medicion. Durante toda la v1
+// el spec prometia rojo y no habia nada que lo produjera: el consumidor real
+// estaba a 70,69% de funciones —9,4 puntos por debajo del minimo declarado de
+// 80— con EXIT 0. Un paquete sintetico al 33,3% (lcov LF:6 LH:2), sin motivo ni
+// fecha declarados, tambien salia EXIT 0, y bajar los umbrales del consumidor a
+// 40 no cambiaba nada porque nadie los estaba leyendo. Hoy el minimo del marco
+// es piso DURO del total: el umbral local solo puede subirlo.
 //
 // POR QUE ESTA ESCRITO ACA Y NO SE ADOPTA UNA HERRAMIENTA EXTERNA
 // (decision D5 del change calidad-fail-closed). La candidata FALLA EN VERDE:
@@ -18,16 +37,37 @@
 // Variables de entorno (las cablea action.yml desde sus inputs):
 //   COBERTURA_LCOV     patrones glob de los reportes, uno por linea
 //                      (default: **/coverage/lcov.info)
-//   COBERTURA_BASE     commit base del rango. Vacio = el paso NO APLICA.
+//   COBERTURA_BASE     commit base del rango. Vacio = el plano del CAMBIO no
+//                      aplica; el del TOTAL mide igual, porque no depende de
+//                      ningun rango.
 //   COBERTURA_CABEZA   commit final del rango (default: HEAD, que es lo que
 //                      esta realmente en el checkout y lo que midieron las
 //                      pruebas).
-//   COBERTURA_MINIMO   porcentaje minimo exigido sobre las lineas del cambio
+//   COBERTURA_MINIMO   porcentaje minimo exigido sobre las lineas del cambio.
+//                      Sobre el total solo puede SUBIR el minimo del marco
 //                      (default: 80).
 //   COBERTURA_MAX_ANOTACIONES  tope de anotaciones ::error file=...:: (20).
+//   COBERTURA_HOY      fecha AAAA-MM-DD contra la que se comparan los plazos de
+//                      las deudas. Existe para las pruebas y NO es un input de
+//                      la action: es la unica palanca capaz de aflojar una
+//                      compuerta, asi que cuando esta puesta la corrida lo grita.
 //
-// Salidas (GITHUB_OUTPUT): porcentaje, lineas_medidas, lineas_sin_cubrir.
-// Codigo de salida: 0 pasa o no aplica; 1 falla.
+// Declaracion por paquete, en su propio package.json, al lado de las
+// exclusiones (la lee `leerPaquetes` de la action hermana):
+//   projects.cobertura.excluidos  [{ patron, motivo }]
+//   projects.cobertura.piso       { lineas, funciones, ramas } — el piso que ya
+//                              consiguio, y del que no puede bajar
+//   projects.cobertura.deuda      { motivo, fecha } — por que todavia no llega al
+//                              minimo y el dia en que llega
+//
+// VENTANA DE ESTRENO: hasta la fecha de VENTANA_DE_GRACIA_HASTA, un paquete por
+// debajo del minimo SIN declaracion avisa en vez de detener, gritando el dia en
+// que sera rojo. Se cierra sola. Ver el comentario de esa constante.
+//
+// Salidas (GITHUB_OUTPUT): porcentaje, lineas_medidas, lineas_sin_cubrir,
+// lineas_fuera_de_medicion, paquetes_medidos, paquetes_bajo_minimo,
+// paquetes_en_rojo.
+// Codigo de salida: 0 pasa o no aplica; 1 falla CUALQUIERA de los dos planos.
 import { readFileSync, readdirSync, appendFileSync, realpathSync } from "node:fs";
 import { execFileSync } from "node:child_process";
 import { join, resolve } from "node:path";
@@ -40,27 +80,75 @@ import { fileURLToPath } from "node:url";
 // es rojo, nunca un verde sin medir.
 import {
   EXTENSIONES_FUENTE,
+  METRICAS_DE_COBERTURA,
   globARegExp as globDelCenso,
+  esFechaIso,
   leerPaquetes,
   paqueteDe,
 } from "../censo-fuentes/censo-fuentes.mjs";
 
 const SHA_CERO = /^0{7,40}$/;
 
-// El numero del marco (decision D5 de calidad-fail-closed). Un consumidor puede
-// exigir MAS, y puede exigir menos — pero no en silencio.
+// El numero del marco (decision D5 de calidad-fail-closed). Sobre las lineas
+// del CAMBIO un consumidor puede exigir mas, y puede exigir menos — pero no en
+// silencio. Sobre el TOTAL DEL PAQUETE es un piso duro: el umbral local solo
+// puede subirlo (ver `compuertaDelTotal`).
 const MINIMO_DEL_MARCO = 80;
+
+// Comparaciones de porcentajes: 79.999999999 no es "por debajo de 80".
+const EPSILON = 1e-9;
+
+// VENTANA DE GRACIA DEL ESTRENO DEL PLANO DEL TOTAL.
+//
+// La constitucion del marco manda estrenar en modo aviso todo check que
+// endurezca, y este endurece: `v1` es un tag MOVIL, asi que el dia en que esto
+// se publica la compuerta aparece en el pipeline de cada consumidor sin que
+// nadie la haya leido. Ya paso el 2026-08-19, al mover `v1` la primera vez.
+//
+// Medido, y es la razon por la que la ventana existe en vez de ser un parrafo:
+// contra un espejo del consumidor real (proyecto-origen en main, con sus dos
+// reportes lcov del 2026-08-20) el plano del total da ROJO — `web` esta en
+// 70,70% de funciones, 9,30 puntos por debajo del minimo. Su arreglo existe y
+// esta medido, pero vive en una rama sin mergear (`feat/cobertura-web-funciones-80`,
+// con umbrales de 93,6 en funciones), asi que el orden importa: si la compuerta
+// aterriza antes que esa rama, el consumidor amanece rojo por un cambio del
+// marco y no por un defecto propio.
+//
+// QUE AFLOJA, y solo eso: un paquete por debajo del minimo que NO declara
+// deuda sale AMARILLO en vez de rojo, gritando la fecha en que pasa a rojo. NO
+// afloja una deuda declarada y vencida (el paquete hizo una promesa y la
+// rompio), ni un retroceso por debajo del piso, ni una declaracion invalida:
+// esos tres exigen que alguien haya escrito algo, y lo escrito se sostiene.
+//
+// SE CIERRA SOLA. Pasada la fecha, la comparacion es roja sin que nadie toque
+// una linea: una ventana que hay que acordarse de cerrar no se cierra nunca.
+// Cuando pase, esta constante y su rama en `veredictoDePaquete` se borran en un
+// PR de limpieza, no porque el comportamiento cambie.
+const VENTANA_DE_GRACIA_HASTA = "2026-09-30";
 
 // ---------------------------------------------------------------- resumen ---
 
 const resumen = [];
 const R = (linea = "") => resumen.push(linea);
 
+// El resumen del plano del TOTAL se acumula aparte y se vuelca DESPUES: el
+// plano del total se evalua primero (no depende del rango del diff) pero se lee
+// mejor debajo, y son dos secciones con titulo propio a proposito. Un unico
+// bloque mezclado hacia imposible saber cual de las dos compuertas hablo.
+const resumenTotal = [];
+const RT = (linea = "") => resumenTotal.push(linea);
+
+// El plano del total puede ENROJECER una corrida que el plano del diff aprueba,
+// y jamas al reves: la salida final es el maximo de las dos. Asi ningun
+// `terminar(0)` de los que ya existian puede tapar un total en falta.
+let salidaMinima = 0;
+
 function volcarResumen() {
   const destino = process.env.GITHUB_STEP_SUMMARY;
-  if (!destino || !resumen.length) return;
+  const lineas = [...resumen, ...resumenTotal];
+  if (!destino || !lineas.length) return;
   try {
-    appendFileSync(destino, resumen.join("\n") + "\n");
+    appendFileSync(destino, lineas.join("\n") + "\n");
   } catch (e) {
     console.error(`::warning::no se pudo escribir el resumen de la corrida: ${e.message}`);
   }
@@ -86,10 +174,13 @@ function publicar(porcentaje, medidas, sinCubrir, fuera = 0) {
   }
 }
 
-/** Cierra el paso: vuelca el resumen SIEMPRE, tambien cuando falla. */
+/**
+ * Cierra el paso: vuelca el resumen SIEMPRE, tambien cuando falla, y jamas sale
+ * en verde si el plano del total quedo en rojo (`salidaMinima`).
+ */
 function terminar(codigo) {
   volcarResumen();
-  process.exit(codigo);
+  process.exit(Math.max(codigo, salidaMinima));
 }
 
 // ----------------------------------------------------------------- rutas ---
@@ -373,31 +464,625 @@ export function parsearDiff(texto) {
 
 // ------------------------------------------------------------------ lcov ---
 
+/** El registro vacio de un archivo: las tres metricas, sin un solo dato. */
+export const registroVacio = () => ({
+  lineas: new Map(),
+  funciones: new Map(),
+  ramas: new Map(),
+  // Registros en los que FN: y FNDA: no se pudieron emparejar. No es
+  // decorativo: sin emparejar, el denominador de funciones deja de ser exacto,
+  // y eso hay que decirlo en vez de publicar un numero como si lo fuera.
+  funcionesDesparejadas: 0,
+});
+
 /**
- * Parsea un lcov quedandose con lo unico que este comparador necesita:
- * `SF:<ruta>` y `DA:<linea>,<hits>`. Devuelve Map<rutaCruda, Map<linea, hits>>.
+ * Parsea un lcov quedandose con los registros POR ITEM de las tres metricas:
+ *
+ *   DA:<linea>,<hits>                        -> lineas,   clave = linea
+ *   FN:<linea>,<nombre> + FNDA:<hits>,<nom>  -> funciones, clave = linea,nombre
+ *   BRDA:<linea>,<bloque>,<rama>,<taken>     -> ramas,     clave = l,b,r
+ *
+ * Devuelve Map<rutaCruda, {lineas, funciones, ramas}>, cada uno Map<clave,hits>.
  * Si la misma ruta aparece en varios reportes se queda con el MAXIMO de hits:
- * una linea cubierta por alguna suite esta cubierta.
+ * un item cubierto por alguna suite esta cubierto.
+ *
+ * POR QUE LOS REGISTROS Y NO LAS LINEAS DE RESUMEN (LF/LH, FNF/FNH, BRF/BRH).
+ * Los resumenes no se pueden FUSIONAR: si dos suites del monorepo miden el
+ * mismo archivo, sumar sus LF/LH cuenta dos veces el denominador y una linea
+ * cubierta por una sola de las dos aparece como media cubierta. Con los
+ * registros la fusion es exacta, y es la misma que el plano del diff ya hacia
+ * con DA.
+ *
+ * POR QUE LAS FUNCIONES SE EMPAREJAN POR POSICION Y NO SE AGRUPAN POR NOMBRE.
+ * `FNDA:` no trae la linea, asi que la identidad de una funcion solo se
+ * reconstruye emparejando cada FNDA con su FN. Agrupar por NOMBRE parece
+ * equivalente y no lo es: el nombre NO es unico dentro de un archivo. Medido
+ * sobre el reporte real del consumidor: 48 de sus 215 funciones comparten
+ * nombre con otra del mismo archivo, y agruparlas movia el total de funciones
+ * 1,84 puntos hacia abajo (70,70% -> 68,86%) sin que nada lo dijera. Un sesgo
+ * silencioso justo en la metrica que origino el incidente es peor que no medir.
+ * Los reporters del stack (v8 e istanbul) emiten TODOS los `FN:` de un registro
+ * y despues todos sus `FNDA:`, en el mismo orden; comprobado contra los dos
+ * reportes del consumidor (75 registros, cero desparejados, cero intercalados).
+ * Si algun reporter no cumpliera, el emparejamiento cae a los nombres y la
+ * corrida lo AVISA en vez de publicar el numero torcido.
+ *
+ * Una `FN:` sin ningun `FNDA:` cuenta como funcion declarada con cero
+ * ejecuciones, que es justamente el caso que hundio al consumidor: funciones
+ * que existen y ninguna prueba llama.
  */
-export function parsearLcov(texto, acumulado = new Map()) {
+export function parsearLcovDetallado(texto, acumulado = new Map()) {
   let actual = null;
+  let declaradas = []; // claves "linea,nombre" en el orden en que llegaron
+  let ejecuciones = []; // [{ nombre, hits }] en el orden en que llegaron
+  const maximo = (mapa, clave, hits) => mapa.set(clave, Math.max(mapa.get(clave) ?? 0, hits));
+
+  const cerrarRegistro = () => {
+    if (!actual) return;
+    for (const clave of declaradas) if (!actual.funciones.has(clave)) actual.funciones.set(clave, 0);
+    if (ejecuciones.length <= declaradas.length) {
+      // El caso normal: emparejamiento por posicion, denominador exacto.
+      ejecuciones.forEach(({ hits }, i) => maximo(actual.funciones, declaradas[i], hits));
+    } else {
+      // Mas ejecuciones que declaraciones: el reporte no respeta la convencion
+      // y no hay con que emparejar. Se cae a los nombres, que es lo unico que
+      // queda, y el registro se marca para que la corrida lo diga.
+      actual.funcionesDesparejadas++;
+      const porNombre = new Map();
+      for (const clave of declaradas) {
+        const nombre = clave.slice(clave.indexOf(",") + 1);
+        if (!porNombre.has(nombre)) porNombre.set(nombre, clave);
+      }
+      for (const { nombre, hits } of ejecuciones) {
+        maximo(actual.funciones, porNombre.get(nombre) ?? `?,${nombre}`, hits);
+      }
+    }
+    declaradas = [];
+    ejecuciones = [];
+  };
+
   for (const linea of texto.split(/\r?\n/)) {
     const l = linea.trim();
     if (l.startsWith("SF:")) {
+      cerrarRegistro();
       const ruta = l.slice(3).trim();
       actual = acumulado.get(ruta);
-      if (!actual) acumulado.set(ruta, (actual = new Map()));
-    } else if (l.startsWith("DA:") && actual) {
+      if (!actual) acumulado.set(ruta, (actual = registroVacio()));
+      continue;
+    }
+    if (l === "end_of_record") {
+      cerrarRegistro();
+      actual = null;
+      continue;
+    }
+    if (!actual) continue;
+    if (l.startsWith("DA:")) {
       const partes = l.slice(3).split(",");
       const numero = Number(partes[0]);
       const hits = Number(partes[1]);
       if (!Number.isFinite(numero) || !Number.isFinite(hits)) continue;
-      actual.set(numero, Math.max(actual.get(numero) ?? 0, hits));
-    } else if (l === "end_of_record") {
-      actual = null;
+      maximo(actual.lineas, numero, hits);
+    } else if (l.startsWith("FN:")) {
+      const coma = l.indexOf(",");
+      if (coma < 0) continue;
+      const numero = Number(l.slice("FN:".length, coma));
+      const nombre = l.slice(coma + 1).trim();
+      if (!nombre || !Number.isFinite(numero)) continue;
+      declaradas.push(`${numero},${nombre}`);
+    } else if (l.startsWith("FNDA:")) {
+      const coma = l.indexOf(",");
+      if (coma < 0) continue;
+      const hits = Number(l.slice("FNDA:".length, coma));
+      const nombre = l.slice(coma + 1).trim();
+      if (!nombre || !Number.isFinite(hits)) continue;
+      ejecuciones.push({ nombre, hits });
+    } else if (l.startsWith("BRDA:")) {
+      const partes = l.slice("BRDA:".length).split(",");
+      if (partes.length < 4) continue;
+      // "-" significa que el bloque nunca se ejecuto, asi que la rama tampoco.
+      const bruto = partes[3].trim();
+      const tomada = bruto === "-" ? 0 : Number(bruto);
+      if (!Number.isFinite(tomada)) continue;
+      maximo(actual.ramas, `${partes[0]},${partes[1]},${partes[2]}`, tomada);
     }
   }
+  // Un lcov sin el `end_of_record` final no pierde su ultimo registro.
+  cerrarRegistro();
   return acumulado;
+}
+
+/** Fusiona el registro de `origen` sobre `destino`, quedandose con el maximo. */
+export function fusionarRegistro(destino, origen) {
+  for (const clave of ["lineas", "funciones", "ramas"]) {
+    for (const [k, h] of origen[clave]) {
+      destino[clave].set(k, Math.max(destino[clave].get(k) ?? 0, h));
+    }
+  }
+  destino.funcionesDesparejadas += origen.funcionesDesparejadas;
+  return destino;
+}
+
+/**
+ * La vista de LINEAS del parser detallado: Map<rutaCruda, Map<linea, hits>>.
+ * Es lo unico que necesita el plano del diff, y conserva la firma que ya tenia.
+ */
+export function parsearLcov(texto, acumulado = new Map()) {
+  for (const [ruta, registro] of parsearLcovDetallado(texto)) {
+    let previo = acumulado.get(ruta);
+    if (!previo) acumulado.set(ruta, (previo = new Map()));
+    for (const [l, h] of registro.lineas) previo.set(l, Math.max(previo.get(l) ?? 0, h));
+  }
+  return acumulado;
+}
+
+// ------------------------------------------- el total, paquete por paquete ---
+//
+// EL SEGUNDO PLANO DEL REQUIREMENT DE COBERTURA, y hasta hoy el que no existia.
+// El plano del diff (todo lo de arriba) protege el codigo NUEVO; sin este, el
+// codigo que ya esta sin pruebas se queda asi para siempre porque nadie lo
+// toca. Medido en el consumidor real: 70,69% de funciones en `web`, 9,4 puntos
+// por debajo del minimo declarado de 80, con EXIT 0 — y el spec prometia rojo.
+//
+// La regla, por metrica medible de cada paquete:
+//
+//   1. total < piso declarado          -> ROJO (retroceso: el piso es ganancia
+//                                        acumulada y no vuelve atras, este
+//                                        arriba o abajo del minimo)
+//   2. total >= minimo del marco       -> VERDE
+//   3. total < minimo del marco y
+//        a. sin deuda declarada        -> ROJO (no esta en transicion: incumple)
+//        b. deuda con fecha vencida    -> ROJO (a partir de ese dia se compara
+//                                        contra el MINIMO, no contra el piso)
+//        c. deuda con fecha vigente    -> AMARILLO, y reporta cuanto falta y
+//                                        cuanto plazo queda
+//
+// El umbral del consumidor NO participa: aca solo puede SUBIR la exigencia
+// (ratchet por encima del minimo), nunca bajarla. Bajar `minimo` a 40 volvia
+// verde un paquete al 33% — es la tercera medicion que este bloque cierra.
+
+/** Dias enteros entre dos fechas ISO (positivo = `hasta` esta en el futuro). */
+export function diasEntre(desde, hasta) {
+  const ms = Date.parse(`${hasta}T00:00:00Z`) - Date.parse(`${desde}T00:00:00Z`);
+  return Math.round(ms / 86400000);
+}
+
+/**
+ * El veredicto del total de UN paquete. Funcion pura a proposito: la regla se
+ * prueba sin armar un repositorio ni un lcov, y los casos de borde (la fecha
+ * que vence HOY, el piso por encima del minimo) quedan escritos como aserciones
+ * y no como un repo temporal que nadie relee.
+ *
+ * `metricas`: { lineas: {encontradas, cubiertas}, funciones: {...}, ramas: {...} }
+ */
+export function veredictoDePaquete({
+  metricas = {},
+  piso = {},
+  deuda = null,
+  minimo,
+  hoy,
+  ventanaHasta = VENTANA_DE_GRACIA_HASTA,
+}) {
+  const vencida = deuda ? diasEntre(hoy, deuda.fecha) < 0 : false;
+  // La ventana de gracia del estreno: mientras dura, la falta de declaracion
+  // avisa en vez de detener. Ver VENTANA_DE_GRACIA_HASTA.
+  const enVentana = ventanaHasta ? diasEntre(hoy, ventanaHasta) >= 0 : false;
+  const filas = [];
+  let rojo = false;
+  let amarillo = false;
+
+  for (const { clave, etiqueta } of METRICAS_DE_COBERTURA) {
+    const m = metricas[clave];
+    // Denominador cero = no hay nada de esa metrica que medir en este paquete
+    // (un paquete sin ramas, un reporter que no emite FN). Se declara "n/a" en
+    // el resumen en vez de callarse: un salteo mudo es indistinguible de una
+    // metrica que nadie mide.
+    if (!m || !m.encontradas) {
+      filas.push({ clave, etiqueta, medible: false });
+      continue;
+    }
+    const pct = (m.cubiertas / m.encontradas) * 100;
+    const pisoDeclarado = typeof piso[clave] === "number" ? piso[clave] : null;
+    const fila = {
+      clave,
+      etiqueta,
+      medible: true,
+      pct,
+      encontradas: m.encontradas,
+      cubiertas: m.cubiertas,
+      pisoDeclarado,
+      veredicto: "verde",
+      falta: 0,
+    };
+    if (pisoDeclarado !== null && pct + EPSILON < pisoDeclarado) {
+      fila.veredicto = "retroceso";
+      rojo = true;
+    } else if (pct + EPSILON < minimo) {
+      fila.falta = minimo - pct;
+      if (!deuda) {
+        if (enVentana) {
+          fila.veredicto = "sin-plazo-en-gracia";
+          amarillo = true;
+        } else {
+          fila.veredicto = "sin-plazo";
+          rojo = true;
+        }
+      } else if (vencida) {
+        fila.veredicto = "plazo-vencido";
+        rojo = true;
+      } else {
+        fila.veredicto = "en-plazo";
+        amarillo = true;
+      }
+    }
+    filas.push(fila);
+  }
+
+  return {
+    filas,
+    vencida,
+    enVentana,
+    ventanaHasta,
+    diasDeVentana: ventanaHasta ? diasEntre(hoy, ventanaHasta) : null,
+    diasDePlazo: deuda ? diasEntre(hoy, deuda.fecha) : null,
+    estado: rojo ? "rojo" : amarillo ? "amarillo" : "verde",
+  };
+}
+
+/**
+ * Reparte la cobertura resuelta entre los paquetes que la contienen y suma sus
+ * metricas. Devuelve `{ porPaquete: Map<paquete, metricas>, excluidos, pruebas }`.
+ *
+ * Lo que NO cuenta en el total, y por que:
+ *  - los archivos de prueba: medir la cobertura de las pruebas infla el total
+ *    con el codigo que siempre se ejecuta;
+ *  - los excluidos por una exclusion declarada CON MOTIVO, que es la valvula
+ *    que el mismo spec contempla ("ese codigo no cuenta en el calculo").
+ */
+export function agregarPorPaquete({ cobertura, paquetes, exclusionDe }) {
+  const porPaquete = new Map();
+  const excluidos = [];
+  const pruebas = [];
+  const sinPaquete = [];
+
+  for (const [archivo, registro] of cobertura) {
+    if (esArchivoDePrueba(archivo)) {
+      pruebas.push(archivo);
+      continue;
+    }
+    const exclusion = exclusionDe(archivo);
+    if (exclusion) {
+      excluidos.push({ archivo, ...exclusion });
+      continue;
+    }
+    const paq = paqueteDe(paquetes, archivo);
+    if (!paq) {
+      sinPaquete.push(archivo);
+      continue;
+    }
+    let acumulado = porPaquete.get(paq);
+    if (!acumulado) {
+      acumulado = { archivos: 0, desparejados: 0, metricas: {} };
+      for (const { clave } of METRICAS_DE_COBERTURA) {
+        acumulado.metricas[clave] = { encontradas: 0, cubiertas: 0 };
+      }
+      porPaquete.set(paq, acumulado);
+    }
+    acumulado.archivos++;
+    acumulado.desparejados += registro.funcionesDesparejadas ?? 0;
+    for (const { clave } of METRICAS_DE_COBERTURA) {
+      const items = registro[clave];
+      acumulado.metricas[clave].encontradas += items.size;
+      for (const hits of items.values()) if (hits > 0) acumulado.metricas[clave].cubiertas++;
+    }
+  }
+
+  return { porPaquete, excluidos, pruebas, sinPaquete };
+}
+
+/**
+ * Las exclusiones declaradas, leidas con la misma mecanica del censo: el
+ * manifiesto del paquete que CONTIENE el archivo, patron + motivo escrito. Una
+ * exclusion sin motivo no excusa nada (y el censo la enrojece por su cuenta).
+ *
+ * Los DOS planos la comparten: si el plano del diff perdonara un archivo que el
+ * del total sigue contando, la misma exclusion querria decir dos cosas.
+ */
+export function crearExclusionDe(paquetes) {
+  return (archivo) => {
+    const paq = paqueteDe(paquetes, archivo);
+    if (!paq || paq.error) return null;
+    const prefijo = paq.dir ? `${paq.dir}/` : "";
+    const relativa = archivo.slice(prefijo.length);
+    for (const ex of paq.excluidos) {
+      const patron = typeof ex?.patron === "string" ? ex.patron.trim() : "";
+      const motivo = typeof ex?.motivo === "string" ? ex.motivo.trim() : "";
+      if (!patron || !motivo) continue;
+      if (globDelCenso(patron).test(relativa)) return { patron, motivo, manifiesto: paq.manifiesto };
+    }
+    return null;
+  };
+}
+
+/** La fecha con la que se compara el plazo. Ver COBERTURA_HOY mas abajo. */
+function fechaDeLaCorrida() {
+  const crudo = (process.env.COBERTURA_HOY ?? "").trim();
+  if (!crudo) return new Date().toISOString().slice(0, 10);
+  // Existe para que las pruebas puedan fijar el dia, y es la unica palanca del
+  // script capaz de aflojar una compuerta (una fecha en el pasado revive un
+  // plazo vencido). Por eso NUNCA es silenciosa: si se usa, la corrida lo dice.
+  if (!esFechaIso(crudo)) {
+    console.error(
+      `::warning::COBERTURA_HOY="${crudo}" no es una fecha AAAA-MM-DD: se ignora y el plazo se compara contra la fecha real de la corrida`
+    );
+    return new Date().toISOString().slice(0, 10);
+  }
+  console.error(
+    `::warning::la fecha de la corrida esta forzada a ${crudo} por COBERTURA_HOY: los plazos de las deudas de cobertura se comparan contra ese dia y no contra hoy`
+  );
+  return crudo;
+}
+
+const pct = (n) => `${n.toFixed(2)}%`;
+
+/**
+ * Corre la compuerta del total y devuelve su codigo de salida (0 o 1). Escribe
+ * su propia seccion del resumen SIEMPRE, tambien en verde: "cada corrida SHALL
+ * reportar, por cada paquete que este por debajo del minimo, cuanto le falta y
+ * cuanto plazo le queda". Una deuda que no se nombra en cada corrida es una
+ * deuda que nadie mira hasta el dia en que vence.
+ */
+function compuertaDelTotal({ paquetes, exclusionDe, cobertura, minimoLocal, ambiguos }) {
+  // El minimo del marco es PISO DURO del total: el umbral del consumidor solo
+  // puede subirlo. Si pudiera bajarlo, la compuerta seria una sugerencia.
+  const minimo = Math.max(MINIMO_DEL_MARCO, minimoLocal);
+  const hoy = fechaDeLaCorrida();
+
+  RT("");
+  RT("## Cobertura total por paquete");
+  RT("");
+  RT(`Minimo del marco: **${MINIMO_DEL_MARCO}%** · exigido en esta corrida: **${minimo}%** · fecha: \`${hoy}\``);
+  RT("");
+
+  if (!paquetes.length) {
+    console.log("::notice::el repositorio no versiona ningun package.json: no hay paquete cuyo total medir");
+    RT("**No aplicable** — el repositorio no versiona ningun manifiesto de paquete.");
+    return 0;
+  }
+
+  // Un manifiesto con el piso o la deuda mal declarados NO se lee como "sin
+  // declaracion": se lee como rojo. Si se leyera como "sin declaracion", una
+  // fecha mal escrita seria la forma mas barata de no tener plazo.
+  const malDeclarados = paquetes.filter((p) => p.error);
+
+  const ambiguas = new Set(ambiguos.map((a) => a.resuelta));
+  const coberturaDelTotal = new Map();
+  for (const [archivo, registro] of cobertura) {
+    if (!ambiguas.has(archivo)) coberturaDelTotal.set(archivo, registro);
+  }
+  if (ambiguas.size) {
+    console.error(
+      `::warning::${ambiguas.size} archivo(s) quedaron FUERA del total porque su ruta SF: corresponde a dos archivos versionados distintos y no se puede saber a que paquete atribuirlos: ${[...ambiguas].slice(0, 5).join(", ")}. Arreglo: configura el projectRoot del reporter lcov en la raiz del repositorio`
+    );
+  }
+
+  const { porPaquete, excluidos, pruebas, sinPaquete } = agregarPorPaquete({
+    cobertura: coberturaDelTotal,
+    paquetes,
+    exclusionDe,
+  });
+
+  // Lo que quedo FUERA del denominador se declara ANTES de cualquier veredicto,
+  // incluido el "no medido" de mas abajo: si un repositorio excluye todo lo que
+  // sus reportes reclaman, el resumen tiene que decir "esta excluido con su
+  // motivo" y no "ningun reporte reclama nada", que es un diagnostico falso.
+  const declararFueraDelTotal = () => {
+    if (excluidos.length) {
+      console.log(
+        `::notice::${excluidos.length} archivo(s) quedaron fuera del total por una exclusion declarada con motivo`
+      );
+      RT("Archivos fuera del total por una exclusion declarada, con su motivo:");
+      for (const x of excluidos.slice(0, 20)) {
+        RT(`- \`${x.archivo}\` — ${x.motivo} (\`${x.manifiesto}\`, patron \`${x.patron}\`)`);
+      }
+      if (excluidos.length > 20) RT(`- ...y ${excluidos.length - 20} mas`);
+      RT("");
+    }
+    if (pruebas.length || sinPaquete.length) {
+      RT(
+        `Fuera del total, ademas: ${pruebas.length} archivo(s) de prueba y ${sinPaquete.length} archivo(s) sin paquete contenedor.`
+      );
+      RT("");
+    }
+  };
+
+  if (!porPaquete.size && !malDeclarados.length) {
+    declararFueraDelTotal();
+    if (excluidos.length) {
+      // Caso legitimo: todo lo medible esta excluido con su motivo escrito.
+      RT("**Sin total que medir** — todo lo que los reportes reclaman esta excluido del calculo con su motivo declarado.");
+      return 0;
+    }
+    // Sin reportes no hay total que medir. NO es rojo por si mismo: el plano
+    // del diff ya enrojece cuando hay lineas agregadas sin datos, y en un push
+    // a main sin cobertura emitida no hay nada que verificar. Pero se dice.
+    console.error(
+      `::warning::ningun reporte de cobertura reclama archivos de un paquete versionado: el total por paquete NO se pudo medir en esta corrida. Arreglo: corre las pruebas con cobertura (y con 'all: true') antes de este paso`
+    );
+    RT("**No medido** — ningun reporte de cobertura reclama archivos de algun paquete.");
+    RT("");
+    RT("Arreglo: corre las pruebas **con cobertura** y con `all: true` antes de este paso.");
+    return 0;
+  }
+
+  const veredictos = [...porPaquete.entries()]
+    .map(([paq, agregado]) => ({
+      paq,
+      agregado,
+      veredicto: veredictoDePaquete({
+        metricas: agregado.metricas,
+        piso: paq.piso,
+        deuda: paq.deuda,
+        minimo,
+        hoy,
+      }),
+    }))
+    .sort((a, b) => (a.paq.dir || ".").localeCompare(b.paq.dir || "."));
+
+  // El denominador de funciones es exacto solo si cada FNDA pudo emparejarse
+  // con su FN. Cuando no, el numero sigue saliendo —es lo mejor que hay— pero
+  // no se publica como si fuera exacto: un sesgo silencioso en esta metrica es
+  // el que dejo al consumidor en verde a 70,69%.
+  const desparejados = veredictos.reduce((a, v) => a + (v.agregado.desparejados ?? 0), 0);
+  if (desparejados) {
+    console.error(
+      `::warning::en ${desparejados} registro(s) de cobertura los FNDA: no se pudieron emparejar con sus FN:, asi que el total de FUNCIONES de esos paquetes es aproximado y no exacto. Arreglo: revisa el reporter lcov del paquete — el formato espera todos los FN: de un archivo y despues todos sus FNDA:, en el mismo orden`
+    );
+    RT(`> ⚠️ El total de funciones es aproximado: ${desparejados} registro(s) con FN:/FNDA: desparejados.`);
+    RT("");
+  }
+
+  RT("| Paquete | Metrica | Total | Minimo | Piso declarado | Estado |");
+  RT("|---|---|---:|---:|---:|---|");
+  const etiquetaDeEstado = {
+    verde: "OK",
+    retroceso: "ROJO · retroceso",
+    "sin-plazo": "ROJO · sin plazo",
+    "sin-plazo-en-gracia": "AMARILLO · ventana de estreno",
+    "plazo-vencido": "ROJO · plazo vencido",
+    "en-plazo": "AMARILLO · en plazo",
+  };
+  for (const { paq, veredicto } of veredictos) {
+    for (const fila of veredicto.filas) {
+      const nombre = `\`${paq.dir || "."}\``;
+      if (!fila.medible) {
+        RT(`| ${nombre} | ${fila.etiqueta} | n/a | ${minimo}% | — | sin datos de esa metrica |`);
+        continue;
+      }
+      RT(
+        `| ${nombre} | ${fila.etiqueta} | **${pct(fila.pct)}** | ${minimo}% | ${
+          fila.pisoDeclarado === null ? "—" : `${fila.pisoDeclarado}%`
+        } | ${etiquetaDeEstado[fila.veredicto]} |`
+      );
+    }
+  }
+  RT("");
+
+  let codigo = 0;
+
+  // EL DEBER DE REPORTE, y sale en TODA corrida: cuanto falta y cuanto plazo
+  // queda, paquete por paquete y metrica por metrica.
+  const enFalta = veredictos.filter((v) => v.veredicto.filas.some((f) => f.medible && f.falta > 0));
+  if (enFalta.length) {
+    RT("### Paquetes por debajo del minimo del marco");
+    RT("");
+    for (const { paq, veredicto } of enFalta) {
+      const faltantes = veredicto.filas.filter((f) => f.medible && f.falta > 0);
+      const detalle = faltantes
+        .map((f) => `${f.etiqueta} ${pct(f.pct)} (faltan ${f.falta.toFixed(2)} puntos)`)
+        .join("; ");
+      if (paq.deuda) {
+        const dias = veredicto.diasDePlazo;
+        const plazo = veredicto.vencida
+          ? `plazo VENCIDO hace ${Math.abs(dias)} dia(s) (${paq.deuda.fecha})`
+          : `quedan ${dias} dia(s) de plazo (${paq.deuda.fecha})`;
+        RT(`- \`${paq.dir || "."}\`: ${detalle} — ${plazo}. Motivo declarado: ${paq.deuda.motivo}`);
+      } else if (veredicto.enVentana) {
+        RT(
+          `- \`${paq.dir || "."}\`: ${detalle} — **sin deuda declarada** en \`${paq.manifiesto}\`. Pasa por la ventana de estreno de esta compuerta, que se cierra el **${veredicto.ventanaHasta}** (quedan ${veredicto.diasDeVentana} dia(s)): desde ese dia esto es rojo.`
+        );
+      } else {
+        RT(`- \`${paq.dir || "."}\`: ${detalle} — **sin deuda declarada** en \`${paq.manifiesto}\``);
+      }
+    }
+    RT("");
+  }
+
+  for (const { paq, agregado, veredicto } of veredictos) {
+    const nombre = paq.dir || ".";
+    const retrocesos = veredicto.filas.filter((f) => f.veredicto === "retroceso");
+    const sinPlazo = veredicto.filas.filter((f) => f.veredicto === "sin-plazo");
+    const vencidos = veredicto.filas.filter((f) => f.veredicto === "plazo-vencido");
+    const enPlazo = veredicto.filas.filter((f) => f.veredicto === "en-plazo");
+    const enGracia = veredicto.filas.filter((f) => f.veredicto === "sin-plazo-en-gracia");
+
+    for (const f of retrocesos) {
+      console.error(
+        `::error file=${paq.manifiesto}::el total de ${f.etiqueta} del paquete "${nombre}" es ${pct(f.pct)} y su piso declarado es ${f.pisoDeclarado}%: la cobertura ya conseguida RETROCEDIO. El piso es ganancia acumulada y no vuelve atras. Arreglo: agrega pruebas hasta recuperar el piso; si el descenso es deliberado, bajar el piso es una linea de diff en ${paq.manifiesto} con su motivo escrito y bajo review`
+      );
+    }
+    for (const f of sinPlazo) {
+      console.error(
+        `::error file=${paq.manifiesto}::el total de ${f.etiqueta} del paquete "${nombre}" es ${pct(f.pct)} y el minimo del marco es ${minimo}%: faltan ${f.falta.toFixed(2)} puntos y el paquete no declara ni motivo ni fecha. Un paquete por debajo del minimo sin plazo escrito no esta en transicion, esta incumpliendo. Arreglo: agrega pruebas hasta el minimo, o declara la deuda en ${paq.manifiesto} con projects.cobertura.deuda = { "motivo": "<por que>", "fecha": "AAAA-MM-DD" }`
+      );
+    }
+    for (const f of vencidos) {
+      console.error(
+        `::error file=${paq.manifiesto}::el plazo que el paquete "${nombre}" declaro (${paq.deuda.fecha}) vencio hace ${Math.abs(veredicto.diasDePlazo)} dia(s) y su total de ${f.etiqueta} sigue en ${pct(f.pct)}, ${f.falta.toFixed(2)} puntos por debajo del minimo de ${minimo}%. Desde el dia del vencimiento la comparacion es contra el MINIMO y no contra el piso. Arreglo: agrega pruebas hasta el minimo; correr la fecha se puede, pero es una linea de diff en ${paq.manifiesto} con su motivo y con el avance conseguido desde la fecha anterior, bajo review`
+      );
+    }
+    for (const f of enPlazo) {
+      console.error(
+        `::warning file=${paq.manifiesto}::el paquete "${nombre}" esta ${f.falta.toFixed(2)} puntos por debajo del minimo de ${minimo}% en ${f.etiqueta} (${pct(f.pct)}) y le quedan ${veredicto.diasDePlazo} dia(s) de plazo (${paq.deuda.fecha}). Motivo declarado: ${paq.deuda.motivo}`
+      );
+    }
+    // La ventana de estreno NO puede ser un verde discreto: si el consumidor no
+    // se entera de que esto va a ser rojo, la ventana no le sirvio de nada y el
+    // rojo lo cobra el que pasa por ahi el dia que se cierra.
+    for (const f of enGracia) {
+      console.error(
+        `::warning file=${paq.manifiesto}::el total de ${f.etiqueta} del paquete "${nombre}" es ${pct(f.pct)} y el minimo del marco es ${minimo}%: faltan ${f.falta.toFixed(2)} puntos y el paquete no declara ni motivo ni fecha. Esta corrida PASA por la ventana de estreno de esta compuerta, que se cierra el ${veredicto.ventanaHasta} (quedan ${veredicto.diasDeVentana} dia(s)); desde ese dia el mismo estado es ROJO. Arreglo: agrega pruebas hasta el minimo, o declara la deuda en ${paq.manifiesto} con projects.cobertura.deuda = { "motivo": "<por que>", "fecha": "AAAA-MM-DD" }`
+      );
+    }
+
+    if (veredicto.estado === "rojo") codigo = 1;
+    if (veredicto.estado === "verde") {
+      const medibles = veredicto.filas.filter((f) => f.medible);
+      console.log(
+        `OK  total del paquete "${nombre}" (${agregado.archivos} archivo(s)): ${medibles
+          .map((f) => `${f.etiqueta} ${pct(f.pct)}`)
+          .join(", ")} · minimo ${minimo}%`
+      );
+    }
+  }
+
+  for (const p of malDeclarados) {
+    codigo = 1;
+    console.error(
+      `::error file=${p.manifiesto}::la configuracion de cobertura de "${p.dir || "."}" esta mal declarada y no se puede leer como declaracion valida: ${p.error}. Una declaracion invalida NO cuenta como declarada — si contara, una fecha mal escrita seria la forma mas barata de no tener plazo. Arreglo: corregi ${p.manifiesto}`
+    );
+    RT(`- \`${p.manifiesto}\`: declaracion de cobertura invalida — ${p.error}`);
+  }
+
+  declararFueraDelTotal();
+
+  const publicables = [
+    `paquetes_medidos=${porPaquete.size}`,
+    `paquetes_bajo_minimo=${enFalta.length}`,
+    `paquetes_en_rojo=${veredictos.filter((v) => v.veredicto.estado === "rojo").length + malDeclarados.length}`,
+  ];
+  console.log(`salidas del total: ${publicables.join(" ")}`);
+  const destino = process.env.GITHUB_OUTPUT;
+  if (destino) {
+    try {
+      appendFileSync(destino, publicables.join("\n") + "\n");
+    } catch (e) {
+      console.error(`::warning::no se pudieron publicar las salidas del total: ${e.message}`);
+    }
+  }
+
+  const porLaVentana = veredictos.filter((v) =>
+    v.veredicto.filas.some((f) => f.veredicto === "sin-plazo-en-gracia")
+  );
+  RT(
+    codigo === 0
+      ? porLaVentana.length
+        ? `**Pasa por la ventana de estreno** — ${porLaVentana.length} paquete(s) por debajo del minimo sin deuda declarada. La ventana se cierra el **${VENTANA_DE_GRACIA_HASTA}** y desde ese dia esto es rojo.`
+        : enFalta.length
+          ? `**Pasa con deuda** — ${enFalta.length} paquete(s) por debajo del minimo, todos con plazo declarado y vigente.`
+          : `**Pasa** — los ${porPaquete.size} paquete(s) medidos estan en o por encima del minimo del marco.`
+      : "**Fallo** — hay paquetes cuyo total incumple el minimo del marco (detalle arriba)."
+  );
+  return codigo;
 }
 
 // -------------------------------------------------------------- programa ---
@@ -437,6 +1122,127 @@ function principal() {
   R("## Cobertura de las lineas del cambio");
   R("");
 
+  // -----------------------------------------------------------------------
+  // 0) LO QUE COMPARTEN LOS DOS PLANOS: los reportes, las rutas del control de
+  //    versiones y los manifiestos de los paquetes.
+  //
+  //    Esta lectura estaba mas abajo, DESPUES de los controles del rango del
+  //    diff. Subirla no es cosmetico: el total de un paquete no depende de
+  //    ningun rango, asi que en un push a main —donde el plano del diff NO
+  //    APLICA y salia 0— el total quedaba sin medir. Y parsear los lcov dos
+  //    veces, una por plano, es la receta para que los dos planos midan cosas
+  //    distintas con el mismo nombre.
+  // -----------------------------------------------------------------------
+  const rastreados = new Set(
+    (git(["ls-files", "-z"]) ?? "")
+      .split("\0")
+      .filter(Boolean)
+      .map(normalizarRuta)
+  );
+  const porMinusculas = new Map();
+  for (const r of rastreados) {
+    const clave = r.toLowerCase();
+    const lista = porMinusculas.get(clave);
+    if (lista) lista.push(r);
+    else porMinusculas.set(clave, [r]);
+  }
+
+  const resolverContraElRepo = (rutaSF) => {
+    let r = normalizarRuta(rutaSF);
+    if (esAbsoluta(r) && r.toLowerCase().startsWith(`${raizNormalizada.toLowerCase()}/`)) {
+      r = r.slice(raizNormalizada.length + 1);
+    }
+    if (rastreados.has(r)) return r;
+    // Windows y macOS no distinguen mayusculas: un lcov puede traer otra caja.
+    // Si hay mas de un candidato la resolucion es ambigua y se descarta.
+    const candidatos = porMinusculas.get(r.toLowerCase());
+    if (candidatos && candidatos.length === 1) return candidatos[0];
+    return null;
+  };
+
+  const rutasLcov = buscarLcov(raiz, GLOB_LCOV);
+  // De QUE reporte vino cada SF:. Sin esa procedencia no se puede ver la
+  // colision de rutas de un monorepo (el bloque 6b de mas abajo).
+  const origenes = new Map();
+  const detalle = new Map(); // rutaSF -> {lineas, funciones, ramas}
+  for (const ruta of rutasLcov) {
+    let parcial;
+    try {
+      parcial = parsearLcovDetallado(readFileSync(join(raiz, ruta), "utf8"), new Map());
+    } catch (e) {
+      console.error(`::warning::no se pudo leer el reporte ${ruta}: ${e.message}`);
+      continue;
+    }
+    const dirLcov = ruta.includes("/") ? ruta.slice(0, ruta.lastIndexOf("/")) : "";
+    for (const [rutaSF, registro] of parcial) {
+      let deDonde = origenes.get(rutaSF);
+      if (!deDonde) origenes.set(rutaSF, (deDonde = new Set()));
+      deDonde.add(dirLcov);
+      const previo = detalle.get(rutaSF);
+      if (!previo) detalle.set(rutaSF, registro);
+      else fusionarRegistro(previo, registro);
+    }
+  }
+
+  // Las rutas del lcov contra las del control de versiones. Este cruce ES el
+  // check: si ninguna resuelve, el reporte esta cableado contra otro arbol y
+  // "medir" daria cero lineas encontradas, o sea un falso verde.
+  const coberturaDetallada = new Map(); // ruta versionada -> {lineas, funciones, ramas}
+  const cobertura = new Map(); // ruta versionada -> Map<linea, hits>
+  const sinResolver = [];
+  const resueltaPorSF = new Map();
+  for (const [rutaSF, registro] of detalle) {
+    const resuelta = resolverContraElRepo(rutaSF);
+    if (!resuelta) {
+      sinResolver.push(rutaSF);
+      continue;
+    }
+    resueltaPorSF.set(rutaSF, resuelta);
+    const previo = coberturaDetallada.get(resuelta);
+    if (!previo) coberturaDetallada.set(resuelta, registro);
+    else fusionarRegistro(previo, registro);
+  }
+  for (const [resuelta, registro] of coberturaDetallada) cobertura.set(resuelta, registro.lineas);
+
+  // LA COLISION DE RUTAS DEL MONOREPO. "SF:src/util.ts" emitido por el paquete
+  // web/ resuelve contra el src/util.ts de la RAIZ: la ruta RESUELVE, asi que
+  // esquiva todas las defensas de arriba, y la cobertura de un archivo termina
+  // anotada en otro. El sintoma en el consumidor era un verde con el
+  // diagnostico equivocado. Si una ruta del reporte corresponde a DOS archivos
+  // versionados —el de la raiz y el que cuelga del directorio del propio
+  // reporte— no dice a cual, y no se puede medir.
+  const ambiguos = [];
+  for (const [rutaSF, deDonde] of origenes) {
+    const resuelta = resueltaPorSF.get(rutaSF);
+    if (!resuelta) continue;
+    const relativa = normalizarRuta(rutaSF);
+    if (esAbsoluta(relativa)) continue;
+    for (const dirLcov of deDonde) {
+      const partes = dirLcov ? dirLcov.split("/") : [];
+      for (let i = partes.length; i > 0; i--) {
+        const candidato = `${partes.slice(0, i).join("/")}/${relativa}`;
+        if (candidato !== resuelta && rastreados.has(candidato)) {
+          ambiguos.push({ rutaSF, resuelta, otro: candidato, reporte: dirLcov });
+          break;
+        }
+      }
+    }
+  }
+
+  const paquetes = leerPaquetes(raiz, [...rastreados]);
+  const exclusionDe = crearExclusionDe(paquetes);
+
+  // -----------------------------------------------------------------------
+  // PLANO DEL TOTAL. Corre ACA, antes que cualquier control del rango, porque
+  // no depende del rango. Su veredicto no cortocircuita nada: se guarda en
+  // `salidaMinima` y `terminar()` lo respeta, asi que el plano del diff sigue
+  // reportando su propio diagnostico completo.
+  // -----------------------------------------------------------------------
+  salidaMinima = Math.max(
+    salidaMinima,
+    compuertaDelTotal({ paquetes, exclusionDe, cobertura: coberturaDetallada, minimoLocal: minimo, ambiguos })
+  );
+
   // 1) Rango degenerado: sin base no hay cambio que medir. NO APLICA, y lo
   //    dice. Jamas se simula un 100%: un push a main no es un pull request con
   //    cobertura total.
@@ -447,9 +1253,10 @@ function principal() {
     console.log(`::notice::cobertura del cambio NO APLICABLE: ${motivo}`);
     R(`**No aplicable** — ${motivo}.`);
     R("");
-    R("Este paso mide las lineas que un pull request agrega respecto de su base.");
+    R("Este plano mide las lineas que un pull request agrega respecto de su base.");
     R("Fuera de ese contexto no hay rango que medir y no se reporta ningun");
-    R("porcentaje: el total del paquete es otra compuerta, con su propio piso.");
+    R("porcentaje. El plano del TOTAL por paquete no depende del rango y SI se");
+    R("midio: su veredicto esta en la seccion de abajo, y manda sobre esta.");
     publicar("n/a", 0, 0);
     terminar(0);
   }
@@ -511,75 +1318,9 @@ function principal() {
     terminar(0);
   }
 
-  // 4) Los reportes de cobertura.
-  const rutasLcov = buscarLcov(raiz, GLOB_LCOV);
-  const datos = new Map();
-  // De QUE reporte vino cada SF:. Sin esa procedencia no se puede ver la
-  // colision de rutas de un monorepo (punto 5 de mas abajo).
-  const origenes = new Map();
-  for (const ruta of rutasLcov) {
-    let parcial;
-    try {
-      parcial = parsearLcov(readFileSync(join(raiz, ruta), "utf8"), new Map());
-    } catch (e) {
-      console.error(`::warning::no se pudo leer el reporte ${ruta}: ${e.message}`);
-      continue;
-    }
-    const dirLcov = ruta.includes("/") ? ruta.slice(0, ruta.lastIndexOf("/")) : "";
-    for (const [rutaSF, lineas] of parcial) {
-      let deDonde = origenes.get(rutaSF);
-      if (!deDonde) origenes.set(rutaSF, (deDonde = new Set()));
-      deDonde.add(dirLcov);
-      const previo = datos.get(rutaSF);
-      if (!previo) datos.set(rutaSF, lineas);
-      else for (const [l, h] of lineas) previo.set(l, Math.max(previo.get(l) ?? 0, h));
-    }
-  }
-
-  // 5) Las rutas del lcov contra las del control de versiones. Este cruce ES
-  //    el check: si ninguna resuelve, el reporte esta cableado contra otro
-  //    arbol y "medir" daria cero lineas encontradas, o sea un falso verde.
-  const rastreados = new Set(
-    (git(["ls-files", "-z"]) ?? "")
-      .split("\0")
-      .filter(Boolean)
-      .map(normalizarRuta)
-  );
-  const porMinusculas = new Map();
-  for (const r of rastreados) {
-    const clave = r.toLowerCase();
-    const lista = porMinusculas.get(clave);
-    if (lista) lista.push(r);
-    else porMinusculas.set(clave, [r]);
-  }
-
-  const resolverContraElRepo = (rutaSF) => {
-    let r = normalizarRuta(rutaSF);
-    if (esAbsoluta(r) && r.toLowerCase().startsWith(`${raizNormalizada.toLowerCase()}/`)) {
-      r = r.slice(raizNormalizada.length + 1);
-    }
-    if (rastreados.has(r)) return r;
-    // Windows y macOS no distinguen mayusculas: un lcov puede traer otra caja.
-    // Si hay mas de un candidato la resolucion es ambigua y se descarta.
-    const candidatos = porMinusculas.get(r.toLowerCase());
-    if (candidatos && candidatos.length === 1) return candidatos[0];
-    return null;
-  };
-
-  const cobertura = new Map(); // ruta versionada -> Map<linea, hits>
-  const sinResolver = [];
-  const resueltaPorSF = new Map();
-  for (const [rutaSF, lineas] of datos) {
-    const resuelta = resolverContraElRepo(rutaSF);
-    if (!resuelta) {
-      sinResolver.push(rutaSF);
-      continue;
-    }
-    resueltaPorSF.set(rutaSF, resuelta);
-    const previo = cobertura.get(resuelta);
-    if (!previo) cobertura.set(resuelta, lineas);
-    else for (const [l, h] of lineas) previo.set(l, Math.max(previo.get(l) ?? 0, h));
-  }
+  // 4 y 5) Los reportes y su cruce contra el control de versiones ya se leyeron
+  //    en el bloque 0, que los DOS planos comparten. Lo que sigue son los
+  //    veredictos del plano del diff sobre esos mismos datos.
 
   // 6) EL CASO QUE HUNDE A LA HERRAMIENTA EXTERNA. Hay lineas agregadas y no
   //    hay un solo dato de cobertura que pueda corresponderles: rojo ruidoso
@@ -623,30 +1364,9 @@ function principal() {
   }
   const nombresSinResolver = new Set(sinResolver.map((r) => nombreDeArchivo(normalizarRuta(r))));
 
-  // 6b) LA COLISION DE RUTAS DEL MONOREPO. "SF:src/util.ts" emitido por el
-  //     paquete web/ resuelve contra el src/util.ts de la RAIZ: la ruta
-  //     RESUELVE, asi que esquiva todas las defensas de arriba, y la cobertura
-  //     de un archivo termina anotada en otro. El sintoma en el consumidor era
-  //     un verde con el diagnostico equivocado. Si una ruta del reporte
-  //     corresponde a DOS archivos versionados —el de la raiz y el que cuelga
-  //     del directorio del propio reporte— no dice a cual, y no se puede medir.
-  const ambiguos = [];
-  for (const [rutaSF, deDonde] of origenes) {
-    const resuelta = resueltaPorSF.get(rutaSF);
-    if (!resuelta) continue;
-    const relativa = normalizarRuta(rutaSF);
-    if (esAbsoluta(relativa)) continue;
-    for (const dirLcov of deDonde) {
-      const partes = dirLcov ? dirLcov.split("/") : [];
-      for (let i = partes.length; i > 0; i--) {
-        const candidato = `${partes.slice(0, i).join("/")}/${relativa}`;
-        if (candidato !== resuelta && rastreados.has(candidato)) {
-          ambiguos.push({ rutaSF, resuelta, otro: candidato, reporte: dirLcov });
-          break;
-        }
-      }
-    }
-  }
+  // 6b) LA COLISION DE RUTAS DEL MONOREPO (calculada en el bloque 0). Cuando
+  //     una ruta SF: corresponde a DOS archivos versionados, la cobertura se
+  //     anotaria en el archivo equivocado: para el plano del diff eso es rojo.
   if (ambiguos.length) {
     console.error(
       `::error::${ambiguos.length} ruta(s) SF: de los reportes corresponden a DOS archivos versionados distintos —el de la raiz del repositorio y el que cuelga del paquete que emitio el reporte—, asi que la cobertura se anotaria en el archivo equivocado y no hay medicion confiable. Arreglo: configura el projectRoot del reporter lcov en la raiz del repositorio (vitest: reporter: [["lcov", { projectRoot: <raiz del monorepo> }]]) para que cada SF: diga a que archivo corresponde, y vuelve a correr las pruebas`
@@ -700,25 +1420,9 @@ function principal() {
     return [...numeros].filter((l) => pareceEjecutable(texto.lineas[l - 1]) && !texto.tipos.has(l));
   };
 
-  // Las exclusiones declaradas, leidas con la misma mecanica del censo: el
-  // manifiesto del paquete que CONTIENE el archivo, patron + motivo escrito.
-  // Una exclusion sin motivo no excusa nada (y el censo la enrojece por su
-  // cuenta). Se arma perezosamente: la mayoria de los cambios no la necesita.
-  let paquetes = null;
-  const exclusionDe = (archivo) => {
-    if (paquetes === null) paquetes = leerPaquetes(raiz, [...rastreados]);
-    const paq = paqueteDe(paquetes, archivo);
-    if (!paq || paq.error) return null;
-    const prefijo = paq.dir ? `${paq.dir}/` : "";
-    const relativa = archivo.slice(prefijo.length);
-    for (const ex of paq.excluidos) {
-      const patron = typeof ex?.patron === "string" ? ex.patron.trim() : "";
-      const motivo = typeof ex?.motivo === "string" ? ex.motivo.trim() : "";
-      if (!patron || !motivo) continue;
-      if (globDelCenso(patron).test(relativa)) return { patron, motivo, manifiesto: paq.manifiesto };
-    }
-    return null;
-  };
+  // Las exclusiones declaradas se leen en el bloque 0 (`exclusionDe`), que los
+  // dos planos comparten a proposito: la misma exclusion no puede querer decir
+  // una cosa sobre las lineas del cambio y otra sobre el total del paquete.
 
   for (const [archivo, lineas] of [...agregadas].sort(([a], [b]) => a.localeCompare(b))) {
     const datosArchivo = cobertura.get(archivo);

@@ -128,6 +128,61 @@ D5c). Lo que falta, y vive en un PR del consumidor y no acá, es subir `function
 a 80 con pruebas contra scenarios de los specs vivos —jamás aflojando el umbral ni
 excluyendo archivos para llegar— o declarar la deuda con su motivo y su fecha.
 
+- [x] 4.5 **Construir la compuerta del total (2026-08-20, design D5d).** La
+      corrección anterior arregló la prosa del spec y no construyó nada, así que
+      la auditoría midió lo mismo otra vez: un paquete sintético al 33,3% sin
+      motivo ni fecha declarados salía `EXIT 0`; con la fecha vencida en
+      1999-01-01, `EXIT 0`; con los umbrales del consumidor bajados a 40,
+      `EXIT 0`; y el deber de reporte por corrida no salía en el resumen. El
+      requirement había pasado de una promesa sin implementar a cuatro. Hecho: el
+      plano del total dentro de `cobertura-diff`, con cada caso cerrado y su rojo
+      demostrado en las dos direcciones. Evidencia: 33 pruebas nuevas en
+      `actions/cobertura-diff/pruebas/cobertura-total.test.mjs`; los 9 casos de
+      comportamiento corridos contra el código ANTERIOR (`EXIT 0` en todos) y
+      contra el nuevo (`EXIT 1`, o verde con la deuda reportada en el resumen); y
+      17 mutaciones del código nuevo, todas muertas por el banco.
+- [x] 4.5b **El estreno lleva ventana con fecha, y la ventana se cierra sola
+      (2026-08-20).** Verificado contra un espejo del consumidor real: en `main`,
+      con sus reportes `lcov` del día, el plano del total lo enrojece —`web` en
+      70,70% de funciones, 9,30 puntos por debajo, sin declaración—. Su arreglo
+      existe medido pero vive en `feat/cobertura-web-funciones-80`, sin mergear, y
+      `v1` es un tag móvil: la compuerta llegaría antes que el arreglo. Hecho:
+      `VENTANA_DE_GRACIA_HASTA = "2026-09-30"` afloja **solo** la falta de
+      declaración, avisando el día en que será rojo, y no perdona deuda vencida,
+      retroceso ni declaración inválida. Evidencia: el espejo del consumidor pasa
+      hoy con el aviso (`EXIT 0`, 41 días), y el mismo repositorio sintético da
+      `EXIT 1` con la ventana cerrada.
+- [ ] 4.5c **Pendiente del consumidor, con fecha:** mergear
+      `feat/cobertura-web-funciones-80` (o declarar la deuda de `web` con su
+      motivo y su fecha) **antes del 2026-09-30**. Pasada esa fecha el marco lo
+      enrojece sin que nadie toque una línea, que es exactamente el punto.
+- [ ] 4.5d **Limpieza posterior:** borrar `VENTANA_DE_GRACIA_HASTA` y su rama en
+      `veredictoDePaquete` cuando la fecha haya pasado. Es un PR de limpieza que
+      NO cambia comportamiento: la ventana ya está cerrada por fecha para
+      entonces.
+- [x] 4.6 **El marco reparte el umbral del total (2026-08-20).** El andamio no
+      repartía ninguno, así que cada proyecto inventaba el número, y el que se
+      inventa es el que la medición dio ese día: así llegó `functions: 70.6`.
+      Hecho: `plantilla/vitest.config.base.mjs` con las cuatro métricas en el
+      mínimo del marco, `all: true` y el `projectRoot` del reporter en la raíz
+      del monorepo, más un check del `marco-ci` que compara ese número contra la
+      constante del comparador. Evidencia: el check en verde y sus tres rojos
+      demostrados (archivo ausente, números divergentes, `all: true` sacado).
+- [ ] 4.7 **Pendiente, con su motivo escrito: nada verifica que el delta de un
+      change y el spec vivo coincidan mientras ese change se archiva.** Las tres
+      ediciones de este requirement mantuvieron los dos archivos iguales a mano
+      —esta última con un solo script para los dos y comprobación por md5 de la
+      sección completa—, pero eso es disciplina de cada sesión y no una propiedad
+      del repositorio. **Ojo con la forma del check**, porque escrito mal se
+      implementa mal: NO es una comparación permanente entre `changes/archive/`
+      y `openspec/specs/`. El archive es historia inmutable y el spec vivo
+      evoluciona, así que un change posterior sobre el mismo requirement los hace
+      divergir con razón, y un check así daría rojo para siempre enseñando a
+      arreglarlo reescribiendo la historia. El alcance correcto es: mientras el PR
+      que archiva un change está abierto, su delta y el spec vivo son dos caras
+      del mismo cambio y tienen que coincidir en los requirements que toca. No se
+      hizo acá para no agrandar el arreglo, y queda como change de Projects.
+
 ## 5. Cierre
 
 - [x] 5.1 Confirmar que ningún consumidor quedó rojo por el aterrizaje.

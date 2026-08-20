@@ -231,8 +231,16 @@ marco una deuda se declara con su fecha o pone rojo.
 
 Esa declaración SHALL vivir en el manifiesto del propio paquete, junto a sus
 exclusiones declaradas, y SHALL llevar dos datos: el motivo escrito y la fecha en
-la que el paquete alcanza el mínimo. En consecuencia la integración SHALL fallar
-en tres casos, y el tercero es el que distingue esta garantía de un piso a secas:
+la que el paquete alcanza el mínimo. El piso SHALL declararse en ese mismo lugar,
+y un paquete que no declara ninguno SHALL tener el mínimo del marco como piso: la
+ausencia de declaración no baja la exigencia, la deja en el destino. Una
+declaración a medio escribir —sin motivo, con una fecha que no existe en el
+calendario, con una métrica que el marco no reconoce— NO SHALL contar como
+declarada, porque si contara, escribirla mal sería la forma más barata de no
+tener plazo.
+
+En consecuencia la integración SHALL fallar en tres casos, y el tercero es el que
+distingue esta garantía de un piso a secas:
 
 1. cuando el total de un paquete cae por debajo de su piso vigente, esté ese piso
    arriba o abajo del mínimo;
@@ -245,6 +253,21 @@ en tres casos, y el tercero es el que distingue esta garantía de un piso a seca
 Correr la fecha SHALL ser una declaración explícita y revisable: una línea de diff,
 con su motivo y con el avance conseguido desde la fecha anterior, y jamás un ajuste
 silencioso. Descender el piso, lo mismo.
+
+**El umbral que el proyecto configure para su propia herramienta SHALL poder
+exigir MÁS que el mínimo del marco, y nunca menos.** Sobre las líneas del cambio,
+bajarlo es una decisión del proyecto y alcanza con que la corrida lo diga; sobre
+el total no, porque un piso que el propio paquete puede bajar no es un piso. La
+verificación del total SHALL recalcularse desde los datos de cobertura y
+compararse contra el mínimo del marco, en vez de creerle a la configuración local.
+La medición que lo obliga: con los cuatro umbrales del consumidor bajados a 40, un
+paquete al 33,3% pasaba la integración entera en verde.
+
+**El marco SHALL repartir el umbral del total junto con su andamio**, para que un
+paquete nuevo nazca con el piso puesto en vez de inventarlo. Un umbral que cada
+proyecto se escribe termina fijado en el número que la medición dio ese día, y ese
+número no exige nada porque ya está cumplido por construcción: así llegó el
+consumidor a declarar 70,6 en funciones estando a 70,69.
 
 Cada corrida SHALL reportar, por cada paquete que esté por debajo del mínimo,
 cuánto le falta y cuánto plazo le queda. Una deuda que no se nombra en cada corrida
@@ -287,6 +310,18 @@ con su motivo escrito, del mismo modo que las exclusiones del alcance.
 #### Scenario: La cobertura total de un paquete retrocede
 - **WHEN** el total de un paquete cae por debajo de su piso vigente
 - **THEN** la integración falla aunque el total siga por encima del mínimo del marco, porque el piso es la ganancia acumulada y no vuelve atrás
+
+#### Scenario: El proyecto configura para sí mismo un umbral menor que el mínimo del marco
+- **WHEN** la configuración de cobertura de un paquete exige menos que el mínimo del marco y su total está por debajo de ese mínimo
+- **THEN** la integración falla comparando contra el mínimo del marco: bajar el umbral local sube la exigencia o no la mueve, y jamás vuelve verde un paquete en deuda
+
+#### Scenario: Una declaración de deuda o de piso mal escrita
+- **WHEN** un paquete por debajo del mínimo declara su deuda sin motivo, con una fecha que no existe en el calendario, o con una métrica que el marco no reconoce
+- **THEN** la integración falla nombrando el manifiesto y el error: una declaración inválida no es una declaración, y no compra plazo
+
+#### Scenario: Un paquete nuevo creado desde el andamio del marco
+- **WHEN** un proyecto se crea copiando el andamio que el marco reparte
+- **THEN** su configuración de cobertura llega con el mínimo del marco puesto en todas sus métricas, sin ningún número que el proyecto tenga que inventar
 
 #### Scenario: Un cambio que solo elimina código
 - **WHEN** un cambio únicamente elimina líneas, o renombra sin agregar código ejecutable

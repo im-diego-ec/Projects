@@ -1,0 +1,105 @@
+// Base de cobertura compartida del monorepo. Vive en la RAIZ y cada paquete la
+// extiende desde su propia config:
+//
+//   // {{PAQUETE_WEB}}/vite.config.ts
+//   import { defineConfig } from "vitest/config";
+//   import { coberturaDelMarco } from "../vitest.config.base.mjs";
+//   export default defineConfig({ test: { ...coberturaDelMarco() } });
+//
+// POR QUE ESTO LO REPARTE EL MARCO Y NO LO ESCRIBE CADA PAQUETE. El umbral del
+// total no es una preferencia del paquete: es el minimo del area. Cuando cada
+// paquete lo escribia solo, el numero terminaba siendo el que la medicion daba
+// ese dia: el consumidor tenia functions: 70.6 fijado en el numero medido, o sea
+// un umbral que no exigia nada porque ya estaba cumplido por construccion.
+// Repartirlo desde aca hace que un paquete nuevo NAZCA con el piso del marco.
+//
+// LA OTRA MITAD DE LA COMPUERTA NO ESTA ACA, Y ES A PROPOSITO. Estos umbrales
+// los hace cumplir vitest cuando corren las pruebas del paquete, asi que
+// bajarlos es una linea de diff bajo review. Pero un umbral que el propio
+// paquete puede bajar no es un piso: por eso la action cobertura-diff del marco
+// mide el total POR SU CUENTA, desde el lcov, contra el minimo del marco, y ahi
+// el umbral local solo puede SUBIR la exigencia. Medido: bajar estos cuatro
+// numeros a 40 daba EXIT 0 en toda la integracion.
+//
+// SI UN PAQUETE TODAVIA NO LLEGA AL MINIMO no se baja el umbral: se declara la
+// deuda en SU package.json, con motivo y con fecha, y el marco la reporta en
+// cada corrida hasta que se paga o vence.
+//
+//   "projects": { "cobertura": {
+//       "piso":  { "lineas": 71.2, "funciones": 70.6, "ramas": 68.0 },
+//       "deuda": { "motivo": "heredado del piloto; el plan esta en el issue N",
+//                  "fecha": "AAAA-MM-DD" } } }
+//
+// POR QUE .mjs Y NO .ts, que seria lo esperable en este stack: un .ts en la
+// raiz del monorepo no cae bajo el tsconfig de ningun paquete, asi que el censo
+// de fuentes lo marcaria como archivo sin programa de tipos y el repo nuevo
+// nace en rojo. Un .mjs no necesita programa de tipos (el censo solo se lo
+// exige a los lenguajes que tienen verificacion de tipos) y el linter si lo
+// mira, porque el ignore de eslint apunta a "*.config.mjs" y este archivo no
+// termina asi. O sea: visible para las dos herramientas, sin declarar ninguna
+// exclusion. Si lo renombras a .ts, agregale su tsconfig o su exclusion con
+// motivo escrito.
+
+import { dirname } from "node:path";
+import { fileURLToPath } from "node:url";
+
+/** La raiz del monorepo: este archivo vive ahi. */
+export const RAIZ_DEL_MONOREPO = dirname(fileURLToPath(import.meta.url));
+
+/**
+ * El minimo del area, en un solo lugar. Un paquete puede exigir MAS pasandole
+ * otro numero; menos, no: el marco lo vuelve a comprobar contra 80 desde el
+ * lcov y la integracion falla igual.
+ */
+export const MINIMO_DEL_MARCO = 80;
+
+export function coberturaDelMarco(minimo = MINIMO_DEL_MARCO) {
+  return {
+    coverage: {
+      provider: "v8",
+
+      // SIN ESTO EL TOTAL MIENTE. Con all:false el reporte solo trae los
+      // archivos que alguna prueba importo, asi que el modulo que nadie prueba
+      // no baja el promedio: simplemente no existe. El plano del total del
+      // marco lo detecta como archivo sin dato de cobertura, pero el umbral de
+      // aca no, y el paquete quedaria verde contra si mismo.
+      //
+      // INCERTIDUMBRE DECLARADA: esto esta escrito para la mayor de vitest que
+      // el stack tiene pinada hoy (2.x), donde `all` es una opcion propia. En
+      // majors posteriores la misma propiedad se expresa solo con `include`, asi
+      // que al subir la mayor de vitest hay que releer este bloque en vez de
+      // asumir que sigue diciendo lo mismo. No se pudo confirmar contra la
+      // documentacion en esta sesion, y por eso se declara en vez de afirmarse.
+      all: true,
+
+      // Que entra al calculo. src y nada mas: la config, los scripts y los
+      // generados no son codigo que a este paquete le corresponda probar. Lo
+      // que se saca a proposito se declara en projects.cobertura.excluidos del
+      // package.json, con su motivo escrito, y ahi lo ve el marco tambien.
+      include: ["src/**/*.{ts,tsx,mts,cts,js,jsx,mjs,cjs}"],
+      exclude: ["src/**/*.test.{ts,tsx}", "src/**/*.d.ts"],
+
+      reportsDirectory: "coverage",
+
+      // projectRoot en la raiz del MONOREPO, no del paquete: las rutas SF: del
+      // lcov tienen que ser comparables contra las de git. Sin esto dos
+      // paquetes emiten "src/..." indistinguibles entre si, la action no puede
+      // decir a que archivo corresponde cada linea y da rojo por rutas
+      // ambiguas. Es el error de cableado numero uno de un monorepo.
+      reporter: [
+        ["text", {}],
+        ["lcov", { projectRoot: RAIZ_DEL_MONOREPO }],
+      ],
+
+      // Los cuatro umbrales del TOTAL del paquete. statements no es redundante
+      // con lines: una linea con varias sentencias puede estar "cubierta" con
+      // sentencias sin ejecutar.
+      thresholds: {
+        lines: minimo,
+        functions: minimo,
+        branches: minimo,
+        statements: minimo,
+      },
+    },
+  };
+}
