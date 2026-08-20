@@ -1006,3 +1006,30 @@ test("un denominador cruzado solo a medias se dice, y no enrojece", () => {
   assert.equal(r.codigo, 0, r.todo);
   assert.match(r.todo, /::warning[^\n]*1 de sus registros de cobertura no declaran FNF/);
 });
+
+test("el denominador de un archivo medido por dos reportes es el MAYOR declarado, no la suma", () => {
+  // HALLAZGO DE UN CONTROL NEGATIVO, sobre el arreglo de esta misma tanda:
+  // mutar el `Math.max` de `fusionarRegistro` a una SUMA sobrevivia al banco.
+  // La prueba de la fusion que ya habia comprobaba que no aparecia un falso
+  // corto —y eso sigue siendo cierto, porque el corto se decide por REGISTRO al
+  // parsear— pero nadie miraba el numero que la corrida REPORTA. Sumando, un
+  // archivo que dos suites miden aparece con el doble de items declarados, y el
+  // diagnostico manda a buscar funciones que no existen.
+  //
+  // Dos reportes del MISMO archivo: uno consistente (declara 2, llegan 2) y uno
+  // corto (declara 5, llegan 2). El mayor declarado es 5; la suma daria 7.
+  const dir = repoNuevo();
+  escribir(dir, "package.json", JSON.stringify({ name: "raiz", private: true }) + "\n");
+  escribir(dir, "web/package.json", JSON.stringify({ name: "web" }, null, 2) + "\n");
+  escribir(dir, "web/src/mod.js", "export const f0 = (x) => x + 0;\n");
+  const base = commit(dir, "base");
+  const reg = (fnf) =>
+    `TN:\nSF:web/src/mod.js\nFN:1,a\nFNDA:1,a\nFN:2,b\nFNDA:1,b\nFNF:${fnf}\nFNH:2\nDA:1,1\nDA:2,1\nLF:2\nLH:2\nBRF:0\nBRH:0\nend_of_record\n`;
+  escribir(dir, "web/coverage/lcov.info", reg(2));
+  escribir(dir, "api/coverage/lcov.info", reg(5));
+  commit(dir, "cambio");
+  const r = correrTotal(dir, base);
+  assert.equal(r.codigo, 1, r.todo);
+  assert.match(r.todo, /sus propios reportes declaran 5\b/);
+  assert.doesNotMatch(r.todo, /sus propios reportes declaran 7\b/);
+});
