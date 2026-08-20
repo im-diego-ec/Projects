@@ -1,0 +1,211 @@
+name: Claude Code
+
+# ---------------------------------------------------------------------------
+# QUE ES ESTO
+#
+# El bot de @claude en los issues y los PRs de PROJECTS. Se dispara solo cuando
+# una persona con permiso de escritura escribe "@claude" en un issue, en un
+# comentario o en un review, y contesta en ese mismo hilo.
+#
+# NO ES PARTE DEL PIPELINE: no reporta ningun check, no gatea ningun merge y si
+# falla no bloquea nada. El unico check requerido de este repo sigue siendo
+# ci-ok (ver .github/proteccion-main.md); este workflow no debe agregarse nunca
+# al ruleset.
+#
+# DE DONDE SALE. El bot existia SOLO en el repo de origen (proyecto-origen).
+# Nunca subio al marco, asi que ni la intranet ni un proyecto nuevo lo
+# heredaban: era una leccion del piloto que se quedo en el piloto. Sube en las
+# dos formas que le corresponden — este archivo (el bot de Projects) y
+# plantilla/.github/workflows/claude.yml (el que copia un proyecto nuevo, para
+# que nazca con el bot en vez de que alguien se acuerde de copiarlo).
+#
+# QUE PUEDE Y QUE NO. Lee, opina y explica. NO decide: el merge, el release y el
+# movimiento del tag v1 son actos humanos. El bloque de permisos de mas abajo
+# esta auditado accion por accion, y lo que NO se concede tambien esta escrito.
+#
+# POR QUE LAS REGLAS DE PROJECTS VIAJAN EN --append-system-prompt Y NO SE CONFIAN
+# A AGENTS.md. Cuando la action corre contra un pull request, restaura CLAUDE.md
+# y .claude/ DESDE LA RAMA BASE antes de arrancar (documentado en la guia de
+# seguridad de la action; las versiones del PR quedan en .claude-pr/ solo como
+# referencia). O sea: si el PR que se esta discutiendo cambia AGENTS.md, el bot
+# lee la version anterior. La instruccion que viaja en ESTE archivo, en cambio,
+# siempre sale de main —para los eventos de issue, comentario y review GitHub
+# ejecuta la definicion del workflow de la rama por defecto—, asi que es el
+# unico canal que un PR no puede alterar. Por eso aca van las reglas que no se
+# pueden perder, y no un resumen de la constitucion.
+# ---------------------------------------------------------------------------
+
+on:
+  issue_comment:
+    types: [created]
+  pull_request_review_comment:
+    types: [created]
+  issues:
+    types: [opened, assigned]
+  pull_request_review:
+    types: [submitted]
+
+jobs:
+  claude:
+    # La compuerta de la mencion. Sin este if el job arrancaria en CADA
+    # comentario del repo: la action igual se cortaria sola por falta de
+    # disparador, pero recien despues de levantar un runner y clonar el arbol.
+    # El control real de QUIEN puede invocarlo no vive aca sino en la action,
+    # que exige permiso de ESCRITURA en el repo al actor y rechaza a los bots
+    # por defecto.
+    if: |
+      (github.event_name == 'issue_comment' && contains(github.event.comment.body, '@claude')) ||
+      (github.event_name == 'pull_request_review_comment' && contains(github.event.comment.body, '@claude')) ||
+      (github.event_name == 'pull_request_review' && contains(github.event.review.body, '@claude')) ||
+      (github.event_name == 'issues' && (contains(github.event.issue.body, '@claude') || contains(github.event.issue.title, '@claude')))
+    runs-on: ubuntu-latest
+
+    # Cinturon contra una corrida colgada. --max-turns acota la conversacion,
+    # pero no acota una instalacion o una red que se quedan esperando, y el
+    # default de GitHub son 6 horas de runner por una respuesta que nadie va a
+    # leer.
+    timeout-minutes: 15
+
+    # PERMISOS, auditados ACCION POR ACCION antes del estreno: es la regla 6 de
+    # docs/reglas-no-escritas.md, la leccion que el repo de origen aprendio TRES
+    # veces, siempre con la misma forma —falta un permiso, la API responde 403 y
+    # el 403 se disfraza de comportamiento normal—. Cada linea esta porque una
+    # llamada concreta la necesita; ninguna esta por las dudas:
+    #
+    #   contents: read       actions/checkout clona el arbol, y sobre ese arbol
+    #                        el bot lee AGENTS.md, los workflows y las actions
+    #                        por las que se le pregunta. Sin esto el checkout
+    #                        muere con 403 antes de que el bot exista.
+    #   issues: read         leer el issue o el comentario que lo menciono y el
+    #                        hilo completo. OJO, no es redundante con el de
+    #                        abajo: un comentario escrito en un PR llega como
+    #                        evento de ISSUE, asi que sin este permiso el bot
+    #                        tampoco puede contestar dentro de un PR.
+    #   pull-requests: read  leer el PR en si: descripcion, diff y comentarios
+    #                        de review. Sin esto opina sobre un cambio que no
+    #                        puede ver.
+    #   id-token: write      NO es escritura en el repo. Es el token OIDC del
+    #                        runner, que la action canjea por el token de la
+    #                        GitHub App con la que responde. La guia de setup de
+    #                        la action lo dice literal: "The default GitHub App
+    #                        authentication path already requires this
+    #                        permission". Sin esto el bot no se autentica y no
+    #                        contesta nada.
+    #   actions: read        leer el estado de las corridas y BAJAR EL LOG del
+    #                        job que fallo (herramientas mcp__github_ci__ :
+    #                        get_ci_status, get_workflow_run_details,
+    #                        download_job_log). En Projects no es un lujo: el
+    #                        producto de este repo ES el CI, y la pregunta
+    #                        tipica al bot es por que se puso rojo un check. Va
+    #                        SIEMPRE de a dos con el input additional_permissions
+    #                        de mas abajo: con el permiso y sin el input las
+    #                        herramientas no se habilitan, y con el input y sin
+    #                        el permiso la action avisa y el bot responde a
+    #                        ciegas. Los dos o ninguno.
+    #
+    # LO QUE NO SE CONCEDE, a proposito: contents:write, issues:write y
+    # pull-requests:write. Este bot no empuja ramas, no abre PRs y no edita
+    # issues. Publicar un cambio del marco sin haberlo probado contra un
+    # consumidor real es una frontera prohibida de AGENTS.md, y un bot con
+    # contents:write es la forma comoda de cruzarla sin querer.
+    #
+    # LIMITE DECLARADO, para no vender mas de lo que hay: este bloque acota el
+    # GITHUB_TOKEN del job. La respuesta del bot NO viaja por ese token sino por
+    # el de la GitHub App de Claude, cuyos permisos quedaron fijados al instalar
+    # la App en la organizacion. Por eso el bloque puede ser de solo lectura sin
+    # dejar al bot mudo — y por eso tampoco es la jaula que le impide empujar:
+    # eso lo impide la proteccion de main (.github/proteccion-main.md), que solo
+    # deja avanzar por PR.
+    permissions:
+      contents: read
+      issues: read
+      pull-requests: read
+      id-token: write
+      actions: read
+
+    env:
+      # El contexto secrets no se puede leer desde el if de un job, pero si
+      # desde su env. De aca lo toma el primer paso.
+      TOKEN_CONFIGURADO: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN != '' }}
+
+    steps:
+      # ROJO, no aviso, y a proposito. El marco manda aviso cuando falta
+      # configuracion y rojo cuando la configuracion esta rota, pero el criterio
+      # de fondo es a quien le llega la senal: aca hay una PERSONA esperando una
+      # respuesta que no va a llegar nunca. Un ::warning:: en un log que nadie
+      # abre es, para ella, silencio — el mismo silencio que el marco prohibe.
+      # La X roja en el hilo es el unico canal que la alcanza.
+      - name: Verificar que el bot esta configurado
+        if: env.TOKEN_CONFIGURADO != 'true'
+        shell: bash
+        run: |
+          echo "::error::falta el secret CLAUDE_CODE_OAUTH_TOKEN en este repo: alguien menciono a @claude y no hay con que autenticarse. Arreglo, dos actos humanos: (1) instalar la GitHub App de Claude sobre este repositorio y (2) cargar el secret en Settings > Secrets and variables > Actions. Hasta que existan los dos, este workflow falla a proposito en vez de dejar la mencion sin respuesta"
+          exit 1
+
+      - name: Checkout del repositorio
+        uses: actions/checkout@v7
+        with:
+          # Profundidad 1: el bot opina sobre el arbol de HOY, no hace
+          # arqueologia. Si alguna vez hace falta historia o tags —comparar el
+          # contrato de un workflow contra la version publicada, por ejemplo— se
+          # sube este numero a proposito y se escribe por que, no se deja
+          # abierto por comodidad.
+          fetch-depth: 1
+
+      - name: Correr Claude Code
+        id: claude
+        # Pineado por SHA, no por el tag movil @v1 de un tercero: es la frontera
+        # de AGENTS.md para toda action de terceros. Y aca la coherencia importa
+        # el doble — este repo le advierte a sus consumidores que un tag movil
+        # entrega comportamiento nuevo sin que nadie haya leido nada; consumir el
+        # tag movil ajeno seria hacer exactamente lo que se predica en contra.
+        # El comentario de al lado NO es decorativo: es lo que Dependabot
+        # reescribe al subir el pin (ecosistema github-actions) y lo unico que
+        # hace legible el diff de un bump.
+        #
+        # ATENCION, esto exige OK humano por partida doble (frontera "pregunta
+        # primero" de AGENTS.md): adoptar una action de terceros, y despues cada
+        # suba del pin. Para mover el pin a mano:
+        #   curl -sS https://api.github.com/repos/anthropics/claude-code-action/git/ref/tags/v1
+        #   curl -sS https://api.github.com/repos/anthropics/claude-code-action/git/tags/<sha-del-objeto-tag>
+        # el object.sha del segundo llamado es el commit que va aca, y el campo
+        # message dice la version exacta que va en el comentario.
+        #
+        # LIMITE DECLARADO: Projects todavia no tiene .github/dependabot.yml, asi
+        # que en ESTE repo el pin no se actualiza solo (el scaffold si trae el
+        # ecosistema github-actions, y alli si). Mientras eso no exista, subir el
+        # pin es un item de la revision trimestral, no un automatismo.
+        uses: anthropics/claude-code-action@e2a4b761cd77a1138a5b41410eda9b28581f9bcd # v1.0.196
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+
+          # Habilita las herramientas de CI del bot. Va de a dos con el permiso
+          # actions: read de arriba, como dice el bloque de permisos.
+          additional_permissions: |
+            actions: read
+
+          # NO se pasa el input prompt: con prompt, la action deja de responder
+          # lo que pide el comentario y ejecuta una instruccion fija. Este bot
+          # existe justamente para contestar lo que la persona escribio.
+          #
+          # --model sonnet / --effort medium: la politica de uso eficiente del
+          # area. Contestar una mencion en un issue no amerita el modelo grande;
+          # escalar es una decision de sesion de builder, no el default de un bot
+          # que corre solo.
+          #
+          # --max-turns 5: el bot opina, no implementa. Una pregunta que no entra
+          # en 5 turnos no era pregunta para el bot, era una sesion de builder.
+          # Subirlo es un acto deliberado y se escribe por que, no un reflejo
+          # cuando una respuesta sale corta.
+          #
+          # --append-system-prompt y no --system-prompt: reemplazarlo entero tira
+          # a la basura las instrucciones propias de la action (como publica la
+          # respuesta, que puede tocar, como se comporta dentro de un PR).
+          # Cada flag en su propia linea, y el texto del prompt en UNA sola: el
+          # valor se parte por lineas antes de pasarse al CLI, asi que un prompt
+          # multilinea llegaria cortado.
+          claude_args: |
+            --model sonnet
+            --effort medium
+            --max-turns 5
+            --append-system-prompt "Estas respondiendo en Projects, el marco de ingenieria del area: no es un proyecto de producto. Todo lo que se mergea aca llega a TODOS los repos consumidores por el tag movil v1, sin que ellos revisen nada. Antes de decir que un cambio es seguro, contesta esta pregunta en voz alta: un consumidor que no toca una sola linea, se puede romper o quedar verde haciendo algo distinto? Si la respuesta es si, es BREAKING, y va como change de OpenSpec y no como PR directo; renombrar un job cuyo nombre publica un check es el breaking mas caro y el mas facil de cometer sin darse cuenta. Nunca propongas mover el tag v1 ni publicar una version como si fuera un paso mas: exige OK humano y exige que el cambio se haya validado contra un repo consumidor real, y publicar sin esa validacion esta prohibido por AGENTS.md. No escribis en el repo ni en la infraestructura de ningun consumidor. Opinas y explicas; el merge, el release y el movimiento del tag son actos humanos. Tenes turnos contados: si te falta contexto, decilo y pedilo en vez de suponer."
