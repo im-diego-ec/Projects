@@ -35,7 +35,253 @@ mueve sobre un cambio incompatible.
 
 ## [No publicado]
 
-Nada todavía.
+### Añadido
+
+- **Check estático nuevo en el job `higiene`: *Ejecutores de paquetes pinados*.**
+  Se pone rojo si un archivo rastreado del repo corre un paquete por un ejecutor
+  que **descarga** (`npx`, `bunx`, `npm exec`, `pnpm dlx`, `yarn dlx`) sin
+  clavarlo a una versión exacta.
+
+  El agujero que cierra es concreto, no teórico. El marco documenta desde su
+  primera versión que el paquete del CLI es `@fission-ai/openspec` y que
+  `openspec` a secas en npm es un **placeholder ajeno**, y la guía de upgrade lo
+  llevaba como ítem de checklist. Un ítem de checklist depende de que alguien se
+  acuerde: en el consumidor piloto el allowlist del agente autorizaba
+  `Bash(npx --yes openspec ...)` en cinco patrones — o sea descargar y
+  **ejecutar** el paquete del squatter, con `--yes`, sin preguntar nada.
+
+  La propiedad es sobre el **ejecutor**, no sobre una lista de paquetes prohibidos
+  que alguien tendría que mantener. `pnpm exec` y `yarn exec` quedan fuera a
+  propósito: leen `node_modules` y fallan si el binario no está —fallan cerrado— y
+  por eso son la salida que el mensaje de error ofrece cuando el binario ya lo
+  trae una dependencia declarada del repo.
+
+  **Se exige la versión, no el scope**, y la distinción importa: hay paquetes
+  legítimos sin scope (`prettier`, `eslint`), así que pedir scope sería un check
+  imposible de satisfacer. La versión exacta sí se puede exigir siempre, y es la
+  que convierte un nombre equivocado en un fallo ruidoso — el squatter publica
+  `0.0.0` y no tiene la versión que uno pina, así que la invocación muere en vez
+  de resolver en silencio.
+
+  Límites declarados en el propio paso, porque esto **lee texto y no ejecuta
+  nada**: los `.md` quedan fuera (son prosa, y la documentación del marco cita la
+  forma incorrecta como contraejemplo, así que un comando de runbook escrito en un
+  README no queda cubierto); las líneas que arrancan en comentario quedan fuera
+  (un comentario no se ejecuta — y sin esa regla el check se pone rojo a sí mismo
+  al documentarse); una invocación partida con `\` no se lee; y el pin no prueba
+  que el nombre sea el paquete que uno quería: hace ruidoso el error, no lo hace
+  imposible. Un pin que llega por variable —el pin canónico del marco es un
+  `input` de este mismo workflow— cuenta como pinado y se informa aparte.
+
+- **Aviso de versión a los consumidores** — `.github/workflows/aviso-version.yml`
+  (workflow propio de Projects) más `actions/aviso-version` (referenciada). Al
+  publicarse un release, el marco **notifica**; hasta hoy solo publicaba.
+
+  El agujero es de forma, no de contenido: el `CHANGELOG.md` y la página del
+  release son superficie de **consulta**, y con `v1` móvil un consumidor recibe
+  comportamiento nuevo —incluido un check que lo pone en rojo— sin haber leído
+  nada. Pasó el 2026-08-19: al mover `v1`, el segundo consumidor quedó a un push
+  de un rojo que nadie le anunció.
+
+  **El contenido no se escribe dos veces.** Sale de la sección `### Para
+  consumidores` de la entrada de esa versión —la que este archivo ya obliga a
+  escribir en el PR que introduce el cambio—, más las líneas `BREAKING` si las
+  hay, más los dos enlaces. No hay un formato paralelo que alguien deba
+  sincronizar: la única fuente que se edita sigue siendo el changelog.
+
+  **El destino no está cableado.** Viaja por `secrets.AVISO_VERSION_DESTINO` (la
+  URL del webhook ES la credencial, así que es secret y no var) y el campo del
+  payload por `vars.AVISO_VERSION_CAMPO` (`text` para Slack, Google Chat y Teams;
+  `content` para Discord). Ni el canal ni la URL aparecen en el repo, y el valor
+  no entra al log: el paso de envío omite cualquier texto que lo contenga, aun
+  dentro de un mensaje de error del propio `curl`.
+
+  **Sin destino configurado no falla el release, pero no se calla**: `::warning::`
+  nombrando el secret que falta y el mensaje completo al resumen de la corrida,
+  que pasa a ser el destino de última instancia. Un destino configurado que
+  **rechaza** el aviso, en cambio, es **rojo** — la distinción de la regla 6:
+  configuración ausente es aviso, configuración rota es rojo, y un canal que dejó
+  de entregar en silencio es exactamente el agujero que esto cierra. El único
+  otro rojo es que el CHANGELOG no tenga entrada para la versión publicada: ahí
+  no hay degradación honesta posible, y el arreglo va escrito en el error.
+
+  **Verificable sin credenciales, que es lo que decide si esto sobrevive.** La
+  action que arma el mensaje es pura: no conoce el destino, no toca la red y
+  corre en cualquier máquina —`AVISO_VERSION=1.2.0 node
+  actions/aviso-version/aviso-version.mjs`— mostrando exactamente qué se
+  enviaría. Y el botón de Actions trae `simulacro` **marcado por defecto**:
+  arma, publica el mensaje en el resumen y no lo manda. Desmarcarlo es el acto
+  deliberado de enviar de verdad.
+
+- **Detector de secretos en el job `higiene`: *Sin secretos en el repo (árbol y
+  historia del cambio)*.** La regla más dura del marco —🛑 nunca poner secrets en
+  código, contexto ni logs— era la única sin **un solo** mecanismo que la hiciera
+  cumplir: disciplina pura, y la disciplina no escala a builders nuevos. Los tres
+  repos del área tienen el escaneo de secretos, la protección de push y las
+  actualizaciones de seguridad de la plataforma en `disabled`, así que hasta hoy
+  no había nada entre un `git push` y una credencial publicada.
+
+  **Es portable a propósito.** Escaneo de secretos y protección de push son de
+  **pago** en repos privados (SKU *Secret Protection*) y esta organización tiene
+  cero repos públicos. El marco le exige la regla a **todos** sus proyectos, así
+  que el mecanismo no puede depender de que alguien compre algo: es un binario
+  pineado (`gitleaks`, input `version_gitleaks`) que se descarga del release
+  oficial y se verifica con el `sha256` del archivo de checksums del **mismo
+  release** — el patrón exacto de `actionlint`, con el mismo alcance declarado:
+  cubre descarga corrupta o asset cambiado, no un release comprometido de raíz.
+
+  **Dos planos, la forma que ya usa la cobertura, con un reparto distinto.** El
+  **árbol completo** va sin tolerancia y sin piso que suba: con cobertura el total
+  admite deuda y por eso el piso sube de a poco, pero una credencial en el árbol
+  no es trabajo pendiente sino un incidente vivo, y no se amortiza. Un detector
+  solo-diff jamás vería lo que ya está adentro. El plano de la **historia del
+  cambio** no es redundante: el árbol solo ve el contenido de hoy, así que
+  «commiteo el `.env`, lo saco en el commit siguiente» deja el árbol impecable y
+  la credencial igual de comprometida — la forma más común en que un secreto entra
+  a un repo, y el único plano que la ve. Por eso el job pasa a pedir
+  `fetch-depth: 0`, que es el costo declarado del cambio.
+
+  **El mensaje nunca imprime el valor, y trae el orden del arreglo.** Archivo,
+  línea, regla y descripción; nada más. El programa que clasifica no lee siquiera
+  los campos que contienen el secreto —ni los que identifican a una persona—, de
+  modo que la redacción de la herramienta es el cinturón y no leerlos son los
+  tirantes. Y el arreglo va numerado, porque acá **el orden es la mitad del
+  arreglo**: (1) rotar la credencial ya, porque un secreto que llegó a un commit
+  está comprometido aunque lo borres —queda en la historia, en los clones, en los
+  forks y en las cachés de la plataforma—; (2) recién después sacarlo del código y
+  hacerlo viajar por referencia al gestor de secretos; (3) la limpieza de la
+  historia se coordina con una persona. El error dice además que un secreto real
+  **no se describe en el PR**: se escala.
+
+  **Los falsos positivos deciden si el check sobrevive, y se declaran con motivo
+  escrito.** La forma es la misma que ya usan las exclusiones del censo de
+  fuentes: `.projects-falsos-positivos.json` (input `archivo_falsos_positivos`) con
+  `{ "archivo", "regla", "motivo" }`. Sin `motivo` es rojo; con comodines es rojo
+  —una declaración nombra **un** archivo, no un árbol—; y una declaración que ya
+  no absorbe ningún hallazgo es **muerta** y también roja, porque si no queda
+  repartiendo permiso sobre la nada. Cada declaración viva se imprime como
+  `::notice::` en **cada** corrida y va al resumen del job: una excepción que
+  nadie vuelve a ver es una excepción que nadie vuelve a discutir.
+
+  **Una sola vía de excepción, y las otras cinco están cerradas.** La herramienta
+  trae cinco canales propios para callar un hallazgo sin motivo y sin dejar
+  rastro, y los cinco se probaron: un `.gitleaks.toml` del repo puede **vaciar
+  todas las reglas** (un repo con un secreto sintético sale en verde), un
+  `.gitleaksignore` silencia por huella, un comentario `gitleaks:allow` al final
+  de la línea baja el hallazgo a cero, y la configuración **también entra por
+  entorno** con `GITLEAKS_CONFIG` o `GITLEAKS_CONFIG_TOML` — los dos únicos que no
+  dejan rastro ni en el repo, y con los que el paso salía **verde y mudo** sobre
+  un repo con secretos adentro. Los dos archivos son rojo si están versionados; el
+  comentario se desactiva con `--ignore-gitleaks-allow`; las dos variables se
+  vacían en el `env:` del paso, porque el runner lo elige el consumidor y en uno
+  propio pueden venir de la máquina.
+
+  **Una declaración cubre una cantidad exacta, no un permiso abierto.** El par
+  (archivo, regla) por sí solo perdona todo lo que ese archivo tenga de esa regla,
+  hoy y siempre: con una declaración viva, un secreto **nuevo** agregado a ese
+  mismo archivo entraba en verde (comprobado). Por eso cada entrada declara
+  cuántos hallazgos absorbe —uno por defecto, `"hallazgos": N` si de verdad son
+  varios— y cualquier desajuste es rojo, con el número que ahora corresponde y la
+  instrucción de revisar las coincidencias una por una antes de subirlo. Se cuenta
+  por plano y se toma el mayor, para que un falso positivo que además entra en los
+  commits del cambio no se cuente dos veces.
+
+  **La salida de la herramienta no se vuelca cruda al log.** En la rama de "no
+  pudo correr" —justo aquella en la que se comportó de forma inesperada— asumir
+  que la redacción actuó es asumir lo que acaba de fallar, y el log de una corrida
+  lo ve cualquiera que vea el repo. Pasan solo las líneas con la forma de su log
+  estructurado, recortadas, y se dice cuántas se omitieron: el diagnóstico útil
+  (config ilegible, archivo inaccesible) sobrevive; un volcado de pánico, no.
+
+  **Se descartó la herramienta con verificación en línea**, que tiene una tasa de
+  falsos positivos imbatible, por una razón que no admite matices: valida el
+  candidato **enviándolo a la API del proveedor**, y su salida JSON lleva el valor
+  en claro. El marco prohíbe que el valor de un secreto salga hacia un tercero,
+  aunque sea para confirmarlo.
+
+  Límites declarados en el propio paso: detecta **forma, no validez**; un secreto
+  sin forma reconocible no se detecta; un archivo ignorado del control de
+  versiones queda fuera del universo (la misma evasión limpia que ya declara el
+  censo de fuentes); y el plano de la historia mira el **rango del cambio**, no la
+  historia entera, así que un secreto anterior a la adopción solo aparece si
+  todavía está en el árbol. El resumen de la corrida lo dice con todas las letras:
+  cero hallazgos **no** prueba que no haya secretos.
+
+### Cambiado
+
+- **`plantilla/AGENTS.md`** suma la regla a las fronteras ✅, con las dos formas
+  correctas: `pnpm exec` para lo que ya está instalado, paquete completo con
+  versión exacta para lo que sí hay que traer de npm. **Es scaffold**: no alcanza
+  a los repos ya creados, que se ponen al día por su propio PR.
+- **`plantilla/README.md`** explica que el check cubre también el allowlist de
+  `.claude/settings.json`, y por qué un repo que ignore `.claude` entero en su
+  `.gitignore` esconde de ese check justo el archivo donde apareció el problema.
+- **`docs/upgrade-openspec.md`** gana la fila que faltaba en "Dónde vive el pin":
+  el allowlist del agente es **el único lugar que repite el número a la fuerza**,
+  porque el permiso se concede por coincidencia literal de texto y no puede
+  referenciar el pin canónico. Es el mecanismo exacto por el que el consumidor
+  quedó atrás. Y el ítem de checklist "sin restos de `openspec` a secas" pasa a
+  decir la verdad nueva: la **ausencia** de versión ya la caza el check; el
+  **atraso** del número sigue siendo trabajo de ese procedimiento.
+- **`plantilla/AGENTS.md`** suma la sección *Cuando el marco publica una versión*:
+  qué es el aviso, que estar en ese canal es requisito del proyecto y no una
+  cortesía, que un aviso con acción requerida se convierte en issue el mismo día,
+  y las dos salidas que **no** valen (copiar el workflow del marco o pinar una
+  versión vieja). El checklist de "antes del primer commit" gana el paso de pedir
+  ese acceso. **Es scaffold**: los repos ya creados lo suman por su propio PR.
+
+### Para consumidores
+
+**Hay una acción obligatoria, y el orden importa.** Un repo con una invocación sin
+versión exacta da rojo apenas este check aterrice. `proyecto-origen` tiene hoy
+cinco, todas en `.claude/settings.json`, y el arreglo es un PR de cinco líneas en
+su propio repo. **Ese PR se mergea ANTES de que se mueva `v1`**, igual que se hizo
+con el check de artefactos regenerados en la 1.2.0: con un solo consumidor y
+nuestro, ordenar los merges es más honesto que enseñar a convivir con un aviso. Si
+ese orden no se puede garantizar, el endurecimiento se estrena en modo aviso y
+endurece en el major siguiente, como manda `AGENTS.md`.
+
+Verificado antes de publicar: sobre `projects` el check pasa en verde (8
+invocaciones, 5 con versión literal y 3 por variable) y sobre `proyecto-origen`
+da rojo exactamente en las cinco líneas reales, sin un solo falso positivo — el
+`pnpm exec playwright` del deploy, el `pnpm exec prisma generate` del Dockerfile y
+los `tsc`/`vitest`/`eslint` de los `scripts` de cada `package.json` no se tocan,
+porque ninguno pasa por un ejecutor que descargue.
+
+**Del detector de secretos hay una acción obligatoria y también tiene orden.** Un
+repo con falsos positivos sin declarar da rojo apenas el check aterrice, así que
+el PR que agrega su `.projects-falsos-positivos.json` **se mergea ANTES de que se
+mueva `v1`** — mismo precedente, misma razón. En `proyecto-origen` son **tres
+declaraciones**, medidas y no estimadas: la sonda de auth de `deploy.yml` (token
+basura literal, existe para que el API responda 401 exacto) y la misma frase de
+prosa del spec de observabilidad en dos lugares (el spec vivo y su copia
+congelada en el archive). El número importa: un barrido de regex a mano sobre ese
+mismo árbol daba 17 candidatos, y esa diferencia es la que decide si el check
+sobrevive al tercer PR o alguien lo apaga.
+
+**No se encontró ningún secreto real** en los archivos rastreados de ninguno de
+los repos revisados. Verificado antes de publicar, con el `run:` del paso
+ejecutado tal cual: `projects` con el paso ya adentro pasa en verde en los dos planos;
+`proyecto-origen` da rojo en sus tres hallazgos y pasa a verde con las tres
+declaraciones, cada una visible en el resumen de la corrida; un repo con un
+secreto sintético en el árbol da rojo; uno con el secreto **borrado** en el commit
+siguiente tiene el árbol limpio y lo caza igual el plano de la historia; y un repo
+que versiona `.gitleaks.toml` es rechazado antes de escanear. La corrida completa,
+descarga del binario incluida, tarda alrededor de 8 segundos sobre el consumidor
+real.
+
+**Del aviso de versión, nada que hacer en el repo del proyecto.** No agrega
+ningún workflow, secret ni paso al consumidor: el aviso se dispara en Projects y el
+destino se configura en Projects. Lo único que se pide es humano y de una sola vez:
+**estar en el canal donde cae**. Si los avisos no llegan, el proyecto se sigue
+enterando como hasta hoy —cuando un check lo pone en rojo—, que es precisamente
+lo que esto viene a evitar. Los repos ya creados suman por su cuenta la sección
+nueva de `plantilla/AGENTS.md`, o al menos la regla: **un aviso con acción
+requerida se convierte en issue el mismo día**.
+
+Este mismo texto que estás leyendo es lo que el aviso va a enviar cuando esta
+versión se publique — la sección «Para consumidores» es la fuente, no un resumen
+de ella.
 
 ---
 
