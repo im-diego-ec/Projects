@@ -18,7 +18,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 
@@ -735,6 +735,36 @@ test("un modo inventado no hace nada en silencio", () => {
   });
   assert.equal(corrida.status, 1);
   assert.match(corrida.stdout, /modo desconocido/);
+});
+
+// Regresion cazada por el verificador de la tanda del 2026-08-19: el hallazgo
+// `sin-superficies` estaba probado SOLO contra `verificar()` y era inalcanzable desde
+// la action, porque `main()` trataba la clave declarada vacia igual que la clave
+// ausente y caia al default del marco. O sea: la propiedad que el action.yml
+// prometia ("declarar cero superficies es rojo") no la exhibia el camino que se
+// despacha. Estas dos pruebas fijan la distincion en el nivel donde se rompio.
+test("declarar la lista de superficies VACIA es rojo, no un default", () => {
+  const raiz = repoTemporal({ valores: { ...VALORES, superficies: [] } });
+  const corrida = spawnSync(process.execPath, [SCRIPT], {
+    encoding: "utf8",
+    env: { ...process.env, CONSTITUCION_RAIZ: raiz, GITHUB_OUTPUT: "", GITHUB_STEP_SUMMARY: "" },
+  });
+  assert.equal(corrida.status, 1, corrida.stdout + corrida.stderr);
+  assert.match(corrida.stdout, /no declara ninguna superficie/);
+});
+
+test("NO declarar la clave de superficies cae al default del marco, sin rojo por eso", () => {
+  const { superficies, ...sinLaClave } = VALORES;
+  assert.equal(superficies, undefined, "VALORES no deberia traer la clave; si la trae, esta prueba miente");
+  const raiz = repoTemporal({ valores: sinLaClave });
+  const corrida = spawnSync(process.execPath, [SCRIPT], {
+    encoding: "utf8",
+    env: { ...process.env, CONSTITUCION_MODO: "escribir", CONSTITUCION_RAIZ: raiz, GITHUB_OUTPUT: "", GITHUB_STEP_SUMMARY: "" },
+  });
+  assert.equal(corrida.status, 0, corrida.stdout + corrida.stderr);
+  for (const nombre of SUPERFICIES_POR_DEFECTO) {
+    assert.ok(existsSync(join(raiz, SUPERFICIES[nombre].ruta)), `no se emitio la superficie por defecto ${nombre}`);
+  }
 });
 
 test("el catalogo de superficies y el default no divergen", () => {
