@@ -89,8 +89,11 @@ inputs:
   superficies:
     description: >-
       Lista separada por comas de las superficies de instrucciones a emitir. Vacio
-      = lo que declare "superficies" en el archivo de valores y, si tampoco lo
-      declara, el default del marco (claude-code,cursor).
+      = lo que declare "superficies" en el archivo de valores y, si el archivo NO
+      declara la clave, el default del marco (claude-code,cursor). Declararla
+      VACIA en el archivo de valores no es un default: es rojo, porque un repo
+      sin superficie declarada es un repo donde las reglas no llegan a ninguna
+      parte, y eso no puede ser indistinguible de no haber llenado el archivo.
     required: false
     default: ""
   raiz:
