@@ -41,7 +41,7 @@ import {
   validarManifiesto,
   verificar,
 } from "../constitucion.mjs";
-import { invocacionesDe } from "../cableado.mjs";
+import { invocacionesDe, parsearYaml } from "../cableado.mjs";
 
 const SCRIPT = join(import.meta.dirname, "..", "constitucion.mjs");
 const CANONICO_REAL = join(import.meta.dirname, "..", "canonico");
@@ -530,7 +530,16 @@ test("el scaffold cablea la verificacion de la constitucion, con las cinco condi
   // archivo entero, y por eso no distinguía «el needs nombra a constitucion» de «la
   // palabra constitucion aparece en algún needs de algún job».
   const invocaciones = invocacionesDe(
-    [{ ruta: ".github/workflows/ci.yml", texto: leerDelRepo("plantilla/.github/workflows/ci.yml") }],
+    [
+      {
+        ruta: ".github/workflows/ci.yml",
+        // El scaffold vive rastreado en ESTE repo y va a vivir rastreado en el
+        // consumidor: el `rastreado` se declara porque desde la ronda 3 el que no lo
+        // declara no cuenta (un `zz.yml` sin `git add` compraba el cableado).
+        rastreado: true,
+        texto: leerDelRepo("plantilla/.github/workflows/ci.yml"),
+      },
+    ],
     "main",
   );
   const validas = invocaciones.filter((i) => i.cuenta);
@@ -556,17 +565,25 @@ test("el scaffold cablea la verificacion de la constitucion, con las cinco condi
 // que ser una invocación de la pieza que parsea.
 // ---------------------------------------------------------------------------
 
-test("el cableado NO se comprueba con un grep: el paso del marco invoca al lector de YAML", () => {
-  const marco = leerDelRepo(".github/workflows/marco-ci.yml");
-  const paso = marco.slice(marco.indexOf("- name: Constitucion del marco cableada"));
-  const hastaElSiguiente = paso.slice(0, paso.indexOf("\n      # HUECO"));
-  assert.match(hastaElSiguiente, /uses:\s*im-diego-ec\/projects\/actions\/constitucion@v1/);
-  assert.match(hastaElSiguiente, /modo:\s*cableado/);
-  assert.equal(
-    /grep/.test(hastaElSiguiente),
-    false,
-    "el paso volvio a decidir el cableado con un grep: una linea `uses:` la tienen igual las cinco configuraciones donde nada verifica",
-  );
+test("el cableado NO se comprueba con un grep: el carril del marco invoca al lector de YAML", () => {
+  // Se lee la ESTRUCTURA y no el texto: desde la ronda 3 la comprobación es un JOB del
+  // workflow reusable y no un paso de `higiene`, porque GitHub descarga las actions de
+  // un job en «Set up job» —antes de mirar el `if` de cualquier paso— y con la action
+  // ausente del tag móvil el paso mataba el job entero.
+  const doc = parsearYaml(leerDelRepo(".github/workflows/marco-ci.yml"));
+  const [clave, job] =
+    Object.entries(doc.jobs).find(([, j]) =>
+      (Array.isArray(j?.steps) ? j.steps : []).some((p) => /actions\/constitucion/.test(String(p?.uses ?? ""))),
+    ) ?? [];
+  assert.ok(clave, "el workflow reusable dejó de invocar actions/constitucion en ningún job");
+  const paso = job.steps.find((p) => /actions\/constitucion/.test(String(p?.uses ?? "")));
+  assert.equal(paso.with.modo, "cableado");
+  assert.equal(JSON.stringify(job).includes("grep"), false, "el job volvió a decidir el cableado con un grep");
+
+  // Y el salteo del carril del consumidor no puede ser mudo: el veredicto del reusable
+  // tiene que mirar su resultado, o el fail-open es indistinguible de que no exista.
+  assert.match(String(doc.jobs.marco_ok.needs.join(",")), new RegExp(clave));
+  assert.match(JSON.stringify(doc.jobs.marco_ok.steps), new RegExp(`needs\\.${clave}\\.result`));
 
   // Y el lector existe con su banco al lado, que es la condición que el propio CI del
   // marco avisa cuando falta.

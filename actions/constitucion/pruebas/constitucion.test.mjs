@@ -244,11 +244,14 @@ test("version adelantada a mano con el sello de esta copia: ROJO, no aviso", () 
   assert.equal(resultado.estado, "rojo");
 });
 
-// LA CAUSA BENIGNA SIGUE SIENDO AVISO, que es la otra mitad de la propiedad. Un
-// consumidor pinado a un SHA viejo corre una copia del marco anterior al artefacto: el
-// sello no coincide con el de esta copia y hay un pin fijo que lo explica, asi que «no
-// puedo verificar» no es «alguien violo la regla».
-test("artefacto mas nuevo con un pin fijo que lo explica: aviso, y dice que no comparo", () => {
+// LA CAUSA BENIGNA SIGUE SIENDO AVISO, que es la otra mitad de la propiedad. Pero la
+// causa benigna NO es «hay un pin fijo»: es que el ESCRITOR corra una copia del marco
+// distinta de la del VERIFICADOR, y eso pasa solo cuando las invocaciones del arbol
+// estan pinadas a refs DISTINTAS. Este fixture llevaba un unico pin a SHA hasta la
+// ronda 3, y ahi estaba el bypass que el refutador cobro con doce caracteres: con un
+// solo pin —cualquiera, `@main`, `@v1.3.0` o un SHA— alcanzaba para bajar el rojo a
+// aviso y borrar cualquier regla del artefacto.
+test("artefacto mas nuevo con DOS refs distintas que lo explican: aviso, y dice que no comparo", () => {
   const canonico = canonicoTemporal({ versiones: VERSIONES_UNA_EN_VENTANA });
   const deOtroMarco = artefactoAlDia(canonico).replace(
     cabecera({ version: "1.3.0", sha: canonico.sha, superficie: "claude-code" }),
@@ -258,35 +261,43 @@ test("artefacto mas nuevo con un pin fijo que lo explica: aviso, y dice que no c
     canonico,
     archivos: { ...CADENA_SANA, ".projects/AGENTS-marco.md": deOtroMarco },
     hoy: DENTRO_DE_LA_VENTANA,
-    pins: [{ ruta: ".github/workflows/ci.yml", job: "constitucion", ref: "0123456789abcdef0123456789abcdef01234567" }],
+    pins: [
+      // el verificador, pinado viejo...
+      { ruta: ".github/workflows/ci.yml", job: "constitucion", ref: "0123456789abcdef0123456789abcdef01234567" },
+      // ...y el escritor, en el tag movil: por ahi entra un artefacto mas nuevo.
+      { ruta: ".github/workflows/actualizar-marco.yml", job: "actualizar", ref: "v1" },
+    ],
   });
   const adelantado = de(resultado, "artefacto-adelantado");
   assert.equal(adelantado.length, 1, JSON.stringify(resultado.hallazgos));
   assert.equal(adelantado[0].nivel, "warning");
-  assert.match(adelantado[0].mensaje, /pin/);
+  assert.match(adelantado[0].mensaje, /refs DISTINTAS/);
   assert.equal(de(resultado, "artefacto-sello-incoherente").length, 0);
 });
 
-// Y SIN PIN QUE LO EXPLIQUE, ROJO. Con el tag movil el consumidor corre siempre la
-// copia mas nueva del marco: un artefacto mas nuevo que ella no tiene explicacion
-// inocente, ni siquiera cuando el sello no delata nada.
-test("artefacto mas nuevo invocado solo con el tag movil: ROJO", () => {
-  const canonico = canonicoTemporal({ versiones: VERSIONES_UNA_EN_VENTANA });
-  const deOtroMarco = artefactoAlDia(canonico).replace(
-    cabecera({ version: "1.3.0", sha: canonico.sha, superficie: "claude-code" }),
-    cabecera({ version: "9.9.9", sha: "abcabcabcabc", superficie: "claude-code" }),
-  );
-  const resultado = correr({
-    canonico,
-    archivos: { ...CADENA_SANA, ".projects/AGENTS-marco.md": deOtroMarco },
-    hoy: DENTRO_DE_LA_VENTANA,
-    pins: [{ ruta: ".github/workflows/ci.yml", job: "constitucion", ref: "v1" }],
-  });
-  const adelantado = de(resultado, "artefacto-adelantado");
-  assert.equal(adelantado.length, 1, JSON.stringify(resultado.hallazgos));
-  assert.equal(adelantado[0].nivel, "error");
-  assert.match(adelantado[0].mensaje, /tag movil/);
-  assert.equal(resultado.estado, "rojo");
+// Y CON UNA SOLA REF, ROJO, sea la que sea. Si todas las invocaciones del repo corren
+// la misma copia del marco, el modo escribir corre el MISMO codigo que este
+// verificador: no puede haber emitido una version mas nueva que la suya. La ortografia
+// de la ref no entra en la cuenta, que es exactamente lo que la volvia evadible.
+test("artefacto mas nuevo con una sola ref: ROJO, y da igual como se escriba la ref", () => {
+  for (const ref of ["v1", "main", "refs/heads/main", "v1.3.0", "0123456789abcdef0123456789abcdef01234567"]) {
+    const canonico = canonicoTemporal({ versiones: VERSIONES_UNA_EN_VENTANA });
+    const deOtroMarco = artefactoAlDia(canonico).replace(
+      cabecera({ version: "1.3.0", sha: canonico.sha, superficie: "claude-code" }),
+      cabecera({ version: "9.9.9", sha: "abcabcabcabc", superficie: "claude-code" }),
+    );
+    const resultado = correr({
+      canonico,
+      archivos: { ...CADENA_SANA, ".projects/AGENTS-marco.md": deOtroMarco },
+      hoy: DENTRO_DE_LA_VENTANA,
+      pins: [{ ruta: ".github/workflows/ci.yml", job: "constitucion", ref }],
+    });
+    const adelantado = de(resultado, "artefacto-adelantado");
+    assert.equal(adelantado.length, 1, `${ref}: ${JSON.stringify(resultado.hallazgos)}`);
+    assert.equal(adelantado[0].nivel, "error", ref);
+    assert.match(adelantado[0].mensaje, /MISMA ref/);
+    assert.equal(resultado.estado, "rojo", ref);
+  }
 });
 
 test("resellar la cabecera NO tapa una edicion del cuerpo", () => {

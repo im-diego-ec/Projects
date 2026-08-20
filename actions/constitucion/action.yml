@@ -82,10 +82,16 @@ author: la organización
 #     "cableado" de esta misma action, que corre desde el marco-ci.yml —el carril que
 #     el consumidor hereda por llamar al workflow reusable— y PARSEA los workflows en
 #     vez de grepearlos: un job con `if: false`, una invocacion en modo escribir, un
-#     archivo en un subdirectorio que GitHub no ejecuta o un job que el ci-ok no
-#     espera cuentan como NO cableado, cada uno con su motivo impreso. Lo que sigue
-#     fuera de alcance es un cableado que llegue por un workflow reusable de terceros:
-#     haria falta leer otro repositorio.
+#     archivo en un subdirectorio que GitHub no ejecuta, un archivo que git no
+#     rastrea, un workflow al que un filtro de paths/branches/types saca del camino
+#     del cambio, un continue-on-error que no se pueda demostrar falso o un ci-ok que
+#     no mire el resultado del job cuentan como NO cableado, cada uno con su motivo
+#     impreso. Lo que sigue fuera de alcance es un cableado que llegue por un
+#     workflow reusable de terceros (haria falta leer otro repositorio) y el
+#     contenido de un `run:`: se verifica que el veredicto CONSULTE
+#     needs.<job>.result, no lo que su script hace con el valor — cerrar eso exige
+#     decidir el comportamiento de un shell arbitrario, y la salida estructural es
+#     que el veredicto lo emita el marco en vez del run: de cada consumidor.
 #   · El motivo de un desvio se verifica que EXISTA, no que sea sincero, y nada
 #     limita cuantos declara un proyecto.
 # ---------------------------------------------------------------------------
@@ -96,13 +102,20 @@ inputs:
       "verificar" (default) compara lo presente contra lo que el marco publica y
       falla segun la tabla de arriba. "escribir" renderiza los artefactos en el
       arbol de trabajo y no falla por estar atrasado, porque justamente lo arregla.
-      "cableado" no mira el artefacto: PARSEA los workflows del repo y verifica que
-      alguno invoque de verdad el modo verificar (en el primer nivel de
-      .github/workflows, disparado en pull_request o en push a la rama por defecto,
-      en modo verificar, sin un if constante falso ni continue-on-error, y colgado
-      del veredicto agregado ci-ok por needs). Lo invoca el marco-ci.yml, que es el
-      carril INDEPENDIENTE: borrar el job de la constitucion no apaga al que
-      denuncia que falta.
+      "cableado" no mira el artefacto: PARSEA los workflows RASTREADOS del repo y
+      verifica que alguno invoque de verdad el modo verificar. Las cinco
+      condiciones son conjuntas: (1) el archivo esta rastreado por git y en el
+      primer nivel de .github/workflows; (2) el workflow SE DISPARA en el camino
+      del cambio, o sea que ninguna clave de filtro de su evento —types, branches,
+      branches-ignore, paths, paths-ignore, tags— lo saca de ahi; (3) invoca en
+      modo verificar; (4) no hay if constante falso, ni un continue-on-error que
+      no se pueda demostrar falso, ni un needs a un job que nunca corre; y (5) un
+      rojo de ese job IMPIDE que el veredicto agregado ci-ok salga verde, que son
+      dos cosas y no una: ci-ok tiene que correr aunque su dependencia falle
+      (if: always()) y tiene que CONSULTAR needs.<job>.result, porque un job
+      salteado reporta Success para GitHub y entonces el needs solo no bloquea
+      nada. Lo invoca el marco-ci.yml, que es el carril INDEPENDIENTE: borrar el
+      job de la constitucion no apaga al que denuncia que falta.
     required: false
     default: verificar
   rama_por_defecto:
