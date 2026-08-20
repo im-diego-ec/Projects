@@ -1325,6 +1325,11 @@ jobs:
           # El programa va inline y no en un archivo aparte, misma razon que el
           # paso de enmascaramiento. Va sin comillas simples porque el programa
           # entero viaja dentro de comillas simples de shell.
+          # shellcheck disable=SC2016
+          # El cuerpo va entre comillas SIMPLES a proposito: es JavaScript y sus
+          # $ son del lenguaje, no del shell. Expandirlos —que es lo que
+          # shellcheck sugiere— romperia el script. Supresion puntual y con
+          # motivo, no un apagado general de la regla.
           ARCHIVO_DECLARACIONES="${DECLARACIONES}" \
           REPORTE_ARBOL="${REPORTE_ARBOL}" \
           REPORTE_HISTORIA="${REPORTE_HISTORIA}" \
