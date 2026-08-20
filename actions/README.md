@@ -14,6 +14,7 @@ uses: im-diego-ec/Projects/actions/<nombre>@v1
 | [`cobertura-diff`](cobertura-diff/) | Mide qué proporción de las líneas del cambio ejercitan las pruebas | Sí: bajo el mínimo, y también sin datos |
 | [`censo-fuentes`](censo-fuentes/) | Deriva el alcance real de la verificación y caza los archivos que no mira ninguna herramienta | Sí: agujeros y exclusiones muertas |
 | [`aviso-version`](aviso-version/) | Arma, desde el CHANGELOG, el mensaje que reciben los consumidores al publicarse una versión | Sí: solo si el CHANGELOG no tiene entrada para esa versión |
+| [`constitucion`](constitucion/) | Entrega la porción del marco de la constitución a cada superficie de agente que el repo declara, y verifica que la presente sea la que el marco publica | Sí: artefacto ausente o atrasado pasada su fecha, editado a mano, cadena de carga rota o desvío muerto |
 
 ## Parametrización
 
@@ -643,6 +644,74 @@ releases—. La contrapartida es honesta: al publicarse bajo `@v1`, sus `inputs`
 
 ---
 
+## `constitucion`
+
+Las cuatro formas de distribución del marco están en el README de la raíz, y
+hasta este change **una sola no tenía ni actualización ni check**: el scaffold,
+que es donde vive el texto que los agentes cargan. El resultado medido: una
+adopción nueva copió `plantilla/AGENTS.md` y el archivo quedó con 241 líneas
+contra 355 —reglas enteras perdidas, no reflujo de formato—, y en el consumidor
+viejo la divergencia ya corría en las dos direcciones.
+
+Esta action mueve **la porción del marco** de scaffold a regenerado. El texto
+canónico vive en `constitucion/canonico/` (una sección por archivo `NN-*.md`,
+en orden, con un `manifiesto.json` que declara la versión y sus fechas), viaja
+DENTRO de la action por `GITHUB_ACTION_PATH` —el `GITHUB_TOKEN` de un consumidor
+no lee otro repositorio— y se **renderiza** contra los valores del proyecto.
+
+Dos modos:
+
+- **`escribir`** deja un artefacto por superficie declarada
+  (`.projects/AGENTS-marco.md` para la cadena `CLAUDE.md → @AGENTS.md → @artefacto`,
+  `.cursor/rules/00-marco.mdc` para la superficie que lee markdown plano y no
+  expande imports). Escribe en el árbol de trabajo y nada más: no commitea, no
+  pushea y no abre PRs. Eso es del workflow del consumidor, porque escribir en el
+  repo de un proyecto desde una sesión de Projects es 🛑.
+- **`verificar`** compara lo presente contra el re-render de la versión que el
+  propio artefacto declara en su cabecera de una línea
+  (`<!-- projects:constitucion version=… sha=… -->`), y deja el artefacto al día en
+  disco para subirlo con `upload-artifact`.
+
+Lo que el proyecto pone, y vive **fuera** de `.projects/` a propósito —ese
+directorio es desechable y el modo escribir lo reemplaza—:
+
+- `.projects-valores.json`: los placeholders de dobles llaves, más un
+  `"superficies"` opcional. Los handles y las cuentas reales viven del lado del
+  consumidor, nunca en Projects.
+- `.projects-desvios.json`: los desvíos declarados, cada uno con `regla`, `fecha`,
+  `aprobado_por` y `motivo`. El desvío se **imprime dentro del artefacto que los
+  agentes cargan, pegado a la regla que anula** —una excepción que el agente no
+  lee produce algo peor que una regla ausente: un agente cumpliendo a rajatabla
+  algo que el proyecto ya anuló—, y **caduca**: cuando la regla que nombra deja de
+  existir en el canónico, el job se pone rojo por desvío muerto con el motivo que
+  tenía escrito.
+
+**El sello no es una firma, y es a propósito.** El `sha` de la cabecera identifica
+el CANÓNICO de esa versión, no el cuerpo renderizado. Si cubriera el cuerpo, el
+arreglo mecánicamente obvio para un rojo de "editado a mano" sería recomputar el
+hash y volver a estampar; la autoridad sobre el cuerpo es el re-render, que no se
+puede falsificar sin cambiar el canónico.
+
+**El rojo lo dispara una fecha, no el release.** Cada versión del canónico declara
+`publicada` y `exigible_desde`, y la propia action rechaza un manifiesto con menos
+de 28 días entre las dos (la puerta de atrás se llama `"urgente": true` y sale por
+`::warning::`, nunca muda). Entre las dos fechas, un artefacto ausente o atrasado
+es `::warning::`; desde `exigible_desde`, `::error::`. Si el consumidor acumuló
+varias versiones sin adoptar, manda la fecha de la **más vieja pendiente**. Lo que
+**no** tiene es rama silenciosa de "este repo no aplica": el repo sin artefacto es
+exactamente el que hay que avisar.
+
+Límites declarados, en el encabezado del `action.yml` y acá: esto garantiza que el
+**texto** llegue íntegro y al día a la superficie que el agente carga, **no** que
+el agente lo obedezca en el turno 40 de una sesión larga — cierra el hueco de
+distribución, no el de comportamiento. Solo cubre las superficies que el
+repositorio **declara**. Y Projects **no puede dogfoodear** este mecanismo: su
+`AGENTS.md` es la constitución del marco, no la de un proyecto, así que la
+evidencia son el banco de pruebas de `constitucion/pruebas/` —que sí corre en el
+CI de Projects— y la validación contra un consumidor real antes de mover `v1`.
+
+---
+
 ## Permisos mínimos
 
 Cada `action.yml` los trae escritos en su encabezado. En otro repo, cada
@@ -658,6 +727,7 @@ para no volver a pagarlo.
 | `censo-fuentes` | — | `contents: read` |
 | `cobertura-diff` | — | `contents: read` |
 | `aviso-version` | — | `contents: read` (el checkout; no llama a la API ni a la red) |
+| `constitucion` | `verificar`, `escribir` | `contents: read` (escribe en el árbol de trabajo y nada más: el commit y el PR los hace el workflow del consumidor, con sus propios permisos) |
 
 Un bloque `permissions:` **reemplaza** los permisos por defecto del token: hay
 que listar `contents: read` explícitamente, no se hereda.
