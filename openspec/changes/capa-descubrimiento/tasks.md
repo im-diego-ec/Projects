@@ -32,11 +32,19 @@ grepeando su salida.
       Evidencia: sección 2 del pre-registro.
 - [ ] 0.3 Nombrar al scorer —el builder que **no** corre ninguno de los dos
       brazos— y dejar por escrito que arma el inventario de materia prima desde
-      las transcripciones **antes** de ver cualquier salida. Evidencia: sección 3
-      del pre-registro, y el commit del inventario anterior al de las salidas.
+      las transcripciones **antes** de ver cualquier salida. Con tres personas el
+      rol choca con la firma del veredicto, y eso no se arregla nombrando gente:
+      hay que **elegir** cuál de las dos combinaciones se usa y **escribir el
+      conflicto que queda**, pegado al ciego imperfecto que `design.md` ya
+      declara. Evidencia: sección 3 del pre-registro, con la elección hecha y el
+      conflicto residual escrito, y el commit del inventario anterior al de las
+      salidas.
 - [ ] 0.4 Escribir la tabla de los siete criterios (G0–G6) con sus umbrales ya
-      fijados, tal como están en `design.md` D6, y la regla de veredicto.
-      Evidencia: sección 4 del pre-registro.
+      fijados, tal como están en `design.md` D6, la regla de veredicto, y el
+      comando exacto que produce la evidencia de cada uno, diciendo también
+      cuáles **no** tienen comando y dependen de lectura humana. Un criterio sin
+      comando no es menos válido: es menos verificable, y eso hay que saberlo
+      antes de correr y no al puntuar. Evidencia: sección 4 del pre-registro.
 - [ ] 0.5 Planilla de horas por sesión, vacía, con las columnas ya definidas (rol,
       brazo, fecha, horas de reloj). Sin esto, G4 se mide de memoria y la memoria
       siempre favorece a lo nuevo. Evidencia: sección 5 del pre-registro.
@@ -45,6 +53,41 @@ grepeando su salida.
 - [ ] 0.7 Commitear el pre-registro **completo** antes de la primera sesión del
       piloto. Evidencia: la fecha del commit del pre-registro es anterior a la
       fecha de la primera entrada de la planilla de horas.
+
+Las cuatro que siguen se agregaron al bloque 0 después de escribirlo, porque el
+bloque se podía tildar entero sin que existiera ninguna de ellas: la checklist
+habría dicho «pre-registro hecho» sobre un pre-registro que no permite medir G1,
+G2 ni G4.
+
+- [ ] 0.8 Convención de identificadores del material y formato de la tabla de
+      trazabilidad, con su domicilio decidido: la tabla vive **con el change**, al
+      lado de los deltas, y no en el directorio del insumo, porque nombra
+      escenarios y D2 prohíbe que un insumo tenga forma de contrato. Sin esta
+      convención los dos brazos citan en dialectos distintos y G1 deja de ser
+      comparable, que es el criterio que justifica la capa. Evidencia:
+      `piloto/convencion-de-procedencia.md`, partes 1 y 2, commiteado antes de la
+      primera sesión.
+- [ ] 0.9 Rúbrica de clasificación regla de negocio / contexto / preferencia, con
+      una prueba de decisión por clase y sus casos de borde. El umbral de G2 es
+      condicional a la clase: si la definición llega después de ver las salidas,
+      el scorer puede reclasificar como «contexto» cualquier ítem caído y el cero
+      se sostiene sin que nada falle. Evidencia:
+      `piloto/convencion-de-procedencia.md`, parte 3, con el commit de la rúbrica
+      anterior al commit del inventario de 3.1.
+- [ ] 0.10 Regla de parada **idéntica** para los dos brazos, y protocolo escrito
+      del brazo A. «El camino de hoy con la asistencia habitual» no es un control:
+      es lo que cada uno haga. Y sin regla de parada las horas de G4 miden una
+      cantidad indefinida, así que gana el brazo que se detiene cuando le parece
+      suficiente. Evidencia: sección 2 del pre-registro, con la condición
+      mecánica (código de salida del arnés), la condición escrita y el techo de
+      sesiones.
+- [ ] 0.11 Mecánica medible de G0: el espacio desechable lleva `git init` y
+      `_bmad/` se commitea **apenas** se instala, antes de trabajar. «Fuera de
+      todo repositorio» (D5) significa fuera de Projects, de `plantilla/` y de los
+      consumidores; **no** significa sin git, porque la evidencia de G0 es un diff
+      de git y sin él el criterio queda no medido, que por la regla de veredicto
+      cuenta en contra. Evidencia: el primer commit del espacio, y el código de
+      salida de `node piloto/arnes/verificar-brazo.mjs <espacio> B`.
 
 ## 1. Lo que este change NO decide (pendiente de OK humano explícito)
 

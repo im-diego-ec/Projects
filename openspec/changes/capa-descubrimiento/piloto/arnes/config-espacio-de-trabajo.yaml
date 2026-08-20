@@ -1,0 +1,84 @@
+# Configuración de OpenSpec del espacio de trabajo desechable del piloto.
+#
+# Se copia a `openspec/config.yaml` del espacio (paso 4 de la receta que está en
+# el encabezado de `verificar-brazo.mjs`), IDÉNTICA para el brazo A y para el
+# brazo B.
+#
+# Por qué existe este archivo, que es la parte que importa. Sin él, la
+# comparación de G4 es injusta por construcción: un brazo redactaría con las
+# reglas del área cargadas en cada sesión y el otro no, y la diferencia de
+# calidad y de horas se leería como mérito del método. El instrumento que vuelve
+# comparable la medición es este, y por eso se versiona junto al pre-registro en
+# vez de armarse a mano el lunes.
+#
+# `validate --all --strict` NO lo exige: medido, un espacio de trabajo sin
+# `openspec/config.yaml` valida en código de salida cero. O sea que su ausencia
+# no rompe nada y nadie se enteraría. Esa es justamente la razón para dejarlo
+# escrito: lo que no rompe nada al faltar es lo que falta.
+#
+# Los bloques `rules` están copiados VERBATIM del `openspec/config.yaml` de
+# Projects, y hay una consecuencia que conviene decir antes de que alguien la
+# descubra a mitad de una sesión: dos de las reglas de `proposal` hablan del
+# marco y de sus categorías de distribución, que no significan nada para una
+# rebanada de Supply Chain. Se dejan tal cual igual, por dos motivos. Primero,
+# porque cambiarlas convertiría la medición en «el piloto bajo reglas
+# inventadas para el piloto», y ahí cualquiera podría sospechar que las reglas se
+# acomodaron. Segundo, porque una regla inaplicable lo es por igual en los dos
+# brazos, así que no inclina la comparación. Quien corra los brazos lee «el
+# marco» como «el proyecto Supply Chain», omite la categoría de distribución, y
+# lo hace igual en A y en B.
+#
+# El bloque `context` sí está reescrito: el de Projects describe el marco, no el
+# dominio, y cargarlo acá le daría a los dos brazos un contexto que no tiene nada
+# que ver con lo que están escribiendo.
+
+schema: spec-driven
+context: |
+  Espacio de trabajo del PILOTO de la capa de descubrimiento (change
+  `capa-descubrimiento` del marco). Esto NO es un repositorio de proyecto: es un
+  laboratorio desechable, y lo que se escribe acá es una MEDICIÓN, no el
+  contrato de ningún sistema.
+  Qué se está escribiendo: el `proposal.md` y los deltas de specs de UNA rebanada
+  de los procesos del proyecto Supply Chain, levantados en entrevistas. La
+  rebanada (qué entrevistas, qué proceso end-to-end y dónde corta) está declarada
+  en la sección 1 del pre-registro del piloto y no se ensancha mientras se
+  trabaja: ensancharla convierte un ítem no cubierto en "eso quedaba afuera".
+  Qué NO se está escribiendo: los specs del proyecto Supply Chain. Ese proyecto
+  todavía no existe y sus specs van a nacer en su propio repositorio. Los deltas
+  de acá se descartan con el espacio de trabajo.
+  Trazabilidad, que es el objeto de la medición: cada requirement y cada
+  escenario cita el identificador del ítem de materia prima que lo origina, con
+  la gramática de `convencion-de-procedencia.md`. La tabla de trazabilidad es una
+  salida obligatoria del brazo, al mismo nivel que el proposal y los deltas: un
+  brazo sin tabla no entregó.
+  Supuestos: lo que el material no resuelve se escribe como pregunta abierta con
+  su identificador, nunca se completa por criterio propio ni se deja en blanco.
+  Una duda declarada es un resultado legítimo del descubrimiento; una duda
+  resuelta por omisión es invención, y es lo que el criterio G3 cuenta.
+  Idioma de specs: español en la prosa; keywords de OpenSpec en inglés.
+  Despersonalización: ni nombres de entrevistados, ni citas que los identifiquen,
+  ni nombres de empleados, clientes o proveedores reales. Se habla de roles
+  ("jefe de bodega", "compras") y de identificadores de entrevista. El material
+  crudo no entra a ningún repositorio.
+rules:
+  proposal:
+    - Mencionar el impacto visible para quien adopta el marco (proyecto
+      consumidor o builder), no solo el cambio interno
+    - Declarar a qué categoría de distribución pertenece lo que cambia
+      (referenciado, scaffold, canónico o regenerado) y si rompe a los
+      adoptantes existentes
+  specs:
+    - Usar escenarios con viñetas WHEN / THEN bajo `#### Scenario:` (prosa en
+      español, keywords en inglés). No usar Dado / Cuando / Entonces
+    - Enunciar los requirements con SHALL como propiedades observables, sin
+      nombres de recursos, cantidades esperadas ni detalles de implementación
+      que cada proyecto fija por su cuenta
+  design:
+    - Registrar las alternativas descartadas con su motivo
+    - Justificar cómo el cambio se hace cumplir solo (qué check falla si
+      alguien no lo cumple); si el cumplimiento depende de que alguien se
+      acuerde, decirlo explícitamente como deuda
+  tasks:
+    - Tareas pequeñas, ejecutables en un paso
+    - Cada tarea deja evidencia verificable (comando corrido, check en verde,
+      archivo creado)

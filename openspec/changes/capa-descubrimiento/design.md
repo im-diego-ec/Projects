@@ -218,8 +218,18 @@ El piloto usa material real y no necesita que exista el proyecto. Corre en un
 espacio de trabajo desechable, con la herramienta pinada, y **no escribe una
 línea en ningún repositorio**: ni en los consumidores, ni en `plantilla/`, ni en
 `openspec/specs/`. Lo único que entra a Projects son los **artefactos del piloto**
-—pre-registro, mediciones y veredicto— dentro del directorio de este change, y
-despersonalizados.
+—el pre-registro con sus instrumentos, las mediciones y el veredicto— dentro del
+directorio de este change, y despersonalizados.
+
+**«Fuera de todo repositorio» no significa «sin git», y la distinción no es
+retórica.** Significa fuera de Projects, fuera de `plantilla/` y fuera de los
+repositorios consumidores: el piloto no escribe una línea en ninguno de los tres.
+El espacio desechable, en cambio, lleva `git init` y commitea el directorio de
+instalación de la herramienta apenas se instala, porque la evidencia de G0 es un
+diff contra ese commit. Leída al pie de la letra, la versión «sin git» deja a G0
+sin con qué medirse, y un criterio no medido cuenta en contra por la regla de
+veredicto. Un `git init` en un directorio temporal no es un repositorio del área:
+es el instrumento de medición.
 
 **Alternativa descartada: pilotear dentro de Projects.** Los specs de dominio de
 Supply Chain no son canónico del marco: `openspec/specs/` describe el carril, no
@@ -341,7 +351,7 @@ otra:
 | El directorio declarado de artefactos de descubrimiento, su entrada en CODEOWNERS del rol de producto y su exclusión del formateador | **Scaffold** | desde el día uno son del proyecto: el nombre del directorio y quién revisa esos artefactos son suyos |
 | El pin de la herramienta de descubrimiento | **Regenerado** | idéntico razonamiento al del CLI de OpenSpec: el marco pina la versión, cada repo la instala, **no se vendora**. Vendorarla congelaría para todos la versión que la generó |
 | El directorio de instalación de la herramienta en el repo del consumidor | **ninguna: se ignora en git** | es dependencia instalada, no fuente. Lo que se versiona son sus **salidas** |
-| Los artefactos del piloto (pre-registro, mediciones, veredicto) | **ninguna** | son la historia de una decisión. Viajan con el change al archive, o al ADR si el veredicto no es verde |
+| Los artefactos del piloto (pre-registro y sus instrumentos, mediciones, veredicto) | **ninguna** | son la historia de una decisión. Viajan con el change al archive, o al ADR si el veredicto no es verde |
 
 ### D10 — El delta va en `gobierno-contribucion`, y el motivo es mecánico
 
@@ -408,21 +418,59 @@ el nombre del directorio declarado; las propiedades siguen siendo las mismas.
 ## El pre-registro, y qué se commitea antes de arrancar
 
 Antes de la primera sesión del piloto entra al directorio de este change un
-`piloto/pre-registro.md` con, y nada más que:
+`piloto/` con el pre-registro y sus instrumentos. El pre-registro
+(`piloto/pre-registro.md`) lleva:
 
 1. la rebanada elegida (entrevistas, proceso, dónde corta) y por qué es
    representativa;
-2. los dos brazos, quién corre cada uno y en qué orden;
-3. quién puntúa, y la declaración de que arma el inventario antes de ver las
-   salidas;
-4. la tabla de los siete criterios con los umbrales **ya escritos**;
+2. los dos brazos, quién corre cada uno, en qué orden, y la **regla de parada
+   idéntica para los dos** con el protocolo escrito del brazo A: sin ella las
+   horas de G4 miden una cantidad indefinida y gana el brazo que se detiene
+   cuando le parece suficiente;
+3. quién puntúa, la declaración de que arma el inventario antes de ver las
+   salidas, y la **colisión de roles resuelta**: con tres personas el scorer y el
+   firmante del veredicto no pueden ser distintos si el otro builder corre los
+   brazos, así que se elige una de las dos combinaciones y se escribe el
+   conflicto que queda;
+4. la tabla de los siete criterios con los umbrales **ya escritos** y, por
+   criterio, el comando que produce su evidencia, diciendo también cuáles no
+   tienen comando y dependen de lectura humana;
 5. la planilla vacía de horas por sesión;
-6. la versión exacta pinada de la herramienta.
+6. la versión exacta pinada de la herramienta, y el resultado del ensayo de
+   instalación: qué exigió de verdad la cadena de herramientas;
+7. las decisiones humanas del bloque 1, con quién las tomó y cuándo;
+8. lo que el piloto **no** mide, para que un veredicto verde no se compre más
+   autoridad de la que tiene.
+
+Los ítems 2, 3 y 4 crecieron al escribir el pre-registro, y el motivo vale
+dejarlo escrito: el bloque 0 se podía tildar entero sin que existiera ninguna de
+esas tres piezas, o sea que la checklist habría dicho «pre-registro hecho» sobre
+un pre-registro que no permite medir G1, G2 ni G4.
+
+Y el pre-registro no alcanza solo. Entran con él, en el mismo commit y por el
+mismo motivo, que es la fecha:
+
+- `piloto/convencion-de-procedencia.md`: la gramática del identificador estable,
+  el formato y el domicilio de la tabla de trazabilidad, y la rúbrica que decide
+  si un ítem es regla de negocio, contexto o preferencia. Sin la gramática los
+  dos brazos citan en dialectos distintos y G1 deja de ser comparable; sin la
+  rúbrica, el umbral de G2 queda condicionado a una clase que el scorer podría
+  redefinir después de ver las salidas.
+- `piloto/arnes/`: el script que cierra G0 y la parte mecánica de G4 **por código
+  de salida**, y la configuración de OpenSpec que se copia al espacio de trabajo
+  idéntica en los dos brazos. Un brazo que redacta con las reglas del área
+  cargadas y otro que no vuelve la comparación injusta por construcción, y la
+  diferencia se leería como mérito del método.
+- `piloto/horas.csv` y `piloto/bitacora-g5.md`: las dos planillas que se llenan
+  mientras pasa. La bitácora existe desde el día uno porque al final de cuatro
+  semanas esa lista se reconstruye mal.
 
 Después del piloto entran `piloto/mediciones.md` (el inventario, las listas del
 scorer y las horas) y `piloto/veredicto.md` (los siete resultados, el veredicto y
-las tres firmas). Todo despersonalizado: ni nombres de entrevistados ni citas que
-los identifiquen.
+las tres firmas). Esos dos **no** se crean vacíos antes de arrancar: un archivo
+vacío con el título puesto invita a llenarlo de memoria, que es justo lo que G4 y
+G5 tratan de evitar. Todo despersonalizado: ni nombres de entrevistados ni citas
+que los identifiquen.
 
 ## Lo que este diseño NO resuelve
 
