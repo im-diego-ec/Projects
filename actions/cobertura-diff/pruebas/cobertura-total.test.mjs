@@ -963,6 +963,33 @@ test("un contador declarado que los items SUPERAN no es un denominador corto", (
   assert.equal(r.codigo, 0, r.todo);
 });
 
+test("el denominador corto por UN SOLO item tambien enrojece: el borde de la comparacion", () => {
+  // HALLAZGO DE UN MUTANTE SOBREVIVIENTE. Todos los cortos que este banco
+  // ejercitaba faltaban de a varios: declara 10 y llegan 3, declara 5 y llegan
+  // 2, declara 5 y llega 1. Con esa distancia, mutar la comparacion a
+  // `contados < declarado - 1` —el clasico corrimiento de uno— sobrevivia al
+  // banco COMPLETO: 128 de 128 verdes con el corto de un item apagado. Y no es
+  // un mutante equivalente: medido, este mismo caso pasaba de
+  // "ROJO · denominador corto" con EXIT 1 a la fila "**100.00%** ... OK" con
+  // EXIT 0. O sea que el agujero que esta rama entera existe para tapar volvia
+  // a abrirse para el corto mas chico, que es el mas facil de que se cuele.
+  //
+  // El caso: el reporte declara FNF:5 y trae 4 funciones, las 4 cubiertas. La
+  // fila publica 100% y la verdad, con el denominador que el propio reporte
+  // declara, es 80%. Un item de diferencia sobre cinco son veinte puntos.
+  const { dir, base } = repoConLcovCrudo(
+    `TN:\nSF:web/src/mod.js\nFN:1,a\nFNDA:1,a\nFN:2,b\nFNDA:1,b\nFN:3,c\nFNDA:1,c\nFN:4,d\nFNDA:1,d\nFNF:5\nFNH:4\n${LINEAS_OK}\n${RAMAS_OK}\nend_of_record\n`
+  );
+  const r = correrTotal(dir, base);
+  assert.equal(r.codigo, 1, r.todo);
+  assert.match(r.todo, /declaran 5\b/);
+  assert.match(r.todo, /declara FNF:5 y llegaron 4/);
+  // El numero publicado no puede quedar desnudo: una fila que dice 100% sin
+  // decir sobre que base es exactamente lo que engaña al que la lee.
+  assert.match(r.resumen, /100\.00% sobre 4 de 5 declarados/);
+  assert.match(r.resumen, /ROJO · denominador corto/);
+});
+
 test("el contrato del denominador esta escrito en el spec vivo, no solo en el codigo", () => {
   // Un veredicto rojo que el contrato no nombra es indistinguible de un bug del
   // marco: es la misma leccion que dejo la ventana de estreno cuando vivia en
