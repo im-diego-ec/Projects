@@ -230,7 +230,11 @@ Usar siempre las URLs canónicas: el CORS del API solo permite esos orígenes.
   trae una dependencia declarada del repo, la forma correcta es `pnpm exec <comando>`, que
   lee `node_modules` y falla si no está en vez de salir a buscarlo. El CI del marco lo
   verifica solo (check *Ejecutores de paquetes pinados*), incluido el allowlist de
-  `.claude/settings.json`.
+  `.claude/settings.json`. Ahí **el comodín va DESPUÉS del paquete pinado**:
+  `Bash(npx --yes @scope/pkg@1.2.3 validate *)` autoriza un comando concreto,
+  mientras que una entrada que corta antes —`Bash(npx:*)`, `Bash(pnpm dlx:*)`,
+  `Bash(npm:*)`— es un permiso permanente para descargar y ejecutar **cualquier**
+  paquete, y el check la trata como tal.
 
 **⚠️ Pregunta primero (requiere OK humano)**
 - Agregar una dependencia nueva.

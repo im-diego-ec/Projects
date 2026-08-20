@@ -29,7 +29,7 @@ import {
   alfabetoDelPaso,
   RAIZ,
 } from "./extraer.mjs";
-import { corpus } from "./generar.mjs";
+import { corpus, alfabetoPropio } from "./generar.mjs";
 import {
   repoDeJuguete,
   carpetaTemporal,
@@ -44,8 +44,15 @@ const PASO = "Ejecutores de paquetes pinados";
 const script = scriptDelPaso(PASO);
 const programa = programaNode(script, PASO);
 const patron = patronDelPrefiltro(script, PASO);
-const alfabeto = alfabetoDelPaso(programa, PASO);
-const CORPUS = corpus(alfabeto);
+// DOS ALFABETOS, a proposito y no por duplicacion. El del PASO se lee del YAML;
+// el del BANCO sale de casos/ortografias.md, escrito desde la documentacion de
+// cada gestor. Compartir uno era la tautologia de la ronda anterior: un corpus
+// derivado del alfabeto que la regla usa solo puede preguntar por los miembros que
+// la regla ya conoce. Con dos, el banco afirma la RELACION entre ellos y el corpus
+// puede traer una forma que el paso todavia no ve.
+const alfabetoDelYaml = alfabetoDelPaso(programa, PASO);
+const alfabetoDelBanco = alfabetoPropio();
+const CORPUS = corpus(alfabetoDelBanco);
 
 function casos() {
   const md = readFileSync(join(RAIZ, "pruebas", "marco-ci", "casos", "ejecutores.md"), "utf8");
@@ -99,10 +106,52 @@ for (const caso of casos()) {
 const ROJAS = CORPUS.filter((entrada) => entrada.rojo);
 const VERDES = CORPUS.filter((entrada) => !entrada.rojo);
 
-test("corpus generado · cruza todos los ejes contra el alfabeto del paso", () => {
-  assert.ok(alfabeto.length >= 5, `el alfabeto leido del paso quedo corto: ${alfabeto.length}`);
+test("corpus generado · cruza todos los ejes contra el alfabeto del banco", () => {
+  assert.ok(
+    alfabetoDelBanco.length >= 5,
+    `el alfabeto del banco quedo corto: ${alfabetoDelBanco.length}`,
+  );
   assert.ok(ROJAS.length > 500, `el corpus rojo quedo corto: ${ROJAS.length}`);
   assert.ok(VERDES.length > 300, `el corpus verde quedo corto: ${VERDES.length}`);
+});
+
+// LA INDEPENDENCIA, hecha mecanica y no confiada a la prosa. El generador no
+// puede volver a leer el paso: si lo lee, el corpus vuelve a preguntar por lo que
+// la regla ya sabe y deja de poder encontrar un miembro nuevo, que es la
+// tautologia que esta ronda vino a cortar. Medido sobre el codigo de 61d604c con
+// el mismo arnes: el corpus derivado del alfabeto del paso encontraba 0 entradas
+// invisibles y el corpus con alfabeto propio encontraba 200. Un comentario
+// pidiendo que no se derive no habria sobrevivido a la tercera ronda; esta
+// asercion si.
+test("corpus generado · el generador no lee el paso que audita", () => {
+  const fuente = readFileSync(join(RAIZ, "pruebas", "marco-ci", "generar.mjs"), "utf8");
+  assert.ok(
+    !/extraer\.mjs|marco-ci\.yml|ALFABETO/.test(fuente),
+    "generar.mjs volvio a mirar el paso (extraer.mjs, marco-ci.yml o su ALFABETO): un corpus derivado de la regla que audita no puede encontrar un miembro nuevo de la clase, solo formas nuevas de los miembros que la regla ya conoce",
+  );
+});
+
+// LA RELACION ENTRE LOS DOS ALFABETOS, que es lo que reemplaza al alfabeto
+// compartido. Va en esta direccion y no en la otra a proposito:
+//
+//   · Todo par que el PASO declara tiene que estar en el alfabeto del BANCO. Si
+//     no esta, el banco no lo puede juzgar: el paso tendria una rama que ninguna
+//     entrada del corpus recorre, y el banco daria verde sin haber preguntado.
+//     Eso es rojo, y el mensaje dice donde se arregla.
+//   · Al REVES no se exige nada. El banco puede conocer formas que el paso no ve,
+//     y esas no fallan aca — fallan en "el lector no deja pasar ninguna entrada
+//     sin pinar", que es donde tienen que fallar: como un agujero del check, con
+//     la entrada concreta que lo muestra, no como una diferencia de listas.
+test("corpus generado · el banco conoce todo par que el paso declara", () => {
+  const delBanco = new Set(alfabetoDelBanco.map((par) => `${par.gestor}=${par.sub}`));
+  const huerfanos = alfabetoDelYaml
+    .map((par) => `${par.gestor}=${par.sub}`)
+    .filter((clave) => !delBanco.has(clave));
+  assert.deepEqual(
+    huerfanos,
+    [],
+    'el paso declara estos pares y el alfabeto del banco no los tiene, asi que ninguna entrada generada los recorre y el corpus daria verde sin preguntar. Arreglo: agregalos a pruebas/marco-ci/casos/ortografias.md con sus ortografias y la fuente de donde salen',
+  );
 });
 
 // Toda entrada sin version exacta tiene que quedar ROJA. Cada entrada vive en su
@@ -156,6 +205,36 @@ test("corpus generado · el prefiltro alcanza a toda entrada que el lector marca
     perdidas.map((entrada) => `${entrada.id} (${entrada.nota}): ${entrada.linea}`),
     [],
     `el prefiltro /${patron}/ no selecciona estas entradas, asi que el lector nunca las ve`,
+  );
+});
+
+// EL REPORTE TIENE QUE LLEGAR ENTERO, y esto se afirma sobre el TEXTO del paso
+// porque en esta maquina no se puede afirmar sobre la conducta. Node no espera a
+// que se vacie el stdout cuando process.exit() corta y la salida es un pipe, que
+// es lo que pone Actions; en Windows el stdout de Node es sincronico y no se
+// pierde nada, asi que un test de conducta daria verde aca con el codigo roto —
+// exactamente lo que paso: el banco de esta maquina daba 58/58 mientras la
+// corrida 32412180384 (ubuntu) perdia 1162 de 1252 anotaciones, con el corte
+// medido en 90 x 739 = 66510 bytes, o sea los 64 KiB del buffer del pipe.
+//
+// Lo que si es conducta y si corre en las dos plataformas es el corpus rojo de
+// mas abajo: sobre Linux vuelve a cazar esto solo. Este test existe para que la
+// causa quede nombrada en el lugar donde alguien la volveria a introducir.
+test("ejecutores · el paso reporta con process.exitCode y no con process.exit", () => {
+  // Se sacan los comentarios de linea antes de mirar: el propio bloque EXPLICA
+  // por que no usa process.exit(), y una asercion sobre el texto crudo se
+  // dispararia con su propia explicacion.
+  const codigo = programa
+    .split("\n")
+    .filter((linea) => !/^\s*\/\//.test(linea))
+    .join("\n");
+  assert.ok(
+    /process\.exitCode = 1/.test(codigo),
+    "el paso tiene que marcar el rojo con process.exitCode para que Node vacie el stdout antes de salir",
+  );
+  assert.ok(
+    !/process\.exit\(/.test(codigo),
+    "el paso volvio a cortar con process.exit(): con la salida en un pipe eso descarta las anotaciones que pasen el buffer, y el reporte que dice QUE arreglar se pierde",
   );
 });
 

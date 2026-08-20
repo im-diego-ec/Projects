@@ -96,13 +96,27 @@ mueve sobre un cambio incompatible.
   informa aparte. Una invocación partida con `\` **sí** se lee, desde que el
   prefiltro selecciona archivos en vez de líneas.
 
-  **Residuos, y son dos.** (1) *Irreducible*: si el nombre del gestor o su
+  **Residuos, y son tres.** (0) *Nuevo, medido, y el más caro de los tres*: los
+  allowlists reales de las **skills de este repo** viven en el frontmatter
+  `allowed-tools:` de archivos `.md`, y los `.md` están **fuera del universo del
+  check** por el pathspec. Medido hoy en el árbol de Projects: dos skills
+  (`.claude/skills/projects-adoptar/SKILL.md` y
+  `.claude/skills/projects-archive-change/SKILL.md`) autorizan `Bash(npx:*)` y
+  `Bash(pnpm:*)` — exactamente la clase que esta ronda acaba de cerrar, y el check
+  no las ve por construcción. No se cierra acá porque las dos salidas son cambios
+  de comportamiento con su propia discusión: leer los `.md` en general estrella el
+  check contra toda la prosa del marco, que cita la forma incorrecta como
+  contraejemplo a propósito; leer solo la línea `allowed-tools:` de un `.md` es
+  angosto y defendible, pero **pone el árbol de Projects en rojo el día que entra** y
+  el arreglo pasa por reescribir permisos de agente, que no se decide dentro de un
+  PR de arreglo. Va como change propio, y hasta entonces está escrito acá y no
+  descubierto por la próxima ronda. (1) *Irreducible*: si el nombre del gestor o su
   subcomando llegan por indirección (`pnpm $SUB pkg`, `eval "$CMD"`, un alias de
   shell, dos mitades concatenadas), el texto de la línea no contiene la invocación
   y ninguna lectura estática la puede ver — cerrarlo pediría ejecutar, que es justo
   lo que este paso no hace, y queda fijado en el banco como caso *límite* y no como
   caso que pasa. (2) *Abierto y no cerrado en esta ronda*: la familia de
-  scaffolding descarga igual y no está en el alfabeto — `npm init <pkg>` resuelve
+  scaffolding descarga igual y sigue afuera del alfabeto — `npm init <pkg>` resuelve
   `create-<pkg>` desde npm, `npm create` es su alias, y `pnpm create`, `yarn
   create` y `bun create` hacen lo mismo (los `init` de pnpm, yarn y bun andamian
   **local** y no descargan, así que meterlos sería puro falso rojo). Se declara en
@@ -119,15 +133,29 @@ mueve sobre un cambio incompatible.
   `pruebas/marco-ci/casos/ejecutores.md` son regresión: fijan por código de salida
   lo que ya se sostiene. El **corpus generado** (`pruebas/marco-ci/generar.mjs`) es
   el que puede encontrar algo nuevo: cruza los ejes de la gramática de
-  entrecomillado, de banderas y de envoltorio contra el alfabeto de ejecutores que
-  **lee del propio paso**, y hoy son 2191 entradas. La versión anterior del banco
-  afirmaba el invariante del prefiltro iterando la lista escrita a mano, y por eso
-  no podía, por construcción, cazar un miembro nuevo de la clase. El corpus
-  encontró uno en su primera corrida: una bandera con valor separado que no tiene
-  forma de paquete (`npx --registry <url> openspec`) hacía que el lector se rindiera
-  con un `::warning::` —que no pone rojo ningún job— sobre una invocación real y sin
-  pinar. Medido contra el paso de la ronda anterior: **500 de 1252** entradas sin
-  pinar salían sin un solo `::error::`; con el tokenizador, 0.
+  entrecomillado, de banderas, de ortografía del ejecutor y de envoltorio contra un
+  **alfabeto propio**, y hoy son 2582 entradas.
+
+  Ese alfabeto propio es el arreglo de la última ronda, y vale explicarlo porque la
+  misma tautología volvió dos veces disfrazada. Primero el invariante recorría una
+  lista de casos escrita a mano: no podía cazar un miembro nuevo porque solo
+  preguntaba por lo ya pensado. La ronda siguiente pasó a generar por producto de
+  ejes, pero leyendo el alfabeto **del propio paso** — y eso arregla el eje de las
+  formas y deja intacto el de los gestores: un corpus derivado de la regla que
+  audita solo puede preguntar por los miembros que la regla ya conoce. Está medido
+  con el mismo arnés sobre el mismo código viejo: el corpus derivado del paso
+  encontraba **0** entradas invisibles y el corpus con alfabeto propio encontraba
+  **200**. Desde esta ronda el alfabeto del banco sale de la documentación de cada
+  gestor y vive en `pruebas/marco-ci/casos/ortografias.md`, con la fuente escrita
+  por gestor; el generador ya no puede leer el paso, y eso es una aserción del
+  banco y no un comentario pidiéndolo.
+
+  Lo que ese corpus encontró, todo medido por código de salida archivo por archivo:
+  una bandera con valor separado sin forma de paquete (`npx --registry <url>
+  openspec`) que hacía al lector rendirse con un `::warning::` —que no pone rojo
+  ningún job— sobre una invocación real y sin pinar; el **corte del reporte a los 64
+  KiB** (abajo, en *Corregido*); y la familia del **comodín del anfitrión**, que era
+  el agujero más grande de los tres.
 
 - **Aviso de versión a los consumidores** — `.github/workflows/aviso-version.yml`
   (workflow propio de Projects) más `actions/aviso-version` (referenciada). Al
@@ -413,6 +441,69 @@ rompe en silencio, el detector arranca igual y mira menos de lo que dice.
 - Los dos tests **miden el binario si aparece en el `PATH`** y anuncian con
   `t.diagnostic` cuando no está, en vez de saltar callados. Un salto silencioso
   sería el fail-open del 2026-08-05 otra vez.
+
+### Corregido — el comodín del anfitrión, y un reporte que llegaba mutilado
+
+**El comodín pegado al ejecutor cegaba el check por completo.** El alfabeto se
+comparaba por **igualdad exacta** contra tokens que todavía traían la puntuación
+que aporta el lenguaje **anfitrión** del archivo. En un allowlist de Claude Code la
+entrada se escribe `Bash(<comando>:*)` para decir «con cualquier argumento», y ese
+`:*` puede quedar pegado al paquete, al subcomando **o al ejecutor**. Se limpiaba
+en **uno** de los tres sitios que comparan contra el alfabeto —el del paquete— así
+que la misma herramienta con una ortografía de diferencia daba veredictos opuestos.
+Medido punta a punta con el paso real, archivo por archivo, un caso por repo:
+
+| entrada en `.claude/settings.json` | antes | después |
+| --- | --- | --- |
+| `Bash(npx openspec:*)` | exit 1 | exit 1 |
+| `Bash(npx:*)` | exit 0, **cero líneas** | exit 1 |
+| `Bash(pnpm dlx:*)` | exit 0, **cero líneas** | exit 1 |
+| `Bash(npm x:*)` · `Bash(npm exec:*)` | exit 0, **cero líneas** | exit 1 |
+| `Bash(bunx:*)` · `Bash(bun x:*)` · `Bash(yarn dlx:*)` | exit 0, **cero líneas** | exit 1 |
+| `Bash(npm:*)` | exit 0, **cero líneas** | exit 1 |
+| `pnpm.cmd dlx openspec` · `npx.exe openspec` | exit 0, **cero líneas** | exit 1 |
+| `Bash(npm run build:*)` (control) | exit 0 | exit 0 |
+| `Bash(npx openspec@1.9.0:*)` (control) | exit 0 | exit 0 |
+
+No es una ortografía suelta: son **diez** formas de escribir un permiso permanente
+para descargar y ejecutar, todas mudas, en el archivo donde la línea no es un
+comando que alguien vaya a revisar cuando falle. Tres arreglos, todos en el mismo
+lugar conceptual: la limpieza se aplica en **los tres** sitios que comparan contra
+el alfabeto; el nombre del gestor se compara sin el **sufijo de ejecutable** de
+Windows (`npx.cmd`, `pnpm.cmd`, `bun.exe`: los deja la propia herramienta en el
+`PATH` y descargan igual); y un gestor con el comodín pegado y **sin subcomando**
+—`Bash(npm:*)`, que autoriza `npm exec` y todo lo demás— cuenta como
+indeterminado, o sea rojo dentro de un allowlist. Esta última la encontró el
+corpus con alfabeto propio en su primera corrida, no una persona.
+
+La condición del último caso es angosta **a propósito**, y la angostura es lo que
+la hace usable: hace falta que el comodín esté pegado al gestor. Sin eso habría que
+marcar todo gestor sin subcomando reconocido, o sea `npm ci`, `npm run build`,
+`pnpm install` — cada línea de cada pipeline del área. Un check que marca eso se
+apaga en el tercer PR. `Bash(npm run build:*)` queda en verde y hay un caso de
+regresión que lo fija.
+
+**Y el reporte se perdía a los 64 KiB.** El paso marcaba el rojo con
+`process.exit(1)`, y Node no espera a que se vacíe el `stdout` cuando la salida es
+un pipe — que es lo que pone Actions siempre. Medido en la corrida `32412180384`:
+de **1252** anotaciones llegaron **90**, y 90 × 739 bytes = 66510, o sea el corte
+cae exactamente en los 65536 del buffer del pipe; las que llegaron son un
+**prefijo exacto** de las esperadas, que es la firma de un corte de salida y no de
+un defecto de lectura (un defecto de lectura agrupa por forma, no por posición). El
+job igual quedaba rojo: lo que se perdía era el reporte que dice **qué** arreglar.
+Ahora el rojo se marca con `process.exitCode` y la línea verde pasó a un `else`,
+para que no imprima «ninguno cae» abajo de la lista de los que sí caen. El mismo
+arreglo va en *Scripts de verificación sin enmascaramiento*, que tiene la misma
+forma; ahí todavía no se midió un corte porque ningún repo del área llega a esa
+cantidad de scripts, pero es el mismo defecto y no se deja plantado esperando al
+repo que sí llegue.
+
+**En Windows esto no se reproduce** porque ahí el `stdout` de Node es sincrónico, y
+eso es la lección más incómoda de la ronda: el banco de la máquina del builder daba
+**58/58 en verde** sobre un reporte que en CI llegaba mutilado. La aserción que lo
+fija es sobre el **texto** del paso —tiene que usar `process.exitCode` y no
+`process.exit(`— y el test dice por qué no puede ser sobre la conducta. La conducta
+la sigue midiendo el corpus rojo, que en Linux vuelve a cazar esto solo.
 
 ### Cambiado
 
