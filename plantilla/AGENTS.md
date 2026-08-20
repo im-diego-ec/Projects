@@ -222,8 +222,9 @@ Usar siempre las URLs canónicas: el CORS del API solo permite esos orígenes.
 - Logging por `{{PAQUETE_API}}/src/lib/log.ts` (JSON estructurado; `no-console` es error).
 - Verificar autorización en el backend en cada operación (nunca confiar en el cliente).
 - Respetar el stack y la estructura de carpetas fijados.
-- Si un comando corre por un ejecutor que DESCARGA (`npx`, `bunx`, `npm exec`, `pnpm dlx`,
-  `yarn dlx`), escribirlo con el paquete completo y su **versión exacta**. El nombre pelado
+- Si un comando corre por un ejecutor que DESCARGA (`npx`, `bunx`, `npm exec`, `npm x`,
+  `pnpm dlx`, `yarn dlx`, `bun x`, con o sin banderas globales entre el gestor y su
+  subcomando), escribirlo con el paquete completo y su **versión exacta**. El nombre pelado
   de un paquete en npm lo puede tener otro: `openspec` a secas es un placeholder ajeno, y
   `npx --yes openspec ...` lo descarga y lo ejecuta sin preguntar. Cuando el binario ya lo
   trae una dependencia declarada del repo, la forma correcta es `pnpm exec <comando>`, que
