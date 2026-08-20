@@ -2,13 +2,16 @@
 
 <!-- projects:regla id=infra-base-fijada -->
 
-- **La infraestructura base está fijada igual que el stack, y es la PRIMERA OPCIÓN
-  siempre**: el backend corre como contenedor de **Express sobre ECS** y los datos
-  viven en **una base relacional administrada (RDS)**. No es una preferencia estética:
-  es la topología que el pipeline del marco sabe desplegar, verificar y rollbackear, y
-  la que el equipo sabe operar de guardia. Cualquier otra forma de cómputo o de
-  persistencia —serverless, colas como base, otro motor, otro proveedor— se
-  **pregunta antes de implementar** (frontera ⚠️), y el desvío se declara.
+- **La infraestructura base no se elige por proyecto: es la de la base tecnológica del
+  área** (capas _Cómputo_ y _Persistencia_), y es la PRIMERA OPCIÓN siempre. No es una
+  preferencia estética: es la topología que el pipeline del marco sabe desplegar,
+  verificar y rollbackear, y la que el equipo sabe operar de guardia. Cualquier otra
+  forma de cómputo o de persistencia —serverless, colas como base, otro motor, otro
+  proveedor— se **pregunta antes de implementar** (frontera ⚠️) y se declara como desvío
+  **de esa capa**. El proyecto con ese desvío aprobado deja de consumir las piezas de
+  entrega del marco y es dueño de su deploy, sin dejar de cumplir la promoción, las
+  compuertas de CI, la serialización sobre el ambiente compartido, la verificación de lo
+  desplegado, la observabilidad ni el manejo de secretos.
 
 <!-- projects:regla id=iac-es-terraform -->
 

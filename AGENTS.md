@@ -177,9 +177,14 @@ Un proyecto que necesita algo distinto tiene exactamente dos caminos:
   SHA solo para **probar** un change antes de que mueva el tag, y ese pin se
   revierte en el mismo PR que lo introdujo.
 
-Lo que **sí** es del proyecto: su deploy con la topología de su
-infraestructura, sus migraciones, sus sondas, sus specs de dominio y todo lo
-que el scaffold le entregó el día uno.
+Lo que **sí** es del proyecto: sus migraciones, sus sondas, sus specs de dominio
+y todo lo que el scaffold le entregó el día uno. Su **deploy** lo es en la medida
+en que la base lo deja: un proyecto que corre sobre la base tecnológica del área
+consume las piezas de entrega del marco y es dueño de la **configuración** de sus
+ambientes, no de la mecánica; un proyecto con un desvío aprobado de la capa de
+cómputo o de persistencia es dueño de su deploy **entero** y no consume esas
+piezas — conserva las propiedades que fija `base-tecnologica`, no la
+implementación de referencia.
 
 ---
 

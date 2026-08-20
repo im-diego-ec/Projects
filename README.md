@@ -56,7 +56,7 @@ pinada.
 | Forma | Qué es | Dónde vive en Projects | Cómo llega al proyecto | Cómo se actualiza |
 |---|---|---|---|---|
 | **Referenciado** | Workflows reusables y composite actions: la mecánica de CI/CD que no debe divergir | `.github/workflows/`, `actions/` | `uses: im-diego-ec/Projects/.github/workflows/marco-ci.yml@v1` | **Solo**, cuando el tag mayor `v1` se mueve. El proyecto no toca nada |
-| **Scaffold** | Plantilla de arranque: constitución, gobernanza, configuración, plantillas de docs | `plantilla/` | Se copia **una vez** al crear el repo y se sustituyen sus placeholders | No se actualiza solo. A partir de la copia es del proyecto; la divergencia se revisa cada trimestre |
+| **Scaffold** | Plantilla de arranque: el `AGENTS.md` propio del proyecto, gobernanza, configuración, plantillas de docs | `plantilla/` | Se copia **una vez** al crear el repo y se sustituyen sus placeholders | No se actualiza solo. A partir de la copia es del proyecto; la divergencia se revisa cada trimestre |
 | **Canónico** | Los specs del marco (OpenSpec): el comportamiento que Projects garantiza | `openspec/specs/` | **No se copia.** El proyecto lee acá; sus specs describen SU dominio | Change de OpenSpec en este repo, con aprobación del PO |
 | **Regenerado** | Skills y comandos del CLI de OpenSpec | En ningún lado: Projects pina la **versión** (el default del input `version_openspec`) | Cada repo los regenera con el CLI pinado | Subiendo el pin acá y regenerando en cada repo |
 
@@ -175,7 +175,6 @@ escriben handles, cuentas ni dominios reales de ningún proyecto. Es una fronter
 |---|---|---|
 | `{{PROYECTO}}` | Nombre del proyecto y del repo | `people-agenda` |
 | `{{ORG}}` | Organización de GitHub | `po` |
-| `{{PAQUETES}}` | Paquetes del monorepo | `web, api, e2e` |
 | `{{EQUIPO_BUILDERS}}` | Slug del equipo de builders en la org (va en `CODEOWNERS`) | `builders` |
 | `{{EQUIPO_PO}}` | Slug del equipo del PO (va en `CODEOWNERS`) | `po` |
 | `{{BUILDER_1}}` | Handle del builder que sostiene la llave de producción | `@builder-uno` |
@@ -243,10 +242,11 @@ agregar una pieza no sabés en cuál va, la pregunta correcta es cómo tiene que
 evolucionar.
 
 Las capabilities de `openspec/specs/` son las del **marco**, no las de ningún
-producto: calidad de código, gobierno de la contribución, despliegue y CI,
-pipeline de entrega, verificación de lo desplegado, observabilidad, gestión de
-secretos y operación de la infraestructura. Un proyecto no las copia: sus specs
-describen su dominio, y estas describen el carril por el que ese dominio viaja.
+producto: base tecnológica, calidad de código, gobierno de la contribución,
+despliegue y CI, pipeline de entrega, verificación de lo desplegado,
+observabilidad, gestión de secretos y operación de la infraestructura. Un
+proyecto no las copia: sus specs describen su dominio, y estas describen el
+carril por el que ese dominio viaja — y, la primera, con qué está construido.
 
 ---
 
@@ -257,12 +257,18 @@ describen su dominio, y estas describen el carril por el que ese dominio viaja.
   API, ni utilidades compartidas. Projects gobierna **cómo se construye y se
   entrega** el software, no qué hace el software. Un paquete compartido de
   código sería otro repo, con otro ciclo de vida.
-- **No impone stack.** El otro repo usa React, Express, Prisma y
-  Terraform, y eso quedó fijado en **su** `AGENTS.md`, no acá. Un proyecto que
-  adopte Projects con otro stack sigue obteniendo lo mismo: el flujo de specs, la
-  gobernanza, los guardrails, el veredicto único de CI, la promoción por
-  ambientes. Lo específico del stack entra al scaffold como parámetro o como
-  sección que el proyecto reemplaza.
+- **Trae una base, y la salida está declarada.** El área fija su base
+  tecnológica —cómputo, persistencia, frontend, backend, identidad, validación de
+  input externo, IaC, pipeline, gestor de paquetes y pruebas— y Projects la publica
+  y la entrega **ya escrita**: es la **primera opción** de todo proyecto, y
+  apartarse de cualquier capa se **pregunta antes de implementar**. Un proyecto
+  con una necesidad legítimamente distinta no queda afuera: declara el desvío de
+  esa capa con su aprobador y su motivo, **conserva las propiedades del marco**
+  —el flujo de specs, la gobernanza, los guardrails, el veredicto único de CI, la
+  promoción por ambientes— y es dueño de su despliegue, sin consumir las piezas
+  de entrega de referencia. Lo que Projects no hace es adivinar: la base se publica
+  en un solo lugar y solo cambia por un change de este repo. La capability
+  `base-tecnologica` lo especifica.
 - **No es un sustituto del criterio del equipo.** Los guardrails atrapan lo que
   ya nos pasó. Lo que no nos pasó todavía lo caza una revisión adversarial: en
   otro repo, un change pasó `validate --strict` **y** el guardrail de

@@ -81,9 +81,8 @@ vez**, al crear el repo, con un buscar-y-reemplazar sobre todo el árbol.
 |---|---|---|
 | `{{PROYECTO}}` | Nombre del repo, kebab-case | `people-agenda` |
 | `{{ORG}}` | Org de GitHub | `po` |
-| `{{PAQUETES}}` | Paquetes del monorepo, lista legible | `web, api, e2e` |
 
-### Paquetes (derivados de `{{PAQUETES}}`, uno por rol)
+### Paquetes (uno por rol)
 
 Los necesitan los globs de lint y la config de Dependabot: la herramienta tiene que saber
 cuál paquete corre en Node y cuál en el navegador.
@@ -207,12 +206,19 @@ dentro de un bloque de código, donde no se resuelve— el agente trabaja sin la
 reglas y nada en la sesión lo delata. Por eso el check nombra el eslabón roto en vez de
 confiar en que se note.
 
-`.projects-valores.json` es **plano**: las claves en MAYÚSCULAS son los placeholders del
-render —exactamente los que el texto canónico usa, ni uno más (uno que sobra sale como
-aviso, igual que una exclusión muerta)— y `superficies` es la única clave en minúsculas.
+Las claves en MAYÚSCULAS de `.projects-valores.json` son los placeholders del render
+—exactamente los que el texto canónico usa, ni uno más (uno que sobra sale como aviso,
+igual que una exclusión muerta)—. Las claves en **minúsculas** no son placeholders: son
+declaraciones que el marco compara, y hoy son dos, `superficies` y `base`.
 
-Esa lista declara las **superficies de instrucciones** de este repo, por nombre. Llega con
-las dos que el área usa hoy:
+`base` **llega llena** con la base tecnológica del área, capa por capa. No es un hueco:
+la base la fija el marco, y este bloque existe para que el CI pueda comparar lo que este
+repo declara contra lo que el marco publica. Se toca únicamente cuando una capa
+legítimamente difiere, y entonces la diferencia va acompañada de su desvío en
+`.projects-desvios.json` — sin desvío, el check la reporta.
+
+`superficies` declara las **superficies de instrucciones** de este repo, por nombre. Llega
+con las dos que el área usa hoy:
 
 ```json
 { "superficies": ["claude-code", "cursor"] }
@@ -274,10 +280,11 @@ mensaje. Un desvío que sobrevive a lo que lo justificaba tapa un agujero que ya
 
 Un buscar-y-reemplazar no los resuelve: son decisiones.
 
-- **`AGENTS.md` → tabla "Stack fijado"**. Llega marcada con 🕳️ y vacía **a propósito**.
-  Una plantilla que trae el stack del proyecto anterior miente desde el día 1, y el resto de
-  la constitución la referencia ("el validador del stack", "el proveedor de auth"). Llenala
-  antes del primer commit y borrá la sección "🕳️ Antes del primer commit".
+- **`AGENTS.md` → "Lo que este proyecto agrega sobre la base"**. La base tecnológica del
+  área **no** es un hueco: la publica el marco y llega en el artefacto, así que no hay
+  tabla de stack que llenar. Lo que va acá es lo que este proyecto agrega encima. Y si el
+  proyecto necesita otra pieza en una capa que la base fija, eso es un **desvío**: se
+  pregunta antes de implementarlo y se declara en `.projects-desvios.json`.
 - **`eslint.config.mjs` → `ignores`**. Hay dos ejemplos comentados: el cliente del ORM y los
   componentes de UI generados. Poné los generados reales de este proyecto; lintar un
   generado es ruido permanente.
@@ -408,10 +415,13 @@ Lo que hace que el marco se cumpla solo depende de que estos puntos queden hecho
 vez**; después ninguno pide que alguien se acuerde de nada.
 
 - [ ] `grep -rnE "\{\{[A-Z0-9_]+\}\}" .` sin resultados (fuera de `node_modules` y `.git`)
-- [ ] Tabla de stack de `AGENTS.md` llena y sección "🕳️ Antes del primer commit" borrada
+- [ ] Sección "🕳️ Antes del primer commit" borrada, y "Lo que este proyecto agrega sobre la
+      base" escrita (o dice que todavía no agrega nada). La base **no** se llena: llega
+      publicada por el marco
 - [ ] `.projects-valores.json` con los valores reales y las superficies que el equipo usa. De
       ahí sale el texto de la constitución que los agentes cargan todos los días: es la
-      única sustitución que conviene releer
+      única sustitución que conviene releer. Su bloque `base` **llega lleno** y solo se
+      toca si alguna capa difiere de verdad, con su desvío declarado al lado
 - [ ] `.projects/AGENTS-marco.md` existe (lo generó `gh workflow run actualizar-marco.yml` y su
       PR está mergeado) y `AGENTS.md` sigue teniendo la línea que lo importa, fuera de todo
       bloque de código. El CI lo verifica: primero avisando, después en rojo

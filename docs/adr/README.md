@@ -9,8 +9,14 @@ probablemente sean dos decisiones.
 
 | | Vive en | Ejemplos |
 |---|---|---|
-| **ADR de marco** | Projects (canónico, este directorio) | cómo se especifica, cómo se promueve a producción, cómo se verifica un deploy |
-| **ADR de proyecto** | `docs/adr/` del repo del proyecto | qué base de datos, qué proveedor de auth, qué modelo de cobro |
+| **ADR de marco** | Projects (canónico, este directorio) | cómo se especifica, cómo se promueve a producción, cómo se verifica un deploy, **qué base tecnológica corre el área** |
+| **ADR de proyecto** | `docs/adr/` del repo del proyecto | su modelo de dominio, su esquema de cobro, un acuerdo con otro equipo |
+
+> Ojo con esa segunda fila: **qué base de datos y qué proveedor de auth ya NO son
+> decisiones del proyecto** — desde el ADR 004 los fija la base tecnológica del
+> área. Un proyecto que necesite otra pieza en una capa de la base no abre un ADR
+> propio para decidirlo: declara el desvío de esa capa, con aprobador y motivo, y
+> se pregunta antes de implementarlo.
 
 Los ADRs de marco viven **solo acá**: si un proyecto los copia, nacen dos
 verdades y una envejece. Desde el proyecto se referencian por nombre
@@ -89,6 +95,7 @@ se escribió, describiendo algo de hace un mes, miente sobre el historial.
 | [001](001-openspec-fuente-de-verdad.md) | OpenSpec como fuente de verdad del comportamiento |
 | [002](002-trunk-based-promocion.md) | Trunk-based single-main con promoción por ambientes |
 | [003](003-verificacion-in-pipeline.md) | Verificación post-deploy dentro del pipeline (read-only en prod) |
+| [004](004-base-tecnologica-del-area.md) | La base tecnológica del área, incluida la infraestructura, es la primera opción |
 
 ### Procedencia
 

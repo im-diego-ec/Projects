@@ -1636,6 +1636,12 @@ jobs:
                 "publicada": "2026-08-19",
                 "exigible_desde": "2026-09-16",
                 "urgente": false
+              },
+              {
+                "version": "1.4.0",
+                "publicada": "2026-08-20",
+                "exigible_desde": "2026-09-17",
+                "urgente": false
               }
             ]
           # Los dos archivos que son DEL PROYECTO viven fuera del directorio que
@@ -2083,6 +2089,296 @@ jobs:
               superficies.length + " superficie(s) declarada(s), " + artefactosLeidos + " artefacto(s) sellado(s) leido(s), " +
               vivos + " desvio(s) vigente(s), " + atrasos + " hallazgo(s) de atraso. " +
               "Se comparan BYTES contra el sello que trae el propio artefacto, no contra un re-render del canonico: caza la edicion a mano, NO prueba que el texto sea el que el marco publica. Y que el texto llegue no dice nada sobre que el agente lo obedezca"
+            );
+            process.exit(salida);
+          '
+
+      # HUECO 10 — LA BASE TECNOLOGICA DECLARADA.
+      #
+      # POR QUE ESTE PASO EXISTE. El area fija su base tecnologica (ADR 004) y
+      # Projects la publica en un solo lugar. Sin este paso, "la base es la primera
+      # opcion" es prosa: un repo puede introducir otra pieza en una capa fijada
+      # y nada lo dice. Con el, la diferencia sin desvio no llega a main.
+      #
+      # POR QUE LA BASE VIAJA INLINE Y NO SE LEE DEL CANONICO. Desde este
+      # workflow reusable no hay con que leer el canonico: el texto viaja DENTRO
+      # de la composite action y el GITHUB_TOKEN de un consumidor no lee otro
+      # repositorio (404 verificado el 2026-08-14). Es el mismo motivo por el que
+      # el paso hermano ya duplica el ledger como CALENDARIO. La copia se paga
+      # con una guarda: el CI de Projects compara ESTOS DOS env contra
+      # canonico/manifiesto.json y falla si divergen. Sin esa guarda este paso
+      # empeoraria el repo, porque agregaria un segundo dato duplicado sin nadie
+      # que lo vigile.
+      #
+      # DONDE ESTA EL ROJO Y DONDE EL AVISO, y la asimetria es deliberada:
+      #   - sin bloque de base -> aviso hasta el exigible_desde de la version
+      #     pendiente mas vieja, rojo desde esa fecha. NUNCA exit 0 mudo: la
+      #     ausencia no es "no aplica", es una comprobacion que no se pudo hacer.
+      #   - capa distinta sin desvio -> mismo tratamiento graduado. El dia del
+      #     estreno nadie pudo declarar un desvio contra un check que no existia,
+      #     y endurecer de golpe sobre un tag movil es breaking.
+      #   - desvio que nombra una capa que la base NO publica -> rojo seco, sin
+      #     ventana. La ventana cubre la adopcion de una regla nueva, no un
+      #     desvio muerto.
+      #   - desvio sin aprobador, sin fecha o sin motivo -> rojo. Un desvio sin
+      #     aprobador escrito es exactamente el hecho consumado que la frontera
+      #     de "preguntar antes" existe para impedir.
+      #
+      # PERMISSIONS: NINGUNO NUEVO. Este paso solo lee archivos del checkout
+      # (RUTA_VALORES y RUTA_DESVIOS) y no llama a la API de GitHub, asi que el
+      # techo `contents: read` del job alcanza. Eso ES la auditoria accion por
+      # accion que el marco exige antes del estreno de un job, y queda escrita
+      # aca en vez de en la memoria de quien lo reviso.
+      #
+      # LIMITES DECLARADOS:
+      #   - Compara DECLARACIONES, no infraestructura desplegada. Lo que hace que
+      #     declarar mentira no pague no es otro check: es que el carril de
+      #     entrega solo sabe desplegar la base.
+      #   - No puede fechar la conversacion, asi que no verifica "pregunto
+      #     antes", solo "esta contestado por escrito antes de integrarse".
+      #   - Nada limita cuantos desvios declara un proyecto: un repo puede quedar
+      #     verde con la base entera desviada. Lo contiene que cada desvio sea un
+      #     diff con aprobador nombrado bajo CODEOWNERS.
+      #   - La base nombra la PIEZA, no su version mayor: que un repo corra React
+      #     18 y otro 19 no lo caza este paso.
+      - name: Base tecnologica declarada
+        if: '!cancelled()'
+        shell: bash
+        env:
+          # EL MISMO CALENDARIO QUE EL PASO HERMANO, a proposito: la ventana de
+          # este check es la del ledger del canonico y no una fecha propia. Dos
+          # ventanas distintas para dos checks del mismo release serian dos
+          # promesas distintas al consumidor.
+          CALENDARIO: |
+            [
+              {
+                "version": "1.3.0",
+                "publicada": "2026-08-19",
+                "exigible_desde": "2026-09-16",
+                "urgente": false
+              },
+              {
+                "version": "1.4.0",
+                "publicada": "2026-08-20",
+                "exigible_desde": "2026-09-17",
+                "urgente": false
+              }
+            ]
+          # LA BASE PUBLICADA. Copia inline de `base.capas` de
+          # canonico/manifiesto.json, atada a el por el check "El calendario y la
+          # base inline no divergen del manifiesto" del CI de Projects. Se edita
+          # ALLA primero; aca es un reflejo.
+          BASE_PUBLICADA: |
+            [
+              { "capa": "computo", "titulo": "Cómputo", "pieza": "Express sobre ECS (contenedor)" },
+              { "capa": "persistencia", "titulo": "Persistencia", "pieza": "base relacional administrada (RDS, PostgreSQL)" },
+              { "capa": "frontend", "titulo": "Frontend", "pieza": "React + Vite + TypeScript" },
+              { "capa": "backend", "titulo": "Backend", "pieza": "Node + Express + TypeScript" },
+              { "capa": "identidad", "titulo": "Identidad", "pieza": "Clerk" },
+              { "capa": "validacion", "titulo": "Validación de input externo", "pieza": "Zod" },
+              { "capa": "iac", "titulo": "Infraestructura como código", "pieza": "AWS + Terraform" },
+              { "capa": "pipeline", "titulo": "Pipeline", "pieza": "GitHub Actions" },
+              { "capa": "paquetes", "titulo": "Gestor de paquetes", "pieza": "pnpm con workspaces" },
+              { "capa": "pruebas-unitarias", "titulo": "Pruebas unitarias", "pieza": "Vitest" },
+              { "capa": "pruebas-e2e", "titulo": "Pruebas E2E", "pieza": "Playwright" }
+            ]
+          RUTA_VALORES: .projects-valores.json
+          RUTA_DESVIOS: .projects-desvios.json
+        run: |
+          set -euo pipefail
+
+          # SKIP POR PROPIEDAD, la misma que usan los pasos hermanos: el repo que
+          # DISTRIBUYE el scaffold es el marco, y el marco no declara la base de
+          # un proyecto porque no es un proyecto. Consecuencia honesta: aca este
+          # paso no verifica nada, y lo que lo cubre son los fixtures de la
+          # action mas la validacion contra un consumidor real antes de mover v1.
+          if [ -f plantilla/.github/workflows/ci.yml ]; then
+            echo "::notice::este repo distribuye el marco (plantilla/): no es consumidor de la base que publica — verificacion omitida"
+            exit 0
+          fi
+
+          if ! command -v node > /dev/null 2>&1; then
+            echo "::error::no hay 'node' en el PATH y sin el no se puede leer la base declarada. Arreglo: agrega 'uses: actions/setup-node@v7' a este job, antes de este paso"
+            exit 1
+          fi
+
+          # El programa va inline por el mismo motivo que los pasos hermanos: un
+          # heredoc no puede cerrar dentro de un bloque de YAML indentado. Viaja
+          # entre comillas SIMPLES de shell, asi que adentro no hay ni una
+          # comilla simple literal (va por String.fromCharCode).
+          # shellcheck disable=SC2016
+          node -e '
+            const { readFileSync, existsSync } = require("node:fs");
+
+            const HOY = new Date().toISOString().slice(0, 10);
+            const RUTA_VALORES = process.env.RUTA_VALORES;
+            const RUTA_DESVIOS = process.env.RUTA_DESVIOS;
+            const RE_FECHA = /^[0-9]{4}-[0-9]{2}-[0-9]{2}$/;
+            const COMILLA = String.fromCharCode(34);
+
+            // Un comando de workflow termina en el salto de linea y trata "%"
+            // como escape: sin normalizar, un mensaje con "%" se mutila solo.
+            const escapar = (valor) =>
+              String(valor).replace(/%/g, "%25").replace(/\r/g, "%0D").replace(/\n/g, "%0A");
+
+            let salida = 0;
+            const decir = (nivel, mensaje) => {
+              if (nivel === "error") salida = 1;
+              console.log("::" + nivel + "::" + escapar(mensaje));
+            };
+
+            // Lo que no se puede leer es rojo, nunca exito mudo.
+            const leerJson = (texto, etiqueta) => {
+              try {
+                return JSON.parse(texto);
+              } catch (error) {
+                decir("error", etiqueta + " no es JSON valido: " + error.message);
+                return null;
+              }
+            };
+
+            const CAPAS = leerJson(process.env.BASE_PUBLICADA, "la base publicada por el marco (BASE_PUBLICADA)");
+            const CALENDARIO = leerJson(process.env.CALENDARIO, "el calendario del canonico (CALENDARIO)");
+            if (!Array.isArray(CAPAS) || CAPAS.length === 0 || !Array.isArray(CALENDARIO) || CALENDARIO.length === 0) {
+              decir("error", "el marco no pudo leer su propia base o su calendario: no se puede comparar nada, y un check que no puede comparar no pasa en verde");
+              process.exit(1);
+            }
+
+            // La version pendiente MAS VIEJA manda: si un consumidor acumulo
+            // varios releases sin adoptar, la fecha que vence es la primera.
+            const EXIGIBLE = CALENDARIO[0];
+            const exigibleYa = !RE_FECHA.test(String(EXIGIBLE.exigible_desde)) || String(EXIGIBLE.exigible_desde) <= HOY;
+            const nivelPorFecha = () => (exigibleYa ? "error" : "warning");
+            const colaPorFecha = () =>
+              exigibleYa
+                ? " Es exigible desde " + EXIGIBLE.exigible_desde + ", asi que ya es un fallo."
+                : " Hasta el " + EXIGIBLE.exigible_desde + " esto es un aviso; desde esa fecha el pipeline falla.";
+
+            if (!existsSync(RUTA_VALORES)) {
+              decir(
+                "error",
+                "falta " + RUTA_VALORES + ": sin el archivo de valores este repo no declara nada, ni su base ni sus superficies. Es un archivo de ESTE repo y vive fuera de .projects/ a proposito"
+              );
+              process.exit(salida);
+            }
+
+            const valores = leerJson(readFileSync(RUTA_VALORES, "utf8"), RUTA_VALORES);
+            if (valores === null) process.exit(1);
+
+            const declarados = existsSync(RUTA_DESVIOS)
+              ? leerJson(readFileSync(RUTA_DESVIOS, "utf8"), RUTA_DESVIOS)
+              : { desvios: [] };
+            if (declarados === null) process.exit(1);
+            const desvios = Array.isArray(declarados && declarados.desvios) ? declarados.desvios : [];
+
+            const idDeCapa = (capa) => "base-capa-" + capa;
+            const publicadas = new Map(CAPAS.map((entrada) => [String(entrada.capa), String(entrada.pieza)]));
+
+            // UN DESVIO DE CAPA SOLO CUENTA SI ESTA COMPLETO. Un desvio sin
+            // aprobador escrito no es una decision tomada por un humano: es la
+            // implementacion autorizandose a si misma.
+            const conDesvio = new Set();
+            for (const bruto of desvios) {
+              const regla = String((bruto && bruto.regla) || "").trim();
+              if (!regla.startsWith("base-capa-")) continue;
+              const capa = regla.slice("base-capa-".length);
+
+              if (!publicadas.has(capa)) {
+                decir(
+                  "error",
+                  "desvio muerto: " + regla + " nombra la capa " + COMILLA + capa + COMILLA +
+                    " y la base del marco no la publica. El motivo que tenia escrito era: " +
+                    COMILLA + String((bruto && bruto.motivo) || "(vacio)") + COMILLA +
+                    ". Arreglo: borrar el desvio, o nombrar la capa vigente que lo reemplaza. Esto no espera ninguna fecha: la ventana de gracia cubre la adopcion de una regla nueva, no un desvio que apunta a una capa inexistente"
+                );
+                continue;
+              }
+
+              const faltan = [];
+              if (!String((bruto && bruto.motivo) || "").trim()) faltan.push("motivo");
+              if (!String((bruto && bruto.aprobado_por) || "").trim()) faltan.push("aprobado_por");
+              if (!RE_FECHA.test(String((bruto && bruto.fecha) || ""))) faltan.push("fecha (AAAA-MM-DD)");
+              if (faltan.length > 0) {
+                decir(
+                  "error",
+                  "el desvio de la capa " + COMILLA + capa + COMILLA + " esta incompleto: le falta " + faltan.join(", ") +
+                    ". Apartarse de la base se PREGUNTA ANTES de implementar, y el aprobador escrito es lo unico que distingue una decision de un hecho consumado — no lo puede otorgar quien implementa"
+                );
+                continue;
+              }
+
+              conDesvio.add(capa);
+              console.log(
+                "::notice::" +
+                  escapar(
+                    "desvio vigente de la capa " + capa + " (aprobado por " + bruto.aprobado_por + " el " + bruto.fecha + "): " + bruto.motivo
+                  )
+              );
+            }
+
+            const base = valores && typeof valores.base === "object" && valores.base !== null && !Array.isArray(valores.base)
+              ? valores.base
+              : null;
+
+            if (base === null) {
+              decir(
+                nivelPorFecha(),
+                RUTA_VALORES + " no declara el bloque " + COMILLA + "base" + COMILLA +
+                  ": no se puede comparar la base de este repo contra la que publica el marco, y una comprobacion que no se pudo hacer no es conformidad. Las capas que el marco publica son: " +
+                  [...publicadas.keys()].join(", ") + "." + colaPorFecha() +
+                  " Arreglo: copiar la base publicada como objeto capa -> pieza en " + RUTA_VALORES
+              );
+              process.exit(salida);
+            }
+
+            // Se absorbe lo que aporta el tipeo (mayusculas, espacios de mas) y
+            // NADA mas: absorber sinonimos seria adivinar, y una comparacion que
+            // adivina deja pasar justo el caso que este paso existe para cazar.
+            const forma = (texto) => String(texto == null ? "" : texto).trim().replace(/[ \t]+/g, " ").toLowerCase();
+
+            let comparadas = 0;
+            for (const [capa, pieza] of publicadas) {
+              if (conDesvio.has(capa)) continue;
+              comparadas += 1;
+              const suya = base[capa];
+
+              if (suya == null || String(suya).trim() === "") {
+                decir(
+                  nivelPorFecha(),
+                  "la capa " + COMILLA + capa + COMILLA + " no esta declarada en " + RUTA_VALORES +
+                    ". La base del marco publica: " + pieza + "." + colaPorFecha()
+                );
+                continue;
+              }
+
+              if (forma(suya) !== forma(pieza)) {
+                const plantilla =
+                  "{" + COMILLA + "regla" + COMILLA + ": " + COMILLA + idDeCapa(capa) + COMILLA + ", " +
+                  COMILLA + "motivo" + COMILLA + ": " + COMILLA + "<por que este proyecto usa " + suya + " en esa capa>" + COMILLA + ", " +
+                  COMILLA + "aprobado_por" + COMILLA + ": " + COMILLA + "<@quien lo aprobo, y no puede ser quien lo implementa>" + COMILLA + ", " +
+                  COMILLA + "fecha" + COMILLA + ": " + COMILLA + "AAAA-MM-DD" + COMILLA + "}";
+                decir(
+                  nivelPorFecha(),
+                  "la capa " + COMILLA + capa + COMILLA + " declara " + COMILLA + suya + COMILLA +
+                    " y la base del marco publica " + COMILLA + pieza + COMILLA + ", y no hay desvio para esa capa." + colaPorFecha() +
+                    " Si la diferencia es legitima se declara ANTES de implementarla, agregando a " + RUTA_DESVIOS + ": " + plantilla
+                );
+              }
+            }
+
+            for (const capa of Object.keys(base)) {
+              if (publicadas.has(capa)) continue;
+              decir(
+                "warning",
+                RUTA_VALORES + " declara la capa " + COMILLA + capa + COMILLA +
+                  " y la base del marco no la publica. Sobra, igual que una exclusion muerta: si es una pieza que este proyecto agrega ENCIMA de la base, va en su AGENTS.md y no en el bloque de base"
+              );
+            }
+
+            // La verdad de lo que se probo, ni una palabra mas.
+            console.log(
+              "== base tecnologica == " + publicadas.size + " capa(s) publicada(s), " + comparadas + " comparada(s), " +
+              conDesvio.size + " con desvio vigente. Se comparan DECLARACIONES, no infraestructura desplegada: lo que hace que declarar mentira no pague es que el carril de entrega del marco solo sabe desplegar la base"
             );
             process.exit(salida);
           '

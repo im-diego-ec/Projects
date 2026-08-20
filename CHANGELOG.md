@@ -37,6 +37,45 @@ mueve sobre un cambio incompatible.
 
 ### Añadido
 
+- **La base tecnológica del área se publica, y es la primera opción.** El marco
+  fija qué pieza corre en cada capa —cómputo, persistencia, frontend, backend,
+  identidad, validación de input externo, IaC, pipeline, gestor de paquetes y
+  pruebas (unitarias y E2E)— y la entrega **ya escrita**. Vive en **un solo
+  lugar**, el bloque `base` de `actions/constitucion/canonico/manifiesto.json`, y
+  se renderiza en la sección nueva del canónico que los agentes cargan: no se
+  tipea al lado, así que no hay dos textos que puedan divergir. El contrato es la
+  capability `base-tecnologica`; la decisión, `docs/adr/004`.
+
+  **Cada capa tiene su propia regla con id estable** (`base-capa-computo`,
+  `base-capa-persistencia`, …). Eso hace que el canal de desvíos que ya existía
+  sirva sin agregarle un campo: un desvío nombra la capa porque el id **es** la
+  capa, dos capas desviadas no chocan entre sí, y el día que una capa deje de
+  existir su desvío caduca solo por el camino del desvío muerto.
+
+- **Paso nuevo en el job `higiene`: *Base tecnologica declarada*.** Compara el
+  bloque `base` del `.projects-valores.json` del consumidor contra la base publicada.
+  Una capa que difiere sin desvío se reporta; **la ausencia del bloque también**
+  —la ausencia no es «no aplica», es una comprobación que no se pudo hacer—, y un
+  desvío que nombra una capa que la base no publica es rojo **sin ventana**. El
+  mensaje del fallo trae la capa, la pieza declarada, la pieza de la base y el
+  JSON exacto del desvío a agregar: un rojo sin la salida escrita empuja al atajo
+  de editar la declaración para que coincida, que es la única mentira que este
+  check no puede cazar.
+
+  **NO es BREAKING para `@v1`.** El paso se estrena en modo **aviso** con la
+  ventana de gracia del ledger y recién bloquea desde el `exigible_desde` de la
+  versión pendiente más vieja. Hoy ningún consumidor declara su base, así que sin
+  ventana este paso pondría rojo a todos los repos que hoy pasan — que es
+  exactamente lo que el marco se prohíbe sobre un tag móvil.
+
+- **Guarda de la duplicación en el CI de Projects: *El calendario y la base inline no
+  divergen del manifiesto*.** Dos datos del marco viajan inline en `marco-ci.yml`
+  porque desde un workflow reusable no hay con qué leer el canónico (el texto vive
+  dentro de la composite action). El `CALENDARIO` ya viajaba así **sin que nada lo
+  comparara**; este check ata los dos —el calendario y la base— al manifiesto, y
+  falla también si un paso se renombra o un env desaparece, porque «no lo pude
+  comparar» no es verde.
+
 - **Check estático nuevo en el job `higiene`: *Ejecutores de paquetes pinados*.**
   Se pone rojo si un archivo rastreado del repo corre un paquete por un ejecutor
   que **descarga** (`npx`, `bunx`, `npm exec`, `pnpm dlx`, `yarn dlx`) sin
@@ -261,6 +300,26 @@ mueve sobre un cambio incompatible.
 
 ### Cambiado
 
+- **La base deja de ser hueco del scaffold.** `plantilla/AGENTS.md` ya no trae la
+  tabla «Stack fijado» con sus 🕳️ ni la instrucción «COMPLETAR AL CREAR EL
+  PROYECTO»: en su lugar queda «Lo que este proyecto agrega sobre la base», y el
+  paso 1 de «Antes del primer commit» desaparece. El bloque `base` de
+  `plantilla/.projects-valores.json` **llega lleno**. El motivo escrito de aquel hueco
+  era que «una plantilla que trae el stack de otro proyecto miente desde el día 1»;
+  con la base fijada ese motivo se invierte, porque no es el stack de otro
+  proyecto, es el del área.
+
+- **Se revierte «No impone stack» del `README.md`.** Era falsa en dos de sus tres
+  afirmaciones desde antes de este cambio: el scaffold ya fijaba Terraform, GitHub
+  Actions y pnpm con workspaces, y el CI del marco depende de una propiedad
+  concreta del workspace. Lo que sí era verdad se conserva: el proyecto que se
+  aparta sigue obteniendo el flujo de specs, la gobernanza, los guardrails, el
+  veredicto único de CI y la promoción por ambientes. La diferencia es que ahora
+  eso es un requirement y no una promesa de prosa. En la misma línea, `AGENTS.md`
+  deja de decir que el deploy con su topología es del proyecto: el proyecto de la
+  base es dueño de la **configuración** de sus ambientes, no de la mecánica, y el
+  proyecto con desvío aprobado de cómputo o de persistencia es dueño de su deploy
+  **entero**.
 - **`plantilla/AGENTS.md`** suma la regla a las fronteras ✅, con las dos formas
   correctas: `pnpm exec` para lo que ya está instalado, paquete completo con
   versión exacta para lo que sí hay que traer de npm. **Es scaffold**: no alcanza
@@ -283,6 +342,15 @@ mueve sobre un cambio incompatible.
   ese acceso. **Es scaffold**: los repos ya creados lo suman por su propio PR.
 
 ### Para consumidores
+
+**Por la base tecnológica, nada urgente.** Hasta el `exigible_desde` de la `1.4.0`
+no hay que hacer nada: el bloque `base` llega lleno por el PR semanal que regenera
+el artefacto. Antes de esa fecha, si su base real difiere de la publicada en alguna
+capa, declarar el desvío de **esa capa** (`base-capa-<capa>`) con aprobador y
+motivo escrito. Y ojo con el ruido: una capa que el proyecto **todavía no
+implementó** no es un desvío sino un pendiente, y lo exigen las capabilities que la
+especifican — si la deuda técnica entra por el canal de desvíos, el ledger deja de
+significar lo que tiene que significar.
 
 **Hay una acción obligatoria, y el orden importa.** Un repo con una invocación sin
 versión exacta da rojo apenas este check aterrice. `un-proyecto-anterior` tiene hoy

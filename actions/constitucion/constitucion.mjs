@@ -89,6 +89,21 @@ export const MARCA_REGLA = /^<!--\s*projects:regla\s+id=([a-z0-9][a-z0-9-]*)\s*-
 export const MARCA_CABECERA = /^<!--\s*projects:constitucion\s+(.*?)\s*-->\s*$/;
 
 /**
+ * Marca donde el canónico expande la BASE TECNOLÓGICA desde el manifiesto.
+ *
+ * Sintaxis distinta de `{{MAYUSCULAS}}` A PROPÓSITO: el escáner de placeholders del
+ * render no la ve, así que ningún consumidor tiene que declarar un valor para ella. La
+ * base es dato DEL MARCO, no del proyecto — el proyecto la *declara* para que se
+ * compare, no la *provee* para que se imprima.
+ *
+ * Por qué se expande acá y no se tipea al lado de la lista: dos textos que dicen la
+ * misma base son dos textos que pueden divergir. Renderizando desde el manifiesto, «hay
+ * una sola base publicada» es verdadero por construcción y no una propiedad que haya
+ * que sostener con un check.
+ */
+export const MARCA_BASE = /^<!--\s*projects:base:capas\s*-->\s*$/;
+
+/**
  * Superficies de instrucciones que el marco sabe emitir (D2).
  *
  * El artefacto no es «un archivo de Claude Code»: es LA PORCIÓN DEL MARCO, y se emite
@@ -194,6 +209,99 @@ export function escaparRegex(texto) {
 // El canónico
 // ---------------------------------------------------------------------------
 
+/** El id de regla de una capa de la base. El id ES la capa: por eso un desvío la nombra
+ *  sin necesidad de un campo nuevo, dos capas desviadas no chocan entre sí, y una capa
+ *  que sale de la base mata su desvío por el camino `desvio-muerto` que ya existe. */
+export function idDeCapa(capa) {
+  return `base-capa-${capa}`;
+}
+
+/** Las capas de la base tal como las declara el manifiesto, ya saneadas. */
+export function capasDeLaBase(manifiesto) {
+  const capas = manifiesto?.base?.capas;
+  return Array.isArray(capas) ? capas : [];
+}
+
+/** La base publicada como mapa capa -> pieza. Es lo que el check del consumidor compara
+ *  contra lo que ese repo declara en su archivo de valores. */
+export function basePublicada(canonico) {
+  const salida = {};
+  for (const entrada of capasDeLaBase(canonico?.manifiesto)) {
+    if (entrada?.capa) salida[String(entrada.capa)] = String(entrada.pieza ?? "");
+  }
+  return salida;
+}
+
+/**
+ * Expande `<!-- projects:base:capas -->` en una viñeta por capa, cada una precedida de su
+ * marca de regla para que tenga id estable y superficie de desvío propia.
+ */
+export function expandirBase(texto, capas) {
+  const bloque = (capas ?? [])
+    .map((entrada) => `<!-- projects:regla id=${idDeCapa(entrada.capa)} -->\n\n- **${entrada.titulo}** — ${entrada.pieza}.`)
+    .join("\n\n");
+  return String(texto ?? "")
+    .split("\n")
+    .map((linea) => (MARCA_BASE.test(linea) ? bloque : linea))
+    .join("\n");
+}
+
+/**
+ * Valida el bloque de base del manifiesto. Lo que se exige no es cosmético:
+ *
+ *   · cada capa con id kebab-case y única, porque el id de la capa es el id de la regla
+ *     y dos capas con el mismo nombre dejarían un desvío sin saber a cuál apunta;
+ *   · `titulo` y `pieza` con texto, porque una capa sin pieza no publica nada;
+ *   · y —la que importa— que por cada capa publicada EXISTA la regla `base-capa-<capa>`
+ *     en el cuerpo. Una capa publicada sin su regla es una capa a la que ningún desvío
+ *     puede apuntar: el proyecto que legítimamente no cabe se queda sin salida legal, y
+ *     eso convierte la base en la jaula que el contrato dice que no es.
+ */
+export function validarBase(manifiesto, ids, tieneMarca) {
+  const problemas = [];
+  const capas = capasDeLaBase(manifiesto);
+
+  if (capas.length === 0) {
+    if (manifiesto?.base !== undefined) {
+      problemas.push("el manifiesto declara un bloque `base` sin ninguna capa en `base.capas`: no hay base que publicar");
+    }
+    if (tieneMarca) {
+      problemas.push(
+        "una seccion del canonico trae la marca `<!-- projects:base:capas -->` y el manifiesto no declara ninguna capa: la marca quedaria impresa como comentario y la base no llegaria a ningun agente",
+      );
+    }
+    return problemas;
+  }
+
+  if (!tieneMarca) {
+    problemas.push(
+      "el manifiesto declara la base y ninguna seccion del canonico la expande: falta la marca `<!-- projects:base:capas -->`. Una base publicada que el artefacto no imprime es una base que ningun agente lee",
+    );
+  }
+
+  const vistas = new Set();
+  for (const entrada of capas) {
+    const capa = String(entrada?.capa ?? "").trim();
+    if (!/^[a-z0-9][a-z0-9-]*$/.test(capa)) {
+      problemas.push(`la capa "${capa || "(sin nombre)"}" de la base no es un id kebab-case: el id de la capa ES el id de su regla`);
+      continue;
+    }
+    if (vistas.has(capa)) {
+      problemas.push(`la base declara dos veces la capa \`${capa}\`: un desvio no sabria a cual apunta`);
+      continue;
+    }
+    vistas.add(capa);
+    if (!String(entrada?.titulo ?? "").trim()) problemas.push(`la capa \`${capa}\` de la base no tiene titulo`);
+    if (!String(entrada?.pieza ?? "").trim()) problemas.push(`la capa \`${capa}\` de la base no nombra ninguna pieza`);
+    if (!(ids ?? []).includes(idDeCapa(capa))) {
+      problemas.push(
+        `la base publica la capa \`${capa}\` y el cuerpo no trae la regla \`${idDeCapa(capa)}\`: es una capa a la que ningun desvio puede apuntar, o sea un proyecto legitimamente distinto sin salida legal`,
+      );
+    }
+  }
+  return problemas;
+}
+
 /**
  * Lee el canónico completo: manifiesto + secciones + cuerpo + sello.
  *
@@ -217,9 +325,20 @@ export function leerCanonico(dir) {
     throw new Error(`el canonico en ${dir} no tiene ninguna seccion NN-*.md: no hay texto que publicar`);
   }
 
-  const secciones = archivos.map((archivo) => ({
+  const crudas = archivos.map((archivo) => ({
     archivo,
     texto: normalizar(readFileSync(join(dir, archivo), "utf8")),
+  }));
+
+  // LA BASE SE EXPANDE ANTES DE TODO LO DEMÁS, y el orden no es un detalle: así los ids
+  // de capa existen para que un desvío los pueda nombrar, el presupuesto de líneas
+  // cuenta el tamaño REAL del texto que va a leer cada agente, y un cambio de base mueve
+  // el sello — que es lo correcto, porque cambiar la base cambia lo que el marco publica.
+  const capas = capasDeLaBase(manifiesto);
+  const tieneMarcaBase = crudas.some((s) => s.texto.split("\n").some((linea) => MARCA_BASE.test(linea)));
+  const secciones = crudas.map((seccion) => ({
+    archivo: seccion.archivo,
+    texto: normalizar(expandirBase(seccion.texto, capas)),
   }));
 
   const problemas = validarManifiesto(manifiesto);
@@ -228,6 +347,7 @@ export function leerCanonico(dir) {
 
   const cuerpo = `${secciones.map((s) => s.texto.replace(/\n$/, "")).join("\n\n")}\n`;
   const lineas = cuerpo.split("\n").length - 1;
+  problemas.push(...validarBase(manifiesto, idsDeReglas(cuerpo), tieneMarcaBase));
 
   // El artefacto no ahorra un token de contexto: partirlo organiza, no reduce. El
   // presupuesto es lo único que contiene el incentivo de que agregar una regla al
@@ -255,6 +375,7 @@ export function leerCanonico(dir) {
     sha: sello.digest("hex").slice(0, 12),
     ids: idsDeReglas(cuerpo),
     piso_permisos: Array.isArray(manifiesto.piso_permisos) ? manifiesto.piso_permisos : [],
+    base: capas,
     problemas,
   };
 }
@@ -550,6 +671,122 @@ export function clasificarDesvios(declarados, idsDelCanonico) {
 }
 
 // ---------------------------------------------------------------------------
+// La base declarada por el consumidor
+// ---------------------------------------------------------------------------
+
+/** El arreglo de un hallazgo de base NO es «correr el modo escribir»: el escritor no
+ *  toca `.projects-valores.json` —ese archivo es del proyecto y vive fuera de `.projects/`
+ *  justamente por eso—, así que ofrecerlo como arreglo mandaría a correr algo que no
+ *  puede arreglarlo. */
+export const ARREGLO_BASE =
+  "declarar la base de este repo en el bloque `base` de .projects-valores.json, copiando la base publicada; y si alguna capa es legitimamente distinta, declararla como desvio de `base-capa-<capa>` con aprobador y motivo escrito ANTES de implementarla";
+
+/** Forma de comparación de una pieza: se absorbe lo que aporta el tipeo —mayúsculas,
+ *  espacios de más— y NADA más. Absorber sinónimos sería adivinar, y una comparación que
+ *  adivina deja pasar exactamente el caso que el check existe para cazar. */
+function formaDePieza(texto) {
+  return String(texto ?? "")
+    .trim()
+    .replace(/\s+/g, " ")
+    .toLowerCase();
+}
+
+/** El JSON exacto que hay que pegar en `.projects-desvios.json`. El mensaje de un rojo tiene
+ *  que traer la salida escrita: un rojo sin salida empuja al atajo de editar la
+ *  declaración para que coincida, que es la única mentira que este check no puede cazar. */
+function comoSeDeclaraElDesvio(capa, pieza) {
+  return `{"regla": "${idDeCapa(capa)}", "motivo": "<por que este proyecto usa ${pieza} en esa capa>", "aprobado_por": "<@quien lo aprobo, y no puede ser quien lo implementa>", "fecha": "AAAA-MM-DD"}`;
+}
+
+/**
+ * Compara la base que el repositorio DECLARA contra la base que el marco publica.
+ *
+ * LA GRADUACIÓN POR FECHA NO ES CORTESÍA. El día que este paso se estrena, ningún
+ * consumidor declara su base: sin ventana, el check pone rojo a todos los repos que hoy
+ * pasan, y eso es exactamente la definición de BREAKING que el marco se prohíbe sobre un
+ * tag móvil. Así que la ausencia y la divergencia avisan hasta el `exigible_desde` de la
+ * versión pendiente más vieja y fallan desde esa fecha — nunca verde mudo (D6).
+ *
+ * EL DESVÍO MUERTO NO LLEVA VENTANA, y la asimetría es a propósito: la ventana cubre la
+ * ADOPCIÓN de una regla nueva, no un desvío que apunta a una capa que la base no publica.
+ * Ese caso ya sale rojo por `desvio-muerto` —el id de la capa es el id de la regla— así
+ * que acá no se duplica el hallazgo.
+ *
+ * LÍMITE DECLARADO: esto compara DECLARACIONES, no infraestructura desplegada. Lo que
+ * hace que declarar mentira no pague no es otro check: es que el carril de entrega del
+ * marco solo sabe desplegar la base, así que el repo que se aparta sin declararlo no se
+ * queda con un check verde y un problema oculto, se queda sin deploy.
+ */
+export function verificarBaseDeclarada({ canonico, valores, desviosValidos, hoy }) {
+  const hallazgos = [];
+  const publicada = basePublicada(canonico);
+  const capas = Object.keys(publicada);
+  if (capas.length === 0) return hallazgos;
+
+  const pendiente = versionPendienteMasVieja(canonico.versiones, null);
+  const declarada = valores?.base;
+
+  if (declarada === undefined || declarada === null || typeof declarada !== "object" || Array.isArray(declarada)) {
+    hallazgos.push(
+      hallazgoPorFecha({
+        codigo: "base-sin-declarar",
+        arreglo: ARREGLO_BASE,
+        pendiente,
+        hoy,
+        mensaje: `.projects-valores.json no declara el bloque \`base\`: no se puede comparar la base de este repo contra la que publica el marco, y una comprobacion que no se pudo hacer no es conformidad. Las capas que el marco publica son: ${capas.join(", ")}`,
+      }),
+    );
+    return hallazgos;
+  }
+
+  const conDesvio = new Set(
+    (desviosValidos ?? []).map((desvio) => String(desvio.regla)).filter((regla) => regla.startsWith("base-capa-")),
+  );
+
+  for (const capa of capas) {
+    if (conDesvio.has(idDeCapa(capa))) continue;
+    const pieza = publicada[capa];
+    const suya = declarada[capa];
+
+    if (suya === undefined || suya === null || String(suya).trim() === "") {
+      hallazgos.push(
+        hallazgoPorFecha({
+          codigo: "base-capa-sin-declarar",
+          arreglo: ARREGLO_BASE,
+          pendiente,
+          hoy,
+          mensaje: `la capa \`${capa}\` de la base no esta declarada en .projects-valores.json. La base publicada para esa capa es: ${pieza}`,
+        }),
+      );
+      continue;
+    }
+
+    if (formaDePieza(suya) !== formaDePieza(pieza)) {
+      hallazgos.push(
+        hallazgoPorFecha({
+          codigo: "base-capa-divergente",
+          arreglo: ARREGLO_BASE,
+          pendiente,
+          hoy,
+          mensaje: `la capa \`${capa}\` declara "${suya}" y la base del marco publica "${pieza}", y no hay desvio para esa capa. Si la diferencia es legitima, se declara ANTES de implementarla agregando a .projects-desvios.json: ${comoSeDeclaraElDesvio(capa, suya)}`,
+        }),
+      );
+    }
+  }
+
+  for (const capa of Object.keys(declarada)) {
+    if (Object.prototype.hasOwnProperty.call(publicada, capa)) continue;
+    hallazgos.push({
+      nivel: "warning",
+      codigo: "base-capa-desconocida",
+      mensaje: `.projects-valores.json declara la capa \`${capa}\` y la base del marco no la publica. Sobra, igual que una exclusion muerta: si es una pieza que este proyecto agrega ENCIMA de la base, va en su AGENTS.md y no en el bloque de base`,
+    });
+  }
+
+  return hallazgos;
+}
+
+// ---------------------------------------------------------------------------
 // Verificación
 // ---------------------------------------------------------------------------
 
@@ -617,6 +854,11 @@ export function verificar({ canonico, valores, desvios, superficies, hoy, leer }
       mensaje: `desvio vigente sobre \`${desvio.regla}\` (aprobado por ${desvio.aprobado_por} el ${desvio.fecha}): ${desvio.motivo}`,
     });
   }
+
+  // La base va DESPUÉS de clasificar los desvíos porque necesita saber cuáles son
+  // válidos: un desvío aprobado de `base-capa-<capa>` es lo que absorbe la diferencia de
+  // esa capa, y solo de esa.
+  hallazgos.push(...verificarBaseDeclarada({ canonico, valores, desviosValidos: clasificados.validos, hoy }));
 
   const render = renderizar({ canonico, valores, desvios: clasificados.validos });
   if (render.faltantes.length > 0) {
@@ -757,7 +999,10 @@ export function verificar({ canonico, valores, desvios, superficies, hoy, leer }
  * desde `exigible_desde`, `::error::`. Nunca verde: el ausente no tiene rama
  * silenciosa de «no aplica».
  */
-export function hallazgoPorFecha({ codigo, ruta, pendiente, hoy, mensaje }) {
+export const ARREGLO_ARTEFACTO =
+  "correr el modo escribir de esta action (el PR semanal de actualizacion lo hace solo) o bajar el artefacto corregido que este job sube";
+
+export function hallazgoPorFecha({ codigo, ruta, pendiente, hoy, mensaje, arreglo = ARREGLO_ARTEFACTO }) {
   const fecha = pendiente?.exigible_desde;
   const exigible = esFecha(fecha) ? aFecha(fecha) <= hoy : true;
   const cola = esFecha(fecha)
@@ -768,7 +1013,7 @@ export function hallazgoPorFecha({ codigo, ruta, pendiente, hoy, mensaje }) {
   return {
     nivel: exigible ? "error" : "warning",
     codigo,
-    mensaje: `${mensaje}. ${cola}. Arreglo: correr el modo escribir de esta action (el PR semanal de actualizacion lo hace solo) o bajar el artefacto corregido que este job sube`,
+    mensaje: `${mensaje}. ${cola}. Arreglo: ${arreglo}`,
   };
 }
 

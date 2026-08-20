@@ -1,5 +1,18 @@
 {
   "superficies": ["claude-code", "cursor"],
+  "base": {
+    "computo": "Express sobre ECS (contenedor)",
+    "persistencia": "base relacional administrada (RDS, PostgreSQL)",
+    "frontend": "React + Vite + TypeScript",
+    "backend": "Node + Express + TypeScript",
+    "identidad": "Clerk",
+    "validacion": "Zod",
+    "iac": "AWS + Terraform",
+    "pipeline": "GitHub Actions",
+    "paquetes": "pnpm con workspaces",
+    "pruebas-unitarias": "Vitest",
+    "pruebas-e2e": "Playwright"
+  },
   "PROYECTO": "{{PROYECTO}}",
   "ORG": "{{ORG}}",
   "PAQUETE_API": "{{PAQUETE_API}}",

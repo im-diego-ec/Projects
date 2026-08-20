@@ -9,11 +9,32 @@
     "Bash(pnpm build)"
   ],
   "piso_permisos_nota": "Piso RECOMENDADO, no exigido: son los comandos que la regla `suite-local-antes-del-push` obliga a correr. Un permiso de menos es friccion (un prompt), no riesgo, asi que su ausencia es ::warning:: y jamas rojo, y el marco no lo escribe en el settings.json de nadie.",
+  "base": {
+    "nota": "La base tecnologica del area, y el UNICO lugar donde se escribe. Es la PRIMERA OPCION de todo proyecto: apartarse de una capa se pregunta ANTES de implementar y se declara como desvio de la regla `base-capa-<capa>` en .projects-desvios.json. Cada entrada de aca genera su regla con id estable en 05-base-tecnologica.md, expandida por el marcador `<!-- projects:base:capas -->`: el id ES la capa, asi un desvio la nombra sin campo nuevo y caduca solo el dia que la capa deja de existir. Se nombra la PIEZA, no su version mayor: eso lo gobierna la politica de dependencias.",
+    "capas": [
+      { "capa": "computo", "titulo": "Cómputo", "pieza": "Express sobre ECS (contenedor)" },
+      { "capa": "persistencia", "titulo": "Persistencia", "pieza": "base relacional administrada (RDS, PostgreSQL)" },
+      { "capa": "frontend", "titulo": "Frontend", "pieza": "React + Vite + TypeScript" },
+      { "capa": "backend", "titulo": "Backend", "pieza": "Node + Express + TypeScript" },
+      { "capa": "identidad", "titulo": "Identidad", "pieza": "Clerk" },
+      { "capa": "validacion", "titulo": "Validación de input externo", "pieza": "Zod" },
+      { "capa": "iac", "titulo": "Infraestructura como código", "pieza": "AWS + Terraform" },
+      { "capa": "pipeline", "titulo": "Pipeline", "pieza": "GitHub Actions" },
+      { "capa": "paquetes", "titulo": "Gestor de paquetes", "pieza": "pnpm con workspaces" },
+      { "capa": "pruebas-unitarias", "titulo": "Pruebas unitarias", "pieza": "Vitest" },
+      { "capa": "pruebas-e2e", "titulo": "Pruebas E2E", "pieza": "Playwright" }
+    ]
+  },
   "versiones": [
     {
       "version": "1.3.0",
       "publicada": "2026-08-19",
       "exigible_desde": "2026-09-16"
+    },
+    {
+      "version": "1.4.0",
+      "publicada": "2026-08-20",
+      "exigible_desde": "2026-09-17"
     }
   ]
 }

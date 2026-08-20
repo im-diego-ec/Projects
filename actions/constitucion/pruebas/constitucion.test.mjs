@@ -27,11 +27,13 @@ import {
   SUPERFICIES,
   SUPERFICIES_POR_DEFECTO,
   artefactoDe,
+  basePublicada,
   bloqueDesvio,
   cabecera,
   clasificarDesvios,
   compararSemver,
   despojarCodigo,
+  idDeCapa,
   idsDeReglas,
   importa,
   insertarDesvios,
@@ -43,15 +45,40 @@ import {
   sustituir,
   validarManifiesto,
   verificar,
+  verificarBaseDeclarada,
   versionPendienteMasVieja,
 } from "../constitucion.mjs";
 
 const SCRIPT = join(import.meta.dirname, "..", "constitucion.mjs");
 const CANONICO_REAL = join(import.meta.dirname, "..", "canonico");
 
+/**
+ * La base publicada, escrita a mano ACÁ y no derivada del manifiesto.
+ *
+ * Es deliberado: derivarla del manifiesto haría que el banco se comparara contra sí mismo
+ * y un cambio de base pasaría en verde. Escrita, cualquier edición del manifiesto tiene
+ * que pasar también por acá — que es justamente la fricción que el contrato pide, porque
+ * cambiar la base exige un cambio del marco con su decisión y no una edición de texto.
+ */
+const BASE_PUBLICADA = {
+  computo: "Express sobre ECS (contenedor)",
+  persistencia: "base relacional administrada (RDS, PostgreSQL)",
+  frontend: "React + Vite + TypeScript",
+  backend: "Node + Express + TypeScript",
+  identidad: "Clerk",
+  validacion: "Zod",
+  iac: "AWS + Terraform",
+  pipeline: "GitHub Actions",
+  paquetes: "pnpm con workspaces",
+  "pruebas-unitarias": "Vitest",
+  "pruebas-e2e": "Playwright",
+};
+
 /** Valores INVENTADOS a propósito: en el marco no se escriben handles, cuentas ni
- *  dominios reales de ningún proyecto (frontera 🛑 de AGENTS.md). */
+ *  dominios reales de ningún proyecto (frontera 🛑 de AGENTS.md). El bloque `base` NO es
+ *  inventado —es dato del marco— y va acá porque un consumidor al día lo declara. */
 const VALORES = {
+  base: BASE_PUBLICADA,
   ORG: "Ejemplo-Org",
   PROYECTO: "people-ejemplo",
   BUILDER_1: "@builder-uno",
@@ -708,6 +735,153 @@ test("el piso de permisos que publica el canonico real no lleva placeholders", (
   const canonico = leerCanonico(CANONICO_REAL);
   assert.ok(canonico.piso_permisos.length > 0);
   for (const entrada of canonico.piso_permisos) assert.equal(/\{\{/.test(entrada), false);
+});
+
+// ---------------------------------------------------------------------------
+// La base tecnológica: los cinco casos de la tarea 2.2 del change `stack-estandar`
+//
+// El caso (e) —un desvío que nombra una capa que la base no publica— NO tiene test
+// propio acá A PROPÓSITO: el id de la capa ES el id de la regla, así que ese caso cae por
+// el camino `desvio-muerto`, que ya está cubierto arriba por «desvio cuya regla ya no
+// existe: rojo, con el motivo que tenia escrito». Se agrega abajo la aserción de que ese
+// camino sigue alcanzando a una capa inventada, para que la cobertura no dependa de que
+// alguien recuerde el razonamiento.
+// ---------------------------------------------------------------------------
+
+const CANONICO_CON_BASE = () => leerCanonico(CANONICO_REAL);
+
+function base({ valores, desviosValidos = [], hoy = PASADO_EL_PLAZO }) {
+  return verificarBaseDeclarada({ canonico: CANONICO_CON_BASE(), valores, desviosValidos, hoy });
+}
+
+test("el canonico real publica las once capas de la base, y cada una tiene su regla", () => {
+  const canonico = leerCanonico(CANONICO_REAL);
+  assert.deepEqual(basePublicada(canonico), BASE_PUBLICADA);
+  for (const capa of Object.keys(BASE_PUBLICADA)) {
+    assert.ok(canonico.ids.includes(idDeCapa(capa)), `falta la regla de la capa ${capa}`);
+  }
+});
+
+test("la base sale del manifiesto: cambiarla mueve el cuerpo y el sello", () => {
+  const original = leerCanonico(CANONICO_REAL);
+  const dir = temporal("projects-base-");
+  const manifiesto = JSON.parse(readFileSync(join(CANONICO_REAL, "manifiesto.json"), "utf8"));
+  manifiesto.base.capas = manifiesto.base.capas.map((entrada) =>
+    entrada.capa === "computo" ? { ...entrada, pieza: "otra forma de computo" } : entrada,
+  );
+  writeFileSync(join(dir, "manifiesto.json"), JSON.stringify(manifiesto), "utf8");
+  for (const seccion of original.secciones) {
+    writeFileSync(join(dir, seccion.archivo), readFileSync(join(CANONICO_REAL, seccion.archivo), "utf8"), "utf8");
+  }
+
+  const movido = leerCanonico(dir);
+  assert.deepEqual(movido.problemas, []);
+  assert.ok(movido.cuerpo.includes("otra forma de computo"), "el cuerpo se renderiza desde el manifiesto");
+  assert.notEqual(movido.sha, original.sha, "cambiar la base tiene que mover el sello");
+});
+
+test("(a) sin bloque de base: aviso en la ventana, rojo pasada la fecha, nunca verde mudo", () => {
+  const enVentana = base({ valores: { ...VALORES, base: undefined }, hoy: DENTRO_DE_LA_VENTANA });
+  assert.equal(enVentana.length, 1);
+  assert.equal(enVentana[0].codigo, "base-sin-declarar");
+  assert.equal(enVentana[0].nivel, "warning");
+
+  const pasado = base({ valores: { ...VALORES, base: undefined } });
+  assert.equal(pasado[0].nivel, "error");
+});
+
+test("(b) base igual a la publicada: nada que reportar", () => {
+  assert.deepEqual(base({ valores: VALORES }), []);
+});
+
+test("(c) capa distinta con desvio aprobado: pasa, y el desvio se imprime pegado a esa capa", () => {
+  const canonico = leerCanonico(CANONICO_REAL);
+  const valores = { ...VALORES, base: { ...BASE_PUBLICADA, persistencia: "DynamoDB" } };
+  const desvio = {
+    regla: idDeCapa("persistencia"),
+    motivo: "El dominio es documental y no hay relaciones que sostener.",
+    aprobado_por: "@builder-dos",
+    fecha: "2026-08-20",
+  };
+  assert.deepEqual(base({ valores, desviosValidos: [desvio] }), []);
+
+  const artefacto = artefactoAlDia(canonico, { desvios: [desvio], valores });
+  const lineas = artefacto.split("\n");
+  const marca = lineas.findIndex((linea) => linea.includes(idDeCapa("persistencia")));
+  const cerca = lineas.slice(marca, marca + 6).join("\n");
+  assert.match(cerca, /\*\*Persistencia\*\*/);
+  assert.match(cerca, /DESVÍO DECLARADO/);
+});
+
+test("(d) capa distinta sin desvio: rojo nombrando capa, pieza declarada y pieza de la base", () => {
+  const hallazgos = base({ valores: { ...VALORES, base: { ...BASE_PUBLICADA, persistencia: "DynamoDB" } } });
+  assert.equal(hallazgos.length, 1);
+  assert.equal(hallazgos[0].codigo, "base-capa-divergente");
+  assert.equal(hallazgos[0].nivel, "error");
+  assert.match(hallazgos[0].mensaje, /`persistencia`/);
+  assert.match(hallazgos[0].mensaje, /DynamoDB/);
+  assert.match(hallazgos[0].mensaje, /base relacional administrada/);
+});
+
+test("(e) un desvio que nombra una capa que la base no publica es un desvio muerto", () => {
+  const canonico = leerCanonico(CANONICO_REAL);
+  const { problemas, validos } = clasificarDesvios(
+    [{ regla: idDeCapa("mensajeria"), motivo: "usamos colas", aprobado_por: "@builder-dos", fecha: "2026-08-20" }],
+    canonico.ids,
+  );
+  assert.deepEqual(validos, []);
+  assert.equal(problemas[0].codigo, "desvio-muerto");
+  assert.equal(problemas[0].nivel, "error");
+  assert.match(problemas[0].mensaje, /usamos colas/);
+});
+
+test("dos capas desviadas a la vez no chocan entre si", () => {
+  const canonico = leerCanonico(CANONICO_REAL);
+  const dos = ["computo", "persistencia"].map((capa) => ({
+    regla: idDeCapa(capa),
+    motivo: `este proyecto no cabe en la capa ${capa}`,
+    aprobado_por: "@builder-dos",
+    fecha: "2026-08-20",
+  }));
+  const { problemas, validos } = clasificarDesvios(dos, canonico.ids);
+  assert.deepEqual(problemas, [], "un id por capa es lo que evita el choque de `desvio-duplicado`");
+  assert.equal(validos.length, 2);
+});
+
+test("el rojo de una capa divergente trae el JSON exacto del desvio a agregar", () => {
+  const hallazgos = base({ valores: { ...VALORES, base: { ...BASE_PUBLICADA, computo: "Lambda" } } });
+  const { mensaje } = hallazgos[0];
+  const json = mensaje.slice(mensaje.indexOf("{"), mensaje.lastIndexOf("}") + 1);
+  const propuesto = JSON.parse(json);
+  assert.equal(propuesto.regla, idDeCapa("computo"));
+  assert.ok(propuesto.motivo && propuesto.aprobado_por && propuesto.fecha);
+});
+
+test("una capa declarada que la base no publica es aviso, no rojo", () => {
+  const hallazgos = base({ valores: { ...VALORES, base: { ...BASE_PUBLICADA, observabilidad: "Datadog" } } });
+  assert.equal(hallazgos.length, 1);
+  assert.equal(hallazgos[0].codigo, "base-capa-desconocida");
+  assert.equal(hallazgos[0].nivel, "warning");
+});
+
+test("una capa publicada sin su regla en el cuerpo es un canonico invalido", () => {
+  const dir = temporal("projects-base-sin-regla-");
+  writeFileSync(
+    join(dir, "manifiesto.json"),
+    JSON.stringify({
+      presupuesto_lineas: 500,
+      versiones: VERSIONES_UNA_EN_VENTANA,
+      base: { capas: [{ capa: "computo", titulo: "Computo", pieza: "una pieza" }] },
+    }),
+    "utf8",
+  );
+  // La sección NO trae la marca: la base queda publicada y sin imprimir.
+  writeFileSync(join(dir, "10-reglas.md"), SECCION, "utf8");
+  const canonico = leerCanonico(dir);
+  assert.ok(
+    canonico.problemas.some((problema) => problema.includes("projects:base:capas")),
+    `se esperaba el problema de la marca ausente, y salio: ${JSON.stringify(canonico.problemas)}`,
+  );
 });
 
 // ---------------------------------------------------------------------------

@@ -82,6 +82,120 @@ jobs:
             echo "toda action con script propio trae su banco de pruebas"
           fi
 
+      # LA GUARDA DE LA DUPLICACION, y no es opcional.
+      #
+      # POR QUE HAY DATOS DEL MARCO DUPLICADOS. `marco-ci.yml` es un workflow
+      # REUSABLE: corre en el repo del consumidor, y desde ahi no hay con que
+      # leer el canonico —el texto viaja DENTRO de la composite action y el
+      # GITHUB_TOKEN de un consumidor no lee otro repositorio (404 verificado el
+      # 2026-08-14)—. Por eso dos datos del marco viajan inline en ese archivo:
+      # el ledger de versiones (`CALENDARIO`) y la base publicada
+      # (`BASE_PUBLICADA`).
+      #
+      # POR QUE ESTE CHECK. Una copia sin guarda envejece sola y en silencio: el
+      # `CALENDARIO` vivio duplicado sin que nada lo comparara contra el
+      # manifiesto, y esa es exactamente la clase de divergencia que el marco
+      # existe para prohibir en los repos de otros. El manifiesto del canonico es
+      # LA FUENTE; estos env son su reflejo, y este paso es lo que hace que un
+      # reflejo desactualizado sea imposible de mergear.
+      #
+      # "NO LO PUDE COMPARAR" NO ES VERDE: si un paso se renombra o un env
+      # desaparece, este check falla en vez de pasar mudo. Un fail-open silencioso
+      # es indistinguible de que la guarda no exista.
+      - name: El calendario y la base inline no divergen del manifiesto
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          # js-yaml pinado con version exacta, igual que el resto de los
+          # ejecutores que descargan (regla `ejecutores-con-version-exacta`).
+          npx --yes js-yaml@4.1.0 .github/workflows/marco-ci.yml > "${RUNNER_TEMP}/marco-ci.json"
+
+          WF_JSON="${RUNNER_TEMP}/marco-ci.json" node -e '
+            const { readFileSync } = require("node:fs");
+
+            const MANIFIESTO = "actions/constitucion/canonico/manifiesto.json";
+            const WORKFLOW = ".github/workflows/marco-ci.yml";
+            const PASOS = ["Constitucion del marco al dia", "Base tecnologica declarada"];
+
+            const manifiesto = JSON.parse(readFileSync(MANIFIESTO, "utf8"));
+            const wf = JSON.parse(readFileSync(process.env.WF_JSON, "utf8"));
+            const pasos = ((wf.jobs || {}).higiene || {}).steps || [];
+
+            let salida = 0;
+            const fallar = (mensaje) => {
+              salida = 1;
+              console.log("::error::" + mensaje);
+            };
+
+            const encontrados = new Map();
+            for (const nombre of PASOS) {
+              const paso = pasos.find((p) => p && p.name === nombre);
+              if (!paso) {
+                fallar(
+                  "no encontre el paso " + JSON.stringify(nombre) + " en el job higiene de " + WORKFLOW +
+                    ". Si lo renombraste, actualiza este check: sin el, los datos del marco que ese paso lleva inline quedan sin nadie que los compare contra " + MANIFIESTO
+                );
+                continue;
+              }
+              encontrados.set(nombre, paso.env || {});
+            }
+            if (salida !== 0) process.exit(salida);
+
+            const normCalendario = (entradas) =>
+              entradas.map((e) => ({
+                version: String(e.version),
+                publicada: String(e.publicada),
+                exigible_desde: String(e.exigible_desde),
+                urgente: e.urgente === true,
+              }));
+            const normBase = (capas) =>
+              capas.map((c) => ({ capa: String(c.capa), titulo: String(c.titulo), pieza: String(c.pieza) }));
+
+            const esperadoCalendario = normCalendario(manifiesto.versiones || []);
+            const esperadaBase = normBase(((manifiesto.base || {}).capas) || []);
+
+            const comparar = (etiqueta, paso, clave, esperado, normalizar) => {
+              const env = encontrados.get(paso) || {};
+              if (typeof env[clave] !== "string") {
+                fallar(
+                  "el paso " + JSON.stringify(paso) + " ya no declara el env " + clave +
+                    ": el dato del marco que llevaba inline quedo sin guarda. Este check no puede comparar, y por eso falla en vez de pasar mudo"
+                );
+                return;
+              }
+              let real;
+              try {
+                real = normalizar(JSON.parse(env[clave]));
+              } catch (error) {
+                fallar("el env " + clave + " del paso " + JSON.stringify(paso) + " no es JSON valido: " + error.message);
+                return;
+              }
+              const a = JSON.stringify(esperado);
+              const b = JSON.stringify(real);
+              if (a === b) {
+                console.log("ok  " + etiqueta + " del paso " + JSON.stringify(paso) + " coincide con el manifiesto");
+                return;
+              }
+              fallar(
+                etiqueta + " del paso " + JSON.stringify(paso) + " divergio de " + MANIFIESTO +
+                  ". El manifiesto es la fuente: se edita ALLA y este env es su reflejo. manifiesto=" + a + " | " + clave + "=" + b
+              );
+            };
+
+            comparar("el calendario de versiones", PASOS[0], "CALENDARIO", esperadoCalendario, normCalendario);
+            comparar("el calendario de versiones", PASOS[1], "CALENDARIO", esperadoCalendario, normCalendario);
+            comparar("la base publicada", PASOS[1], "BASE_PUBLICADA", esperadaBase, normBase);
+
+            if (salida === 0) {
+              console.log(
+                "== fuente unica == el calendario y la base que " + WORKFLOW + " lleva inline son los del manifiesto del canonico. " +
+                "Viajan duplicados porque desde un workflow reusable no hay con que leer el canonico; esta comparacion es lo que impide que la copia envejezca sola"
+              );
+            }
+            process.exit(salida);
+          '
+
       # node --test es el runner que trae Node 22: cero dependencias, igual que
       # el resto del marco. Los archivos se pasan uno por uno a proposito:
       # `node --test <directorio>` no resuelve el patron en las versiones nuevas

@@ -12,8 +12,9 @@
 
 <!-- projects:regla id=validar-input-externo -->
 
-- Validar TODO input externo con el validador de schemas del stack (**Zod** salvo que
-  la tabla de stack del proyecto diga otra cosa) antes de usarlo.
+- Validar TODO input externo con el validador de la base (**Zod**) antes de usarlo. El
+  proyecto no elige esa capa: si necesita otro validador, es un desvío declarado de
+  `base-capa-validacion`.
 
 <!-- projects:regla id=logging-estructurado -->
 
@@ -27,7 +28,9 @@
 
 <!-- projects:regla id=respetar-stack-y-estructura -->
 
-- Respetar el stack y la estructura de carpetas fijados por el proyecto.
+- Respetar la **base tecnológica del área**, lo que este proyecto agregó encima y la
+  estructura de carpetas fijada. La base la fija el marco; lo que el proyecto agrega
+  vive en su `AGENTS.md`.
 
 <!-- projects:regla id=ejecutores-con-version-exacta -->
 
@@ -90,11 +93,13 @@
 
 <!-- projects:regla id=apartarse-de-la-infra-base-exige-preguntar-antes -->
 
-- **Apartarse de la infraestructura base fijada se PREGUNTA ANTES de implementar**, no
-  se documenta después. La base es primera opción siempre (ver _Infraestructura_); una
-  alternativa se evalúa como decisión, con su alternativa descartada escrita, y recién
-  entonces se escribe código. Descubrir en el review que el servicio ya está desplegado
-  convierte la decisión en un hecho consumado.
+- **Apartarse de CUALQUIER capa de la base se PREGUNTA ANTES de implementar**, no se
+  documenta después. La base es primera opción siempre (ver _La base tecnológica del
+  área_); una alternativa se evalúa como decisión, con su alternativa descartada escrita,
+  y recién entonces se escribe código. Descubrir en el review que el servicio ya está
+  desplegado convierte la decisión en un hecho consumado. El desvío lo aprueba alguien
+  que **no** lo implementa, vale solo para la capa que nombra, y una capa que el proyecto
+  todavía no implementó no es un desvío: es un pendiente.
 
 **🛑 Nunca**
 
