@@ -1033,3 +1033,21 @@ test("el denominador de un archivo medido por dos reportes es el MAYOR declarado
   assert.match(r.todo, /sus propios reportes declaran 5\b/);
   assert.doesNotMatch(r.todo, /sus propios reportes declaran 7\b/);
 });
+
+test("dentro de la ventana de estreno el denominador CORTO tambien avisa en vez de detener", () => {
+  // HALLAZGO DE UN CONTROL NEGATIVO. La prueba de la ventana que ya habia
+  // ejercitaba el caso "sin contador"; mutar la rama de la ventana del
+  // denominador CORTO a rojo-desde-hoy sobrevivia al banco entero. Son dos
+  // veredictos distintos con la misma ventana, y una ventana que solo esta
+  // probada en uno de los dos no esta probada: el otro puede aterrizar en rojo
+  // sobre un consumidor que no leyo nada, que es justo lo que la ventana existe
+  // para impedir.
+  const { dir, base } = repoConLcovCrudo(
+    `TN:\nSF:web/src/mod.js\nFN:1,a\nFNDA:1,a\nFN:2,b\nFNDA:1,b\nFN:3,c\nFNDA:1,c\nFNF:10\nFNH:3\n${LINEAS_OK}\n${RAMAS_OK}\nend_of_record\n`
+  );
+  const r = correrTotal(dir, base, { COBERTURA_HOY: HOY });
+  assert.equal(r.codigo, 0, r.todo);
+  assert.match(r.todo, /::warning[^\n]*denominador llego CORTO/);
+  assert.match(r.todo, /2026-09-30/);
+  assert.match(r.resumen, /AMARILLO · denominador corto \(ventana de estreno\)/);
+});
