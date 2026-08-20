@@ -1,0 +1,18 @@
+{
+  "superficies": ["claude-code", "cursor"],
+  "PROYECTO": "{{PROYECTO}}",
+  "ORG": "{{ORG}}",
+  "PAQUETE_API": "{{PAQUETE_API}}",
+  "BUILDER_1": "{{BUILDER_1}}",
+  "BUILDER_2": "{{BUILDER_2}}",
+  "PO": "{{PO}}",
+  "CUENTA_DEV": "{{CUENTA_DEV}}",
+  "CUENTA_PROD": "{{CUENTA_PROD}}",
+  "REGION": "{{REGION}}",
+  "PERFIL_DEV": "{{PERFIL_DEV}}",
+  "PERFIL_PROD": "{{PERFIL_PROD}}",
+  "DOMINIO_DEV": "{{DOMINIO_DEV}}",
+  "DOMINIO_PROD": "{{DOMINIO_PROD}}",
+  "CANAL_ALERTAS": "{{CANAL_ALERTAS}}",
+  "PREFIJO_RECURSOS": "{{PREFIJO_RECURSOS}}"
+}
