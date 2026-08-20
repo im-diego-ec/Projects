@@ -1,0 +1,29 @@
+# EXTRA: la misma pieza en dev y en prod, con VERSIONES distintas: ROJO.
+#
+# "La misma pieza" incluye la versión, y este es el reparto exacto que descartó
+# la alternativa del reusable solo-dev: dev verificaría con un código distinto
+# del que producción ejecuta, que es lo que la promoción existe para impedir.
+#
+# Es además el error probable de un debut pinado a medias: el tramo de dev queda
+# apuntando al SHA del change y el de producción vuelve al tag móvil, o al
+# revés.
+name: Promocion
+on:
+  push:
+    branches: [main]
+
+jobs:
+  deploy-dev:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Tarea de una sola vez contra dev
+        uses: im-diego-ec/Projects/actions/compuerta-de-ejemplo@0123456789abcdef0123456789abcdef01234567
+
+  deploy-prod:
+    needs: [deploy-dev]
+    environment: production
+    runs-on: ubuntu-latest
+    # projects:sin-tramo-de-dev via=ninguna
+    steps:
+      - name: Tarea de una sola vez contra produccion
+        uses: im-diego-ec/Projects/actions/compuerta-de-ejemplo@v1

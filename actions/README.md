@@ -15,6 +15,7 @@ uses: im-diego-ec/Projects/actions/<nombre>@v1
 | [`censo-fuentes`](censo-fuentes/) | Deriva el alcance real de la verificación y caza los archivos que no mira ninguna herramienta | Sí: agujeros y exclusiones muertas |
 | [`aviso-version`](aviso-version/) | Arma, desde el CHANGELOG, el mensaje que reciben los consumidores al publicarse una versión | Sí: solo si el CHANGELOG no tiene entrada para esa versión |
 | [`constitucion`](constitucion/) | Entrega la porción del marco de la constitución a cada superficie de agente que el repo declara, y verifica que la presente sea la que el marco publica | Sí: artefacto ausente o atrasado pasada su fecha, editado a mano, cadena de carga rota o desvío muerto |
+| [`dev-antes-que-prod`](dev-antes-que-prod/) | Verifica que ninguna pieza del marco alcance un job de producción sin haber corrido en el tramo de dev de la misma promoción | Sí: pieza sin gemelo en dev, misma pieza en otra versión, o vía sin declarar. El aviso de mecánica copiada, nunca |
 
 ## Parametrización
 
@@ -712,6 +713,145 @@ CI de Projects— y la validación contra un consumidor real antes de mover `v1`
 
 ---
 
+## `dev-antes-que-prod`
+
+El marco **no despliega nada**, así que no puede ejercitar por sí mismo la
+mecánica de entrega que publica. Y la mitad de producción de una promoción no
+corre en ningún ensayo previo: por spec, un disparo manual sobre una rama de
+trabajo deja los jobs de producción sin ejecutar. Ese hueco es el que hacía
+imposible publicar compuertas de entrega con la conciencia tranquila, y la
+alternativa que se evaluó primero —un canario, una app de mentira con sus dos
+ambientes— costaba una aplicación, dos ambientes, una base y su mantenimiento.
+
+Este check lo cierra **sin construir nada**, porque la unidad de distribución
+bajó del workflow a la compuerta: la misma pieza, en la misma versión, corrió en
+el tramo de dev del mismo run minutos antes. El dogfooding que Projects no puede
+hacer lo hace **cada consumidor en cada promoción**, por construcción, y esto lo
+verifica en vez de que alguien lo afirme.
+
+La propiedad, tal como la exige el spec:
+
+> Cuando una promoción incluye tramo de dev y tramo de producción, toda pieza
+> referenciada del marco que ejecute un job de producción tiene que haber sido
+> ejecutada por el tramo de dev de esa **misma** promoción, en la **misma**
+> versión.
+
+El tramo de producción se reconoce por `environment` como clave directa del job,
+que es la propiedad que el marco ya exige de todo job de producción.
+
+### El problema de diseño, y por qué la declaración no es burocracia
+
+El invariante es **estático** (esto lee la definición de pipeline, no logs) y sus
+agujeros son **dinámicos** (son caminos de ejecución). Un lector de YAML no puede
+saber cuál `if:` disparó en un run concreto: en el consumidor real la diferencia
+entre «pieza solo en producción» (rojo) y «dispatch de emergencia» (verde por
+excepción) no vive en la lista de `uses:`, vive en las expresiones de las
+condiciones y en un output calculado en runtime.
+
+Por eso el verificador **no clasifica caminos por observación**. Exige que la
+topología declare sus vías sin tramo de dev, con un vocabulario **cerrado**:
+
+```yaml
+deploy-api-prod:
+  environment: production
+  # projects:sin-tramo-de-dev via=dispatch-de-emergencia
+  # projects:sin-tramo-de-dev via=reuso-de-verificacion-de-dev
+```
+
+Si esto se implementara por heurística sobre las expresiones `if:`, la primera
+reescritura de una condición en el consumidor lo volvería **fail-open
+silencioso**, que es exactamente lo que la constitución prohíbe y lo que ya pasó
+en otro repo con el 403 de `actions: read`: la detección devolvía 403, el
+fail-open lo tapaba, y una función del pipeline no actuó durante una semana.
+
+Va como **comentario** y no como clave del job porque GitHub rechaza claves
+desconocidas dentro de un job, y actionlint también. Es la misma convención de
+marca que ya usa `constitucion` (`projects:regla id=…`), sin dialecto nuevo.
+
+### Las cuatro vías, con su control compensatorio
+
+| Vía | Por qué no tiene tramo de dev | Qué corre igual |
+| --- | --- | --- |
+| `rollback-a-artefacto-publicado` | Los jobs de dev quedan fuera por diseño cuando se pide un rollback | Se despliega un artefacto que **ya estuvo** en producción, y su existencia se valida contra el registro antes de tocar el servicio |
+| `dispatch-de-emergencia` | Salta dev por diseño; está en el spec vivo del marco | Hereda el riesgo que esa vía siempre tuvo, y queda registrado en el historial del proveedor de CI |
+| `reuso-de-verificacion-de-dev` | Producción procede referenciando una corrida anterior sobre contenido idéntico | La ventana es acotada, y el residuo se acota porque mover el tag mayor es un acto humano deliberado |
+| `ninguna` | No hay vía: producción no se alcanza sin el tramo de dev | **No se toma como palabra**: se comprueba contra el grafo de `needs:` del archivo |
+
+Esa última fila es la que impide que la declaración se firme sola. Un job que
+declara `ninguna` y no depende (ni transitivamente) del job de dev que le da la
+pieza está describiendo un run que existe y no declaró: eso es rojo.
+
+El vocabulario es cerrado **a propósito**. Una vía nueva se declara **antes de
+existir**, con su control compensatorio escrito, y eso es un change de OpenSpec
+en el marco, no una línea que alguien suma en su repo: un agujero descubierto
+después es indistinguible de un invariante que nunca se cumplió.
+
+### Por qué esto entra en MINOR sin romper a nadie
+
+Para un repositorio que todavía **no adoptó ninguna compuerta**, el invariante es
+**vacuamente verdadero**: no usa ninguna pieza del marco en un job de producción.
+No hay nada que pueda ponerse rojo. El verde vacuo se **dice** con un
+`::notice::`, para que no sea indistinguible de un check que se rompió y no miró
+nada.
+
+El aviso de **mecánica copiada** —el repositorio conserva a mano una compuerta que
+ya existe como pieza referenciada— es `::warning::` y **nunca** rojo, también a
+propósito: la adopción es trabajo deliberado por compuerta, y un check que ponga
+rojo a un repositorio que no modificó una sola línea rompe repos ajenos en
+silencio. Es el ítem «adopción de lo referenciado» de la revisión trimestral
+convertido en señal automática, y lo que vigila es el estado peligroso: mitad
+extraído y mitad copiado es **peor que cualquiera de los dos extremos**, porque
+el repo queda con dos fuentes para la misma mecánica y la corrección de un
+incidente vuelve a tener que portarse a mano justo en la mitad que quedó copiada.
+
+Su registro nace **vacío**, y es una decisión y no un olvido: hoy el marco no
+publica todavía ninguna compuerta de entrega que nombrar, y un aviso que nombra
+una pieza inexistente es peor que no avisar. El change que publique la primera
+compuerta agrega **una línea**, porque el mecanismo ya está acá y probado.
+
+### Inputs
+
+| Input | Default | Para qué |
+| --- | --- | --- |
+| `marco` | `im-diego-ec/Projects` | Identidad `<org>/<repo>` cuyas piezas se vigilan. Existe para que un fork funcione sin editar el script |
+| `workflows` | `.github/workflows` | Directorio de definiciones de pipeline |
+| `raiz` | `.` | Raíz del repo consumidor |
+| `instalar-node` | `"false"` | El default es `false` porque los runners hospedados ya traen Node: pagar un `setup-node` que no hace falta es costo por costumbre |
+| `version-node` | `"22"` | Solo cuando `instalar-node` es `"true"` |
+
+### Límites declarados
+
+- **Que el gemelo de dev exista en la definición no prueba que haya corrido en
+  ese run.** Eso lo garantiza la topología, y de ahí que `ninguna` se compruebe
+  contra el grafo de dependencias en vez de creerse.
+- Una promoción **partida en dos archivos** (dev en uno, producción en otro,
+  encadenados por `workflow_run`) se evalúa por archivo, así que la pieza de
+  producción se lee como «sin tramo de dev» y sale **rojo**. Es el lado
+  conservador a propósito: habilitar esa forma es una vía nueva.
+- Un job de producción **sin `environment`** se lee como tramo de dev. Eso lo
+  cubre el endurecimiento del verificador de topología, no esta pieza.
+- No se lee YAML en estilo flujo, ni indentación con tabs, ni anclas o alias: las
+  tres son **rojo por ilegible**, no verde optimista. El marco no tiene
+  dependencias y traer un parser de YAML sería la única del repo; el precedente
+  en contra ya está escrito en el verificador, porque GitHub **prohíbe**
+  expresiones en el campo `uses:` y entonces un ancla exacta alcanza para leerlo.
+- Esto verifica el **cableado** de la promoción. No verifica que la pieza haga lo
+  que promete: eso es del banco de pruebas de cada pieza.
+
+### Correrlo en local
+
+```bash
+node actions/dev-antes-que-prod/dev-antes-que-prod.mjs
+```
+
+Contra otro repo, sin moverse de directorio:
+
+```bash
+DAP_RAIZ=/ruta/al/consumidor node actions/dev-antes-que-prod/dev-antes-que-prod.mjs
+```
+
+---
+
 ## Permisos mínimos
 
 Cada `action.yml` los trae escritos en su encabezado. En otro repo, cada
@@ -728,6 +868,7 @@ para no volver a pagarlo.
 | `cobertura-diff` | — | `contents: read` |
 | `aviso-version` | — | `contents: read` (el checkout; no llama a la API ni a la red) |
 | `constitucion` | `verificar`, `escribir` | `contents: read` (escribe en el árbol de trabajo y nada más: el commit y el PR los hace el workflow del consumidor, con sus propios permisos) |
+| `dev-antes-que-prod` | — | `contents: read` (el checkout; lee la definición de pipeline del árbol, no llama a la API ni observa runs) |
 
 Un bloque `permissions:` **reemplaza** los permisos por defecto del token: hay
 que listar `contents: read` explícitamente, no se hereda.

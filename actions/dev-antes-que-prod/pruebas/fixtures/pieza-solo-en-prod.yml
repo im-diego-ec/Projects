@@ -1,0 +1,25 @@
+# CASO 2: la pieza corre SOLO en un job de producción: ROJO.
+#
+# Es el caso que el invariante existe para atrapar: el marco publicaría, y un
+# consumidor ejecutaría en producción, código que ningún tramo de dev ejerció.
+# El rojo tiene que nombrar la pieza y el tramo que falta.
+name: Promocion
+on:
+  push:
+    branches: [main]
+
+jobs:
+  deploy-dev:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Tarea de una sola vez contra dev, a mano
+        run: ./scripts/one-off.sh dev
+
+  deploy-prod:
+    needs: [deploy-dev]
+    environment: production
+    runs-on: ubuntu-latest
+    # projects:sin-tramo-de-dev via=ninguna
+    steps:
+      - name: Tarea de una sola vez contra produccion
+        uses: im-diego-ec/Projects/actions/compuerta-de-ejemplo@v1

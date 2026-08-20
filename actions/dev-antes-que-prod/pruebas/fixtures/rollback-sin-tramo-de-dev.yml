@@ -1,0 +1,40 @@
+# CASO 3: rollback a un artefacto ya publicado: VERDE por excepción declarada.
+#
+# Los jobs de dev quedan fuera POR DISEÑO cuando se pide un rollback, así que en
+# ese run producción actualiza el servicio sin tramo de dev. El control
+# compensatorio corre igual: se despliega un artefacto que YA estuvo en
+# producción y su existencia se valida contra el registro antes de tocar el
+# servicio.
+#
+# El cableado sigue siendo obligatorio: la excepción documenta el camino de
+# ejecución, no perdona la falta de gemelo en dev. Por eso la pieza también
+# aparece en `deploy-dev`.
+name: Promocion
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      artefacto:
+        description: Etiqueta de un artefacto ya publicado, para volver a el.
+        required: false
+
+jobs:
+  deploy-dev:
+    if: ${{ !inputs.artefacto }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Tarea de una sola vez contra dev
+        uses: im-diego-ec/Projects/actions/compuerta-de-ejemplo@v1
+
+  deploy-prod:
+    needs: [deploy-dev]
+    if: ${{ !cancelled() }}
+    environment: production
+    runs-on: ubuntu-latest
+    # projects:sin-tramo-de-dev via=rollback-a-artefacto-publicado
+    steps:
+      - name: El artefacto pedido existe en el registro
+        run: ./scripts/validar-artefacto.sh
+      - name: Tarea de una sola vez contra produccion
+        uses: im-diego-ec/Projects/actions/compuerta-de-ejemplo@v1

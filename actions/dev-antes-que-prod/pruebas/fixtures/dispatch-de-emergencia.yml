@@ -1,0 +1,32 @@
+# CASO 4: disparo manual de emergencia sobre la rama de integración: VERDE por
+# excepción declarada.
+#
+# Salta dev por diseño, y está en el spec vivo del marco (capability
+# `pipeline-entrega`, requirement "El deploy está gateado por el éxito de CI",
+# escenario "Deploy manual de emergencia"). No se le pone un control nuevo: la
+# vía hereda el riesgo que siempre tuvo y queda registrada en el historial del
+# proveedor de CI.
+name: Promocion
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  deploy-dev:
+    if: ${{ github.ref != 'refs/heads/main' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Tarea de una sola vez contra dev
+        uses: im-diego-ec/Projects/actions/compuerta-de-ejemplo@v1
+
+  deploy-prod:
+    needs:
+      - deploy-dev
+    if: ${{ !cancelled() && (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main') }}
+    environment: production
+    runs-on: ubuntu-latest
+    # projects:sin-tramo-de-dev via=dispatch-de-emergencia
+    steps:
+      - name: Tarea de una sola vez contra produccion
+        uses: im-diego-ec/Projects/actions/compuerta-de-ejemplo@v1

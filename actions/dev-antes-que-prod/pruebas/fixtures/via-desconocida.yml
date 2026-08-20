@@ -1,0 +1,26 @@
+# EXTRA: el vocabulario de vías es CERRADO: ROJO.
+#
+# Un consumidor no puede habilitarse una excepción nueva escribiéndole un
+# nombre. Si hiciera falta una vía más, es un change de OpenSpec en el marco,
+# con su control compensatorio escrito, porque un agujero descubierto después
+# es indistinguible de un invariante que nunca se cumplió.
+name: Promocion
+on:
+  push:
+    branches: [main]
+
+jobs:
+  deploy-dev:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Tarea de una sola vez contra dev
+        uses: im-diego-ec/Projects/actions/compuerta-de-ejemplo@v1
+
+  deploy-prod:
+    needs: [deploy-dev]
+    environment: production
+    runs-on: ubuntu-latest
+    # projects:sin-tramo-de-dev via=urgencia-del-viernes
+    steps:
+      - name: Tarea de una sola vez contra produccion
+        uses: im-diego-ec/Projects/actions/compuerta-de-ejemplo@v1

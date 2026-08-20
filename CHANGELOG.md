@@ -37,6 +37,78 @@ mueve sobre un cambio incompatible.
 
 ### Añadido
 
+- **`actions/dev-antes-que-prod`: el invariante que vuelve verificable el
+  dogfooding del marco.** Verifica que ninguna pieza referenciada del marco que
+  ejecute un job de producción falte en el tramo de dev de la **misma**
+  promoción, en la **misma** versión.
+
+  **Qué tiene que hacer un consumidor: nada, hasta que adopte su primera
+  compuerta de entrega.** Para un repositorio que todavía no usa ninguna pieza del
+  marco en un job de producción el invariante es **vacuamente verdadero** —no hay
+  nada que pueda ponerse rojo—, y por eso esto entra en una línea MINOR sin poner
+  rojo a nadie que no haya tocado una línea. El verde vacuo sale por `::notice::`
+  en vez de callarse, para que no sea indistinguible de un check que se rompió y
+  no miró nada.
+
+  El agujero que cierra: el marco **no despliega nada**, así que no puede
+  ejercitar por sí mismo la mecánica de entrega que publica, y la mitad de
+  producción de una promoción no corre en ningún ensayo previo, porque por spec un
+  disparo manual sobre una rama de trabajo deja los jobs de producción sin
+  ejecutar. La alternativa que se evaluó primero era un canario —una aplicación de
+  mentira con sus dos ambientes y su base— y quedó descartada: bajando la unidad
+  de distribución del workflow a la compuerta, la misma pieza en la misma versión
+  corre en el tramo de dev del mismo run minutos antes, y el dogfooding lo hace
+  cada consumidor en cada promoción, por construcción.
+
+  **Este check nace ANTES que la primera compuerta, y no es un detalle de orden.**
+  Si naciera después, su primera corrida verde no probaría nada: no habría nada
+  que verificar y el verde sería indistinguible de un check roto.
+
+  Las cuatro **vías sin tramo de dev** viven en un vocabulario **cerrado** que el
+  consumidor declara con un comentario dentro del job de producción
+  (`# projects:sin-tramo-de-dev via=<nombre>`): `rollback-a-artefacto-publicado`,
+  `dispatch-de-emergencia`, `reuso-de-verificacion-de-dev` y `ninguna`. Cada una
+  se imprime en cada corrida con su control compensatorio, porque una excepción
+  aplicada en silencio es un fail-open silencioso. Una vía nueva se declara
+  **antes de existir** y eso es un change de OpenSpec en el marco, no una línea
+  que alguien suma en su repo: un agujero descubierto después es indistinguible de
+  un invariante que nunca se cumplió. Y `ninguna` **no se toma como palabra**: se
+  comprueba contra el grafo de `needs:`, así que un job que la declara sin depender
+  del job de dev que le da la pieza es rojo.
+
+  **Por qué la declaración y no la deducción.** El invariante es estático (esto
+  lee la definición de pipeline, no logs) y sus agujeros son dinámicos: son
+  caminos de ejecución. Leer las expresiones `if:` por heurística volvería el
+  check fail-open silencioso en cuanto alguien reescriba una condición, que es
+  exactamente lo que ya pasó en otro repo con el 403 de `actions: read`
+  —la detección fallaba, el fail-open lo tapaba, y una función del pipeline no
+  actuó durante una semana—.
+
+  Límites declarados en el encabezado del `action.yml` y en el catálogo: una
+  promoción partida en dos archivos se lee como «sin tramo de dev» y sale rojo (el
+  lado conservador a propósito); un job de producción sin `environment` se lee como
+  tramo de dev; el YAML en estilo flujo, los tabs y las anclas son rojo por
+  ilegible y no verde optimista; y que el gemelo de dev **exista** en la
+  definición no prueba que haya **corrido** en ese run, que es justamente por qué
+  `ninguna` se verifica contra el grafo.
+
+  Trae además el **aviso de mecánica copiada** (el repositorio conserva a mano una
+  compuerta que ya existe como pieza referenciada), que es `::warning::` y
+  **nunca** rojo: la adopción es trabajo deliberado por compuerta. Su registro
+  nace **vacío** porque hoy el marco no publica todavía ninguna compuerta de
+  entrega que nombrar, y un aviso que nombra una pieza inexistente es peor que no
+  avisar; el change que publique la primera agrega una línea, porque el mecanismo
+  ya está y tiene banco de pruebas.
+
+  **Lo que este cambio NO trae todavía, para que no se descubra después:** el paso
+  que lo invoca desde `marco-ci.yml` no está cableado. `uses:` no admite
+  expresiones, así que la referencia sería literal a `@v1`, y la action todavía no
+  existe en ese tag: el paso quedaría rojo esperando una señal que no llega, que
+  es el error más caro de la migración al marco y ya se cometió una vez. El
+  cableado va en el mismo PR que mueva `v1`. Hasta entonces la pieza se ejercita en
+  el CI de Projects por su banco de pruebas (`pruebas-actions`), con los siete casos
+  del design y sus veredictos.
+
 - **Check estático nuevo en el job `higiene`: *Ejecutores de paquetes pinados*.**
   Se pone rojo si un archivo rastreado del repo corre un paquete por un ejecutor
   que **descarga** (`npx`, `bunx`, `npm exec`, `pnpm dlx`, `yarn dlx`) sin

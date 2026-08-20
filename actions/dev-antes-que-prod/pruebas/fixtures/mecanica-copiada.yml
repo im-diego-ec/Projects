@@ -1,0 +1,26 @@
+# EXTRA: mecánica copiada que ya existe como pieza referenciada: AVISO, y el
+# job en VERDE.
+#
+# El ítem "adopción de lo referenciado" de la revisión trimestral convertido en
+# señal automática. No es rojo a propósito: la adopción es trabajo deliberado por
+# compuerta, y un check que ponga rojo a un repositorio que no modificó una sola
+# línea rompe repos ajenos en silencio.
+#
+# El estado que este aviso vigila es el peligroso: mitad extraído y mitad
+# copiado es peor que cualquiera de los dos extremos, porque el repo queda con
+# dos fuentes para la misma mecánica y la corrección de un incidente vuelve a
+# tener que portarse a mano justo en la mitad que quedó copiada.
+name: Promocion
+on:
+  push:
+    branches: [main]
+
+jobs:
+  deploy-dev:
+    runs-on: ubuntu-latest
+    steps:
+      - name: La compuerta, todavia copiada a mano
+        run: |
+          set -euo pipefail
+          herramienta-de-ejemplo lanzar-tarea --esperar
+          herramienta-de-ejemplo leer-resultado

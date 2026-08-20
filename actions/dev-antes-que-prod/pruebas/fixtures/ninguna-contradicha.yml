@@ -1,0 +1,28 @@
+# EXTRA: 'ninguna' declarada y desmentida por el grafo de dependencias: ROJO.
+#
+# La declaración es lo único que el verificador puede leer, así que 'ninguna' no
+# se toma como palabra: se comprueba contra el grafo. Acá el job de producción no
+# depende (ni transitivamente) del job de dev que ejecuta la pieza, o sea que
+# existe un run donde producción corre y dev no corrió. Esa vía existe, y no
+# declararla la vuelve indistinguible de un invariante que nunca se cumplió.
+#
+# Sin esta comprobación, 'ninguna' sería una declaración que se firma sola.
+name: Promocion
+on:
+  push:
+    branches: [main]
+
+jobs:
+  deploy-dev:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Tarea de una sola vez contra dev
+        uses: im-diego-ec/Projects/actions/compuerta-de-ejemplo@v1
+
+  deploy-prod:
+    environment: production
+    runs-on: ubuntu-latest
+    # projects:sin-tramo-de-dev via=ninguna
+    steps:
+      - name: Tarea de una sola vez contra produccion
+        uses: im-diego-ec/Projects/actions/compuerta-de-ejemplo@v1

@@ -1,0 +1,30 @@
+# CASO 7: el repositorio no usa NINGUNA pieza del marco en producción: VERDE
+# VACUO.
+#
+# Este es el caso de todo consumidor que todavía no adoptó ninguna compuerta, y
+# es la razón por la que el check puede nacer en una línea MINOR sin poner rojo
+# a nadie que no haya tocado una línea: el invariante es vacuamente verdadero.
+#
+# El verde vacuo se DICE con un aviso informativo. Un verde mudo sería
+# indistinguible de un check que se rompió y no miró nada.
+name: Promocion
+on:
+  push:
+    branches: [main]
+
+jobs:
+  deploy-dev:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Tarea de una sola vez contra dev, a mano
+        run: ./scripts/one-off.sh dev
+
+  deploy-prod:
+    needs: [deploy-dev]
+    environment: production
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Tarea de una sola vez contra produccion, a mano
+        run: ./scripts/one-off.sh prod

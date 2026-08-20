@@ -1,0 +1,13 @@
+# EXTRA: el mapa de jobs en estilo flujo: ROJO por ilegible.
+#
+# Este verificador lee líneas, no un árbol de YAML, y lo declara: el marco no
+# tiene dependencias y traer un parser sería la única del repo. La consecuencia
+# no se tapa con una lectura optimista. Lo que no se puede verificar es rojo,
+# nunca éxito mudo, porque un verde acá sería indistinguible de un archivo que
+# cumple el invariante.
+name: Promocion
+on:
+  push:
+    branches: [main]
+
+jobs: { deploy-prod: { environment: production, runs-on: ubuntu-latest } }

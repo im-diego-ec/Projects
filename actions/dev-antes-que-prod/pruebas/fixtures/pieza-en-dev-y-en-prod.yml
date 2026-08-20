@@ -1,0 +1,35 @@
+# CASO 1: pieza en dev y en prod, en la misma versión: VERDE.
+#
+# La forma que el invariante describe: la misma pieza, en la misma versión, la
+# ejecuta el tramo de dev de la promoción antes de que un job de producción la
+# toque. `deploy-prod` declara 'ninguna' y lo respalda el grafo: depende
+# transitivamente de `deploy-dev` a través de `smoke-dev`.
+name: Promocion
+on:
+  push:
+    branches: [main]
+
+jobs:
+  deploy-dev:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Tarea de una sola vez contra dev
+        uses: im-diego-ec/Projects/actions/compuerta-de-ejemplo@v1
+
+  smoke-dev:
+    needs: [deploy-dev]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Sonda de humo
+        run: ./scripts/smoke.sh
+
+  deploy-prod:
+    needs: [smoke-dev]
+    environment: production
+    runs-on: ubuntu-latest
+    # projects:sin-tramo-de-dev via=ninguna
+    steps:
+      - uses: actions/checkout@v7
+      - name: Tarea de una sola vez contra produccion
+        uses: im-diego-ec/Projects/actions/compuerta-de-ejemplo@v1

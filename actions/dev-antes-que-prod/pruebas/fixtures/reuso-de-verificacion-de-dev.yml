@@ -1,0 +1,41 @@
+# CASO 5: reuso de una verificación de dev anterior sobre contenido idéntico:
+# VERDE por excepción declarada.
+#
+# Producción procede referenciando una corrida de dispatch anterior sobre el
+# MISMO contenido, así que el tramo de dev no corre en este run. El residuo es
+# real y está declarado: esa corrida pudo haber ejercitado una versión anterior
+# de la pieza si el tag mayor se movió en la ventana. Es mitigación OPERATIVA y
+# no estructural, y lo que la acota es que mover el tag mayor es un acto humano
+# deliberado.
+name: Promocion
+on:
+  push:
+    branches: [main]
+
+jobs:
+  reuso:
+    runs-on: ubuntu-latest
+    outputs:
+      dev_verificado: ${{ steps.buscar.outputs.dev_verificado }}
+    steps:
+      - name: Buscar una verificacion de dev sobre este mismo contenido
+        id: buscar
+        run: ./scripts/buscar-verificacion-de-dev.sh
+
+  deploy-dev:
+    needs: [reuso]
+    if: ${{ needs.reuso.outputs.dev_verificado != 'true' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Tarea de una sola vez contra dev
+        uses: im-diego-ec/Projects/actions/compuerta-de-ejemplo@v1
+
+  deploy-prod:
+    needs: [reuso, deploy-dev]
+    if: ${{ !cancelled() }}
+    environment: production
+    runs-on: ubuntu-latest
+    # projects:sin-tramo-de-dev via=reuso-de-verificacion-de-dev
+    steps:
+      - name: Tarea de una sola vez contra produccion
+        uses: im-diego-ec/Projects/actions/compuerta-de-ejemplo@v1

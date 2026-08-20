@@ -1,0 +1,145 @@
+name: Invariante dev-antes-que-prod
+description: >-
+  Falla si una pieza referenciada del marco corre en un job de producción sin que
+  el tramo de dev de la misma promoción la ejecute, en la misma versión.
+author: la organización
+
+# ---------------------------------------------------------------------------
+# PERMISOS MINIMOS QUE DEBE CONCEDER EL CONSUMIDOR
+#
+#   permissions:
+#     contents: read   # el checkout previo; esta action no llama a la API
+#
+# No necesita pull-requests ni actions: TODO el analisis es sobre archivos ya
+# clonados. Esto no es prolijidad, es la leccion que este marco ya pago TRES
+# veces (y es el conteo lo que la hace creible): un job estrenado con un token
+# al que le faltaba un permiso daba 403, el fail-open lo tapaba en silencio y una
+# funcion del pipeline no actuo durante una semana. Un permiso que la pieza no
+# necesita es un permiso que nadie va a poder quitar despues.
+#
+# REQUISITOS DEL JOB QUE LA USA
+#   1. actions/checkout ANTES de esta action: lee .github/workflows del working
+#      dir. Alcanza el checkout por defecto, no necesita historial.
+#   2. Nada mas. No instala dependencias del repo y no toca la red.
+#
+# QUE VERIFICA, EN UNA LINEA
+#   Ninguna pieza referenciada del marco que ejecute un job de produccion puede
+#   faltar en el tramo de dev de la MISMA promocion, en la misma version.
+#
+# DONDE ESTA EL ROJO Y DONDE EL AVISO (la regla de fail-open ruidoso del marco)
+#   · pieza en un job de produccion sin gemelo en dev -> ::error::, nombrando la
+#     pieza y el tramo que falta.
+#   · misma pieza en otra version -> ::error::: "la misma pieza" incluye la
+#     version, o dev verificaria con un codigo distinto del que produccion
+#     ejecuta.
+#   · job de produccion que usa piezas y no declara sus vias sin tramo de dev ->
+#     ::error::. Una via que no esta declarada es indistinguible de un invariante
+#     que nunca se cumplio.
+#   · via con un nombre que el marco no reconoce -> ::error::. El vocabulario es
+#     CERRADO: una via nueva se declara ANTES de existir, y eso es un change de
+#     OpenSpec en el marco.
+#   · via valida -> ::notice:: en CADA corrida, con su control compensatorio. Una
+#     excepcion aplicada en silencio es un fail-open silencioso.
+#   · mecanica copiada que ya existe como pieza referenciada -> ::warning::, y
+#     NUNCA rojo: la adopcion es trabajo deliberado por compuerta, y un check que
+#     ponga rojo a un repo que no modifico una linea rompe repos ajenos.
+#   · definicion que no se pudo leer con confianza -> ::error::. Lo que no se
+#     puede verificar es rojo, nunca exito mudo.
+#
+# COMO DECLARA UN CONSUMIDOR SUS VIAS SIN TRAMO DE DEV
+#
+#   deploy-api-prod:
+#     environment: production
+#     # projects:sin-tramo-de-dev via=dispatch-de-emergencia
+#     # projects:sin-tramo-de-dev via=reuso-de-verificacion-de-dev
+#
+# Va como COMENTARIO y no como clave del job porque GitHub rechaza claves
+# desconocidas dentro de un job, y actionlint tambien. Es la misma convencion de
+# marca que ya usa la constitucion (projects:regla id=...), sin dialecto nuevo.
+#
+# Vocabulario cerrado: rollback-a-artefacto-publicado, dispatch-de-emergencia,
+# reuso-de-verificacion-de-dev y ninguna.
+#
+# LIMITES DECLARADOS (esto LEE la definicion de pipeline, no ejecuta ni observa
+# ningun run)
+#   · El invariante es estatico y sus agujeros son dinamicos. El verificador NO
+#     clasifica caminos de ejecucion: no lee las expresiones "if" ni deduce cual
+#     disparo en un run concreto. Exige que la topologia DECLARE sus vias. Leerlo
+#     por heuristica sobre las condiciones lo volveria fail-open silencioso en
+#     cuanto alguien reescriba una.
+#   · El tramo de produccion se reconoce por "environment" como clave directa del
+#     job, que es la propiedad que el marco ya exige de todo job de produccion.
+#     Un job de produccion sin "environment" queda leido como tramo de dev, y eso
+#     lo cubre el endurecimiento del verificador de topologia, no esta pieza.
+#   · Una promocion PARTIDA EN DOS ARCHIVOS se evalua por archivo, asi que la
+#     pieza de produccion se lee como "sin tramo de dev" y sale ROJO. Es el lado
+#     conservador a proposito: habilitar esa forma es una via nueva y se declara
+#     antes de existir.
+#   · No se lee YAML en estilo flujo, ni indentacion con tabs, ni anclas o alias.
+#     Las tres son rojo por ilegible, no verde optimista.
+#   · Que el gemelo de dev EXISTA en la definicion no prueba que haya corrido en
+#     ese run: eso lo garantiza la topologia (los "needs" y los ambientes), y de
+#     ahi que la via "ninguna" se comprueba contra el grafo de dependencias.
+#   · El aviso de mecanica copiada nace SIN entradas: hoy el marco no publica
+#     todavia ninguna compuerta de entrega que nombrar, y un aviso que nombra una
+#     pieza inexistente es peor que no avisar.
+# ---------------------------------------------------------------------------
+
+inputs:
+  marco:
+    description: >-
+      Identidad `<org>/<repo>` del marco cuyas piezas se vigilan. Se puede cambiar
+      para un fork; el default es el repositorio que publica estas actions.
+    required: false
+    default: im-diego-ec/Projects
+  workflows:
+    description: Directorio de definiciones de pipeline, relativo a la raíz del checkout.
+    required: false
+    default: .github/workflows
+  raiz:
+    description: Raíz del repo consumidor, relativa al working directory del job.
+    required: false
+    default: "."
+  instalar-node:
+    description: >-
+      "true" para instalar Node con actions/setup-node. Ponlo en "false" si el job
+      ya hizo su propio setup-node y no querés pagarlo dos veces.
+    required: false
+    default: "false"
+  version-node:
+    description: Versión de Node a instalar cuando instalar-node es "true".
+    required: false
+    default: "22"
+
+runs:
+  using: composite
+  steps:
+    # El check es un script sin dependencias: alcanza con un Node moderno, y los
+    # runners hospedados por GitHub ya lo traen. Por eso el default de
+    # instalar-node es "false" y no "true": pagar un setup-node que no hace falta
+    # en cada job es costo por costumbre.
+    - name: Node para el invariante
+      if: inputs.instalar-node == 'true'
+      uses: actions/setup-node@v7
+      with:
+        node-version: ${{ inputs.version-node }}
+
+    - name: Ninguna pieza del marco alcanza produccion sin haber corrido en dev
+      shell: bash
+      env:
+        DAP_MARCO: ${{ inputs.marco }}
+        DAP_WORKFLOWS: ${{ inputs.workflows }}
+        DAP_RAIZ: ${{ inputs.raiz }}
+      # GITHUB_ACTION_PATH apunta a la copia de ESTA action (el marco), no al repo
+      # del consumidor: por eso el script viaja con la action y ningun proyecto
+      # vendora una copia que se pueda quedar vieja. Mismo transporte que
+      # guardrail-deltas, y por la misma razon.
+      run: |
+        set -euo pipefail
+
+        if ! command -v node > /dev/null 2>&1; then
+          echo "::error::no hay 'node' en el PATH y sin el no se puede leer la definicion de pipeline. Arreglo: pone instalar-node en 'true', o agrega 'uses: actions/setup-node@v7' a este job antes de este paso"
+          exit 1
+        fi
+
+        node "${GITHUB_ACTION_PATH}/dev-antes-que-prod.mjs"

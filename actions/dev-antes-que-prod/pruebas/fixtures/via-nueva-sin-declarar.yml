@@ -1,0 +1,29 @@
+# CASO 6: una vía que esquiva el invariante y NO se declara: ROJO.
+#
+# El job de producción ejecuta piezas del marco y no dice por qué vías puede
+# alcanzar producción sin el tramo de dev. Acá el `if:` habilita el disparo
+# manual sobre la rama de integración, que es exactamente una de las tres vías,
+# pero el verificador NO lo deduce de la expresión: leerlo por heurística sería
+# fail-open en cuanto alguien reescriba la condición. Sin declaración, es rojo.
+name: Promocion
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  deploy-dev:
+    if: ${{ github.ref != 'refs/heads/main' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Tarea de una sola vez contra dev
+        uses: im-diego-ec/Projects/actions/compuerta-de-ejemplo@v1
+
+  deploy-prod:
+    needs: [deploy-dev]
+    if: ${{ !cancelled() && (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main') }}
+    environment: production
+    runs-on: ubuntu-latest
+    steps:
+      - name: Tarea de una sola vez contra produccion
+        uses: im-diego-ec/Projects/actions/compuerta-de-ejemplo@v1
