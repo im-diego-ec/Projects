@@ -286,6 +286,14 @@ jobs:
       # sobra sobre su piso. El piso del total es la OTRA compuerta y vive en
       # la configuracion de cobertura de cada paquete.
       #
+      # Y el piso es TRANSICION, no destino: un paquete por debajo del minimo
+      # del marco declara en su manifiesto el motivo y la FECHA en la que
+      # llega, y el dia que esa fecha vence la comparacion pasa a ser contra
+      # el minimo. Sin plazo escrito, el piso termina siendo el minimo de
+      # hecho: paso de verdad, medido en verde a 70,69% de funciones contra un
+      # minimo declarado de 80. Ver el requirement de cobertura del spec
+      # calidad-codigo.
+      #
       # No mide nada en un push a main —ahi no hay rango— y lo dice en vez de
       # simular un 100%. Y si no encuentra reportes habiendo lineas
       # agregadas, es ROJO: "sin datos" no es "todo cubierto".

@@ -110,6 +110,23 @@ piso impide que la ganancia se pierda.
       piso de un paquete que ya supera el mínimo —de 80,9 a 80— perdiendo
       justo la protección que el bloque agrega. El mínimo es el suelo del
       contrato; el piso es la ganancia acumulada, y nunca es menor.
+      **Segunda corrección (2026-08-20):** la fórmula así escrita solo describe
+      al paquete que YA llegó. Mientras un paquete no llega, su piso es el total
+      medido y nada más, y esa era la puerta que el spec dejaba abierta. La
+      fórmula completa quedó en el spec: el piso es el total conseguido, y desde
+      el día en que el paquete alcanza el mínimo pasa a ser el mayor entre el
+      mínimo y ese total.
+
+**Resultado medido del bloque 4, y lo que quedó abierto (2026-08-20).** El bloque
+llevó a `web` de 30,8% a 80,99% en líneas y sentencias, y `api` quedó en 86,26%.
+Pero la puesta al día NO llegó al 80 en todas las métricas del paquete web: la
+auditoría de cierre de v1 midió `functions` en **70,69%** con `EXIT = 0`, 9,4
+puntos por debajo del mínimo, porque el umbral del paquete se fijó en el número
+medido (`functions: 70.6`) y el spec permitía que eso pasara. El contrato ya no lo
+permite: un paquete por debajo del mínimo sin fecha declarada es rojo (design
+D5c). Lo que falta, y vive en un PR del consumidor y no acá, es subir `functions`
+a 80 con pruebas contra scenarios de los specs vivos —jamás aflojando el umbral ni
+excluyendo archivos para llegar— o declarar la deuda con su motivo y su fecha.
 
 ## 5. Cierre
 
