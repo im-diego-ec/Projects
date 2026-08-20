@@ -1026,9 +1026,17 @@ jobs:
           # que si trae un ejecutor, y eso es un verde que afirma haber mirado.
           # Por eso acepta cualquier gestor + banderas + subcomando (exec, dlx,
           # x) y deja que el lector descarte los que fallan cerrado.
+          #
+          # "banderas" incluye las que se llevan su VALOR en el argumento
+          # SIGUIENTE ("pnpm -C . dlx"): el grupo repetido acepta una bandera y,
+          # opcional, un token que no arranca con guion. Sin esa parte opcional
+          # el prefiltro quedaba mas angosto que el lector nuevo y el paso volvia
+          # a salir exit 0 con "no hay nada que pinar" — el mismo verde que la
+          # auditoria del 2026-08-20 midio y que este banco fija por codigo de
+          # salida.
           CANDIDATOS="${RUNNER_TEMP}/ejecutores.txt"
           set +e
-          git -c core.quotePath=false grep -I -n -E '(npx|bunx|(npm|pnpm|yarn|bun)([[:space:]]+-+[^[:space:]]+)*[[:space:]]+(exec|dlx|x))' -- ':!*.md' > "${CANDIDATOS}"
+          git -c core.quotePath=false grep -I -n -E '(npx|bunx|(npm|pnpm|yarn|bun)([[:space:]]+-+[^[:space:]]+([[:space:]]+[^-[:space:]][^[:space:]]*)?)*[[:space:]]+(exec|dlx|x))' -- ':!*.md' > "${CANDIDATOS}"
           RC=$?
           set -e
           if [ "${RC}" -gt 1 ]; then
@@ -1062,6 +1070,43 @@ jobs:
             // ejecutores que fallan cerrado, asi que "pnpm exec" y "yarn exec"
             // siguen fuera del alfabeto con banderas y sin ellas.
             //
+            // Y la bandera puede llevarse su VALOR en el argumento SIGUIENTE.
+            // La primera vuelta de este arreglo solo toleraba las banderas que
+            // traen el valor pegado ("--loglevel=error") o ninguno
+            // ("--silent"), asi que la mitad de la clase seguia siendo punto
+            // ciego: medido el 2026-08-20, "pnpm -C . dlx openspec update",
+            // "npm --prefix ./x exec openspec" y "yarn --cwd . dlx openspec
+            // update" salian los tres exit 0, y no por el lector sino ya por el
+            // prefiltro, imprimiendo "no hay nada que pinar".
+            //
+            // QUE BANDERAS SON. La lista sale de la DOCUMENTACION de cada
+            // gestor y de su propio --help, no de la intuicion, y son dos
+            // alfabetos distintos:
+            //   · npm resuelve CUALQUIER clave de config como "--clave <valor>"
+            //     antes del subcomando (--prefix / -C, --loglevel, --registry,
+            //     --workspace / -w, --userconfig, --cache). Verificado en esta
+            //     maquina con npm 11: "npm --prefix . exec --help",
+            //     "npm --loglevel error --registry <url> x --help" y
+            //     "npm -C . -w foo exec --help" devuelven exit 0.
+            //   · pnpm, yarn y bun tienen un conjunto acotado de globales con
+            //     valor separado: pnpm -C / --dir, --filter, --loglevel,
+            //     --reporter, --store-dir, --workspace-concurrency (verificado
+            //     con pnpm 11: los seis dan exit 0 delante de "dlx --help");
+            //     yarn --cwd; bun --cwd y -c / --config. yarn y bun NO estan
+            //     instalados aca, asi que de esos dos la forma viene de la doc y
+            //     lo medido es el check, no el binario.
+            //
+            // POR ESO EL ALFABETO SE ESCRIBE GENERAL Y NO COMO LISTA CERRADA:
+            // una bandera y, opcional, un token que no arranca con guion. Con
+            // lista cerrada el defecto es de CLASE y vuelve con la bandera
+            // siguiente —npm admite claves de config arbitrarias, o sea que la
+            // lista no se puede terminar— y volveria como FALSO VERDE mudo.
+            // Costo asumido, fijado en el banco como caso "limite": sin lista no
+            // hay forma de saber que "--silent" es booleana, asi que
+            // "npm --silent run x algo" se lee como bandera + valor + ejecutor y
+            // cae del lado del ejecutor. Es un falso ROJO legible en un check de
+            // seguridad, que es el lado conservador; el falso verde no lo es.
+            //
             // VA EN UN SOLO LITERAL, largo y todo, y no armado por pedazos en un
             // array de strings. El motivo es el mismo que el de la regla de los
             // comentarios: este bloque NOMBRA los ejecutores para definirlos, y
@@ -1072,7 +1117,7 @@ jobs:
             // literal cada nombre queda seguido de "|" o de "(", que no son
             // separadores de invocacion, asi que el check es inmune a su propia
             // definicion por construccion y no por suerte.
-            const EJECUTOR = /(^|[^A-Za-z0-9_.\/@-])(npx|bunx|npm(?:[ \t]+-{1,2}[A-Za-z][^ \t]*)*[ \t]+(?:exec|x)|bun(?:[ \t]+-{1,2}[A-Za-z][^ \t]*)*[ \t]+x|pnpm(?:[ \t]+-{1,2}[A-Za-z][^ \t]*)*[ \t]+dlx|yarn(?:[ \t]+-{1,2}[A-Za-z][^ \t]*)*[ \t]+dlx)(?=[ \t"\x27,]|$)/g;
+            const EJECUTOR = /(^|[^A-Za-z0-9_.\/@-])(npx|bunx|npm(?:[ \t]+-{1,2}[A-Za-z][^ \t]*(?:[ \t]+[^-\s][^ \t]*)?)*[ \t]+(?:exec|x)|bun(?:[ \t]+-{1,2}[A-Za-z][^ \t]*(?:[ \t]+[^-\s][^ \t]*)?)*[ \t]+x|pnpm(?:[ \t]+-{1,2}[A-Za-z][^ \t]*(?:[ \t]+[^-\s][^ \t]*)?)*[ \t]+dlx|yarn(?:[ \t]+-{1,2}[A-Za-z][^ \t]*(?:[ \t]+[^-\s][^ \t]*)?)*[ \t]+dlx)(?=[ \t"\x27,]|$)/g;
 
             // El allowlist de un agente escribe "Bash(<comando>:*)" para decir
             // "con cualquier argumento". Ese ":*" no puede ser parte de un

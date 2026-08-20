@@ -41,7 +41,9 @@ mueve sobre un cambio incompatible.
   Se pone rojo si un archivo rastreado del repo corre un paquete por un ejecutor
   que **descarga** (`npx`, `bunx`, `npm exec`, `npm x`, `bun x`, `pnpm dlx`,
   `yarn dlx`, cada uno con o sin banderas globales entre el gestor y su
-  subcomando) sin clavarlo a una versión exacta.
+  subcomando, incluidas las que se llevan su **valor en el argumento siguiente**
+  como `pnpm -C . dlx` o `npm --prefix ./x exec`) sin clavarlo a una versión
+  exacta.
 
   El agujero que cierra es concreto, no teórico. El marco documenta desde su
   primera versión que el paquete del CLI es `@fission-ai/openspec` y que
@@ -293,6 +295,71 @@ anterior y verde con el arreglo).
   que ser rojo, y los dos casos están en el banco para que ese parche no pase. El
   aviso interpolaba además `${DIRS[*]}`, un array que un cambio anterior había
   borrado: salía mutilado y sin nombrar los archivos de los que hablaba.
+
+### Corregido — la mitad de la clase que el arreglo anterior dejó abierta
+
+La auditoría midió que el check de ejecutores toleraba banderas globales entre el
+gestor y su subcomando. El arreglo anterior lo cumplió **a medias**: toleraba las
+banderas sin valor (`--silent`) y las que lo traen pegado (`--loglevel=error`), y
+seguía ciego a las que se llevan el valor en el **argumento siguiente**. Medido el
+2026-08-20, un archivo y una línea por caso: `pnpm -C . dlx openspec update`,
+`npm --prefix ./x exec openspec` y `yarn --cwd . dlx openspec update` salían los
+tres **exit 0**, y no por el lector sino ya por el prefiltro, imprimiendo «no hay
+nada que pinar» — el mismo verde que afirma haber mirado que la auditoría vino a
+cazar. **Un consumidor no tiene que hacer nada**: el check queda más estricto, no
+más suave.
+
+- **Se tolera la bandera con valor separado, en los dos alfabetos.** La forma se
+  escribe **general** —una bandera y, opcional, un token que no arranca con
+  guion— y no como lista cerrada de banderas, porque el defecto es de **clase**:
+  npm resuelve cualquier clave de config como `--clave <valor>` antes del
+  subcomando, así que una lista no se puede terminar y la bandera siguiente
+  reabriría el agujero como falso verde mudo. Las banderas que originaron la
+  regla salen de la documentación de cada gestor y de su `--help`, no de la
+  intuición, y están escritas en el propio paso: npm (`--prefix` / `-C`,
+  `--loglevel`, `--registry`, `--workspace` / `-w`), pnpm (`-C` / `--dir`,
+  `--filter`, `--loglevel`, `--reporter`, `--store-dir`,
+  `--workspace-concurrency`), yarn (`--cwd`) y bun (`--cwd`, `-c` / `--config`).
+  El **prefiltro** de `git grep` se ensancha igual: dejarlo atrás lo volvía más
+  angosto que el lector, que es la forma de volver al exit 0 con «no hay nada que
+  pinar».
+
+- **`pnpm exec` y `yarn exec` siguen fuera del alfabeto**, con banderas y con
+  valores: fallan cerrado y son la salida que ofrece el mensaje de error. Hay caso
+  de control por cada una.
+
+- **Costo asumido y fijado en el banco como caso `limite`**: sin lista cerrada no
+  hay forma de saber que `--silent` es booleana, así que `npm --silent run x algo`
+  se lee como bandera + valor + ejecutor y cae del lado del ejecutor. Es un falso
+  **rojo** legible en un check de seguridad, que es el lado conservador; el falso
+  verde no lo es.
+
+### Corregido — dos «no medido» declarados, ahora fijados por su forma
+
+`gitleaks` no está en la máquina donde corre el banco y el banco **no baja
+binarios**, así que dos propiedades quedaban declaradas sin medir: que la
+herramienta acepte `--log-opts` y le reenvíe a `git` el
+`--diff-merges=first-parent`, y que acepte `[extend] useDefault = true`. **Siguen
+sin medir contra el binario y el nombre de cada test lo dice.** Lo que se cierra
+es la **forma** del argumento, que es donde vive el modo de fallar barato: se
+rompe en silencio, el detector arranca igual y mira menos de lo que dice.
+
+- El valor de `--log-opts` tiene que viajar como **un solo** argumento entre
+  comillas (el detector lo parte por espacios él mismo; sin comillas lo parte
+  antes el shell y el rango se le va como posicional), sin tabuladores, sin
+  espacios dobles —que le dan un token vacío— y con `--diff-merges=first-parent`
+  escrito con `=` en un token propio. Que esa lista de tokens sea una línea de
+  `git log` válida se mide con git, por código de salida.
+
+- La config del marco tiene que ser **exactamente** `[extend]` +
+  `useDefault = true`: la clave es camelCase y el booleano va desnudo. Cualquier
+  otra grafía la ignora el detector en silencio, se queda sin reglas por defecto,
+  y un barrido sin reglas sale exit 0 sobre cualquier repo — indistinguible de un
+  repo limpio.
+
+- Los dos tests **miden el binario si aparece en el `PATH`** y anuncian con
+  `t.diagnostic` cuando no está, en vez de saltar callados. Un salto silencioso
+  sería el fail-open del 2026-08-05 otra vez.
 
 ### Cambiado
 
