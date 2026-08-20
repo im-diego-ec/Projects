@@ -270,8 +270,9 @@ Texto propuesto para el bullet (el implementador lo ajusta de forma, no de
 fondo):
 
 > - **Trae una base, y la salida está declarada.** El área fija su base
->   tecnológica —cómputo, persistencia, frontend, backend, identidad, IaC,
->   pipeline, gestor de paquetes y pruebas— y Projects la publica y la entrega ya
+>   tecnológica —cómputo, persistencia, frontend, backend, identidad, validación
+>   de input externo, IaC, pipeline, gestor de paquetes y pruebas— y Projects la
+>   publica y la entrega ya
 >   escrita: es la **primera opción** de todo proyecto, y apartarse de cualquier
 >   capa se **pregunta antes de implementar**. Un proyecto con una necesidad
 >   legítimamente distinta no queda afuera: declara el desvío de esa capa con su

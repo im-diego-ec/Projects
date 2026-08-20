@@ -68,9 +68,10 @@ no escrita, que es exactamente el estado que hoy declara en
 
 - [ ] 1.1 Declarar la base en el manifiesto del canónico
       (`actions/constitucion/canonico/manifiesto.json`) como bloque capa → pieza,
-      con las once capas: cómputo, persistencia, frontend, backend, identidad,
-      validación de input externo, IaC, pipeline, gestor de paquetes, pruebas
-      unitarias, pruebas E2E. Valores de la decisión del 2026-08-18: Express
+      con las diez capas del requirement, y la de pruebas desdoblada en dos
+      porque son dos herramientas distintas: cómputo, persistencia, frontend,
+      backend, identidad, validación de input externo, IaC, pipeline, gestor de
+      paquetes, pruebas unitarias, pruebas E2E. Valores de la decisión del 2026-08-18: Express
       sobre ECS; base relacional administrada (PostgreSQL); React + Vite +
       TypeScript; Node + Express; Clerk; Zod; AWS + Terraform; GitHub Actions;
       pnpm con workspaces; Vitest; Playwright. Evidencia: el diff del
