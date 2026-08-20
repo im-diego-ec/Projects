@@ -259,6 +259,97 @@ mueve sobre un cambio incompatible.
   por el solo hecho de usar el perfil de prod contradiría a `AGENTS.md`, que
   autoriza expresamente **leer** producción por CLI.
 
+### Corregido — la constitución del marco tenía dos verificadores y ninguno verificaba
+
+Una auditoría adversarial del 2026-08-20 puso a prueba por **código de salida** las
+afirmaciones de este change y refutó siete. Cinco tenían una sola causa estructural:
+la misma propiedad estaba verificada en **dos** lugares —`actions/constitucion` y un
+paso inline del `marco-ci.yml` que heredan todos los consumidores— y las dos verdades
+ya discrepaban en esquema, en severidad y en formato de sello. En una doble
+contabilidad la declaración siempre pierde contra el check, así que el arreglo no fue
+conciliar las copias: fue **dejar una**.
+
+- **El paso inline «Constitucion del marco al dia» se BORRÓ**, y con él su copia del
+  calendario del canónico. Era **verde permanente** en el único repo que venía a
+  proteger: con el esquema de `superficies` que el scaffold emite hoy
+  (`["claude-code","cursor"]`) salía **exit 0 mudo** —cero `::error::`, cero
+  `::warning::`— sobre un repo sin `.projects/` y sin ningún artefacto, y también con la
+  versión ya exigible. Y cuando el artefacto **sí** estaba lo rechazaba: exigía un
+  `sha` de 64 hex del cuerpo y la action emite 12 hex del canónico, así que desde el
+  2026-09-16 iba a ser exit 1 sobre artefactos **correctos**, con un mensaje que
+  mandaba a correr el escritor que acababa de generarlos. En cascada, la detección de
+  desvíos muertos quedaba apagada: la misma condición que en la action da exit 1 con
+  el motivo escrito, ahí entraba en `avisos` y salía exit 0 en cualquier fecha.
+  La pieza que sobrevive es la que compara contra el **re-render** del canónico:
+  recomputar un sello es un `git commit` y cambiar el canónico no.
+- **`plantilla/.github/workflows/ci.yml` gana el job `constitucion`**, que corre
+  `actions/constitucion@v1` en modo verificar y cuelga de `ci-ok`. Hasta ahora la
+  action **no se invocaba en ningún carril de verificación de ningún consumidor**: su
+  única invocación era el workflow de actualización, en modo escribir, que declara no
+  verificar nada y delegaba en el paso inline apagado. Circularidad completa. Corre en
+  los **dos** carriles, sin `if` de solo-docs: la constitución es documentación, y un
+  PR de solo docs es justo el que puede editarla a mano.
+- **Check nuevo en `higiene`: *Constitucion del marco cableada*.** Una action que
+  nadie invoca no verifica nada, y ese era el estado real. Asimétrico y sin calendario
+  propio: un repo que no versiona `.projects-valores.json` recibe **aviso** (todavía no
+  adoptó, y adoptar es un PR de migración que este check no puede exigir de un día
+  para otro); un repo que **sí** lo versiona y no cablea la verificación recibe
+  **rojo**, porque tiene la maquinaria y se saltea el check —y se arregla en el mismo
+  PR que adopta. Skip por propiedad para el repo que distribuye el scaffold.
+- **Un valor cuyo TEXTO es el propio marcador ya no cuenta como valor.** Copiando
+  `plantilla/.projects-valores.json` tal cual —que trae `"PROYECTO": "{{PROYECTO}}"` y 14
+  entradas iguales, o sea el estado normal de un proyecto recién scaffoldeado— el modo
+  escribir salía **exit 0** y el artefacto quedaba con 27 líneas de dobles llaves, el
+  título incluido, mientras el modo verificar afirmaba «está al día en 2
+  superficie(s)». El rojo llegaba, pero de **otro** check: la propiedad estaba cubierta
+  por casualidad de vecindad y no por el guardrail que la declara. Ahora es rojo con su
+  nombre, más un cinturón que vuelve a mirar el cuerpo antes de sellarlo.
+- **La action reconoce las dos clases de desvío** (`regla` y `permiso`). Solo conocía
+  la primera, así que un desvío de permiso bien formado salía `desvio-sin-regla`:
+  cablearla habría puesto roja a la action sobre un archivo correcto, y ese falso rojo
+  era el último obstáculo para que su camino rojo del desvío muerto fuera alcanzable.
+  Nuevos: `desvio-sin-objeto` (no nombra qué anula) y `desvio-ambiguo` (nombra las dos
+  cosas, y entonces el motivo escrito deja de decir de qué es).
+- **El piso recomendado de permisos se declara y se mide en UNA sola pieza.** El
+  manifiesto del canónico lo declaraba y el paso de permisos lo verificaba con una
+  lista literal escrita a mano, sin derivación: `grep -rn 'piso_permisos' .github/` no
+  daba una coincidencia. Las dos copias ya habían divergido en las **dos** direcciones
+  —el manifiesto declaraba `Bash(pnpm build)` que el paso no miraba, el paso exigía
+  `openspec` que el manifiesto no declaraba— y mutar el manifiesto no movía el
+  veredicto del paso ni un milímetro: seguía midiendo su propio arreglo. Ahora cada
+  ítem declara la `entrada` que el marco recomienda y la propiedad que `cubre` (con el
+  invariante de que `cubre` esté **dentro** de `entrada`, para que las dos mitades de
+  la misma declaración no deriven), y lo mide quien lo transporta.
+- **Fail-open silencioso de `PERFIL_PROD`, ahora ruidoso.** El `::warning::` cubría
+  solo «existe y no parsea»; si `.projects-valores.json` no estaba, o no declaraba el
+  perfil, la detección se apagaba **en silencio** y el paso informaba «0 corre(n) con
+  el perfil de produccion» sobre un allowlist que contenía a la vista
+  `Bash(AWS_PROFILE=… terraform plan *)`. Un conteo falso reportado como hecho es
+  indistinguible de que la función no exista: es el incidente del 2026-08-05. Ahora
+  avisa y el propio resumen dice que ese 0 significa «no se buscó».
+- **`.projects-valores.json` ausente entra por la ventana de gracia en modo verificar.**
+  La action abortaba con exit 1 **antes** de ramificar por modo, así que el repo que
+  todavía no adoptó recibía un rojo seco el primer día —un endurecimiento estrenado
+  sin modo aviso, contra la regla del propio `AGENTS.md`— y el escritor que debía
+  depositar el artefacto por primera vez también fallaba. En modo escribir sigue
+  siendo rojo: sin valores no hay con qué renderizar.
+- **El canónico ya no anuncia un hueco que el marco cerró.** La regla
+  `openspec-validar-tras-editar` decía que el guardrail de deltas «no avisa si el
+  título de un requirement del `MODIFIED` no existe en el spec vivo». Medido: avisa y
+  sale 1, con las dos salidas legítimas en el mensaje, y el arreglo ya viaja por `@v1`.
+  La otra mitad (un `MODIFIED` que pierde escenarios) también está cubierta. Ese texto
+  viaja en el artefacto que **todos** los consumidores cargan en **cada** sesión y
+  costaba doble: mandaba a revisar a mano algo que el CI caza, y enseñaba que las
+  advertencias del canónico pueden estar viejas —justo el crédito que este change
+  existe para construir. En su lugar quedan los límites que **sí** están medidos: el
+  guardrail solo dice la verdad **antes** del archive, y el archive cuenta operaciones
+  **declaradas** y no cambios efectivos.
+- **Banco nuevo: `actions/constitucion/pruebas/regresiones-auditoria.test.mjs`** (25
+  casos). Ninguno pasaba contra el código anterior: se corrieron en rojo primero.
+  Cuatro no ejercitan una función sino que comprueban que la **segunda contabilidad no
+  vuelva** —ni el calendario, ni el piso, ni un segundo validador del sello en ningún
+  workflow del marco, y el cableado de la action presente en el scaffold.
+
 ### Cambiado
 
 - **`plantilla/AGENTS.md`** suma la regla a las fronteras ✅, con las dos formas
@@ -331,22 +422,50 @@ lo que esto viene a evitar. Los repos ya creados suman por su cuenta la sección
 nueva de `plantilla/AGENTS.md`, o al menos la regla: **un aviso con acción
 requerida se convierte en issue el mismo día**.
 
-**De la constitución entregada hay una acción obligatoria de cinco pasos, y el
-paso 1 y el paso 3 no son opcionales.** En el repo del proyecto: (1) escribir
-`.projects-valores.json` con los valores del proyecto —sin él no hay render posible y
-un artefacto con dobles llaves sin resolver es peor que ninguno—; (2) generar el
-artefacto por cada superficie declarada; (3) dejar el import y **borrar el texto
-duplicado** del `AGENTS.md` propio —completar sin borrar deja al agente una
+**De la constitución entregada hay una acción obligatoria de seis pasos, y los
+pasos 1, 2 y 4 no son opcionales.** En el repo del proyecto: (1) escribir
+`.projects-valores.json` con los valores del proyecto —sin él no hay render posible, y
+un valor que quedó siendo el propio marcador `{{…}}` **no cuenta como valor**—;
+(2) **cablear el job `constitucion`** en su `ci.yml`, invocando
+`actions/constitucion@v1` en modo verificar y colgándolo de `ci-ok`: una action que
+nadie invoca no verifica nada, y el marco ahora comprueba estáticamente que esté; (3)
+generar el artefacto por cada superficie declarada; (4) dejar el import y **borrar el
+texto duplicado** del `AGENTS.md` propio —completar sin borrar deja al agente una
 prohibición y una autorización sobre lo mismo, y la que queda en el archivo del
-proyecto es la permisiva—; (4) excluir `.projects/` y el artefacto de Cursor del
-formateador, igual que ya están fuera los artefactos del CLI de OpenSpec; (5)
+proyecto es la permisiva—; (5) excluir `.projects/` y el artefacto de Cursor del
+formateador, igual que ya están fuera los artefactos del CLI de OpenSpec; (6)
 declarar como desvío, con motivo y aprobador, toda diferencia real que el proyecto
 quiera conservar.
+
+Los pasos 1 y 2 van **en el mismo PR**, y el orden dentro de él no importa pero la
+compañía sí: el check de cableado da **rojo** al repo que versiona
+`.projects-valores.json` sin invocar la verificación —tiene la maquinaria y se saltea el
+check—, y **aviso** al que todavía no adoptó ninguna de las dos cosas. Adoptar a
+medias es el único estado que enrojece, y es el que se evita haciendo los dos pasos
+juntos.
+
+**Un artefacto ya generado con el texto anterior de la regla
+`openspec-validar-tras-editar` queda divergente y hay que reemitirlo.** Es el
+mecanismo funcionando, no un efecto colateral: el texto del canónico cambió, así que
+el artefacto de una versión anterior ya no coincide con el re-render. Medido sobre la
+rama de migración de `un-proyecto-anterior`: exit 1 con `artefacto-divergente` en sus dos
+superficies, y el diff es **exactamente** esa regla y nada más (14 líneas nuevas, 6
+borradas, más el `sha` de la cabecera, que identifica al canónico). El arreglo es
+correr el modo escribir —lo hace solo el PR semanal de actualización— o bajar el
+artefacto al día que el propio job sube como `constitucion-al-dia`.
 
 **El estreno va en MINOR con la ventana de gracia activa: amarillo para todos
 desde el día uno, rojo para nadie.** Medido sobre los dos repos reales antes de
 publicar: los dos salen `::warning::` con la fecha en que pasa a fallar, ninguno
-sale rojo. `v1` se mueve **después** de que los PRs de migración estén mergeados y
+sale rojo. Sigue valiendo con el check de cableado nuevo, y las dos mitades están
+medidas contra los árboles reales y no estimadas: en el `main` de
+`un-proyecto-anterior` no hay un solo archivo `.projects*`
+(`git ls-tree -r --name-only origin/main | grep '^\.projects'` → sin coincidencias), así
+que cae en la rama del **aviso**; y su rama de migración, que sí versiona
+`.projects-valores.json`, ya declara el job `constitucion` con `modo: verificar` y lo
+cuelga del `needs` de `ci-ok`, así que cae en la rama **verde**. El estado que
+enrojece —versionar los valores sin cablear la verificación— no existe hoy en ningún
+árbol. `v1` se mueve **después** de que los PRs de migración estén mergeados y
 verificados, no antes.
 
 **Lo que este bloque NO trae resuelto, y hay que decidirlo a mano antes de mover
