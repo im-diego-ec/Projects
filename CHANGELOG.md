@@ -207,6 +207,58 @@ mueve sobre un cambio incompatible.
   todavía está en el árbol. El resumen de la corrida lo dice con todas las letras:
   cero hallazgos **no** prueba que no haya secretos.
 
+- **`actions/constitucion` — la porción del marco de la constitución deja de
+  copiarse y pasa a entregarse.** El texto común (OpenSpec, git y despliegue,
+  fronteras, seguridad y observabilidad, infra/AWS/secretos, agentes y modelos,
+  GitHub) vive **una vez** en `actions/constitucion/canonico/` y viaja adentro de
+  la action, por el mismo transporte que `guardrail-deltas` y por la misma razón:
+  el `GITHUB_TOKEN` de un consumidor no lee otro repositorio. El modo `escribir`
+  renderiza un artefacto por **superficie de agente** declarada contra los valores
+  del proyecto (`.projects-valores.json`); el modo `verificar` compara lo presente
+  contra el re-render y deja el artefacto al día en disco para `upload-artifact`.
+  No commitea, no pushea y no abre PRs.
+
+  El agujero que cierra está medido, no supuesto: la copia del marco en un
+  consumidor había perdido **114 líneas** de 355, se le habían caído reglas con
+  check vivo detrás, y una regla de seguridad estaba **invertida** — decía lo
+  contrario de lo que el marco manda, y ningún check podía verla porque nadie
+  compara prosa copiada.
+
+  Tres cosas que hay que leer antes de aprobar, porque no son detalles:
+  - **La ventana de gracia es de fecha, no de release.** El manifiesto declara
+    `publicada` y `exigible_desde`, y la action rechaza un manifiesto con menos de
+    **28 días** entre las dos (`urgente: true` es la puerta de atrás y sale por
+    `::warning::`, nunca muda). Artefacto ausente o atrasado = `::warning::` hasta
+    esa fecha y `::error::` desde ella. **Nunca `exit 0` mudo.**
+  - **El sello de la cabecera cubre el CANÓNICO, no el cuerpo renderizado.** Es
+    deliberado: si cubriera el cuerpo, el arreglo obvio para un rojo de "editado a
+    mano" sería recomputar el hash y volver a estampar, que es la debilidad por la
+    que se descartaron los bloques sellados. La autoridad sobre el cuerpo es el
+    re-render, y hay prueba de que resellar **no** tapa una edición.
+  - **Un desvío es una puerta, y se verifica que el motivo EXISTA, no que sea
+    sincero.** Cada desvío vivo se reimprime como `::notice::` en cada corrida y
+    queda impreso pegado a la regla que anula, dentro del artefacto que los
+    agentes cargan; uno cuya regla ya no existe es rojo por muerto, con el motivo
+    que tenía escrito. Nada limita cuántos declara un proyecto.
+
+  **Límite declarado, y no es una nota al pie:** esto cierra el hueco de
+  **distribución**, no el de comportamiento. Lo que el check compara son bytes en
+  un archivo. Que la regla esté, íntegra y al día, en la superficie que el agente
+  carga no dice nada sobre si la va a aplicar en el turno 40 de una sesión larga.
+
+- **Dos checks nuevos al final del job `higiene`**, sin una sola llamada a la API
+  (solo leen el árbol ya checkouteado; el permiso que exigen es `contents: read`,
+  que ya es el techo del job): *Constitución del marco al día* y *Permisos del
+  agente sin escritura*. El segundo se pone rojo si el allowlist de
+  `.claude/settings.json` autoriza una operación **mutante** sin desvío declarado
+  —por verbo, por método HTTP de escritura, por tool MCP cuyo nombre escribe, o
+  por comodín en la **posición del subcomando** (`terraform *` autoriza `apply`)—
+  y avisa, nunca falla, si falta un ítem del piso recomendado. Con el perfil de
+  producción el subcomando tiene que estar **clavado**: un comodín ahí es rojo, y
+  toda entrada con ese perfil sale como `::notice::` en cada corrida. Un rojo seco
+  por el solo hecho de usar el perfil de prod contradiría a `AGENTS.md`, que
+  autoriza expresamente **leer** producción por CLI.
+
 ### Cambiado
 
 - **`plantilla/AGENTS.md`** suma la regla a las fronteras ✅, con las dos formas
@@ -278,6 +330,35 @@ enterando como hasta hoy —cuando un check lo pone en rojo—, que es precisame
 lo que esto viene a evitar. Los repos ya creados suman por su cuenta la sección
 nueva de `plantilla/AGENTS.md`, o al menos la regla: **un aviso con acción
 requerida se convierte en issue el mismo día**.
+
+**De la constitución entregada hay una acción obligatoria de cinco pasos, y el
+paso 1 y el paso 3 no son opcionales.** En el repo del proyecto: (1) escribir
+`.projects-valores.json` con los valores del proyecto —sin él no hay render posible y
+un artefacto con dobles llaves sin resolver es peor que ninguno—; (2) generar el
+artefacto por cada superficie declarada; (3) dejar el import y **borrar el texto
+duplicado** del `AGENTS.md` propio —completar sin borrar deja al agente una
+prohibición y una autorización sobre lo mismo, y la que queda en el archivo del
+proyecto es la permisiva—; (4) excluir `.projects/` y el artefacto de Cursor del
+formateador, igual que ya están fuera los artefactos del CLI de OpenSpec; (5)
+declarar como desvío, con motivo y aprobador, toda diferencia real que el proyecto
+quiera conservar.
+
+**El estreno va en MINOR con la ventana de gracia activa: amarillo para todos
+desde el día uno, rojo para nadie.** Medido sobre los dos repos reales antes de
+publicar: los dos salen `::warning::` con la fecha en que pasa a fallar, ninguno
+sale rojo. `v1` se mueve **después** de que los PRs de migración estén mergeados y
+verificados, no antes.
+
+**Lo que este bloque NO trae resuelto, y hay que decidirlo a mano antes de mover
+`v1`:** el texto normativo de las tres reglas nuevas de gobernanza (escalar de
+modelo, configuración de repo u organización, e infra base fijada) se redactó a
+partir de decisiones conversacionales y no existe en ningún archivo aprobado —una
+de ellas **reemplaza** texto vigente que decía lo contrario—; el número de versión
+del manifiesto y sus dos fechas los fija quien corte el release; y hay un hueco
+conocido y fijado por prueba: subir a mano la versión de la cabecera a una que la
+copia del marco no conoce deja el cuerpo **sin comparar**, así que el aviso lo
+nombra y el cierre propuesto (rojo cuando la action se resolvió con el tag móvil)
+está escrito y sin implementar.
 
 Este mismo texto que estás leyendo es lo que el aviso va a enviar cuando esta
 versión se publique — la sección «Para consumidores» es la fuente, no un resumen
