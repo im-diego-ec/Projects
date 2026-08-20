@@ -665,13 +665,17 @@ export function fusionarRegistro(destino, origen) {
   // items solo puede crecer, asi que el maximo es el unico que sigue siendo una
   // cota valida. Los conteos de registros cortos y sin contador se SUMAN, porque
   // cada registro es una observacion distinta.
+  // Y se leen a la defensiva: un registro armado a mano que no traiga estos
+  // campos tiene que perder la verificacion, no tirar el proceso. Una compuerta
+  // que revienta no verifica nada.
   for (const { clave } of METRICAS_DE_COBERTURA) {
-    if (origen.declarado[clave] !== null) {
-      destino.declarado[clave] = Math.max(destino.declarado[clave] ?? 0, origen.declarado[clave]);
+    const declaradoDeOrigen = origen.declarado?.[clave] ?? null;
+    if (declaradoDeOrigen !== null) {
+      destino.declarado[clave] = Math.max(destino.declarado[clave] ?? 0, declaradoDeOrigen);
     }
-    destino.sinContador[clave] += origen.sinContador[clave];
-    destino.cortos[clave] += origen.cortos[clave];
-    const f = origen.faltante[clave];
+    destino.sinContador[clave] += origen.sinContador?.[clave] ?? 0;
+    destino.cortos[clave] += origen.cortos?.[clave] ?? 0;
+    const f = origen.faltante?.[clave] ?? null;
     if (f && (destino.faltante[clave] === null || f.falta > destino.faltante[clave].falta)) {
       destino.faltante[clave] = f;
     }
