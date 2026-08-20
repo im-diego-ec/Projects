@@ -191,6 +191,15 @@ Un buscar-y-reemplazar no los resuelve: son decisiones.
   actualizan acá también. Ojo con el nombre — `openspec` a secas en npm es un paquete ajeno
   (placeholder `0.0.0`), así que un patrón sin scope permitiría correr otra cosa.
 
+  Esto **ya no depende de que alguien se acuerde**: el check *Ejecutores de paquetes
+  pinados* del job `higiene` lee todos los archivos rastreados del repo (menos los `.md`,
+  que son prosa) y se pone rojo si un `npx`, `bunx`, `npm exec`, `pnpm dlx` o `yarn dlx`
+  corre un paquete sin versión exacta. Si el binario ya lo trae una dependencia declarada,
+  la salida correcta es `pnpm exec <comando>`: lee `node_modules` y falla si no está, en
+  vez de salir a buscar a npm un nombre que puede ser de otro. **Un repo que ignore
+  `.claude` entero en su `.gitignore` esconde de ese check justo este archivo** — por eso
+  el `.gitignore` del scaffold ignora `settings.local.json` y no el directorio.
+
 ---
 
 ## 4. Lo que el scaffold NO trae (y de dónde sale)

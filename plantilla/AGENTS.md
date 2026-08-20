@@ -23,7 +23,11 @@ miente desde el día 1.
    poner en cada uno, está en el README del scaffold de Projects).
 3. Confirmar los tres roles del encabezado de OpenSpec (PO y dos builders) y que
    `.github/CODEOWNERS` tenga los handles reales.
-4. Borrar esta sección y este párrafo. **Recién ahí** corre la verificación final:
+4. Pedir el acceso al canal donde Projects avisa cada versión que publica (sección
+   **Cuando el marco publica una versión**, más abajo). Este repo consume `@v1`, que es un
+   tag **móvil**: sin ese aviso, el proyecto se entera de un comportamiento nuevo del marco
+   el día que un check lo pone en rojo.
+5. Borrar esta sección y este párrafo. **Recién ahí** corre la verificación final:
    `grep -rnE "\{\{[A-Z0-9_]+\}\}" --exclude-dir=node_modules --exclude-dir=.git .` no debe
    devolver nada (esta sección es la única que menciona la doble llave a propósito; el
    patrón exige mayúsculas para no marcar las expresiones `${{ ... }}` de GitHub Actions).
@@ -145,6 +149,38 @@ suena la alarma" vive en `docs/runbooks/`.
 
 ---
 
+## Cuando el marco publica una versión
+
+Este repo consume Projects por `uses: {{ORG}}/Projects/...@v1`, y **`v1` es un tag móvil**: lo que
+Projects publique llega a este pipeline sin que nadie acá toque una línea. Ese es el valor de lo
+referenciado —una corrección del marco llega sola, sin abrir un PR— y también su riesgo: un
+check nuevo puede poner este repo en rojo **sin que nadie lo haya leído**. Pasó el
+2026-08-19, al mover `v1` la primera vez.
+
+Por eso el CHANGELOG de Projects no alcanza: es superficie de consulta, y nadie consulta a
+tiempo. **Projects avisa.** Al publicar una versión dispara un mensaje al canal del área con la
+sección «Para consumidores» de esa entrada, que es exactamente donde dice qué hay que hacer
+en este repo (lo normal: nada).
+
+- **Estar en ese canal es requisito del proyecto, no una cortesía.** Si los avisos no
+  llegan, pedile el acceso a @{{BUILDER_1}}: el destino se configura en Projects, no acá — este
+  repo no tiene ningún secret ni workflow que dependa del aviso.
+- **Un aviso con acción requerida se convierte en issue de este repo el mismo día.** Un
+  mensaje leído y no anotado es un rojo esperando al próximo PR de cualquiera, y quien lo
+  cobre no va a ser quien lo leyó.
+- **El aviso es la notificación, no la fuente.** Ante cualquier duda manda el `CHANGELOG.md`
+  de Projects en la versión publicada, enlazado en el propio mensaje. Si el aviso llega
+  recortado, es porque la entrada era larga: el resto está en ese enlace.
+- **Un aviso marcado BREAKING no debería existir sobre `v1`.** Si aparece, no se trabaja
+  alrededor: se escala en Projects ese mismo día, porque `v1` no se mueve sobre un cambio
+  incompatible.
+- **Lo que NO se hace** cuando un check nuevo molesta: copiar el workflow del marco a este
+  repo para editarlo, ni pinar una versión vieja para ganar tiempo. Las dos cosas rompen la
+  propiedad que hace útil al marco (un arreglo llega a todos). Se abre issue o change **en
+  Projects**.
+
+---
+
 ## Git y despliegue
 
 - **Trunk-based, una sola rama permanente: `main`.** Ramas de trabajo (`feat/*`, `chore/*`,
@@ -186,6 +222,14 @@ Usar siempre las URLs canónicas: el CORS del API solo permite esos orígenes.
 - Logging por `{{PAQUETE_API}}/src/lib/log.ts` (JSON estructurado; `no-console` es error).
 - Verificar autorización en el backend en cada operación (nunca confiar en el cliente).
 - Respetar el stack y la estructura de carpetas fijados.
+- Si un comando corre por un ejecutor que DESCARGA (`npx`, `bunx`, `npm exec`, `pnpm dlx`,
+  `yarn dlx`), escribirlo con el paquete completo y su **versión exacta**. El nombre pelado
+  de un paquete en npm lo puede tener otro: `openspec` a secas es un placeholder ajeno, y
+  `npx --yes openspec ...` lo descarga y lo ejecuta sin preguntar. Cuando el binario ya lo
+  trae una dependencia declarada del repo, la forma correcta es `pnpm exec <comando>`, que
+  lee `node_modules` y falla si no está en vez de salir a buscarlo. El CI del marco lo
+  verifica solo (check *Ejecutores de paquetes pinados*), incluido el allowlist de
+  `.claude/settings.json`.
 
 **⚠️ Pregunta primero (requiere OK humano)**
 - Agregar una dependencia nueva.
