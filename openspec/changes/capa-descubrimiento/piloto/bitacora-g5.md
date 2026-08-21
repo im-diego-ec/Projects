@@ -19,11 +19,18 @@ algo que ningún check verifica.
 menor es el material de G5: un guardrail nace de un olvido barato, no de una
 catástrofe. Si no está claro si algo cuenta, se anota y el scorer decide después.
 
+**Lo que NO va acá, para que no se mezclen dos listas.** Las preguntas que la
+herramienta o el brazo le hagan al PO y que el corpus no contestaba van a
+`lista-de-observacion.md` del espacio de ese brazo, con su `L0xx`: son procedencia
+de un escenario, no deuda de disciplina. Si además hubo que acordarse de anotarlas,
+**eso** sí es un ítem de esta bitácora.
+
 **La regla dura, impresa acá para que no haga falta buscarla:** esta lista **no
 puede terminar vacía**. Una lista vacía no significa que el piloto no dependió de
 la memoria de nadie; significa que nadie miró, y así se lee en el veredicto. Y si
 todos los ítems terminan con destino «queda fuera», el techo del veredicto es
-**amarillo**, por la regla de D6. O sea que llenar la columna de destino con
+**amarillo**, por la regla de veredicto de la sección 4 del pre-registro, que es la
+vigente. O sea que llenar la columna de destino con
 «queda fuera» en todo no es la salida barata: es un resultado con consecuencia.
 
 **Sin nombres de entrevistados**, ni citas que los identifiquen. Los roles del
