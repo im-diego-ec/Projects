@@ -208,16 +208,38 @@ const archivados = existsSync(ARCHIVE)
 // no debería existir), y es la dirección correcta para equivocarse: un falso
 // negativo acá deja pasar historia rara, y un falso positivo pondría en rojo
 // permanente a un repositorio sin defecto.
-const superados = new Map(); // capability -> Set<título dado de baja o retitulado>
-const deBaja = (cap) => superados.get(cap) ?? new Set();
+// capability -> Map<titulo, Set<change que lo supero>>. Se guarda QUIEN y no solo
+// que alguien lo hizo, por el motivo del comentario de abajo.
+const superados = new Map();
+// Superado POR OTRO change. Excluir al que pregunta es lo que mantiene vivo el
+// plano: un change no puede superarse a si mismo, porque si pudiera cada delta
+// MODIFIED se eximiria solo y esto no verificaria nada.
+const superadoPorOtro = (cap, req, yo) => {
+  const quienes = superados.get(cap)?.get(req);
+  if (!quienes) return false;
+  for (const quien of quienes) if (quien !== yo) return true;
+  return false;
+};
 for (const nombre of archivados) {
   for (const cap of capsDe(join(ARCHIVE, nombre))) {
     const texto = leer(join(ARCHIVE, nombre, "specs", cap, "spec.md"));
-    if (!superados.has(cap)) superados.set(cap, new Set());
-    for (const req of titulos(seccionDe(texto, "REMOVED"), "### Requirement:")) {
-      superados.get(cap).add(req);
-    }
-    for (const [, viejo] of renombres(texto)) superados.get(cap).add(viejo);
+    if (!superados.has(cap)) superados.set(cap, new Map());
+    const anotar = (req) => {
+      const m = superados.get(cap);
+      if (!m.has(req)) m.set(req, new Set());
+      m.get(req).add(nombre);
+    };
+    for (const req of titulos(seccionDe(texto, "REMOVED"), "### Requirement:")) anotar(req);
+    for (const [, viejo] of renombres(texto)) anotar(viejo);
+    // Y un MODIFIED de OTRO change tambien supera: reescribe el requirement, asi
+    // que el delta anterior describe un contrato que ya no rige. Sin esto, el delta
+    // mas viejo de una capability que evoluciono pierde SIEMPRE contra el spec vivo,
+    // y eso es el falso positivo que este archivo declara querer evitar.
+    // Medido en proyecto-origen: la estrategia de ramas se agrego en
+    // 2026-07-23-add-git-branch-strategy y DOS changes posteriores la reescribieron
+    // con MODIFIED; el ADDED original quedaba rojo para siempre y sin ninguna via de
+    // declaracion, que es el peor tipo de rojo que este marco puede emitir.
+    for (const req of titulos(seccionDe(texto, "MODIFIED"), "### Requirement:")) anotar(req);
   }
 }
 
@@ -235,7 +257,7 @@ for (const nombre of archivados) {
       const bloque = seccionDe(texto, seccion);
       return bloque ? titulos(bloque, "### Requirement:").map((req) => ({ seccion, req, bloque })) : [];
     });
-    const vigentes = declarados.filter(({ req }) => !deBaja(cap).has(req));
+    const vigentes = declarados.filter(({ req }) => !superadoPorOtro(cap, req, nombre));
     if (!vigentes.length) continue;
 
     if (!existsSync(vigentePath)) {

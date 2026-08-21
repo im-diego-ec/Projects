@@ -35,6 +35,8 @@ mueve sobre un cambio incompatible.
 
 ## [No publicado]
 
+## [1.3.0] — 2026-08-21
+
 ### Añadido
 
 - **Check estático nuevo en el job `higiene`: *Ejecutores de paquetes pinados*.**
@@ -762,18 +764,29 @@ conciliar las copias: fue **dejar una**.
 
 ### Para consumidores
 
-**Hay una acción obligatoria, y el orden importa.** Un repo con una invocación sin
-versión exacta da rojo apenas este check aterrice. `proyecto-origen` tiene hoy
-cinco, todas en `.claude/settings.json`, y el arreglo es un PR de cinco líneas en
-su propio repo. **Ese PR se mergea ANTES de que se mueva `v1`**, igual que se hizo
-con el check de artefactos regenerados en la 1.2.0: con un solo consumidor y
-nuestro, ordenar los merges es más honesto que enseñar a convivir con un aviso. Si
-ese orden no se puede garantizar, el endurecimiento se estrena en modo aviso y
-endurece en el major siguiente, como manda `AGENTS.md`.
+**Esta acción obligatoria YA ESTÁ HECHA en `proyecto-origen`.** El repo tenía
+cinco invocaciones sin versión exacta en `.claude/settings.json` —`npx --yes
+openspec ...`, con el nombre pelado que en npm es de otra persona— y el PR #155 las
+pinó a `@fission-ai/openspec@1.9.0` el 2026-08-20, antes de que este tag se moviera.
+Medido hoy sobre su `main`: 5 de 5 pinadas, 0 sin pinar.
 
-Verificado antes de publicar: sobre `projects` el check pasa en verde (8
+**Lo que sigue pendiente en ese repo, y es el orden que importa:** su
+`.projects-falsos-positivos.json` **no existe todavía** (`git ls-files` vacío), así que
+el detector de secretos le va a dar rojo en sus tres hallazgos declarables el día
+que este tag se mueva. Ese PR va ANTES del movimiento del tag, igual que fue el del
+allowlist. Si el orden no se puede garantizar, el endurecimiento se estrena en modo
+aviso y endurece en el major siguiente, como manda `AGENTS.md`.
+
+**Y hay tres consumidores, no uno.** Al medir el impacto del tag apareció
+`riesgos-investigaciones` con cuatro PRs abiertos contra `@v1` y un `README.md` que
+declara «consume Projects v1.2.0»; y `riesgos-moc` ya tiene en su `main` el change de
+adopción sin ejecutar. Ninguno de los dos estaba en la lista. Las **57 referencias
+externas al marco son todas `@v1`**: ningún repo está pinado a un SHA, así que no
+existe consumidor a salvo del movimiento del tag.
+
+Verificado cuando el check se escribió: sobre `projects` pasaba en verde (8
 invocaciones, 5 con versión literal y 3 por variable) y sobre `proyecto-origen`
-da rojo exactamente en las cinco líneas reales, sin un solo falso positivo — el
+daba rojo exactamente en las cinco líneas reales, sin un solo falso positivo — el
 `pnpm exec playwright` del deploy, el `pnpm exec prisma generate` del Dockerfile y
 los `tsc`/`vitest`/`eslint` de los `scripts` de cada `package.json` no se tocan,
 porque ninguno pasa por un ejecutor que descargue.
