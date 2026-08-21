@@ -148,6 +148,40 @@ jobs:
           printf '%s\n' "${PRUEBAS[@]}"
 
           node --test "${PRUEBAS[@]}"
+  # EL CABLEADO DE LA CONSTITUCION, SOBRE EL PROPIO MARCO Y POR RUTA LOCAL.
+  #
+  # El carril del consumidor vive en marco-ci.yml y llama a la action por su ref
+  # publicada; ese job se saltea en este repo a proposito, porque `uses:` no admite
+  # expresiones y una ruta local dentro de un workflow reusable se resuelve contra el
+  # repo de quien LLAMA, no contra el del reusable. Esta es la otra mitad de esa
+  # particion, y es la misma solucion que este archivo ya usa para el reusable
+  # (`./.github/workflows/marco-ci.yml`): cada PR se valida contra la version que ESE
+  # PR propone, no contra la etiqueta ya publicada.
+  #
+  # No es decoracion de dogfooding: es lo unico que ejercita el modo `cableado` como
+  # PASO DE UN JOB antes de que llegue a los consumidores. La ronda 3 de la refutacion
+  # midio que, sin esto, la action se nombraba por una ref que no la tenia (@v1 no la
+  # trae todavia), el job moria en "Set up job" y toda la evidencia de la compuerta era
+  # local.
+  #
+  # Sobre este repo el veredicto esperado es "al dia" por el skip del distribuidor, que
+  # NO es una ausencia: exige repartir el scaffold RASTREADO, no versionar
+  # .projects-valores.json, y que ese scaffold CABLEE la verificacion con las cinco
+  # condiciones. Si el scaffold deja de cablearla, este job es rojo.
+  constitucion:
+    name: constitucion
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with: { node-version: "22" }
+      - name: Constitucion del marco cableada
+        uses: ./actions/constitucion
+        with:
+          modo: cableado
+          rama_por_defecto: ${{ github.event.repository.default_branch }}
 
   # Check REQUERIDO por el ruleset main-protegida (nombre exacto: "ci-ok").
   #
@@ -160,7 +194,7 @@ jobs:
   # el veredicto lo cuenta como exito SOLO si la deteccion dijo solo-docs.
   ci_ok:
     name: ci-ok
-    needs: [marco, pruebas_actions]
+    needs: [marco, pruebas_actions, constitucion]
     if: always()
     runs-on: ubuntu-latest
     steps:
@@ -173,6 +207,14 @@ jobs:
           }
           [ "${{ needs.pruebas_actions.result }}" = "success" ] || {
             echo "::error::el banco de pruebas de las actions termino en '${{ needs.pruebas_actions.result }}'"
+            exit 1
+          }
+          # Cualquier resultado que no sea success es un fallo, "skipped" incluido: un
+          # skipped aca significaria que alguien le puso un if al job, y eso es
+          # apagarlo. La doc de GitHub dice que un job salteado reporta Success, asi
+          # que esta linea es la que convierte el salteo en rojo.
+          [ "${{ needs.constitucion.result }}" = "success" ] || {
+            echo "::error::el cableado de la constitucion (modo cableado, por ruta local) termino en '${{ needs.constitucion.result }}'"
             exit 1
           }
           echo "marco: OK (solo_docs=${{ needs.marco.outputs.solo_docs }}, deteccion_confiable=${{ needs.marco.outputs.deteccion_confiable }})"

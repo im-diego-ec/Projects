@@ -1,16 +1,16 @@
-# calidad-codigo
+# calidad-codigo — Delta
 
-## Purpose
+## RENAMED Requirements
 
-Calidad de código de un repositorio del marco: lint y formato configurados y
-ejecutables en TODOS los paquetes del monorepo, con reglas alineadas a la
-constitución de ingeniería del repositorio (`AGENTS.md`: TypeScript strict,
-`any` solo con justificación, sin promesas flotantes), scripts que propagan el
-fallo real al invocador —para que CI no pueda quedar verde sobre un lint
-roto— y la regla de que todo defecto conocido entra acompañado del test que lo
-reproduce.
+- FROM: `### Requirement: Scripts de lint sin enmascaramiento de fallo`
+- TO: `### Requirement: Scripts de verificación sin enmascaramiento de fallo`
 
-## Requirements
+El título decía "lint" desde el principio mientras su cuerpo ya hablaba de
+"scripts de verificación". El retitulado alinea el título con lo que el
+requirement siempre dijo, y con el hecho de que ahora hay un check que lo
+comprueba sobre cualquier script de verificación, no solo el de lint.
+
+## MODIFIED Requirements
 
 ### Requirement: Lint y formato configurados para todos los paquetes
 
@@ -39,31 +39,6 @@ enunciada por paquete puede describirlos.
 - **WHEN** se incorpora al monorepo un paquete que no queda cubierto por la configuración de lint
 - **THEN** la verificación de CI lo señala como fallo — un paquete sin lint no pasa por verificado
 
-### Requirement: Prohibir `any` sin justificación
-
-La configuración de lint SHALL marcar como error el uso de `any` que no venga
-acompañado de un comentario que lo justifique, replicando la regla escrita en
-la constitución de ingeniería del repositorio.
-
-#### Scenario: `any` sin comentario
-- **WHEN** el código introduce un tipo `any` sin un comentario que explique por qué
-- **THEN** el lint falla señalando la ubicación
-
-#### Scenario: `any` justificado con comentario
-- **WHEN** el código usa `any` acompañado del comentario justificativo acordado
-- **THEN** el lint no reporta error para ese caso
-
-### Requirement: Prohibir promesas flotantes
-
-La configuración de lint SHALL marcar como error toda promesa cuyo resultado
-no se espera ni se maneja, incluidas las mutaciones asíncronas de la capa de
-datos del cliente invocadas sin `try/catch` ni manejador de error — el patrón
-que deja la interfaz colgada sin que nadie se entere.
-
-#### Scenario: Mutación asíncrona sin manejo de error
-- **WHEN** un componente invoca una mutación asíncrona sin `try/catch` ni manejador de rechazo
-- **THEN** el lint falla señalando la promesa flotante
-
 ### Requirement: Scripts de verificación sin enmascaramiento de fallo
 
 Los scripts de verificación declarados en los manifiestos de los paquetes
@@ -83,68 +58,7 @@ todo lo que dependa de su código de salida —incluido el pipeline—, así que
 - **WHEN** un script de verificación declarado en un manifiesto convierte un fallo en éxito mediante un sufijo o un envoltorio
 - **THEN** la verificación de integración falla señalando el manifiesto, el script y el arreglo concreto
 
-### Requirement: Test de regresión obligatorio por defecto conocido
-
-Todo defecto conocido que se corrige (hallazgo de auditoría o incidente) SHALL
-entrar acompañado de un test que primero lo REPRODUCE (falla antes del fix,
-pasa después) y que permanece en la suite. El test SHALL escribirse al nivel
-más bajo que reproduzca el defecto: unitario cuando sea suficiente;
-integración o E2E solo cuando el defecto emerge de la integración entre
-componentes.
-
-#### Scenario: Fix de un hallazgo con test que lo reproduce
-- **WHEN** se corrige un defecto conocido (por ejemplo un error de la capa de datos que se traduce en un 500, o una carrera de concurrencia entre dos solicitudes)
-- **THEN** el PR incluye un test que falla sin el fix y pasa con él, al nivel más bajo suficiente (error de la capa de datos → unitario con doble de prueba; carrera → integración contra una base real)
-
-#### Scenario: Fix sin test de regresión
-- **WHEN** un PR corrige un defecto conocido sin incluir su test de regresión
-- **THEN** la revisión lo rechaza hasta que el test exista
-
-### Requirement: Las definiciones de pipeline se validan como código
-
-Las definiciones de pipeline del repositorio SHALL validarse en CI con la misma
-dureza que el resto del código: un error de sintaxis, una referencia inválida o
-una expresión mal formada SHALL detener el pipeline antes de que el cambio se
-integre.
-
-La validación SHALL correr también cuando el cambio toca únicamente las
-definiciones de pipeline. El carril rápido omite las etapas que verifican lo que
-se sirve en runtime, y una definición de pipeline no se sirve — pero sí se
-ejecuta, y un error en ella se manifiesta en la corrida siguiente, cuando ya está
-integrada y, en el caso del marco, cuando otros repositorios ya la consumen.
-
-#### Scenario: Una definición de pipeline con sintaxis inválida
-- **WHEN** un cambio introduce un error de sintaxis o una expresión inválida en una definición de pipeline
-- **THEN** el pipeline falla señalando el archivo y la línea, antes del merge
-
-#### Scenario: Un cambio que solo toca definiciones de pipeline
-- **WHEN** el cambio entra por el carril rápido porque no altera lo que se sirve
-- **THEN** la validación de las definiciones de pipeline corre igual
-
-### Requirement: Un repositorio nacido del scaffold no conserva marcadores sin resolver
-
-Un repositorio que adoptó el scaffold del marco SHALL quedar libre de los
-marcadores que el scaffold emite para señalar lo que hay que completar
-—sustituciones pendientes y huecos de decisión—, y CI SHALL fallar mientras
-alguno sobreviva.
-
-La verificación SHALL comprobar la ausencia de esos marcadores, no la corrección
-de los valores que los reemplazaron: validar que un identificador exista o que
-corresponda al proyecto exige credenciales y contexto que CI no tiene, y su falso
-positivo bloquearía integraciones legítimas.
-
-Este requirement existe porque el modo de falla es silencioso: un marcador sin
-sustituir en el archivo de propietarios de código no produce error alguno —
-simplemente no asigna revisores, y el review cruzado que el marco promete
-desaparece sin ruido desde el primer día del proyecto.
-
-#### Scenario: El bootstrap quedó a medias
-- **WHEN** un repositorio conserva un marcador del scaffold sin resolver
-- **THEN** el pipeline falla indicando el archivo y el marcador pendiente
-
-#### Scenario: Sintaxis parecida que no es un marcador
-- **WHEN** el repositorio usa legítimamente una sintaxis similar que el proveedor de CI resuelve en cada corrida
-- **THEN** la verificación no la confunde con un marcador pendiente
+## ADDED Requirements
 
 ### Requirement: Ningún archivo fuente fuera del alcance de la verificación
 
@@ -273,14 +187,10 @@ SHALL nombrar el día desde el cual el mismo estado es rojo. La ventana SHALL
 cerrarse por el paso del tiempo y no por una edición: pasada esa fecha, el mismo
 repositorio falla sin que nadie toque una línea.
 
-Y la ventana SHALL aflojar ÚNICAMENTE lo que nadie escribió: la falta de
-declaración y la métrica que el reporte no midió. Una deuda declarada y vencida,
-un retroceso por debajo del piso, un piso sin datos y una declaración inválida
-SHALL fallar dentro de la ventana igual que fuera: en esos cuatro casos alguien
-escribió algo, y lo escrito se sostiene desde el día en que se escribió. La línea
-que separa las dos mitades no es la gravedad del caso sino su autoría: la ventana
-existe para que un veredicto NUEVO del marco no aterrice en rojo sobre un
-proyecto que no lo leyó, y no para perdonar una promesa rota.
+Y la ventana SHALL aflojar ÚNICAMENTE la falta de declaración. Una deuda declarada
+y vencida, un retroceso por debajo del piso, un piso sin datos y una declaración
+inválida SHALL fallar dentro de la ventana igual que fuera: en esos cuatro casos
+alguien escribió algo, y lo escrito se sostiene desde el día en que se escribió.
 
 La fecha de cierre SHALL estar escrita acá y no solo en el código. La medición que
 lo obliga: la primera implementación de esta verificación puso la ventana en un
@@ -323,30 +233,6 @@ La medición SHALL distinguir «cubierto» de «no medido»: la ausencia de dato
 cobertura habiendo líneas agregadas SHALL ser un fallo ruidoso y NO un éxito
 silencioso.
 
-**Y el DENOMINADOR del total SHALL verificarse contra el que el propio reporte
-declara.** Un porcentaje es cubiertas sobre encontradas, y «encontradas» se
-reconstruye ítem por ítem de un reporte que el proyecto genera: un denominador
-más corto que el real no baja la cobertura, la INFLA, así que apagar parte de la
-medición rinde más que agregar pruebas. Por eso la verificación SHALL comparar
-los ítems que llegaron contra el denominador que el reporte declara para esa
-métrica y ese archivo, y SHALL fallar cuando lleguen menos. Y SHALL distinguir
-«esta métrica vale cero» —el reporte declara su denominador en cero, y eso es un
-n/a legítimo— de «esta métrica no se midió» —el reporte no declara denominador
-alguno y no llegó ni un ítem—, que es «no medido» otra vez y NO SHALL pasar en
-verde ni en silencio. La medición que lo obliga: sobre el reporte real del
-consumidor, el paquete a 70,70% de funciones pasaba a EXIT 0 y a un «n/a» mudo
-con solo dejar de emitir los registros de funciones —una opción documentada del
-generador de reportes, y también lo que hace por su cuenta un generador de una
-versión más nueva—; y borrándole los registros sin cubrir dejando el denominador
-declarado intacto, la corrida publicaba 95,83% con la fila en OK teniendo el
-propio reporte declaradas 215 funciones de las que llegaban 120. Las dos rondas
-anteriores endurecieron la REGLA y ninguna la ENTRADA que la regla lee.
-
-Un archivo del reporte cuya ruta no corresponde a ningún archivo versionado
-queda fuera del total, y eso SHALL decirse en CUALQUIER evento del pipeline y no
-solo en los que miden el diff: un archivo que sale del denominador sin dejar
-rastro es la misma inflación por otra puerta.
-
 Un paquete PUEDE excluir del cálculo el código que no le corresponde probar
 —generado por otra herramienta, o puro arranque de la aplicación— declarándolo
 con su motivo escrito, del mismo modo que las exclusiones del alcance.
@@ -382,18 +268,6 @@ con su motivo escrito, del mismo modo que las exclusiones del alcance.
 #### Scenario: Un piso declarado cuya métrica llega sin datos
 - **WHEN** un paquete declara un piso para una métrica y su cobertura llega sin un solo dato de esa métrica
 - **THEN** la integración falla nombrando el manifiesto y la métrica: un piso que no se puede comparar contra nada dejó de proteger la ganancia acumulada, y reportarlo como «n/a» en verde es indistinguible de no tener piso
-
-#### Scenario: Una métrica que el reporte no midió
-- **WHEN** una métrica de un paquete llega sin un solo dato y el reporte no declara ningún denominador para ella
-- **THEN** la integración la trata como NO MEDIDA y no como una métrica que no aplica, porque apagar la métrica que enrojece costaría una línea de configuración del generador de reportes
-
-#### Scenario: Una métrica que el reporte declara en cero
-- **WHEN** una métrica de un paquete llega sin un solo dato y el reporte declara su denominador en cero
-- **THEN** la corrida la reporta como «n/a» y pasa: el reporte está diciendo que midió y no había nada que medir, y esa es la única forma de no aplicar que no se puede fabricar apagando la medición
-
-#### Scenario: El denominador llega más corto que el que el reporte declara
-- **WHEN** los ítems de una métrica que llegan al cálculo son menos que los que el propio reporte declara para ese archivo
-- **THEN** la integración falla diciendo cuántos declaró y cuántos llegaron, y NO publica el porcentaje como total: los ítems que faltan no están «sin cubrir», están fuera del denominador, y un denominador corto infla la cobertura
 
 #### Scenario: Una deuda declarada sobre un paquete sin nada que medir
 - **WHEN** un paquete declara una deuda y no aporta ninguna métrica medible en la corrida
