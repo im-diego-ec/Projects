@@ -2563,6 +2563,25 @@ jobs:
   #   · repo que SI lo versiona y no tiene un cableado que cuente -> ::error::,
   #     y cada invocacion que no cuenta sale con el motivo exacto por el que no
   #     cuenta. El pecado del paso anterior no era el color: era el silencio.
+  #   · Y UNA TERCERA FILA desde el 2026-08-21, que es el residuo A01 declarado en
+  #     MODO AVISO por decision del Builder 1: repo que cumple todo lo que este check
+  #     DECIDE y solo queda colgado de "algun paso vivo de ci-ok cobra el
+  #     resultado" -> ::warning:: con el residuo nombrado, jamas ::error::. El
+  #     motivo: esa condicion promete una propiedad sobre un CAMINO —del job de la
+  #     compuerta, por cada eslabon de needs, hasta el check run cuyo nombre exige
+  #     el ruleset— y lo que verifica es un patron sintactico sobre un NODO. Medido
+  #     con oraculo semantico independiente: 70 falsos verdes sobre 2928 casos
+  #     generados, una sola clase, cuya forma mas corta es un paso con
+  #     `if: needs.<job>.result == success`, que satisface la compuerta
+  #     SALTEANDOSE. Una regla cuyo lado de aceptacion es unsound no puede
+  #     presentar su lado de rechazo como compuerta. Lo que se decide por
+  #     ESTRUCTURA —que exista el check run del veredicto, que cuelgue de la
+  #     compuerta por needs, que declare if: always(), que ningun nodo del camino
+  #     lave el rojo con continue-on-error o un if constante falso— sigue en rojo:
+  #     no se afloja lo que funciona. El residuo sale en la salida del paso en TODA
+  #     corrida, incluida la verde, porque desde aca el falso verde es
+  #     indistinguible del cableado sano. Su fila esta en
+  #     docs/reglas-no-escritas.md.
   #
   # SKIP DEL DISTRIBUIDOR, ahora como PROPIEDAD POSITIVA y con tres candados:
   # el repo que reparte el scaffold es el marco y no es consumidor de su propia
