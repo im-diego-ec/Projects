@@ -92,7 +92,20 @@ entero: el inventario del que cuelgan G1 y G2 no tenía dónde vivir.
       el scorer puede reclasificar como «contexto» cualquier ítem caído y el cero
       se sostiene sin que nada falle. Evidencia:
       `piloto/convencion-de-procedencia.md`, parte 3, con el commit de la rúbrica
-      anterior al commit del inventario de 3.1.
+      anterior al commit del inventario de 3.1. Incluye los dos casos que el corpus
+      obliga a resolver antes: la lista de casos borde (un caso por ítem, o G2
+      pierde los caídos de adentro de un solo id) y el prototipo (se inventarían
+      las decisiones, no los elementos).
+- [ ] 0.14 Campo `origen` del inventario, con sus **tres** valores (`corpus`,
+      `derivado` y `elicitado`) y la regla dura de que un `derivado` no sostiene un
+      escenario sin marca de supuesto. Lleva el 0.14 y no un numero en secuencia
+      porque llego en un merge, cuando 0.12 y 0.13 ya estaban tomadas; el orden del
+      archivo no es el orden de ejecucion. Se agregó el 2026-08-21: con el corpus ya escrito, la
+      invención dejó de verse como un escenario colgado de la nada y pasó a verse
+      como uno perfectamente citado cuya ancla dice algo parecido pero no eso. Sin
+      este campo, G3 no tiene con qué separar lo que dijo el corpus de lo que
+      interpretó un agente. Evidencia: `piloto/convencion-de-procedencia.md`, parte
+      1, y la columna `origen` en el formato de la tabla de trazabilidad (parte 2).
 - [ ] 0.10 Regla de parada **idéntica** para los dos brazos, y protocolo escrito
       del brazo A. «El camino de hoy con la asistencia habitual» no es un control:
       es lo que cada uno haga. Y sin regla de parada las horas de G4 miden una
@@ -269,6 +282,30 @@ experimental de cualquier change, incluido este.
 - [ ] 4.4 Entrada del `CHANGELOG.md` en el mismo PR que estrena el paso, con la
       sección «para consumidores» diciendo lo que tienen que hacer: **nada**,
       mientras no declaren un change experimental. Evidencia: la entrada escrita.
+- [ ] 4.5 Check nuevo en el CI de **Projects**: si el cuerpo del canónico cambia y el
+      `manifiesto.json` no gana una entrada de versión, es rojo. Salió de una
+      medición del 2026-08-21 (D11) y no de una intuición: con una regla nueva en el
+      canónico y el manifiesto intacto, `node --test
+      actions/constitucion/pruebas/*.test.mjs` devuelve **0** con 203 pruebas en
+      verde, el presupuesto de líneas tampoco lo caza (600 de 700), y el consumidor
+      al día con la 1.3.0 devuelve **1** con `::error::` «difiere del texto que el
+      marco publica para la version 1.3.0». O sea que el rojo cae río abajo, en el
+      pipeline de repos que no hicieron nada. Es dogfoodeable sin consumidor:
+      compara dos archivos de este repo. **No depende del veredicto del piloto.**
+      Evidencia: los tres casos —canónico tocado sin versión nueva, canónico tocado
+      con versión nueva, canónico intacto— con su veredicto esperado, por código de
+      salida.
+- [ ] 4.6 Cortar la versión del canónico que publica la mitad **operativa** de D11
+      («el descubrimiento se produce fuera del repositorio y entra como insumo al
+      inicio de la sesión»), con el texto que D11 ya trae escrito, y con
+      `exigible_desde` a **28 días o más** de `publicada`, que es lo que la propia
+      action exige. Está en el bloque 4 y no en el 5 porque **no depende del
+      veredicto**: es la forma en que el área trabaja, con o sin la herramienta.
+      **Es tarea humana y no la toma un agente**: cortar una versión mueve el
+      calendario de todos los consumidores, y la 1.3.0 ya se publicó el 2026-08-21
+      con `v1` apuntando a su commit. Hoy no se cortó a propósito, y el motivo está
+      medido en D11. Evidencia: la entrada nueva en `manifiesto.json`, la ventana de
+      28 días verificada por la action, y la sección del `CHANGELOG.md`.
 
 ## 4b. La segunda rebanada, con el orden invertido (SOLO si la primera dio verde)
 
@@ -304,8 +341,14 @@ Nada de este bloque se adelanta, y desde el 2026-08-21 tampoco arranca con un so
 verde. Adelantarlo compra costo hundido y el costo hundido decide veredictos.
 
 - [ ] 5.1 Check de forma: un artefacto de la ubicación declarada que contenga
-      encabezados de delta o escenarios es rojo. Evidencia: fixture con un insumo
-      con forma de spec en rojo, y el mismo insumo sin esa forma en verde.
+      encabezados de delta o escenarios es rojo. **Buscar la estructura, no la
+      palabra**: medido el 2026-08-21, `validate --all --strict` cuenta el
+      encabezado `####` y no el literal `Scenario:` (renombrar los tres escenarios
+      del delta a `#### <cualquier cosa>` sale 0; borrarles el encabezado y dejar
+      los `WHEN`/`THEN` sale 1). Un check que greppee `#### Scenario:` deja pasar un
+      insumo que el validador ya trataría como contrato. Evidencia: fixture con un
+      insumo con forma de spec en rojo, el mismo insumo con encabezados `####` que
+      no dicen «Scenario» **también** en rojo, y el insumo sin esa forma en verde.
 - [ ] 5.2 Check de procedencia: escenarios del delta sin entrada en la tabla de
       trazabilidad, o con procedencia vacía, en rojo. Evidencia: fixture con un
       escenario huérfano.
@@ -342,12 +385,24 @@ verde. Adelantarlo compra costo hundido y el costo hundido decide veredictos.
       explícitamente que no es requisito del marco. Evidencia: el documento, y
       cero cambios en `openspec/specs/` y en `plantilla/`.
 - [ ] 6.3 Rescatar el requirement de caducidad (bloque 4) a un **change propio** y
-      archivarlo por separado: es el único ítem de acá que vale con independencia
-      del piloto (D7). Evidencia: el change nuevo, con su delta y su archive.
-- [ ] 6.4 Borrar el directorio de este change en el mismo PR del ADR. Un delta que
-      el piloto refutó no se funde en el contrato, y un change que nadie archiva ni
-      descarta es el zombi que el bloque 4 existe para evitar. Evidencia: el
-      directorio ausente y `validate --all --strict` en verde por código de salida.
+      archivarlo por separado (D7). Evidencia: el change nuevo, con su delta y su
+      archive.
+- [ ] 6.4 Rescatar, al mismo change propio del 6.3 o a uno aparte, el requirement
+      de **D11**: el descubrimiento se produce fuera del repositorio y entra como
+      insumo al inicio de la sesión. Es el **segundo** ítem de este change que vale
+      con independencia del veredicto, y por eso el 6.3 ya no dice «el único». Builder 1
+      lo enunció como la forma en que el área trabaja, no como consecuencia de
+      adoptar la herramienta; está en este delta porque hoy es la única ruta que
+      conserva el gate del PO por CODEOWNERS (D10). Evidencia: el requirement en el
+      spec vivo de `gobierno-contribucion`, con `validate --all --strict` y el
+      guardrail de deltas en cero por código de salida.
+- [ ] 6.5 Borrar el directorio de este change en el mismo PR del ADR. Va **último**
+      del bloque a propósito: los dos rescates (6.3 y 6.4) tienen que estar hechos
+      antes, porque borrar el directorio se lleva los enunciados con él. Un delta
+      que el piloto refutó no se funde en el contrato, y un change que nadie
+      archiva ni descarta es el zombi que el bloque 4 existe para evitar.
+      Evidencia: el directorio ausente y `validate --all --strict` en verde por
+      código de salida.
 
 ## 7. Cierre, en cualquiera de los tres casos
 
