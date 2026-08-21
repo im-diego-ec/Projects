@@ -495,6 +495,7 @@ una tarde entre todos y cierran las clases de error más caras.
 | 14 | Publicar una versión del marco AVISA a los consumidores | — | bajo | 🔴 |
 | 15 | **A01** — que el rojo de la compuerta LLEGUE al check requerido | — | alto | 🟠 |
 | 16 | **A16** — que un permiso de allowlist no autorice descargar sin pinar | — | alto | 🟠 |
+| 17 | La exencion de este check para lo GENERADO es por extension, no por origen | El paso de ejecutores pinados exime `.md` y `.mdc` por pathspec. Un artefacto generado no es codigo que alguien pueda arreglar —el marco ya tiene esa regla escrita para el formateador— pero la exencion adivina el origen por la extension del archivo. Una superficie de agente nueva que renderice a `.txt` o `.toml` vuelve a caer. Medido el 2026-08-21: `.cursor/rules/00-marco.mdc` puso en rojo a proyecto-origen con la prosa de la propia regla del pin citando `npx --yes openspec` como contraejemplo. La version derivada exige que `actions/constitucion` publique sus rutas como output y que el paso las reciba entre jobs. Se intento filtrar por el SELLO del artefacto y una prueba del banco lo rechazo con razon: «el sello lo valida UNA sola pieza», y dos lugares interpretando el mismo sello es el defecto de las 12 contra 64 posiciones hex de esta semana |
 
 > **Sobre la fila 13**, que nació de un incidente doble el 2026-08-19: el carril
 > rápido trata la definición del pipeline como "no se sirve en runtime" y la

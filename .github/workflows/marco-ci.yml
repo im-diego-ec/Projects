@@ -1114,10 +1114,28 @@ jobs:
           #     ("npx" seguido de "bunx") y el paso se marcaria a si mismo. Con
           #     la clase de caracteres los tokens que salen son "np", "mx",
           #     "yarn" y "bun", que no forman ninguna invocacion.
-          # Los .md salen por pathspec: ver el limite declarado arriba.
+          # Los .md salen por pathspec: ver el limite declarado arriba, y con ellos
+          # los .mdc, que son la MISMA prosa renderizada para otra superficie de
+          # agente. El 2026-08-21 este paso puso en rojo a un consumidor por
+          # .cursor/rules/00-marco.mdc: es la porcion del marco escrita para Cursor,
+          # su texto cita `npx --yes openspec` como CONTRAEJEMPLO —es la regla del pin
+          # explicandose— y `.mdc` no es `.md`, asi que el pathspec no lo eximia. El
+          # marco escribia un archivo que reprobaba su propio check, y nadie podia
+          # arreglarlo a mano porque es generado.
+          #
+          # LIMITE DECLARADO, y es la clase que esto NO cierra: la exencion sigue
+          # siendo por EXTENSION, asi que una superficie nueva que renderice a .txt o
+          # a .toml vuelve a caer. La version derivada —que el paso consuma la lista
+          # de rutas que la action publica, en vez de adivinarla por extension— exige
+          # que la action la exponga como output y que el paso la reciba entre jobs.
+          # Se intento filtrar por el SELLO del artefacto y una prueba del banco lo
+          # rechazo con razon: «el sello lo valida UNA sola pieza», y dos lugares
+          # interpretando el mismo sello es exactamente el defecto de las 12 contra 64
+          # posiciones hexadecimales que se arreglo esta misma semana. Queda en
+          # docs/reglas-no-escritas.md.
           CANDIDATOS="${RUNNER_TEMP}/ejecutores.txt"
           set +e
-          git -c core.quotePath=false grep -I -l -z -E 'np[mx]|yarn|bun' -- ':!*.md' > "${CANDIDATOS}"
+          git -c core.quotePath=false grep -I -l -z -E 'np[mx]|yarn|bun' -- ':!*.md' ':!*.mdc' > "${CANDIDATOS}"
           RC=$?
           set -e
           if [ "${RC}" -gt 1 ]; then
@@ -1126,7 +1144,7 @@ jobs:
           fi
 
           if [ ! -s "${CANDIDATOS}" ]; then
-            echo "ningun archivo rastreado fuera de los .md menciona un gestor de paquetes: no hay nada que pinar"
+            echo "ningun archivo rastreado fuera de los .md y .mdc menciona un gestor de paquetes: no hay nada que pinar"
             exit 0
           fi
 
