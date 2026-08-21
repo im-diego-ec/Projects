@@ -401,7 +401,7 @@ otra:
 
 | Pieza | Forma | Por qué esa |
 |---|---|---|
-| Los dos requirements nuevos | **Canónico** | son contrato del marco. Un proyecto no los copia: los cumple |
+| Los tres requirements nuevos | **Canónico** | son contrato del marco. Un proyecto no los copia: los cumple. El tercero (D11) tiene además una mitad operativa que va al canónico **transportado** —el artefacto que la action reparte— y que necesita una versión nueva del manifiesto: escrita en D11, sin cortar |
 | Los cuatro checks (forma de spec, procedencia, supuestos abiertos, caducidad) | **Referenciado** | tienen que corregirse una vez para todos y llegar sin que el proyecto toque nada |
 | El directorio declarado de artefactos de descubrimiento, su entrada en CODEOWNERS del rol de producto y su exclusión del formateador | **Scaffold** | desde el día uno son del proyecto: el nombre del directorio y quién revisa esos artefactos son suyos |
 | El pin de la herramienta de descubrimiento | **Regenerado** | idéntico razonamiento al del CLI de OpenSpec: el marco pina la versión, cada repo la instala, **no se vendora**. Vendorarla congelaría para todos la versión que la generó |
@@ -431,6 +431,123 @@ Si la capa crece, partirla a su propia capability es un change posterior que
 empieza por agregar sus dos líneas de CODEOWNERS y recién después mueve el
 requirement. En ese orden, no en el inverso.
 
+### D11 — (obligatoria) El descubrimiento se produce fuera del repositorio y entra al inicio de la sesión: dónde va esa regla, y qué no se pudo escribir hoy
+
+El 2026-08-21 Builder 1 aclaró algo que cambia el piloto (ver `piloto/pre-registro.md`,
+sección 0) y que además **excede al piloto**. Lo enunció como regla general del
+área, no como excepción de Supply Chain:
+
+> El discovery se produce **fuera del repositorio** y entra como insumo **al inicio
+> de la sesión**: de un proyecto nuevo, de un deploy nuevo, o de un agregado a un
+> proyecto existente. **El repositorio no es su custodio.**
+
+Una regla general del área tiene dos domicilios posibles y hay que elegir con
+motivo, porque los dos son defendibles y uno de los dos hoy no se puede pagar.
+
+#### Va al delta de `gobierno-contribucion`, como tercer requirement
+
+Tres razones, en orden de peso:
+
+1. **Es la única ruta que conserva la aprobación del PO.** El flujo del marco dice
+   que los specs se aprueban por delta y los aprueba PO. Escribir la regla
+   directo en `openspec/specs/gobierno-contribucion/spec.md` la volvería contrato
+   sin pasar por su firma, y encima haría mentir al guardrail de deltas, que compara
+   el delta contra el spec vivo: un spec vivo editado a mano hace que el guardrail
+   salga verde sobre un contrato que nadie propuso. La ruta del delta es más lenta y
+   es la que tiene gate.
+2. **Cae en la capability correcta y por el motivo mecánico de D10.** El gate del PO
+   está cableado a `/openspec/changes/**/specs/gobierno-contribucion/`, así que el
+   requirement queda asignado al PO sin que nadie se acuerde de pedírselo. Y
+   encaja por contenido: la capability ya gobierna la procedencia, y esto es de
+   dónde sale el material del que la procedencia habla.
+3. **No necesita una versión nueva del canónico**, que es lo que hoy no se puede
+   cortar. Ver abajo.
+
+**Acoplamiento declarado, con su salida escrita, igual que en D7.** Esta regla vale
+con o sin la herramienta y con cualquier veredicto del piloto: Builder 1 la enunció como
+la forma en que el área trabaja, no como una consecuencia de adoptar BMAD. Está en
+este delta porque es donde puede pasar por el gate del PO hoy, y si el veredicto es
+rojo o amarillo **se rescata a un change propio y se archiva por separado**, con el
+mismo tratamiento que el requirement de caducidad. Está escrito como tarea (6.4),
+no como buena intención.
+
+#### Lo que va al canónico está escrito y NO se corta hoy
+
+El canónico es el domicilio natural de la mitad **operativa** de la regla: «entra
+como insumo al inicio de la sesión» es una instrucción sobre cómo se trabaja, y el
+canónico es justamente el artefacto que se carga en cada sesión de cada repo. El
+texto propuesto, para `actions/constitucion/canonico/10-openspec.md`:
+
+```markdown
+<!-- projects:regla id=descubrimiento-fuera-del-repo -->
+
+- **El descubrimiento se produce FUERA del repositorio y entra como insumo al
+  INICIO de la sesión** que lo consume: la de un proyecto nuevo, la de un deploy
+  nuevo, o la de un agregado a un proyecto existente. El repositorio no es su
+  custodio: conserva los artefactos derivados y la trazabilidad por identificador
+  estable, no el corpus. El corpus es insumo de una sesión, no contexto permanente
+  (no va a la cadena de imports) y no es contrato: la autoridad sigue siendo el
+  spec vivo.
+```
+
+**No se corta la versión que lo publicaría, y el motivo está medido, no supuesto.**
+Agregar una regla al canónico exige una entrada nueva en
+`actions/constitucion/canonico/manifiesto.json` con `publicada` y `exigible_desde`,
+y la propia action rechaza menos de **28 días** entre las dos. Hoy el manifiesto
+declara una sola versión, la **1.3.0**, publicada el 2026-08-21 y exigible desde el
+2026-09-18. La 1.3.0 ya se publicó hoy y el tag móvil `v1` ya apunta a su commit,
+así que la regla necesitaría una **1.4.0** con su propio calendario, y cortar una
+versión no es decisión de un agente.
+
+Lo que se midió el 2026-08-21, con un consumidor sintético al día con la 1.3.0 y la
+action real en modo `verificar`, por código de salida:
+
+| Paso | Qué se midió | Código |
+|---|---|---|
+| A | canónico intacto, consumidor al día con la 1.3.0 | **0** («la porcion del marco esta al dia en 2 superficie(s): version 1.3.0, sha 22b7d8ee231f») |
+| B | canónico **con la regla nueva** y manifiesto **sin subir de versión** | **1**, con `::error::` en las dos superficies: «difiere del texto que el marco publica para la version 1.3.0» |
+| C | canónico revertido, misma medición que A | **0** |
+
+O sea: escribir la regla en el canónico sin cortar la versión pone en **rojo duro**
+a todo consumidor que ya adoptó la 1.3.0, y **sin ventana de gracia**, porque la
+ventana protege a quien todavía no adoptó una versión nueva, no a quien tiene la
+versión correcta con el cuerpo cambiado abajo. No sería un aviso: sería `::error::`
+en el pipeline de repos que no hicieron nada.
+
+El paso A falló la primera vez por una razón que vale anotar: al consumidor
+sintético le faltaba el `CLAUDE.md`, así que el control daba 1 antes de tocar nada
+y B era indistinguible de A. Con el control roto la conclusión habría sido la misma
+por casualidad, que es la peor forma de tener razón. Se arregló el fixture y recién
+entonces la medición dice algo.
+
+#### El hueco que esta medición destapó, con su destino
+
+**Projects no se habría enterado.** Con la regla nueva metida en el canónico y el
+manifiesto intacto, `node --test actions/constitucion/pruebas/*.test.mjs` devuelve
+**0** con 203 pruebas en verde. El presupuesto de líneas tampoco lo caza: el
+canónico tiene 600 líneas y el presupuesto declarado es 700, así que sobra lugar
+para varias reglas. El rojo aparece **río abajo**, en el CI de cada consumidor, que
+es el peor lugar posible para descubrir un error de este repo.
+
+Destino, escrito acá y no como intención: **check propuesto** para el CI de Projects,
+que si el cuerpo del canónico cambia y el `manifiesto.json` no gana una entrada de
+versión nueva, sea rojo. Es dogfoodeable, a diferencia del transporte del artefacto,
+porque no necesita un consumidor: compara dos archivos de este repo. Va como tarea
+4.5, y no depende del veredicto del piloto. El corte de la versión en sí es la
+tarea 4.6, y es humana.
+
+**Alternativa descartada: poner solo la mitad operativa en el canónico y nada en el
+delta.** Dejaría la regla como prosa que un agente lee, sin requirement y sin
+capability, o sea sin nada que un spec vivo tenga que describir después. Es
+exactamente la categoría de regla que este repo ya tiene inventariada como
+incumplida hasta volverse check.
+
+**Alternativa descartada: esperar la 1.4.0 y meter las dos mitades juntas.** Suena
+más ordenado y cuesta el lunes: el piloto arranca el 2026-08-24 con el corpus en la
+mano, y la regla que dice cómo entra ese corpus estaría sin escribir en ningún
+artefacto revisable. El delta se puede abrir hoy y pasa por el gate del PO; la
+versión del canónico se corta cuando una persona la corte.
+
 ## La propiedad, enunciada
 
 > **Requirement: El descubrimiento llega al contrato con procedencia, y no lo
@@ -454,7 +571,20 @@ requirement. En ese orden, no en el inverso.
 > veredicto vence, y el pipeline SHALL rechazar el repositorio cuando esa fecha
 > pase sin veredicto, o cuando el change se declare experimental sin fecha.
 
-Ninguno de los dos enunciados nombra un producto, un formato de archivo ni un
+> **Requirement: El descubrimiento se produce fuera del repositorio y entra como
+> insumo de la sesión** (D11)
+>
+> El corpus de descubrimiento SHALL producirse fuera del repositorio y SHALL
+> entrar como insumo al inicio de la sesión que lo consume, sea la de un proyecto
+> nuevo, la de un deploy nuevo o la de un agregado a un proyecto existente. El
+> repositorio NO SHALL ser su custodio: conserva los artefactos derivados y la
+> trazabilidad por identificador estable.
+>
+> El corpus NO SHALL incorporarse a la cadena de artefactos que el repositorio
+> carga en cada sesión, y entrar a una sesión NO SHALL darle autoridad de
+> contrato.
+
+Ninguno de los tres enunciados nombra un producto, un formato de archivo ni un
 directorio. Si mañana se cambia de herramienta de descubrimiento, cambia el pin y
 el nombre del directorio declarado; las propiedades siguen siendo las mismas.
 
@@ -468,6 +598,10 @@ el nombre del directorio declarado; las propiedades siguen siendo las mismas.
 | El experimento caduca | paso nuevo, **inerte** hasta que un change se declara experimental | un change declara `experimental` sin fecha, o su fecha pasó sin veredicto |
 | El artefacto de descubrimiento no entra al contexto de los agentes | **— sin check** | nada distingue mecánicamente un import legítimo de uno indebido. La mitigación es que el artefacto vive fuera de la cadena de imports y la regla queda escrita en el canónico |
 | El material crudo con datos de personas no entra al repositorio | **— sin check** | un nombre no es un secreto y el detector no lo ve. La mitigación es que la trazabilidad funciona **sin** el material, así que no hay incentivo para subirlo |
+| El corpus se produce fuera del repositorio y no queda residente (D11) | **— sin check** | mismo límite que la fila anterior, y por la misma razón: el detector no ve un nombre. La mitigación es la misma y es real: la trazabilidad funciona **sin** el corpus, así que subirlo no compra nada. Lo que sí se puede verificar es lo que ya verifica el requirement 1: que el artefacto derivado no tenga forma de contrato |
+| Un insumo con forma de contrato que no sea un `.md` (por ejemplo un prototipo) | **— sin check, y el diseñado es ciego** | el check de forma busca encabezados de delta y escenarios; un prototipo HTML no trae ninguno de los dos y pasaría. Es el caso más peligroso y hoy queda cubierto solo por G6, o sea lectura humana. Declarado en `piloto/pre-registro.md`, sección 4 |
+| Un insumo con la SUSTANCIA de un escenario pero sin la palabra | **— sin check, y las dos herramientas no se ponen de acuerdo** | medido el 2026-08-21: `validate --all --strict` cuenta el **encabezado `####`**, no la palabra. Un requirement cuyos tres escenarios se renombran a `#### <cualquier cosa>` sale **0**; borrarles el encabezado y dejar los `WHEN`/`THEN` sale **1**. El check de D2, en cambio, va a buscar el literal `#### Scenario:`. O sea que un artefacto con `#### <algo>` más `WHEN`/`THEN` es un contrato para el validador y un documento cualquiera para el check de forma. Al diseñar 5.1 hay que buscar la **estructura**, no la palabra |
+| El canónico gana una regla sin subir de versión | **— sin check, y el rojo cae río abajo** | medido el 2026-08-21 (D11): la suite de Projects sale **0** con 203 pruebas y el consumidor al día sale **1** con `::error::`. Destino: tarea 4.5 |
 | La procedencia es buena, no solo existente | **— sin check, y no puede haberlo** | ver la última sección |
 
 ## El pre-registro, y qué se commitea antes de arrancar
@@ -476,8 +610,16 @@ Antes de la primera sesión del piloto entra al directorio de este change un
 `piloto/` con el pre-registro y sus instrumentos. El pre-registro
 (`piloto/pre-registro.md`) lleva:
 
-1. la rebanada elegida (entrevistas, proceso, dónde corta) y por qué es
-   representativa;
+0. **la pregunta que el piloto responde**, escrita antes que todo lo demás. Se
+   agregó el 2026-08-21, cuando Builder 1 aclaró que el descubrimiento ya está hecho
+   (D11): los dos brazos que el pre-registro tenía comparaban **hacer**
+   descubrimiento con la herramienta y sin ella, y con un corpus ya producido
+   ninguno de los dos se podía correr. Un gate que mide lo que no va a pasar
+   devuelve «no medido» en las siete celdas, o lo reinterpreta alguien el lunes con
+   el resultado a la vista. La reescritura es legítima como pre-registro porque
+   `piloto/horas.csv` tiene cero filas de datos: la primera sesión no corrió;
+1. la rebanada elegida (piezas del corpus, proceso, dónde corta, y si el prototipo
+   la cubre) y por qué es representativa;
 2. los dos brazos, quién corre cada uno, en qué orden, y la **regla de parada
    idéntica para los dos** con el protocolo escrito del brazo A: sin ella las
    horas de G4 miden una cantidad indefinida y gana el brazo que se detiene
@@ -502,15 +644,20 @@ dejarlo escrito: el bloque 0 se podía tildar entero sin que existiera ninguna d
 esas tres piezas, o sea que la checklist habría dicho «pre-registro hecho» sobre
 un pre-registro que no permite medir G1, G2 ni G4.
 
-Y el pre-registro no alcanza solo. Entran con él, en el mismo commit y por el
-mismo motivo, que es la fecha:
+Y el pre-registro no alcanza solo. Entran con él, **antes de la primera sesión** y
+por ese motivo, que es la fecha y no el número de commit:
 
 - `piloto/convencion-de-procedencia.md`: la gramática del identificador estable,
   el formato y el domicilio de la tabla de trazabilidad, y la rúbrica que decide
   si un ítem es regla de negocio, contexto o preferencia. Sin la gramática los
   dos brazos citan en dialectos distintos y G1 deja de ser comparable; sin la
   rúbrica, el umbral de G2 queda condicionado a una clase que el scorer podría
-  redefinir después de ver las salidas.
+  redefinir después de ver las salidas. Con el corpus ya producido (D11) esta pieza
+  creció y cambió de peso: nombra las cuatro clases de pieza que el corpus trae
+  —entrevista, documento, prototipo, feedback—, cada una con el localizador que
+  admite, y agrega el campo `origen` (`corpus` o `derivado`), que es lo que permite
+  separar lo que dijo el corpus de lo que interpretó un agente. Es la vara de G3
+  bajo la pregunta nueva.
 - `piloto/arnes/`: el script que cierra G0 y la parte mecánica de G4 **por código
   de salida**, y la configuración de OpenSpec que se copia al espacio de trabajo
   idéntica en los dos brazos. Un brazo que redacta con las reglas del área
