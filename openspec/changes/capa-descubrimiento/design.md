@@ -263,6 +263,12 @@ criterios que justifican la capa (G2 y G3) exigen **cero absoluto**, no «mejor 
 el control». Un empate o una derrota de B sería una señal fortísima; una victoria
 está inflada y se lee con esa corrección puesta.
 
+**Y por eso el verde significa «no se refutó que ayude», no «ayuda».** Builder 1 lo
+decidió el 2026-08-21: el orden se mantiene A → B tal como está, y el verde de esa
+corrida habilita **una segunda rebanada con el orden invertido**, no el archive ni
+el estreno de los checks ni el pin. El razonamiento entero está en D8 y su versión
+vigente en `piloto/pre-registro.md`, sección 2.
+
 **Quién puntúa.** El builder que **no** corrió ninguno de los dos brazos. Arma el
 inventario de materia prima desde las transcripciones antes de mirar las salidas,
 y después puntúa las dos. El ciego es imperfecto —las dos salidas se distinguen a
@@ -325,11 +331,26 @@ archiva por separado**; está escrito como tarea, no como buena intención.
 el estado por defecto y es el zombi. La revisión trimestral lo cazaría, y su
 propio texto admite que no es enforcement.
 
-### D8 — Los tres veredictos, con su desenlace escrito de antemano
+### D8 — Los veredictos, con su desenlace escrito de antemano
+
+**Corrección del 2026-08-21, decidida por Builder 1, y es la fila del verde la que
+cambia.** Hasta hoy el verde de una sola rebanada habilitaba el archive, el estreno
+de los checks y el pin en el carril de todos los consumidores. Con la misma persona
+corriendo A y después B, un verde mide **la herramienta más la memoria de haber
+hecho ya la tarea** —el propio pre-registro dice que leer el corpus es la parte más
+cara— y eso no se puede separar con n=1. Entonces el verde pasa a significar **«no
+se refutó que ayude»** y habilita **una segunda rebanada con el orden invertido (B
+primero)**, no el bloque 5. Dos corridas con el sesgo de orden en direcciones
+opuestas acotan el efecto real: una lo infla y la otra lo deprime, y así el sesgo
+deja de ser un defecto y pasa a ser el instrumento. Eso exige no quemar el control
+limpio en la primera corrida, y por eso la primera va A → B. El detalle vive en
+`piloto/pre-registro.md`, sección 2, que es el pre-registro vigente.
 
 | Veredicto | Qué significa | Qué pasa con este change |
 |---|---|---|
-| **Verde** (los siete criterios) | la capa produce material trazable, no inventa y cuesta lo declarado | se archiva: los dos requirements entran a los specs vivos, se amplía el `## Purpose`, y arranca la tanda de implementación (checks, scaffold, pin) |
+| **Verde** (los siete criterios) | **no se refutó** que la capa ayude: produce material trazable, no inventa y cuesta lo declarado, con el sesgo de orden todavía adentro del número | **no se archiva todavía**: habilita la **segunda rebanada con el orden invertido**. El archive, el estreno de los checks de D2 y D4 y el pin en el carril de los consumidores esperan que esa segunda corrida también dé verde |
+| **Verde y después verde** (las dos rebanadas) | el efecto sobrevive con el sesgo de orden invertido, o sea acotado por arriba y por abajo | se archiva: los dos requirements entran a los specs vivos, se amplía el `## Purpose`, y arranca la tanda de implementación (checks, scaffold, pin) |
+| **Verde y después no verde** | lo que midió la primera corrida era el orden, no la herramienta | desenlace de no-verde de esta misma tabla, con las mediciones de **las dos** corridas en el ADR |
 | **Amarillo** (falla solo el costo, o G5 entero afuera) | sirve, pero no como requisito del marco | queda como **herramienta del PO documentada en `docs/`**: sin requirement, sin huella en el scaffold y sin check. El change **no** se archiva: su evidencia se escribe como ADR y el directorio se borra en ese mismo PR. El requirement de caducidad se rescata aparte |
 | **Rojo** (G0, G1, G2 o G3) | no cierra el hueco, o hay que forkear el método para usarlo | ADR de rechazo con las mediciones, y el directorio del change se borra en ese mismo PR. El plan B queda anotado en el ADR |
 

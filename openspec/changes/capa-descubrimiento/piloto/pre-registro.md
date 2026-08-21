@@ -253,26 +253,86 @@ no es un sesgo:
 - **Esa lista no cambia el veredicto, y no se le pone umbral.** Un umbral inventado
   hoy sobre algo que nadie vio todavía es exactamente el número que inventa un
   éxito, y este mismo archivo prohíbe eso dos secciones más abajo. Queda como el
-  candidato más fuerte a medición propia si el veredicto habilita una segunda
-  vuelta.
+  candidato más fuerte a medición propia de **la segunda rebanada**, que es lo que
+  un verde habilita (más abajo, en esta misma sección).
 
 Vale decir por qué se registra en vez de prohibirse: si la herramienta le saca al
 PO algo que el corpus no tenía, eso es **exactamente el valor que su fase 1
 promete**, y prohibirlo sería medirla amputada. Lo que no puede hacer es contaminar
 los denominadores.
 
-### El orden, y a quién favorece
+### El orden, la decisión del Builder 1, y qué significa el verde por causa de ella
 
-Primero A, después B, sobre el mismo material. Quien escriba A ya va a haber
-pensado el problema cuando llegue a B, así que **el sesgo del orden favorece al
-brazo B**. Con un corpus preexistente el sesgo es **más fuerte** que antes, y hay
-que decirlo: la parte más cara del trabajo es leer y entender el corpus, y eso se
-hace una sola vez, en el brazo A. El brazo B arranca con el corpus ya digerido.
+**Primero A, después B, sobre el mismo material, tal como está. No se invierte.**
+Lo decidió Builder 1 el 2026-08-21, con el orden ya sobre la mesa como objeción al
+instrumento, y acá se transcribe: un pre-registro no interpreta una decisión, la
+escribe.
 
-La consecuencia práctica, que hay que tener puesta al leer el resultado: una
-victoria de B está inflada, y un empate o una derrota de B son una señal
-fortísima. Por eso los dos criterios que justifican la existencia de la capa
-(G2 y G3) piden **cero absoluto** y no «mejor que el control».
+Quien escriba A ya va a haber pensado el problema cuando llegue a B, así que **el
+sesgo del orden favorece al brazo B**. Con un corpus preexistente el sesgo es
+**más fuerte** que antes, y hay que decirlo: la parte más cara del trabajo es leer
+y entender el corpus, y eso se hace una sola vez, en el brazo A. El brazo B
+arranca con el corpus ya digerido.
+
+**Y de ahí sale el cambio de significado, que es la mitad de la decisión: el verde
+deja de significar «la herramienta ayuda» y pasa a significar «NO SE REFUTÓ QUE
+AYUDE».** El motivo, con las palabras que son el argumento: con la misma persona
+corriendo A y después B, la persona llega a B con el corpus ya digerido, y el
+propio documento dice que leerlo es la parte más cara. Un verde mide entonces **la
+herramienta MÁS la memoria de haber hecho ya la tarea**, y eso no se puede separar
+con n=1.
+
+La lectura del resultado no cambia de dirección, se endurece: una victoria de B
+está inflada, y un empate o una derrota de B son una señal fortísima. Por eso los
+dos criterios que justifican la existencia de la capa (G2 y G3) piden **cero
+absoluto** y no «mejor que el control».
+
+### Qué habilita el verde, y qué no: la segunda rebanada con el orden invertido
+
+Esta es la parte que hace que la decisión no sea «no hacer nada». Hasta hoy, D8 le
+colgaba al verde el archive del change, el estreno de los checks y el pin de la
+dependencia en el carril de todos los consumidores. **Eso cambia.**
+
+> **El verde del lunes habilita UNA SEGUNDA REBANADA CON EL ORDEN INVERTIDO (B
+> primero). No habilita el bloque 5.**
+
+**Por qué una segunda rebanada, y por qué invertida.** Dos corridas con el sesgo de
+orden en direcciones **opuestas** acotan el efecto real: una lo infla y la otra lo
+deprime, y el verdadero queda en el medio. El sesgo pasa de ser un defecto a ser el
+instrumento. Y eso **no se puede hacer si se quema el control limpio en la primera
+corrida**: por eso la primera va A → B y no al revés. Invertir hoy compraría una
+corrida sin sesgo a favor de B a cambio de perder para siempre la única corrida en
+que el control se escribe sin haber visto nada.
+
+**Lo que el verde de la primera rebanada NO habilita**, dicho por su nombre para
+que el lunes nadie lo lea como un trámite pendiente:
+
+- el **archive** de este change, o sea fundir los dos requirements en los specs
+  vivos;
+- el **estreno de los checks** de D2 y D4 (bloque 5, tareas 5.1 a 5.3), incluido el
+  estreno en rojo que G6 pueda obligar;
+- el **pin de la dependencia** en el carril de los consumidores, que además es un
+  OK aparte y explícito de la decisión 1.1.
+
+Los tres esperan la segunda rebanada. El único ítem que sigue corriendo con
+independencia de todo esto es el bloque 4, la caducidad del estado experimental,
+que ya estaba declarado como independiente del veredicto (D7).
+
+**El desenlace de la segunda rebanada se escribe ahora, no después.** No es una
+decisión nueva: es la regla que este archivo ya tiene —«un delta que el piloto
+refutó no se funde», «un criterio no medido cuenta en contra»— aplicada al caso que
+la segunda corrida abre.
+
+| Primera rebanada (A → B) | Segunda rebanada (B → A) | Qué pasa |
+|---|---|---|
+| verde | verde | recién ahí corre el bloque 5: checks, scaffold, pin y archive |
+| verde | no verde | el efecto que midió la primera era el orden y no la herramienta. Desenlace de no-verde de D8, con las mediciones de **las dos** corridas en el ADR |
+| no verde | no se corre | desenlace de D8 tal como está: amarillo o rojo, con su ADR |
+
+**Lo que la segunda rebanada no arregla, para que no se lea como que sí.** Sigue
+siendo n=1 por rebanada y la misma persona en los dos brazos. Dos corridas acotan
+el efecto del **orden**; no convierten el piloto en evidencia de que la capa sirve
+en general. La asimetría de la sección 8 se mantiene entera.
 
 ### El conjunto de salidas, idéntico para los dos brazos
 
@@ -491,10 +551,18 @@ justamente contra su caso más peligroso. Consecuencias, escritas antes:
 - Y va a `bitacora-g5.md` como candidato a check propio, con el destino que le
   corresponde: hoy es disciplina declarada y no enforcement.
 
-**Regla de veredicto**, sin cambios respecto de D6: verde exige los siete. Rojo si
-falla G0, G1, G2 o G3, que son la razón de existir de la capa. Amarillo si falla
-solo G4, o si G5 queda entero afuera. G6 no cambia el veredicto: cambia con qué
-dureza se estrena el check de D2.
+**Regla de veredicto**, sin cambios respecto de D6 en su mecánica: verde exige los
+siete. Rojo si falla G0, G1, G2 o G3, que son la razón de existir de la capa.
+Amarillo si falla solo G4, o si G5 queda entero afuera. G6 no cambia el veredicto:
+cambia con qué dureza se estrena el check de D2.
+
+**Lo que sí cambió es qué afirma un verde, y qué habilita.** Por la decisión de
+Builder 1 del 2026-08-21 (sección 2): un verde de esta primera rebanada significa **«no
+se refutó que la herramienta ayude»**, no «ayuda», porque con la misma persona
+corriendo A y después B el verde mide la herramienta más la memoria de haber hecho
+ya la tarea. Y habilita **la segunda rebanada con el orden invertido**, no el
+bloque 5: ni el archive, ni el estreno de los checks de D2 y D4, ni el pin en el
+carril de los consumidores.
 
 **Un criterio no medido no es un criterio aprobado.** Si algo no se pudo medir, se
 escribe «no medido» con el motivo, y el veredicto se calcula con esa celda en
@@ -636,7 +704,7 @@ sigue siendo bloqueante dura** para el lunes.
 
 | | Decisión | Quién | Cuándo | Estado |
 |---|---|---|---|---|
-| 1.1 | Usar una dependencia de terceros en el piloto, con su versión y su alcance de módulos. El OK para que el pin entre al carril de todos los consumidores es **otro** OK, y solo si el veredicto es verde | Builder 1 | antes de la primera sesión | **RESUELTA: la tomó @builder-uno el 2026-08-20.** Alcance: `bmad-method@6.11.0`, módulo `bmm`, herramienta `claude-code`, en espacio desechable. El OK para que el pin entre al carril de los consumidores sigue PENDIENTE y es otro |
+| 1.1 | Usar una dependencia de terceros en el piloto, con su versión y su alcance de módulos. El OK para que el pin entre al carril de todos los consumidores es **otro** OK, y solo si las **dos** rebanadas dan verde (sección 2) | Builder 1 | antes de la primera sesión | **RESUELTA: la tomó @builder-uno el 2026-08-20.** Alcance: `bmad-method@6.11.0`, módulo `bmm`, herramienta `claude-code`, en espacio desechable. El OK para que el pin entre al carril de los consumidores sigue PENDIENTE y es otro |
 | 1.2 | Dónde vive el corpus de descubrimiento y si puede pasar por un modelo. El repositorio no es su custodio (D3) | Builder 1, con el PO | antes de abrir el material | **RESUELTA: la contestó Builder 1 el 2026-08-21.** Ver abajo |
 | 1.3 | Correr el piloto: reserva de tiempo del PO y de dos builders, y confirmación del reparto de roles de la sección 2 | Builder 1, PO (PO), Builder 2 | antes de la primera sesión | PENDIENTE |
 | 1.4 | Cadena de herramientas: instalación ensayada en la máquina del brazo B, **y** si la fase 1 ingiere un corpus terminado | quien corra el brazo B | antes de la primera sesión | **PARCIAL**: instalación ensayada el 2026-08-20 (exit 0, pide `uv`; sección 6). Sigue PENDIENTE si el brazo B corre en otra máquina, PENDIENTE el caso sin `uv`, y PENDIENTE la ingesta del corpus |
@@ -704,6 +772,12 @@ compre más autoridad de la que tiene.
 - **No mide si la capa sirve en general.** n=1: una rebanada, un proyecto, un PO,
   una persona corriendo los dos brazos. El gate está diseñado para poder decir
   no; no puede decir sí más allá de este caso. La asimetría es deliberada.
+- **No mide la herramienta separada del orden en que se corrió.** Con la misma
+  persona en los dos brazos, el brazo B recibe el corpus ya digerido por el brazo
+  A, y eso no se puede descontar con n=1. Por eso un verde de esta rebanada dice
+  «no se refutó que ayude» y habilita la segunda rebanada invertida (sección 2), en
+  vez de habilitar el archive. Las dos corridas juntas **acotan** el efecto del
+  orden; ninguna de las dos lo elimina.
 - **No mide la calidad de la procedencia.** Que un escenario tenga origen no dice
   nada sobre si el origen era una buena idea. La trazabilidad va a rastrear con
   fidelidad perfecta hasta una mala decisión del negocio. Lo que se cierra es la

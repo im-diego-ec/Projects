@@ -14,6 +14,15 @@ piloto. Nada del bloque 5 se adelanta «para tenerlo listo»: adelantar la
 maquinaria de una capa que todavía no se validó es la forma más eficiente de que
 el veredicto salga verde por costo hundido.
 
+**Y desde el 2026-08-21 hay un bloque más entre el veredicto y el bloque 5.** Builder 1
+decidió que el orden del piloto se mantiene A → B y que, por eso mismo, un verde
+significa **«no se refutó que la herramienta ayude»** y no «ayuda»: con la misma
+persona en los dos brazos, el verde mide la herramienta más la memoria de haber
+hecho ya la tarea. Ese verde habilita el **bloque 4b**, la segunda rebanada con el
+orden invertido; el bloque 5 pasa a depender de que las **dos** corridas den verde.
+Los umbrales y el desenlace de cada combinación viven en
+`piloto/pre-registro.md`, sección 2, que es el pre-registro vigente.
+
 El bloque 0 es bloqueante por una razón metodológica, no burocrática: un umbral
 escrito después de ver el resultado no es un umbral. El sello de tiempo de git es
 la evidencia.
@@ -94,9 +103,9 @@ G2 ni G4.
 Ninguna de estas cuatro se resuelve por defecto, y ninguna la toma un agente.
 
 - [ ] 1.1 **Dependencia de terceros** (⚠️ de `AGENTS.md`): OK para usar la
-      herramienta en el piloto, y —por separado, y solo si el veredicto es
-      verde— OK para que su pin entre al carril que consumen todos. Evidencia: el
-      OK en la sesión, con la versión y el alcance de módulos escritos.
+      herramienta en el piloto, y —por separado, y solo si las **dos** rebanadas
+      dan verde— OK para que su pin entre al carril que consumen todos. Evidencia:
+      el OK en la sesión, con la versión y el alcance de módulos escritos.
 - [ ] 1.2 **Material con datos de personas**: dónde viven las transcripciones, y
       si pueden pasar por un modelo. El repositorio no es su custodio (D3) y el
       piloto no arranca sin esta decisión tomada por una persona. Evidencia: la
@@ -155,8 +164,11 @@ Ninguna de estas cuatro se resuelve por defecto, y ninguna la toma un agente.
       y eso queda anotado como consecuencia, no como nota al pie. Evidencia: la
       búsqueda y su resultado.
 - [ ] 3.7 Escribir `piloto/veredicto.md`: los siete resultados con sus números, el
-      veredicto según la regla de D6, y las tres firmas (PO por fidelidad al
-      negocio, scorer por la medición, Builder 1 por el veredicto). Evidencia: el
+      veredicto según la regla de la sección 4 del pre-registro, y las tres firmas
+      (PO por fidelidad al negocio, scorer por la medición, Builder 1 por el veredicto).
+      Y escribir qué habilita ese veredicto con las palabras que le corresponden:
+      un verde significa **«no se refutó que ayude»** y habilita el bloque 4b —la
+      segunda rebanada con el orden invertido—, no el bloque 5. Evidencia: el
       archivo, con fecha anterior al `veredicto_antes_de`.
 
 ## 4. Caducidad del estado experimental (independiente del veredicto)
@@ -182,10 +194,38 @@ experimental de cualquier change, incluido este.
       sección «para consumidores» diciendo lo que tienen que hacer: **nada**,
       mientras no declaren un change experimental. Evidencia: la entrada escrita.
 
-## 5. SOLO si el veredicto es VERDE
+## 4b. La segunda rebanada, con el orden invertido (SOLO si la primera dio verde)
 
-Nada de este bloque se adelanta. Adelantarlo compra costo hundido y el costo
-hundido decide veredictos.
+No es una repetición del piloto: es la corrida que acota el sesgo de orden. La
+primera va A → B y deja el sesgo a favor de B; esta va **B primero** y lo deja en
+contra. Con las dos, el efecto real queda encerrado entre un número inflado y uno
+deprimido, y el sesgo pasa de defecto a instrumento. Por eso la primera no se
+invierte: el control limpio se puede escribir una sola vez.
+
+- [ ] 4b.1 Elegir la **segunda rebanada** con el PO y un builder, con las mismas
+      cinco declaraciones de la sección 1 del pre-registro. Tiene que ser otra
+      rebanada del mismo corpus: repetir la primera mide memoria, no herramienta.
+      Evidencia: la sección 1 del pre-registro de la segunda corrida, commiteada
+      antes de su primera sesión.
+- [ ] 4b.2 Correr los dos brazos con el orden **invertido**: primero B, después A.
+      Todo lo demás idéntico —misma persona, misma regla de parada, mismo techo de
+      5 sesiones, mismo conjunto de cinco salidas—. Evidencia: los artefactos de
+      los dos brazos y sus horas, con el orden visible en las fechas de
+      `horas.csv`.
+- [ ] 4b.3 Puntuar los siete criterios de la misma tabla y con los mismos umbrales,
+      sin tocar ninguno: mover un umbral entre corridas vuelve incomparables las
+      dos. Evidencia: el `veredicto.md` de la segunda corrida.
+- [ ] 4b.4 Escribir la lectura conjunta: el efecto de cada criterio en las dos
+      corridas, y qué queda en pie cuando el sesgo apunta al revés. Evidencia: la
+      sección de lectura conjunta, con los dos números por criterio.
+
+Si la segunda corrida **no** da verde, no corre el bloque 5: corre el 6, con las
+mediciones de las **dos** corridas adentro del ADR (D8).
+
+## 5. SOLO si las DOS rebanadas dieron VERDE
+
+Nada de este bloque se adelanta, y desde el 2026-08-21 tampoco arranca con un solo
+verde. Adelantarlo compra costo hundido y el costo hundido decide veredictos.
 
 - [ ] 5.1 Check de forma: un artefacto de la ubicación declarada que contenga
       encabezados de delta o escenarios es rojo. Evidencia: fixture con un insumo
@@ -214,7 +254,7 @@ hundido decide veredictos.
       toca el mismo `Purpose`. Evidencia: `openspec validate --all --strict` y el
       guardrail de deltas, los dos **por código de salida**.
 
-## 6. SOLO si el veredicto es AMARILLO o ROJO
+## 6. SOLO si el veredicto es AMARILLO o ROJO, o si la SEGUNDA rebanada no dio verde
 
 - [ ] 6.1 ADR nuevo en `docs/adr/` con contexto, decisión y consecuencias, y con
       **las mediciones adentro**: los siete criterios con sus números. La
