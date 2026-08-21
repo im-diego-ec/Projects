@@ -43,6 +43,63 @@ jobs:
     # que YAML lea un mapa en flujo y el archivo no parsea antes de sustituirlo.
     uses: "{{ORG}}/Projects/.github/workflows/marco-ci.yml@v1"
 
+  # ---------------------------------------------------------------------------
+  # LA PORCION DEL MARCO DE LA CONSTITUCION: que las reglas que leen los agentes
+  # de este repo sean las que el marco publica, integras y al dia. En un area que
+  # implementa con agentes, las reglas que el agente lee SON el producto.
+  #
+  # POR QUE ES UN JOB DE ESTE ARCHIVO Y NO UN PASO DEL WORKFLOW REUSABLE. El
+  # texto canonico viaja DENTRO de la composite action —el GITHUB_TOKEN de un
+  # consumidor no lee otro repositorio—, asi que la unica pieza capaz de comparar
+  # el artefacto contra el RE-RENDER de la fuente es la action. Hubo tambien un
+  # paso inline en marco-ci.yml que comparaba contra el SELLO que trae el propio
+  # artefacto, y la auditoria del 2026-08-20 lo midio: recomputar un sello es un
+  # `git commit` y cambiar el canonico no, asi que el paso pasaba en VERDE con una
+  # regla borrada mientras la action daba rojo. Encima las dos verdades discrepaban
+  # en el formato del sello y el paso rechazaba artefactos recien generados por la
+  # action, con un mensaje que mandaba a correr el escritor que los habia generado.
+  # El paso se borro; esto es el reemplazo.
+  #
+  # CORRE EN LOS DOS CARRILES, sin el if de solo_docs: la constitucion ES
+  # documentacion, y un PR de solo docs es exactamente el que puede editarla a
+  # mano. Dejarla fuera del carril rapido seria no verificar el caso mas probable.
+  #
+  # NO ES BORRABLE EN SILENCIO: el job de marco comprueba estaticamente que este
+  # workflow invoque la action, y si no la encuentra da rojo con el snippet listo
+  # para pegar. Un guardrail que se puede sacar sin que nada lo note no lo es.
+  # ---------------------------------------------------------------------------
+  constitucion:
+    name: constitucion
+    runs-on: ubuntu-latest
+    # Minimo real y declarado POR JOB, no heredado del workflow: la action no
+    # llama a la API de GitHub, solo lee el arbol ya checkouteado. Es lo que la
+    # propia constitucion exige ("un job nuevo declara permissions explicitos con
+    # el minimo necesario") y lo que un check de permisos por job va a leer.
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v7
+      # La action necesita node en el PATH y lo dice con el arreglo escrito si no
+      # esta. No hace falta pnpm ni instalar dependencias: esto lee y renderiza
+      # texto, no interroga al toolchain del proyecto.
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "22"
+      - id: marco_constitucion
+        uses: "{{ORG}}/Projects/actions/constitucion@v1"
+        with:
+          modo: verificar
+      # El artefacto AL DIA se sube SIEMPRE, tambien cuando el veredicto es verde:
+      # un repo sin el workflow semanal de actualizacion lo baja de aca y lo aplica
+      # a mano, y esa es la salida que el mensaje de fallo promete. Sin
+      # if: !cancelled() no se subiria justo en la corrida que lo necesita.
+      - if: '!cancelled()'
+        uses: actions/upload-artifact@v5
+        with:
+          name: constitucion-al-dia
+          path: ${{ steps.marco_constitucion.outputs.corregidos }}
+          if-no-files-found: warn
+
   # Lo del producto. Se omite cuando el cambio no altera lo que se sirve.
   build_test:
     name: build-test
@@ -323,7 +380,7 @@ jobs:
   # origen). ci-ok reporta en AMBOS carriles gracias a if: always().
   ci_ok:
     name: ci-ok
-    needs: [marco, build_test]
+    needs: [marco, constitucion, build_test]
     if: always()
     runs-on: ubuntu-latest
     steps:
@@ -331,6 +388,10 @@ jobs:
         shell: bash
         run: |
           [ "${{ needs.marco.result }}" = "success" ] || { echo "::error::el CI de marco fallo"; exit 1; }
+          # La constitucion no tiene carril rapido: corre en los dos, asi que
+          # cualquier resultado que no sea success es un fallo. Un "skipped" aca
+          # significaria que alguien le puso un if, y eso es apagarla.
+          [ "${{ needs.constitucion.result }}" = "success" ] || { echo "::error::la verificacion de la constitucion del marco termino en '${{ needs.constitucion.result }}'"; exit 1; }
           if [ "${{ needs.build_test.result }}" = "success" ]; then exit 0; fi
           if [ "${{ needs.build_test.result }}" = "skipped" ] && [ "${{ needs.marco.outputs.solo_docs }}" = "true" ]; then
             echo "solo docs: build-test omitido a proposito"; exit 0

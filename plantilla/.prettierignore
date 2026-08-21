@@ -11,3 +11,14 @@ pnpm-lock.yaml
 # documentos que ya cerraron y ensuciaria el registro del porque. Los changes
 # activos y los specs vivos SI se formatean.
 openspec/changes/archive
+
+# La porcion del marco es un ARTEFACTO GENERADO: lo escribe el marco y el CI
+# compara su contenido contra el texto publicado para la version que declara.
+# Pasarle el formateador de este repo lo pondria en divergencia por una razon
+# que no es del proyecto — y el rojo diria "alguien lo edito a mano".
+# Las ENTRADAS del render (.projects-valores.json, .projects-desvios.json) viven
+# fuera de este directorio a proposito, y esas SI se formatean.
+.projects/
+
+# Misma razon, para la superficie de Cursor cuando el proyecto la declara.
+.cursor/rules/00-marco.mdc
