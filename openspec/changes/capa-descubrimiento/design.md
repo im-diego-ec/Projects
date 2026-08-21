@@ -241,17 +241,44 @@ necesita: un directorio local alcanza.
 
 ### D6 — (obligatoria) El gate es una medición pre-registrada sobre el MISMO material, con dos brazos
 
+> **NOTA DE SUPREMACÍA, agregada el 2026-08-21. Los umbrales vigentes son los de
+> `piloto/pre-registro.md`, sección 4. Los de esta decisión NO son el gate.**
+>
+> El 2026-08-21 Builder 1 aclaró que el descubrimiento del proyecto **ya está hecho**:
+> PO produjo un corpus —documentos, procesos, casos borde y un prototipo con
+> feedback de usuario— y ese corpus, no una grabación, es el material que entra el
+> lunes. El pre-registro se reescribió contra esa pregunta y ahí quedaron los
+> umbrales que rigen: G3, G4 y G6 rearmados, cinco salidas por brazo en vez de
+> tres, y el insumo declarado como corpus y no como transcripciones.
+>
+> Esta decisión y su tabla quedan como **historia del diseño viejo**: explican por
+> qué el gate existe y con qué forma nació. No se borran porque el design es el
+> lugar donde se lee el razonamiento, y borrarlo dejaría el pre-registro sin
+> genealogía. Pero **donde esta tabla y el pre-registro difieran, manda el
+> pre-registro**, y no por jerarquía de documentos: porque es el archivo cuyo sello
+> de tiempo de git es anterior a la primera fila de `horas.csv`, que es lo único
+> que hace falsable un umbral.
+>
+> Dos documentos vigentes que se contradicen no son un problema de prolijidad: son
+> la puerta exacta por la que el lunes a la mañana entra la reinterpretación que un
+> pre-registro existe para impedir. Por eso esto se escribe acá y no en el
+> pre-registro, que ya lo dice de su lado.
+
 Un gate que se aprueba con «pareció útil» no es un gate. El piloto es una
 comparación con umbrales **escritos antes de correr y commiteados antes de la
 primera sesión** — el sello de tiempo de git es la prueba de que no se acomodaron
 después de ver el resultado.
 
-**La rebanada.** Un proceso end-to-end que aparezca en las entrevistas, elegido
-por el PO y un builder antes de arrancar, declarado por escrito: qué entrevistas,
-qué proceso y dónde corta.
+**La rebanada.** Un proceso end-to-end que aparezca en el material, elegido por el
+PO y un builder antes de arrancar, declarado por escrito: qué piezas, qué proceso y
+dónde corta. (En el pre-registro vigente las piezas son las del **corpus**, y la
+declaración lleva además si el prototipo la cubre.)
 
-**Brazo A (control).** El camino de hoy: desde las transcripciones directo a
-`proposal.md` + deltas, con la asistencia de agente que se usa habitualmente.
+**Brazo A (control).** El camino de hoy: del material directo a `proposal.md` +
+deltas, con la asistencia de agente que se usa habitualmente. El protocolo escrito
+del control —insumo, asistencia, reglas cargadas y qué está prohibido mirar— vive
+en el pre-registro, sección 2, porque «el camino de hoy» sin esas cuatro líneas no
+es un control.
 
 **Brazo B.** Fases 1 y 2 de la herramienta sobre el **mismo** material → brief +
 PRD; y desde el PRD, `proposal.md` + deltas.
@@ -263,13 +290,26 @@ criterios que justifican la capa (G2 y G3) exigen **cero absoluto**, no «mejor 
 el control». Un empate o una derrota de B sería una señal fortísima; una victoria
 está inflada y se lee con esa corrección puesta.
 
+**Y por eso el verde significa «no se refutó que ayude», no «ayuda».** Builder 1 lo
+decidió el 2026-08-21: el orden se mantiene A → B tal como está, y el verde de esa
+corrida habilita **una segunda rebanada con el orden invertido**, no el archive ni
+el estreno de los checks ni el pin. El razonamiento entero está en D8 y su versión
+vigente en `piloto/pre-registro.md`, sección 2.
+
 **Quién puntúa.** El builder que **no** corrió ninguno de los dos brazos. Arma el
-inventario de materia prima desde las transcripciones antes de mirar las salidas,
-y después puntúa las dos. El ciego es imperfecto —las dos salidas se distinguen a
+inventario de materia prima desde el material —el corpus, en el pre-registro
+vigente— antes de mirar las salidas, y después puntúa las dos. El ciego es imperfecto —las dos salidas se distinguen a
 ojo— y con tres personas no tiene arreglo: queda declarado como sesgo residual.
 El PO firma la fidelidad al negocio; Builder 1 firma el veredicto.
 
-**Los siete criterios, todos eliminatorios:**
+**Los siete criterios, todos eliminatorios** —en la forma con que **nacieron**, no
+en la que rige. La tabla vigente, con G3, G4 y G6 rearmados contra el corpus, está
+en `piloto/pre-registro.md`, sección 4. Cuatro diferencias concretas, para que
+nadie tenga que diffear: acá el insumo son «las transcripciones» y en el
+pre-registro es el corpus; acá el brazo entrega tres salidas y allá cinco; acá G4
+compara «2× las horas de PO del control» y allá compara horas de **conversión** del
+builder con un absoluto de una hora para el PO; acá G6 se cuenta solo en B y allá
+en los dos brazos:
 
 | | Qué se mide | Umbral pre-registrado | Evidencia que se pide |
 |---|---|---|---|
@@ -325,11 +365,26 @@ archiva por separado**; está escrito como tarea, no como buena intención.
 el estado por defecto y es el zombi. La revisión trimestral lo cazaría, y su
 propio texto admite que no es enforcement.
 
-### D8 — Los tres veredictos, con su desenlace escrito de antemano
+### D8 — Los veredictos, con su desenlace escrito de antemano
+
+**Corrección del 2026-08-21, decidida por Builder 1, y es la fila del verde la que
+cambia.** Hasta hoy el verde de una sola rebanada habilitaba el archive, el estreno
+de los checks y el pin en el carril de todos los consumidores. Con la misma persona
+corriendo A y después B, un verde mide **la herramienta más la memoria de haber
+hecho ya la tarea** —el propio pre-registro dice que leer el corpus es la parte más
+cara— y eso no se puede separar con n=1. Entonces el verde pasa a significar **«no
+se refutó que ayude»** y habilita **una segunda rebanada con el orden invertido (B
+primero)**, no el bloque 5. Dos corridas con el sesgo de orden en direcciones
+opuestas acotan el efecto real: una lo infla y la otra lo deprime, y así el sesgo
+deja de ser un defecto y pasa a ser el instrumento. Eso exige no quemar el control
+limpio en la primera corrida, y por eso la primera va A → B. El detalle vive en
+`piloto/pre-registro.md`, sección 2, que es el pre-registro vigente.
 
 | Veredicto | Qué significa | Qué pasa con este change |
 |---|---|---|
-| **Verde** (los siete criterios) | la capa produce material trazable, no inventa y cuesta lo declarado | se archiva: los dos requirements entran a los specs vivos, se amplía el `## Purpose`, y arranca la tanda de implementación (checks, scaffold, pin) |
+| **Verde** (los siete criterios) | **no se refutó** que la capa ayude: produce material trazable, no inventa y cuesta lo declarado, con el sesgo de orden todavía adentro del número | **no se archiva todavía**: habilita la **segunda rebanada con el orden invertido**. El archive, el estreno de los checks de D2 y D4 y el pin en el carril de los consumidores esperan que esa segunda corrida también dé verde |
+| **Verde y después verde** (las dos rebanadas) | el efecto sobrevive con el sesgo de orden invertido, o sea acotado por arriba y por abajo | se archiva: los dos requirements entran a los specs vivos, se amplía el `## Purpose`, y arranca la tanda de implementación (checks, scaffold, pin) |
+| **Verde y después no verde** | lo que midió la primera corrida era el orden, no la herramienta | desenlace de no-verde de esta misma tabla, con las mediciones de **las dos** corridas en el ADR |
 | **Amarillo** (falla solo el costo, o G5 entero afuera) | sirve, pero no como requisito del marco | queda como **herramienta del PO documentada en `docs/`**: sin requirement, sin huella en el scaffold y sin check. El change **no** se archiva: su evidencia se escribe como ADR y el directorio se borra en ese mismo PR. El requirement de caducidad se rescata aparte |
 | **Rojo** (G0, G1, G2 o G3) | no cierra el hueco, o hay que forkear el método para usarlo | ADR de rechazo con las mediciones, y el directorio del change se borra en ese mismo PR. El plan B queda anotado en el ADR |
 
@@ -471,6 +526,16 @@ las tres firmas). Esos dos **no** se crean vacíos antes de arrancar: un archivo
 vacío con el título puesto invita a llenarlo de memoria, que es justo lo que G4 y
 G5 tratan de evitar. Todo despersonalizado: ni nombres de entrevistados ni citas
 que los identifiquen.
+
+**Y eso deja una consecuencia que el pre-registro tuvo que resolver: el inventario
+del scorer no vive acá.** Se commitea **antes** de las salidas —es la mitad de la
+evidencia de G1 y de G2— pero lleva la cita textual de cada ítem del corpus, así que
+meterlo en el repositorio sería meter el material del corpus, que D3 prohíbe y que la
+decisión de despersonalización todavía no autorizó. Vive en un **espacio de git
+propio del scorer**, fuera de todo repositorio, igual que los espacios de los brazos:
+ahí el sello de tiempo funciona igual y la frontera de privacidad no se mueve. Lo que
+viaja a Projects es `mediciones.md`, después y despersonalizado
+(`piloto/pre-registro.md`, sección 3).
 
 ## Lo que este diseño NO resuelve
 

@@ -41,9 +41,10 @@
 //   2. `git init` DENTRO del espacio. Sí, git.
 //
 //   3. Solo el brazo B: instalar la herramienta con su versión exacta (la del
-//      pre-registro, sección 6) y, ACTO SEGUIDO, commitear `_bmad/`:
+//      pre-registro, sección 6) y, ACTO SEGUIDO, commitear LOS DOS directorios
+//      que la instalación escribe:
 //
-//        git add --all --force -- _bmad
+//        git add --all --force -- _bmad .claude/skills
 //        git commit -m "instalacion limpia de la herramienta"
 //
 //      Ese commit es el patrón de comparación de G0 y no hay otro. Si se
@@ -52,6 +53,16 @@
 //      nula. El `--force` está porque la herramienta puede traer su propio
 //      .gitignore que ignore su directorio de instalación (en el repo de un
 //      consumidor eso es lo correcto, D9; acá lo queremos versionado).
+//
+//      SON DOS DIRECTORIOS Y NO UNO, y esto se corrigió el 2026-08-21 porque la
+//      versión anterior medía la mitad. La instalación escribe `_bmad/` **y 49
+//      skills** en `.claude/skills/` (medido el 2026-08-20; pre-registro,
+//      sección 6). La edición más probable de todo el piloto —tocar el prompt de
+//      una skill para que la fase 1 ingiera un corpus en vez de elicitar— ocurre
+//      en el directorio que G0 no estaba mirando, así que el fork pasaba el
+//      criterio en VERDE. Reproducido antes de arreglarlo: con `_bmad` intacto y
+//      una sola skill reescrita de «elicita al usuario» a «ingiere el corpus»,
+//      el arnés devolvía código de salida 0.
 //
 //   4. Copiar `config-espacio-de-trabajo.yaml` (está al lado de este archivo) a
 //      `openspec/config.yaml` del espacio. IDÉNTICO EN LOS DOS BRAZOS: es lo que
@@ -87,6 +98,13 @@
 //   · El directorio de salidas de la herramienta (`_bmad-output/`) NO es parte de
 //     la instalación, así que G0 no lo mira. Eso es correcto: esas salidas son
 //     el producto del brazo B, y tocarlas es usar la herramienta, no forkearla.
+//
+//   · G0 mira los dos directorios que la instalación escribe, y solo esos. Una
+//     edición que la herramienta necesitara en OTRO lugar del espacio —un
+//     archivo de configuración propio, por ejemplo— no la vería. El criterio
+//     está definido sobre «el directorio de instalación de la herramienta», y lo
+//     que se corrigió acá es que ese directorio son dos. Si el lunes aparece un
+//     tercero, se agrega a `DIRS_HERRAMIENTA` y se dice en la bitácora de G5.
 // ---------------------------------------------------------------------------
 
 import { spawnSync } from "node:child_process";
@@ -237,32 +255,53 @@ resultados.push({ nombre: "(b) validate --all --strict", ...validacion });
 // y `git diff --quiet` la declararía verde. Con `add --all` entran las
 // modificaciones, los agregados y los borrados, y todo sale por un solo código
 // de salida.
+//
+// Y se miran LOS DOS directorios que la instalación escribe, no solo `_bmad`:
+// ver la nota del paso 3 de la receta. Medir uno solo dejaba en verde
+// justamente el fork más probable del piloto.
 // ---------------------------------------------------------------------------
+
+// Los directorios que la instalación de la herramienta escribe en el espacio.
+// Medido el 2026-08-20: `_bmad/` (núcleo y módulos) y 49 skills en
+// `.claude/skills/`. G0 se mide sobre los dos, y el mensaje los nombra a los dos
+// para que «cero ediciones» no se pueda leer como si cubriera uno.
+const DIRS_HERRAMIENTA = ["_bmad", ".claude/skills"];
+const NOMBRES_DIRS = DIRS_HERRAMIENTA.join(" y ");
+
 if (BRAZO === "A") {
   console.log("");
-  console.log("── (c) G0: ediciones al directorio de instalación de la herramienta");
+  console.log(`── (c) G0: ediciones a los directorios de instalación (${NOMBRES_DIRS})`);
   console.log("   NO APLICA al brazo A: el control no instala la herramienta.");
   console.log("   Esto no es verde, es no-aplica, y así va al veredicto.");
   resultados.push({ nombre: "(c) G0", codigo: 0, motivo: null, noAplica: true });
 } else {
-  const dirBmad = join(ESPACIO, "_bmad");
   const cabeza = correrCallado("git", ["rev-parse", "--verify", "HEAD"], { cwd: ESPACIO });
-  const enHead = correrCallado("git", ["cat-file", "-e", "HEAD:_bmad"], { cwd: ESPACIO });
+
+  // Un impedimento POR DIRECTORIO, y con el nombre adentro del motivo. Si uno de
+  // los dos no se puede mirar, G0 no se mide: medir la mitad y llamarlo cero es
+  // exactamente el defecto que este bloque corrige.
+  const faltanEnHead =
+    cabeza.codigo === 0
+      ? DIRS_HERRAMIENTA.filter(
+          (d) => correrCallado("git", ["cat-file", "-e", `HEAD:${d}`], { cwd: ESPACIO }).codigo !== 0,
+        )
+      : [];
+  const faltanEnArbol = DIRS_HERRAMIENTA.filter((d) => !existsSync(join(ESPACIO, d)));
 
   const impedimento =
     raizEspacio === null
       ? "el espacio no es un repositorio de git, así que no hay contra qué comparar"
       : cabeza.codigo !== 0
         ? "el espacio no tiene ningún commit: falta el commit de instalación (paso 3 de la receta)"
-        : enHead.codigo !== 0
-          ? "_bmad no está en el commit de instalación: se instaló sin commitear, o se commiteó tarde"
-          : !existsSync(dirBmad)
-            ? "_bmad no existe en el árbol de trabajo: la herramienta no está instalada acá"
+        : faltanEnHead.length
+          ? `${faltanEnHead.join(" y ")} no está(n) en el commit de instalación: se instaló sin commitear, o se commiteó tarde. G0 se mide sobre ${NOMBRES_DIRS}`
+          : faltanEnArbol.length
+            ? `${faltanEnArbol.join(" y ")} no existe(n) en el árbol de trabajo: la herramienta no está instalada acá, o está a medias`
             : null;
 
   if (impedimento) {
     console.log("");
-    console.log("── (c) G0: ediciones al directorio de instalación de la herramienta");
+    console.log(`── (c) G0: ediciones a los directorios de instalación (${NOMBRES_DIRS})`);
     console.log(`   NO SE PUDO MEDIR: ${impedimento}`);
     console.log("   «no se pudo medir» NO es «cero ediciones». Va al veredicto como no medido,");
     console.log("   y un criterio no medido cuenta en contra (pre-registro, sección 4).");
@@ -272,23 +311,25 @@ if (BRAZO === "A") {
     const entorno = { ...process.env, GIT_INDEX_FILE: indiceTemporal };
 
     const leerArbol = correr("(c.1) G0: índice temporal desde el commit de instalación", "git", ["read-tree", "HEAD"], { cwd: ESPACIO, env: entorno });
-    const agregar = correr("(c.2) G0: estado actual de _bmad al índice temporal", "git", ["add", "--all", "--force", "--", "_bmad"], { cwd: ESPACIO, env: entorno });
+    const agregar = correr(`(c.2) G0: estado actual de ${NOMBRES_DIRS} al índice temporal`, "git", ["add", "--all", "--force", "--", ...DIRS_HERRAMIENTA], { cwd: ESPACIO, env: entorno });
 
     if (leerArbol.codigo !== 0 || agregar.codigo !== 0) {
-      const motivo = "no se pudo armar el índice temporal para comparar _bmad";
+      const motivo = `no se pudo armar el índice temporal para comparar ${NOMBRES_DIRS}`;
       console.log(`   NO SE PUDO MEDIR: ${motivo}`);
       resultados.push({ nombre: "(c) G0", codigo: null, motivo });
     } else {
-      const g0 = correr("(c.3) G0: ¿difiere _bmad del commit de instalación?", "git", ["diff-index", "--cached", "--quiet", "HEAD", "--", "_bmad"], { cwd: ESPACIO, env: entorno });
+      const g0 = correr(`(c.3) G0: ¿difieren ${NOMBRES_DIRS} del commit de instalación?`, "git", ["diff-index", "--cached", "--quiet", "HEAD", "--", ...DIRS_HERRAMIENTA], { cwd: ESPACIO, env: entorno });
       if (g0.codigo !== 0) {
         console.log("");
         console.log("   las ediciones, una por línea (esta lista es la evidencia de G0 en rojo):");
-        correr("(c.4) G0: lista de ediciones", "git", ["diff-index", "--cached", "--name-status", "HEAD", "--", "_bmad"], { cwd: ESPACIO, env: entorno });
+        correr("(c.4) G0: lista de ediciones", "git", ["diff-index", "--cached", "--name-status", "HEAD", "--", ...DIRS_HERRAMIENTA], { cwd: ESPACIO, env: entorno });
       } else {
         console.log("");
-        console.log("   cero ediciones a _bmad respecto del commit de instalación.");
-        console.log("   Esto SÍ es distinguible de «no se miró»: los cuatro impedimentos");
-        console.log("   posibles se verificaron antes y ninguno disparó.");
+        console.log(`   cero ediciones a ${NOMBRES_DIRS} respecto del commit de instalación.`);
+        console.log("   Los DOS directorios de la instalación, no solo el núcleo: la edición más");
+        console.log("   probable del piloto es el prompt de una skill, y ahí es donde ocurriría.");
+        console.log("   Esto SÍ es distinguible de «no se miró»: los impedimentos posibles se");
+        console.log("   verificaron antes, directorio por directorio, y ninguno disparó.");
       }
       resultados.push({ nombre: "(c) G0", ...g0 });
     }
