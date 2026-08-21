@@ -10,11 +10,37 @@ unica salida seria aflojarlo, que es la salida prohibida.
 Cada caso es una linea, el archivo donde se escribe dentro del repo de juguete y
 el codigo de salida que el check tiene que devolver. `origen` dice si el caso
 nacio de la auditoria del 2026-08-20 (`refutacion`), si ya se sostenia y esta aca
-para que un arreglo no lo rompa (`control`), o si fija un COSTO conocido del
-diseño (`limite`): un caso que el check resuelve del lado conservador y no del
-lado correcto. Un `limite` no es un caso que "pasa": es una decision medida,
-escrita con su motivo, para que un cambio de criterio se vea en el diff en vez de
-descubrirse cuando alguien lo cobre.
+para que un arreglo no lo rompa (`control`), si fija un COSTO conocido del
+diseño (`limite`) —un caso que el check resuelve del lado conservador y no del
+lado correcto— o si es una linea que el marco DECIDIO no enforzar y solo avisar
+(`aviso`, desde el 2026-08-21). Un `limite` y un `aviso` no son casos que
+"pasan": son decisiones medidas, escritas con su motivo, para que un cambio de
+criterio se vea en el diff en vez de descubrirse cuando alguien lo cobre.
+
+**El campo opcional `anota`** dice QUE anotacion tiene que emitir el paso sobre
+esa linea: `error`, `warning` o `nada`. Existe porque el codigo de salida solo
+distingue dos estados y desde el modo aviso hacen falta tres: un aviso ruidoso y
+un silencio salen los dos exit 0, y son cosas distintas —uno DECLARA el residuo,
+el otro ES el residuo—. Donde el campo esta, es lo que sostiene el caso; donde no,
+alcanza el exit. En los casos de `aviso` es lo unico que impide que la decision de
+no enforzar se convierta, sin que nadie lo note, en no mirar.
+
+**Lo que se decidio NO enforzar el 2026-08-21 (residuo A16)**, y por que: el
+alfabeto compara el gestor y su subcomando por IGUALDAD EXACTA contra tokens que
+traen la puntuacion del lenguaje anfitrion. Con el comodin del allowlist PEGADO
+(`:*`) el recorte lo saca y la entrada se lee; con el comodin SEPARADO por un
+espacio no hay nada que recortar, y el token que sigue no es ningun subcomando del
+alfabeto, asi que la entrada sale muda. Medido el 2026-08-21 sobre cinco entradas
+de la misma familia: las cuatro de un gestor con subcomando dieron **exit 0 con
+cero anotaciones** y la del ejecutor directo dio **exit 1**. Misma herramienta,
+una ortografia de diferencia. Poner rojo solo la ortografia que este lector
+alcanza no es enforzar la clase «un permiso de allowlist que autoriza descargar
+sin pinar»: es enforzar una ortografia, y presentarla como compuerta es el falso
+verde que este paso existe para no tener. Asi que lo INDETERMINADO —la linea que
+trae un ejecutor y de la que no se puede leer que paquete corre— pasa a aviso, y
+lo que se verifica completo —un paquete LEGIBLE sin version exacta— sigue siendo
+rojo. El caso `allowlist-comodin`, que es la forma en que el problema aparecio de
+verdad, esta del lado que sigue rojo.
 
 ```json
 [
@@ -64,15 +90,17 @@ descubrirse cuando alguien lo cobre.
     "archivo": ".claude/settings.json",
     "linea": "    \"Bash(npx --yes openspec:*)\",",
     "exit": 1,
-    "por_que": "la forma en que el problema aparecio DE VERDAD: el comodin del allowlist dejaba el paquete indeterminado y degradaba a ::warning:: con exit 0"
+    "anota": "error",
+    "por_que": "la forma en que el problema aparecio DE VERDAD: el comodin del allowlist dejaba el paquete indeterminado y degradaba a ::warning:: con exit 0. Aca el paquete se LEE (openspec, sin version), asi que cae del lado que se verifica completo y sigue rojo despues del modo aviso del 2026-08-21"
   },
   {
     "id": "allowlist-ilegible",
-    "origen": "refutacion",
+    "origen": "aviso",
     "archivo": ".claude/settings.json",
     "linea": "    \"Bash(npx :::)\",",
-    "exit": 1,
-    "por_que": "en un allowlist una linea que no se puede leer no es un aviso: es un permiso permanente sin revisar"
+    "exit": 0,
+    "anota": "warning",
+    "por_que": "MODO AVISO desde el 2026-08-21 (residuo A16). Era rojo, y el rojo era honesto solo para esta ortografia: 'Bash(npm :::)' —el mismo permiso ilegible sobre un gestor con subcomando— salia exit 0 y CERO anotaciones, porque el token siguiente no es ningun subcomando del alfabeto. Enforzar una ortografia y no la clase es presentar como compuerta lo que no lo es, asi que lo indeterminado avisa con el residuo nombrado. El aviso tiene que estar: si esta linea saliera muda, seria el residuo y no la decision"
   },
   {
     "id": "pnpm-dlx-bandera-con-valor",
@@ -152,7 +180,8 @@ descubrirse cuando alguien lo cobre.
     "archivo": ".claude/settings.json",
     "linea": "    \"Bash(npm --prefix ./x exec openspec:*)\",",
     "exit": 1,
-    "por_que": "la misma ceguera dentro de un allowlist de agente, donde la linea no es una invocacion que alguien revise cuando falle sino un permiso permanente para descargar y ejecutar"
+    "anota": "error",
+    "por_que": "la misma ceguera dentro de un allowlist de agente, donde la linea no es una invocacion que alguien revise cuando falle sino un permiso permanente para descargar y ejecutar. El paquete se LEE, asi que sigue siendo rojo despues del modo aviso del 2026-08-21: lo que bajo a aviso es lo indeterminado, no lo legible sin pinar"
   },
   {
     "id": "pnpm-dlx-pelado",
@@ -288,7 +317,8 @@ descubrirse cuando alguien lo cobre.
     "archivo": "flujo.yml",
     "linea": "      - run: npx :::",
     "exit": 0,
-    "por_que": "fuera de un allowlist lo indeterminado sigue siendo ::warning::, que es ruidoso y no bloqueante"
+    "anota": "warning",
+    "por_que": "fuera de un allowlist lo indeterminado siempre fue ::warning::, ruidoso y no bloqueante. El caso queda para fijar que el modo aviso no lo volvio MUDO: la diferencia entre avisar y no mirar es todo lo que separa un residuo declarado de un agujero"
   },
   {
     "id": "valor-entrecomillado-doble",
@@ -436,27 +466,57 @@ descubrirse cuando alguien lo cobre.
   },
   {
     "id": "comodin-pegado-al-ejecutor",
-    "origen": "refutacion",
+    "origen": "aviso",
     "archivo": ".claude/settings.json",
     "linea": "      \"Bash(npx:*)\",",
-    "exit": 1,
-    "por_que": "medido exit 0 con CERO lineas de salida en 61d604c: el alfabeto se comparaba por igualdad exacta y el token llegaba con el comodin del anfitrion pegado. Es un permiso permanente para descargar y ejecutar cualquier paquete"
+    "exit": 0,
+    "anota": "warning",
+    "por_que": "medido exit 0 con CERO lineas de salida en 61d604c: el alfabeto se comparaba por igualdad exacta y el token llegaba con el comodin del anfitrion pegado. La ronda del 2026-08-20 lo puso rojo; el 2026-08-21 baja a AVISO porque la misma entrada con el comodin SEPARADO sigue muda, y enforzar una ortografia no es enforzar la clase. El permiso sigue siendo el mas ancho posible y el aviso lo dice con el residuo al lado"
   },
   {
     "id": "comodin-pegado-al-subcomando",
-    "origen": "refutacion",
+    "origen": "aviso",
     "archivo": ".claude/settings.json",
     "linea": "      \"Bash(pnpm dlx:*)\",",
-    "exit": 1,
-    "por_que": "misma causa un token mas adentro: el subcomando es el SEGUNDO sitio que compara contra el alfabeto, y limpiar() solo estaba en el tercero (el paquete). Medido exit 0 antes"
+    "exit": 0,
+    "anota": "warning",
+    "por_que": "misma causa un token mas adentro: el subcomando es el SEGUNDO sitio que compara contra el alfabeto, y limpiar() solo estaba en el tercero (el paquete). Medido exit 0 antes del 2026-08-20 y exit 1 despues; desde el 2026-08-21 es AVISO, por la asimetria del comodin separado"
   },
   {
     "id": "comodin-pegado-al-gestor-sin-subcomando",
-    "origen": "refutacion",
+    "origen": "aviso",
     "archivo": ".claude/settings.json",
     "linea": "      \"Bash(npm:*)\",",
-    "exit": 1,
-    "por_que": "lo encontro el corpus con alfabeto propio, no una lista escrita a mano: autoriza CUALQUIER subcomando de npm, exec incluido, asi que es el permiso mas ancho posible para descargar y ejecutar. Medido exit 0 antes"
+    "exit": 0,
+    "anota": "warning",
+    "por_que": "lo encontro el corpus con alfabeto propio, no una lista escrita a mano: autoriza CUALQUIER subcomando de npm, el de ejecutar incluido, asi que es el permiso mas ancho posible para descargar y ejecutar. Desde el 2026-08-21 es AVISO y no rojo: su hermana con el comodin separado —el caso residuo-comodin-separado, aca abajo— es el MISMO permiso y sale muda"
+  },
+  {
+    "id": "residuo-comodin-separado-con-subcomando",
+    "origen": "limite",
+    "archivo": ".claude/settings.json",
+    "linea": "      \"Bash(npm *)\",",
+    "exit": 0,
+    "anota": "nada",
+    "por_que": "RESIDUO A16, medido el 2026-08-21: exit 0 y CERO anotaciones. Es el MISMO permiso que 'Bash(npm:*)' —autoriza cualquier subcomando, el de ejecutar incluido— y el lector no lo ve, porque el comodin separado no es puntuacion que recortar y el token que sigue no es ningun subcomando del alfabeto. Queda fijado como caso: el dia que este check lo anote, esta linea se cae y el residuo se cierra en el diff en vez de descubrirse por casualidad"
+  },
+  {
+    "id": "residuo-comodin-separado-pnpm",
+    "origen": "limite",
+    "archivo": ".claude/settings.json",
+    "linea": "      \"Bash(pnpm *)\",",
+    "exit": 0,
+    "anota": "nada",
+    "por_que": "la misma medicion en el otro gestor con subcomando: exit 0 y cero anotaciones. Estan los dos porque el residuo es de la CLASE (gestor con subcomando + comodin separado) y no de un nombre"
+  },
+  {
+    "id": "aviso-comodin-separado-ejecutor-directo",
+    "origen": "aviso",
+    "archivo": ".claude/settings.json",
+    "linea": "      \"Bash(npx *)\",",
+    "exit": 0,
+    "anota": "warning",
+    "por_que": "LA ASIMETRIA, en una linea: medido exit 1 el 2026-08-21 mientras sus cuatro hermanas de gestor con subcomando daban exit 0 mudo. Un ejecutor DIRECTO no tiene subcomando, asi que el comodin cae en el lugar del paquete y el lector lo lee como indeterminado. Misma herramienta, una ortografia de diferencia: por eso lo indeterminado paso a aviso en vez de dejar rojo el unico caso que este lector alcanza"
   },
   {
     "id": "gestor-con-sufijo-de-ejecutable",

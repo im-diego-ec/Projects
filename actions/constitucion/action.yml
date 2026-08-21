@@ -92,6 +92,22 @@ author: la organización
 #     needs.<job>.result, no lo que su script hace con el valor — cerrar eso exige
 #     decidir el comportamiento de un shell arbitrario, y la salida estructural es
 #     que el veredicto lo emita el marco en vez del run: de cada consumidor.
+#   · Y DE ESAS CONDICIONES DEL MODO "cableado", UNA ES MODO AVISO Y NO COMPUERTA
+#     (residuo A01, decision del Builder 1 del 2026-08-21). "Un ci-ok que no mire el
+#     resultado del job" se decide LEYENDO el texto de los pasos, y esa lectura acepta
+#     un paso con `if: needs.<job>.result == success`, que satisface la compuerta
+#     SALTEANDOSE: con la compuerta en rojo el if es falso, el paso se saltea y el job
+#     concluye success. Medido con oraculo semantico independiente: 70 falsos verdes
+#     sobre 2928 casos generados, una sola clase. La propiedad prometida es sobre un
+#     CAMINO —del job de la compuerta, por cada eslabon, hasta el check run cuyo nombre
+#     exige el ruleset— y lo verificado es un patron sintactico sobre un NODO. Cuatro
+#     rondas la abrieron una capa mas adentro cada vez, asi que se DECLARA en vez de
+#     intentar cerrarla una quinta: ese hallazgo sale ::warning:: con el residuo en el
+#     mensaje, en TODA corrida —incluida la que sale verde, porque desde aca el falso
+#     verde es indistinguible del cableado sano— y el resto de las condiciones sigue en
+#     rojo. Consecuencia honesta: que este modo no diga nada sobre el camino NO
+#     acredita que el rojo llegue al check requerido. El diagnostico y su fila de
+#     backlog viven en docs/reglas-no-escritas.md.
 #   · El motivo de un desvio se verifica que EXISTA, no que sea sincero, y nada
 #     limita cuantos declara un proyecto.
 # ---------------------------------------------------------------------------
@@ -116,6 +132,21 @@ inputs:
       salteado reporta Success para GitHub y entonces el needs solo no bloquea
       nada. Lo invoca el marco-ci.yml, que es el carril INDEPENDIENTE: borrar el
       job de la constitucion no apaga al que denuncia que falta.
+
+      Y LA MITAD DE LA CONDICION 5 QUE ES MODO AVISO Y NO COMPUERTA, desde el
+      2026-08-21 (residuo A01): la segunda parte —"algun paso vivo de ci-ok cobra el
+      resultado"— se decide LEYENDO el texto de los pasos, y su lado de ACEPTACION
+      quedo refutado con un oraculo semantico independiente: 70 falsos verdes sobre
+      2928 casos generados, una sola clase, cuya forma mas corta es un paso con
+      "if: needs.<job>.result == success", que satisface la compuerta SALTEANDOSE
+      (con la compuerta en rojo el if es falso, el paso se saltea y el job concluye
+      success). Una regla cuyo lado de aceptacion es unsound no puede presentar su
+      lado de rechazo como compuerta, asi que ese hallazgo sale por ::warning:: con
+      el residuo nombrado y NUNCA por ::error::. Lo que se decide por ESTRUCTURA
+      —que exista el check run del veredicto, que cuelgue de la compuerta por needs,
+      que declare if: always(), que ningun nodo del camino lave el rojo con
+      continue-on-error o un if constante falso— sigue siendo rojo. El diagnostico
+      completo y su fila de backlog viven en docs/reglas-no-escritas.md.
     required: false
     default: verificar
   rama_por_defecto:
