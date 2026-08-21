@@ -14,6 +14,15 @@ piloto. Nada del bloque 5 se adelanta «para tenerlo listo»: adelantar la
 maquinaria de una capa que todavía no se validó es la forma más eficiente de que
 el veredicto salga verde por costo hundido.
 
+**Y desde el 2026-08-21 hay un bloque más entre el veredicto y el bloque 5.** Builder 1
+decidió que el orden del piloto se mantiene A → B y que, por eso mismo, un verde
+significa **«no se refutó que la herramienta ayude»** y no «ayuda»: con la misma
+persona en los dos brazos, el verde mide la herramienta más la memoria de haber
+hecho ya la tarea. Ese verde habilita el **bloque 4b**, la segunda rebanada con el
+orden invertido; el bloque 5 pasa a depender de que las **dos** corridas den verde.
+Los umbrales y el desenlace de cada combinación viven en
+`piloto/pre-registro.md`, sección 2, que es el pre-registro vigente.
+
 El bloque 0 es bloqueante por una razón metodológica, no burocrática: un umbral
 escrito después de ver el resultado no es un umbral. El sello de tiempo de git es
 la evidencia.
@@ -23,16 +32,18 @@ grepeando su salida.
 
 ## 0. Pre-registro (BLOQUEANTE: antes de correr un solo brazo)
 
-- [ ] 0.1 Elegir la rebanada con el PO y un builder: qué entrevistas, qué proceso
-      end-to-end, dónde corta y por qué es representativa del material de Supply
-      Chain. Evidencia: la sección 1 de `piloto/pre-registro.md`.
+- [ ] 0.1 Elegir la rebanada con el PO y un builder: qué **piezas del corpus**, qué
+      proceso end-to-end, dónde corta, por qué es representativa del corpus de
+      Supply Chain y si el prototipo la cubre. Evidencia: la sección 1 de
+      `piloto/pre-registro.md`, que es donde vive la tabla vigente con sus cinco
+      filas.
 - [ ] 0.2 Declarar los dos brazos, quién corre cada uno y el orden (A primero), y
       escribir el sesgo que ese orden introduce **a favor del brazo B**. Un sesgo
       declarado se puede corregir al leer; uno tapado invalida la medición.
       Evidencia: sección 2 del pre-registro.
 - [ ] 0.3 Nombrar al scorer —el builder que **no** corre ninguno de los dos
       brazos— y dejar por escrito que arma el inventario de materia prima desde
-      las transcripciones **antes** de ver cualquier salida. Con tres personas el
+      el **corpus** **antes** de ver cualquier salida. Con tres personas el
       rol choca con la firma del veredicto, y eso no se arregla nombrando gente:
       hay que **elegir** cuál de las dos combinaciones se usa y **escribir el
       conflicto que queda**, pegado al ciego imperfecto que `design.md` ya
@@ -40,24 +51,32 @@ grepeando su salida.
       conflicto residual escrito, y el commit del inventario anterior al de las
       salidas.
 - [ ] 0.4 Escribir la tabla de los siete criterios (G0–G6) con sus umbrales ya
-      fijados, tal como están en `design.md` D6, la regla de veredicto, y el
-      comando exacto que produce la evidencia de cada uno, diciendo también
-      cuáles **no** tienen comando y dependen de lectura humana. Un criterio sin
-      comando no es menos válido: es menos verificable, y eso hay que saberlo
-      antes de correr y no al puntuar. Evidencia: sección 4 del pre-registro.
+      fijados **en `piloto/pre-registro.md`, sección 4, que es el pre-registro
+      vigente**, la regla de veredicto, y el comando exacto que produce la
+      evidencia de cada uno, diciendo también cuáles **no** tienen comando y
+      dependen de lectura humana. Un criterio sin comando no es menos válido: es
+      menos verificable, y eso hay que saberlo antes de correr y no al puntuar. La
+      tabla de `design.md` D6 quedó como historia del diseño viejo y **no** es el
+      gate: sus umbrales son los de la pregunta anterior, cuando el insumo eran
+      transcripciones y las salidas eran tres. Evidencia: sección 4 del
+      pre-registro.
 - [ ] 0.5 Planilla de horas por sesión, vacía, con las columnas ya definidas (rol,
-      brazo, fecha, horas de reloj). Sin esto, G4 se mide de memoria y la memoria
-      siempre favorece a lo nuevo. Evidencia: sección 5 del pre-registro.
+      brazo, fecha, **categoría**, horas de reloj). Sin esto, G4 se mide de memoria
+      y la memoria siempre favorece a lo nuevo. Y sin la categoría, el marcado de
+      escenarios que exige la vara del PO (G3b) le come el techo de horas al brazo
+      **más prolijo**, que es lo contrario de lo que G4 busca. Evidencia: sección 5
+      del pre-registro, y `piloto/horas.csv` con el encabezado y cero filas.
 - [ ] 0.6 Pinar la versión exacta de la herramienta y anotarla. Evidencia: sección
       6 del pre-registro con la versión, y el comando de instalación registrado.
 - [ ] 0.7 Commitear el pre-registro **completo** antes de la primera sesión del
       piloto. Evidencia: la fecha del commit del pre-registro es anterior a la
       fecha de la primera entrada de la planilla de horas.
 
-Las cuatro que siguen se agregaron al bloque 0 después de escribirlo, porque el
+Las seis que siguen se agregaron al bloque 0 después de escribirlo, porque el
 bloque se podía tildar entero sin que existiera ninguna de ellas: la checklist
 habría dicho «pre-registro hecho» sobre un pre-registro que no permite medir G1,
-G2 ni G4.
+G2 ni G4. Las dos últimas se agregaron el 2026-08-21, al releer el instrumento
+entero: el inventario del que cuelgan G1 y G2 no tenía dónde vivir.
 
 - [ ] 0.8 Convención de identificadores del material y formato de la tabla de
       trazabilidad, con su domicilio decidido: la tabla vive **con el change**, al
@@ -82,46 +101,87 @@ G2 ni G4.
       mecánica (código de salida del arnés), la condición escrita y el techo de
       sesiones.
 - [ ] 0.11 Mecánica medible de G0: el espacio desechable lleva `git init` y
-      `_bmad/` se commitea **apenas** se instala, antes de trabajar. «Fuera de
+      **los dos** directorios que la instalación escribe —`_bmad/` y
+      `.claude/skills/`— se commitean **apenas** se instala, antes de trabajar. Son
+      dos y no uno porque la edición más probable del piloto es el prompt de una
+      skill, y midiendo solo `_bmad` ese fork pasaba en verde (pre-registro,
+      «Por qué G0 mira dos directorios»). «Fuera de
       todo repositorio» (D5) significa fuera de Projects, de `plantilla/` y de los
       consumidores; **no** significa sin git, porque la evidencia de G0 es un diff
       de git y sin él el criterio queda no medido, que por la regla de veredicto
       cuenta en contra. Evidencia: el primer commit del espacio, y el código de
       salida de `node piloto/arnes/verificar-brazo.mjs <espacio> B`.
+- [ ] 0.12 Domicilio del inventario, declarado antes de que exista: `inventario.md`
+      en el **espacio de trabajo propio del scorer**, fuera de todo repositorio del
+      área y con su `git init`, y su commit es el **primero** de ese espacio. No va a
+      `piloto/` porque lleva la **cita textual** de cada ítem del corpus, y eso es
+      material del corpus entrando al repositorio: lo prohíbe D3 y no lo autorizó la
+      decisión 1.5, que sigue bloqueante. Lo que viaja a Projects es `mediciones.md`,
+      despersonalizado y después. Sin este domicilio, el archivo del que cuelgan G1
+      y G2 no tiene ningún lugar legal donde commitearse el lunes. Evidencia: la
+      sección 3 del pre-registro, y el `git log` del espacio del scorer con el
+      inventario como primer commit, anterior a los commits de salidas de los dos
+      brazos.
+- [ ] 0.13 Spot-check de granularidad del inventario por el PO, antes de la primera
+      sesión: que una lista de doce casos borde no haya quedado comprimida en un
+      ítem. No revisa clasificaciones —las gobierna la rúbrica—, y es la única
+      segunda mirada que el equipo puede poner sobre el punto donde el piloto es más
+      fácil de arruinar sin mala fe. Es **propuesta**: la confirma la decisión 1.3.
+      Evidencia: el visto del PO con fecha, anterior a la primera fila de
+      `horas.csv`.
 
 ## 1. Lo que este change NO decide (pendiente de OK humano explícito)
 
-Ninguna de estas cuatro se resuelve por defecto, y ninguna la toma un agente.
+Ninguna se resuelve por defecto y ninguna la toma un agente. La tabla completa, con
+las seis decisiones, quién decide cada una y su estado, vive en la sección 7 del
+pre-registro: acá están las que quedan por tomar y su evidencia.
 
 - [ ] 1.1 **Dependencia de terceros** (⚠️ de `AGENTS.md`): OK para usar la
-      herramienta en el piloto, y —por separado, y solo si el veredicto es
-      verde— OK para que su pin entre al carril que consumen todos. Evidencia: el
-      OK en la sesión, con la versión y el alcance de módulos escritos.
-- [ ] 1.2 **Material con datos de personas**: dónde viven las transcripciones, y
-      si pueden pasar por un modelo. El repositorio no es su custodio (D3) y el
-      piloto no arranca sin esta decisión tomada por una persona. Evidencia: la
-      decisión escrita en el pre-registro, con quién la tomó.
-- [ ] 1.3 **Correr el piloto**: consume tiempo del PO y de dos builders.
-      Evidencia: el OK y las fechas reservadas.
-- [ ] 1.4 **Cadena de herramientas**: confirmar si la instalación exige Python y
-      `uv` además de Node, y para qué módulo. Hoy está declarado como
-      incertidumbre en `design.md`. Evidencia: la instalación corrida en una
-      máquina limpia, con lo que pidió de verdad.
+      herramienta en el piloto, y —por separado, y solo si las **dos** rebanadas
+      dan verde— OK para que su pin entre al carril que consumen todos. Evidencia:
+      el OK en la sesión, con la versión y el alcance de módulos escritos.
+- [ ] 1.2 **Material con datos de personas**: dónde vive el corpus, y si puede
+      pasar por un modelo. El repositorio no es su custodio (D3) y el piloto no
+      arranca sin esta decisión tomada por una persona. Evidencia: la decisión
+      escrita en el pre-registro, con quién la tomó. **RESUELTA** el 2026-08-21
+      (pre-registro, decisión 1.2); su residuo abrió la decisión 1.5, que sigue
+      bloqueante.
+- [ ] 1.3 **Correr el piloto**: consume tiempo del PO y de dos builders, e incluye
+      confirmar el reparto de roles de la sección 2 del pre-registro. Evidencia: el
+      OK y las fechas reservadas.
+- [ ] 1.4 **Cadena de herramientas**, dos mitades y ninguna opcional: (a) la
+      instalación ensayada **en la máquina que va a correr el brazo B**, con lo que
+      pidió de verdad —el ensayo del 2026-08-20 ya midió que pide `uv`, y no midió
+      el caso sin `uv`—; y (b) **si la fase 1 ingiere un corpus terminado en vez de
+      elicitar**, que es lo que puede tumbar el brazo B y no se cierra leyendo el
+      README. Evidencia: los dos resultados escritos en la sección 6 del
+      pre-registro, con su código de salida.
+- [ ] 1.5 **Despersonalización del corpus** (decisión 1.5 del pre-registro,
+      **bloqueante**): si las piezas que entran a la sesión traen nombres de
+      empleados y juicios sobre su propio trabajo. La toma PO con Builder 1, y hasta
+      que esté tomada el inventario del scorer —que lleva **cita textual** de cada
+      ítem— no tiene domicilio legal en ningún repositorio. Evidencia: la decisión
+      escrita en el pre-registro, con quién la tomó y cuándo.
 
 ## 2. El piloto (arranca el lunes 2026-08-24)
 
-- [ ] 2.1 **Brazo A (control)**: desde las transcripciones directo a `proposal.md`
-      y deltas de specs de la rebanada, con la asistencia de agente habitual.
+- [ ] 2.1 **Brazo A (control)**: desde el **corpus** de la rebanada, leído directo,
+      a las **cinco** salidas —proposal, deltas, tabla de trazabilidad, design y
+      tasks—, con el protocolo del control escrito en la sección 2 del
+      pre-registro. Ahí está el conjunto de salidas vigente, y ahí está por qué el
+      control lee el corpus y no transcripciones: el descubrimiento ya está hecho.
       Evidencia: los artefactos del brazo A, y las horas anotadas por sesión en la
       planilla.
-- [ ] 2.2 **Brazo B**: fases 1 y 2 de la herramienta sobre el **mismo** material
-      → informe de descubrimiento, brief y PRD; y desde el PRD, `proposal.md` y
-      deltas. Evidencia: los artefactos del brazo B y sus horas.
-- [ ] 2.3 Registrar **cada** edición que haya hecho falta hacer sobre el
-      directorio de instalación de la herramienta para cortar en el PRD (G0). Si
-      la lista queda vacía, decirlo explícitamente: es el resultado esperado y hay
-      que poder distinguirlo de «no se miró». Evidencia: estado de git del espacio
-      de trabajo del piloto.
+- [ ] 2.2 **Brazo B**: fases 1 y 2 de la herramienta sobre el **mismo corpus**
+      → informe de descubrimiento, brief y PRD; y desde ahí, las mismas cinco
+      salidas. Evidencia: los artefactos del brazo B y sus horas.
+- [ ] 2.3 Registrar **cada** edición que haya hecho falta hacer sobre los
+      directorios de instalación de la herramienta —`_bmad/` y `.claude/skills/`,
+      los dos— para que ingiera el corpus o para cortar en el PRD (G0). Si la lista
+      queda vacía, decirlo explícitamente: es el resultado esperado y hay que poder
+      distinguirlo de «no se miró». Evidencia: el código de salida de
+      `node piloto/arnes/verificar-brazo.mjs <espacio> B`, que nombra los dos
+      directorios y lista archivo por archivo lo que difiere.
 - [ ] 2.4 Correr el piloto **fuera de todo repositorio** (D5). Nada se escribe en
       los consumidores, ni en `plantilla/`, ni en `openspec/specs/`. Evidencia:
       los repos sin un solo commit del piloto.
@@ -129,23 +189,48 @@ Ninguna de estas cuatro se resuelve por defecto, y ninguna la toma un agente.
       de que alguien se acordara de algo (insumo de G5). Al final de un piloto de
       cuatro semanas esa lista se reconstruye mal. Evidencia: la lista con fecha
       por ítem.
+- [ ] 2.6 Anotar, en el momento y en `lista-de-observacion.md` del espacio del
+      brazo, **cada pregunta que la herramienta o el brazo le haga al PO y que el
+      corpus no contestaba**, con su `L0xx`, su fecha, la pregunta textual y la
+      respuesta en una línea. Es lo que le da ancla a un escenario `elicitado`
+      —satisface G1 y queda afuera de G2 y G3— y es lo que el PO revisa al firmar:
+      una entrada que no reconozca es un hallazgo de G3. Anotada después de entregar
+      las salidas no es una elicitación, es una reconstrucción. Evidencia: la lista
+      con una entrada por pregunta y las horas del PO imputadas a `elicitacion`.
 
 ## 3. Medición y veredicto
 
-- [ ] 3.1 El scorer arma el inventario de materia prima desde las transcripciones
-      y clasifica cada ítem (regla de negocio / contexto / preferencia).
-      Evidencia: `piloto/mediciones.md`, sección inventario, con el id de cada
-      ítem.
-- [ ] 3.2 Puntuar G1 (procedencia 100%) y G2 (caídos en silencio) contra ese
-      inventario, ítem por ítem y para los dos brazos. Evidencia: las dos listas
+- [ ] 3.1 El scorer arma el inventario de materia prima **desde el corpus** y
+      clasifica cada ítem (regla de negocio / contexto / preferencia), con su
+      `origen` según la convención. Vive en `inventario.md` del espacio del scorer
+      (0.12) y su commit es anterior al de las salidas de los dos brazos. Evidencia:
+      ese `git log`, y después `piloto/mediciones.md` con el inventario ya
+      despersonalizado y el id de cada ítem.
+- [ ] 3.2 Puntuar G1 (100% de escenarios con ítem asociado, `I0xx` o `L0xx`) y G2
+      (caídos en silencio) contra ese inventario, ítem por ítem y para los dos
+      brazos. G1 es **simétrico**: se exige el 100% en las **dos** tablas, y si la
+      del control no llega, las comparativas de G2 y G4 quedan **no medidas** —una
+      tabla A subllenada le regalaría a B la comparativa—. Evidencia: las dos listas
       con veredicto por ítem.
-- [ ] 3.3 Puntuar G3 (invención): afirmaciones de regla de negocio sin origen
-      rastreable y sin marca de supuesto, con la **cita textual** de cada una.
-      Evidencia: la lista; para el brazo B el umbral es cero absoluto.
-- [ ] 3.4 Cerrar G4: horas de la planilla, y los gates de siempre sobre la salida
-      del brazo B —`openspec validate --strict` y el guardrail de deltas—
-      verificados **por código de salida**. Evidencia: las horas y los dos exit
-      codes, con el comando exacto.
+- [ ] 3.3 Puntuar G3, las dos mitades. **G3a (invención)**: enumerar **todas** las
+      afirmaciones de regla de negocio del delta, una por línea y con veredicto por
+      afirmación —no solo las falladas: una omisión invisible favorece al veredicto
+      que el scorer firma—, con la **cita textual**, el ancla invocada y lo que esa
+      ancla dice de verdad. **G3b (fidelidad al negocio)**: las tres marcas del PO
+      por escenario, anotadas **antes** de ver los otros criterios. Evidencia: la
+      lista completa y la columna del PO; para el brazo B el umbral es cero absoluto
+      en G3a y 100% «describe» en G3b, y las dos son eliminatorias.
+- [ ] 3.4 Cerrar G4: horas de la planilla **por categoría** —`conversion` y
+      `elicitacion` entran a la comparación, `marcado` queda afuera—, y los gates de
+      siempre sobre la salida del brazo B —`openspec validate --strict` y el
+      guardrail de deltas— verificados **por código de salida**. Evidencia: las
+      horas y los dos exit codes, con el comando exacto.
+- [ ] 3.4b Reportar, **sin umbral y por brazo**, la distribución de los ítems de
+      regla de negocio entre `cubierto` / `fuera de alcance declarado` / `pregunta
+      abierta`. No hace fallar nada por sí sola, y sin ella un verde con un delta
+      hueco es ilegible: ninguna de las siete celdas mide cuánto se convirtió, y un
+      brazo que puntúa mucho y convierte poco pasa los siete gates. Evidencia: los
+      tres números y el total, para los dos brazos, en `piloto/veredicto.md`.
 - [ ] 3.5 Cerrar G5: la lista del 2.5 con su columna de destino («check propuesto»
       o «queda fuera, y por qué»). Si todo queda fuera, el techo del veredicto es
       amarillo y hay que escribirlo así. Evidencia: la lista completa.
@@ -155,8 +240,11 @@ Ninguna de estas cuatro se resuelve por defecto, y ninguna la toma un agente.
       y eso queda anotado como consecuencia, no como nota al pie. Evidencia: la
       búsqueda y su resultado.
 - [ ] 3.7 Escribir `piloto/veredicto.md`: los siete resultados con sus números, el
-      veredicto según la regla de D6, y las tres firmas (PO por fidelidad al
-      negocio, scorer por la medición, Builder 1 por el veredicto). Evidencia: el
+      veredicto según la regla de la sección 4 del pre-registro, y las tres firmas
+      (PO por fidelidad al negocio, scorer por la medición, Builder 1 por el veredicto).
+      Y escribir qué habilita ese veredicto con las palabras que le corresponden:
+      un verde significa **«no se refutó que ayude»** y habilita el bloque 4b —la
+      segunda rebanada con el orden invertido—, no el bloque 5. Evidencia: el
       archivo, con fecha anterior al `veredicto_antes_de`.
 
 ## 4. Caducidad del estado experimental (independiente del veredicto)
@@ -182,10 +270,38 @@ experimental de cualquier change, incluido este.
       sección «para consumidores» diciendo lo que tienen que hacer: **nada**,
       mientras no declaren un change experimental. Evidencia: la entrada escrita.
 
-## 5. SOLO si el veredicto es VERDE
+## 4b. La segunda rebanada, con el orden invertido (SOLO si la primera dio verde)
 
-Nada de este bloque se adelanta. Adelantarlo compra costo hundido y el costo
-hundido decide veredictos.
+No es una repetición del piloto: es la corrida que acota el sesgo de orden. La
+primera va A → B y deja el sesgo a favor de B; esta va **B primero** y lo deja en
+contra. Con las dos, el efecto real queda encerrado entre un número inflado y uno
+deprimido, y el sesgo pasa de defecto a instrumento. Por eso la primera no se
+invierte: el control limpio se puede escribir una sola vez.
+
+- [ ] 4b.1 Elegir la **segunda rebanada** con el PO y un builder, con las mismas
+      cinco declaraciones de la sección 1 del pre-registro. Tiene que ser otra
+      rebanada del mismo corpus: repetir la primera mide memoria, no herramienta.
+      Evidencia: la sección 1 del pre-registro de la segunda corrida, commiteada
+      antes de su primera sesión.
+- [ ] 4b.2 Correr los dos brazos con el orden **invertido**: primero B, después A.
+      Todo lo demás idéntico —misma persona, misma regla de parada, mismo techo de
+      5 sesiones, mismo conjunto de cinco salidas—. Evidencia: los artefactos de
+      los dos brazos y sus horas, con el orden visible en las fechas de
+      `horas.csv`.
+- [ ] 4b.3 Puntuar los siete criterios de la misma tabla y con los mismos umbrales,
+      sin tocar ninguno: mover un umbral entre corridas vuelve incomparables las
+      dos. Evidencia: el `veredicto.md` de la segunda corrida.
+- [ ] 4b.4 Escribir la lectura conjunta: el efecto de cada criterio en las dos
+      corridas, y qué queda en pie cuando el sesgo apunta al revés. Evidencia: la
+      sección de lectura conjunta, con los dos números por criterio.
+
+Si la segunda corrida **no** da verde, no corre el bloque 5: corre el 6, con las
+mediciones de las **dos** corridas adentro del ADR (D8).
+
+## 5. SOLO si las DOS rebanadas dieron VERDE
+
+Nada de este bloque se adelanta, y desde el 2026-08-21 tampoco arranca con un solo
+verde. Adelantarlo compra costo hundido y el costo hundido decide veredictos.
 
 - [ ] 5.1 Check de forma: un artefacto de la ubicación declarada que contenga
       encabezados de delta o escenarios es rojo. Evidencia: fixture con un insumo
@@ -214,7 +330,7 @@ hundido decide veredictos.
       toca el mismo `Purpose`. Evidencia: `openspec validate --all --strict` y el
       guardrail de deltas, los dos **por código de salida**.
 
-## 6. SOLO si el veredicto es AMARILLO o ROJO
+## 6. SOLO si el veredicto es AMARILLO o ROJO, o si la SEGUNDA rebanada no dio verde
 
 - [ ] 6.1 ADR nuevo en `docs/adr/` con contexto, decisión y consecuencias, y con
       **las mediciones adentro**: los siete criterios con sus números. La

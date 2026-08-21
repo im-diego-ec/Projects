@@ -38,28 +38,36 @@ context: |
   `capa-descubrimiento` del marco). Esto NO es un repositorio de proyecto: es un
   laboratorio desechable, y lo que se escribe acá es una MEDICIÓN, no el
   contrato de ningún sistema.
-  Qué se está escribiendo: el `proposal.md` y los deltas de specs de UNA rebanada
-  de los procesos del proyecto Supply Chain, levantados en entrevistas. La
-  rebanada (qué entrevistas, qué proceso end-to-end y dónde corta) está declarada
-  en la sección 1 del pre-registro del piloto y no se ensancha mientras se
-  trabaja: ensancharla convierte un ítem no cubierto en "eso quedaba afuera".
+  Qué se está escribiendo: las CINCO salidas de UNA rebanada de los procesos del
+  proyecto Supply Chain — `proposal.md`, los deltas de specs, la tabla de
+  trazabilidad, `design.md` y `tasks.md`. El insumo es el CORPUS de
+  descubrimiento que el PO ya produjo: documentos, procesos levantados, casos
+  borde y un prototipo con feedback de usuario. El descubrimiento ya está hecho;
+  acá se lo convierte. La rebanada (qué piezas del corpus, qué proceso
+  end-to-end y dónde corta) está declarada en la sección 1 del pre-registro del
+  piloto y no se ensancha mientras se trabaja: ensancharla convierte un ítem no
+  cubierto en "eso quedaba afuera".
   Qué NO se está escribiendo: los specs del proyecto Supply Chain. Ese proyecto
   todavía no existe y sus specs van a nacer en su propio repositorio. Los deltas
   de acá se descartan con el espacio de trabajo.
   Trazabilidad, que es el objeto de la medición: cada requirement y cada
-  escenario cita el identificador del ítem de materia prima que lo origina, con
-  la gramática de `convencion-de-procedencia.md`. La tabla de trazabilidad es una
-  salida obligatoria del brazo, al mismo nivel que el proposal y los deltas: un
-  brazo sin tabla no entregó.
-  Supuestos: lo que el material no resuelve se escribe como pregunta abierta con
+  escenario cita el identificador del ítem que lo origina, con la gramática de
+  `convencion-de-procedencia.md`, y declara su `origen` — `corpus` si el corpus
+  lo dice, `derivado` si lo infirió quien convertía, `elicitado` si lo contestó
+  el PO durante el piloto porque el corpus no lo tenía. La tabla de trazabilidad
+  es una salida obligatoria del brazo, al mismo nivel que el proposal y los
+  deltas: un brazo sin tabla no entregó.
+  Supuestos: lo que el corpus no resuelve se escribe como pregunta abierta con
   su identificador, nunca se completa por criterio propio ni se deja en blanco.
   Una duda declarada es un resultado legítimo del descubrimiento; una duda
-  resuelta por omisión es invención, y es lo que el criterio G3 cuenta.
+  resuelta por omisión es invención, y es lo que el criterio G3 cuenta. Presentar
+  como `corpus` algo que el corpus no dice es la misma falta, y es la que G3
+  mide bajo la pregunta de este piloto.
   Idioma de specs: español en la prosa; keywords de OpenSpec en inglés.
   Despersonalización: ni nombres de entrevistados, ni citas que los identifiquen,
   ni nombres de empleados, clientes o proveedores reales. Se habla de roles
-  ("jefe de bodega", "compras") y de identificadores de entrevista. El material
-  crudo no entra a ningún repositorio.
+  ("jefe de bodega", "compras") y de identificadores de pieza del corpus. El
+  material crudo no entra a ningún repositorio.
 rules:
   proposal:
     - Mencionar el impacto visible para quien adopta el marco (proyecto
