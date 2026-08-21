@@ -112,9 +112,16 @@ de specs con sus escenarios en lenguaje de negocio, `design.md` y `tasks.md`.
 siete, tres apuntan a la propiedad que la capa promete y que ninguna otra pieza
 del marco puede dar: que lo que llegó al contrato se pueda rastrear hasta el
 corpus (G1), que lo que el corpus decía no se haya caído en el camino (G2), y que
-lo que llegó al contrato **no diga más de lo que el corpus dice** (G3). Las otras
-cuatro son el costo (G4), la adopción acotada (G0), la deuda de disciplina (G5) y
-la confusión insumo-contrato (G6).
+lo que llegó al contrato **no diga más de lo que el corpus dice** (G3, contado por
+el scorer contra las anclas y por el PO contra el negocio). Las otras cuatro son el
+costo (G4), la adopción acotada (G0), la deuda de disciplina (G5) y la confusión
+insumo-contrato (G6).
+
+Y hay una cosa que las siete celdas **no** dicen y el veredicto reporta igual, sin
+umbral: **cuánto se convirtió**, o sea la distribución de los ítems de regla de
+negocio entre cubierto, fuera de alcance y pregunta abierta, por brazo. Sin ese
+número, un delta casi vacío puede pasar los siete gates y el verde queda ilegible
+(sección 4).
 
 ### La pregunta que este piloto YA NO responde, y por qué eso no se puede tapar
 
