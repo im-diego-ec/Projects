@@ -35,6 +35,44 @@ mueve sobre un cambio incompatible.
 
 ## [No publicado]
 
+### Cambiado
+
+- **Dos checks pasan a MODO AVISO en la parte que no pueden verificar, y lo dicen
+  en su propia salida.** No es aflojar lo que funciona: es que dos afirmaciones se
+  estaban cobrando como compuertas sin serlo, y cada una tiene su medición.
+
+  - **A01 — el modo `cableado` de `actions/constitucion`.** Su condición 5 promete
+    que *un rojo de la compuerta impide que `ci-ok` salga verde*, que es una
+    propiedad de un **camino** (del job de la compuerta, por cada eslabón de
+    `needs`, hasta el check run que el ruleset exige) y lo que verifica es un
+    patrón sintáctico sobre un **nodo**. Medido con oráculo semántico
+    independiente: **70 falsos verdes sobre 2928 casos generados**, una sola clase,
+    cuya forma más corta es un paso de `ci-ok` con
+    `if: needs.<job>.result == 'success'` — que satisface la compuerta
+    **salteándose**. Desde ahora «ningún paso vivo consulta el `result`» sale
+    `::warning::` con el residuo nombrado; los hechos del **grafo** siguen siendo
+    rojos (que exista el check run del veredicto, que cuelgue por `needs`, que
+    declare `if: always()`, que ningún eslabón lave el rojo con
+    `continue-on-error` o un `if` constante falso), igual que las condiciones 1 a 4.
+  - **A16 — el paso *Ejecutores de paquetes pinados*.** El alfabeto compara el
+    gestor y su subcomando por igualdad exacta contra tokens que traen la
+    puntuación del lenguaje anfitrión. Medido: `Bash(npm *)`, `Bash(pnpm *)`,
+    `Bash(yarn *)` y `Bash(bun *)` dan **exit 0 con cero anotaciones** y
+    `Bash(npx *)` da **exit 1** — el mismo permiso, una ortografía de diferencia.
+    Desde ahora lo **indeterminado** dentro de un allowlist sale `::warning::` con
+    el residuo nombrado en vez de rojo; un paquete **legible** sin versión exacta
+    sigue siendo rojo, que es donde vive el caso real del squatter de `openspec`
+    (`Bash(npx --yes openspec:*)`, medido exit 1 también después del cambio).
+
+  **Qué tiene que hacer un consumidor: nada, y su CI no se enrojece.** El cambio
+  sólo baja severidades y agrega avisos, así que ninguna corrida que hoy pasa
+  empieza a fallar. Lo que sí cambia es la lectura: **un verde de estos dos checks
+  ya no acredita** que el rojo llegue al check requerido (A01) ni que el allowlist
+  esté libre de permisos anchos (A16). Las dos filas quedan en el backlog de
+  `docs/reglas-no-escritas.md` con su medición y con la forma concreta de
+  cerrarlas, y los agujeros están fijados como casos de banco que **afirman el
+  agujero**: el día que se cierren, el banco se cae y se ve en el diff.
+
 ## [1.3.0] — 2026-08-21
 
 ### Añadido
