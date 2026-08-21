@@ -491,13 +491,43 @@ válido, es menos verificable, y eso hay que saberlo antes y no después.
 
 | | Qué se mide y con qué umbral | Cómo se produce la evidencia |
 |---|---|---|
-| **G0** | Ediciones a archivos del directorio de instalación de la herramienta durante el piloto. Umbral: **cero**. Si hubo que tocarla para que ingiera el corpus, o para cortar en el PRD, la adopción no es acotada: es mantener un fork de un método ajeno | Por código de salida, dentro del espacio desechable: `git diff-index --cached --quiet HEAD -- _bmad` sobre un índice temporal en el que se acaba de hacer `git add --all --force -- _bmad`. Lo corre `verificar-brazo.mjs`, que además distingue «cero ediciones» de «no se pudo mirar» (sin `_bmad`, o sin el commit de instalación, G0 **no se mide**, no se aprueba). La lista de ediciones, si hubo, sale de `git diff-index --cached --name-status HEAD -- _bmad` |
+| **G0** | Ediciones a archivos de **los dos** directorios que la instalación de la herramienta escribe —`_bmad` y `.claude/skills`— durante el piloto. Umbral: **cero**. Si hubo que tocarla para que ingiera el corpus, o para cortar en el PRD, la adopción no es acotada: es mantener un fork de un método ajeno | Por código de salida, dentro del espacio desechable: `git diff-index --cached --quiet HEAD -- _bmad .claude/skills` sobre un índice temporal en el que se acaba de hacer `git add --all --force -- _bmad .claude/skills`. Lo corre `verificar-brazo.mjs`, que además distingue «cero ediciones» de «no se pudo mirar», **directorio por directorio** (si a uno de los dos le falta el commit de instalación o el árbol de trabajo, G0 **no se mide**, no se aprueba). La lista de ediciones, si hubo, sale de `git diff-index --cached --name-status HEAD -- _bmad .claude/skills` |
 | **G1** | Escenarios del delta del brazo B con al menos un ítem del corpus asociado. Umbral: **100%**, cero `n/a` | Sin comando: es lectura de la tabla de trazabilidad contra el inventario. Lo mecánico es el formato, que hace la lectura contable: cada fila es un par ítem-escenario y la última columna no puede quedar vacía ni decir `n/a` (`convencion-de-procedencia.md`, parte 2). El orden inventario-antes-que-salidas se lee con `git log --format='%cI %h %s' -- <inventario>` |
 | **G2** | Ítems del inventario que no quedaron ni cubiertos, ni fuera de alcance declarado, ni pregunta abierta (**caídos en silencio**). Umbral: brazo B **cero** en los ítems clasificados como regla de negocio, y estrictamente menos que el control en el total | Sin comando, pero con denominador fijo: son los identificadores del inventario que aparecen en **cero** filas de la tabla de trazabilidad. La clase de cada ítem viene de la rúbrica pre-registrada, y reclasificar un ítem después de leer las salidas hace que G2 no se pueda puntuar (`convencion-de-procedencia.md`, parte 3). El denominador es el inventario **del corpus**, congelado en el commit del scorer: lo elicitado nuevo no entra (sección 2) |
 | **G3** rearmado | **Invención, en la forma que toma cuando el corpus ya existe:** afirmaciones de regla de negocio cuyo ítem tiene `origen: derivado` y que aun así sostienen un escenario sin marca de supuesto. Umbral: brazo B **cero** | Sin comando: lista del scorer con la **cita textual** de la afirmación, el ancla que se invocó, y la frase que esa ancla dice de verdad al lado, para que la diferencia se vea. Sigue siendo el criterio menos mecanizable de los siete, y ahora es además el más importante: es el único que separa «lo dijo el corpus» de «lo interpretó un agente» |
 | **G4** rearmado | **Horas de conversión del builder**, por brazo: brazo B ≤ **2×** las del control. **Y** horas del PO, por brazo: brazo B **no supera en más de 1 hora absoluta** las del control. **Y** la salida del brazo B pasa los mismos gates | Las horas salen de `horas.csv`, anotadas por sesión y no al final, con la columna `rol` separando builder de PO. Los gates salen de `node verificar-brazo.mjs <espacio> <brazo>`, que imprime y devuelve los códigos de salida del guardrail de deltas y de `validate --all --strict` sin enmascarar ninguno. La aceptación de los escenarios la firma el PO |
 | **G5** | Puntos del piloto que dependieron de que alguien se acordara. Umbral: la lista **no puede estar vacía**, y cada ítem lleva destino (check propuesto, o queda fuera y por qué). Si todo queda fuera, el techo del veredicto es **amarillo** | Sin comando, y por eso el insumo existe desde el primer día: `bitacora-g5.md`, que se llena mientras pasa. Una lista vacía significa que nadie miró |
 | **G6** rearmado | Veces que **una pieza del corpus** se usó como autoridad de comportamiento sin escenario que lo respalde. Umbral: **cero**, contado en **los dos brazos** y no solo en B. Si aparece aunque sea una, el check de D2 se estrena rojo desde el día uno, sin ventana de gracia | Búsqueda del scorer en los artefactos y en los PRs del piloto. Dos datos ya medidos que cuentan acá: un archivo de `piloto/` con forma de delta pasa hoy el guardrail y `validate --all --strict` en verde; y el prototipo del corpus es invisible para el check de D2 tal como está diseñado (ver abajo) |
+
+### Por qué G0 mira dos directorios y no uno, corregido antes de la primera sesión
+
+El criterio se escribió como «ediciones al directorio de instalación de la
+herramienta», en singular, y el arnés commiteaba y diffeaba **solo `_bmad`**. La
+sección 6 de este mismo archivo dice, medido el 2026-08-20, que la instalación
+escribe `_bmad/` **y 49 skills en `.claude/skills/`**. O sea que el criterio miraba
+la mitad de la herramienta.
+
+Y no era una mitad cualquiera: **la edición más probable de todo el piloto es el
+prompt de una skill.** El riesgo declarado del brazo B es que la fase 1 no ingiera
+un corpus terminado, y la forma más directa de forzarla es reescribir el prompt de
+la skill que elicita. Eso es exactamente «mantener un fork de un método ajeno», que
+es lo que G0 existe para contar, y estaba pasando en verde. Se reprodujo antes de
+arreglarlo: con `_bmad` intacto y una sola skill reescrita de «elicita al usuario»
+a «ingiere el corpus provisto», el arnés devolvía código de salida **0**. Con la
+corrección devuelve **1** y nombra el archivo.
+
+Tres consecuencias que quedan escritas:
+
+- El paso 3 de la receta del espacio commitea `_bmad` **y** `.claude/skills` en el
+  commit de instalación. Si uno de los dos falta en ese commit, G0 se registra como
+  **no medido** —con el nombre del que falta— y un criterio no medido cuenta en
+  contra.
+- El mensaje del arnés nombra los dos directorios, en el verde y en el rojo, para
+  que «cero ediciones» no se pueda leer como si cubriera uno solo.
+- G0 sigue sin mirar `_bmad-output/`, que es la salida y no la instalación, y sigue
+  sin ver una edición que la herramienta necesitara en un tercer lugar del espacio.
+  Si el lunes aparece un tercero, se agrega a la lista del arnés y va a la bitácora
+  de G5.
 
 ### Por qué G4 se rearmó, con el número que lo delata
 

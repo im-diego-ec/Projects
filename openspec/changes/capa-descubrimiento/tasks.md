@@ -97,7 +97,11 @@ G2 ni G4.
       mecánica (código de salida del arnés), la condición escrita y el techo de
       sesiones.
 - [ ] 0.11 Mecánica medible de G0: el espacio desechable lleva `git init` y
-      `_bmad/` se commitea **apenas** se instala, antes de trabajar. «Fuera de
+      **los dos** directorios que la instalación escribe —`_bmad/` y
+      `.claude/skills/`— se commitean **apenas** se instala, antes de trabajar. Son
+      dos y no uno porque la edición más probable del piloto es el prompt de una
+      skill, y midiendo solo `_bmad` ese fork pasaba en verde (pre-registro,
+      «Por qué G0 mira dos directorios»). «Fuera de
       todo repositorio» (D5) significa fuera de Projects, de `plantilla/` y de los
       consumidores; **no** significa sin git, porque la evidencia de G0 es un diff
       de git y sin él el criterio queda no medido, que por la regla de veredicto
@@ -149,11 +153,13 @@ pre-registro: acá están las que quedan por tomar y su evidencia.
 - [ ] 2.2 **Brazo B**: fases 1 y 2 de la herramienta sobre el **mismo corpus**
       → informe de descubrimiento, brief y PRD; y desde ahí, las mismas cinco
       salidas. Evidencia: los artefactos del brazo B y sus horas.
-- [ ] 2.3 Registrar **cada** edición que haya hecho falta hacer sobre el
-      directorio de instalación de la herramienta para cortar en el PRD (G0). Si
-      la lista queda vacía, decirlo explícitamente: es el resultado esperado y hay
-      que poder distinguirlo de «no se miró». Evidencia: estado de git del espacio
-      de trabajo del piloto.
+- [ ] 2.3 Registrar **cada** edición que haya hecho falta hacer sobre los
+      directorios de instalación de la herramienta —`_bmad/` y `.claude/skills/`,
+      los dos— para que ingiera el corpus o para cortar en el PRD (G0). Si la lista
+      queda vacía, decirlo explícitamente: es el resultado esperado y hay que poder
+      distinguirlo de «no se miró». Evidencia: el código de salida de
+      `node piloto/arnes/verificar-brazo.mjs <espacio> B`, que nombra los dos
+      directorios y lista archivo por archivo lo que difiere.
 - [ ] 2.4 Correr el piloto **fuera de todo repositorio** (D5). Nada se escribe en
       los consumidores, ni en `plantilla/`, ni en `openspec/specs/`. Evidencia:
       los repos sin un solo commit del piloto.
