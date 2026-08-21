@@ -7,7 +7,7 @@ Projects. Eso lo distingue de las otras piezas del marco:
 | Pieza | Cómo evoluciona |
 |---|---|
 | **Scaffold** (esto) | Se copia una vez. Después es del proyecto. Un cambio acá NO llega a los repos ya creados. |
-| **Referenciado** (workflows reusables, composite actions) | Se consume por `uses: {{ORG}}/Projects/...@v1`. Cambia una vez para todos. |
+| **Referenciado** (workflows reusables, composite actions) | Se consume por `uses: {{ORG}}/Projects/...@v1.4.1`, **por versión exacta**. Una versión nueva llega como PR de Dependabot, no empujada. |
 | **Canónico** (specs del marco) | Viven solo en Projects. Nadie los copia. |
 | **Regenerado** (skills y comandos de OpenSpec, y la porción del marco de la constitución) | No se vendoran: el marco pina la herramienta o publica el texto, y cada repo lo regenera. |
 
@@ -51,7 +51,7 @@ que la medición dio ese día — así llegó el consumidor a tener `functions: 
 fijado en su propio valor medido, un umbral cumplido por construcción.
 
 Lo que llega en `.github/workflows/ci.yml` es un **llamador delgado**: hereda del marco el
-carril de docs y la validación de OpenSpec con `uses: {{ORG}}/Projects/...@v1`, y deja el
+carril de docs y la validación de OpenSpec con `uses: {{ORG}}/Projects/...@v1.4.1`, y deja el
 `build-test` del producto para que este repo lo llene. La mecánica del marco NO se copia:
 si se copiara, un arreglo en Projects dejaría de llegar acá.
 
@@ -369,7 +369,7 @@ Un buscar-y-reemplazar no los resuelve: son decisiones.
 | Falta | De dónde sale |
 |---|---|
 | `package.json`, `pnpm-workspace.yaml` | Del proyecto: dependen del stack elegido. Ver el snippet de abajo para la parte de lint/format, que sí es del marco. |
-| El resto de `.github/workflows/*` (deploy, verificación, cron) | Del proyecto: dependen de su topología de infraestructura. La MECANICA del marco no se copia nunca: `ci.yml` ya la consume por `uses: ...@v1`. |
+| El resto de `.github/workflows/*` (deploy, verificación, cron) | Del proyecto: dependen de su topología de infraestructura. La MECANICA del marco no se copia nunca: `ci.yml` ya la consume por `uses: ...@<versión>`. |
 | Las skills y comandos **de OpenSpec** (`.claude/skills/openspec-*`, `.claude/commands/`) | **Regenerado**: los genera el CLI de OpenSpec en la versión que pina el marco. No se vendoran ni se editan a mano. Lo que sí llega en el scaffold son las dos piezas escritas a mano del marco (sección 3), que ningún CLI regenera. |
 | `.projects/AGENTS-marco.md` | **Generado por el marco** en el repo nuevo: lo escribe `actualizar-marco.yml` (sección 2.5). Las entradas del render sí llegan en el scaffold. |
 | `openspec/` | Lo inicializa el CLI de OpenSpec en el repo nuevo. Los specs del MARCO son canónicos y viven en Projects. |
@@ -446,7 +446,9 @@ vez**; después ninguno pide que alguien se acuerde de nada.
       motivo en `EXCEPCIONES` del `ci.yml`). No hace falta acordarse: el CI lo exige y falla
       nombrando el `package.json` incompleto
 - [ ] `.github/workflows/ci.yml`: el job `build_test` refleja el stack real y el job `marco`
-      apunta a `<org>/projects/.github/workflows/marco-ci.yml@v1`
+      apunta a `<org>/projects/.github/workflows/marco-ci.yml@<versión exacta>` (nunca
+        `@v1`: un tag móvil no produce PR de Dependabot, y sin ese PR este repo no
+        aparece en el censo de consumidores del marco)
 - [ ] Los tres handles de `.github/CODEOWNERS` existen en la org y tienen acceso de escritura
       al repo (un handle mal escrito no falla: GitHub simplemente **no asigna a nadie**, y el
       review cruzado deja de existir sin avisar)

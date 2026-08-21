@@ -298,7 +298,7 @@ npx --yes @fission-ai/openspec@X.Y.Z list
   1** (el change dejo de contar como activo).
 - `list` **sin changes activos** (o sin el que acabas de archivar).
 - **El guardrail de deltas en verde.** Ese no corre en local: vive en el marco y
-  llega a este repo por el `uses: ...@v1` del `ci.yml`, asi que su veredicto se
+  llega a este repo por el `uses: ...@<version>` del `ci.yml`, asi que su veredicto se
   lee en el PR. Si lo queres antes del push, hace falta un checkout del marco:
   `node <checkout-del-marco>/actions/guardrail-deltas/check-openspec-deltas.mjs`
   corrido desde la raiz de ESTE repo. No es obligatorio adelantarlo, pero si el

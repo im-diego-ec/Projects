@@ -84,9 +84,11 @@ llamada:
 
 ```yaml
 jobs:
-  # Lo que hereda del marco. @v1 es un tag MOVIL: los arreglos llegan solos.
+  # Lo que hereda del marco, por VERSION EXACTA. El bump a la version siguiente
+  # lo propone Dependabot como PR: el rojo de un check nuevo se lee ahi, no en
+  # main. Nunca @v1 —un tag movil no produce PR y este repo no entraria al censo.
   marco:
-    uses: im-diego-ec/Projects/.github/workflows/marco-ci.yml@v1
+    uses: im-diego-ec/Projects/.github/workflows/marco-ci.yml@v1.4.1
     permissions:
       contents: read
       pull-requests: read
@@ -136,7 +138,7 @@ infraestructura, las migraciones, las sondas. Eso no es marco.
 **Verificacion del paso 2** — la definicion parsea y los jobs viejos ya no estan:
 
 ```bash
-grep -n "projects/.github/workflows/marco-ci.yml@v1" .github/workflows/ci.yml
+grep -nE "projects/\.github/workflows/marco-ci\.yml@v[0-9]+\.[0-9]+\.[0-9]+" .github/workflows/ci.yml
 grep -rn "openspec validate\|check-openspec-deltas" .github/workflows/
 ```
 
@@ -199,21 +201,21 @@ preferencia:
       # DESPUES del install: el censo EJECUTA el toolchain del repo para
       # preguntarle que archivos ve. Sin dependencias instaladas emite un
       # ::warning:: ruidoso en vez de pasar en verde.
-      - uses: im-diego-ec/Projects/actions/censo-fuentes@v1
+      - uses: im-diego-ec/Projects/actions/censo-fuentes@v1.4.1
 
       # ... lint, typecheck, tests ...
 
       # DESPUES de los tests: consume los lcov que las suites acaban de escribir.
-      - uses: im-diego-ec/Projects/actions/cobertura-diff@v1
+      - uses: im-diego-ec/Projects/actions/cobertura-diff@v1.4.1
 
       # ... builds ...
 ```
 
 **El censo no es opcional.** El job `higiene` del reusable comprueba
 estaticamente que algun workflow del repo invoque `actions/censo-fuentes`, y si
-no lo encuentra **da rojo con el paso listo para pegar**. Es decir: adoptar `@v1`
-sin cablear el censo deja el repo en rojo desde el primer PR. Van en el mismo
-cambio.
+no lo encuentra **da rojo con el paso listo para pegar**. Es decir: adoptar el
+marco sin cablear el censo deja el repo en rojo desde el primer PR. Van en el
+mismo cambio.
 
 **Verificacion del paso 4:**
 
@@ -397,7 +399,8 @@ resolver" del job `higiene` pone en rojo cualquier marcador que sobreviva.
 | Renombrar el job del check agregado | Todos los PRs quedan esperando un check que nadie emite; el error no menciona a Projects | Conservar el nombre exacto que exige el ruleset (paso 1) |
 | Check requerido que solo reporta en un carril | Un PR de solo docs no se puede mergear nunca: su check queda `skipped` y no reporta | El requerido es el **veredicto agregado**, que corre con `if: always()` |
 | Falta `pull-requests: read` en el llamador | 403 al listar los archivos del PR, `::warning::` en el job de deteccion y `solo_docs` siempre `false` | Declararlo a nivel de workflow **y** en el job `marco` |
-| Adoptar `@v1` sin cablear el censo | Rojo del check "Censo de fuentes cableado", con el paso listo para pegar | Cablear censo y cobertura en el mismo cambio |
+| Adoptar el marco sin cablear el censo | Rojo del check "Censo de fuentes cableado", con el paso listo para pegar | Cablear censo y cobertura en el mismo cambio |
+| Pinar el `uses:` a `@v1` | Dependabot **no propone ningun bump** (para el, `v1` ya es la mayor vigente), asi que el repo no recibe versiones nuevas por PR y **no aparece en el censo de consumidores**. No falla: se queda callado | Pinar la **version exacta** `vX.Y.Z` y dejar el marco en su propio grupo de `dependabot.yml` |
 | `fetch-depth` por defecto | La cobertura por diff falla porque el commit base no esta en el clon | `fetch-depth: 0` en el checkout |
 | La lista del censo asusta | Decenas de archivos fuera de alcance en la primera corrida | Es lo esperado. **Cubrir antes que excluir**: 23 archivos cerrados cubriendolos y UNA sola exclusion declarada en todo el repo, en el consumidor de origen |
 | Repo privado sin acceso de Actions | Error de repositorio no encontrado que parece un typo en la ruta del `uses:` | Habilitar el acceso en el repo del **marco** (requiere OK humano) |
@@ -408,7 +411,8 @@ resolver" del job `higiene` pone en rojo cualquier marcador que sobreviva.
 - [ ] Acceso de Actions del marco habilitado (repos privados)
 - [ ] Nombre exacto del check requerido, leido del ruleset ANTES de tocar el `ci.yml`
 - [ ] Mecanica del marco fuera del repo: cero `openspec validate` y cero guardrail copiados
-- [ ] `uses: ...@v1` del reusable, con `needs`/`if` del carril de docs
+- [ ] `uses: ...@vX.Y.Z` del reusable (**version exacta, nunca `@v1`**), con `needs`/`if` del carril de docs
+- [ ] `.github/dependabot.yml` con el marco en **su propio grupo**, separado del `*` de actions
 - [ ] `permissions: contents: read` + `pull-requests: read` en el llamador y en el job `marco`
 - [ ] `censo-fuentes` despues del install; `cobertura-diff` despues de los tests; `fetch-depth: 0`
 - [ ] Artefactos del CLI regenerados al pin vigente + allowlist de `.claude/settings.json` al dia
