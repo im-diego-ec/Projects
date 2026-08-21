@@ -43,3 +43,10 @@ Thumbs.db
 **/.claude/agent-memory-local
 **/.claude/first-run
 **/.claude/assistant-daemon-state.json
+
+# Payload que escribe actions/aviso-version al correrlo en local. Es un artefacto
+# de corrida, no fuente: si se rastrea, el check de ejecutores pinados lee la prosa
+# del CHANGELOG que lleva adentro y la tokeniza como nombres de paquete. Pasado el
+# 2026-08-21 en el PR del release 1.3.0, con el check dando rojo sobre tres
+# invocaciones inexistentes.
+aviso-version.json
