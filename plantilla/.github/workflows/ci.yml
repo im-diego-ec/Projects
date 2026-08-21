@@ -338,14 +338,38 @@ jobs:
       # diff, bajo review.
       - uses: "{{ORG}}/Projects/actions/censo-fuentes@v1"
 
-      # Cobertura de las lineas que el cambio agrega o modifica. Sin holgura:
-      # codigo nuevo sin pruebas es rojo aunque el paquete tenga margen de
-      # sobra sobre su piso. El piso del total es la OTRA compuerta y vive en
-      # la configuracion de cobertura de cada paquete.
+      # Cobertura en los DOS planos, en un solo paso, porque los dos leen los
+      # mismos lcov y los mismos manifiestos:
       #
-      # No mide nada en un push a main —ahi no hay rango— y lo dice en vez de
-      # simular un 100%. Y si no encuentra reportes habiendo lineas
-      # agregadas, es ROJO: "sin datos" no es "todo cubierto".
+      #   1. Las lineas que el cambio agrega o modifica, sin holgura: codigo
+      #      nuevo sin pruebas es rojo aunque el paquete tenga margen de sobra.
+      #      No aplica en un push a main —ahi no hay rango— y lo dice en vez de
+      #      simular un 100%. Si no encuentra reportes habiendo lineas
+      #      agregadas es ROJO: "sin datos" no es "todo cubierto".
+      #
+      #   2. El TOTAL de cada paquete contra el minimo del marco, que corre
+      #      SIEMPRE, tambien en un push a main. Un paquete por debajo del
+      #      minimo sin motivo ni fecha declarados es ROJO; con la fecha
+      #      vencida, ROJO; con la fecha vigente, AMARILLO, y la corrida
+      #      reporta cuanto falta y cuanto plazo queda. Bajar el umbral de este
+      #      paso NO abre esa compuerta: sobre el total, el 80 del marco es
+      #      piso duro y el umbral local solo puede subirlo.
+      #
+      #      Este plano se estrena con VENTANA DE GRACIA hasta el 2026-09-30:
+      #      hasta ese dia, un paquete por debajo del minimo SIN declaracion
+      #      avisa en vez de detener, y la corrida grita la fecha. Despues es
+      #      rojo sin que nadie toque nada. Si este repo ya tiene un paquete en
+      #      deuda, ese es el plazo real para subirlo o declararla.
+      #
+      # El piso es TRANSICION, no destino, y por eso lleva plazo: sin plazo
+      # escrito el piso termina siendo el minimo de hecho. Paso de verdad,
+      # medido en verde a 70,69% de funciones contra un minimo declarado de 80.
+      # Ver el requirement de cobertura del spec calidad-codigo.
+      #
+      # Para que el plano del total vea el codigo que ninguna prueba importa,
+      # la cobertura de cada paquete tiene que emitirse con `all: true` y con el
+      # projectRoot del reporter lcov en la raiz del monorepo. Las dos cosas
+      # vienen armadas en `vitest.config.base.mjs` de la raiz.
       - uses: "{{ORG}}/Projects/actions/cobertura-diff@v1"
 
   # EL CHECK REQUERIDO POR EL RULESET DE main ES ESTE (nombre exacto: "ci-ok").

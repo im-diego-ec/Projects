@@ -1169,6 +1169,77 @@ jobs:
       #   - El plano de la historia mira el RANGO del cambio, no la historia
       #     entera del repo. Un secreto anterior a la adopcion del check solo
       #     aparece si todavia esta en el arbol.
+      # HUECO 5 — el umbral del total del marco vivia en UN solo lugar (la
+      # constante del comparador de cobertura) y el andamio no lo repartia, asi
+      # que cada proyecto nuevo se inventaba el numero. El que se inventa
+      # termina siendo el que la medicion daba ese dia: el consumidor llego a
+      # tener functions: 70.6 fijado en su propio valor medido, o sea un umbral
+      # cumplido por construccion. Ahora el andamio lo trae, y como eso son DOS
+      # copias del mismo numero en dos archivos, este check las compara. Dos
+      # numeros que tienen que coincidir y que nadie compara son un numero que
+      # va a divergir.
+      #
+      # Solo aplica al repo que DISTRIBUYE el andamio (Projects). En un consumidor
+      # no hay plantilla/ que comparar, y el paso lo dice en vez de callarse.
+      - name: El andamio reparte el umbral del total del marco
+        if: '!cancelled()'
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          COMPARADOR="actions/cobertura-diff/medir-cobertura-diff.mjs"
+          BASE_VITEST="plantilla/vitest.config.base.mjs"
+
+          if [ ! -f "${COMPARADOR}" ]; then
+            echo "::notice::este repo no distribuye el comparador de cobertura del marco: no hay umbral que comparar — verificacion omitida"
+            exit 0
+          fi
+
+          # El [[:space:]]* del final absorbe el retorno de carro: en un
+          # checkout de Windows sin .gitattributes el archivo llega en CRLF y un
+          # ancla al ";$" pelado no matchea nunca. Ahi el check se caeria por un
+          # motivo que no es el suyo.
+          DEL_MARCO="$(sed -n 's/^const MINIMO_DEL_MARCO = \([0-9][0-9]*\);[[:space:]]*$/\1/p' "${COMPARADOR}" | head -n 1)"
+          if [ -z "${DEL_MARCO}" ]; then
+            echo "::error::no se pudo leer MINIMO_DEL_MARCO de ${COMPARADOR}. Si la constante se renombro o cambio de forma, actualiza este check en el mismo PR: un check que no puede leer el numero no puede declarar que coincide con nada"
+            exit 1
+          fi
+          echo "minimo del marco, segun el comparador: ${DEL_MARCO}"
+
+          if [ ! -f "plantilla/.github/workflows/ci.yml" ]; then
+            echo "::notice::este repo no distribuye un andamio (plantilla/): el umbral del total se lo reparte el marco, no este repo — verificacion omitida"
+            exit 0
+          fi
+
+          if [ ! -f "${BASE_VITEST}" ]; then
+            echo "::error::el andamio no reparte ninguna configuracion de cobertura del total: falta ${BASE_VITEST}. Sin eso cada proyecto nuevo inventa su umbral, y el que se inventa es el que la medicion dio ese dia: un umbral cumplido por construccion. Arreglo: agregar ${BASE_VITEST} con thresholds en ${DEL_MARCO} para lines, functions, branches y statements"
+            exit 1
+          fi
+
+          DEL_ANDAMIO="$(sed -n 's/^export const MINIMO_DEL_MARCO = \([0-9][0-9]*\);[[:space:]]*$/\1/p' "${BASE_VITEST}" | head -n 1)"
+          if [ -z "${DEL_ANDAMIO}" ]; then
+            echo "::error::${BASE_VITEST} no declara MINIMO_DEL_MARCO de forma legible, asi que no se puede comprobar que reparta el mismo numero que el comparador. Arreglo: dejalo como 'export const MINIMO_DEL_MARCO = ${DEL_MARCO};'"
+            exit 1
+          fi
+
+          if [ "${DEL_ANDAMIO}" != "${DEL_MARCO}" ]; then
+            echo "::error file=${BASE_VITEST}::el andamio reparte un umbral de total de ${DEL_ANDAMIO}% y el comparador del marco exige ${DEL_MARCO}%: un proyecto creado hoy nace con su suite local pidiendo un numero y la integracion pidiendo otro. Arreglo: dejar los dos en el mismo valor, cambiados en el mismo PR"
+            exit 1
+          fi
+
+          # Las cuatro metricas y all:true. Sin all:true el reporte solo trae
+          # los archivos que alguna prueba importo y el total sube por omision:
+          # el umbral quedaria puesto sin medir el codigo que a nadie molesta.
+          FALTAN=()
+          for CLAVE in "lines: minimo" "functions: minimo" "branches: minimo" "statements: minimo" "all: true"; do
+            if ! grep -qF "${CLAVE}" "${BASE_VITEST}"; then FALTAN+=("${CLAVE}"); fi
+          done
+          if [ ${#FALTAN[@]} -gt 0 ]; then
+            echo "::error file=${BASE_VITEST}::a la configuracion de cobertura del andamio le falta: ${FALTAN[*]}. Las cuatro metricas y all:true son lo que hace que el umbral mida algo"
+            exit 1
+          fi
+
+          echo "el andamio reparte el umbral del total (${DEL_ANDAMIO}%) y coincide con el del comparador"
       - name: Sin secretos en el repo (arbol y historia del cambio)
         if: '!cancelled()'
         shell: bash
