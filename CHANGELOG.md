@@ -6,11 +6,17 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y
 el versionado sigue [Semantic Versioning](https://semver.org/lang/es/).
 
 **Este archivo lo leen los consumidores.** Los proyectos hacen
-`uses: im-diego-ec/Projects/...@v1`, y `v1` es un tag **móvil**: lo que se
-publique acá les llega sin que ellos toquen una línea. Por eso la entrada del
-changelog se escribe en el **mismo PR** que introduce el cambio, no al momento
-del release, y por eso cada entrada dice **qué tiene que hacer un consumidor**
-(normalmente: nada).
+`uses: im-diego-ec/Projects/...@vX.Y.Z`, por **versión exacta**, y reciben
+cada versión nueva como **PR de Dependabot** en su repo: el rojo de un check
+nuevo aparece dentro de ese PR, que es donde se puede leer antes de mergear. Esa
+es la razón de que estas notas sean lo primero que alguien abre al ver el PR.
+
+Por eso la entrada del changelog se escribe en el **mismo PR** que introduce el
+cambio, no al momento del release, y por eso cada entrada dice **qué tiene que
+hacer un consumidor** (normalmente: nada).
+
+Hasta la 1.3.0 el canal era el tag móvil `v1`, que empujaba el cambio a todos a
+la vez. `v1` sigue existiendo, pero ya no es el canal de distribución.
 
 Convención de secciones: `Añadido`, `Cambiado`, `Obsoleto`, `Eliminado`,
 `Corregido`, `Seguridad`. Todo lo que sea **BREAKING para `@v1`** se marca en
@@ -34,6 +40,55 @@ mueve sobre un cambio incompatible.
 ---
 
 ## [No publicado]
+
+### Corregido
+
+- **Un proyecto nuevo nace pinado a la versión exacta, no al tag móvil `v1`.** La
+  1.4.0 movió la distribución a versión exacta con bump por PR de Dependabot, y ese
+  cambio se aplicó al consumidor real y **no al andamio**: con la 1.4.1 ya publicada,
+  `plantilla/` y la skill de adopción seguían pinando `@v1` en seis `uses:`. El
+  siguiente proyecto creado desde el andamio habría nacido con el modelo viejo.
+
+  El modo de falla es **callado**, que es lo que lo hace caro: Dependabot no propone
+  bump para `@v1` —desde su punto de vista `v1` ya es la mayor vigente, y las 1.4.x
+  dentro de `v1` no mueven el ref— así que el repo no falla, no avisa, y simplemente
+  nunca recibe una versión nueva por PR. Como desde la 1.4.0 **esos PRs son el censo
+  de consumidores**, un repo así tampoco aparece en el censo: el marco no tendría
+  forma de saber que existe.
+
+  Va también la skill `projects-validar-consumidor`, cuyo `sed` buscaba `@v1` en el
+  consumidor para reemplazarlo por el SHA bajo prueba. Desde la 1.4.0 los consumidores
+  pinan `@vX.Y.Z`, y sobre `@v1.4.1` ese patrón **parte el ref**: matchea el prefijo
+  `v1` y deja el resto colgando, o sea `@<SHA-COMPLETO>.4.1`.
+  GitHub no resuelve ese ref, así que el ensayo muere con un error que parece un typo
+  en la ruta del repo, a tres pasos de la línea que lo causó. El patrón ahora acepta
+  `@vX.Y.Z` y la verificación comprueba que **ningún ref quedó partido**, que es la
+  propiedad que importa (contar reemplazos habría dado 2 y pasado igual).
+
+### Añadido
+
+- **Un banco que se pone rojo si el andamio queda atrás de la versión publicada**
+  (`pruebas/andamio/pinado.test.mjs`, 4 aserciones). Comprueba que ningún `uses:` del
+  marco apunte a `@v1` y que todo pin exacto sea igual a la versión más alta del
+  CHANGELOG. La clase es «se arregló en el consumidor y no en el andamio», y pasó
+  **dos veces el 2026-08-21** —antes con el grupo de Dependabot—, así que se cierra
+  con una aserción y no con una línea más en el checklist del release.
+
+  Trae su propio control de no-op: si el escaneo encuentra menos de cinco pines, eso
+  es rojo. Un escaneo que no matchea nada pasaría vacuamente, y ese mismo día `node
+  --test` con un glob vacío dio exit 0.
+
+### Para consumidores
+
+**Nada que hacer.** Estos cambios son del andamio (`plantilla/`), de las skills del
+marco y del banco de pruebas: un repo ya creado no los consume. Lo que cambia es con
+qué nace el **próximo** proyecto.
+
+Y una cosa que conviene revisar igual, porque no la caza ningún check del marco: que
+tu `.github/dependabot.yml` tenga al marco en **su propio grupo**. Si comparte el
+grupo `*` con las demás actions, un PR del grupo trabado deja de proponer el bump del
+marco — medido el 2026-08-21 en proyecto-origen, donde la 1.4.1 no se propuso por
+un PR abierto de `actions/upload-artifact`.
 
 ## [1.4.1] — 2026-08-21
 

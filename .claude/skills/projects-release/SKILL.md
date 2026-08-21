@@ -10,10 +10,18 @@ metadata:
 # Cortar una version del marco
 
 Publicar una version de Projects son **seis pasos con orden obligatorio**. No es un
-`git tag` con ceremonia: `v1` es un tag **movil** y cada consumidor que hace
-`uses: im-diego-ec/Projects/...@v1` recibe el cambio **sin tocar una sola
-linea de su repo**. Un release a medias no deja un repo a medias: deja pipelines
-ajenos corriendo codigo que nadie les anuncio.
+`git tag` con ceremonia: cada consumidor pina la **version exacta**
+(`uses: im-diego-ec/Projects/...@vX.Y.Z`) y recibe la version nueva como
+**PR de Dependabot** en su repo. Un release a medias no deja un repo a medias:
+deja PRs abiertos en pipelines ajenos apuntando a un arbol que nadie termino de
+anunciar.
+
+Hasta la 1.3.0 el canal era el tag movil `v1`, que empujaba el cambio a todos a
+la vez sin que nadie tocara una linea. Cambio el 2026-08-21, cuando un check
+nuevo enrojecio a un consumidor que el dia anterior pasaba y nadie lo habia
+pedido: con el bump por PR, ese rojo aparece **dentro del PR**, que es donde se
+puede leer antes de mergear. `v1` sigue existiendo —el paso 5 lo mueve— pero ya
+no es el canal de distribucion.
 
 Todos los comandos se corren **desde la raiz del repo del marco**
 (`im-diego-ec/Projects`), sobre `main` actualizado, y **en Git Bash** (usan
