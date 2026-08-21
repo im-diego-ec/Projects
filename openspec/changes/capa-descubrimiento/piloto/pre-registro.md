@@ -10,6 +10,44 @@ veredicto_antes_de: 2026-09-21
 
 # capa-descubrimiento — Pre-registro del piloto
 
+## Media página, para leer el lunes a la mañana
+
+Lo que abajo se escribe con rigor, acá se dice en castellano. Si esta media página
+no alcanza para entender qué se está midiendo, el documento falló: el lector que
+hay que convencer es el que **no** lo escribió.
+
+**Qué se prueba.** PO ya hizo el descubrimiento y tiene sus documentos. La
+pregunta es una sola: ¿sirve la herramienta para convertir esos documentos en specs
+de OpenSpec, o conviene que un builder lo haga a mano?
+
+**Cómo.** La misma persona lo hace dos veces. Primero **a mano** (el brazo A, que es
+el punto de comparación) y después **con la herramienta** (el brazo B).
+
+**Con qué se juzga.** Siete criterios, y estos son en una línea cada uno:
+
+| | La pregunta que hace |
+|---|---|
+| **G0** | ¿Hubo que **modificar la herramienta** para que funcione? Si sí, no estás adoptando una herramienta: estás manteniendo un fork ajeno |
+| **G1** | ¿Cada spec que salió **se puede rastrear** a algo que PO escribió? |
+| **G2** | ¿Se **perdió** algo del material del PO en el camino? |
+| **G3** | ¿Se **inventó** algo? Un spec que afirma lo que el material no dice. Y **G3b**: ¿el negocio reconoce como verdadero lo que el spec describe? |
+| **G4** | ¿Cuánto **costó**, en horas del builder y en horas del PO? |
+| **G5** | ¿Qué funcionó **solo porque alguien se acordó**? Esa lista no puede estar vacía |
+| **G6** | ¿Alguien usó un documento del PO como **autoridad** sin un spec que lo respalde? |
+
+**Y qué significa que salga verde**, que es la parte que se decidió el 2026-08-21 y
+conviene no malinterpretar: **no** significa «la herramienta ayuda». Significa «no se
+demostró que no ayude». El motivo es que la misma persona corre los dos brazos en
+orden, así que cuando llega al segundo ya leyó todo el material, y leerlo es la parte
+más cara. Un verde mide la herramienta **más** la memoria de haber hecho ya la tarea.
+
+Por eso un verde habilita **una segunda corrida con el orden invertido**, no la
+adopción. Dos corridas con el sesgo en direcciones opuestas acotan el efecto real:
+una lo infla, la otra lo deprime.
+
+---
+
+
 Este archivo existe por una sola razón, y la razón es la fecha del commit. Los
 umbrales del piloto ya estaban escritos en prosa dentro de `design.md`, y un
 design se lee: se puede matizar, se puede releer con el resultado en la mano y se
@@ -600,9 +638,26 @@ se corre para producir la evidencia, y qué parte de cada criterio **no** tiene
 comando y depende de lectura humana: un criterio sin comando no es menos válido, es
 menos verificable, y eso hay que saberlo antes y no después.
 
-**Esta tabla es el gate.** La de `design.md` D6 quedó como historia del diseño viejo,
-de cuando el insumo eran transcripciones y las salidas eran tres; donde las dos
-difieran, manda esta.
+**Esta tabla es el gate, y es la ÚNICA fuente normativa del piloto.** Donde cualquier
+otro texto —de este archivo, de `design.md`, de `tasks.md`, de `proposal.md`, de la
+convención de procedencia o del encabezado del arnés— diga algo distinto sobre el
+umbral, la evidencia o el veredicto de un criterio, **manda esta tabla**. Todo lo demás
+es contexto: explica por qué el criterio quedó así, y no lo define.
+
+**Por qué se declara así y no se persigue cada contradicción.** El instrumento son
+unas 1.900 líneas repartidas en nueve archivos, y cuatro rondas de corrección
+mostraron el mismo patrón: cada arreglo crea una superficie nueva donde dos textos
+pueden dejar de coincidir. El 2026-08-21, el arreglo de las horas de marcado
+reintrodujo exactamente el defecto que se había arreglado horas antes, en otra celda.
+Perseguir contradicciones de a una no converge; declarar una sola fuente las vuelve
+**inofensivas por construcción**. Es la misma lógica de derivar en vez de enumerar que
+ya cerró dos clases enteras en este marco.
+
+Consecuencia práctica para el lunes: **si dos textos se contradicen, no hay que
+discutir cuál manda.** Manda esta tabla, y la discusión se pospone a después del
+veredicto, que es donde no contamina nada. La tabla de `design.md` D6 quedó como
+historia del diseño viejo, de cuando el insumo eran transcripciones y las salidas eran
+tres.
 
 **Qué se movió, y cuándo, para que nadie tenga que reconstruirlo:**
 
@@ -625,7 +680,7 @@ de la corrección con fecha posterior. La comprobación es la misma de siempre:
 |---|---|---|
 | **G0** | Ediciones a archivos de **los dos** directorios que la instalación de la herramienta escribe —`_bmad` y `.claude/skills`— durante el piloto. Umbral: **cero**. Si hubo que tocarla para que ingiera el corpus, o para cortar en el PRD, la adopción no es acotada: es mantener un fork de un método ajeno | Por código de salida, dentro del espacio desechable: `git diff-index --cached --quiet HEAD -- _bmad .claude/skills` sobre un índice temporal en el que se acaba de hacer `git add --all --force -- _bmad .claude/skills`. Lo corre `verificar-brazo.mjs`, que además distingue «cero ediciones» de «no se pudo mirar», **directorio por directorio** (si a uno de los dos le falta el commit de instalación o el árbol de trabajo, G0 **no se mide**, no se aprueba). La lista de ediciones, si hubo, sale de `git diff-index --cached --name-status HEAD -- _bmad .claude/skills` |
 | **G1** | Escenarios con al menos un ítem asociado —`I0xx` del inventario o `L0xx` de la lista de observación—, **en las dos tablas de trazabilidad**, la de B y la del control. Umbral: **100%**, cero `n/a`. En el brazo B es eliminatorio; en el control es además la condición que hace medibles las comparativas de G2 y G4 (ver abajo) | Sin comando: es lectura de las dos tablas de trazabilidad contra el inventario. Lo mecánico es el formato, que hace la lectura contable: cada fila es un par ítem-escenario y la última columna no puede quedar vacía ni decir `n/a` (`convencion-de-procedencia.md`, parte 2). El orden inventario-antes-que-salidas se lee con `git log --format='%cI %h %s' -- inventario.md` en el espacio del scorer (sección 3) |
-| **G2** | Ítems del inventario que no quedaron ni cubiertos, ni fuera de alcance declarado, ni pregunta abierta (**caídos en silencio**). Umbral: brazo B **cero** en los ítems clasificados como regla de negocio, **y B ≤ control en el total** | Sin comando, pero con denominador fijo: son los identificadores del inventario que aparecen en **cero** filas de la tabla de trazabilidad. La clase de cada ítem viene de la rúbrica pre-registrada, y reclasificar un ítem después de leer las salidas hace que G2 no se pueda puntuar (`convencion-de-procedencia.md`, parte 3). El denominador es el inventario **del corpus**, congelado en el commit del scorer: lo elicitado nuevo (`L0xx`) no entra (sección 2) |
+| **G2** | Ítems del inventario que no quedaron ni cubiertos, ni fuera de alcance declarado, ni pregunta abierta (**caídos en silencio**). Umbral: brazo B **cero** en los ítems clasificados como regla de negocio, **y B ≤ control en el total** | Sin comando, pero con denominador fijo: son los identificadores del inventario que aparecen en **cero** filas de la tabla de trazabilidad. La clase de cada ítem viene de la rúbrica pre-registrada, y reclasificar un ítem después de leer las salidas hace que G2 no se pueda puntuar (`convencion-de-procedencia.md`, parte 3). El denominador es el inventario **del corpus**, congelado en el commit del scorer: lo elicitado nuevo (`L0xx`) no entra. **Y la comparativa «B ≤ control» solo es válida si las DOS tablas pasaron G1.** Si la del control no llega al 100%, la comparativa queda **NO MEDIDA**, cuenta en contra y el techo del veredicto es amarillo. Sin esta condición quedaba abierto el walkover por el lado de los ítems: G1 exige que cada escenario cite un ítem, pero nada obligaba a la tabla del control a **citar todos los ítems**, y una tabla A subllenada infla los caídos del control y le regala a B la comparativa sin que nadie lo pueda ver (sección 2) |
 | **G3** rearmado | Dos mitades, las dos con umbral y las dos eliminatorias para el brazo B. **G3a, invención:** afirmaciones de regla de negocio cuyo ítem tiene `origen: derivado` y que aun así sostienen un escenario sin marca de supuesto. Umbral: brazo B **cero**. **G3b, fidelidad al negocio:** la vara del PO de la sección 2, **100% «describe»** en los escenarios clasificados como regla de negocio, con «no puedo saberlo» contando como no firmado | Sin comando. G3a: lista del scorer que enumera **todas** las afirmaciones de regla de negocio del delta, una por línea, con su veredicto —y no solo las falladas—, con la **cita textual**, el ancla invocada y la frase que esa ancla dice de verdad al lado. G3b: las tres marcas del PO en la columna de la tabla de trazabilidad, anotadas **antes** de ver el veredicto de los otros criterios |
 | **G4** rearmado | **Horas de conversión del builder**, por brazo: brazo B ≤ **2×** las del control. **Y** horas del PO, por brazo: brazo B **no supera en más de 1 hora absoluta** las del control, contando solo las categorías de conversión y **excluyendo el marcado** de G3b. **Y** la salida del brazo B pasa los mismos gates | Las horas salen de `horas.csv`, anotadas por sesión y no al final, con la columna `rol` separando builder de PO y la columna `categoria` separando `conversion` de `marcado`. Los gates salen de `node verificar-brazo.mjs <espacio> <brazo>`, que imprime y devuelve los códigos de salida del guardrail de deltas y de `validate --all --strict` sin enmascarar ninguno. La firma de fidelidad al negocio del PO **ya no cuelga de acá**: es G3b |
 | **G5** | Puntos del piloto que dependieron de que alguien se acordara. Umbral: la lista **no puede estar vacía**, y cada ítem lleva destino (check propuesto, o queda fuera y por qué). Si todo queda fuera, el techo del veredicto es **amarillo** | Sin comando, y por eso el insumo existe desde el primer día: `bitacora-g5.md`, que se llena mientras pasa. Una lista vacía significa que nadie miró |
