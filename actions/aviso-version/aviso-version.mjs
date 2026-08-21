@@ -4,7 +4,8 @@
 //
 // Por qué existe (fila 14 del backlog de `docs/reglas-no-escritas.md`): el
 // CHANGELOG y el release son superficie de CONSULTA, no de NOTIFICACIÓN. Con un
-// tag móvil, un consumidor recibe comportamiento nuevo —incluido un check que lo
+// bump del PR de Dependabot (o, hasta la 1.3.0, por el tag móvil), un consumidor
+// recibe comportamiento nuevo —incluido un check que lo
 // pone en rojo— sin haber leído nada. Pasó el 2026-08-19: al mover `v1`, el
 // segundo consumidor quedó a un push de un rojo que nadie le anunció.
 //
@@ -171,7 +172,10 @@ export function construirMensaje({ version, seccion, urlRelease, urlChangelog, l
   const breaking = lineasBreaking(seccion.cuerpo);
   const consumidores = extraerParaConsumidores(seccion.cuerpo);
 
-  const partes = [`Projects ${version} publicado — el tag móvil \`v1\` ya apunta acá.`];
+  const partes = [
+    `Projects ${version} publicado.` +
+      " El bump llega a cada repo como PR de Dependabot: el tag \`v1\` sigue existiendo y ya no es el canal de distribucion.",
+  ];
 
   if (breaking.length) {
     partes.push(
