@@ -642,10 +642,18 @@ por implicación, que se dice en vez de disimularse:
   contenido, y la respuesta cierra la primera.
 
 **Y esta regla no se queda en el piloto.** Builder 1 la enunció como la forma en que el
-área trabaja, así que se propuso donde vale para todos los proyectos y no solo para
-este change: ver **D11** en `design.md`, que dice en qué superficie quedó, por qué
-esa y no otra, y qué parte no se pudo escribir hoy sin cortar una versión nueva del
-canónico.
+área trabaja, no como un cuidado de este proyecto, así que se propuso donde vale
+para todos: como **requirement del delta de `gobierno-contribucion`**, en un PR
+aparte del que trae este pre-registro. Va aparte a propósito, y el motivo es el
+gate y no la prolijidad: el delta de esa capability lo gatea el PO por CODEOWNERS,
+y este archivo no. Mezclarlos en un PR haría que la corrección del instrumento
+—que el piloto necesita el lunes— quedara esperando una aprobación que no le
+corresponde.
+
+Ese PR lleva la decisión **D11** de `design.md`, con tres cosas que acá no entran:
+en qué superficie quedó la regla y por qué esa, la medición que descartó escribirla
+hoy en el canónico transportado, y la versión del canónico que haría falta y que
+**no se cortó**.
 
 Cuando una decisión se resuelve, se escribe acá **quién la tomó y en qué fecha**.
 Una decisión sin autor es una decisión que nadie va a poder discutir en seis meses.
