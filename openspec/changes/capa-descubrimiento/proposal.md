@@ -95,12 +95,23 @@ Toda la maquinaria está condicionada al veredicto del piloto.
 
 ### Modified Capabilities
 
-- `gobierno-contribucion`: **dos requirements nuevos** — (1) el descubrimiento
+- `gobierno-contribucion`: **tres requirements nuevos** — (1) el descubrimiento
   llega al contrato con procedencia y no lo reemplaza; (2) el estado experimental
-  de un change caduca por fecha. Los tres requirements vigentes de la capability
-  **no se tocan** (el delta es solo `ADDED`, así que el hueco conocido del
-  guardrail de deltas —un `MODIFIED` cuyo título no existe en el spec vivo no
-  avisa— no aplica acá).
+  de un change caduca por fecha; (3) el descubrimiento se produce fuera del
+  repositorio y entra como insumo al inicio de la sesión que lo consume. Los tres
+  requirements vigentes de la capability **no se tocan** (el delta es solo `ADDED`,
+  así que el hueco conocido del guardrail de deltas —un `MODIFIED` cuyo título no
+  existe en el spec vivo no avisa— no aplica acá).
+
+El tercero lo agregó una aclaración del Builder 1 del 2026-08-21: el descubrimiento se
+produce **fuera** del repositorio y entra como insumo al inicio de la sesión, sea
+de un proyecto nuevo, de un deploy o de un agregado a un proyecto existente. Lo
+enunció como regla general del área y no como excepción de este proyecto, así que
+no podía quedarse solo en el piloto. Va en este delta porque es la única ruta que
+conserva el gate del PO, y **vale con independencia del veredicto**: si el piloto
+sale rojo o amarillo se rescata a un change propio, igual que el requirement de
+caducidad. El razonamiento completo, con la medición que por hoy descartó el
+canónico, está en `design.md` D11.
 
 `reglas-al-dia` también agrega un requirement a esta capability. Los títulos no
 colisionan, y el `## Purpose` —que los deltas no transportan— lo amplía el
@@ -131,9 +142,12 @@ verificación de qué exige de verdad la cadena de herramientas:
 1. **Dependencia de terceros** (⚠️ de `AGENTS.md`): la herramienta de
    descubrimiento entra —si el veredicto es verde— al carril de todos los
    consumidores. Se pina por versión exacta y se declara su alcance de módulos.
-2. **Material con datos de personas**: dónde viven las transcripciones y si
-   pueden pasar por un modelo. El repositorio no es su custodio y este change no
-   lo decide por defecto.
+2. **Material con datos de personas**: dónde vive el corpus y si puede pasar por
+   un modelo. **Contestada por Builder 1 el 2026-08-21**: se produce fuera del
+   repositorio y entra como insumo al inicio de la sesión, así que el repositorio
+   no es su custodio y sí pasa por un modelo. Queda abierto el residuo, que es
+   otra frontera: si lo que entra está despersonalizado. Eso depende de ver el
+   corpus y lo decide el PO con Builder 1 (`piloto/pre-registro.md`, decisión 1.5).
 3. **Correr el piloto**: consume tiempo del PO y de un builder, y su
    pre-registro se commitea antes de la primera sesión.
 

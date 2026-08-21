@@ -49,6 +49,45 @@ en que eso ocurriría.
 - **WHEN** alguien quiere verificar de dónde salió un escenario y el material crudo no vive en el repositorio
 - **THEN** el identificador estable que el artefacto declara lo lleva al ítem exacto del material, y la verificación se completa sin que el contenido de ese material —ni los datos de las personas que participaron— haya entrado al repositorio
 
+### Requirement: El descubrimiento se produce fuera del repositorio y entra como insumo de la sesión
+
+El corpus de descubrimiento de un proyecto —entrevistas, procesos levantados, los
+documentos que de ellos se derivan, las listas de casos borde, los prototipos y el
+feedback que esos prototipos recibieron— SHALL producirse **fuera del
+repositorio**, y SHALL entrar como insumo **al inicio de la sesión de trabajo que
+lo consume**. El repositorio NO SHALL ser su custodio.
+
+La regla NO SHALL distinguir la ocasión: vale igual para la sesión que abre un
+proyecto nuevo, para la que prepara un deploy nuevo y para la que agrega algo a un
+proyecto que ya existe. Un descubrimiento que solo entra «cuando el proyecto
+arranca» deja sin insumo a los dos casos que ocurren más seguido, que son los
+agregados y los deploys, y ahí es donde la invención vuelve a colarse: no hay
+corpus contra el que contrastar lo que se escribe.
+
+Lo que el repositorio SHALL conservar son los **artefactos derivados** y la
+**trazabilidad por identificador estable**, que es lo que permite responder de
+dónde salió un escenario sin que el corpus viaje. La autoridad sobre el
+comportamiento SHALL seguir siendo únicamente los specs vivos: el corpus es insumo
+de una sesión, y entrar a una sesión no le da autoridad de contrato.
+
+El corpus NO SHALL incorporarse a la cadena de artefactos que el repositorio carga
+en **cada** sesión. Es insumo de la sesión que lo necesita y no contexto
+permanente: un corpus en la cadena de imports paga su costo en todas las sesiones,
+incluidas las que no lo van a usar, y queda al mismo nivel de autoridad que las
+reglas del marco.
+
+#### Scenario: Un proyecto cuyo descubrimiento ya estaba hecho
+- **WHEN** arranca la sesión de un proyecto cuyo corpus de descubrimiento ya fue producido antes y fuera del repositorio
+- **THEN** ese corpus entra como primer insumo de la sesión, y lo que queda en el repositorio son los artefactos derivados y la trazabilidad por identificador, no el corpus, de modo que el trabajo se puede contrastar contra lo que alguien levantó en vez de contra lo que quien escribe recuerda
+
+#### Scenario: Un agregado a un proyecto que ya existe
+- **WHEN** se agrega una capacidad a un proyecto existente, o sale un deploy nuevo, y detrás hay descubrimiento
+- **THEN** ese descubrimiento entra igual, al inicio de la sesión que lo consume, sin que el repositorio lo adopte, porque la regla no distingue el proyecto nuevo del agregado y es en el agregado donde el contraste falta más seguido
+
+#### Scenario: El corpus no se vuelve contexto permanente
+- **WHEN** un corpus de descubrimiento entra como insumo al inicio de una sesión
+- **THEN** entra para el trabajo de esa sesión y no se agrega a la cadena de artefactos que el repositorio carga en todas, porque hacerlo cobraría su costo en cada sesión y lo pondría al mismo nivel de autoridad que las reglas, que es exactamente la confusión insumo-contrato que el resto de esta capability existe para cerrar
+
 ### Requirement: El estado experimental de un change caduca por fecha
 
 Un change puede declararse **experimental**: su propuesta existe, está revisada y
