@@ -1479,7 +1479,10 @@ export const JOB_SUGERIDO = [
   "      - uses: actions/checkout@v7",
   "      - uses: actions/setup-node@v7",
   '        with: { node-version: "22" }',
-  `      - uses: im-diego-ec/Projects/${SEGMENTO_ACTION}@v1`,
+  // Version exacta y no @v1: el tag mayor se retira, y un snippet que sugiere un
+  // ref inexistente manda al consumidor a un error que parece un typo en la ruta.
+  // La version la exige el banco del andamio contra el CHANGELOG.
+  `      - uses: im-diego-ec/Projects/${SEGMENTO_ACTION}@v1.4.1`,
   "        with:",
   "          modo: verificar",
   "",

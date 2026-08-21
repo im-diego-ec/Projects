@@ -43,6 +43,70 @@ mueve sobre un cambio incompatible.
 
 ### Corregido
 
+- **El pin de version exacta dejo de ser una media verdad.** La 1.4.0 movio la
+  distribucion a version exacta para que ningun consumidor recibiera comportamiento
+  nuevo sin un PR que alguien pudiera leer. Faltaba la mitad: **`marco-ci.yml`
+  referenciaba a sus propias actions hermanas por `@v1`**, el tag movil. O sea que un
+  repo pinado a `marco-ci.yml@v1.4.1` recibia el workflow de la 1.4.1 y
+  `guardrail-deltas` y `constitucion` de lo que `v1` apuntara **en ese momento**.
+
+  Dos jobs que corren en cada PR de cada consumidor (`marco / openspec` y
+  `marco / constitucion-cableada`) tenian esa mezcla de versiones adentro. El pin que
+  el consumidor creia exacto no lo era, y el aviso que la 1.4.0 prometia —el rojo
+  dentro del PR de bump— no cubria esas dos actions.
+
+  Se descubrio al intentar **retirar `v1`**: los dos `uses:` son `uses:` VIVOS, asi que
+  borrar el tag habria roto el CI de todo consumidor con un error de "no se pudo
+  resolver la action" que parece un typo en la ruta del repo.
+
+- **El texto canonico de la constitucion ya no ensena el canal viejo.**
+  `canonico/20-marco-version.md` —el que se renderiza en el arbol de cada consumidor y
+  cargan los agentes— decia que el repo consume `@v1`, que `v1` es un tag movil y que
+  lo que Projects publique "llega a este pipeline sin que nadie aca toque una linea". Y
+  una de sus reglas le pedia al consumidor **no pinar una version**, con la
+  justificacion de que asi "un arreglo llega a todos". Con el bump por PR eso esta al
+  reves: pinar la version exacta ES el modelo. Los cinco ids de regla se conservan.
+
+  Tambien se corrigio la regla que prometia un "PR semanal que regenera este archivo":
+  ese PR solo existe si el repo cableo `actualizar-marco.yml`, y ninguno de los dos
+  consumidores lo tenia. Una regla que nombra un dueno inexistente entrena a ignorar el
+  resto del archivo.
+
+### Retirado
+
+- **El tag movil `v1`.** Apuntaba al mismo commit que `v1.4.1`, no lo consumia ningun
+  repo del censo, y su existencia sostenia dos afirmaciones falsas: que el canal de
+  distribucion seguia siendo el push (no lo es desde la 1.4.0) y que el pin exacto
+  alcanzaba (no alcanzaba, ver arriba). `projects-release` paso de **seis pasos a cinco**:
+  el que lo movia no existe, y con el desaparecio una de las tres precondiciones.
+
+  La compuerta humana no se perdio: se movio al merge del PR de release a `main`, que
+  ya exige el OK y ocurre ANTES de que el tag exista.
+
+### Anadido
+
+- **La compuerta del pinado ahora cubre `.github/workflows/` y `actions/`**, que es
+  donde estaban los pines vivos. La primera version del banco (esta misma manana)
+  miraba solo `plantilla/` y `.claude/skills/`: mas angosto que el problema, y por eso
+  no vio los dos `uses:` de `marco-ci.yml`. Quedan fuera los directorios `pruebas/`
+  —sus fixtures usan `@v1` a proposito, porque prueban el parseo de un ref cualquiera—
+  y las lineas de comentario, por la misma razon que la prosa.
+
+### Para consumidores
+
+**Dos cosas, y las dos hay que hacerlas.**
+
+1. **Si tu `uses:` del marco dice `@v1`, cambialo a la version exacta.** El tag ya no
+   existe: la corrida falla con "Unable to resolve action" o "workflow not found", que
+   parece un typo en la ruta y no menciona el tag. Al 2026-08-21 los repos con esa
+   linea son `intranet#1` y `riesgos-investigaciones#2`, los dos en PRs sin mergear.
+2. **Regenera la porcion del marco de tu constitucion.** El texto canonico cambio, asi
+   que tu artefacto quedo atrasado: el check lo dice en `::warning::` y pasa a rojo el
+   `exigible_desde` que el propio aviso imprime. La forma de que deje de ser manual es
+   cablear `actualizar-marco.yml`, que el andamio ya trae.
+
+### Corregido
+
 - **Un proyecto nuevo nace pinado a la versión exacta, no al tag móvil `v1`.** La
   1.4.0 movió la distribución a versión exacta con bump por PR de Dependabot, y ese
   cambio se aplicó al consumidor real y **no al andamio**: con la 1.4.1 ya publicada,
