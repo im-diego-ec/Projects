@@ -43,6 +43,11 @@ jobs:
   # posible son los casos sinteticos de aca mas la validacion contra un
   # consumidor real. Sin este job, ese codigo llega a todos los consumidores sin
   # que nada lo pruebe.
+  #
+  # El job lleva ademas el banco de los pasos INLINE de marco-ci.yml (segundo
+  # paso de "casos sinteticos"): el nombre quedo por las actions, que fueron lo
+  # primero que tuvo banco, pero lo que agrupa es "todo el codigo del marco que
+  # se prueba con casos controlados".
   pruebas_actions:
     name: pruebas-actions
     runs-on: ubuntu-latest
@@ -108,6 +113,41 @@ jobs:
 
           node --test "${PRUEBAS[@]}"
 
+      # Banco de los pasos INLINE de marco-ci.yml.
+      #
+      # POR QUE ES UN PASO APARTE Y POR QUE HACIA FALTA. Los guardrails que
+      # viven dentro de un bloque "run:" no pueden salir de ahi: marco-ci.yml es
+      # un workflow reusable, asi que cuando lo llama un consumidor el arbol
+      # checkouteado es el DEL CONSUMIDOR y ningun archivo de Projects esta
+      # presente. Por eso ese codigo va inline, y por eso era el unico codigo del
+      # marco sin una sola asercion. La auditoria del 2026-08-20 lo anoto como
+      # hueco justo despues de medir, en esos mismos pasos, cuatro defectos que
+      # salian en VERDE —uno de ellos en el detector de secretos— y una rama de
+      # aviso que era codigo muerto.
+      #
+      # El banco no copia ese codigo (una copia se desincroniza y miente): lee
+      # marco-ci.yml, extrae el script exacto del paso y lo corre contra
+      # fixtures. Si un paso se renombra o pierde su "run:", el extractor tira y
+      # esto se pone rojo en vez de dejar de probar en silencio.
+      - name: Casos sinteticos de los pasos inline de marco-ci
+        shell: bash
+        run: |
+          set -euo pipefail
+          shopt -s globstar nullglob
+
+          PRUEBAS=(pruebas/**/*.test.mjs)
+
+          # Misma disciplina que el paso de arriba: "no encontre pruebas" jamas
+          # se reporta como exito.
+          if [ ${#PRUEBAS[@]} -eq 0 ]; then
+            echo "::error::no se encontro ningun archivo de pruebas en pruebas/**/*.test.mjs. Si moviste el banco de los pasos inline, actualiza este patron; si lo borraste, esos pasos volvieron a no tener ninguna asercion"
+            exit 1
+          fi
+
+          echo "== bancos de los pasos inline encontrados =="
+          printf '%s\n' "${PRUEBAS[@]}"
+
+          node --test "${PRUEBAS[@]}"
   # EL CABLEADO DE LA CONSTITUCION, SOBRE EL PROPIO MARCO Y POR RUTA LOCAL.
   #
   # El carril del consumidor vive en marco-ci.yml y llama a la action por su ref
