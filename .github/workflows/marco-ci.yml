@@ -1167,7 +1167,8 @@ jobs:
             // espacio y el tabulador vienen de la gramatica de shell; la coma y
             // el corchete, de un array JSON ("command": ["npx","prisma"]); el
             // parentesis, el punto y coma, la barra y el ampersand, de shell.
-            // Las llaves NO estan: partirlas rompe ${VAR} y ${{ inputs.x }},
+            // Las llaves NO estan: partirlas rompe la expansion de shell y las
+            // expresiones de Actions (dos llaves, inputs.algo),
             // que son la forma legitima de un pin por variable.
             const SEPARADOR = /[\s,;|&<>()[\]`]/;
             const BANDERA = /^-{1,2}[A-Za-z]/;
