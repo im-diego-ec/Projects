@@ -21,9 +21,23 @@ updates:
     schedule:
       interval: "weekly"
       day: "monday"
+    # DOS GRUPOS, y el marco va SOLO en el suyo. Con un unico grupo `*`,
+    # Dependabot no abre un segundo PR mientras el del grupo siga abierto: da las
+    # demas dependencias por «manejadas» y espera actualizar el PR existente.
+    # Medido el 2026-08-21: la 1.4.1 del marco no se propuso porque habia un PR
+    # abierto del grupo por `actions/upload-artifact`, de v4 a v7 —tres majors de
+    # salto, o sea un PR que con razon puede quedarse quieto semanas— y el log lo
+    # dijo textual: «Adding dependencies as handled: (..., projects/...)».
+    #
+    # El marco es la dependencia cuyo aviso importa: es la que trae checks nuevos y
+    # arreglos de seguridad, y los PRs de su bump son ademas el censo de quien lo
+    # consume. Agruparla con el resto la vuelve rehen del PR mas trabado.
     groups:
+      marco:
+        patterns: ["{{ORG}}/Projects*"]
       actions:
         patterns: ["*"]
+        exclude-patterns: ["{{ORG}}/Projects*"]
 
   - package-ecosystem: "docker"
     directory: "/{{PAQUETE_API}}"
