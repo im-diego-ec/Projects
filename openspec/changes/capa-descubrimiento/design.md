@@ -527,6 +527,16 @@ vacío con el título puesto invita a llenarlo de memoria, que es justo lo que G
 G5 tratan de evitar. Todo despersonalizado: ni nombres de entrevistados ni citas
 que los identifiquen.
 
+**Y eso deja una consecuencia que el pre-registro tuvo que resolver: el inventario
+del scorer no vive acá.** Se commitea **antes** de las salidas —es la mitad de la
+evidencia de G1 y de G2— pero lleva la cita textual de cada ítem del corpus, así que
+meterlo en el repositorio sería meter el material del corpus, que D3 prohíbe y que la
+decisión de despersonalización todavía no autorizó. Vive en un **espacio de git
+propio del scorer**, fuera de todo repositorio, igual que los espacios de los brazos:
+ahí el sello de tiempo funciona igual y la frontera de privacidad no se mueve. Lo que
+viaja a Projects es `mediciones.md`, después y despersonalizado
+(`piloto/pre-registro.md`, sección 3).
+
 ## Lo que este diseño NO resuelve
 
 - **La procedencia no es calidad.** La capa garantiza que un escenario tenga
