@@ -951,6 +951,33 @@ export function correAunConFallo(job) {
  * verificamos qué hace el run»: la lectura sí se verifica, y también que el paso que
  * lee esté vivo y no amortiguado.
  */
+/**
+ * Los textos de los pasos que SI consultarian el resultado pero estan
+ * neutralizados, con el motivo. Existe porque tirar esta informacion convertia dos
+ * casos distintos en el mismo veredicto: «hay un paso que cobra y alguien lo
+ * amortiguo» es un hecho SINTACTICO del YAML —decidible, y por lo tanto rojo— y «no
+ * hay ningun paso que cobre» es el limite de lectura que este check declara como
+ * residuo. Medido el 2026-08-21: sin esta distincion, 9 ortografias del amortiguador
+ * a nivel PASO pasaron de exit 1 a exit 0, incluida la mas barata de todas, poner
+ * continue-on-error: true en el paso del veredicto para desbloquear un merge.
+ */
+export function textosAmortiguadosDe(job) {
+  const trozos = [];
+  let motivo = '';
+  for (const paso of Array.isArray(job?.steps) ? job.steps : []) {
+    if (paso === null || typeof paso !== 'object') continue;
+    const apagado = ifApagado(paso.if);
+    const tapado = tapaElRojoEn(paso);
+    if (!apagado && !tapado) continue;
+    if (!motivo) motivo = apagado ? `su if lo apaga (${JSON.stringify(paso.if)})` : 'su continue-on-error tapa el rojo';
+    for (const clave of ['run', 'if']) {
+      const valor = paso[clave];
+      if (typeof valor !== 'string') continue;
+      for (const linea of valor.split('\n')) trozos.push(sinComentario(linea));
+    }
+  }
+  return { texto: trozos.join('\n'), motivo };
+}
 export function textosVivosDe(job) {
   const trozos = [];
   for (const paso of Array.isArray(job?.steps) ? job.steps : []) {
@@ -1044,6 +1071,12 @@ export function transportaElRojo(jobs, nodo, compuerta, vistos = new Set()) {
   }
   return {
     transporta: false,
+    // CLASE "lectura": este veredicto no sale de la estructura del grafo sino de LEER
+    // el texto de los pasos para decidir si alguno cobra el rojo, y esa lectura es la
+    // que el oraculo refuto (ver el residuo A01 en invocacionesDe). Su lado que
+    // ACEPTA es unsound, asi que su lado que RECHAZA no puede presentarse como
+    // compuerta: sale por aviso con el residuo nombrado.
+    clase: "lectura",
     porque: `el eslabon "${nodo}" corre aunque su needs falle (${JSON.stringify(job.if)}) y ningun paso VIVO suyo consulta el needs.<job>.result de un eslabon que lleve a "${compuerta}"${
       propios.length > 0 ? ` (cuelga de ${propios.join(", ")})` : ""
     }: corre, sale VERDE, y el rojo se pierde ahi`,
@@ -1084,21 +1117,44 @@ export function vigilaElResultado(jobs, veredicto, compuerta) {
   const texto = textosVivosDe(job);
   const consultados = eslabones.filter((eslabon) => consultaElResultado(texto, eslabon));
   if (consultados.length === 0) {
+    // ANTES de declarar el residuo de lectura: mirar si el paso que cobra EXISTE y
+    // esta neutralizado. Si existe, esto no es un limite de lectura, es un
+    // amortiguador puesto a mano, y va en ROJO.
+    const amortiguado = textosAmortiguadosDe(job);
+    const tapados = amortiguado.texto
+      ? eslabones.filter((eslabon) => consultaElResultado(amortiguado.texto, eslabon))
+      : [];
+    if (tapados.length > 0) {
+      return {
+        vigila: false,
+        clase: 'estructura',
+        porque: `"${veredicto}" TIENE un paso que consulta needs.${tapados.join(', ')}.result, pero ese paso esta neutralizado: ${amortiguado.motivo}. Un paso amortiguado se ejecuta y su rojo no detiene el job, asi que el veredicto sale VERDE con la compuerta en rojo y el check requerido del ruleset no bloquea nada. Esto NO es el residuo de lectura de este check: que el paso exista y este tapado se lee del YAML, asi que es rojo. Arreglo: sacale el continue-on-error o el if al paso que compara, no agregues otro paso`,
+      };
+    }
     return {
       vigila: false,
+      // CLASE "lectura", igual que la hoja de transportaElRojo y por el mismo motivo:
+      // quien decide es consultaElResultado sobre el texto de los pasos vivos.
+      clase: "lectura",
       porque: `"${veredicto}" cuelga de "${eslabones.join(
         ", ",
       )}" y NINGUN paso vivo suyo consulta needs.<job>.result: con if: always() el veredicto corre igual y sale VERDE, y la doc de checks requeridos dice que un job salteado reporta Success. Solo cuenta el run o el if de un paso que corra y cuyo rojo no este amortiguado: un name, un env que nadie lee o la linea comentada dentro del run no consultan nada, y .outputs tampoco transporta el fallo (un job que fallo antes de imprimir deja el output vacio, indistinguible de un verde sin outputs)`,
     };
   }
   const motivos = [];
+  const clases = [];
   for (const eslabon of consultados) {
     const camino = transportaElRojo(jobs, eslabon, compuerta, new Set());
     if (camino.transporta) return { vigila: true, como: `mira needs.${eslabon}.result, y ${camino.como}` };
     motivos.push(camino.porque);
+    clases.push(camino.clase ?? "estructura");
   }
   return {
     vigila: false,
+    // Si ALGUN eslabon del camino falla por estructura, el veredicto agregado es de
+    // estructura: el lado conservador es el que conserva el rojo. Solo cuando TODO lo
+    // que falla es lectura el hallazgo baja a aviso.
+    clase: clases.every((c) => c === "lectura") ? "lectura" : "estructura",
     porque: `"${veredicto}" consulta needs.${consultados.join(
       ".result, needs.",
     )}.result, pero por ese camino el rojo de "${compuerta}" no llega: ${motivos.join("; y ")}`,
@@ -1147,6 +1203,23 @@ export function invocacionesDe(archivos, ramaPorDefecto = "main") {
         const modo =
           paso?.with?.modo === undefined || paso?.with?.modo === null ? "verificar" : String(paso.with.modo).trim();
         const motivos = [];
+        // LOS DOS BOLSILLOS, y la division no es cosmetica: separa lo que este lector
+        // DECIDE de lo que apenas puede indicar.
+        //   · `motivos` son las condiciones que se deciden mirando la estructura del
+        //     YAML: donde vive el archivo, si git lo rastrea, con que evento corre,
+        //     con que modo se invoca, si el job esta apagado o amortiguado, si existe
+        //     el check run del veredicto y si cuelga de este job. Todas siguen siendo
+        //     ROJAS: aflojarlas seria cambiar de tema.
+        //   · `residuos` es la parte de la condicion 5 que promete una propiedad sobre
+        //     un CAMINO y verifica un patron sintactico sobre un NODO. El representante
+        //     medido de la clase: un paso de "ci-ok" cuyo `if` NOMBRA
+        //     needs.<job>.result satisface el patron SALTEANDOSE —con la compuerta en
+        //     rojo el `if` es falso, el paso se saltea y el job concluye success—.
+        //     Oraculo semantico independiente, 2026-08-21: 70 falsos verdes sobre 2928
+        //     casos generados, UNA sola clase. Cuatro rondas la abrieron una capa mas
+        //     adentro cada vez, asi que por decision del Builder 1 se DECLARA en modo aviso
+        //     en vez de intentar cerrarla una quinta.
+        const residuos = [];
         if (archivo.rastreado === false) {
           motivos.push(
             `git no rastrea ${archivo.origen ?? archivo.ruta} (no aparece en git ls-files), asi que ese archivo existe solo en la maquina donde se escribio: GitHub Actions corre lo que esta versionado`,
@@ -1194,8 +1267,22 @@ export function invocacionesDe(archivos, ramaPorDefecto = "main") {
               `"${VEREDICTO_AGREGADO}" cuelga de "${clave}" y no declara if: always(), asi que cuando "${clave}" falla el veredicto queda SALTEADO — y la doc de GitHub dice que un job salteado por un condicional reporta Success y no bloquea el merge: el rojo no llega al check requerido`,
             );
           }
+          // Y ACA SE PARTE EL VEREDICTO DEL CAMINO, por CLASE y no por caso:
+          //   · clase "estructura" —continue-on-error que no se puede demostrar
+          //     falso, if constante falso, un eslabon que lava el rojo, un needs que
+          //     no lleva a la compuerta— son hechos del grafo, se deciden mirando el
+          //     YAML y siguen siendo ROJOS. Son la parte mas auditada del check y no
+          //     se toca.
+          //   · clase "lectura" —"ningun paso vivo consulta needs.<job>.result"— sale
+          //     de LEER el texto de los pasos, y es exactamente la regla que el
+          //     oraculo refuto: su lado que ACEPTA se satisface con un paso que se
+          //     saltea. Una regla cuyo lado de aceptacion es unsound no puede
+          //     presentar su lado de rechazo como compuerta, asi que va al residuo.
           const vigilancia = vigilaElResultado(jobs, veredicto, clave);
-          if (!vigilancia.vigila) motivos.push(vigilancia.porque);
+          if (!vigilancia.vigila) {
+            if (vigilancia.clase === "lectura") residuos.push(vigilancia.porque);
+            else motivos.push(vigilancia.porque);
+          }
         }
         encontradas.push({
           ruta: archivo.origen ?? archivo.ruta,
@@ -1212,7 +1299,13 @@ export function invocacionesDe(archivos, ramaPorDefecto = "main") {
           disparable,
           apagado: ifApagado(job?.if) || ifApagado(paso?.if) || cadena !== null,
           motivos,
-          cuenta: motivos.length === 0,
+          residuos,
+          // `cuenta` no cambia de significado: sigue queriendo decir «las cinco
+          // condiciones se cumplen». Lo que cambia es el COLOR que el veredicto le
+          // pone a cada forma de no cumplirlas, y para eso hace falta la segunda
+          // pregunta: ¿lo unico que falta es la parte que no se puede decidir?
+          cuenta: motivos.length === 0 && residuos.length === 0,
+          cuentaSalvoCamino: motivos.length === 0,
         });
       }
     }
@@ -1235,6 +1328,17 @@ export function invocacionesDe(archivos, ramaPorDefecto = "main") {
  *     la maquinaria y se saltea el check.
  * Y en los dos casos las candidatas que NO cuentan salen con su motivo: el pecado
  * del paso anterior no era el color, era el silencio.
+ *
+ * Y LA TERCERA FILA, desde el 2026-08-21 (residuo A01, decisión del Builder 1):
+ *   · repo que cumple todo lo DECIDIBLE y solo queda colgado del camino del rojo ->
+ *     ::warning:: con el residuo nombrado, jamás ::error::. La condición 5 promete
+ *     una propiedad sobre un camino y verifica un patrón sintáctico sobre un nodo;
+ *     medido con oráculo semántico independiente, 70 falsos verdes sobre 2928 casos
+ *     generados, una sola clase. Un check que se pone rojo por una propiedad que no
+ *     puede decidir se presenta como compuerta sin serlo.
+ * Lo que NO se aflojó: existir el check run del veredicto, colgar de la compuerta
+ * por `needs` y declarar `if: always()` son hechos sintácticos del grafo y siguen
+ * siendo rojos, igual que las condiciones 1 a 4.
  */
 export function evaluarCableado({ archivos, adopto, distribuye, scaffoldCablea, ramaPorDefecto = "main" }) {
   const hallazgos = [];
@@ -1276,32 +1380,74 @@ export function evaluarCableado({ archivos, adopto, distribuye, scaffoldCablea, 
   }
 
   const validas = invocaciones.filter((i) => i.cuenta);
+  // Las que cumplen todo lo decidible y solo quedan colgadas del camino. No son
+  // rojas: son la superficie del residuo A01 en ESTE repo.
+  const soloElCamino = invocaciones.filter((i) => !i.cuenta && i.cuentaSalvoCamino);
+  const cableado = validas.length > 0 ? validas : soloElCamino;
 
   // Las que NO cuentan se imprimen SIEMPRE, también cuando hay una válida: una
   // invocación muerta al lado de una viva es la que va a quedar el día que alguien
   // borre la viva creyendo que la otra cubre.
-  for (const invocacion of invocaciones.filter((i) => !i.cuenta)) {
+  for (const invocacion of invocaciones.filter((i) => !i.cuenta && !i.cuentaSalvoCamino)) {
     hallazgos.push({
-      nivel: validas.length > 0 ? "notice" : "warning",
+      nivel: cableado.length > 0 ? "notice" : "warning",
       codigo: "invocacion-que-no-cuenta",
       mensaje: `${invocacion.ruta} (job "${invocacion.job}", paso ${invocacion.paso}) nombra ${SEGMENTO_ACTION} y NO cuenta como cableado: ${invocacion.motivos.join("; ")}`,
     });
   }
 
-  if (validas.length > 0) {
+  // EL CAMINO SIN COBRAR: aviso con el residuo en el mensaje, nunca rojo. Es un
+  // hallazgo sobre el REPO —hay algo concreto que arreglar en su ci.yml— y por eso
+  // mueve el estado a "aviso", a diferencia del hallazgo de más abajo, que habla del
+  // límite del check y no del repositorio.
+  for (const invocacion of soloElCamino) {
+    hallazgos.push({
+      codigo: "camino-sin-cobrar",
+      nivel: "warning",
+      mensaje: `${invocacion.ruta} (job "${invocacion.job}", paso ${invocacion.paso}) cumple las condiciones que este check DECIDE —rastreada, primer nivel, modo verificar, disparada en el camino del cambio y esperada por "${VEREDICTO_AGREGADO}"— y por el camino del rojo queda esto: ${invocacion.residuos.join("; ")}. Es MODO AVISO y no rojo porque la condicion 5 promete una propiedad sobre un CAMINO y verifica un patron sintactico sobre un NODO: medido con oraculo semantico independiente, 70 falsos verdes sobre 2928 casos generados. Un check que se pone rojo por una propiedad que no puede decidir se presenta como compuerta sin serlo, y eso es el falso verde que este paso existe para no tener. El arreglo sigue siendo el mismo y vale la pena hacerlo, porque el aviso no lo reemplaza: que un paso VIVO de "${VEREDICTO_AGREGADO}" compare el resultado y falle, con la linea [ "\${{ needs.${invocacion.job}.result }}" = "success" ] || exit 1`,
+    });
+  }
+
+  // EL RESIDUO, en la salida del propio paso y en TODA corrida donde haya algo que
+  // juzgar, incluida la que sale verde. Va acá y no en un comentario del código
+  // porque el falso verde medido es indistinguible del cableado sano DESDE ACÁ: si
+  // el residuo solo se nombrara cuando el check sospecha, no se nombraría nunca en
+  // los 70 casos donde el check no sospecha nada.
+  if (invocaciones.length > 0) {
+    hallazgos.push({
+      codigo: "residuo-camino",
+      nivel: "warning",
+      // `residuo: true` lo saca del cálculo del estado del repo: ver el comentario
+      // del return de más abajo.
+      residuo: true,
+      mensaje: `RESIDUO DECLARADO (A01, modo aviso desde el 2026-08-21): la condicion 5 de este check —"un rojo de la compuerta impide que ${VEREDICTO_AGREGADO} salga verde"— promete una propiedad sobre un CAMINO (del job de la compuerta, por cada eslabon de needs, hasta el check run cuyo nombre exige el ruleset) y lo que verifica es un patron sintactico sobre un NODO. Medido con oraculo semantico independiente: 70 falsos verdes sobre 2928 casos generados, una sola clase, cuyo representante mas corto es un paso de ${VEREDICTO_AGREGADO} con "if: needs.<job>.result == success", que satisface la compuerta SALTEANDOSE. O sea: que este paso no reporte nada sobre el camino NO acredita que el rojo llegue al check requerido. Lo que si queda acreditado es todo lo demas: que la invocacion este rastreada, en el primer nivel de ${DIR_WORKFLOWS}, en modo verificar, disparada en el camino del cambio, no apagada ni amortiguada, y esperada por ${VEREDICTO_AGREGADO}. El diagnostico completo y el backlog viven en docs/reglas-no-escritas.md`,
+    });
+  }
+
+  if (cableado.length > 0) {
     if (!adopto) {
       hallazgos.push({
         nivel: "warning",
         codigo: "cableado-sin-valores",
-        mensaje: `este repo cablea la verificacion de la constitucion (${validas[0].ruta}, job "${validas[0].job}") y no versiona ${VALORES}, asi que el job va a decir que falta y no va a poder renderizar nada. Arreglo: declara los valores de este proyecto en ${VALORES}`,
+        mensaje: `este repo cablea la verificacion de la constitucion (${cableado[0].ruta}, job "${cableado[0].job}") y no versiona ${VALORES}, asi que el job va a decir que falta y no va a poder renderizar nada. Arreglo: declara los valores de este proyecto en ${VALORES}`,
       });
     }
     hallazgos.push({
       nivel: "notice",
       codigo: "cableado-verificado",
-      mensaje: `la verificacion de la constitucion corre en ${validas.map((v) => `${v.ruta}#${v.job}`).join(", ")}: modo verificar, rastreada por git, en el primer nivel de ${DIR_WORKFLOWS}, disparada en el camino del cambio sin filtros que la saquen, y con un rojo que "${VEREDICTO_AGREGADO}" mira y cobra`,
+      // EL MENSAJE DICE LO QUE SE PROBO Y NADA MAS. Antes cerraba con «y con un rojo
+      // que ci-ok mira y cobra», que es exactamente la afirmacion que la clase de los
+      // 70 falsos verdes refuta: el patron se satisface salteandose. La parte del
+      // camino sale por el hallazgo del residuo, en su propio nivel.
+      mensaje: `la verificacion de la constitucion corre en ${cableado.map((v) => `${v.ruta}#${v.job}`).join(", ")}: modo verificar, rastreada por git, en el primer nivel de ${DIR_WORKFLOWS}, disparada en el camino del cambio sin filtros que la saquen, y esperada por "${VEREDICTO_AGREGADO}" por needs`,
     });
-    return { hallazgos, estado: hallazgos.some((h) => h.nivel === "warning") ? "aviso" : "al-dia", invocaciones };
+    // EL ESTADO ES DEL REPOSITORIO, NO DEL CHECK. Los hallazgos marcados `residuo`
+    // hablan del limite de esta verificacion y no de algo que este repo tenga que
+    // arreglar: si movieran el estado, todo repo sano quedaria en "aviso" para
+    // siempre y el aviso dejaria de significar «aca hay algo que hacer». Salen igual
+    // por ::warning:: en el log, que es donde el residuo tiene que estar.
+    const propios = hallazgos.some((h) => h.nivel === "warning" && h.residuo !== true);
+    return { hallazgos, estado: propios ? "aviso" : "al-dia", invocaciones };
   }
 
   const comun = `el artefacto puede faltar, estar atrasado, estar editado a mano o no estar cargado por ninguna superficie, y nada lo pondría en rojo. Arreglo: pegá el job que este paso imprime abajo en ${DIR_WORKFLOWS}/ci.yml y agregalo al needs de "${VEREDICTO_AGREGADO}"`;
@@ -1447,7 +1593,16 @@ export function revisarScaffold(raiz, ramaPorDefecto = "main") {
   if (invocaciones.length === 0) {
     return { cablea: false, porque: `ningun workflow rastreado del scaffold invoca ${SEGMENTO_ACTION}` };
   }
-  return { cablea: false, porque: invocaciones.map((i) => `${i.ruta}#${i.job}: ${i.motivos.join("; ")}`).join(" | ") };
+  // Los residuos entran en el mensaje: acá la pregunta es por qué el scaffold que
+  // este repo REPARTE no cablea, y un scaffold que solo queda colgado del camino
+  // deja el motivo en `residuos` y `motivos` vacío. Sin esto el mensaje saldría en
+  // blanco, que es la forma más barata de que un rojo no se pueda arreglar.
+  return {
+    cablea: false,
+    porque: invocaciones
+      .map((i) => `${i.ruta}#${i.job}: ${[...i.motivos, ...(i.residuos ?? [])].join("; ")}`)
+      .join(" | "),
+  };
 }
 
 function emitir(hallazgo) {

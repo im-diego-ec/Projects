@@ -297,15 +297,31 @@ test("(2) tapaElRojo: presente y no demostrablemente falso es tapado", () => {
 // `always()` — y por eso el `always()` sin mirar el resultado es peor que nada.
 // ---------------------------------------------------------------------------
 
-test("(3) ci-ok con always() que NO consulta el resultado: el rojo no llega al check requerido", () => {
+// MODO AVISO DESDE EL 2026-08-21 (residuo A01, decisión del Builder 1). Este caso sigue
+// siendo un hallazgo y sigue saliendo con su motivo, pero por ::warning:: y no por
+// ::error::. No es que el hallazgo valga menos: es que la regla que lo produce
+// —«ningún paso vivo consulta needs.<job>.result»— se decide LEYENDO el texto de los
+// pasos, y su lado de ACEPTACIÓN quedó refutado con un oráculo semántico
+// independiente: 70 falsos verdes sobre 2928 casos generados, cuya forma más corta es
+// un paso con `if: needs.<job>.result == success`, que satisface la compuerta
+// SALTEÁNDOSE. Una regla cuyo lado de aceptación es unsound no puede presentar su lado
+// de rechazo como compuerta. Lo que sí se decide por estructura —el `always()` que
+// falta, el continue-on-error, el eslabón que lava el rojo— sigue siendo ROJO, y los
+// casos que siguen lo fijan.
+test("(3) ci-ok con always() que NO consulta el resultado: AVISO con el residuo nombrado, ya no rojo", () => {
   const ci = mutar(
     CI_SANO,
     '      - run: |\n          [ "${{ needs.constitucion.result }}" = "success" ] || exit 1\n',
     "      - run: echo ok\n",
   );
   const corrida = correrCableado(repo(conValores(ci)));
-  assert.equal(corrida.status, 1, corrida.stdout);
+  assert.equal(corrida.status, 0, corrida.stdout);
   assert.match(corrida.stdout, /NINGUN paso vivo suyo consulta/);
+  assert.doesNotMatch(corrida.stdout, /::error::/, corrida.stdout);
+  // El aviso del repo y el residuo del check son dos cosas, y las dos tienen que
+  // estar: una dice qué arreglar acá, la otra dice qué NO acredita este paso.
+  assert.match(corrida.stdout, /::warning::[^\n]*MODO AVISO/, corrida.stdout);
+  assert.match(corrida.stdout, /70 falsos verdes sobre 2928/, corrida.stdout);
 });
 
 test("(3) ci-ok sin always(): la constitucion en rojo lo saltea, y un job salteado reporta Success", () => {

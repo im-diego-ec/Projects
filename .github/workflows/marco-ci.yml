@@ -1416,7 +1416,7 @@ jobs:
               } catch (error) {
                 // No se pudo leer: no se declara verde sobre eso, y en un
                 // allowlist es rojo.
-                anotar(dudosos, ruta + "|0|ilegible", { ruta: ruta, linea: 0, motivo: "no se pudo leer el archivo (" + error.code + ")", critico: true });
+                anotar(dudosos, ruta + "|0|ilegible", { ruta: ruta, linea: 0, motivo: "no se pudo leer el archivo (" + error.code + ")", critico: true, decidible: true });
                 continue;
               }
               const fisicas = contenido.split(/\r?\n/);
@@ -1485,31 +1485,84 @@ jobs:
               if (ubicados.has(item.ruta + "|" + item.linea)) dudosos.delete(clave);
             }
 
-            // Lo indeterminado avisa en general y ES ROJO dentro de un
-            // allowlist de agente: alla la linea no es una invocacion que
-            // alguien vaya a revisar cuando falle, es un permiso permanente
-            // para descargar y ejecutar, y un ::warning:: no pone rojo ningun
-            // job.
+            // LO INDETERMINADO ES MODO AVISO, NO COMPUERTA (residuo A16,
+            // decision del Builder 1 del 2026-08-21). Hasta hoy era ::warning::
+            // afuera y ::error:: dentro de un allowlist de agente, y ese rojo
+            // solo alcanzaba una ORTOGRAFIA de la clase. Medido el 2026-08-21
+            // sobre cinco entradas del mismo permiso: las cuatro de un gestor
+            // con subcomando y comodin SEPARADO dieron exit 0 con CERO
+            // anotaciones, y la del ejecutor directo dio exit 1. Misma
+            // herramienta, una ortografia de diferencia — porque el alfabeto
+            // compara por igualdad exacta y el comodin separado no es
+            // puntuacion que limpiar(), asi que el token que sigue al gestor no
+            // es ninguno de sus subcomandos y no hay ocurrencia.
+            //
+            // Enforzar una ortografia y presentarla como si cerrara la clase es
+            // el falso verde que este paso existe para no tener, y el residuo se
+            // abrio una capa mas adentro en cada una de las cuatro rondas que lo
+            // intentaron. Asi que se DECLARA: lo indeterminado sale ::warning::
+            // con el residuo NOMBRADO, y lo que este paso verifica completo —un
+            // paquete LEGIBLE sin version exacta, que es la forma en que el
+            // problema aparecio de verdad con el squatter de "openspec"— sigue
+            // siendo ::error:: y sigue poniendo rojo el job.
+            //
+            // Lo que NO cambia es que se mire: un aviso mudo seria el agujero
+            // otra vez. El banco lo afirma por entrada y no por cantidad
+            // (pruebas/marco-ci/ejecutores.test.mjs, "el lector AVISA sobre cada
+            // permiso indeterminado"), y el agujero que queda esta fijado como
+            // caso de clase "residuo", asi que el dia que se cierre el banco se
+            // cae y se ve en el diff.
             const criticos = [...dudosos.values()].filter((item) => item.critico);
+            const RESIDUO_A16 = " RESIDUO DECLARADO (A16, modo aviso desde el 2026-08-21): esto es AVISO y no rojo porque la clase no se puede cerrar leyendo texto. El alfabeto compara el gestor y su subcomando por igualdad exacta, y el comodin del allowlist escrito SEPARADO por un espacio no es puntuacion que recortar: medido, cuatro entradas de un gestor con subcomando y comodin separado dieron exit 0 con cero anotaciones y la del ejecutor directo dio exit 1, o sea el mismo permiso con dos suertes distintas. Poner rojo solo la ortografia que este lector alcanza seria enforzar una ortografia y llamarla compuerta. El diagnostico y su fila de backlog viven en docs/reglas-no-escritas.md";
+            // LAS DOS CLASES NO SE MEZCLAN. Un archivo que no se pudo leer es un
+            // hecho decidido y va en ROJO: el propio paso ya trata el rc>1 de
+            // git grep asi, con el argumento de que sin poder mirar no se declara
+            // que las invocaciones esten pinadas, y no puede tener dos respuestas
+            // segun cual de los dos lectores fallo. El residuo A16 es sobre la
+            // ORTOGRAFIA del comodin y no sobre la E/S, asi que pegarselo a un
+            // ENOENT era mandar a quien lo lea a arreglar algo que no es su caso.
+            // Medido el 2026-08-21: sin esta separacion, un ENOENT en el allowlist
+            // paso de exit 1 a exit 0 con el residuo equivocado en el mensaje.
+            const ilegibles = [...dudosos.values()].filter((item) => item.decidible);
+            for (const item of ilegibles) {
+              console.log(
+                "::error file=" + escapar(item.ruta) + ",line=" + item.linea +
+                  "::hay un ejecutor de paquetes en esta linea y no se pudo LEER el archivo (" + escapar(item.motivo) +
+                  "). Esto no es una ambiguedad de texto y no entra en el residuo A16: es E/S, y sin poder mirar no se declara que las invocaciones esten pinadas. Arreglo: revisa que el archivo exista y sea legible en el runner; si el paso corre despues de un borrado, movelo antes"
+              );
+            }
             for (const item of dudosos.values()) {
-              const nivel = item.critico ? "error" : "warning";
+              if (item.decidible) continue;
               const cola = item.critico
-                ? ". Esta linea vive en un ALLOWLIST de agente: no es una invocacion que alguien vaya a revisar cuando falle, es un permiso permanente para descargar y ejecutar sin preguntar, asi que aca lo que no se puede leer es rojo y no aviso. Arreglo: escribi la entrada con el paquete completo y su version exacta (<paquete>@<X.Y.Z>); si lo que querias era permitir cualquier argumento, el comodin va DESPUES del paquete pinado"
+                ? ". Esta linea vive en un ALLOWLIST de agente: no es una invocacion que alguien vaya a revisar cuando falle, es un permiso permanente para descargar y ejecutar sin preguntar, asi que lo que no se puede leer aca es lo mas ancho que se puede escribir. Arreglo: escribi la entrada con el paquete completo y su version exacta (<paquete>@<X.Y.Z>); si lo que querias era permitir cualquier argumento, el comodin va DESPUES del paquete pinado." + RESIDUO_A16
                 : ", asi que este check NO la esta cubriendo. Arreglo: si es prosa, reescribila para que no parezca una invocacion; si es una invocacion real, dejala en la forma que el check sabe leer: el ejecutor, despues sus banderas, y despues el paquete escrito <nombre>@<X.Y.Z>";
-              console.log("::" + nivel + " file=" + escapar(item.ruta) + ",line=" + item.linea + "::hay un ejecutor de paquetes en esta linea y no se pudo determinar que paquete corre (" + escapar(item.motivo) + ")" + cola);
+              console.log("::warning file=" + escapar(item.ruta) + ",line=" + item.linea + "::hay un ejecutor de paquetes en esta linea y no se pudo determinar que paquete corre (" + escapar(item.motivo) + ")" + cola);
             }
 
-            if (sueltos.size > 0 || criticos.length > 0) {
-              console.log("== resumen == " + sueltos.size + " invocacion(es) sin version exacta y " + criticos.length + " indeterminada(s) en un allowlist de agente, sobre " + archivos.size + " archivo(s) rastreado(s) con ejecutor");
+            // EL RESUMEN SALE SIEMPRE QUE HAYA ALGO, y separa las dos cuentas: el
+            // rojo es de las invocaciones legibles sin pinar, el aviso es de lo
+            // indeterminado. Antes las dos sumaban al mismo exit y el resumen se
+            // imprimia solo en el rojo, asi que una corrida con puros avisos
+            // caia en el mensaje del else y afirmaba "todas con version exacta"
+            // sobre lineas que nadie pudo leer.
+            // Un ilegible pone rojo por si solo, aunque no haya ninguna invocacion
+            // suelta: es la parte que el modo aviso no debia aflojar.
+            if (ilegibles.length > 0 && sueltos.size === 0) {
+              console.log("== resumen == " + ilegibles.length + " archivo(s) que no se pudieron LEER (ROJO, no es el residuo A16) y " + (criticos.length - ilegibles.length) + " indeterminada(s) por texto en un allowlist (AVISO, residuo A16), sobre " + archivos.size + " archivo(s) rastreado(s) con ejecutor");
+              process.exitCode = 1;
+            } else if (sueltos.size > 0) {
+              console.log("== resumen == " + sueltos.size + " invocacion(es) sin version exacta (ROJO) y " + criticos.length + " indeterminada(s) en un allowlist de agente (AVISO, residuo A16), sobre " + archivos.size + " archivo(s) rastreado(s) con ejecutor");
               // process.exitCode y NO process.exit(): con process.exit() Node no
               // espera el vaciado del stdout cuando la salida es un pipe, que es
               // lo que pone Actions, y lo que pase el buffer se pierde. Medido en
               // la corrida 32412180384: de 1252 anotaciones llegaron 90, o sea
               // 66510 bytes, el corte justo en los 65536 del buffer del pipe.
               process.exitCode = 1;
+            } else if (dudosos.size > 0) {
+              console.log("== resumen == 0 invocacion(es) sin version exacta y " + dudosos.size + " indeterminada(s) (" + criticos.length + " en un allowlist de agente): AVISO y no rojo por el residuo A16. " + (literal + porVariable) + " invocacion(es) legible(s) en " + archivos.size + " archivo(s), todas con version exacta");
             } else {
               // La verdad de lo que se probo, ni una palabra mas.
-              console.log((literal + porVariable) + " invocacion(es) de un ejecutor que descarga, en " + archivos.size + " archivo(s): todas con version exacta (" + literal + " literal, " + porVariable + " por variable) y " + exentos + " con --no-install. Es lectura de texto y no ejecucion: NO prueba que el paquete pinado sea el que se quiso, solo que un nombre equivocado fallaria en vez de resolver en silencio");
+              console.log((literal + porVariable) + " invocacion(es) de un ejecutor que descarga, en " + archivos.size + " archivo(s): todas con version exacta (" + literal + " literal, " + porVariable + " por variable) y " + exentos + " con --no-install. Es lectura de texto y no ejecucion: NO prueba que el paquete pinado sea el que se quiso, solo que un nombre equivocado fallaria en vez de resolver en silencio. Y no cubre la clase entera: un permiso de allowlist escrito con el comodin SEPARADO del gestor (residuo A16) no se lee como invocacion y no deja rastro aca");
             }
           ' "${CANDIDATOS}"
 
@@ -2563,6 +2616,25 @@ jobs:
   #   · repo que SI lo versiona y no tiene un cableado que cuente -> ::error::,
   #     y cada invocacion que no cuenta sale con el motivo exacto por el que no
   #     cuenta. El pecado del paso anterior no era el color: era el silencio.
+  #   · Y UNA TERCERA FILA desde el 2026-08-21, que es el residuo A01 declarado en
+  #     MODO AVISO por decision del Builder 1: repo que cumple todo lo que este check
+  #     DECIDE y solo queda colgado de "algun paso vivo de ci-ok cobra el
+  #     resultado" -> ::warning:: con el residuo nombrado, jamas ::error::. El
+  #     motivo: esa condicion promete una propiedad sobre un CAMINO —del job de la
+  #     compuerta, por cada eslabon de needs, hasta el check run cuyo nombre exige
+  #     el ruleset— y lo que verifica es un patron sintactico sobre un NODO. Medido
+  #     con oraculo semantico independiente: 70 falsos verdes sobre 2928 casos
+  #     generados, una sola clase, cuya forma mas corta es un paso con
+  #     `if: needs.<job>.result == success`, que satisface la compuerta
+  #     SALTEANDOSE. Una regla cuyo lado de aceptacion es unsound no puede
+  #     presentar su lado de rechazo como compuerta. Lo que se decide por
+  #     ESTRUCTURA —que exista el check run del veredicto, que cuelgue de la
+  #     compuerta por needs, que declare if: always(), que ningun nodo del camino
+  #     lave el rojo con continue-on-error o un if constante falso— sigue en rojo:
+  #     no se afloja lo que funciona. El residuo sale en la salida del paso en TODA
+  #     corrida, incluida la verde, porque desde aca el falso verde es
+  #     indistinguible del cableado sano. Su fila esta en
+  #     docs/reglas-no-escritas.md.
   #
   # SKIP DEL DISTRIBUIDOR, ahora como PROPIEDAD POSITIVA y con tres candados:
   # el repo que reparte el scaffold es el marco y no es consumidor de su propia
