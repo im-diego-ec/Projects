@@ -1,8 +1,9 @@
-name: Cobertura de las lineas del cambio
+name: Cobertura de las lineas del cambio y del total por paquete
 description: >-
-  Mide qué proporción de las líneas que el pull request agrega o modifica
-  ejercitan las pruebas, cruzando los reportes lcov del repositorio con el
-  diff. Sin datos habiendo líneas agregadas es ROJO, nunca cobertura total.
+  Mide la cobertura de pruebas en los DOS planos que el marco exige: las líneas
+  que el pull request agrega o modifica, cruzando los reportes lcov con el diff,
+  y el TOTAL de cada paquete contra el mínimo del marco. Sin datos habiendo
+  líneas agregadas es ROJO, nunca cobertura total.
 author: la organización
 
 # ---------------------------------------------------------------------------
@@ -24,6 +25,26 @@ author: la organización
 #      repositorio. En un monorepo eso significa configurar el projectRoot del
 #      reporter: sin eso, dos paquetes emiten "src/..." indistinguibles entre
 #      si e incomparables contra el diff.
+#   4. Para que el plano del TOTAL mida el codigo que ninguna prueba importa,
+#      la cobertura del paquete tiene que emitirse con `all: true`. Sin eso el
+#      reporte solo trae los archivos que alguna prueba toco y el total sale
+#      alto por omision. El scaffold reparte esa configuracion ya armada en
+#      `vitest.config.base.ts`.
+#
+# LOS DOS PLANOS Y SUS COMPUERTAS
+#   Plano del CAMBIO: las lineas que el diff agrega o modifica, contra `minimo`.
+#     No aplica fuera de un pull request (no hay rango) y lo dice.
+#   Plano del TOTAL: la cobertura total de cada paquete contra el minimo del
+#     marco. Corre SIEMPRE, tambien en un push a main. Es rojo si un paquete
+#     esta por debajo del minimo sin declarar motivo y fecha, si esa fecha
+#     vencio, si retrocedio por debajo de su piso declarado, o si su
+#     declaracion esta mal escrita. Es amarillo, con el faltante y el plazo
+#     restante en el resumen, si la deuda esta declarada y vigente.
+#     La declaracion vive en el package.json del propio paquete:
+#       "projects": { "cobertura": {
+#           "excluidos": [{ "patron": "...", "motivo": "..." }],
+#           "piso": { "lineas": 0, "funciones": 0, "ramas": 0 },
+#           "deuda": { "motivo": "...", "fecha": "AAAA-MM-DD" } } }
 #
 # POR QUE UN COMPARADOR PROPIO Y NO UNA HERRAMIENTA EXTERNA (design D5)
 #   La candidata FALLA EN VERDE: si las rutas de su entrada no coinciden con
@@ -57,6 +78,10 @@ inputs:
     description: >-
       Porcentaje mínimo de cobertura exigido sobre las líneas del cambio. El
       mínimo del marco es 80 (decisión D5 del change calidad-fail-closed).
+      Sobre las líneas del cambio se puede bajar —con un `::warning::` que lo
+      deja escrito en la corrida—, pero sobre el TOTAL de cada paquete el 80 es
+      piso DURO: acá el umbral local solo puede SUBIRLO. Bajarlo a 40 dejaba en
+      verde un paquete al 33%, que es la medición que originó esa asimetría.
     required: false
     default: "80"
   max-anotaciones:
@@ -97,6 +122,21 @@ outputs:
       número miente por omisión: una línea cubierta y cincuenta sin dato dan
       "100.00" sobre una cobertura real del 2%.
     value: ${{ steps.medir.outputs.lineas_fuera_de_medicion }}
+  paquetes_medidos:
+    description: Paquetes cuyo total pudo medirse en esta corrida.
+    value: ${{ steps.medir.outputs.paquetes_medidos }}
+  paquetes_bajo_minimo:
+    description: >-
+      Paquetes cuyo total está por debajo del mínimo del marco, con deuda
+      declarada o sin ella. Es la deuda que la corrida reporta SIEMPRE, para que
+      no se descubra el día en que vence.
+    value: ${{ steps.medir.outputs.paquetes_bajo_minimo }}
+  paquetes_en_rojo:
+    description: >-
+      Paquetes que hacen fallar el plano del total: por debajo del mínimo sin
+      plazo declarado, con el plazo vencido, en retroceso respecto de su piso, o
+      con su declaración de cobertura mal escrita.
+    value: ${{ steps.medir.outputs.paquetes_en_rojo }}
 
 runs:
   using: composite
