@@ -35,7 +35,543 @@ mueve sobre un cambio incompatible.
 
 ## [No publicado]
 
-Nada todavía.
+### Añadido
+
+- **Check estático nuevo en el job `higiene`: *Ejecutores de paquetes pinados*.**
+  Se pone rojo si un archivo rastreado del repo corre un paquete por un ejecutor
+  que **descarga** (`npx`, `bunx`, `npm exec`, `pnpm dlx`, `yarn dlx`) sin
+  clavarlo a una versión exacta.
+
+  El agujero que cierra es concreto, no teórico. El marco documenta desde su
+  primera versión que el paquete del CLI es `@fission-ai/openspec` y que
+  `openspec` a secas en npm es un **placeholder ajeno**, y la guía de upgrade lo
+  llevaba como ítem de checklist. Un ítem de checklist depende de que alguien se
+  acuerde: en el consumidor piloto el allowlist del agente autorizaba
+  `Bash(npx --yes openspec ...)` en cinco patrones — o sea descargar y
+  **ejecutar** el paquete del squatter, con `--yes`, sin preguntar nada.
+
+  La propiedad es sobre el **ejecutor**, no sobre una lista de paquetes prohibidos
+  que alguien tendría que mantener. `pnpm exec` y `yarn exec` quedan fuera a
+  propósito: leen `node_modules` y fallan si el binario no está —fallan cerrado— y
+  por eso son la salida que el mensaje de error ofrece cuando el binario ya lo
+  trae una dependencia declarada del repo.
+
+  **Se exige la versión, no el scope**, y la distinción importa: hay paquetes
+  legítimos sin scope (`prettier`, `eslint`), así que pedir scope sería un check
+  imposible de satisfacer. La versión exacta sí se puede exigir siempre, y es la
+  que convierte un nombre equivocado en un fallo ruidoso — el squatter publica
+  `0.0.0` y no tiene la versión que uno pina, así que la invocación muere en vez
+  de resolver en silencio.
+
+  Límites declarados en el propio paso, porque esto **lee texto y no ejecuta
+  nada**: los `.md` quedan fuera (son prosa, y la documentación del marco cita la
+  forma incorrecta como contraejemplo, así que un comando de runbook escrito en un
+  README no queda cubierto); las líneas que arrancan en comentario quedan fuera
+  (un comentario no se ejecuta — y sin esa regla el check se pone rojo a sí mismo
+  al documentarse); una invocación partida con `\` no se lee; y el pin no prueba
+  que el nombre sea el paquete que uno quería: hace ruidoso el error, no lo hace
+  imposible. Un pin que llega por variable —el pin canónico del marco es un
+  `input` de este mismo workflow— cuenta como pinado y se informa aparte.
+
+- **Aviso de versión a los consumidores** — `.github/workflows/aviso-version.yml`
+  (workflow propio de Projects) más `actions/aviso-version` (referenciada). Al
+  publicarse un release, el marco **notifica**; hasta hoy solo publicaba.
+
+  El agujero es de forma, no de contenido: el `CHANGELOG.md` y la página del
+  release son superficie de **consulta**, y con `v1` móvil un consumidor recibe
+  comportamiento nuevo —incluido un check que lo pone en rojo— sin haber leído
+  nada. Pasó el 2026-08-19: al mover `v1`, el segundo consumidor quedó a un push
+  de un rojo que nadie le anunció.
+
+  **El contenido no se escribe dos veces.** Sale de la sección `### Para
+  consumidores` de la entrada de esa versión —la que este archivo ya obliga a
+  escribir en el PR que introduce el cambio—, más las líneas `BREAKING` si las
+  hay, más los dos enlaces. No hay un formato paralelo que alguien deba
+  sincronizar: la única fuente que se edita sigue siendo el changelog.
+
+  **El destino no está cableado.** Viaja por `secrets.AVISO_VERSION_DESTINO` (la
+  URL del webhook ES la credencial, así que es secret y no var) y el campo del
+  payload por `vars.AVISO_VERSION_CAMPO` (`text` para Slack, Google Chat y Teams;
+  `content` para Discord). Ni el canal ni la URL aparecen en el repo, y el valor
+  no entra al log: el paso de envío omite cualquier texto que lo contenga, aun
+  dentro de un mensaje de error del propio `curl`.
+
+  **Sin destino configurado no falla el release, pero no se calla**: `::warning::`
+  nombrando el secret que falta y el mensaje completo al resumen de la corrida,
+  que pasa a ser el destino de última instancia. Un destino configurado que
+  **rechaza** el aviso, en cambio, es **rojo** — la distinción de la regla 6:
+  configuración ausente es aviso, configuración rota es rojo, y un canal que dejó
+  de entregar en silencio es exactamente el agujero que esto cierra. El único
+  otro rojo es que el CHANGELOG no tenga entrada para la versión publicada: ahí
+  no hay degradación honesta posible, y el arreglo va escrito en el error.
+
+  **Verificable sin credenciales, que es lo que decide si esto sobrevive.** La
+  action que arma el mensaje es pura: no conoce el destino, no toca la red y
+  corre en cualquier máquina —`AVISO_VERSION=1.2.0 node
+  actions/aviso-version/aviso-version.mjs`— mostrando exactamente qué se
+  enviaría. Y el botón de Actions trae `simulacro` **marcado por defecto**:
+  arma, publica el mensaje en el resumen y no lo manda. Desmarcarlo es el acto
+  deliberado de enviar de verdad.
+
+- **Detector de secretos en el job `higiene`: *Sin secretos en el repo (árbol y
+  historia del cambio)*.** La regla más dura del marco —🛑 nunca poner secrets en
+  código, contexto ni logs— era la única sin **un solo** mecanismo que la hiciera
+  cumplir: disciplina pura, y la disciplina no escala a builders nuevos. Los tres
+  repos del área tienen el escaneo de secretos, la protección de push y las
+  actualizaciones de seguridad de la plataforma en `disabled`, así que hasta hoy
+  no había nada entre un `git push` y una credencial publicada.
+
+  **Es portable a propósito.** Escaneo de secretos y protección de push son de
+  **pago** en repos privados (SKU *Secret Protection*) y esta organización tiene
+  cero repos públicos. El marco le exige la regla a **todos** sus proyectos, así
+  que el mecanismo no puede depender de que alguien compre algo: es un binario
+  pineado (`gitleaks`, input `version_gitleaks`) que se descarga del release
+  oficial y se verifica con el `sha256` del archivo de checksums del **mismo
+  release** — el patrón exacto de `actionlint`, con el mismo alcance declarado:
+  cubre descarga corrupta o asset cambiado, no un release comprometido de raíz.
+
+  **Dos planos, la forma que ya usa la cobertura, con un reparto distinto.** El
+  **árbol completo** va sin tolerancia y sin piso que suba: con cobertura el total
+  admite deuda y por eso el piso sube de a poco, pero una credencial en el árbol
+  no es trabajo pendiente sino un incidente vivo, y no se amortiza. Un detector
+  solo-diff jamás vería lo que ya está adentro. El plano de la **historia del
+  cambio** no es redundante: el árbol solo ve el contenido de hoy, así que
+  «commiteo el `.env`, lo saco en el commit siguiente» deja el árbol impecable y
+  la credencial igual de comprometida — la forma más común en que un secreto entra
+  a un repo, y el único plano que la ve. Por eso el job pasa a pedir
+  `fetch-depth: 0`, que es el costo declarado del cambio.
+
+  **El mensaje nunca imprime el valor, y trae el orden del arreglo.** Archivo,
+  línea, regla y descripción; nada más. El programa que clasifica no lee siquiera
+  los campos que contienen el secreto —ni los que identifican a una persona—, de
+  modo que la redacción de la herramienta es el cinturón y no leerlos son los
+  tirantes. Y el arreglo va numerado, porque acá **el orden es la mitad del
+  arreglo**: (1) rotar la credencial ya, porque un secreto que llegó a un commit
+  está comprometido aunque lo borres —queda en la historia, en los clones, en los
+  forks y en las cachés de la plataforma—; (2) recién después sacarlo del código y
+  hacerlo viajar por referencia al gestor de secretos; (3) la limpieza de la
+  historia se coordina con una persona. El error dice además que un secreto real
+  **no se describe en el PR**: se escala.
+
+  **Los falsos positivos deciden si el check sobrevive, y se declaran con motivo
+  escrito.** La forma es la misma que ya usan las exclusiones del censo de
+  fuentes: `.projects-falsos-positivos.json` (input `archivo_falsos_positivos`) con
+  `{ "archivo", "regla", "motivo" }`. Sin `motivo` es rojo; con comodines es rojo
+  —una declaración nombra **un** archivo, no un árbol—; y una declaración que ya
+  no absorbe ningún hallazgo es **muerta** y también roja, porque si no queda
+  repartiendo permiso sobre la nada. Cada declaración viva se imprime como
+  `::notice::` en **cada** corrida y va al resumen del job: una excepción que
+  nadie vuelve a ver es una excepción que nadie vuelve a discutir.
+
+  **Una sola vía de excepción, y las otras cinco están cerradas.** La herramienta
+  trae cinco canales propios para callar un hallazgo sin motivo y sin dejar
+  rastro, y los cinco se probaron: un `.gitleaks.toml` del repo puede **vaciar
+  todas las reglas** (un repo con un secreto sintético sale en verde), un
+  `.gitleaksignore` silencia por huella, un comentario `gitleaks:allow` al final
+  de la línea baja el hallazgo a cero, y la configuración **también entra por
+  entorno** con `GITLEAKS_CONFIG` o `GITLEAKS_CONFIG_TOML` — los dos únicos que no
+  dejan rastro ni en el repo, y con los que el paso salía **verde y mudo** sobre
+  un repo con secretos adentro. Los dos archivos son rojo si están versionados; el
+  comentario se desactiva con `--ignore-gitleaks-allow`; las dos variables se
+  vacían en el `env:` del paso, porque el runner lo elige el consumidor y en uno
+  propio pueden venir de la máquina.
+
+  **Una declaración cubre una cantidad exacta, no un permiso abierto.** El par
+  (archivo, regla) por sí solo perdona todo lo que ese archivo tenga de esa regla,
+  hoy y siempre: con una declaración viva, un secreto **nuevo** agregado a ese
+  mismo archivo entraba en verde (comprobado). Por eso cada entrada declara
+  cuántos hallazgos absorbe —uno por defecto, `"hallazgos": N` si de verdad son
+  varios— y cualquier desajuste es rojo, con el número que ahora corresponde y la
+  instrucción de revisar las coincidencias una por una antes de subirlo. Se cuenta
+  por plano y se toma el mayor, para que un falso positivo que además entra en los
+  commits del cambio no se cuente dos veces.
+
+  **La salida de la herramienta no se vuelca cruda al log.** En la rama de "no
+  pudo correr" —justo aquella en la que se comportó de forma inesperada— asumir
+  que la redacción actuó es asumir lo que acaba de fallar, y el log de una corrida
+  lo ve cualquiera que vea el repo. Pasan solo las líneas con la forma de su log
+  estructurado, recortadas, y se dice cuántas se omitieron: el diagnóstico útil
+  (config ilegible, archivo inaccesible) sobrevive; un volcado de pánico, no.
+
+  **Se descartó la herramienta con verificación en línea**, que tiene una tasa de
+  falsos positivos imbatible, por una razón que no admite matices: valida el
+  candidato **enviándolo a la API del proveedor**, y su salida JSON lleva el valor
+  en claro. El marco prohíbe que el valor de un secreto salga hacia un tercero,
+  aunque sea para confirmarlo.
+
+  Límites declarados en el propio paso: detecta **forma, no validez**; un secreto
+  sin forma reconocible no se detecta; un archivo ignorado del control de
+  versiones queda fuera del universo (la misma evasión limpia que ya declara el
+  censo de fuentes); y el plano de la historia mira el **rango del cambio**, no la
+  historia entera, así que un secreto anterior a la adopción solo aparece si
+  todavía está en el árbol. El resumen de la corrida lo dice con todas las letras:
+  cero hallazgos **no** prueba que no haya secretos.
+
+- **`actions/constitucion` — la porción del marco de la constitución deja de
+  copiarse y pasa a entregarse.** El texto común (OpenSpec, git y despliegue,
+  fronteras, seguridad y observabilidad, infra/AWS/secretos, agentes y modelos,
+  GitHub) vive **una vez** en `actions/constitucion/canonico/` y viaja adentro de
+  la action, por el mismo transporte que `guardrail-deltas` y por la misma razón:
+  el `GITHUB_TOKEN` de un consumidor no lee otro repositorio. El modo `escribir`
+  renderiza un artefacto por **superficie de agente** declarada contra los valores
+  del proyecto (`.projects-valores.json`); el modo `verificar` compara lo presente
+  contra el re-render y deja el artefacto al día en disco para `upload-artifact`.
+  No commitea, no pushea y no abre PRs.
+
+  El agujero que cierra está medido, no supuesto: la copia del marco en un
+  consumidor había perdido **114 líneas** de 355, se le habían caído reglas con
+  check vivo detrás, y una regla de seguridad estaba **invertida** — decía lo
+  contrario de lo que el marco manda, y ningún check podía verla porque nadie
+  compara prosa copiada.
+
+  Tres cosas que hay que leer antes de aprobar, porque no son detalles:
+  - **La ventana de gracia es de fecha, no de release.** El manifiesto declara
+    `publicada` y `exigible_desde`, y la action rechaza un manifiesto con menos de
+    **28 días** entre las dos (`urgente: true` es la puerta de atrás y sale por
+    `::warning::`, nunca muda). Artefacto ausente o atrasado = `::warning::` hasta
+    esa fecha y `::error::` desde ella. **Nunca `exit 0` mudo.**
+  - **El sello de la cabecera cubre el CANÓNICO, no el cuerpo renderizado.** Es
+    deliberado: si cubriera el cuerpo, el arreglo obvio para un rojo de "editado a
+    mano" sería recomputar el hash y volver a estampar, que es la debilidad por la
+    que se descartaron los bloques sellados. La autoridad sobre el cuerpo es el
+    re-render, y hay prueba de que resellar **no** tapa una edición.
+  - **Un desvío es una puerta, y se verifica que el motivo EXISTA, no que sea
+    sincero.** Cada desvío vivo se reimprime como `::notice::` en cada corrida y
+    queda impreso pegado a la regla que anula, dentro del artefacto que los
+    agentes cargan; uno cuya regla ya no existe es rojo por muerto, con el motivo
+    que tenía escrito. Nada limita cuántos declara un proyecto.
+
+  **Límite declarado, y no es una nota al pie:** esto cierra el hueco de
+  **distribución**, no el de comportamiento. Lo que el check compara son bytes en
+  un archivo. Que la regla esté, íntegra y al día, en la superficie que el agente
+  carga no dice nada sobre si la va a aplicar en el turno 40 de una sesión larga.
+
+- **Dos checks nuevos al final del job `higiene`**, sin una sola llamada a la API
+  (solo leen el árbol ya checkouteado; el permiso que exigen es `contents: read`,
+  que ya es el techo del job): *Constitución del marco al día* y *Permisos del
+  agente sin escritura*. El segundo se pone rojo si el allowlist de
+  `.claude/settings.json` autoriza una operación **mutante** sin desvío declarado
+  —por verbo, por método HTTP de escritura, por tool MCP cuyo nombre escribe, o
+  por comodín en la **posición del subcomando** (`terraform *` autoriza `apply`)—
+  y avisa, nunca falla, si falta un ítem del piso recomendado. Con el perfil de
+  producción el subcomando tiene que estar **clavado**: un comodín ahí es rojo, y
+  toda entrada con ese perfil sale como `::notice::` en cada corrida. Un rojo seco
+  por el solo hecho de usar el perfil de prod contradiría a `AGENTS.md`, que
+  autoriza expresamente **leer** producción por CLI.
+
+### Corregido — el cableado de la constitución se comprobaba con un `grep`
+
+La segunda corrida de la auditoría, el mismo 2026-08-20, midió la otra mitad de la
+afirmación A01. La primera mitad era cierta: el paso mudo se había borrado y el
+scaffold cablea la action de verdad. La segunda —«y `marco-ci` comprueba
+estáticamente ESE cableado»— era falsa: el check era un
+`grep -rE 'uses:.*actions/constitucion' .github/workflows`, o sea que exigía que la
+**línea** existiera en cualquier archivo bajo ese directorio. Se midieron **cinco**
+configuraciones donde nada verifica nada y el paso sale `exit 0`, cuatro de ellas
+**mudas** (cero anotaciones):
+
+- **el caso que el propio marco reparte**: un consumidor con el `ci.yml` del scaffold
+  anterior (sin el job) más `plantilla/.github/workflows/actualizar-marco.yml` tal
+  cual, que invoca la action en modo **escribir** y cuyo encabezado dice, textual,
+  «este workflow no verifica: solo propone el arreglo». Circularidad completa
+  declarada sana;
+- un job con `if: false` cableando la action;
+- la única invocación en un workflow `on: workflow_dispatch`, en modo escribir;
+- la action cableada sólo en `.github/workflows/archivo/viejo.yml` — GitHub Actions
+  **no ejecuta subdirectorios** de `.github/workflows` («workflows must be defined at
+  the top level of the .github/workflows/ directory», y la doc de reusables lo repite:
+  «subdirectories of the workflows directory are not supported»), pero `grep -r` entra
+  igual;
+- **la perilla**: un `plantilla/.github/workflows/ci.yml` vacío y **sin rastrear**
+  apagaba el check entero en un repo adoptado, porque el skip del distribuidor se
+  decidía con `test -f`.
+
+Lo que cambia:
+
+- **`actions/constitucion` tiene un tercer modo, `cableado`, y PARSEA el YAML.** Un
+  cableado cuenta sólo si, en un workflow del **primer nivel** de
+  `.github/workflows` que corre en `pull_request` o en `push` a la rama por defecto,
+  la invocación está en **modo verificar**, el job y el paso no están apagados por un
+  `if` constante falso ni tapados con `continue-on-error: true`, y el job **cuelga de
+  `ci-ok` por `needs`**, directa o transitivamente. El lector de YAML va sin
+  dependencias (`actions/constitucion/cableado.mjs`, Node pelado) y **cuando ninguna
+  invocación cuenta, cada candidata sale con el motivo exacto**: el pecado del paso
+  anterior no era el color, era el silencio.
+- **El paso del `marco-ci.yml` dejó de ser un `grep` y es un `uses:`** de ese modo.
+  Corre en el carril que el consumidor hereda por llamar al workflow reusable, así que
+  borrar su job de la constitución no apaga al que denuncia que falta.
+- **El skip del distribuidor es una propiedad POSITIVA con tres candados**: el
+  `plantilla/.github/workflows/ci.yml` tiene que estar **rastreado**, el repo **no**
+  puede versionar `.projects-valores.json`, y el scaffold que reparte tiene que **cablear**
+  la verificación con las cinco condiciones. Un repo adoptado no se apaga agregando un
+  archivo, y un distribuidor que reparte un scaffold sin el cableado es **rojo** en vez
+  de silencio.
+- **El sello dejó de ser evadible.** Subir a mano `version=1.3.0` a `version=9.9.9`
+  sobre un cuerpo amputado daba **exit 0** con avisos de `artefacto-adelantado`: el
+  cuerpo no se comparaba contra nada y se podía borrar cualquier regla. Con esta action
+  como único verificador del contenido, ese era el último bypass. Ahora hay **dos
+  discriminadores independientes** y cada uno alcanza solo: el `sha` cubre
+  `version + secciones`, así que una cabecera que declara una versión más nueva y trae
+  **el sha que esta copia calcula para la suya** se contradice sola (`exit 1`); y si los
+  workflows del repo invocan la action **sólo con el tag móvil**, no hay pin que
+  explique un artefacto más nuevo que la copia que corre (`exit 1`). La causa benigna
+  —un pin a un SHA o a un tag viejo— sigue siendo **aviso**. Se lee el árbol y no
+  `GITHUB_ACTION_REF`: esa variable **no** está en la referencia de variables de GitHub,
+  y una garantía no se apoya en algo indocumentado.
+- **El artefacto ya no sale con dobles llaves que vienen de un desvío.** Los marcadores
+  se medían sobre el texto sustituido y **antes** de insertar los desvíos, con el
+  argumento de que el motivo de un desvío es prosa del proyecto: el argumento era cierto
+  y la conclusión estaba al revés. Medido: un motivo que dice «lo aprobó {{PO}} para
+  {{PROYECTO}}» viajaba al artefacto tal cual y el modo escribir lo emitía en verde
+  (`exit 0`, 2 marcadores en el archivo), mientras el rojo lo cobraba el check vecino
+  del propio consumidor sobre un archivo que el marco escribió. Ahora la medición es
+  sobre el **cuerpo final** y hay un hallazgo propio, `desvio-con-marcadores`, que manda
+  a arreglar `.projects-desvios.json` en vez de a buscar un valor que no falta.
+- **El piso recomendado de permisos se mide por ENTRADA, no sobre la concatenación del
+  allowlist.** Medido: un allowlist de **puro relleno** —seis cadenas que no son entrada
+  de permiso de nada: `["lint", "format", "typecheck", "test", "build", "openspec"]`— se
+  declaraba **100% cubierto**, exit 0 y cero avisos. La medición no decía «el agente
+  puede correr el linter sin pedir permiso», decía «en algún lugar del archivo aparece
+  la palabra lint». Ahora la propiedad se busca dentro de **una** entrada y con la
+  **misma herramienta** que el ítem recomienda: el mismo allowlist da 6 de 6 sin cubrir.
+  Sigue siendo **aviso** y jamás rojo, por la razón que ya estaba escrita.
+- **Bancos nuevos y ampliados.** `actions/constitucion/pruebas/cableado.test.mjs` (27
+  casos, uno por cada una de las cinco configuraciones medidas más el lector de YAML), y
+  el banco de regresiones suma el sello, el desvío con marcadores, el piso de relleno y
+  **el recorte del comodín del allowlist**, que no tenía ninguna prueba: borrándolo el
+  banco quedaba entero en verde mientras se creaba un falso rojo sobre
+  `Bash(terraform validate:*)` —la entrada que el propio scaffold reparte—, denunciada
+  como si autorizara `terraform apply`. El programa de ese paso va inline en el YAML, así
+  que la prueba lo **extrae del workflow** y lo corre: es la única forma de que el código
+  que llega a todos los consumidores por `@v1` pase por un caso controlado.
+
+Las cinco configuraciones se corrieron contra el paso anterior antes de escribir el
+reemplazo (las cinco: `exit 0`; cuatro con cero anotaciones) y las doce mutaciones del
+código nuevo matan a su prueba, una por una.
+
+### Corregido — la constitución del marco tenía dos verificadores y ninguno verificaba
+
+Una auditoría adversarial del 2026-08-20 puso a prueba por **código de salida** las
+afirmaciones de este change y refutó siete. Cinco tenían una sola causa estructural:
+la misma propiedad estaba verificada en **dos** lugares —`actions/constitucion` y un
+paso inline del `marco-ci.yml` que heredan todos los consumidores— y las dos verdades
+ya discrepaban en esquema, en severidad y en formato de sello. En una doble
+contabilidad la declaración siempre pierde contra el check, así que el arreglo no fue
+conciliar las copias: fue **dejar una**.
+
+- **El paso inline «Constitucion del marco al dia» se BORRÓ**, y con él su copia del
+  calendario del canónico. Era **verde permanente** en el único repo que venía a
+  proteger: con el esquema de `superficies` que el scaffold emite hoy
+  (`["claude-code","cursor"]`) salía **exit 0 mudo** —cero `::error::`, cero
+  `::warning::`— sobre un repo sin `.projects/` y sin ningún artefacto, y también con la
+  versión ya exigible. Y cuando el artefacto **sí** estaba lo rechazaba: exigía un
+  `sha` de 64 hex del cuerpo y la action emite 12 hex del canónico, así que desde el
+  2026-09-16 iba a ser exit 1 sobre artefactos **correctos**, con un mensaje que
+  mandaba a correr el escritor que acababa de generarlos. En cascada, la detección de
+  desvíos muertos quedaba apagada: la misma condición que en la action da exit 1 con
+  el motivo escrito, ahí entraba en `avisos` y salía exit 0 en cualquier fecha.
+  La pieza que sobrevive es la que compara contra el **re-render** del canónico:
+  recomputar un sello es un `git commit` y cambiar el canónico no.
+- **`plantilla/.github/workflows/ci.yml` gana el job `constitucion`**, que corre
+  `actions/constitucion@v1` en modo verificar y cuelga de `ci-ok`. Hasta ahora la
+  action **no se invocaba en ningún carril de verificación de ningún consumidor**: su
+  única invocación era el workflow de actualización, en modo escribir, que declara no
+  verificar nada y delegaba en el paso inline apagado. Circularidad completa. Corre en
+  los **dos** carriles, sin `if` de solo-docs: la constitución es documentación, y un
+  PR de solo docs es justo el que puede editarla a mano.
+- **Check nuevo en `higiene`: *Constitucion del marco cableada*.** Una action que
+  nadie invoca no verifica nada, y ese era el estado real. Asimétrico y sin calendario
+  propio: un repo que no versiona `.projects-valores.json` recibe **aviso** (todavía no
+  adoptó, y adoptar es un PR de migración que este check no puede exigir de un día
+  para otro); un repo que **sí** lo versiona y no cablea la verificación recibe
+  **rojo**, porque tiene la maquinaria y se saltea el check —y se arregla en el mismo
+  PR que adopta. Skip por propiedad para el repo que distribuye el scaffold.
+- **Un valor cuyo TEXTO es el propio marcador ya no cuenta como valor.** Copiando
+  `plantilla/.projects-valores.json` tal cual —que trae `"PROYECTO": "{{PROYECTO}}"` y 14
+  entradas iguales, o sea el estado normal de un proyecto recién scaffoldeado— el modo
+  escribir salía **exit 0** y el artefacto quedaba con 27 líneas de dobles llaves, el
+  título incluido, mientras el modo verificar afirmaba «está al día en 2
+  superficie(s)». El rojo llegaba, pero de **otro** check: la propiedad estaba cubierta
+  por casualidad de vecindad y no por el guardrail que la declara. Ahora es rojo con su
+  nombre, más un cinturón que vuelve a mirar el cuerpo antes de sellarlo.
+- **La action reconoce las dos clases de desvío** (`regla` y `permiso`). Solo conocía
+  la primera, así que un desvío de permiso bien formado salía `desvio-sin-regla`:
+  cablearla habría puesto roja a la action sobre un archivo correcto, y ese falso rojo
+  era el último obstáculo para que su camino rojo del desvío muerto fuera alcanzable.
+  Nuevos: `desvio-sin-objeto` (no nombra qué anula) y `desvio-ambiguo` (nombra las dos
+  cosas, y entonces el motivo escrito deja de decir de qué es).
+- **El piso recomendado de permisos se declara y se mide en UNA sola pieza.** El
+  manifiesto del canónico lo declaraba y el paso de permisos lo verificaba con una
+  lista literal escrita a mano, sin derivación: `grep -rn 'piso_permisos' .github/` no
+  daba una coincidencia. Las dos copias ya habían divergido en las **dos** direcciones
+  —el manifiesto declaraba `Bash(pnpm build)` que el paso no miraba, el paso exigía
+  `openspec` que el manifiesto no declaraba— y mutar el manifiesto no movía el
+  veredicto del paso ni un milímetro: seguía midiendo su propio arreglo. Ahora cada
+  ítem declara la `entrada` que el marco recomienda y la propiedad que `cubre` (con el
+  invariante de que `cubre` esté **dentro** de `entrada`, para que las dos mitades de
+  la misma declaración no deriven), y lo mide quien lo transporta.
+- **Fail-open silencioso de `PERFIL_PROD`, ahora ruidoso.** El `::warning::` cubría
+  solo «existe y no parsea»; si `.projects-valores.json` no estaba, o no declaraba el
+  perfil, la detección se apagaba **en silencio** y el paso informaba «0 corre(n) con
+  el perfil de produccion» sobre un allowlist que contenía a la vista
+  `Bash(AWS_PROFILE=… terraform plan *)`. Un conteo falso reportado como hecho es
+  indistinguible de que la función no exista: es el incidente del 2026-08-05. Ahora
+  avisa y el propio resumen dice que ese 0 significa «no se buscó».
+- **`.projects-valores.json` ausente entra por la ventana de gracia en modo verificar.**
+  La action abortaba con exit 1 **antes** de ramificar por modo, así que el repo que
+  todavía no adoptó recibía un rojo seco el primer día —un endurecimiento estrenado
+  sin modo aviso, contra la regla del propio `AGENTS.md`— y el escritor que debía
+  depositar el artefacto por primera vez también fallaba. En modo escribir sigue
+  siendo rojo: sin valores no hay con qué renderizar.
+- **El canónico ya no anuncia un hueco que el marco cerró.** La regla
+  `openspec-validar-tras-editar` decía que el guardrail de deltas «no avisa si el
+  título de un requirement del `MODIFIED` no existe en el spec vivo». Medido: avisa y
+  sale 1, con las dos salidas legítimas en el mensaje, y el arreglo ya viaja por `@v1`.
+  La otra mitad (un `MODIFIED` que pierde escenarios) también está cubierta. Ese texto
+  viaja en el artefacto que **todos** los consumidores cargan en **cada** sesión y
+  costaba doble: mandaba a revisar a mano algo que el CI caza, y enseñaba que las
+  advertencias del canónico pueden estar viejas —justo el crédito que este change
+  existe para construir. En su lugar quedan los límites que **sí** están medidos: el
+  guardrail solo dice la verdad **antes** del archive, y el archive cuenta operaciones
+  **declaradas** y no cambios efectivos.
+- **Banco nuevo: `actions/constitucion/pruebas/regresiones-auditoria.test.mjs`** (25
+  casos). Ninguno pasaba contra el código anterior: se corrieron en rojo primero.
+  Cuatro no ejercitan una función sino que comprueban que la **segunda contabilidad no
+  vuelva** —ni el calendario, ni el piso, ni un segundo validador del sello en ningún
+  workflow del marco, y el cableado de la action presente en el scaffold.
+
+### Cambiado
+
+- **`plantilla/AGENTS.md`** suma la regla a las fronteras ✅, con las dos formas
+  correctas: `pnpm exec` para lo que ya está instalado, paquete completo con
+  versión exacta para lo que sí hay que traer de npm. **Es scaffold**: no alcanza
+  a los repos ya creados, que se ponen al día por su propio PR.
+- **`plantilla/README.md`** explica que el check cubre también el allowlist de
+  `.claude/settings.json`, y por qué un repo que ignore `.claude` entero en su
+  `.gitignore` esconde de ese check justo el archivo donde apareció el problema.
+- **`docs/upgrade-openspec.md`** gana la fila que faltaba en "Dónde vive el pin":
+  el allowlist del agente es **el único lugar que repite el número a la fuerza**,
+  porque el permiso se concede por coincidencia literal de texto y no puede
+  referenciar el pin canónico. Es el mecanismo exacto por el que el consumidor
+  quedó atrás. Y el ítem de checklist "sin restos de `openspec` a secas" pasa a
+  decir la verdad nueva: la **ausencia** de versión ya la caza el check; el
+  **atraso** del número sigue siendo trabajo de ese procedimiento.
+- **`plantilla/AGENTS.md`** suma la sección *Cuando el marco publica una versión*:
+  qué es el aviso, que estar en ese canal es requisito del proyecto y no una
+  cortesía, que un aviso con acción requerida se convierte en issue el mismo día,
+  y las dos salidas que **no** valen (copiar el workflow del marco o pinar una
+  versión vieja). El checklist de "antes del primer commit" gana el paso de pedir
+  ese acceso. **Es scaffold**: los repos ya creados lo suman por su propio PR.
+
+### Para consumidores
+
+**Hay una acción obligatoria, y el orden importa.** Un repo con una invocación sin
+versión exacta da rojo apenas este check aterrice. `proyecto-origen` tiene hoy
+cinco, todas en `.claude/settings.json`, y el arreglo es un PR de cinco líneas en
+su propio repo. **Ese PR se mergea ANTES de que se mueva `v1`**, igual que se hizo
+con el check de artefactos regenerados en la 1.2.0: con un solo consumidor y
+nuestro, ordenar los merges es más honesto que enseñar a convivir con un aviso. Si
+ese orden no se puede garantizar, el endurecimiento se estrena en modo aviso y
+endurece en el major siguiente, como manda `AGENTS.md`.
+
+Verificado antes de publicar: sobre `projects` el check pasa en verde (8
+invocaciones, 5 con versión literal y 3 por variable) y sobre `proyecto-origen`
+da rojo exactamente en las cinco líneas reales, sin un solo falso positivo — el
+`pnpm exec playwright` del deploy, el `pnpm exec prisma generate` del Dockerfile y
+los `tsc`/`vitest`/`eslint` de los `scripts` de cada `package.json` no se tocan,
+porque ninguno pasa por un ejecutor que descargue.
+
+**Del detector de secretos hay una acción obligatoria y también tiene orden.** Un
+repo con falsos positivos sin declarar da rojo apenas el check aterrice, así que
+el PR que agrega su `.projects-falsos-positivos.json` **se mergea ANTES de que se
+mueva `v1`** — mismo precedente, misma razón. En `proyecto-origen` son **tres
+declaraciones**, medidas y no estimadas: la sonda de auth de `deploy.yml` (token
+basura literal, existe para que el API responda 401 exacto) y la misma frase de
+prosa del spec de observabilidad en dos lugares (el spec vivo y su copia
+congelada en el archive). El número importa: un barrido de regex a mano sobre ese
+mismo árbol daba 17 candidatos, y esa diferencia es la que decide si el check
+sobrevive al tercer PR o alguien lo apaga.
+
+**No se encontró ningún secreto real** en los archivos rastreados de ninguno de
+los repos revisados. Verificado antes de publicar, con el `run:` del paso
+ejecutado tal cual: `projects` con el paso ya adentro pasa en verde en los dos planos;
+`proyecto-origen` da rojo en sus tres hallazgos y pasa a verde con las tres
+declaraciones, cada una visible en el resumen de la corrida; un repo con un
+secreto sintético en el árbol da rojo; uno con el secreto **borrado** en el commit
+siguiente tiene el árbol limpio y lo caza igual el plano de la historia; y un repo
+que versiona `.gitleaks.toml` es rechazado antes de escanear. La corrida completa,
+descarga del binario incluida, tarda alrededor de 8 segundos sobre el consumidor
+real.
+
+**Del aviso de versión, nada que hacer en el repo del proyecto.** No agrega
+ningún workflow, secret ni paso al consumidor: el aviso se dispara en Projects y el
+destino se configura en Projects. Lo único que se pide es humano y de una sola vez:
+**estar en el canal donde cae**. Si los avisos no llegan, el proyecto se sigue
+enterando como hasta hoy —cuando un check lo pone en rojo—, que es precisamente
+lo que esto viene a evitar. Los repos ya creados suman por su cuenta la sección
+nueva de `plantilla/AGENTS.md`, o al menos la regla: **un aviso con acción
+requerida se convierte en issue el mismo día**.
+
+**De la constitución entregada hay una acción obligatoria de seis pasos, y los
+pasos 1, 2 y 4 no son opcionales.** En el repo del proyecto: (1) escribir
+`.projects-valores.json` con los valores del proyecto —sin él no hay render posible, y
+un valor que quedó siendo el propio marcador `{{…}}` **no cuenta como valor**—;
+(2) **cablear el job `constitucion`** en su `ci.yml`, invocando
+`actions/constitucion@v1` en modo verificar y colgándolo de `ci-ok`: una action que
+nadie invoca no verifica nada, y el marco ahora comprueba estáticamente que esté; (3)
+generar el artefacto por cada superficie declarada; (4) dejar el import y **borrar el
+texto duplicado** del `AGENTS.md` propio —completar sin borrar deja al agente una
+prohibición y una autorización sobre lo mismo, y la que queda en el archivo del
+proyecto es la permisiva—; (5) excluir `.projects/` y el artefacto de Cursor del
+formateador, igual que ya están fuera los artefactos del CLI de OpenSpec; (6)
+declarar como desvío, con motivo y aprobador, toda diferencia real que el proyecto
+quiera conservar.
+
+Los pasos 1 y 2 van **en el mismo PR**, y el orden dentro de él no importa pero la
+compañía sí: el check de cableado da **rojo** al repo que versiona
+`.projects-valores.json` sin invocar la verificación —tiene la maquinaria y se saltea el
+check—, y **aviso** al que todavía no adoptó ninguna de las dos cosas. Adoptar a
+medias es el único estado que enrojece, y es el que se evita haciendo los dos pasos
+juntos.
+
+**Un artefacto ya generado con el texto anterior de la regla
+`openspec-validar-tras-editar` queda divergente y hay que reemitirlo.** Es el
+mecanismo funcionando, no un efecto colateral: el texto del canónico cambió, así que
+el artefacto de una versión anterior ya no coincide con el re-render. Medido sobre la
+rama de migración de `proyecto-origen`: exit 1 con `artefacto-divergente` en sus dos
+superficies, y el diff es **exactamente** esa regla y nada más (14 líneas nuevas, 6
+borradas, más el `sha` de la cabecera, que identifica al canónico). El arreglo es
+correr el modo escribir —lo hace solo el PR semanal de actualización— o bajar el
+artefacto al día que el propio job sube como `constitucion-al-dia`.
+
+**El estreno va en MINOR con la ventana de gracia activa: amarillo para todos
+desde el día uno, rojo para nadie.** Medido sobre los dos repos reales antes de
+publicar: los dos salen `::warning::` con la fecha en que pasa a fallar, ninguno
+sale rojo. Sigue valiendo con el check de cableado nuevo, y las dos mitades están
+medidas contra los árboles reales y no estimadas: en el `main` de
+`proyecto-origen` no hay un solo archivo `.projects*`
+(`git ls-tree -r --name-only origin/main | grep '^\.projects'` → sin coincidencias), así
+que cae en la rama del **aviso**; y su rama de migración, que sí versiona
+`.projects-valores.json`, ya declara el job `constitucion` con `modo: verificar` y lo
+cuelga del `needs` de `ci-ok`, así que cae en la rama **verde**. El estado que
+enrojece —versionar los valores sin cablear la verificación— no existe hoy en ningún
+árbol. `v1` se mueve **después** de que los PRs de migración estén mergeados y
+verificados, no antes.
+
+**Lo que este bloque NO trae resuelto, y hay que decidirlo a mano antes de mover
+`v1`:** el texto normativo de las tres reglas nuevas de gobernanza (escalar de
+modelo, configuración de repo u organización, e infra base fijada) se redactó a
+partir de decisiones conversacionales y no existe en ningún archivo aprobado —una
+de ellas **reemplaza** texto vigente que decía lo contrario—; el número de versión
+del manifiesto y sus dos fechas los fija quien corte el release; y hay un hueco
+conocido y fijado por prueba: subir a mano la versión de la cabecera a una que la
+copia del marco no conoce deja el cuerpo **sin comparar**, así que el aviso lo
+nombra y el cierre propuesto (rojo cuando la action se resolvió con el tag móvil)
+está escrito y sin implementar.
+
+Este mismo texto que estás leyendo es lo que el aviso va a enviar cuando esta
+versión se publique — la sección «Para consumidores» es la fuente, no un resumen
+de ella.
 
 ---
 

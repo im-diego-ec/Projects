@@ -1,0 +1,21 @@
+# Normalizacion de fin de linea. Sin esto, con core.autocrlf=true git
+# rematerializa los archivos con CRLF en cada checkout, y los BANCOS DE PRUEBAS
+# del marco comparan contenido byte a byte: un fixture que en el repo es LF pero
+# en disco es CRLF hace fallar una prueba de borrado puro —el diff ve las lineas
+# como modificadas en vez de eliminadas— sin que nada haya cambiado en el codigo.
+# Paso el 2026-08-19, despues de un simple 'git reset --hard'.
+#
+# La leccion venia de proyecto-origen, que recibio su .gitattributes esa
+# misma manana. Al marco no volvio: es el patron que este repo existe para
+# romper, esta vez sobre si mismo.
+* text=auto eol=lf
+
+# Binarios: sin conversion ni diff de texto.
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.pdf binary
+*.woff binary
+*.woff2 binary

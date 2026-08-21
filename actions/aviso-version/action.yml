@@ -1,0 +1,114 @@
+name: Aviso de version
+description: >-
+  Arma, desde el CHANGELOG, el mensaje que reciben los consumidores cuando el
+  marco publica una version. NO lo envia y no conoce el destino.
+author: la organización
+
+# ---------------------------------------------------------------------------
+# PERMISOS MINIMOS QUE DEBE CONCEDER EL CONSUMIDOR
+#
+#   permissions:
+#     contents: read   # el checkout previo; esta action no llama a la API
+#
+# QUE HACE, EN UNA LINEA
+#   CHANGELOG.md + version  ->  mensaje de texto + payload JSON en disco.
+#
+# POR QUE ARMA PERO NO ENVIA. El envio es lo unico que necesita el secreto del
+# destino. Separarlo deja esta pieza PURA: se corre en cualquier maquina, sin
+# credenciales, y muestra exactamente que se enviaria. Esa es toda la estrategia
+# de verificacion del aviso — un paso que solo se puede probar disparandolo de
+# verdad no se prueba nunca.
+#
+#   node actions/aviso-version/aviso-version.mjs   (con AVISO_VERSION=1.2.0)
+#
+# EL CONTENIDO NO SE INVENTA. Sale del CHANGELOG, que ya se escribe por version
+# diciendo que tiene que hacer un consumidor (seccion "Para consumidores"). No
+# hay un formato paralelo: si el aviso dice algo distinto del CHANGELOG, es
+# porque alguien edito el CHANGELOG, que es la unica fuente.
+#
+# DONDE ESTA EL ROJO Y DONDE EL AVISO (regla 3: fail-open ruidoso)
+#   · CHANGELOG sin entrada para la version  -> ROJO. No hay degradacion
+#     posible: un aviso vacio o inventado seria el formato paralelo que este
+#     diseno evita. El arreglo (agregar la entrada y re-disparar el boton) va
+#     en el mensaje de error.
+#   · Entrada sin seccion "Para consumidores" -> ::warning:: y se manda el
+#     cuerpo COMPLETO. Se manda de mas, no de menos, y se dice por que.
+#   · Mensaje mas largo que el limite -> ::warning:: y se recorta con el enlace
+#     al release. Un truncado en silencio es peor que un mensaje largo.
+#   · Entrada con lineas BREAKING -> ::warning:: y el aviso las pone primero.
+#
+# LIMITES DECLARADOS
+#   · El mensaje viaja como Markdown, tal cual lo escribe el CHANGELOG. No hay
+#     traduccion al dialecto de ningun destino: hacerla seria cablear un
+#     proveedor, que es justo lo que el diseno no hace.
+#   · El payload es {"<campo>": "<mensaje>"} y nada mas. Sirve para Slack,
+#     Google Chat y Teams con campo "text", y para Discord con "content". Un
+#     destino que exija otra forma es un change del marco, no una config.
+#   · "Para consumidores" es una convencion del CHANGELOG, no un contrato que
+#     algo verifique al escribirlo: su ausencia se detecta al avisar, no antes.
+# ---------------------------------------------------------------------------
+
+inputs:
+  version:
+    description: >-
+      Version a avisar. Se acepta con o sin la v del tag ("1.2.0" o "v1.2.0"):
+      el release publica el tag inmutable y el CHANGELOG titula sin la v.
+    required: true
+  changelog:
+    description: Ruta del changelog, relativa al working directory del job.
+    required: false
+    default: CHANGELOG.md
+  limite:
+    description: >-
+      Largo maximo del mensaje en caracteres. Por encima se recorta y se avisa.
+      El default entra en casi cualquier destino (Slack corta los bloques en
+      3000, Google Chat en 4096).
+    required: false
+    default: "3500"
+  campo:
+    description: >-
+      Campo de texto del payload JSON. "text" para Slack, Google Chat y Teams;
+      "content" para Discord.
+    required: false
+    default: text
+  salida:
+    description: >-
+      Ruta donde escribir el payload. Vacio = $RUNNER_TEMP/aviso-version.json.
+      El paso de envio lo postea con --data-binary @archivo: el mensaje nunca
+      pasa por una interpolacion de shell.
+    required: false
+    default: ""
+
+outputs:
+  payload:
+    description: Ruta del archivo JSON listo para postear.
+    value: ${{ steps.armar.outputs.payload }}
+  version:
+    description: Version normalizada, sin la v del tag.
+    value: ${{ steps.armar.outputs.version }}
+  breaking:
+    description: '"true" si la entrada del CHANGELOG declara cambios BREAKING.'
+    value: ${{ steps.armar.outputs.breaking }}
+  recortado:
+    description: '"true" si el mensaje se recorto por el limite.'
+    value: ${{ steps.armar.outputs.recortado }}
+  sin_para_consumidores:
+    description: '"true" si la entrada no traia la seccion "Para consumidores".'
+    value: ${{ steps.armar.outputs.sin_para_consumidores }}
+
+runs:
+  using: composite
+  steps:
+    # GITHUB_ACTION_PATH apunta a la copia de ESTA action, no al repo del
+    # consumidor: el script viaja con la action y nadie vendora una copia que se
+    # pueda quedar vieja.
+    - name: Armar el mensaje desde el CHANGELOG
+      id: armar
+      shell: bash
+      env:
+        AVISO_VERSION: ${{ inputs.version }}
+        AVISO_CHANGELOG: ${{ inputs.changelog }}
+        AVISO_LIMITE: ${{ inputs.limite }}
+        AVISO_CAMPO: ${{ inputs.campo }}
+        AVISO_SALIDA: ${{ inputs.salida }}
+      run: node "${GITHUB_ACTION_PATH}/aviso-version.mjs"

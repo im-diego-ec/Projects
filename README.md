@@ -229,6 +229,7 @@ diff.
 │   ├── PULL_REQUEST_TEMPLATE.md   # pide distribución, impacto en consumidores y veredicto de breaking
 │   ├── proteccion-main.md # estado REAL del ruleset de main y los pasos para aplicarlo
 │   └── workflows/         # REFERENCIADO: marco-ci.yml (reusable, @v1) + ci.yml (el CI propio, dogfooding)
+│                          #   + aviso-version.yml: al publicar un release avisa a los consumidores
 ├── actions/               # REFERENCIADO: composite actions (una carpeta por action, con su action.yml)
 │   └── README.md          #   catálogo: qué hace cada una, inputs/outputs y permisos mínimos
 ├── plantilla/             # SCAFFOLD: el árbol que se copia UNA vez al crear un proyecto,
