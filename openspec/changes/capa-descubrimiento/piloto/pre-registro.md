@@ -24,7 +24,7 @@ primera fila de `horas.csv`.
 
 La versión anterior medía dos brazos que **hacían** el descubrimiento: uno con la
 herramienta y otro sin ella. El 2026-08-21 Builder 1 aclaró que el descubrimiento **ya
-está hecho**. PO produjo el corpus completo del proyecto: documentos de varios
+está hecho**. Según lo que Builder 1 informó el 2026-08-21, PO produjo el corpus del proyecto: documentos de varios
 tipos, procesos, casos borde y un prototipo HTML que ya recibió feedback de
 usuario. Ese corpus vive fuera del repositorio y entra como primer insumo al
 arrancar el lunes.
@@ -175,6 +175,28 @@ que G2 dé cero sin haber cubierto nada.
 | Scorer | Builder 1 | propuesto; ver la colisión de roles en la sección 3 |
 | Firma de fidelidad al negocio | PO (PO) | propuesto; lo confirma la tarea 1.3 |
 | Firma del veredicto | Builder 1 | regla del área, no se negocia acá |
+
+**Qué firma exactamente el PO, porque «firma de fidelidad» sin vara no es un gate.**
+Hasta esta corrección, «Firma de fidelidad al negocio» aparecía **una sola vez** en
+todo el change —en la tabla de roles— y no había en ninguna parte un criterio contra
+el cual firmar. Un gate que se aprueba leyendo y asintiendo es exactamente el gate
+que este pre-registro dice no querer.
+
+La vara es **por escenario** y no por artefacto. Para cada escenario del delta, el PO
+marca una de tres:
+
+- **Describe** lo que el negocio hace hoy, o lo que decidió que haga.
+- **No describe**: dice algo que el negocio no hace, o lo dice al revés.
+- **No puedo saberlo** con lo que el escenario dice.
+
+Umbral: **100% «describe»** en los escenarios que la rúbrica clasificó como regla de
+negocio. Y **«no puedo saberlo» cuenta como no firmado**, no como duda neutra: un
+escenario que el dueño del *qué* no puede evaluar es un escenario que no está escrito
+en lenguaje de negocio, y eso es la mitad del punto de la capa.
+
+Las tres marcas van en la tabla de trazabilidad, en una columna nueva, y se anotan
+**antes** de ver el veredicto de los otros criterios: si el PO firma después de saber
+que el brazo B ganó, la firma mide su expectativa y no los escenarios.
 
 **Los dos brazos los corre la misma persona, y eso es a propósito.** Repartirlos
 entre dos builders cambiaría la variable medida: dejaría de ser «el método» y
@@ -413,7 +435,7 @@ válido, es menos verificable, y eso hay que saberlo antes y no después.
 | **G1** | Escenarios del delta del brazo B con al menos un ítem del corpus asociado. Umbral: **100%**, cero `n/a` | Sin comando: es lectura de la tabla de trazabilidad contra el inventario. Lo mecánico es el formato, que hace la lectura contable: cada fila es un par ítem-escenario y la última columna no puede quedar vacía ni decir `n/a` (`convencion-de-procedencia.md`, parte 2). El orden inventario-antes-que-salidas se lee con `git log --format='%cI %h %s' -- <inventario>` |
 | **G2** | Ítems del inventario que no quedaron ni cubiertos, ni fuera de alcance declarado, ni pregunta abierta (**caídos en silencio**). Umbral: brazo B **cero** en los ítems clasificados como regla de negocio, y estrictamente menos que el control en el total | Sin comando, pero con denominador fijo: son los identificadores del inventario que aparecen en **cero** filas de la tabla de trazabilidad. La clase de cada ítem viene de la rúbrica pre-registrada, y reclasificar un ítem después de leer las salidas hace que G2 no se pueda puntuar (`convencion-de-procedencia.md`, parte 3). El denominador es el inventario **del corpus**, congelado en el commit del scorer: lo elicitado nuevo no entra (sección 2) |
 | **G3** rearmado | **Invención, en la forma que toma cuando el corpus ya existe:** afirmaciones de regla de negocio cuyo ítem tiene `origen: derivado` y que aun así sostienen un escenario sin marca de supuesto. Umbral: brazo B **cero** | Sin comando: lista del scorer con la **cita textual** de la afirmación, el ancla que se invocó, y la frase que esa ancla dice de verdad al lado, para que la diferencia se vea. Sigue siendo el criterio menos mecanizable de los siete, y ahora es además el más importante: es el único que separa «lo dijo el corpus» de «lo interpretó un agente» |
-| **G4** rearmado | **Horas de conversión del builder**, por brazo: brazo B ≤ **2×** las del control. **Y** horas del PO, por brazo: brazo B ≤ **2×** las del control. **Y** la salida del brazo B pasa los mismos gates | Las horas salen de `horas.csv`, anotadas por sesión y no al final, con la columna `rol` separando builder de PO. Los gates salen de `node verificar-brazo.mjs <espacio> <brazo>`, que imprime y devuelve los códigos de salida del guardrail de deltas y de `validate --all --strict` sin enmascarar ninguno. La aceptación de los escenarios la firma el PO |
+| **G4** rearmado | **Horas de conversión del builder**, por brazo: brazo B ≤ **2×** las del control. **Y** horas del PO, por brazo: brazo B **no supera en más de 1 hora absoluta** las del control. **Y** la salida del brazo B pasa los mismos gates | Las horas salen de `horas.csv`, anotadas por sesión y no al final, con la columna `rol` separando builder de PO. Los gates salen de `node verificar-brazo.mjs <espacio> <brazo>`, que imprime y devuelve los códigos de salida del guardrail de deltas y de `validate --all --strict` sin enmascarar ninguno. La aceptación de los escenarios la firma el PO |
 | **G5** | Puntos del piloto que dependieron de que alguien se acordara. Umbral: la lista **no puede estar vacía**, y cada ítem lleva destino (check propuesto, o queda fuera y por qué). Si todo queda fuera, el techo del veredicto es **amarillo** | Sin comando, y por eso el insumo existe desde el primer día: `bitacora-g5.md`, que se llena mientras pasa. Una lista vacía significa que nadie miró |
 | **G6** rearmado | Veces que **una pieza del corpus** se usó como autoridad de comportamiento sin escenario que lo respalde. Umbral: **cero**, contado en **los dos brazos** y no solo en B. Si aparece aunque sea una, el check de D2 se estrena rojo desde el día uno, sin ventana de gracia | Búsqueda del scorer en los artefactos y en los PRs del piloto. Dos datos ya medidos que cuentan acá: un archivo de `piloto/` con forma de delta pasa hoy el guardrail y `validate --all --strict` en verde; y el prototipo del corpus es invisible para el check de D2 tal como está diseñado (ver abajo) |
 
@@ -431,8 +453,14 @@ lunes, a ojo, y con el resultado ya visto.
 El arreglo mantiene el **2×** —cambiar el multiplicador ahora sí sería acomodar el
 instrumento— y le cambia el ancla a la cantidad que de verdad varía: las horas de
 **convertir**, que las pone el builder. Las horas del PO se conservan como segunda
-condición y con el mismo 2×, porque es exactamente donde aparecería el costo de que
-la herramienta lo vuelva a elicitar, y ese costo lo paga él.
+condición porque es exactamente donde aparecería el costo de que la herramienta lo
+vuelva a elicitar, y ese costo lo paga él. Pero **no con un múltiplo**, y esta es una
+corrección al pre-registro hecha antes de la primera sesión: el párrafo de arriba
+demuestra que un `2×` contra una cantidad que tiende a cero no se puede evaluar, y
+conservarlo en la segunda condición reproducía **verbatim** el defecto que se acababa
+de diagnosticar en la primera. Un múltiplo mide proporciones, y acá la cantidad es
+chica: se mide en **absoluto**. Si el brazo B le cuesta al PO más de una hora extra
+que el control, eso ya es el costo de re-elicitar y se ve sin dividir nada.
 
 **Las horas se leen con sus decimales, no redondeadas a sesiones.** Con un
 denominador chico, redondear a sesiones convierte cualquier cociente en 1 o en
