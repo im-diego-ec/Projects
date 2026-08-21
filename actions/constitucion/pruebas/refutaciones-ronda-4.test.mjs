@@ -113,11 +113,33 @@ ${intermedios}${veredicto}`;
 const invocaciones = (texto) =>
   invocacionesDe([{ ruta: `${DIR_WORKFLOWS}/ci.yml`, texto, rastreado: true }], "main");
 
-/** ¿El cableado de este workflow cuenta? Con el motivo, para que el fallo se lea. */
+/**
+ * ¿El cableado de este workflow cuenta? Con el motivo, para que el fallo se lea.
+ *
+ * DOS BOLSILLOS DESDE EL 2026-08-21 (residuo A01 declarado en modo aviso). `cuenta` no
+ * cambió de significado —sigue siendo «las cinco condiciones se cumplen»— pero el
+ * MOTIVO de no cumplirlas cae en uno de dos lugares, y el lugar decide el color:
+ *   · `motivos`  -> clase "estructura": hechos del grafo (continue-on-error que no se
+ *     puede demostrar falso, if constante falso, un eslabón que lava el rojo, un needs
+ *     que no lleva a la compuerta). Siguen siendo ROJOS.
+ *   · `residuos` -> clase "lectura": el veredicto sale de LEER el texto de los pasos,
+ *     que es la regla cuyo lado de aceptación refutó el oráculo (un paso con
+ *     `if: needs.<job>.result == success` satisface la compuerta salteándose: 70 falsos
+ *     verdes sobre 2928 casos). Sale por aviso, con el residuo nombrado.
+ * `motivos` acá junta los dos, porque lo que estos casos afirman es que el motivo se
+ * REPORTA, y eso vale igual en cualquiera de los dos bolsillos. La partición se afirma
+ * aparte, para que un cambio de criterio no pase por acá callado.
+ */
 function cuenta(texto) {
   const halladas = invocaciones(texto);
   assert.equal(halladas.length, 1, `el fixture tiene que traer UNA invocacion: ${JSON.stringify(halladas)}`);
-  return { cuenta: halladas[0].cuenta, motivos: halladas[0].motivos.join(" | ") };
+  const residuos = halladas[0].residuos ?? [];
+  return {
+    cuenta: halladas[0].cuenta,
+    motivos: [...halladas[0].motivos, ...residuos].join(" | "),
+    soloEstructura: halladas[0].motivos.join(" | "),
+    soloResiduos: residuos.join(" | "),
+  };
 }
 
 test("(A0) control positivo: el cableado sano cuenta, y sin esto nada de abajo mide", () => {
@@ -143,12 +165,20 @@ for (const forma of ["true", "${{ true }}", '"true"', "${{ vars.X }}", "yes", "1
 }
 
 // --- B1, E1: el PASO del veredicto neutralizado --------------------------------------
+//
+// CORREGIDOS el 2026-08-21. Estos dos tests afirmaban que el motivo dijera
+// "NINGUN paso vivo consulta...", y esa frase era el defecto, no la propiedad: el
+// paso EXISTE y consulta, lo que pasa es que alguien lo amortiguo. Decirle a quien
+// lee el mensaje que agregue un paso que ya esta escrito lo manda a hacer trabajo
+// hecho, y ademas mezcla dos clases: que el paso este tapado se LEE del YAML
+// (decidible, rojo) y "no hay ningun paso que cobre" es el residuo de lectura.
+// Lo que se afirma ahora es que el motivo NOMBRE el amortiguador.
 test("(B1) un continue-on-error en el PASO del veredicto: el paso que compara no cobra nada", () => {
   const veredicto = cuenta(
     workflow({ veredicto: VEREDICTO_SANO.replace("      - run:", "      - continue-on-error: true\n        run:") }),
   );
   assert.equal(veredicto.cuenta, false, veredicto.motivos);
-  assert.match(veredicto.motivos, /NINGUN paso vivo/);
+  assert.match(veredicto.motivos, /neutralizado|amortiguad|continue-on-error|apaga/i);
 });
 
 test("(E1) un if: false en el PASO del veredicto: consultar en un paso que no corre es no consultar", () => {
@@ -156,7 +186,7 @@ test("(E1) un if: false en el PASO del veredicto: consultar en un paso que no co
     workflow({ veredicto: VEREDICTO_SANO.replace("      - run:", "      - if: false\n        run:") }),
   );
   assert.equal(veredicto.cuenta, false, veredicto.motivos);
-  assert.match(veredicto.motivos, /NINGUN paso vivo/);
+  assert.match(veredicto.motivos, /neutralizado|amortiguad|continue-on-error|apaga/i);
 });
 
 // --- C1, C2, D1: la referencia que no decide nada -----------------------------------
@@ -179,7 +209,7 @@ for (const [nombre, pasos] of REFERENCIAS_MUDAS) {
       }),
     );
     assert.equal(veredicto.cuenta, false, veredicto.motivos);
-    assert.match(veredicto.motivos, /NINGUN paso vivo/);
+    assert.match(veredicto.motivos, /neutralizado|amortiguad|continue-on-error|apaga/i);
   });
 }
 
@@ -234,6 +264,35 @@ test("(M1) un eslabon intermedio con always() + continue-on-error LAVA el rojo, 
   );
   assert.equal(veredicto.cuenta, false, veredicto.motivos);
   assert.match(veredicto.motivos, /LAVA el rojo en el medio del camino/);
+});
+
+// LA PARTICIÓN EN SÍ, y va acá porque acá están los dos representantes juntos. Es la
+// línea que separa lo que este check decide de lo que apenas indica, y es la única
+// cosa que un cambio de criterio no puede mover sin que se vea: si mañana alguien
+// manda al bolsillo del residuo un hecho del grafo, el rojo de esa condición se apaga
+// sin que ningún otro test se queje, porque `cuenta` sigue siendo false en los dos
+// casos. Medido el 2026-08-21: con la partición al revés, las seis ortografías del
+// continue-on-error del veredicto pasaban a aviso.
+test("(P1) la particion es por CLASE: el lavado del rojo es estructura, la lectura muda es residuo", () => {
+  const lavado = cuenta(workflow({ intermedios: INTERMEDIO_QUE_LAVA, veredicto: VEREDICTO_VIA_INTERMEDIO }));
+  assert.match(
+    lavado.soloEstructura,
+    /LAVA el rojo en el medio del camino/,
+    "un eslabon que lava el rojo es un hecho del grafo: tiene que quedar en el bolsillo ROJO",
+  );
+  assert.equal(lavado.soloResiduos, "", "y no puede aparecer tambien como residuo");
+
+  const mudo = cuenta(
+    workflow({
+      veredicto: "  ci_ok:\n    name: ci-ok\n    needs: [constitucion]\n    if: always()\n    runs-on: ubuntu-latest\n    steps:\n      - run: echo ok\n",
+    }),
+  );
+  assert.match(
+    mudo.soloResiduos,
+    /NINGUN paso vivo/,
+    "«ningun paso vivo consulta el result» sale de LEER los pasos, que es la regla refutada: va al residuo",
+  );
+  assert.equal(mudo.soloEstructura, "", "y no puede quedar tambien en el bolsillo rojo");
 });
 
 test("(M1 bis) el MISMO intermedio sin continue-on-error si transporta: queda skipped, y skipped no es success", () => {
