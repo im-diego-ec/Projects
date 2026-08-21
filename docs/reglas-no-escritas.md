@@ -21,6 +21,33 @@ producto del documento, no un apéndice.
 | 🟡 **SEMIAUTOMÁTICO** | El marco lo empuja (plantilla, scaffold, hook local) pero se puede evadir sin que nada se ponga rojo. |
 | 🔴 **DISCIPLINA** | Hoy depende de que una persona se acuerde. Es deuda declarada, no una preferencia. |
 
+Y desde el 2026-08-21 hay un estado más, que no es un grado intermedio de los
+otros tres sino una cosa distinta:
+
+| Estado | Significa |
+|---|---|
+| 🟠 **MODO AVISO** | Existe un check, corre, mira y **anota** — y está declarado que **no es compuerta**. Se usa cuando la propiedad que la regla promete no se puede decidir con lo que el check puede leer, y la medición lo demuestra. Un 🟠 **no** es un 🟡: el 🟡 se puede evadir en silencio, el 🟠 avisa siempre y dice qué parte no acredita. |
+
+**Por qué existe este estado.** Un check que se pone rojo por una propiedad que
+no puede decidir se lee como compuerta sin serlo, y eso es peor que no tenerlo:
+el verde de la corrida siguiente se interpreta como prueba. El estado nació con
+dos residuos medidos (A01 y A16, las filas 15 y 16 del backlog) después de que
+cuatro rondas cerraran los casos citados y la clase se abriera una capa más
+adentro cada vez. La salida está habilitada por el change `rojo-primero`, ya en
+main: *una regla sin compuerta sigue siendo válida, pero deja de leerse como si
+estuviera enforzada*.
+
+**La regla del 🟠**, para que no se vuelva un lugar donde esconder cosas:
+
+1. El residuo se nombra **en la salida del propio paso**, con su medición, en
+   toda corrida — **incluida la que sale verde**. Si sólo se nombrara cuando el
+   check sospecha, no se nombraría nunca en los casos donde el check no sospecha,
+   que son exactamente los falsos verdes.
+2. Lo que el check **sí** verifica completo sigue siendo rojo. Bajar todo a aviso
+   «por prolijidad» es cambiar de tema.
+3. El agujero se fija como **caso de banco que afirma el agujero**, para que el
+   día que se cierre el banco se caiga y se vea en el diff.
+
 ---
 
 ## 1. Tests ROJOS primero
@@ -466,6 +493,8 @@ una tarde entre todos y cierran las clases de error más caras.
 | 12 | Contador de fail-open activados por corrida | 3 | medio | 🔴 |
 | 13 | Un cambio a la definición del pipeline NO puede viajar por el carril rápido | — | bajo | 🔴 |
 | 14 | Publicar una versión del marco AVISA a los consumidores | — | bajo | 🔴 |
+| 15 | **A01** — que el rojo de la compuerta LLEGUE al check requerido | — | alto | 🟠 |
+| 16 | **A16** — que un permiso de allowlist no autorice descargar sin pinar | — | alto | 🟠 |
 
 > **Sobre la fila 13**, que nació de un incidente doble el 2026-08-19: el carril
 > rápido trata la definición del pipeline como "no se sirve en runtime" y la
@@ -485,6 +514,78 @@ una tarde entre todos y cierran las clases de error más caras.
 > no. El aviso es barato: la entrada del CHANGELOG **ya escribe por versión** qué
 > tiene que hacer un consumidor — solo falta empujarla al canal del área en vez de
 > esperar que alguien la busque.
+
+> **Sobre la fila 15 (A01)**, declarada en 🟠 MODO AVISO el 2026-08-21 por
+> decisión del Builder 1. El modo `cableado` de `actions/constitucion` verifica cinco
+> condiciones, y la quinta promete que *un rojo de la compuerta impide que `ci-ok`
+> salga verde*. Eso es una propiedad de un **CAMINO** —del job de la compuerta,
+> por cada eslabón de `needs`, hasta el check run cuyo nombre exige el ruleset— y
+> lo que el check verifica es un **patrón sintáctico sobre un NODO**.
+>
+> **La medición**, con oráculo semántico independiente: **70 falsos verdes sobre
+> 2928 casos generados**, una sola clase. Su representante más corto es un paso de
+> `ci-ok` con `if: needs.<job>.result == 'success'`: el patrón exige que algún paso
+> vivo CONSULTE `needs.<job>.result`, y ese `if` lo nombra — pero cuando la
+> constitución falla el `if` es falso, **el paso se saltea, el job concluye
+> `success`** y el rojo no llega al check requerido. O sea: la compuerta se
+> satisface **salteándose**.
+>
+> **Qué queda enforzado y qué no.** El corte es por clase de veredicto, no por
+> caso: los hechos del **grafo** siguen siendo rojos (que exista el check run del
+> veredicto, que cuelgue de la compuerta por `needs`, que declare `if: always()`,
+> que ningún nodo del camino lave el rojo con `continue-on-error` o un `if`
+> constante falso, más las condiciones 1 a 4: rastreada, primer nivel, modo
+> verificar, disparada en el camino del cambio). Lo que baja a aviso es «ningún
+> paso vivo consulta el `result`», que se decide **leyendo** el texto de los pasos:
+> es la regla cuyo lado de aceptación quedó refutado, y una regla así no puede
+> presentar su lado de rechazo como compuerta. Un primer corte que mandaba toda la
+> condición 5 al aviso apagaba las seis ortografías del `continue-on-error` del
+> veredicto y el caso del eslabón que lava el rojo — medido, 15 casos del banco en
+> rojo — y se descartó por eso.
+>
+> **Cómo se cierra.** No con una lectura más fina: la salida estructural es que el
+> **veredicto lo emita el marco** en vez del `run:` de cada consumidor. Mientras el
+> texto que decide viva en el shell de cada repo, cerrarlo exige decidir el
+> comportamiento de un shell arbitrario. Fijado en
+> `actions/constitucion/pruebas/modo-aviso-camino.test.mjs`.
+
+> **Sobre la fila 16 (A16)**, declarada en 🟠 MODO AVISO el 2026-08-21 por decisión
+> del Builder 1. El paso «Ejecutores de paquetes pinados» exige que todo ejecutor que
+> DESCARGA lleve su paquete con versión exacta, y dentro de un allowlist de agente
+> ponía rojo lo indeterminado. El problema es que el alfabeto compara el gestor y
+> su subcomando **por igualdad exacta** contra tokens que traen la puntuación del
+> lenguaje anfitrión.
+>
+> **La medición** del 2026-08-21, cinco entradas que escriben el **mismo** permiso:
+>
+> | Entrada del allowlist | Exit | Anotaciones |
+> |---|---|---|
+> | `Bash(npm *)` | 0 | 0 |
+> | `Bash(pnpm *)` | 0 | 0 |
+> | `Bash(yarn *)` | 0 | 0 |
+> | `Bash(bun *)` | 0 | 0 |
+> | `Bash(npx *)` | 1 | 1 |
+>
+> Misma herramienta, **una ortografía de diferencia**. Con el comodín PEGADO
+> (`:*`) el recorte lo saca y la entrada se lee; con el comodín SEPARADO por un
+> espacio no hay nada que recortar, el token que sigue al gestor no es ninguno de
+> sus subcomandos, no hay ocurrencia y la línea sale muda. Un ejecutor **directo**
+> no tiene subcomando, así que ahí el comodín cae en el lugar del paquete y sí se
+> lee: de ahí la asimetría.
+>
+> **Qué queda enforzado y qué no.** Un paquete **legible** sin versión exacta
+> sigue siendo rojo — ahí vive la forma en que el problema apareció de verdad,
+> `Bash(npx --yes openspec:*)` con el squatter de `openspec`, y sigue midiendo
+> exit 1. Lo **indeterminado** pasa a aviso con el residuo nombrado: poner rojo
+> sólo la ortografía que este lector alcanza es enforzar una ortografía y llamarla
+> compuerta.
+>
+> **Cómo se cierra.** No agrandando la lista de ortografías, que es lo que
+> fracasó cuatro veces: el comodín de un allowlist es la puntuación de un LENGUAJE
+> DE PATRONES, no de una línea de comandos, así que la entrada hay que leerla como
+> patrón —«qué comandos autoriza esto»— y no como invocación. Fijado en
+> `pruebas/marco-ci/casos/ejecutores.md` (los dos casos
+> `residuo-comodin-separado-*`) y en el corpus generado con la clase `residuo`.
 
 **Cómo se cierra una fila**: el check se construye en Projects (referenciado,
 para que llegue a todos los proyectos de una), la regla cambia de estado en
