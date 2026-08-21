@@ -109,7 +109,8 @@ archive de cada change: el que archive segundo relee lo que dejó el primero.
 ## Impact
 
 **Distribución.** Hoy este change toca **solo lo canónico** (el delta) y
-`docs/`. Si el piloto da verde, la tanda de implementación toca además:
+`docs/`. Si las **dos** rebanadas del piloto dan verde, la tanda de implementación
+toca además:
 *referenciado* (los cuatro checks viajan en el workflow reusable y llegan a todo
 consumidor de `@v1`, **inertes** hasta que un repositorio declara material de
 descubrimiento o un change se declara experimental), *scaffold* (el directorio
@@ -119,7 +120,7 @@ la versión y cada repo la instala; no se vendora, igual que el CLI de OpenSpec)
 
 **Impacto en los proyectos consumidores.** Hoy: **ninguno**. Un repo que hace
 `uses: ...@v1` y no modifica una línea no ve nada de este change, porque no hay
-nada publicado. Tras un veredicto verde: sigue siendo ninguno mientras no
+nada publicado. Tras los dos veredictos verdes: sigue siendo ninguno mientras no
 declare material de descubrimiento ni changes experimentales — los checks son
 opt-in por declaración, no por presencia. Eso lo vuelve **MINOR y no breaking**:
 ningún repositorio que hoy pasa, mañana falla.
@@ -129,8 +130,9 @@ pendientes de OK explícito, listadas en `tasks.md` bloque 1 junto con la
 verificación de qué exige de verdad la cadena de herramientas:
 
 1. **Dependencia de terceros** (⚠️ de `AGENTS.md`): la herramienta de
-   descubrimiento entra —si el veredicto es verde— al carril de todos los
-   consumidores. Se pina por versión exacta y se declara su alcance de módulos.
+   descubrimiento entra —solo si las **dos** rebanadas del piloto dan verde, y con
+   un OK aparte— al carril de todos los consumidores. Se pina por versión exacta y
+   se declara su alcance de módulos.
 2. **Material con datos de personas**: dónde viven las transcripciones y si
    pueden pasar por un modelo. El repositorio no es su custodio y este change no
    lo decide por defecto.
@@ -150,7 +152,8 @@ eso es exactamente lo que este change gatea. El resto de los límites está en
 Este change **no se archiva hoy, y eso es el diseño**. Un change de OpenSpec
 activo y sin archivar es el estado experimental nativo del marco: la propuesta
 existe, está revisada, es citable y **no es contrato**. Se archiva —o sea, sus
-deltas se funden en los specs vivos— **solo si el piloto da verde**.
+deltas se funden en los specs vivos— **solo si las dos rebanadas del piloto dan
+verde**: la primera con el orden A → B y la segunda con el orden invertido.
 
 - **El piloto arranca el lunes 2026-08-24** con las transcripciones reales de
   Supply Chain. No depende de que el proyecto exista: corre fuera de todo
@@ -163,9 +166,21 @@ deltas se funden en los specs vivos— **solo si el piloto da verde**.
   ventana que el marco ya usa para estrenar en modo aviso). El campo
   `veredicto_antes_de` del frontmatter no es decorativo: el requirement 2 de este
   delta lo vuelve rojo cuando vence.
-- **Tres veredictos posibles**, con su desenlace escrito de antemano en D8:
-  verde → archive; amarillo → herramienta del PO documentada en `docs/`, sin
-  requirement y sin huella en el scaffold; rojo → ADR de rechazo con las
+- **Los veredictos, con su desenlace escrito de antemano** en D8 y en la sección 2
+  del pre-registro: verde → **segunda rebanada con el orden invertido**; verde y
+  después verde → archive; amarillo → herramienta del PO documentada en `docs/`,
+  sin requirement y sin huella en el scaffold; rojo → ADR de rechazo con las
   mediciones. En los dos últimos casos el requirement de caducidad se rescata a
   un change propio: es el único ítem de acá que vale con independencia del
   piloto.
+- **Un verde de la primera rebanada significa «no se refutó que ayude», no
+  «ayuda».** Lo decidió Builder 1 el 2026-08-21 y es la lectura correcta del
+  instrumento: la misma persona corre los dos brazos, así que llega al brazo B con
+  el corpus ya digerido, y el propio pre-registro dice que leerlo es la parte más
+  cara. Un verde mide entonces la herramienta **más la memoria de haber hecho ya
+  la tarea**, y eso no se puede separar con n=1. Por eso el orden se mantiene
+  A → B —el control limpio se escribe una sola vez— y el verde habilita una
+  segunda rebanada **invertida**: dos corridas con el sesgo en direcciones opuestas
+  acotan el efecto real, una lo infla y la otra lo deprime. El archive, el estreno
+  de los checks y el pin en el carril de los consumidores esperan esa segunda
+  corrida.
