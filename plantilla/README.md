@@ -342,8 +342,12 @@ Un buscar-y-reemplazar no los resuelve: son decisiones.
   La otra es **un ejecutor sin versión exacta**, y esa tampoco depende ya de que alguien se
   acuerde: el check *Ejecutores de paquetes
   pinados* del job `higiene` lee todos los archivos rastreados del repo (menos los `.md`,
-  que son prosa) y se pone rojo si un `npx`, `bunx`, `npm exec`, `pnpm dlx` o `yarn dlx`
-  corre un paquete sin versión exacta. Si el binario ya lo trae una dependencia declarada,
+  que son prosa) y se pone rojo si un `npx`, `bunx`, `npm exec`, `npm x`, `pnpm dlx`,
+  `yarn dlx` o `bun x` corre un paquete sin versión exacta. No lo decide con un regex de
+  línea: **tokeniza** respetando comillas simples, comillas dobles y escapes, así que un
+  valor de bandera entrecomillado con espacios (`pnpm -C "./mi dir" dlx …`) no lo ciega, y
+  desenvuelve el comando cuando viaja dentro de un string de JSON, que es exactamente la
+  forma en la que aparece en este archivo. Si el binario ya lo trae una dependencia declarada,
   la salida correcta es `pnpm exec <comando>`: lee `node_modules` y falla si no está, en
   vez de salir a buscar a npm un nombre que puede ser de otro. **Un repo que ignore
   `.claude` entero en su `.gitignore` esconde de ese check justo este archivo** — por eso

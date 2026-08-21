@@ -39,8 +39,11 @@ mueve sobre un cambio incompatible.
 
 - **Check estático nuevo en el job `higiene`: *Ejecutores de paquetes pinados*.**
   Se pone rojo si un archivo rastreado del repo corre un paquete por un ejecutor
-  que **descarga** (`npx`, `bunx`, `npm exec`, `pnpm dlx`, `yarn dlx`) sin
-  clavarlo a una versión exacta.
+  que **descarga** (`npx`, `bunx`, `npm exec`, `npm x`, `bun x`, `pnpm dlx`,
+  `yarn dlx`, cada uno con o sin banderas globales entre el gestor y su
+  subcomando, incluidas las que se llevan su **valor en el argumento siguiente**
+  como `pnpm -C . dlx` o `npm --prefix ./x exec`) sin clavarlo a una versión
+  exacta.
 
   El agujero que cierra es concreto, no teórico. El marco documenta desde su
   primera versión que el paquete del CLI es `@fission-ai/openspec` y que
@@ -63,15 +66,96 @@ mueve sobre un cambio incompatible.
   `0.0.0` y no tiene la versión que uno pina, así que la invocación muere en vez
   de resolver en silencio.
 
+  **La decisión la toma un tokenizador, no un regex.** Las dos primeras versiones
+  del check leían la línea con dos expresiones regulares —una en el prefiltro de
+  `git grep` y otra en el lector— que intentaban seguir la gramática de una línea
+  de comando. Las dos acumularon parches y las dos volvieron a caer con la
+  ortografía siguiente: medido en `exit 0` con el mensaje *"no hay nada que
+  pinar"* sobre `pnpm -C "./mi dir" dlx openspec update`, y lo mismo con comilla
+  simple, porque un valor **entrecomillado con espacio** cegaba a las dos a la vez.
+  El lector ahora parte la línea en palabras respetando el entrecomillado de POSIX
+  shell (comilla simple literal, comilla doble con escapes, barra invertida suelta)
+  más la puntuación de los formatos donde estas líneas viven de verdad (coma y
+  corchete de un array JSON, paréntesis y punto y coma de shell); y cuando una
+  palabra salió entrecomillada y su contenido menciona un gestor, la **desenvuelve
+  y la vuelve a tokenizar**, que es lo que hace legible un comando que viaja dentro
+  de un string de JSON — la forma exacta que tiene una entrada de allowlist de
+  agente. El prefiltro dejó de intentar parsear: ahora pregunta qué **archivos**
+  mencionan el nombre de un gestor, y el lector recorre el archivo completo.
+  Mencionar el nombre es condición necesaria de toda la clase, así que el prefiltro
+  es más ancho que el lector por construcción y no por revisión.
+
   Límites declarados en el propio paso, porque esto **lee texto y no ejecuta
   nada**: los `.md` quedan fuera (son prosa, y la documentación del marco cita la
   forma incorrecta como contraejemplo, así que un comando de runbook escrito en un
   README no queda cubierto); las líneas que arrancan en comentario quedan fuera
   (un comentario no se ejecuta — y sin esa regla el check se pone rojo a sí mismo
-  al documentarse); una invocación partida con `\` no se lee; y el pin no prueba
-  que el nombre sea el paquete que uno quería: hace ruidoso el error, no lo hace
-  imposible. Un pin que llega por variable —el pin canónico del marco es un
-  `input` de este mismo workflow— cuenta como pinado y se informa aparte.
+  al documentarse); y el pin no prueba que el nombre sea el paquete que uno quería:
+  hace ruidoso el error, no lo hace imposible. Un pin que llega por variable —el pin
+  canónico del marco es un `input` de este mismo workflow— cuenta como pinado y se
+  informa aparte. Una invocación partida con `\` **sí** se lee, desde que el
+  prefiltro selecciona archivos en vez de líneas.
+
+  **Residuos, y son tres.** (0) *Nuevo, medido, y el más caro de los tres*: los
+  allowlists reales de las **skills de este repo** viven en el frontmatter
+  `allowed-tools:` de archivos `.md`, y los `.md` están **fuera del universo del
+  check** por el pathspec. Medido hoy en el árbol de Projects: dos skills
+  (`.claude/skills/projects-adoptar/SKILL.md` y
+  `.claude/skills/projects-archive-change/SKILL.md`) autorizan `Bash(npx:*)` y
+  `Bash(pnpm:*)` — exactamente la clase que esta ronda acaba de cerrar, y el check
+  no las ve por construcción. No se cierra acá porque las dos salidas son cambios
+  de comportamiento con su propia discusión: leer los `.md` en general estrella el
+  check contra toda la prosa del marco, que cita la forma incorrecta como
+  contraejemplo a propósito; leer solo la línea `allowed-tools:` de un `.md` es
+  angosto y defendible, pero **pone el árbol de Projects en rojo el día que entra** y
+  el arreglo pasa por reescribir permisos de agente, que no se decide dentro de un
+  PR de arreglo. Va como change propio, y hasta entonces está escrito acá y no
+  descubierto por la próxima ronda. (1) *Irreducible*: si el nombre del gestor o su
+  subcomando llegan por indirección (`pnpm $SUB pkg`, `eval "$CMD"`, un alias de
+  shell, dos mitades concatenadas), el texto de la línea no contiene la invocación
+  y ninguna lectura estática la puede ver — cerrarlo pediría ejecutar, que es justo
+  lo que este paso no hace, y queda fijado en el banco como caso *límite* y no como
+  caso que pasa. (2) *Abierto y no cerrado en esta ronda*: la familia de
+  scaffolding descarga igual y sigue afuera del alfabeto — `npm init <pkg>` resuelve
+  `create-<pkg>` desde npm, `npm create` es su alias, y `pnpm create`, `yarn
+  create` y `bun create` hacen lo mismo (los `init` de pnpm, yarn y bun andamian
+  **local** y no descargan, así que meterlos sería puro falso rojo). Se declara en
+  vez de cerrarse porque cerrarlo bien pide una distinción nueva que este paso no
+  tiene: para `exec`/`x`/`dlx` un ejecutor sin argumento es *indeterminado*,
+  mientras que para `init`/`create` sin argumento significa que **no descarga
+  nada** — y sin esa distinción `npm init -y`, local e inofensivo, saldría rojo
+  dentro de un allowlist. Medido: cero ocurrencias de esa familia en el árbol de
+  Projects y cero en el consumidor real, así que declararlo no deja ningún hallazgo
+  sin reportar hoy; cerrarlo es un cambio de comportamiento propio y va en su
+  propio change.
+
+  **El banco tiene dos mitades y hacen cosas distintas.** Los casos concretos de
+  `pruebas/marco-ci/casos/ejecutores.md` son regresión: fijan por código de salida
+  lo que ya se sostiene. El **corpus generado** (`pruebas/marco-ci/generar.mjs`) es
+  el que puede encontrar algo nuevo: cruza los ejes de la gramática de
+  entrecomillado, de banderas, de ortografía del ejecutor y de envoltorio contra un
+  **alfabeto propio**, y hoy son 2582 entradas.
+
+  Ese alfabeto propio es el arreglo de la última ronda, y vale explicarlo porque la
+  misma tautología volvió dos veces disfrazada. Primero el invariante recorría una
+  lista de casos escrita a mano: no podía cazar un miembro nuevo porque solo
+  preguntaba por lo ya pensado. La ronda siguiente pasó a generar por producto de
+  ejes, pero leyendo el alfabeto **del propio paso** — y eso arregla el eje de las
+  formas y deja intacto el de los gestores: un corpus derivado de la regla que
+  audita solo puede preguntar por los miembros que la regla ya conoce. Está medido
+  con el mismo arnés sobre el mismo código viejo: el corpus derivado del paso
+  encontraba **0** entradas invisibles y el corpus con alfabeto propio encontraba
+  **200**. Desde esta ronda el alfabeto del banco sale de la documentación de cada
+  gestor y vive en `pruebas/marco-ci/casos/ortografias.md`, con la fuente escrita
+  por gestor; el generador ya no puede leer el paso, y eso es una aserción del
+  banco y no un comentario pidiéndolo.
+
+  Lo que ese corpus encontró, todo medido por código de salida archivo por archivo:
+  una bandera con valor separado sin forma de paquete (`npx --registry <url>
+  openspec`) que hacía al lector rendirse con un `::warning::` —que no pone rojo
+  ningún job— sobre una invocación real y sin pinar; el **corte del reporte a los 64
+  KiB** (abajo, en *Corregido*); y la familia del **comodín del anfitrión**, que era
+  el agujero más grande de los tres.
 
 - **Aviso de versión a los consumidores** — `.github/workflows/aviso-version.yml`
   (workflow propio de Projects) más `actions/aviso-version` (referenciada). Al
@@ -163,28 +247,41 @@ mueve sobre un cambio incompatible.
   `::notice::` en **cada** corrida y va al resumen del job: una excepción que
   nadie vuelve a ver es una excepción que nadie vuelve a discutir.
 
-  **Una sola vía de excepción, y las otras cinco están cerradas.** La herramienta
-  trae cinco canales propios para callar un hallazgo sin motivo y sin dejar
-  rastro, y los cinco se probaron: un `.gitleaks.toml` del repo puede **vaciar
+  **Una sola vía de excepción, y las otras seis están cerradas.** La herramienta
+  trae seis canales propios para callar un hallazgo sin motivo y sin dejar
+  rastro, y los seis se probaron: un `.gitleaks.toml` del repo puede **vaciar
   todas las reglas** (un repo con un secreto sintético sale en verde), un
   `.gitleaksignore` silencia por huella, un comentario `gitleaks:allow` al final
-  de la línea baja el hallazgo a cero, y la configuración **también entra por
-  entorno** con `GITLEAKS_CONFIG` o `GITLEAKS_CONFIG_TOML` — los dos únicos que no
+  de la línea baja el hallazgo a cero, la configuración **también entra por
+  entorno** con `GITLEAKS_CONFIG` o `GITLEAKS_CONFIG_TOML` —los dos únicos que no
   dejan rastro ni en el repo, y con los que el paso salía **verde y mudo** sobre
-  un repo con secretos adentro. Los dos archivos son rojo si están versionados; el
-  comentario se desactiva con `--ignore-gitleaks-allow`; las dos variables se
-  vacían en el `env:` del paso, porque el runner lo elige el consumidor y en uno
-  propio pueden venir de la máquina.
+  un repo con secretos adentro— y el archivo del **directorio del barrido** es el
+  último eslabón de la precedencia documentada
+  (`--config` > `GITLEAKS_CONFIG` > `GITLEAKS_CONFIG_TOML` >
+  `<destino>/.gitleaks.toml`). Los dos archivos son rojo **si están, rastreados o
+  no**, decidido con presencia en disco: el runner lo elige el consumidor y en uno
+  propio `actions/checkout` no limpia lo no rastreado, así que «no está en el
+  índice» no significa «no está ahí cuando el detector corre». El comentario se
+  desactiva con `--ignore-gitleaks-allow`; las dos variables se vacían en el
+  `env:` del paso; y el paso pasa su propia config (`[extend] useDefault = true`)
+  con `--config`, que saca de la cadena al archivo del destino sin cambiar el
+  universo de reglas.
 
-  **Una declaración cubre una cantidad exacta, no un permiso abierto.** El par
+  **Una declaración cubre coincidencias concretas, no un permiso abierto.** El par
   (archivo, regla) por sí solo perdona todo lo que ese archivo tenga de esa regla,
   hoy y siempre: con una declaración viva, un secreto **nuevo** agregado a ese
   mismo archivo entraba en verde (comprobado). Por eso cada entrada declara
-  cuántos hallazgos absorbe —uno por defecto, `"hallazgos": N` si de verdad son
-  varios— y cualquier desajuste es rojo, con el número que ahora corresponde y la
-  instrucción de revisar las coincidencias una por una antes de subirlo. Se cuenta
-  por plano y se toma el mayor, para que un falso positivo que además entra en los
-  commits del cambio no se cuente dos veces.
+  cuántos hallazgos absorbe **en el árbol** —uno por defecto, `"hallazgos": N` si
+  de verdad son varios— y cualquier desajuste es rojo, con el número que ahora
+  corresponde y la instrucción de revisar las coincidencias una por una antes de
+  subirlo. El plano de la **historia** no se cuenta contra ese número: una
+  coincidencia suya la absorbe la declaración solo si cae en una de las líneas que
+  ya cubre en el árbol. Así la coincidencia que entró y se borró dentro del cambio
+  —que por definición no está en el árbol— no tiene dónde entrar, y un falso
+  positivo que el cambio vuelve a tocar no obliga a declarar un número que cambia
+  cuando el rango del PR pasa. Límite declarado: si la línea de un falso positivo
+  declarado **se mueve** dentro del rango, la historia lo reporta como no cubierto
+  — rojo del lado conservador, con el mensaje diciendo exactamente eso.
 
   **La salida de la herramienta no se vuelca cruda al log.** En la rama de "no
   pudo correr" —justo aquella en la que se comportó de forma inesperada— asumir
@@ -207,6 +304,206 @@ mueve sobre un cambio incompatible.
   todavía está en el árbol. El resumen de la corrida lo dice con todas las letras:
   cero hallazgos **no** prueba que no haya secretos.
 
+  El plano de la historia mira además los diffs de los **merges**
+  (`--diff-merges=first-parent` dentro de `--log-opts`), porque `git log -p` los
+  suprime por defecto y traer `main` a la rama de trabajo es el flujo diario de
+  este marco. Consecuencia asumida: el diff de un merge de `main` también muestra
+  lo que `main` trae, contenido que el plano del árbol ya cubre, así que suma
+  ruido y no rojos nuevos.
+
+- **Banco de pruebas de los pasos inline de `marco-ci.yml`** (`pruebas/marco-ci/`,
+  cableado en el `ci.yml` de Projects). Los guardrails que viven dentro de un bloque
+  `run:` no pueden salir de ahí —`marco-ci.yml` es reusable, así que cuando lo
+  llama un consumidor el árbol checkouteado es el **del consumidor** y ningún
+  archivo de Projects está presente—, y por eso eran el único código del marco sin
+  una sola aserción. El banco no copia ese código: lee `marco-ci.yml`, extrae el
+  script exacto del paso y lo corre contra fixtures, afirmando por **código de
+  salida**. Si un paso se renombra o pierde su `run:`, el extractor tira y el job
+  se pone rojo en vez de dejar de probar en silencio.
+
+  Límite declarado: `gitleaks` no se descarga en el banco, así que del detector de
+  secretos se prueban el cruce con las declaraciones, el rojo por presencia de los
+  archivos de excepción (con un stub de `curl` que deja una señal en disco, para
+  afirmar por existencia de archivo que el paso cortó **antes** del binario) y que
+  las banderas de `git log` destapen el diff de un merge. Ninguna de las tres
+  reemplaza una corrida real con el binario.
+
+### Corregido — cuatro defectos de estos checks, encontrados por la auditoría de cierre de v1
+
+Los cuatro salían **en verde** o mentían sobre la causa del rojo, los cuatro están
+medidos por código de salida en la auditoría del 2026-08-20, y cada arreglo entra
+con su caso en el banco nuevo (verificado: el banco se pone rojo contra el código
+anterior y verde con el arreglo).
+
+- **El cruce del detector de secretos tomaba `max(árbol, historia)`**, así que una
+  declaración de dos falsos positivos **absorbía una coincidencia nueva** de la
+  misma regla que entraba y se borraba dentro del PR: exit 0 diciendo «3
+  hallazgo(s): 0 sin declarar». Un archivo con falsos positivos declarados se
+  volvía punto ciego para su propia regla, en verde, en un check de seguridad.
+
+- **El plano de la historia no veía las resoluciones de merge.** `gitleaks git`
+  corre `git log -p`, que suprime los diffs de merge: un secreto que entraba en la
+  resolución y se borraba después salía exit 0, 0 hallazgos, **imprimiendo «(árbol
+  + historia del cambio)»** — afirmando una cobertura que no tuvo. Es el fail-open
+  silencioso del 2026-08-05 otra vez, y en el camino más transitado del marco.
+
+- **El rojo por los archivos de excepción se decidía con `git ls-files`**, o sea
+  solo sobre lo rastreado. Un `.gitleaks.toml` sin rastrear con
+  `useDefault = false` llevaba el plano de la historia de exit 1 a **exit 0**, y un
+  `.gitleaksignore` sin rastrear con la huella del hallazgo, lo mismo. Se corrige
+  el comentario que llamaba «cinturón» a `--gitleaks-ignore-path` sobre un
+  directorio vacío: medido en 8.30.1 **no neutraliza nada**.
+
+- **El check de ejecutores no veía tres formas que descargan igual**: `npm x`
+  (alias documentado de `npm exec`), `bun x` y cualquier bandera global entre el
+  gestor y su subcomando (`pnpm --silent dlx`). Las tres medían exit 0 con «no hay
+  nada que pinar», que es el peor verde posible: uno que afirma haber mirado. Y la
+  forma en que el problema apareció **de verdad** —`Bash(npx --yes openspec:*)` en
+  el allowlist de un agente— caía en «no pude determinar el paquete» y degradaba a
+  `::warning::` con exit 0. Ahora el comodín del allowlist se recorta antes de leer
+  el paquete (el error dice «openspec va sin versión», que es lo que hay que
+  arreglar) y lo indeterminado **dentro de un allowlist de agente** es rojo: ahí la
+  línea no es una invocación que alguien revise cuando falle, es un permiso
+  permanente para descargar y ejecutar.
+
+- **La rama del aviso de *Artefactos regenerados al día* era código muerto**: el
+  paso no podía salir amarillo nunca. `xargs` colapsa los códigos de `grep` —sale
+  123 si cualquier hijo salió entre 1 y 125—, así que «no encontré nada» caía en la
+  guarda del «no pude mirar» y el repo **sin cabeceras**, la clase más atrasada y
+  justo la que el check dice proteger, recibía un rojo que mentía sobre la causa y
+  ofrecía el arreglo equivocado. Se corrige con un archivo por iteración, no
+  ignorando el 123: eso habría apagado el «no pude leer», que es el caso que tiene
+  que ser rojo, y los dos casos están en el banco para que ese parche no pase. El
+  aviso interpolaba además `${DIRS[*]}`, un array que un cambio anterior había
+  borrado: salía mutilado y sin nombrar los archivos de los que hablaba.
+
+### Corregido — la mitad de la clase que el arreglo anterior dejó abierta
+
+La auditoría midió que el check de ejecutores toleraba banderas globales entre el
+gestor y su subcomando. El arreglo anterior lo cumplió **a medias**: toleraba las
+banderas sin valor (`--silent`) y las que lo traen pegado (`--loglevel=error`), y
+seguía ciego a las que se llevan el valor en el **argumento siguiente**. Medido el
+2026-08-20, un archivo y una línea por caso: `pnpm -C . dlx openspec update`,
+`npm --prefix ./x exec openspec` y `yarn --cwd . dlx openspec update` salían los
+tres **exit 0**, y no por el lector sino ya por el prefiltro, imprimiendo «no hay
+nada que pinar» — el mismo verde que afirma haber mirado que la auditoría vino a
+cazar. **Un consumidor no tiene que hacer nada**: el check queda más estricto, no
+más suave.
+
+- **Se tolera la bandera con valor separado, en los dos alfabetos.** La forma se
+  escribe **general** —una bandera y, opcional, un token que no arranca con
+  guion— y no como lista cerrada de banderas, porque el defecto es de **clase**:
+  npm resuelve cualquier clave de config como `--clave <valor>` antes del
+  subcomando, así que una lista no se puede terminar y la bandera siguiente
+  reabriría el agujero como falso verde mudo. Las banderas que originaron la
+  regla salen de la documentación de cada gestor y de su `--help`, no de la
+  intuición, y están escritas en el propio paso: npm (`--prefix` / `-C`,
+  `--loglevel`, `--registry`, `--workspace` / `-w`), pnpm (`-C` / `--dir`,
+  `--filter`, `--loglevel`, `--reporter`, `--store-dir`,
+  `--workspace-concurrency`), yarn (`--cwd`) y bun (`--cwd`, `-c` / `--config`).
+  El **prefiltro** de `git grep` se ensancha igual: dejarlo atrás lo volvía más
+  angosto que el lector, que es la forma de volver al exit 0 con «no hay nada que
+  pinar».
+
+- **`pnpm exec` y `yarn exec` siguen fuera del alfabeto**, con banderas y con
+  valores: fallan cerrado y son la salida que ofrece el mensaje de error. Hay caso
+  de control por cada una.
+
+- **Costo asumido y fijado en el banco como caso `limite`**: sin lista cerrada no
+  hay forma de saber que `--silent` es booleana, así que `npm --silent run x algo`
+  se lee como bandera + valor + ejecutor y cae del lado del ejecutor. Es un falso
+  **rojo** legible en un check de seguridad, que es el lado conservador; el falso
+  verde no lo es.
+
+### Corregido — dos «no medido» declarados, ahora fijados por su forma
+
+`gitleaks` no está en la máquina donde corre el banco y el banco **no baja
+binarios**, así que dos propiedades quedaban declaradas sin medir: que la
+herramienta acepte `--log-opts` y le reenvíe a `git` el
+`--diff-merges=first-parent`, y que acepte `[extend] useDefault = true`. **Siguen
+sin medir contra el binario y el nombre de cada test lo dice.** Lo que se cierra
+es la **forma** del argumento, que es donde vive el modo de fallar barato: se
+rompe en silencio, el detector arranca igual y mira menos de lo que dice.
+
+- El valor de `--log-opts` tiene que viajar como **un solo** argumento entre
+  comillas (el detector lo parte por espacios él mismo; sin comillas lo parte
+  antes el shell y el rango se le va como posicional), sin tabuladores, sin
+  espacios dobles —que le dan un token vacío— y con `--diff-merges=first-parent`
+  escrito con `=` en un token propio. Que esa lista de tokens sea una línea de
+  `git log` válida se mide con git, por código de salida.
+
+- La config del marco tiene que ser **exactamente** `[extend]` +
+  `useDefault = true`: la clave es camelCase y el booleano va desnudo. Cualquier
+  otra grafía la ignora el detector en silencio, se queda sin reglas por defecto,
+  y un barrido sin reglas sale exit 0 sobre cualquier repo — indistinguible de un
+  repo limpio.
+
+- Los dos tests **miden el binario si aparece en el `PATH`** y anuncian con
+  `t.diagnostic` cuando no está, en vez de saltar callados. Un salto silencioso
+  sería el fail-open del 2026-08-05 otra vez.
+
+### Corregido — el comodín del anfitrión, y un reporte que llegaba mutilado
+
+**El comodín pegado al ejecutor cegaba el check por completo.** El alfabeto se
+comparaba por **igualdad exacta** contra tokens que todavía traían la puntuación
+que aporta el lenguaje **anfitrión** del archivo. En un allowlist de Claude Code la
+entrada se escribe `Bash(<comando>:*)` para decir «con cualquier argumento», y ese
+`:*` puede quedar pegado al paquete, al subcomando **o al ejecutor**. Se limpiaba
+en **uno** de los tres sitios que comparan contra el alfabeto —el del paquete— así
+que la misma herramienta con una ortografía de diferencia daba veredictos opuestos.
+Medido punta a punta con el paso real, archivo por archivo, un caso por repo:
+
+| entrada en `.claude/settings.json` | antes | después |
+| --- | --- | --- |
+| `Bash(npx openspec:*)` | exit 1 | exit 1 |
+| `Bash(npx:*)` | exit 0, **cero líneas** | exit 1 |
+| `Bash(pnpm dlx:*)` | exit 0, **cero líneas** | exit 1 |
+| `Bash(npm x:*)` · `Bash(npm exec:*)` | exit 0, **cero líneas** | exit 1 |
+| `Bash(bunx:*)` · `Bash(bun x:*)` · `Bash(yarn dlx:*)` | exit 0, **cero líneas** | exit 1 |
+| `Bash(npm:*)` | exit 0, **cero líneas** | exit 1 |
+| `pnpm.cmd dlx openspec` · `npx.exe openspec` | exit 0, **cero líneas** | exit 1 |
+| `Bash(npm run build:*)` (control) | exit 0 | exit 0 |
+| `Bash(npx openspec@1.9.0:*)` (control) | exit 0 | exit 0 |
+
+No es una ortografía suelta: son **diez** formas de escribir un permiso permanente
+para descargar y ejecutar, todas mudas, en el archivo donde la línea no es un
+comando que alguien vaya a revisar cuando falle. Tres arreglos, todos en el mismo
+lugar conceptual: la limpieza se aplica en **los tres** sitios que comparan contra
+el alfabeto; el nombre del gestor se compara sin el **sufijo de ejecutable** de
+Windows (`npx.cmd`, `pnpm.cmd`, `bun.exe`: los deja la propia herramienta en el
+`PATH` y descargan igual); y un gestor con el comodín pegado y **sin subcomando**
+—`Bash(npm:*)`, que autoriza `npm exec` y todo lo demás— cuenta como
+indeterminado, o sea rojo dentro de un allowlist. Esta última la encontró el
+corpus con alfabeto propio en su primera corrida, no una persona.
+
+La condición del último caso es angosta **a propósito**, y la angostura es lo que
+la hace usable: hace falta que el comodín esté pegado al gestor. Sin eso habría que
+marcar todo gestor sin subcomando reconocido, o sea `npm ci`, `npm run build`,
+`pnpm install` — cada línea de cada pipeline del área. Un check que marca eso se
+apaga en el tercer PR. `Bash(npm run build:*)` queda en verde y hay un caso de
+regresión que lo fija.
+
+**Y el reporte se perdía a los 64 KiB.** El paso marcaba el rojo con
+`process.exit(1)`, y Node no espera a que se vacíe el `stdout` cuando la salida es
+un pipe — que es lo que pone Actions siempre. Medido en la corrida `32412180384`:
+de **1252** anotaciones llegaron **90**, y 90 × 739 bytes = 66510, o sea el corte
+cae exactamente en los 65536 del buffer del pipe; las que llegaron son un
+**prefijo exacto** de las esperadas, que es la firma de un corte de salida y no de
+un defecto de lectura (un defecto de lectura agrupa por forma, no por posición). El
+job igual quedaba rojo: lo que se perdía era el reporte que dice **qué** arreglar.
+Ahora el rojo se marca con `process.exitCode` y la línea verde pasó a un `else`,
+para que no imprima «ninguno cae» abajo de la lista de los que sí caen. El mismo
+arreglo va en *Scripts de verificación sin enmascaramiento*, que tiene la misma
+forma; ahí todavía no se midió un corte porque ningún repo del área llega a esa
+cantidad de scripts, pero es el mismo defecto y no se deja plantado esperando al
+repo que sí llegue.
+
+**En Windows esto no se reproduce** porque ahí el `stdout` de Node es sincrónico, y
+eso es la lección más incómoda de la ronda: el banco de la máquina del builder daba
+**58/58 en verde** sobre un reporte que en CI llegaba mutilado. La aserción que lo
+fija es sobre el **texto** del paso —tiene que usar `process.exitCode` y no
+`process.exit(`— y el test dice por qué no puede ser sobre la conducta. La conducta
+la sigue midiendo el corpus rojo, que en Linux vuelve a cazar esto solo.
 - **`actions/constitucion` — la porción del marco de la constitución deja de
   copiarse y pasa a entregarse.** El texto común (OpenSpec, git y despliegue,
   fronteras, seguridad y observabilidad, infra/AWS/secretos, agentes y modelos,
@@ -480,6 +777,19 @@ da rojo exactamente en las cinco líneas reales, sin un solo falso positivo — 
 `pnpm exec playwright` del deploy, el `pnpm exec prisma generate` del Dockerfile y
 los `tsc`/`vitest`/`eslint` de los `scripts` de cada `package.json` no se tocan,
 porque ninguno pasa por un ejecutor que descargue.
+
+Volver a medir después de completar el alfabeto (`npm x`, `bun x`, banderas
+intermedias, comodín del allowlist) **no movió esos números**: `projects` sigue en
+verde con las mismas 8 invocaciones y cero avisos, y `proyecto-origen` sigue en
+rojo con exactamente las mismas 5 líneas. El alfabeto nuevo no agrega hallazgos al
+consumidor real; cierra formas que hoy no usa y que habrían entrado en verde.
+
+**Del detector de secretos, una consecuencia para quien corre en runner propio.**
+El rojo por `.gitleaks.toml` o `.gitleaksignore` se decide ahora por **presencia en
+disco**, no por el índice. En un runner efímero de la plataforma no cambia nada; en
+uno propio, un archivo de esos que quedó de una corrida anterior pone el paso en
+rojo, y eso es a propósito: `actions/checkout` no limpia lo no rastreado, así que
+un archivo así **sí** apagaría el detector si el check no lo mirara.
 
 **Del detector de secretos hay una acción obligatoria y también tiene orden.** Un
 repo con falsos positivos sin declarar da rojo apenas el check aterrice, así que
