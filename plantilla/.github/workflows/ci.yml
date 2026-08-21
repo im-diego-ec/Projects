@@ -41,7 +41,7 @@ jobs:
   marco:
     # Entre comillas a proposito: sin ellas, el placeholder de doble llave hace
     # que YAML lea un mapa en flujo y el archivo no parsea antes de sustituirlo.
-    uses: "{{ORG}}/Projects/.github/workflows/marco-ci.yml@v1"
+    uses: "{{ORG}}/Projects/.github/workflows/marco-ci.yml@v1.4.1"
 
   # ---------------------------------------------------------------------------
   # LA PORCION DEL MARCO DE LA CONSTITUCION: que las reglas que leen los agentes
@@ -86,7 +86,7 @@ jobs:
         with:
           node-version: "22"
       - id: marco_constitucion
-        uses: "{{ORG}}/Projects/actions/constitucion@v1"
+        uses: "{{ORG}}/Projects/actions/constitucion@v1.4.1"
         with:
           modo: verificar
       # El artefacto AL DIA se sube SIEMPRE, tambien cuando el veredicto es verde:
@@ -336,7 +336,7 @@ jobs:
       # de SU paquete, bajo projects.cobertura.excluidos, con su motivo escrito.
       # La exclusion no vuelve imposible la evasion: la vuelve visible, en un
       # diff, bajo review.
-      - uses: "{{ORG}}/Projects/actions/censo-fuentes@v1"
+      - uses: "{{ORG}}/Projects/actions/censo-fuentes@v1.4.1"
 
       # Cobertura en los DOS planos, en un solo paso, porque los dos leen los
       # mismos lcov y los mismos manifiestos:
@@ -370,7 +370,7 @@ jobs:
       # la cobertura de cada paquete tiene que emitirse con `all: true` y con el
       # projectRoot del reporter lcov en la raiz del monorepo. Las dos cosas
       # vienen armadas en `vitest.config.base.mjs` de la raiz.
-      - uses: "{{ORG}}/Projects/actions/cobertura-diff@v1"
+      - uses: "{{ORG}}/Projects/actions/cobertura-diff@v1.4.1"
 
   # EL CHECK REQUERIDO POR EL RULESET DE main ES ESTE (nombre exacto: "ci-ok").
   #
