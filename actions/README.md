@@ -361,13 +361,101 @@ declararlo excluido con motivo— más el comando para reproducirlo.
 
 ## `cobertura-diff`
 
-Mide qué proporción de las **líneas que el pull request agrega o modifica**
-ejercitan las pruebas, cruzando los reportes `lcov` del repositorio con el diff.
-Es la mitad "sobre el diff" del mínimo de cobertura del marco (design `D5` del
-change `calidad-fail-closed`): bloquea desde el día uno porque solo aplica a
-código nuevo, y no exige ninguna puesta al día previa. El otro plano —el total
-del paquete, que no retrocede— vive en la configuración de cobertura del
-proyecto, no acá.
+Mide la cobertura de pruebas en **los dos planos** del mínimo del marco (design
+`D5` del change `calidad-fail-closed`), porque cada uno tapa un hueco que el otro
+deja abierto.
+
+**Plano 1 — las líneas que el pull request agrega o modifica**, cruzando los
+reportes `lcov` con el diff. Bloquea desde el día uno porque solo aplica a código
+nuevo y no exige ninguna puesta al día previa. No aplica fuera de un pull request
+(no hay rango que medir) y lo dice, en vez de simular un 100%.
+
+**Plano 2 — el total de cada paquete** contra el mínimo del marco. Corre
+**siempre**, también en un push a `main`, porque no depende de ningún rango. Sin
+este plano, el código que ya existe sin pruebas se queda así indefinidamente:
+nada obliga a nadie mientras nadie lo toque.
+
+| Situación del total de un paquete | Veredicto |
+|---|---|
+| En o por encima del mínimo del marco (80) | verde |
+| Por debajo del mínimo, **sin** motivo ni fecha declarados | **rojo** |
+| Por debajo del mínimo, con la fecha declarada **ya vencida** | **rojo** |
+| Por debajo del mínimo, con motivo y fecha **vigente** | amarillo, y la corrida reporta cuánto falta y cuánto plazo queda |
+| Por debajo de su propio **piso declarado**, esté ese piso arriba o abajo del mínimo | **rojo** (retroceso: el piso es ganancia acumulada) |
+| Con un **piso declarado para una métrica que llegó SIN DATOS** | **rojo** — el piso no se pudo comparar contra nada, y un ratchet que no compara es una compuerta apagada en verde |
+| Con una **deuda declarada** y ninguna métrica medible en la corrida | amarillo con `::warning::` — la deuda no excusa nada, y una deuda que ninguna corrida nombra envejece en el manifiesto |
+| Con la declaración de cobertura mal escrita | **rojo** — una declaración inválida no cuenta como declarada |
+| Con una métrica **que el reporte no midió** (cero ítems y ningún `LF:`/`FNF:`/`BRF:` declarado) | **rojo** — es «no medido», no «no aplica» |
+| Con una métrica **que el reporte declara en cero** (`FNF:0`, `BRF:0`) | verde, y la fila sale como `n/a` — el reporter dice que midió y no había nada |
+| Con **menos ítems de los que su propio reporte declara** para esa métrica | **rojo** — el denominador llegó corto, y un denominador corto no baja la cobertura: la **infla** |
+
+> **El denominador se verifica contra el que el reporte declara.** Un porcentaje
+> es cubiertas sobre encontradas, y «encontradas» se reconstruye ítem por ítem de
+> un archivo que el propio proyecto genera: apagar parte de la medición rinde más
+> que agregar pruebas. Medido sobre el reporte real del consumidor, con su paquete
+> a 70,70% de funciones: sacándole los registros de funciones el rojo pasaba a
+> `n/a` con EXIT 0 y **sin un solo aviso**, y borrándole los registros sin cubrir
+> dejando `FNF:` intacto la corrida publicaba **95,83%** con la fila en OK teniendo
+> el reporte declaradas 215 funciones de las que llegaban 120. El discriminador no
+> es una lista de ortografías, es la gramática del formato: un tracefile declara su
+> propio denominador por registro (`LF:`, `FNF:`, `BRF:`), y esa línea es la única
+> forma de separar «vale cero» de «no se midió». Los 75 registros de los dos
+> reportes reales lo declaran, 11 con `FNF:0` y 3 con `BRF:0`, y sus ítems coinciden
+> exacto con el contador en los 75.
+>
+> Si el reporter emitió la métrica en un formato que esta action **no lee** (lcov
+> 2.x usa `FNL:`/`FNA:` en vez de `FN:`/`FNDA:`), el rojo lo dice con esas palabras
+> y manda a arreglarlo **en el marco**, no en el manifiesto del proyecto: el
+> denominador declarado prueba que el reporter sí midió.
+
+> **Ventana de estreno, hasta el 2026-09-30.** Mientras dure, los dos veredictos
+> que **nadie escribió** —un paquete por debajo del mínimo que no declara deuda, y
+> una métrica que el reporte no midió— pasan en amarillo con un `::warning::` que
+> nombra el día en que serán rojos. La ventana existe porque `v1` es un tag móvil:
+> sin ella, la compuerta aparece en el pipeline de cada consumidor sin que nadie la
+> haya leído. No afloja lo que un paquete escribió y rompió —deuda vencida,
+> retroceso, piso sin datos, declaración inválida—, y se cierra sola: pasada la
+> fecha, el mismo estado es rojo sin que nadie toque una línea. La línea que separa
+> las dos mitades es la autoría del caso, no su gravedad.
+
+El piso es el mecanismo de **transición** hacia el mínimo, no un sustituto de él,
+y por eso lleva plazo. Sin fecha, el piso termina siendo el mínimo de hecho, y eso
+pasó de verdad: el consumidor estuvo en verde a 70,69% de funciones contra un
+mínimo declarado de 80, con el piso fijado en el número medido. Correr la fecha se
+puede, pero es una línea de diff con su motivo y con el avance conseguido, bajo
+review, igual que bajar un piso.
+
+Las tres cosas se declaran en el `package.json` del **propio paquete**, al lado de
+sus exclusiones, dentro de un diff y bajo revisión:
+
+```json
+{
+  "projects": {
+    "cobertura": {
+      "excluidos": [{ "patron": "src/generated/**", "motivo": "cliente generado por el ORM" }],
+      "piso": { "lineas": 71.2, "funciones": 70.6, "ramas": 68.0 },
+      "deuda": { "motivo": "heredado del piloto; el plan esta en el issue N", "fecha": "2026-12-31" }
+    }
+  }
+}
+```
+
+Las claves del piso son las del marco (`lineas`, `funciones`, `ramas`) y una clave
+desconocida es **roja**, no ignorada: un `functions: 80` escrito por costumbre de
+vitest no declararía nada y el paquete quedaría sin piso creyendo tenerlo.
+
+**El umbral del consumidor no abre esta compuerta.** El input `minimo` gobierna el
+plano del diff, donde bajarlo es decisión del proyecto (con un `::warning::` que lo
+deja escrito en la corrida). Sobre el total, el 80 del marco es piso **duro** y el
+umbral local solo puede **subirlo**: bajarlo a 40 dejaba en verde un paquete al
+33%, y esa medición es la razón de la asimetría. Los umbrales de vitest tampoco lo
+abren, porque este plano recalcula el total desde el `lcov` en vez de creerle a la
+configuración del paquete.
+
+**Requisito para que el plano 2 mida lo que dice medir**: la cobertura del paquete
+tiene que emitirse con `all: true`. Sin eso, el reporte solo trae los archivos que
+alguna prueba importó y el total sale alto por omisión. El scaffold reparte esa
+configuración ya armada en `vitest.config.base.mjs`.
 
 ```yaml
 jobs:
@@ -394,15 +482,24 @@ roja y ruidosa**, y el mensaje trae el arreglo.
 
 ### Qué hace, paso a paso
 
-1. Encuentra los `lcov` por glob y parsea `SF:` y `DA:`.
-2. Saca las líneas agregadas o modificadas con `git diff --unified=0 <base> HEAD`
+1. Encuentra los `lcov` por glob y parsea `SF:`, `DA:`, `FN:`/`FNDA:` y `BRDA:`.
+   Esta lectura y la resolución de rutas del punto 4 son **compartidas por los dos
+   planos**, y ocurren antes de cualquier control del rango: el total no depende de
+   ningún rango, así que en un push a `main` —donde el plano del diff no aplica— el
+   total se mide igual.
+2. Corre el **plano del total**: reparte la cobertura entre los paquetes que la
+   contienen, la compara contra el mínimo del marco y escribe su sección del
+   resumen. Su veredicto no cortocircuita nada: se guarda como piso del código de
+   salida, así que el plano del diff sigue imprimiendo su diagnóstico completo y
+   ningún `exit 0` de los suyos puede tapar un total en falta.
+3. Saca las líneas agregadas o modificadas con `git diff --unified=0 <base> HEAD`
    —comparación de **dos puntos**, no de tres: `A...B` exige merge-base y muere
    en el clon superficial que deja `actions/checkout` por defecto—.
-3. **Normaliza las rutas**: un `lcov` generado en Windows trae `web\src\App.tsx`
+4. **Normaliza las rutas**: un `lcov` generado en Windows trae `web\src\App.tsx`
    y uno de Linux `web/src/App.tsx`; git siempre habla con barras normales. Sin
    esto el cruce da cero coincidencias y la compuerta pasa en verde por la razón
    equivocada.
-4. Cruza: de las líneas agregadas mide las que el reporte declara con `DA:`, y
+5. Cruza: de las líneas agregadas mide las que el reporte declara con `DA:`, y
    calcula el porcentaje cubierto. Una línea agregada **sin** `DA:` no se
    descarta por las buenas: se lee su texto en el commit medido y, si tiene
    contenido ejecutable, cuenta como línea fuera del denominador —y si el
@@ -462,7 +559,7 @@ saltea el job entero.
 | `lcov` | `**/coverage/lcov.info` | Globs de los reportes, uno por línea (`**`, `*`, `?`, `{a,b}`) |
 | `base` | `github.event.pull_request.base.sha` | Commit base. Vacío = paso no aplicable |
 | `cabeza` | `HEAD` | Commit final; `HEAD` es lo que midieron las pruebas |
-| `minimo` | `80` | Mínimo del marco sobre las líneas del cambio |
+| `minimo` | `80` | Mínimo sobre las líneas del cambio. Sobre el total solo puede **subir** el del marco |
 | `max-anotaciones` | `20` | Tope de anotaciones inline; el listado completo va al resumen |
 | `instalar-node` | `false` | Para llegar acá el job ya corrió las pruebas, así que ya tiene Node |
 | `version-node` | `22` | Solo si `instalar-node` es `true` |
@@ -475,12 +572,47 @@ saltea el job entero.
 | `lineas_medidas` | Líneas agregadas con dato de cobertura |
 | `lineas_sin_cubrir` | Cuántas de esas no las ejercita ninguna prueba |
 | `lineas_fuera_de_medicion` | Líneas fuente del cambio sin dato de cobertura, fuera del denominador |
+| `paquetes_medidos` | Paquetes cuyo total pudo medirse |
+| `paquetes_bajo_minimo` | Paquetes por debajo del mínimo del marco, con deuda declarada o sin ella |
+| `paquetes_en_rojo` | Paquetes que hacen fallar el plano del total |
+
+### Qué pasa en cada caso, plano del total
+
+| Situación | Veredicto |
+| --- | --- |
+| Todos los paquetes en o por encima del mínimo del marco | Pasa, y la sección del total sale igual en el resumen |
+| Un paquete por debajo del mínimo sin motivo ni fecha | **Rojo**, con anotación sobre su `package.json` |
+| La fecha declarada ya pasó y el paquete sigue debajo | **Rojo**: desde ese día se compara contra el mínimo, no contra el piso |
+| La fecha declarada está vigente | Pasa en amarillo, y el resumen dice cuánto falta y cuántos días quedan |
+| El total cayó por debajo del piso declarado | **Rojo**: retroceso, esté el piso arriba o abajo del mínimo |
+| `piso` o `deuda` mal declarados (fecha inexistente, clave desconocida, motivo vacío) | **Rojo**: una declaración inválida no cuenta como declarada |
+| Un `piso` declarado para una métrica que llegó sin un solo dato | **Rojo**: la comparación desapareció. Arreglo: que el reporter emita esa métrica, o sacar esa clave del piso con su motivo |
+| Una `deuda` declarada en un paquete sin ninguna métrica medible | Pasa con `::warning::` sobre su `package.json`: la deuda sobra y hay que borrarla |
+| El `minimo` del paso es menor que el del marco | El total se sigue comparando contra el del marco |
+| Ningún reporte reclama archivos de un paquete | **No medido**, con `::warning::`. El plano del diff ya enrojece si hay líneas agregadas |
+| Todo lo que los reportes reclaman está excluido con su motivo | Pasa, y los motivos quedan escritos en el resumen |
+| Un paquete sin declaración, dentro de la ventana de estreno | Pasa en amarillo, nombrando el día en que será rojo |
+| `FNDA:` que no se pudieron emparejar con sus `FN:` | Pasa, con `::warning::`: el total de funciones se publica como aproximado, no como exacto |
 
 ### Límites declarados
 
 - **No prueba el orden.** Cierra "cambio sin prueba", no "prueba escrita después
-  del arreglo". Y un cambio que **borra** pruebas dejando el código pasa: eso
-  solo lo cierra el plano del total.
+  del arreglo".
+- **El total se calcula sobre lo que los reportes reclaman.** Un archivo fuente
+  que ningún `lcov` menciona no entra al denominador del total; lo caza el plano
+  del diff cuando el cambio lo toca, y el censo de fuentes cuando queda fuera del
+  alcance de las herramientas. Es el motivo por el que `all: true` no es
+  opcional: sin eso, el archivo menos probado del repo es justo el que no molesta
+  a nadie.
+- **Las métricas del total salen de los registros por ítem del `lcov`** (`DA`,
+  `FN`/`FNDA`, `BRDA`), no de sus líneas de resumen (`LF`/`LH`, `FNF`/`FNH`,
+  `BRF`/`BRH`). Los resúmenes no se pueden fusionar cuando dos suites miden el
+  mismo archivo: sumarlos cuenta el denominador dos veces. Consecuencia honesta:
+  un reporter que no emita `FN`/`FNDA` deja la métrica de funciones sin
+  denominador, y entonces sale como `n/a` en el resumen en vez de callarse.
+- **La deuda es por paquete, no por métrica.** Una deuda vigente cubre el
+  faltante del paquete en cualquiera de las tres métricas. Separarlas obligaría a
+  tres declaraciones para un solo atraso.
 - **La comparación de dos puntos puede sobrecontar** si la rama base avanzó desde
   que salió el pull request: aparecen líneas que el cambio no introdujo.
   Sobrecontar es el lado conservador, y es el precio de funcionar en un clon
@@ -502,9 +634,17 @@ saltea el job entero.
   considera ejecutable, y un rojo con esa ambigüedad no lo puede apagar nadie.
   Quedan fuera del denominador y el número sale publicado en
   `lineas_fuera_de_medicion`.
-- **El `minimo` del consumidor no tiene piso duro.** El mínimo del marco es 80
-  (decisión D5); un repositorio puede pedir menos, pero el paso lo grita con un
-  `::warning::` que dice cuál es el del marco. Es visible, no imposible.
+- **El `minimo` del consumidor no tiene piso duro SOBRE EL DIFF.** El mínimo del
+  marco es 80 (decisión D5); sobre las líneas del cambio un repositorio puede
+  pedir menos, y el paso lo grita con un `::warning::` que dice cuál es el del
+  marco: visible, no imposible. Sobre el **total** la asimetría es deliberada —
+  ahí el 80 es piso duro y el umbral local solo puede subirlo—, porque con la
+  otra regla la compuerta del total se apagaba bajando un número.
+- **La fecha de la corrida se puede forzar con `COBERTURA_HOY`**, y eso podría
+  revivir un plazo vencido. No es un input de la action (existe para el banco de
+  pruebas) y cuando está puesta la corrida emite un `::warning::` diciéndolo: es
+  la única palanca del script capaz de aflojar una compuerta, así que no puede
+  usarse en silencio.
 
 ### Correrlo en local
 
@@ -516,11 +656,18 @@ COBERTURA_BASE=$(git merge-base origin/main HEAD) \
 ```
 
 Su banco de pruebas (`actions/cobertura-diff/pruebas/`) arma repositorios git de
-verdad y corre el script como lo corre la action:
+verdad y corre el script como lo corre la action. Son dos archivos, uno por plano
+—`cobertura-diff.test.mjs` y `cobertura-total.test.mjs`—, y están separados a
+propósito: mezclarlos hacía imposible leer cuál de las dos compuertas había
+enrojecido.
 
 ```bash
 node --test "actions/cobertura-diff/pruebas/*.test.mjs"
 ```
+
+El banco del total corre con la ventana de estreno **cerrada**
+(`COBERTURA_HOY` en una fecha posterior) porque lo que hay que fijar es el régimen
+permanente; la ventana tiene sus dos pruebas propias, una a cada lado de la fecha.
 
 ---
 
