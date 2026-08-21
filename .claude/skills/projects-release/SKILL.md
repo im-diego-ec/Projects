@@ -1,6 +1,6 @@
 ---
 name: projects-release
-description: Cortar y publicar una version del marco Projects — CHANGELOG, PR de release, tag inmutable vX.Y.Z, tag movil vX y notas del release en GitHub. Usar cuando haya que publicar una version del marco, mover el tag v1, o cuando alguien pregunte como se saca una version de Projects.
+description: Cortar y publicar una version del marco Projects — CHANGELOG, pines internos, PR de release, tag inmutable vX.Y.Z y notas del release en GitHub. Usar cuando haya que publicar una version del marco o cuando alguien pregunte como se saca una version de Projects. El tag movil v1 se RETIRO: no hay ningun paso que lo mueva.
 allowed-tools: Bash(git:*), Bash(gh:*), Bash(grep:*), Bash(sed:*), Bash(awk:*), Bash(mktemp:*), Bash(node:*), Bash(head:*), Bash(wc:*), Read, Edit
 metadata:
   author: Transformación Digital y Data
@@ -9,7 +9,7 @@ metadata:
 
 # Cortar una version del marco
 
-Publicar una version de Projects son **seis pasos con orden obligatorio**. No es un
+Publicar una version de Projects son **cinco pasos con orden obligatorio**. No es un
 `git tag` con ceremonia: cada consumidor pina la **version exacta**
 (`uses: im-diego-ec/Projects/...@vX.Y.Z`) y recibe la version nueva como
 **PR de Dependabot** en su repo. Un release a medias no deja un repo a medias:
@@ -20,8 +20,18 @@ Hasta la 1.3.0 el canal era el tag movil `v1`, que empujaba el cambio a todos a
 la vez sin que nadie tocara una linea. Cambio el 2026-08-21, cuando un check
 nuevo enrojecio a un consumidor que el dia anterior pasaba y nadie lo habia
 pedido: con el bump por PR, ese rojo aparece **dentro del PR**, que es donde se
-puede leer antes de mergear. `v1` sigue existiendo —el paso 5 lo mueve— pero ya
-no es el canal de distribucion.
+puede leer antes de mergear.
+
+**`v1` se retiro por completo** y esta skill ya no tiene un paso que lo mueva. La
+razon de fondo la encontro una revision del 2026-08-21: el tag no solo era el canal
+hacia afuera, tambien era como `marco-ci.yml` referenciaba a sus PROPIAS actions
+hermanas. O sea que un consumidor pinado a `marco-ci.yml@v1.4.1` recibia el workflow
+de la 1.4.1 y las actions de lo que `v1` apuntara en ese momento: el pin exacto era
+una **media verdad**. Retirarlo no fue limpieza, fue el arreglo.
+
+El costo es que ahora el release tiene que mover esos pines internos. No depende de
+que nadie se acuerde: `pruebas/andamio/pinado.test.mjs` exige que todo `uses:` del
+marco sea igual a la version mas alta del CHANGELOG, y se pone rojo si no.
 
 Todos los comandos se corren **desde la raiz del repo del marco**
 (`im-diego-ec/Projects`), sobre `main` actualizado, y **en Git Bash** (usan
@@ -29,21 +39,23 @@ Todos los comandos se corren **desde la raiz del repo del marco**
 
 ---
 
-## Antes de empezar: tres precondiciones. Si falta una, PARA
+## Antes de empezar: dos precondiciones. Si falta una, PARA
 
-1. **OK humano explicito para mover `v1`.** Mover el tag mayor es una frontera
-   ⚠️ de `AGENTS.md`. La skill llega hasta el paso 4 y **se detiene** a pedirlo.
-   No lo asumas por el hecho de que te hayan pedido "sacar la version".
-2. **El cambio ya se probo contra un consumidor real.** Publicar sin eso es una
+> **Eran tres.** La primera era el OK humano para mover `v1`, y desaparecio con el
+> tag: publicar una version ya no empuja nada a nadie. La compuerta humana no se
+> perdio, se movio de lugar — **el merge del PR de release a `main` exige el OK de
+> Builder 1**, como todo merge a main, y eso pasa ANTES de que exista el tag.
+
+1. **El cambio ya se probo contra un consumidor real.** Publicar sin eso es una
    frontera 🛑 de `AGENTS.md`. El procedimiento esta en la skill
    `projects-validar-consumidor`; la evidencia es un id de corrida verde sobre el
    SHA que se va a taguear. Si no existe esa evidencia, para y consegui la.
-3. **El `CHANGELOG.md` ya tiene las entradas.** El changelog se escribe en el PR
+2. **El `CHANGELOG.md` ya tiene las entradas.** El changelog se escribe en el PR
    que introduce cada cambio, no en el release. Si `## [No publicado]` dice
    "Nada todavia", **no hay version que cortar**: lo que hay es un cambio que se
    mergeo sin su entrada, y eso se arregla antes.
 
-Verificacion de la 3, antes de nada:
+Verificacion de la 2, antes de nada:
 
 ```bash
 sed -n "/^## \[No publicado\]/,/^## \[/p" CHANGELOG.md
@@ -69,7 +81,31 @@ modo que un repo que hoy pasa manana falle.
 
 ---
 
-## Paso 1 — Cortar el CHANGELOG
+## Paso 1 — Cortar el CHANGELOG **y mover los pines internos**
+
+Las dos cosas van en el MISMO PR, y el orden entre ellas no importa: lo que importa
+es que ninguna se quede afuera.
+
+**Los pines internos.** `marco-ci.yml` invoca a sus actions hermanas por `uses:` con
+la version exacta, y la documentacion de `actions/`, el andamio y la skill de
+adopcion tambien la nombran. Todos tienen que decir la version que se esta cortando:
+
+```bash
+grep -rnE 'uses:.*projects[^ "]*@v[0-9]+\.[0-9]+\.[0-9]+' \
+  .github/workflows actions plantilla .claude/skills | grep -v /pruebas/
+```
+
+No hace falta acordarse de esta lista: `node --test pruebas/andamio/pinado.test.mjs`
+compara cada pin contra la version mas alta del CHANGELOG y se pone **rojo** si
+alguno quedo atras. Corrilo despues de editar, antes del PR.
+
+**Y el canonico de la constitucion**, si el texto de `actions/constitucion/canonico/`
+cambio en esta version: `manifiesto.json` necesita una entrada nueva en `versiones`
+con `publicada` y `exigible_desde` (28 dias minimo, y la puerta `"urgente": true` se
+justifica en la seccion «Para consumidores»). Sin esa entrada, el artefacto de los
+consumidores queda distinto del canonico y el check no puede decir por que.
+
+### Cortar el CHANGELOG
 
 Rama desde `main` actualizado, atomica:
 
@@ -201,37 +237,7 @@ Los tags de este repo son **ligeros** (`v1.0.0`, `v1.1.0` y `v1.2.0` lo son:
 
 ---
 
-## Paso 5 — Mover el tag movil `vX` · PARA Y PEDI EL OK
-
-**Este paso exige el OK humano explicito de la precondicion 1.** Si no lo
-tenes en esta sesion, **detene el procedimiento aca** y pedilo, nombrando la
-version y el SHA. No lo ejecutes "porque es obvio que sigue".
-
-Con el OK dado:
-
-```bash
-git tag -f v1 <SHA>
-git push origin v1 --force
-```
-
-**Sin `-m`, y sin `-a`.** Ver la trampa 2.
-
-**Verificacion del paso 5** — las cuatro salidas:
-
-```bash
-git cat-file -t v1              # commit   (si dice "tag", esta mal: ver trampa 2)
-git rev-parse v1                # <SHA>
-git rev-parse v1^{commit}       # el MISMO <SHA> que la linea de arriba
-git ls-remote --tags origin v1
-```
-
-En `git ls-remote` tiene que aparecer **una sola** linea `refs/tags/v1`. Si
-aparece ademas una linea `refs/tags/v1^{}`, el tag quedo anotado y hay que
-rehacerlo.
-
----
-
-## Paso 6 — Publicar las notas del release en GitHub
+## Paso 5 — Publicar las notas del release en GitHub
 
 **Este es el paso que se olvido en la practica.** No lo dejes para despues: es
 el ultimo, no produce ningun diff local, y por eso el repo se ve terminado sin
@@ -321,9 +327,11 @@ pagina que les diga que cambio.
 **Cierre.** El release no esta hecho hasta que `gh release list` muestre la
 version. Esa comprobacion es el final del procedimiento, no un adorno.
 
-### Trampa 2 — el tag movil se crea LIGERO, nunca anotado
+### Trampa 2 — el tag se crea LIGERO, nunca anotado
 
-**Que hacer.** `git tag -f v1 <SHA>` — sin `-m` y sin `-a`.
+**Que hacer.** `git tag vX.Y.Z <SHA>` — sin `-m` y sin `-a`. La trampa se aprendio
+con el tag movil `v1`, que ya no existe, pero vale igual para el inmutable: la
+convencion de este repo es que TODOS los tags son ligeros.
 
 **Que pasa si le ponen `-m`.** `-m` implica `-a`: git crea un **objeto tag** y
 la referencia `refs/tags/v1` pasa a apuntar a ese objeto, no al commit. Paso de
@@ -332,47 +340,59 @@ verdad y hubo que rehacer el tag.
 **Sintoma exacto.**
 
 ```bash
-git cat-file -t v1     # imprime "tag" en vez de "commit"
-git rev-parse v1       # imprime el SHA del objeto tag
-git rev-parse v1^{commit}   # imprime OTRO SHA: el del commit
+git cat-file -t vX.Y.Z         # imprime "tag" en vez de "commit"
+git rev-parse vX.Y.Z           # imprime el SHA del objeto tag
+git rev-parse vX.Y.Z^{commit}  # imprime OTRO SHA: el del commit
 ```
 
 Los dos `rev-parse` devuelven cosas distintas. En el remoto, `git ls-remote
---tags origin v1` muestra dos lineas: `refs/tags/v1` y `refs/tags/v1^{}`.
+--tags origin vX.Y.Z` muestra dos lineas: `refs/tags/vX.Y.Z` y `refs/tags/vX.Y.Z^{}`.
 
-**Arreglo:**
+**Arreglo** (un tag inmutable NO se reescribe a la ligera: si ya se publico y algun
+consumidor lo pineo, borrarlo y recrearlo le cambia el arbol bajo los pies. Si el
+error se detecta antes de anunciar la version, se rehace; si no, se saca la siguiente):
 
 ```bash
-git tag -f v1 <SHA>
-git push origin v1 --force
-git cat-file -t v1     # ahora si: commit
+git tag -d vX.Y.Z
+git push origin :refs/tags/vX.Y.Z
+git tag vX.Y.Z <SHA>
+git push origin vX.Y.Z
+git cat-file -t vX.Y.Z   # ahora si: commit
 ```
 
-### Trampa 3 — el orden importa: `v1` se mueve DESPUES de cortar el CHANGELOG
+### Trampa 3 — la ventana entre el merge y el tag, que ahora es corta pero existe
 
-Si el tag movil se mueve antes de que el CHANGELOG este cortado y mergeado a
-`main`, **`v1` queda apuntando a un commit sin version**: en ese arbol la
-seccion se sigue llamando `## [No publicado]`.
+Desde que los pines internos son exactos, el `main` mergeado en el paso 3 referencia
+un tag que **todavia no existe**: `marco-ci.yml` dice `actions/...@vX.Y.Z` y el tag se
+crea en el paso 4. Entre esos dos momentos, cualquier corrida de un consumidor que
+resuelva `main` falla con "Unable to resolve action".
 
-**Sintoma exacto.** Un consumidor que abre el CHANGELOG en `@v1` no encuentra la
-version que le acaba de llegar; y si el repo tiene el aviso de version, el paso
-que arma el mensaje se pone **rojo** porque no hay entrada del CHANGELOG para
-`X.Y.Z`.
+En la practica los consumidores pinan una version publicada y no `main`, asi que la
+ventana afecta al propio repo del marco y a quien pinee `@main` a proposito. Igual:
+**el paso 4 va inmediatamente despues del 3, en la misma sesion.** No se corta una
+version para taguearla mañana.
 
-El orden 1 → 6 de esta skill es el orden. No se reordena por comodidad.
+Y el orden con el CHANGELOG sigue importando: si el tag se crea antes de que el
+CHANGELOG este cortado y mergeado, el tag apunta a un arbol donde la seccion se sigue
+llamando `## [No publicado]`, el aviso de version se pone **rojo** por no encontrar la
+entrada de `X.Y.Z`, y un consumidor que abre el CHANGELOG en ese tag no encuentra la
+version que le acaba de llegar.
+
+El orden 1 → 5 de esta skill es el orden. No se reordena por comodidad.
 
 ---
 
 ## Checklist del release
 
 - [ ] Evidencia de validacion contra un consumidor real (id de corrida verde)
-- [ ] `X.Y.Z` elegido con el criterio de semver; si es breaking, **no se mueve `v1`**
+- [ ] `X.Y.Z` elegido con el criterio de semver
 - [ ] CHANGELOG cortado: `## [X.Y.Z] — YYYY-MM-DD` + `## [No publicado]` nuevo y vacio
+- [ ] **Pines internos movidos a `X.Y.Z`** y `node --test pruebas/andamio/pinado.test.mjs` en verde
+- [ ] Si el canonico de la constitucion cambio: entrada nueva en `manifiesto.json`
 - [ ] PR de release con `ci-ok` en verde y solo tu commit en la rama
 - [ ] `reviewDecision` en `APPROVED` (el ruleset NO lo exige hoy: la parada es tuya) y `mergeStateStatus` sin `BEHIND`
 - [ ] Merge a `main` y `<SHA>` anotado
 - [ ] `vX.Y.Z` creado y pusheado — `git cat-file -t` dice `commit`
-- [ ] **OK humano explicito** antes de mover `v1`
-- [ ] `v1` movido LIGERO — `git cat-file -t v1` dice `commit` y los dos `rev-parse` coinciden
+- [ ] `vX.Y.Z` creado **inmediatamente despues del merge**, no mañana (trampa 3)
 - [ ] `gh release list` **muestra la version**, `isDraft` es `false` y el cuerpo de las notas no esta vacio
 - [ ] Si existe el aviso de version: la corrida salio y no quedo en `::warning::`
