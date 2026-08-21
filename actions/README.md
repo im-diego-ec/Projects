@@ -14,6 +14,7 @@ uses: im-diego-ec/Projects/actions/<nombre>@v1
 | [`cobertura-diff`](cobertura-diff/) | Mide qué proporción de las líneas del cambio ejercitan las pruebas | Sí: bajo el mínimo, y también sin datos |
 | [`censo-fuentes`](censo-fuentes/) | Deriva el alcance real de la verificación y caza los archivos que no mira ninguna herramienta | Sí: agujeros y exclusiones muertas |
 | [`aviso-version`](aviso-version/) | Arma, desde el CHANGELOG, el mensaje que reciben los consumidores al publicarse una versión | Sí: solo si el CHANGELOG no tiene entrada para esa versión |
+| [`constitucion`](constitucion/) | Entrega la porción del marco de la constitución a cada superficie de agente que el repo declara, y verifica que la presente sea la que el marco publica | Sí: artefacto ausente o atrasado pasada su fecha, editado a mano, cadena de carga rota o desvío muerto |
 
 ## Parametrización
 
@@ -362,13 +363,101 @@ declararlo excluido con motivo— más el comando para reproducirlo.
 
 ## `cobertura-diff`
 
-Mide qué proporción de las **líneas que el pull request agrega o modifica**
-ejercitan las pruebas, cruzando los reportes `lcov` del repositorio con el diff.
-Es la mitad "sobre el diff" del mínimo de cobertura del marco (design `D5` del
-change `calidad-fail-closed`): bloquea desde el día uno porque solo aplica a
-código nuevo, y no exige ninguna puesta al día previa. El otro plano —el total
-del paquete, que no retrocede— vive en la configuración de cobertura del
-proyecto, no acá.
+Mide la cobertura de pruebas en **los dos planos** del mínimo del marco (design
+`D5` del change `calidad-fail-closed`), porque cada uno tapa un hueco que el otro
+deja abierto.
+
+**Plano 1 — las líneas que el pull request agrega o modifica**, cruzando los
+reportes `lcov` con el diff. Bloquea desde el día uno porque solo aplica a código
+nuevo y no exige ninguna puesta al día previa. No aplica fuera de un pull request
+(no hay rango que medir) y lo dice, en vez de simular un 100%.
+
+**Plano 2 — el total de cada paquete** contra el mínimo del marco. Corre
+**siempre**, también en un push a `main`, porque no depende de ningún rango. Sin
+este plano, el código que ya existe sin pruebas se queda así indefinidamente:
+nada obliga a nadie mientras nadie lo toque.
+
+| Situación del total de un paquete | Veredicto |
+|---|---|
+| En o por encima del mínimo del marco (80) | verde |
+| Por debajo del mínimo, **sin** motivo ni fecha declarados | **rojo** |
+| Por debajo del mínimo, con la fecha declarada **ya vencida** | **rojo** |
+| Por debajo del mínimo, con motivo y fecha **vigente** | amarillo, y la corrida reporta cuánto falta y cuánto plazo queda |
+| Por debajo de su propio **piso declarado**, esté ese piso arriba o abajo del mínimo | **rojo** (retroceso: el piso es ganancia acumulada) |
+| Con un **piso declarado para una métrica que llegó SIN DATOS** | **rojo** — el piso no se pudo comparar contra nada, y un ratchet que no compara es una compuerta apagada en verde |
+| Con una **deuda declarada** y ninguna métrica medible en la corrida | amarillo con `::warning::` — la deuda no excusa nada, y una deuda que ninguna corrida nombra envejece en el manifiesto |
+| Con la declaración de cobertura mal escrita | **rojo** — una declaración inválida no cuenta como declarada |
+| Con una métrica **que el reporte no midió** (cero ítems y ningún `LF:`/`FNF:`/`BRF:` declarado) | **rojo** — es «no medido», no «no aplica» |
+| Con una métrica **que el reporte declara en cero** (`FNF:0`, `BRF:0`) | verde, y la fila sale como `n/a` — el reporter dice que midió y no había nada |
+| Con **menos ítems de los que su propio reporte declara** para esa métrica | **rojo** — el denominador llegó corto, y un denominador corto no baja la cobertura: la **infla** |
+
+> **El denominador se verifica contra el que el reporte declara.** Un porcentaje
+> es cubiertas sobre encontradas, y «encontradas» se reconstruye ítem por ítem de
+> un archivo que el propio proyecto genera: apagar parte de la medición rinde más
+> que agregar pruebas. Medido sobre el reporte real del consumidor, con su paquete
+> a 70,70% de funciones: sacándole los registros de funciones el rojo pasaba a
+> `n/a` con EXIT 0 y **sin un solo aviso**, y borrándole los registros sin cubrir
+> dejando `FNF:` intacto la corrida publicaba **95,83%** con la fila en OK teniendo
+> el reporte declaradas 215 funciones de las que llegaban 120. El discriminador no
+> es una lista de ortografías, es la gramática del formato: un tracefile declara su
+> propio denominador por registro (`LF:`, `FNF:`, `BRF:`), y esa línea es la única
+> forma de separar «vale cero» de «no se midió». Los 75 registros de los dos
+> reportes reales lo declaran, 11 con `FNF:0` y 3 con `BRF:0`, y sus ítems coinciden
+> exacto con el contador en los 75.
+>
+> Si el reporter emitió la métrica en un formato que esta action **no lee** (lcov
+> 2.x usa `FNL:`/`FNA:` en vez de `FN:`/`FNDA:`), el rojo lo dice con esas palabras
+> y manda a arreglarlo **en el marco**, no en el manifiesto del proyecto: el
+> denominador declarado prueba que el reporter sí midió.
+
+> **Ventana de estreno, hasta el 2026-09-30.** Mientras dure, los dos veredictos
+> que **nadie escribió** —un paquete por debajo del mínimo que no declara deuda, y
+> una métrica que el reporte no midió— pasan en amarillo con un `::warning::` que
+> nombra el día en que serán rojos. La ventana existe porque `v1` es un tag móvil:
+> sin ella, la compuerta aparece en el pipeline de cada consumidor sin que nadie la
+> haya leído. No afloja lo que un paquete escribió y rompió —deuda vencida,
+> retroceso, piso sin datos, declaración inválida—, y se cierra sola: pasada la
+> fecha, el mismo estado es rojo sin que nadie toque una línea. La línea que separa
+> las dos mitades es la autoría del caso, no su gravedad.
+
+El piso es el mecanismo de **transición** hacia el mínimo, no un sustituto de él,
+y por eso lleva plazo. Sin fecha, el piso termina siendo el mínimo de hecho, y eso
+pasó de verdad: el consumidor estuvo en verde a 70,69% de funciones contra un
+mínimo declarado de 80, con el piso fijado en el número medido. Correr la fecha se
+puede, pero es una línea de diff con su motivo y con el avance conseguido, bajo
+review, igual que bajar un piso.
+
+Las tres cosas se declaran en el `package.json` del **propio paquete**, al lado de
+sus exclusiones, dentro de un diff y bajo revisión:
+
+```json
+{
+  "projects": {
+    "cobertura": {
+      "excluidos": [{ "patron": "src/generated/**", "motivo": "cliente generado por el ORM" }],
+      "piso": { "lineas": 71.2, "funciones": 70.6, "ramas": 68.0 },
+      "deuda": { "motivo": "heredado del piloto; el plan esta en el issue N", "fecha": "2026-12-31" }
+    }
+  }
+}
+```
+
+Las claves del piso son las del marco (`lineas`, `funciones`, `ramas`) y una clave
+desconocida es **roja**, no ignorada: un `functions: 80` escrito por costumbre de
+vitest no declararía nada y el paquete quedaría sin piso creyendo tenerlo.
+
+**El umbral del consumidor no abre esta compuerta.** El input `minimo` gobierna el
+plano del diff, donde bajarlo es decisión del proyecto (con un `::warning::` que lo
+deja escrito en la corrida). Sobre el total, el 80 del marco es piso **duro** y el
+umbral local solo puede **subirlo**: bajarlo a 40 dejaba en verde un paquete al
+33%, y esa medición es la razón de la asimetría. Los umbrales de vitest tampoco lo
+abren, porque este plano recalcula el total desde el `lcov` en vez de creerle a la
+configuración del paquete.
+
+**Requisito para que el plano 2 mida lo que dice medir**: la cobertura del paquete
+tiene que emitirse con `all: true`. Sin eso, el reporte solo trae los archivos que
+alguna prueba importó y el total sale alto por omisión. El scaffold reparte esa
+configuración ya armada en `vitest.config.base.mjs`.
 
 ```yaml
 jobs:
@@ -395,15 +484,24 @@ roja y ruidosa**, y el mensaje trae el arreglo.
 
 ### Qué hace, paso a paso
 
-1. Encuentra los `lcov` por glob y parsea `SF:` y `DA:`.
-2. Saca las líneas agregadas o modificadas con `git diff --unified=0 <base> HEAD`
+1. Encuentra los `lcov` por glob y parsea `SF:`, `DA:`, `FN:`/`FNDA:` y `BRDA:`.
+   Esta lectura y la resolución de rutas del punto 4 son **compartidas por los dos
+   planos**, y ocurren antes de cualquier control del rango: el total no depende de
+   ningún rango, así que en un push a `main` —donde el plano del diff no aplica— el
+   total se mide igual.
+2. Corre el **plano del total**: reparte la cobertura entre los paquetes que la
+   contienen, la compara contra el mínimo del marco y escribe su sección del
+   resumen. Su veredicto no cortocircuita nada: se guarda como piso del código de
+   salida, así que el plano del diff sigue imprimiendo su diagnóstico completo y
+   ningún `exit 0` de los suyos puede tapar un total en falta.
+3. Saca las líneas agregadas o modificadas con `git diff --unified=0 <base> HEAD`
    —comparación de **dos puntos**, no de tres: `A...B` exige merge-base y muere
    en el clon superficial que deja `actions/checkout` por defecto—.
-3. **Normaliza las rutas**: un `lcov` generado en Windows trae `web\src\App.tsx`
+4. **Normaliza las rutas**: un `lcov` generado en Windows trae `web\src\App.tsx`
    y uno de Linux `web/src/App.tsx`; git siempre habla con barras normales. Sin
    esto el cruce da cero coincidencias y la compuerta pasa en verde por la razón
    equivocada.
-4. Cruza: de las líneas agregadas mide las que el reporte declara con `DA:`, y
+5. Cruza: de las líneas agregadas mide las que el reporte declara con `DA:`, y
    calcula el porcentaje cubierto. Una línea agregada **sin** `DA:` no se
    descarta por las buenas: se lee su texto en el commit medido y, si tiene
    contenido ejecutable, cuenta como línea fuera del denominador —y si el
@@ -463,7 +561,7 @@ saltea el job entero.
 | `lcov` | `**/coverage/lcov.info` | Globs de los reportes, uno por línea (`**`, `*`, `?`, `{a,b}`) |
 | `base` | `github.event.pull_request.base.sha` | Commit base. Vacío = paso no aplicable |
 | `cabeza` | `HEAD` | Commit final; `HEAD` es lo que midieron las pruebas |
-| `minimo` | `80` | Mínimo del marco sobre las líneas del cambio |
+| `minimo` | `80` | Mínimo sobre las líneas del cambio. Sobre el total solo puede **subir** el del marco |
 | `max-anotaciones` | `20` | Tope de anotaciones inline; el listado completo va al resumen |
 | `instalar-node` | `false` | Para llegar acá el job ya corrió las pruebas, así que ya tiene Node |
 | `version-node` | `22` | Solo si `instalar-node` es `true` |
@@ -476,12 +574,47 @@ saltea el job entero.
 | `lineas_medidas` | Líneas agregadas con dato de cobertura |
 | `lineas_sin_cubrir` | Cuántas de esas no las ejercita ninguna prueba |
 | `lineas_fuera_de_medicion` | Líneas fuente del cambio sin dato de cobertura, fuera del denominador |
+| `paquetes_medidos` | Paquetes cuyo total pudo medirse |
+| `paquetes_bajo_minimo` | Paquetes por debajo del mínimo del marco, con deuda declarada o sin ella |
+| `paquetes_en_rojo` | Paquetes que hacen fallar el plano del total |
+
+### Qué pasa en cada caso, plano del total
+
+| Situación | Veredicto |
+| --- | --- |
+| Todos los paquetes en o por encima del mínimo del marco | Pasa, y la sección del total sale igual en el resumen |
+| Un paquete por debajo del mínimo sin motivo ni fecha | **Rojo**, con anotación sobre su `package.json` |
+| La fecha declarada ya pasó y el paquete sigue debajo | **Rojo**: desde ese día se compara contra el mínimo, no contra el piso |
+| La fecha declarada está vigente | Pasa en amarillo, y el resumen dice cuánto falta y cuántos días quedan |
+| El total cayó por debajo del piso declarado | **Rojo**: retroceso, esté el piso arriba o abajo del mínimo |
+| `piso` o `deuda` mal declarados (fecha inexistente, clave desconocida, motivo vacío) | **Rojo**: una declaración inválida no cuenta como declarada |
+| Un `piso` declarado para una métrica que llegó sin un solo dato | **Rojo**: la comparación desapareció. Arreglo: que el reporter emita esa métrica, o sacar esa clave del piso con su motivo |
+| Una `deuda` declarada en un paquete sin ninguna métrica medible | Pasa con `::warning::` sobre su `package.json`: la deuda sobra y hay que borrarla |
+| El `minimo` del paso es menor que el del marco | El total se sigue comparando contra el del marco |
+| Ningún reporte reclama archivos de un paquete | **No medido**, con `::warning::`. El plano del diff ya enrojece si hay líneas agregadas |
+| Todo lo que los reportes reclaman está excluido con su motivo | Pasa, y los motivos quedan escritos en el resumen |
+| Un paquete sin declaración, dentro de la ventana de estreno | Pasa en amarillo, nombrando el día en que será rojo |
+| `FNDA:` que no se pudieron emparejar con sus `FN:` | Pasa, con `::warning::`: el total de funciones se publica como aproximado, no como exacto |
 
 ### Límites declarados
 
 - **No prueba el orden.** Cierra "cambio sin prueba", no "prueba escrita después
-  del arreglo". Y un cambio que **borra** pruebas dejando el código pasa: eso
-  solo lo cierra el plano del total.
+  del arreglo".
+- **El total se calcula sobre lo que los reportes reclaman.** Un archivo fuente
+  que ningún `lcov` menciona no entra al denominador del total; lo caza el plano
+  del diff cuando el cambio lo toca, y el censo de fuentes cuando queda fuera del
+  alcance de las herramientas. Es el motivo por el que `all: true` no es
+  opcional: sin eso, el archivo menos probado del repo es justo el que no molesta
+  a nadie.
+- **Las métricas del total salen de los registros por ítem del `lcov`** (`DA`,
+  `FN`/`FNDA`, `BRDA`), no de sus líneas de resumen (`LF`/`LH`, `FNF`/`FNH`,
+  `BRF`/`BRH`). Los resúmenes no se pueden fusionar cuando dos suites miden el
+  mismo archivo: sumarlos cuenta el denominador dos veces. Consecuencia honesta:
+  un reporter que no emita `FN`/`FNDA` deja la métrica de funciones sin
+  denominador, y entonces sale como `n/a` en el resumen en vez de callarse.
+- **La deuda es por paquete, no por métrica.** Una deuda vigente cubre el
+  faltante del paquete en cualquiera de las tres métricas. Separarlas obligaría a
+  tres declaraciones para un solo atraso.
 - **La comparación de dos puntos puede sobrecontar** si la rama base avanzó desde
   que salió el pull request: aparecen líneas que el cambio no introdujo.
   Sobrecontar es el lado conservador, y es el precio de funcionar en un clon
@@ -503,9 +636,17 @@ saltea el job entero.
   considera ejecutable, y un rojo con esa ambigüedad no lo puede apagar nadie.
   Quedan fuera del denominador y el número sale publicado en
   `lineas_fuera_de_medicion`.
-- **El `minimo` del consumidor no tiene piso duro.** El mínimo del marco es 80
-  (decisión D5); un repositorio puede pedir menos, pero el paso lo grita con un
-  `::warning::` que dice cuál es el del marco. Es visible, no imposible.
+- **El `minimo` del consumidor no tiene piso duro SOBRE EL DIFF.** El mínimo del
+  marco es 80 (decisión D5); sobre las líneas del cambio un repositorio puede
+  pedir menos, y el paso lo grita con un `::warning::` que dice cuál es el del
+  marco: visible, no imposible. Sobre el **total** la asimetría es deliberada —
+  ahí el 80 es piso duro y el umbral local solo puede subirlo—, porque con la
+  otra regla la compuerta del total se apagaba bajando un número.
+- **La fecha de la corrida se puede forzar con `COBERTURA_HOY`**, y eso podría
+  revivir un plazo vencido. No es un input de la action (existe para el banco de
+  pruebas) y cuando está puesta la corrida emite un `::warning::` diciéndolo: es
+  la única palanca del script capaz de aflojar una compuerta, así que no puede
+  usarse en silencio.
 
 ### Correrlo en local
 
@@ -517,11 +658,18 @@ COBERTURA_BASE=$(git merge-base origin/main HEAD) \
 ```
 
 Su banco de pruebas (`actions/cobertura-diff/pruebas/`) arma repositorios git de
-verdad y corre el script como lo corre la action:
+verdad y corre el script como lo corre la action. Son dos archivos, uno por plano
+—`cobertura-diff.test.mjs` y `cobertura-total.test.mjs`—, y están separados a
+propósito: mezclarlos hacía imposible leer cuál de las dos compuertas había
+enrojecido.
 
 ```bash
 node --test "actions/cobertura-diff/pruebas/*.test.mjs"
 ```
+
+El banco del total corre con la ventana de estreno **cerrada**
+(`COBERTURA_HOY` en una fecha posterior) porque lo que hay que fijar es el régimen
+permanente; la ventana tiene sus dos pruebas propias, una a cada lado de la fecha.
 
 ---
 
@@ -643,6 +791,74 @@ releases—. La contrapartida es honesta: al publicarse bajo `@v1`, sus `inputs`
 
 ---
 
+## `constitucion`
+
+Las cuatro formas de distribución del marco están en el README de la raíz, y
+hasta este change **una sola no tenía ni actualización ni check**: el scaffold,
+que es donde vive el texto que los agentes cargan. El resultado medido: una
+adopción nueva copió `plantilla/AGENTS.md` y el archivo quedó con 241 líneas
+contra 355 —reglas enteras perdidas, no reflujo de formato—, y en el consumidor
+viejo la divergencia ya corría en las dos direcciones.
+
+Esta action mueve **la porción del marco** de scaffold a regenerado. El texto
+canónico vive en `constitucion/canonico/` (una sección por archivo `NN-*.md`,
+en orden, con un `manifiesto.json` que declara la versión y sus fechas), viaja
+DENTRO de la action por `GITHUB_ACTION_PATH` —el `GITHUB_TOKEN` de un consumidor
+no lee otro repositorio— y se **renderiza** contra los valores del proyecto.
+
+Dos modos:
+
+- **`escribir`** deja un artefacto por superficie declarada
+  (`.projects/AGENTS-marco.md` para la cadena `CLAUDE.md → @AGENTS.md → @artefacto`,
+  `.cursor/rules/00-marco.mdc` para la superficie que lee markdown plano y no
+  expande imports). Escribe en el árbol de trabajo y nada más: no commitea, no
+  pushea y no abre PRs. Eso es del workflow del consumidor, porque escribir en el
+  repo de un proyecto desde una sesión de Projects es 🛑.
+- **`verificar`** compara lo presente contra el re-render de la versión que el
+  propio artefacto declara en su cabecera de una línea
+  (`<!-- projects:constitucion version=… sha=… -->`), y deja el artefacto al día en
+  disco para subirlo con `upload-artifact`.
+
+Lo que el proyecto pone, y vive **fuera** de `.projects/` a propósito —ese
+directorio es desechable y el modo escribir lo reemplaza—:
+
+- `.projects-valores.json`: los placeholders de dobles llaves, más un
+  `"superficies"` opcional. Los handles y las cuentas reales viven del lado del
+  consumidor, nunca en Projects.
+- `.projects-desvios.json`: los desvíos declarados, cada uno con `regla`, `fecha`,
+  `aprobado_por` y `motivo`. El desvío se **imprime dentro del artefacto que los
+  agentes cargan, pegado a la regla que anula** —una excepción que el agente no
+  lee produce algo peor que una regla ausente: un agente cumpliendo a rajatabla
+  algo que el proyecto ya anuló—, y **caduca**: cuando la regla que nombra deja de
+  existir en el canónico, el job se pone rojo por desvío muerto con el motivo que
+  tenía escrito.
+
+**El sello no es una firma, y es a propósito.** El `sha` de la cabecera identifica
+el CANÓNICO de esa versión, no el cuerpo renderizado. Si cubriera el cuerpo, el
+arreglo mecánicamente obvio para un rojo de "editado a mano" sería recomputar el
+hash y volver a estampar; la autoridad sobre el cuerpo es el re-render, que no se
+puede falsificar sin cambiar el canónico.
+
+**El rojo lo dispara una fecha, no el release.** Cada versión del canónico declara
+`publicada` y `exigible_desde`, y la propia action rechaza un manifiesto con menos
+de 28 días entre las dos (la puerta de atrás se llama `"urgente": true` y sale por
+`::warning::`, nunca muda). Entre las dos fechas, un artefacto ausente o atrasado
+es `::warning::`; desde `exigible_desde`, `::error::`. Si el consumidor acumuló
+varias versiones sin adoptar, manda la fecha de la **más vieja pendiente**. Lo que
+**no** tiene es rama silenciosa de "este repo no aplica": el repo sin artefacto es
+exactamente el que hay que avisar.
+
+Límites declarados, en el encabezado del `action.yml` y acá: esto garantiza que el
+**texto** llegue íntegro y al día a la superficie que el agente carga, **no** que
+el agente lo obedezca en el turno 40 de una sesión larga — cierra el hueco de
+distribución, no el de comportamiento. Solo cubre las superficies que el
+repositorio **declara**. Y Projects **no puede dogfoodear** este mecanismo: su
+`AGENTS.md` es la constitución del marco, no la de un proyecto, así que la
+evidencia son el banco de pruebas de `constitucion/pruebas/` —que sí corre en el
+CI de Projects— y la validación contra un consumidor real antes de mover `v1`.
+
+---
+
 ## Permisos mínimos
 
 Cada `action.yml` los trae escritos en su encabezado. En otro repo, cada
@@ -658,6 +874,7 @@ para no volver a pagarlo.
 | `censo-fuentes` | — | `contents: read` |
 | `cobertura-diff` | — | `contents: read` |
 | `aviso-version` | — | `contents: read` (el checkout; no llama a la API ni a la red) |
+| `constitucion` | `verificar`, `escribir` | `contents: read` (escribe en el árbol de trabajo y nada más: el commit y el PR los hace el workflow del consumidor, con sus propios permisos) |
 
 Un bloque `permissions:` **reemplaza** los permisos por defecto del token: hay
 que listar `contents: read` explícitamente, no se hereda.

@@ -32,6 +32,6 @@ openspec/changes/
 - [ ] **Si corrige un defecto**: incluye el test de regresión que lo REPRODUCE (rojo antes del fix), al nivel más bajo suficiente
 - [ ] **Si toca `openspec/`**: `openspec validate <change> --strict` verde + coherencia releída entre secciones (proposal ↔ design ↔ specs ↔ tasks)
 - [ ] **Si toca `infra/` o `infra-prod/`**: el `.tf` del PR es EXACTAMENTE lo aplicado (plan limpio) y se respetó la política de infra (dev primero, con horneado, salvo urgencia)
-- [ ] **Si escribe en producción**: OK explícito de @{{BUILDER_1}} en esta sesión
+- [ ] **Si escribe en producción**: OK explícito de {{BUILDER_1}} en esta sesión
 - [ ] Sin secrets ni credenciales en el diff
 - [ ] Revisión cruzada solicitada (la asigna CODEOWNERS sola: el builder que no escribió)
