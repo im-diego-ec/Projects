@@ -23,9 +23,19 @@ grepeando su salida.
 
 ## 0. Pre-registro (BLOQUEANTE: antes de correr un solo brazo)
 
-- [ ] 0.1 Elegir la rebanada con el PO y un builder: qué entrevistas, qué proceso
-      end-to-end, dónde corta y por qué es representativa del material de Supply
-      Chain. Evidencia: la sección 1 de `piloto/pre-registro.md`.
+- [ ] 0.0 Escribir la pregunta que el piloto responde, antes que cualquier umbral.
+      Se agregó el 2026-08-21: Builder 1 aclaró que el descubrimiento ya está hecho, y
+      los dos brazos que el pre-registro tenía comparaban **hacer** descubrimiento
+      con la herramienta y sin ella, así que ninguno se podía correr. Un instrumento
+      que mide lo que no va a pasar devuelve «no medido» en las siete celdas, o lo
+      reinterpreta alguien el lunes con el resultado a la vista. Evidencia: la
+      sección 0 de `piloto/pre-registro.md`, y `tail -n +2 piloto/horas.csv | wc -l`
+      igual a cero, que es lo que demuestra que la reescritura sigue siendo
+      pre-registro y no una corrección con fecha posterior.
+- [ ] 0.1 Elegir la rebanada con el PO y un builder: qué piezas del corpus, qué
+      proceso end-to-end, dónde corta, si el prototipo la cubre, y por qué es
+      representativa del corpus de Supply Chain. Evidencia: la sección 1 de
+      `piloto/pre-registro.md`.
 - [ ] 0.2 Declarar los dos brazos, quién corre cada uno y el orden (A primero), y
       escribir el sesgo que ese orden introduce **a favor del brazo B**. Un sesgo
       declarado se puede corregir al leer; uno tapado invalida la medición.
@@ -73,7 +83,18 @@ G2 ni G4.
       el scorer puede reclasificar como «contexto» cualquier ítem caído y el cero
       se sostiene sin que nada falle. Evidencia:
       `piloto/convencion-de-procedencia.md`, parte 3, con el commit de la rúbrica
-      anterior al commit del inventario de 3.1.
+      anterior al commit del inventario de 3.1. Incluye los dos casos que el corpus
+      obliga a resolver antes: la lista de casos borde (un caso por ítem, o G2
+      pierde los caídos de adentro de un solo id) y el prototipo (se inventarían
+      las decisiones, no los elementos).
+- [ ] 0.12 Campo `origen` del inventario, con sus dos valores (`corpus` y
+      `derivado`) y la regla dura de que un `derivado` no sostiene un escenario sin
+      marca de supuesto. Se agregó el 2026-08-21: con el corpus ya escrito, la
+      invención dejó de verse como un escenario colgado de la nada y pasó a verse
+      como uno perfectamente citado cuya ancla dice algo parecido pero no eso. Sin
+      este campo, G3 no tiene con qué separar lo que dijo el corpus de lo que
+      interpretó un agente. Evidencia: `piloto/convencion-de-procedencia.md`, parte
+      1, y la columna `origen` en el formato de la tabla de trazabilidad (parte 2).
 - [ ] 0.10 Regla de parada **idéntica** para los dos brazos, y protocolo escrito
       del brazo A. «El camino de hoy con la asistencia habitual» no es un control:
       es lo que cada uno haga. Y sin regla de parada las horas de G4 miden una
@@ -91,37 +112,68 @@ G2 ni G4.
 
 ## 1. Lo que este change NO decide (pendiente de OK humano explícito)
 
-Ninguna de estas cuatro se resuelve por defecto, y ninguna la toma un agente.
+Ninguna de estas seis se resuelve por defecto, y ninguna la toma un agente. Las
+dos últimas nacieron el 2026-08-21, cuando la respuesta del Builder 1 a 1.2 la resolvió
+y a la vez dejó a la vista lo que no cubría.
 
 - [ ] 1.1 **Dependencia de terceros** (⚠️ de `AGENTS.md`): OK para usar la
       herramienta en el piloto, y —por separado, y solo si el veredicto es
       verde— OK para que su pin entre al carril que consumen todos. Evidencia: el
       OK en la sesión, con la versión y el alcance de módulos escritos.
-- [ ] 1.2 **Material con datos de personas**: dónde viven las transcripciones, y
-      si pueden pasar por un modelo. El repositorio no es su custodio (D3) y el
-      piloto no arranca sin esta decisión tomada por una persona. Evidencia: la
-      decisión escrita en el pre-registro, con quién la tomó.
+- [x] 1.2 **Material con datos de personas**: dónde vive el corpus, y si puede
+      pasar por un modelo. El repositorio no es su custodio (D3) y el piloto no
+      arranca sin esta decisión tomada por una persona. **RESUELTA: la contestó
+      Builder 1 el 2026-08-21** — el descubrimiento se produce fuera del repositorio y
+      entra como insumo al inicio de la sesión, así que el repositorio no es su
+      custodio, y entrar como insumo de la sesión implica que sí pasa por un
+      modelo. Evidencia: `piloto/pre-registro.md` sección 7, con el enunciado
+      textual, la fecha, y la separación entre lo que la respuesta cubre y lo que
+      deja abierto.
 - [ ] 1.3 **Correr el piloto**: consume tiempo del PO y de dos builders.
       Evidencia: el OK y las fechas reservadas.
 - [ ] 1.4 **Cadena de herramientas**: confirmar si la instalación exige Python y
-      `uv` además de Node, y para qué módulo. Hoy está declarado como
-      incertidumbre en `design.md`. Evidencia: la instalación corrida en una
-      máquina limpia, con lo que pidió de verdad.
+      `uv` además de Node, y para qué módulo; **y** si la fase 1 ingiere un corpus
+      terminado en vez de elicitar. La segunda mitad se agregó el 2026-08-21: el
+      ensayo del 2026-08-20 midió que la herramienta se instala (exit 0), no que
+      acepte material terminado, porque cuando se corrió la pregunta del piloto era
+      otra. Es lo que puede tumbar el brazo B el lunes. Evidencia: la instalación
+      corrida en la máquina del brazo B con lo que pidió de verdad, y la fase 1
+      corrida contra una pieza del corpus con lo que pasó.
+- [ ] 1.5 **Despersonalización del corpus**: si las piezas que entran a la sesión
+      traen nombres de empleados y juicios sobre su propio trabajo, o ya vienen
+      despersonalizadas. Es el residuo de 1.2 y es **otra** frontera: custodia y
+      contenido no son lo mismo, y la respuesta del Builder 1 cierra la primera. Depende
+      de ver el corpus, así que no se puede cerrar sin él. Evidencia: la decisión
+      escrita en el pre-registro (1.5), con quién la tomó.
+- [ ] 1.6 **Inventario de piezas del corpus**: el identificador y la letra de tipo
+      (`E`/`D`/`P`/`F`) de cada pieza, que es lo que la rebanada va a citar. Lo
+      entrega el PO con el corpus. Sin esto la sección 1 del pre-registro no se
+      puede llenar sin inventar nombres. Evidencia: la tabla identificador-pieza,
+      que vive **con el corpus** y fuera del repositorio (D3), y la sección 1
+      citando esos identificadores.
 
 ## 2. El piloto (arranca el lunes 2026-08-24)
 
-- [ ] 2.1 **Brazo A (control)**: desde las transcripciones directo a `proposal.md`
-      y deltas de specs de la rebanada, con la asistencia de agente habitual.
-      Evidencia: los artefactos del brazo A, y las horas anotadas por sesión en la
-      planilla.
-- [ ] 2.2 **Brazo B**: fases 1 y 2 de la herramienta sobre el **mismo** material
-      → informe de descubrimiento, brief y PRD; y desde el PRD, `proposal.md` y
-      deltas. Evidencia: los artefactos del brazo B y sus horas.
+- [ ] 2.1 **Brazo A (control)**: desde el corpus directo a `proposal.md`, deltas,
+      tabla de trazabilidad, `design.md` y `tasks.md` de la rebanada, con la
+      asistencia de agente habitual y sin ningún artefacto intermedio producido
+      dentro del piloto. Evidencia: los cinco artefactos del brazo A, y las horas
+      anotadas por sesión en la planilla.
+- [ ] 2.2 **Brazo B**: fases 1 y 2 de la herramienta sobre el **mismo** corpus →
+      informe de descubrimiento, brief y PRD; y desde el PRD, las mismas cinco
+      salidas que el brazo A. Evidencia: los artefactos del brazo B y sus horas.
 - [ ] 2.3 Registrar **cada** edición que haya hecho falta hacer sobre el
-      directorio de instalación de la herramienta para cortar en el PRD (G0). Si
-      la lista queda vacía, decirlo explícitamente: es el resultado esperado y hay
-      que poder distinguirlo de «no se miró». Evidencia: estado de git del espacio
-      de trabajo del piloto.
+      directorio de instalación de la herramienta, sea para que ingiera el corpus o
+      para cortar en el PRD (G0). Si la lista queda vacía, decirlo explícitamente:
+      es el resultado esperado y hay que poder distinguirlo de «no se miró».
+      Evidencia: estado de git del espacio de trabajo del piloto.
+- [ ] 2.6 Anotar **aparte** todo lo que la herramienta elicite del PO y que el
+      corpus no contestaba, con su brazo, su fecha y la pregunta que lo produjo. No
+      entra a los denominadores de G1, G2 ni G3, que se congelan en el commit del
+      inventario: si entrara, los dos brazos dejarían de trabajar sobre el mismo
+      material y la comparación se rompería en silencio. La regla es simétrica para
+      los dos brazos o es un sesgo. Evidencia: la lista, y la declaración de que el
+      inventario no se tocó después de su commit.
 - [ ] 2.4 Correr el piloto **fuera de todo repositorio** (D5). Nada se escribe en
       los consumidores, ni en `plantilla/`, ni en `openspec/specs/`. Evidencia:
       los repos sin un solo commit del piloto.
@@ -181,6 +233,30 @@ experimental de cualquier change, incluido este.
 - [ ] 4.4 Entrada del `CHANGELOG.md` en el mismo PR que estrena el paso, con la
       sección «para consumidores» diciendo lo que tienen que hacer: **nada**,
       mientras no declaren un change experimental. Evidencia: la entrada escrita.
+- [ ] 4.5 Check nuevo en el CI de **Projects**: si el cuerpo del canónico cambia y el
+      `manifiesto.json` no gana una entrada de versión, es rojo. Salió de una
+      medición del 2026-08-21 (D11) y no de una intuición: con una regla nueva en el
+      canónico y el manifiesto intacto, `node --test
+      actions/constitucion/pruebas/*.test.mjs` devuelve **0** con 203 pruebas en
+      verde, el presupuesto de líneas tampoco lo caza (600 de 700), y el consumidor
+      al día con la 1.3.0 devuelve **1** con `::error::` «difiere del texto que el
+      marco publica para la version 1.3.0». O sea que el rojo cae río abajo, en el
+      pipeline de repos que no hicieron nada. Es dogfoodeable sin consumidor:
+      compara dos archivos de este repo. **No depende del veredicto del piloto.**
+      Evidencia: los tres casos —canónico tocado sin versión nueva, canónico tocado
+      con versión nueva, canónico intacto— con su veredicto esperado, por código de
+      salida.
+- [ ] 4.6 Cortar la versión del canónico que publica la mitad **operativa** de D11
+      («el descubrimiento se produce fuera del repositorio y entra como insumo al
+      inicio de la sesión»), con el texto que D11 ya trae escrito, y con
+      `exigible_desde` a **28 días o más** de `publicada`, que es lo que la propia
+      action exige. Está en el bloque 4 y no en el 5 porque **no depende del
+      veredicto**: es la forma en que el área trabaja, con o sin la herramienta.
+      **Es tarea humana y no la toma un agente**: cortar una versión mueve el
+      calendario de todos los consumidores, y la 1.3.0 ya se publicó el 2026-08-21
+      con `v1` apuntando a su commit. Hoy no se cortó a propósito, y el motivo está
+      medido en D11. Evidencia: la entrada nueva en `manifiesto.json`, la ventana de
+      28 días verificada por la action, y la sección del `CHANGELOG.md`.
 
 ## 5. SOLO si el veredicto es VERDE
 
@@ -188,8 +264,14 @@ Nada de este bloque se adelanta. Adelantarlo compra costo hundido y el costo
 hundido decide veredictos.
 
 - [ ] 5.1 Check de forma: un artefacto de la ubicación declarada que contenga
-      encabezados de delta o escenarios es rojo. Evidencia: fixture con un insumo
-      con forma de spec en rojo, y el mismo insumo sin esa forma en verde.
+      encabezados de delta o escenarios es rojo. **Buscar la estructura, no la
+      palabra**: medido el 2026-08-21, `validate --all --strict` cuenta el
+      encabezado `####` y no el literal `Scenario:` (renombrar los tres escenarios
+      del delta a `#### <cualquier cosa>` sale 0; borrarles el encabezado y dejar
+      los `WHEN`/`THEN` sale 1). Un check que greppee `#### Scenario:` deja pasar un
+      insumo que el validador ya trataría como contrato. Evidencia: fixture con un
+      insumo con forma de spec en rojo, el mismo insumo con encabezados `####` que
+      no dicen «Scenario» **también** en rojo, y el insumo sin esa forma en verde.
 - [ ] 5.2 Check de procedencia: escenarios del delta sin entrada en la tabla de
       trazabilidad, o con procedencia vacía, en rojo. Evidencia: fixture con un
       escenario huérfano.
@@ -226,12 +308,24 @@ hundido decide veredictos.
       explícitamente que no es requisito del marco. Evidencia: el documento, y
       cero cambios en `openspec/specs/` y en `plantilla/`.
 - [ ] 6.3 Rescatar el requirement de caducidad (bloque 4) a un **change propio** y
-      archivarlo por separado: es el único ítem de acá que vale con independencia
-      del piloto (D7). Evidencia: el change nuevo, con su delta y su archive.
-- [ ] 6.4 Borrar el directorio de este change en el mismo PR del ADR. Un delta que
-      el piloto refutó no se funde en el contrato, y un change que nadie archiva ni
-      descarta es el zombi que el bloque 4 existe para evitar. Evidencia: el
-      directorio ausente y `validate --all --strict` en verde por código de salida.
+      archivarlo por separado (D7). Evidencia: el change nuevo, con su delta y su
+      archive.
+- [ ] 6.4 Rescatar, al mismo change propio del 6.3 o a uno aparte, el requirement
+      de **D11**: el descubrimiento se produce fuera del repositorio y entra como
+      insumo al inicio de la sesión. Es el **segundo** ítem de este change que vale
+      con independencia del veredicto, y por eso el 6.3 ya no dice «el único». Builder 1
+      lo enunció como la forma en que el área trabaja, no como consecuencia de
+      adoptar la herramienta; está en este delta porque hoy es la única ruta que
+      conserva el gate del PO por CODEOWNERS (D10). Evidencia: el requirement en el
+      spec vivo de `gobierno-contribucion`, con `validate --all --strict` y el
+      guardrail de deltas en cero por código de salida.
+- [ ] 6.5 Borrar el directorio de este change en el mismo PR del ADR. Va **último**
+      del bloque a propósito: los dos rescates (6.3 y 6.4) tienen que estar hechos
+      antes, porque borrar el directorio se lleva los enunciados con él. Un delta
+      que el piloto refutó no se funde en el contrato, y un change que nadie
+      archiva ni descarta es el zombi que el bloque 4 existe para evitar.
+      Evidencia: el directorio ausente y `validate --all --strict` en verde por
+      código de salida.
 
 ## 7. Cierre, en cualquiera de los tres casos
 
