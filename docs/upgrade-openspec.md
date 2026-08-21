@@ -31,11 +31,26 @@ puede mentir. Este documento es el procedimiento y las tres trampas.
 | **Workflow de validación del marco** | La línea `npx --yes @fission-ai/openspec@X.Y.Z validate --all --strict`. **Este es el pin canónico.** | A mano, en un PR del marco |
 | **Las máquinas del equipo** | Cada quien invoca por `npx` con la misma versión, o tiene instalada esa versión | Se sigue del pin canónico |
 | **`generatedBy` de las skills y comandos** | Front-matter de cada `SKILL.md` y de cada comando `opsx` generado | Se **regenera**, no se edita |
+| **El allowlist del agente, en cada repo** | Los patrones `Bash(npx --yes @fission-ai/openspec@X.Y.Z ...)` de `.claude/settings.json`. **Es el único lugar que repite el número a la fuerza**: el permiso se concede por coincidencia literal de texto, así que no puede referenciar el pin canónico | A mano, en el mismo PR que sube el pin — en `plantilla/` y en cada repo ya creado |
 
 El pin canónico vive en **un solo lugar del marco** y los repos que
-consumen el workflow reusable **no repiten el número**. Si un repo necesita
-otra versión, la pasa explícitamente como input — y eso es visible, que es
-justamente el punto.
+consumen el workflow reusable **no repiten el número** en su pipeline. Si un
+repo necesita otra versión, la pasa explícitamente como input — y eso es
+visible, que es justamente el punto.
+
+La excepción es el allowlist del agente, y conviene mirarla de frente porque
+ya mordió. Como el permiso se concede por texto literal, cada repo lleva su
+propia copia del número — y una copia es exactamente lo que envejece sin que
+nadie se entere. El consumidor piloto quedó con la forma vieja del patrón,
+**sin scope y sin versión**, es decir autorizando al agente a descargar y
+ejecutar el paquete ajeno con `--yes`; el scaffold ya tenía el pin correcto,
+pero el scaffold se copia una vez y después no se actualiza solo.
+
+Lo que hoy **sí** falla solo es la mitad que importa: el check *Ejecutores de
+paquetes pinados* del job `higiene` se pone rojo si un patrón —o cualquier
+otra línea rastreada que no sea `.md`— corre un paquete sin versión exacta.
+Que el número esté **atrasado** sigue siendo cosa de este procedimiento; que
+esté **ausente** ya no depende de que nadie se acuerde.
 
 Para saber qué versión está pineada hoy, sin adivinar:
 
@@ -243,7 +258,9 @@ Nunca: dar el archive por bueno porque el CLI dijo `successfully`.
 - [ ] `validate --all --strict` en verde con la versión **nueva**, antes de mover el pin
 - [ ] Pin canónico actualizado en un solo lugar
 - [ ] Skills y comandos regenerados: `generatedBy` en `X.Y.Z` en **todos**
-- [ ] Sin restos de `openspec` a secas (sin scope) en scripts ni workflows
+- [ ] Patrones de `.claude/settings.json` actualizados a `X.Y.Z` (en `plantilla/`
+      y en cada repo). Que estén **sin versión** ya lo caza el check *Ejecutores
+      de paquetes pinados*; que estén **atrasados**, no — eso es este ítem
 - [ ] Suite local antes del push
 - [ ] PR con `Closes #<issue>` desde la creación y el diff de versiones en el cuerpo
 - [ ] Primera corrida de CI sobre `main` en verde

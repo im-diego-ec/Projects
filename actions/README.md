@@ -13,6 +13,8 @@ uses: im-diego-ec/Projects/actions/<nombre>@v1
 | [`carril-docs`](carril-docs/) | Marca los cambios que no alteran lo que se sirve (`solo_docs`) | Nunca: fail-open ruidoso |
 | [`cobertura-diff`](cobertura-diff/) | Mide qué proporción de las líneas del cambio ejercitan las pruebas | Sí: bajo el mínimo, y también sin datos |
 | [`censo-fuentes`](censo-fuentes/) | Deriva el alcance real de la verificación y caza los archivos que no mira ninguna herramienta | Sí: agujeros y exclusiones muertas |
+| [`aviso-version`](aviso-version/) | Arma, desde el CHANGELOG, el mensaje que reciben los consumidores al publicarse una versión | Sí: solo si el CHANGELOG no tiene entrada para esa versión |
+| [`constitucion`](constitucion/) | Entrega la porción del marco de la constitución a cada superficie de agente que el repo declara, y verifica que la presente sea la que el marco publica | Sí: artefacto ausente o atrasado pasada su fecha, editado a mano, cadena de carga rota o desvío muerto |
 
 ## Parametrización
 
@@ -671,6 +673,192 @@ permanente; la ventana tiene sus dos pruebas propias, una a cada lado de la fech
 
 ---
 
+## `aviso-version`
+
+El `CHANGELOG.md` y la página del release son superficie de **consulta**, y
+nadie consulta a tiempo. Con `v1` móvil, un consumidor recibe comportamiento
+nuevo —incluido un check que lo pone en rojo— sin haber leído nada; pasó el
+2026-08-19, al mover `v1` la primera vez. Esta action convierte la publicación
+de una versión en una **notificación**.
+
+**Arma el mensaje y no lo envía.** No conoce el destino, no lee ningún secret y
+no toca la red: lee el `CHANGELOG.md` del checkout, devuelve texto y escribe un
+payload JSON en disco. El envío —lo único que necesita la credencial— vive en el
+workflow que la usa, en unas líneas de `curl`.
+
+Esa separación es toda la estrategia de verificación: un paso que solo se puede
+probar disparándolo de verdad no se prueba nunca. Así se corre en cualquier
+máquina, sin credenciales, y muestra exactamente qué se enviaría:
+
+```bash
+AVISO_VERSION=1.2.0 node ruta/a/projects/actions/aviso-version/aviso-version.mjs
+```
+
+**El contenido no se escribe dos veces.** Sale de la sección `### Para
+consumidores` de la entrada de esa versión, que el `CHANGELOG.md` ya mantiene
+por convención propia y que dice exactamente qué tiene que hacer un consumidor.
+No hay un formato paralelo que alguien deba sincronizar: la única fuente que se
+edita es el changelog, en el mismo PR que introduce el cambio.
+
+```yaml
+on:
+  release:
+    types: [published]
+
+jobs:
+  aviso:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v7
+      - id: mensaje
+        uses: im-diego-ec/Projects/actions/aviso-version@v1
+        with:
+          version: ${{ github.event.release.tag_name }}
+      - shell: bash
+        env:
+          DESTINO: ${{ secrets.AVISO_VERSION_DESTINO }}
+          PAYLOAD: ${{ steps.mensaje.outputs.payload }}
+        run: |    # ...el envio, y la rama de "no hay destino"...
+```
+
+En el evento `release` el checkout cae en el commit del tag publicado, así que
+el changelog que se lee es el de **esa** versión.
+
+### Inputs
+
+| Input | Default | Para qué |
+| --- | --- | --- |
+| `version` | (obligatorio) | Versión a avisar, con o sin la `v` del tag (`1.2.0` o `v1.2.0`) |
+| `changelog` | `CHANGELOG.md` | Ruta del changelog, relativa al working directory |
+| `limite` | `3500` | Largo máximo del mensaje; por encima recorta y lo dice |
+| `campo` | `text` | Campo de texto del payload JSON (`content` para Discord) |
+| `salida` | `$RUNNER_TEMP/aviso-version.json` | Dónde escribir el payload |
+
+### Outputs
+
+| Output | Contenido |
+| --- | --- |
+| `payload` | Ruta del JSON listo para postear con `--data-binary @archivo` |
+| `version` | Versión normalizada, sin la `v` del tag |
+| `breaking` | `"true"` si la entrada declara cambios BREAKING |
+| `recortado` | `"true"` si el mensaje se recortó por el límite |
+| `sin_para_consumidores` | `"true"` si la entrada no traía la sección accionable |
+
+### Qué pasa en cada caso
+
+| Situación | Veredicto |
+| --- | --- |
+| Entrada con su sección «Para consumidores» | Mensaje completo, con los dos enlaces |
+| Entrada **sin** esa sección | `::warning::` y va el **cuerpo completo** de la versión: se manda de más, no de menos |
+| Entrada con líneas `BREAKING` | `::warning::` y el mensaje las pone **primero** |
+| Mensaje más largo que el límite | `::warning::`, recorta por línea y deja el enlace al release |
+| **No hay entrada para esa versión** | **Rojo**, con el arreglo: agregar la entrada y re-disparar el botón |
+| No se puede leer el changelog | **Rojo**: falta el `checkout` |
+
+El único rojo es "no hay entrada", y es deliberado: no existe una degradación
+honesta. Un aviso vacío, o uno armado con el texto de otra versión, sería
+justamente el formato paralelo que este diseño evita — y el modo de fallo más
+caro posible, porque le diría a un consumidor que haga algo que no corresponde.
+
+### Límites declarados
+
+- **El mensaje viaja como Markdown, tal cual lo escribe el CHANGELOG.** No hay
+  traducción al dialecto de ningún destino (Slack no renderiza `**negrita**`
+  igual que GitHub): hacerla sería cablear un proveedor, que es justo lo que
+  este diseño no hace. Lo que se gana es que el aviso y el changelog son el
+  mismo texto, verificable carácter por carácter.
+- **El payload es `{"<campo>": "<mensaje>"}` y nada más.** Sirve para Slack,
+  Google Chat y Teams con `text`, y para Discord con `content`. Un destino que
+  exija otra forma es un change del marco, no una configuración.
+- **«Para consumidores» es una convención del changelog, no un contrato que algo
+  verifique al escribirlo.** Su ausencia se detecta al avisar —cuando la versión
+  ya está publicada—, no en el PR que la introdujo. Cerrar ese hueco es otro
+  check y otra fila del backlog.
+- **Esta action no envía nada, así que no puede garantizar que el aviso llegue.**
+  Lo que el workflow que la consuma no puede hacer es callarse: sin destino
+  configurado, `::warning::` y el mensaje al resumen de la corrida.
+
+### Clasificación de distribución
+
+Es **referenciada**, y hoy tiene un solo consumidor: el propio Projects. Vive acá y
+no como un script suelto del repo por dos razones que se sostienen solas —el
+banco de pruebas del CI descubre `actions/*/pruebas/` sin que nadie cablee nada,
+y "changelog + versión → mensaje" es genérico para cualquier repo que publique
+releases—. La contrapartida es honesta: al publicarse bajo `@v1`, sus `inputs` y
+`outputs` son contrato, y cambiarlos sigue las mismas reglas que el resto.
+
+---
+
+## `constitucion`
+
+Las cuatro formas de distribución del marco están en el README de la raíz, y
+hasta este change **una sola no tenía ni actualización ni check**: el scaffold,
+que es donde vive el texto que los agentes cargan. El resultado medido: una
+adopción nueva copió `plantilla/AGENTS.md` y el archivo quedó con 241 líneas
+contra 355 —reglas enteras perdidas, no reflujo de formato—, y en el consumidor
+viejo la divergencia ya corría en las dos direcciones.
+
+Esta action mueve **la porción del marco** de scaffold a regenerado. El texto
+canónico vive en `constitucion/canonico/` (una sección por archivo `NN-*.md`,
+en orden, con un `manifiesto.json` que declara la versión y sus fechas), viaja
+DENTRO de la action por `GITHUB_ACTION_PATH` —el `GITHUB_TOKEN` de un consumidor
+no lee otro repositorio— y se **renderiza** contra los valores del proyecto.
+
+Dos modos:
+
+- **`escribir`** deja un artefacto por superficie declarada
+  (`.projects/AGENTS-marco.md` para la cadena `CLAUDE.md → @AGENTS.md → @artefacto`,
+  `.cursor/rules/00-marco.mdc` para la superficie que lee markdown plano y no
+  expande imports). Escribe en el árbol de trabajo y nada más: no commitea, no
+  pushea y no abre PRs. Eso es del workflow del consumidor, porque escribir en el
+  repo de un proyecto desde una sesión de Projects es 🛑.
+- **`verificar`** compara lo presente contra el re-render de la versión que el
+  propio artefacto declara en su cabecera de una línea
+  (`<!-- projects:constitucion version=… sha=… -->`), y deja el artefacto al día en
+  disco para subirlo con `upload-artifact`.
+
+Lo que el proyecto pone, y vive **fuera** de `.projects/` a propósito —ese
+directorio es desechable y el modo escribir lo reemplaza—:
+
+- `.projects-valores.json`: los placeholders de dobles llaves, más un
+  `"superficies"` opcional. Los handles y las cuentas reales viven del lado del
+  consumidor, nunca en Projects.
+- `.projects-desvios.json`: los desvíos declarados, cada uno con `regla`, `fecha`,
+  `aprobado_por` y `motivo`. El desvío se **imprime dentro del artefacto que los
+  agentes cargan, pegado a la regla que anula** —una excepción que el agente no
+  lee produce algo peor que una regla ausente: un agente cumpliendo a rajatabla
+  algo que el proyecto ya anuló—, y **caduca**: cuando la regla que nombra deja de
+  existir en el canónico, el job se pone rojo por desvío muerto con el motivo que
+  tenía escrito.
+
+**El sello no es una firma, y es a propósito.** El `sha` de la cabecera identifica
+el CANÓNICO de esa versión, no el cuerpo renderizado. Si cubriera el cuerpo, el
+arreglo mecánicamente obvio para un rojo de "editado a mano" sería recomputar el
+hash y volver a estampar; la autoridad sobre el cuerpo es el re-render, que no se
+puede falsificar sin cambiar el canónico.
+
+**El rojo lo dispara una fecha, no el release.** Cada versión del canónico declara
+`publicada` y `exigible_desde`, y la propia action rechaza un manifiesto con menos
+de 28 días entre las dos (la puerta de atrás se llama `"urgente": true` y sale por
+`::warning::`, nunca muda). Entre las dos fechas, un artefacto ausente o atrasado
+es `::warning::`; desde `exigible_desde`, `::error::`. Si el consumidor acumuló
+varias versiones sin adoptar, manda la fecha de la **más vieja pendiente**. Lo que
+**no** tiene es rama silenciosa de "este repo no aplica": el repo sin artefacto es
+exactamente el que hay que avisar.
+
+Límites declarados, en el encabezado del `action.yml` y acá: esto garantiza que el
+**texto** llegue íntegro y al día a la superficie que el agente carga, **no** que
+el agente lo obedezca en el turno 40 de una sesión larga — cierra el hueco de
+distribución, no el de comportamiento. Solo cubre las superficies que el
+repositorio **declara**. Y Projects **no puede dogfoodear** este mecanismo: su
+`AGENTS.md` es la constitución del marco, no la de un proyecto, así que la
+evidencia son el banco de pruebas de `constitucion/pruebas/` —que sí corre en el
+CI de Projects— y la validación contra un consumidor real antes de mover `v1`.
+
+---
+
 ## Permisos mínimos
 
 Cada `action.yml` los trae escritos en su encabezado. En otro repo, cada
@@ -685,6 +873,8 @@ para no volver a pagarlo.
 | `carril-docs` | `push` | `contents: read` |
 | `censo-fuentes` | — | `contents: read` |
 | `cobertura-diff` | — | `contents: read` |
+| `aviso-version` | — | `contents: read` (el checkout; no llama a la API ni a la red) |
+| `constitucion` | `verificar`, `escribir` | `contents: read` (escribe en el árbol de trabajo y nada más: el commit y el PR los hace el workflow del consumidor, con sus propios permisos) |
 
 Un bloque `permissions:` **reemplaza** los permisos por defecto del token: hay
 que listar `contents: read` explícitamente, no se hereda.

@@ -9,12 +9,17 @@ Projects. Eso lo distingue de las otras piezas del marco:
 | **Scaffold** (esto) | Se copia una vez. Después es del proyecto. Un cambio acá NO llega a los repos ya creados. |
 | **Referenciado** (workflows reusables, composite actions) | Se consume por `uses: {{ORG}}/Projects/...@v1`. Cambia una vez para todos. |
 | **Canónico** (specs del marco) | Viven solo en Projects. Nadie los copia. |
-| **Regenerado** (skills y comandos de OpenSpec) | No se vendoran: el marco pina la versión del CLI y cada repo las regenera. |
+| **Regenerado** (skills y comandos de OpenSpec, y la porción del marco de la constitución) | No se vendoran: el marco pina la herramienta o publica el texto, y cada repo lo regenera. |
 
 Corolario práctico: **nada que deba cambiar para todos los proyectos a la vez va acá.**
 Si al editar un archivo del scaffold pensás "esto habría que propagarlo a los repos
-existentes", es señal de que la regla pertenece a un workflow reusable o a un spec del
-marco, no a la plantilla.
+existentes", es señal de que la regla pertenece a un workflow reusable, a un spec del marco
+o a la porción regenerada de la constitución (sección 2.5), no a la plantilla.
+
+Ese corolario es también la explicación de por qué `AGENTS.md` **adelgazó**: las reglas
+comunes del área estaban acá, en un archivo que se copia una vez, y cada proyecto terminaba
+con su propia versión envejecida de la misma regla. Ahora el scaffold entrega lo del
+proyecto —stack, ambientes, sus reglas propias— y lo común llega regenerado.
 
 ---
 
@@ -35,18 +40,30 @@ robocopy "$env:TEMP\projects\plantilla" . /E /XF README.md
 ```
 
 Verificá que llegaron los ocultos: `ls -a` (o `Get-ChildItem -Force`) tiene que mostrar
-`.claude/`, `.github/` (con `workflows/ci.yml` adentro), `.gitignore`, `.prettierrc`,
-`.prettierignore`. Y en la raíz, junto a `eslint.config.mjs` y `tsconfig.base.json`, tiene
-que estar `vitest.config.base.mjs`: ahí viaja el **umbral de cobertura del total** que el
-marco reparte, para que un paquete nuevo no lo tenga que inventar. El número que un paquete
-se pone a sí mismo termina siendo el que la medición dio ese día — así llegó el consumidor
-a tener `functions: 70.6` fijado en su propio valor medido, un umbral cumplido por
-construcción.
+`.claude/` (con `settings.json`, `skills/` y `agents/` adentro), `.github/` (con
+`workflows/`: `ci.yml`, `claude.yml` y `actualizar-marco.yml`), `.gitignore`,
+`.gitattributes`, `.prettierrc`, `.prettierignore`, `.projects-valores.json` y
+`.projects-desvios.json`. Y en la raíz, junto a `eslint.config.mjs` y
+`tsconfig.base.json`, tiene que estar `vitest.config.base.mjs`: ahí viaja el
+**umbral de cobertura del total** que el marco reparte, para que un paquete nuevo no
+lo tenga que inventar. El número que un paquete se pone a sí mismo termina siendo el
+que la medición dio ese día — así llegó el consumidor a tener `functions: 70.6`
+fijado en su propio valor medido, un umbral cumplido por construcción.
 
 Lo que llega en `.github/workflows/ci.yml` es un **llamador delgado**: hereda del marco el
 carril de docs y la validación de OpenSpec con `uses: {{ORG}}/Projects/...@v1`, y deja el
 `build-test` del producto para que este repo lo llene. La mecánica del marco NO se copia:
 si se copiara, un arreglo en Projects dejaría de llegar acá.
+
+Los otros dos workflows son scaffold porque **escriben o responden en este repo**, y eso no
+se puede consumir por referencia: `claude.yml` es el bot de @claude en issues y PRs (con la
+política de modelo del área ya puesta), y `actualizar-marco.yml` es el que abre solo el PR
+que trae al día la porción del marco de la constitución (sección 2.5). Los dos traen su
+propio encabezado explicando qué exigen del repo antes de funcionar.
+
+`.gitattributes` llega con `* text=auto eol=lf` y **no es cosmético**: el marco compara
+contenido byte a byte —el artefacto de la constitución, los fixtures de sus actions—, así
+que un repo que materialice CRLF en el checkout sale rojo por un motivo que no es el suyo.
 
 **No copies `plantilla/README.md`** (este archivo). El README del proyecto se escribe
 aparte: qué hace la app, ambientes, cómo correr en local, cómo verificar, pipeline.
@@ -161,6 +178,101 @@ primer commit.
 > también las expresiones de GitHub Actions (`${{ github.ref }}`, `${{ needs.marco.result }}`)
 > que el `ci.yml` usa de forma legítima y que NO se sustituyen nunca.
 
+Los valores de `.projects-valores.json` entran en ese mismo buscar-y-reemplazar: el archivo
+llega con los placeholders como valores, así que se llena solo con el resto del árbol. Es
+la única lista donde conviene revisar el resultado dos veces, porque de ahí sale el texto
+de la constitución que los agentes leen todos los días.
+
+---
+
+## 2.5. La porción del marco de la constitución
+
+`AGENTS.md` tiene **dos mitades y una sola es del proyecto**. Las reglas comunes del área
+—OpenSpec, git y despliegue, las fronteras de tres niveles, seguridad y observabilidad,
+AWS, secretos, GitHub— no se copian: llegan como **artefacto generado** y se actualizan
+solas. Eso arregla el problema que este mecanismo existe para arreglar: una constitución
+copiada a mano llega incompleta la primera vez y envejece a partir de ahí, y cada proyecto
+termina con una versión distinta de la misma regla.
+
+| Archivo | Qué es | Quién lo escribe |
+|---|---|---|
+| `.projects/AGENTS-marco.md` | La porción del marco, renderizada con los valores de este repo. Abre con un sello de una línea (comentario HTML con la versión y el `sha256` del cuerpo) | **El marco.** No se edita a mano: el CI compara el cuerpo contra ese sello —eso caza la edición a mano— y la action del marco, que tiene el texto canónico a mano, hace el diff byte a byte |
+| `.projects-valores.json` | Los valores del proyecto con los que se renderiza | El proyecto, una vez, en el bootstrap |
+| `.projects-desvios.json` | Los desvíos declarados: reglas del marco de las que este repo se aparta | El proyecto, cuando hace falta, con motivo escrito |
+| `AGENTS.md` | Lo del proyecto: stack, ambientes, sus reglas propias. Y la línea que carga el artefacto | El proyecto |
+
+**Las entradas viven en la raíz y no dentro de `.projects/` a propósito**: ese directorio es
+del marco y es desechable —el modo escribir puede borrarlo y re-emitirlo entero—, así que
+un `rm -rf .projects` seguido de un render no puede llevarse un desvío del proyecto. Todo lo
+de adentro es descartable; todo lo de afuera es tuyo.
+
+**La cadena de carga es mecánica y el CI la verifica**: `CLAUDE.md` importa `AGENTS.md`, que
+importa `.projects/AGENTS-marco.md`. Si el eslabón se rompe —alguien borra la línea, o la deja
+dentro de un bloque de código, donde no se resuelve— el agente trabaja sin la mitad de las
+reglas y nada en la sesión lo delata. Por eso el check nombra el eslabón roto en vez de
+confiar en que se note.
+
+`.projects-valores.json` es **plano**: las claves en MAYÚSCULAS son los placeholders del
+render —exactamente los que el texto canónico usa, ni uno más (uno que sobra sale como
+aviso, igual que una exclusión muerta)— y `superficies` es la única clave en minúsculas.
+
+Esa lista declara las **superficies de instrucciones** de este repo, por nombre. Llega con
+las dos que el área usa hoy:
+
+```json
+{ "superficies": ["claude-code", "cursor"] }
+```
+
+`claude-code` emite `.projects/AGENTS-marco.md` y se carga por la cadena de arriba; `cursor`
+emite `.cursor/rules/00-marco.mdc`, con el mismo cuerpo y un frontmatter que lo hace de
+carga siempre, porque esa herramienta lee markdown plano y no expande imports. **La cadena
+de cada superficie la sabe el marco**, no este repo: acá solo se declara qué superficies se
+usan. Si el equipo no usa una, se la saca de la lista y deja de emitirse; lo que no se puede
+es declarar cero. Y una herramienta que alguien enchufe sin declararla queda fuera: el marco
+cubre lo declarado, no lo que nadie dijo.
+
+**Generarlo la primera vez**, después del primer push:
+
+```bash
+gh workflow run actualizar-marco.yml
+```
+
+Ese workflow corre semanalmente y abre el PR con el artefacto al día, así que el camino
+normal deja de ser "acordate de regenerar" y pasa a ser "aparece un PR, lo revisás y lo
+mergeás". Leé su encabezado antes del primer merge: hay dos límites de GitHub —el PR nace
+sin checks si no hay un token propio, y el commit de un bot no va firmado— que conviene
+conocer antes de topárselos.
+
+**Apartarse de una regla del marco, cuando hay razón para hacerlo.** No se edita el
+artefacto (el CI lo ve como edición a mano) ni se escribe la regla contraria en `AGENTS.md`
+(nada la reconoce como override). Se declara el desvío:
+
+```json
+{
+  "desvios": [
+    {
+      "regla": "dev-no-contacta-usuarios",
+      "motivo": "Este repo comparte la instancia de identidad entre dev y prod hasta que se aprovisione la segunda; mientras tanto las notificaciones salientes quedan apagadas por configuracion.",
+      "aprobado_por": "@builder-uno",
+      "fecha": "2026-08-19"
+    }
+  ]
+}
+```
+
+El `id` de la regla lo trae el propio artefacto, en un comentario HTML pegado a cada regla
+(`<!-- projects:regla id=... -->`): se lee de ahí, no se inventa. Cada entrada anula **una**
+cosa: o una `regla` del canónico, o un `permiso` exacto del allowlist del agente (el caso de
+la sección 3). El `motivo` es obligatorio —sin él es rojo—; `aprobado_por` y `fecha` son
+para el humano que relee el desvío en la revisión trimestral, y su ausencia sale como aviso.
+
+El desvío se imprime **pegado a la regla que anula**, dentro del mismo artefacto que los
+agentes cargan: una excepción que el agente no lee produce algo peor que la regla sola —un
+agente cumpliendo a rajatabla algo que el proyecto ya anuló, o leyendo una prohibición y
+una autorización sin saber cuál manda. Y **caduca solo**: el día que el marco elimine esa
+regla, el desvío queda huérfano y el CI falla, con el motivo que tenía escrito en el
+mensaje. Un desvío que sobrevive a lo que lo justificaba tapa un agujero que ya nadie ve.
+
 ---
 
 ## 3. Llenar los huecos que NO son placeholders
@@ -198,12 +310,53 @@ Un buscar-y-reemplazar no los resuelve: son decisiones.
   excepción muerta.
 - **`.claude/settings.json`**. Es el allowlist del EQUIPO (por eso se versiona, a
   diferencia de `settings.local.json`, que es por máquina y está en `.gitignore`). Trae solo
-  comandos de lectura/verificación: lint, typecheck, tests, `terraform validate`,
-  `terraform plan`, `gh run watch`. **Nada que escriba**: ni `terraform apply`, ni
-  `git push`, ni `gh pr merge`. Los patrones de OpenSpec llegan con el paquete y la versión
-  que el marco pina (`npx --yes @fission-ai/openspec@1.9.0 ...`): si el pin sube, se
-  actualizan acá también. Ojo con el nombre — `openspec` a secas en npm es un paquete ajeno
-  (placeholder `0.0.0`), así que un patrón sin scope permitiría correr otra cosa.
+  comandos de lectura/verificación: lint, typecheck, tests, build, `terraform validate`,
+  `terraform plan` **con el perfil de dev**, `gh run watch`. Los patrones de OpenSpec llegan
+  con el paquete y la versión que el marco pina (`npx --yes @fission-ai/openspec@1.9.0 ...`):
+  si el pin sube, se actualizan acá también. Ojo con el nombre — `openspec` a secas en npm es
+  un paquete ajeno (placeholder `0.0.0`), así que un patrón sin scope permitiría correr otra
+  cosa.
+
+  **Nada que escriba, y la asimetría es deliberada**: un permiso de más es un riesgo, uno de
+  menos es fricción. Por eso no hay `terraform apply`, ni `git push`, ni `gh pr merge`. Y
+  esto **ya tiene check**: el paso *Permisos del agente sin escritura* del job `higiene` lee
+  la forma de cada entrada y se pone rojo con dos cosas — un **verbo que escribe** (`apply`,
+  `push`, `merge`, `create-*`, `put-*`, `-X DELETE`…) y un **comodín en la posición del
+  subcomando** (`Bash(terraform *)` autoriza todos los subcomandos de terraform, `apply`
+  incluido). Si una de las dos es deliberada, no se agrega en silencio: se declara como
+  desvío de permiso en `.projects-desvios.json`, con motivo, y el check lo absorbe de ahí y
+  reimprime el motivo en cada corrida.
+
+  Sobre el **perfil de producción**: el marco autoriza expresamente *leer* producción por
+  CLI (`validate`, `plan`, `describe-*`), así que una entrada con ese perfil no es un
+  hallazgo — el check la imprime como `::notice::` en cada corrida para que esté a la vista,
+  y lo que sí exige es que el subcomando esté clavado. El scaffold trae solo el `plan` con
+  el perfil de dev: si este proyecto quiere además el de producción, es una línea que se
+  agrega a conciencia, sabiendo que va a aparecer en el log de cada corrida.
+
+  Una forma de equivocarse que no se ve a simple vista: **un patrón que termina en `*` se
+  traga los argumentos que vengan**, así que una entrada de aspecto inofensivo como
+  `Bash(gh api repos/... *)` autoriza también `-X DELETE`. Lo que se autoriza es el comando
+  entero, no el verbo que uno tenía en la cabeza.
+
+  La otra es **un ejecutor sin versión exacta**, y esa tampoco depende ya de que alguien se
+  acuerde: el check *Ejecutores de paquetes
+  pinados* del job `higiene` lee todos los archivos rastreados del repo (menos los `.md`,
+  que son prosa) y se pone rojo si un `npx`, `bunx`, `npm exec`, `pnpm dlx` o `yarn dlx`
+  corre un paquete sin versión exacta. Si el binario ya lo trae una dependencia declarada,
+  la salida correcta es `pnpm exec <comando>`: lee `node_modules` y falla si no está, en
+  vez de salir a buscar a npm un nombre que puede ser de otro. **Un repo que ignore
+  `.claude` entero en su `.gitignore` esconde de ese check justo este archivo** — por eso
+  el `.gitignore` del scaffold ignora `settings.local.json` y no el directorio.
+- **`.claude/skills/` y `.claude/agents/` → nada que llenar, pero conviene saber qué son.**
+  El scaffold trae dos piezas escritas a mano por el marco, que no las genera ningún CLI:
+  la skill `projects-archive-change` (archivar un change de OpenSpec sin el CLI de archive, que
+  en Windows dice "Specs updated successfully" y hace rollback de todo) y el subagente
+  `cazador-fail-open` (auditor adversarial de caminos que terminan en verde sin haber
+  verificado nada). Llevan el prefijo del marco para no chocar con las skills que **sí**
+  regenera el CLI de OpenSpec en cada repo. Son scaffold: desde la copia son de este
+  proyecto, y si las mejorás de una forma que le sirva a cualquiera, esa mejora sube al
+  marco en la revisión trimestral de divergencia.
 
 ---
 
@@ -213,7 +366,8 @@ Un buscar-y-reemplazar no los resuelve: son decisiones.
 |---|---|
 | `package.json`, `pnpm-workspace.yaml` | Del proyecto: dependen del stack elegido. Ver el snippet de abajo para la parte de lint/format, que sí es del marco. |
 | El resto de `.github/workflows/*` (deploy, verificación, cron) | Del proyecto: dependen de su topología de infraestructura. La MECANICA del marco no se copia nunca: `ci.yml` ya la consume por `uses: ...@v1`. |
-| `.claude/skills/`, `.claude/commands/` | **Regenerado**: los genera el CLI de OpenSpec en la versión que pina el marco. No se vendoran ni se editan a mano. |
+| Las skills y comandos **de OpenSpec** (`.claude/skills/openspec-*`, `.claude/commands/`) | **Regenerado**: los genera el CLI de OpenSpec en la versión que pina el marco. No se vendoran ni se editan a mano. Lo que sí llega en el scaffold son las dos piezas escritas a mano del marco (sección 3), que ningún CLI regenera. |
+| `.projects/AGENTS-marco.md` | **Generado por el marco** en el repo nuevo: lo escribe `actualizar-marco.yml` (sección 2.5). Las entradas del render sí llegan en el scaffold. |
 | `openspec/` | Lo inicializa el CLI de OpenSpec en el repo nuevo. Los specs del MARCO son canónicos y viven en Projects. |
 | `infra/`, `infra-prod/` | Terraform del proyecto. El marco fija que la IaC es Terraform y los nombres de esas dos carpetas (`dependabot.yml` y `AGENTS.md` ya los asumen). |
 | `README.md` del proyecto | Se escribe a mano: qué hace la app, ambientes, correr en local, verificar, pipeline, estructura. |
@@ -264,11 +418,21 @@ imports.
 
 ## 5. Checklist del primer commit
 
-Lo que hace que el marco se cumpla solo depende de que estos cinco puntos queden hechos una
-vez; después ninguno pide que alguien se acuerde de nada.
+Lo que hace que el marco se cumpla solo depende de que estos puntos queden hechos **una
+vez**; después ninguno pide que alguien se acuerde de nada.
 
 - [ ] `grep -rnE "\{\{[A-Z0-9_]+\}\}" .` sin resultados (fuera de `node_modules` y `.git`)
 - [ ] Tabla de stack de `AGENTS.md` llena y sección "🕳️ Antes del primer commit" borrada
+- [ ] `.projects-valores.json` con los valores reales y las superficies que el equipo usa. De
+      ahí sale el texto de la constitución que los agentes cargan todos los días: es la
+      única sustitución que conviene releer
+- [ ] `.projects/AGENTS-marco.md` existe (lo generó `gh workflow run actualizar-marco.yml` y su
+      PR está mergeado) y `AGENTS.md` sigue teniendo la línea que lo importa, fuera de todo
+      bloque de código. El CI lo verifica: primero avisando, después en rojo
+- [ ] Secret `CLAUDE_CODE_OAUTH_TOKEN` cargado y la GitHub App de Claude instalada sobre el
+      repo, si el equipo quiere el bot de `@claude` en issues y PRs. Sin los dos,
+      `claude.yml` falla a propósito cuando alguien lo menciona, en vez de dejar la mención
+      sin respuesta
 - [ ] `pnpm lint` y `pnpm format:check` corren y pasan en el repo vacío
 - [ ] La config de cobertura de cada paquete importa `coberturaDelMarco` de
       `vitest.config.base.mjs`. Sin esa línea el paquete no tiene umbral de total propio, y
