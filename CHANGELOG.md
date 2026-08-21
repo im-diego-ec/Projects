@@ -35,6 +35,42 @@ mueve sobre un cambio incompatible.
 
 ## [No publicado]
 
+## [1.4.1] — 2026-08-21
+
+### Corregido
+
+- **Un artefacto que el marco GENERA ya no reprueba el check que el marco escribe.** El
+  paso de *Ejecutores de paquetes pinados* puso en rojo a un consumidor por
+  `.cursor/rules/00-marco.mdc`, que es la porcion del marco renderizada para Cursor: su
+  texto cita `npx --yes openspec` **como contraejemplo** —es la regla del pin
+  explicandose— y `.mdc` no es `.md`, asi que el pathspec que exime la prosa no lo
+  cubria. Nadie podia arreglarlo a mano, porque es generado.
+
+  Es la **cuarta vez esta semana** de la misma clase: prosa que explica lo correcto, en un
+  archivo cuya extension el check no exime. Las tres anteriores fueron una expresion de
+  Actions en la `description` de un input, otra en un comentario de JS dentro de un
+  `run:`, y el payload de `aviso-version` commiteado por error en un `.json`.
+
+  **Y el arreglo que una prueba rechazo, que vale mas que el arreglo.** Se intento
+  filtrar por el **sello** del artefacto (`projects:constitucion`, que viaja en su primera
+  linea) en vez de por extension: deriva en vez de enumerar y cierra la clase entera. El
+  banco lo tumbo con la prueba «el sello lo valida UNA sola pieza: ningun workflow del
+  marco lo verifica por su cuenta», y tiene razon — dos lugares interpretando el mismo
+  sello es el defecto de las **12 contra 64 posiciones hexadecimales** que se arreglo esta
+  misma semana. Revertido antes de entrar.
+
+### Para consumidores
+
+**Nada que hacer.** Este release solo quita un rojo que el propio marco producia sobre un
+archivo que el propio marco escribe. Si tu repo declara la superficie `cursor`, el rojo
+desaparece sin que toques nada.
+
+**La clase queda ABIERTA y declarada:** la exencion sigue adivinando el origen por la
+extension del archivo, asi que una superficie de agente nueva que renderice a `.txt` o
+`.toml` vuelve a caer. La version derivada exige que `actions/constitucion` publique sus
+rutas como output. Esta como fila **17** de `docs/reglas-no-escritas.md`, con su medicion.
+
+
 ## [1.4.0] — 2026-08-21
 
 ### Corregido
