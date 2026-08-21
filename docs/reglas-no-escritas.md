@@ -465,6 +465,7 @@ una tarde entre todos y cierran las clases de error más caras.
 | 11 | Plantilla de migración con invariantes de propiedad + lint de literales | 5 | alto | 🔴 |
 | 12 | Contador de fail-open activados por corrida | 3 | medio | 🔴 |
 | 13 | Un cambio a la definición del pipeline NO puede viajar por el carril rápido | — | bajo | 🔴 |
+| 14 | Publicar una versión del marco AVISA a los consumidores | — | bajo | 🔴 |
 
 > **Sobre la fila 13**, que nació de un incidente doble el 2026-08-19: el carril
 > rápido trata la definición del pipeline como "no se sirve en runtime" y la
@@ -475,6 +476,15 @@ una tarde entre todos y cierran las clases de error más caras.
 > un caso raro: es estructural, y el síntoma es siempre el mismo, un verde que
 > no verificó nada. La corrección probable es acotar el patrón del carril para
 > que la definición del pipeline quede fuera, no agregar un check nuevo.
+
+> **Sobre la fila 14.** El CHANGELOG y el release son superficie de **consulta**,
+> no de notificación. Con `@v1` móvil, un consumidor recibe comportamiento nuevo
+> —incluido un check que lo pone en rojo— **sin haber leído nunca nada**. Pasó el
+> 2026-08-19: al mover `v1`, el segundo consumidor quedó a un push de un rojo que
+> nadie le anunció. Con dos consumidores se tapa con un mensaje a mano; con cinco
+> no. El aviso es barato: la entrada del CHANGELOG **ya escribe por versión** qué
+> tiene que hacer un consumidor — solo falta empujarla al canal del área en vez de
+> esperar que alguien la busque.
 
 **Cómo se cierra una fila**: el check se construye en Projects (referenciado,
 para que llegue a todos los proyectos de una), la regla cambia de estado en
@@ -509,7 +519,9 @@ arriba porque un check ya falla solo cuando alguien se aparta:
   a ser contrato** (`despliegue-ci`, change `marco-se-cumple-solo`), pero su
   check automático todavía no existe: la serialización se configura en el
   workflow de despliegue, que el marco aún no provee. Llega con el esqueleto de
-  entrega. Hasta entonces es contrato verificable en revisión, no check — y por
+  entrega, cuyo design ya está decidido: la mecánica de cada compuerta sube al
+  marco como pieza referenciada y la topología queda en el proyecto, verificada
+  estáticamente. Hasta entonces es contrato verificable en revisión, no check — y por
   eso figura acá con asterisco en vez de contarse como cerrado.
 - Producción solo por promoción: sin smoke y E2E de dev en verde, el deploy
   a producción no arranca.

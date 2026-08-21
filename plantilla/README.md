@@ -43,7 +43,12 @@ Verificá que llegaron los ocultos: `ls -a` (o `Get-ChildItem -Force`) tiene que
 `.claude/` (con `settings.json`, `skills/` y `agents/` adentro), `.github/` (con
 `workflows/`: `ci.yml`, `claude.yml` y `actualizar-marco.yml`), `.gitignore`,
 `.gitattributes`, `.prettierrc`, `.prettierignore`, `.projects-valores.json` y
-`.projects-desvios.json`.
+`.projects-desvios.json`. Y en la raíz, junto a `eslint.config.mjs` y
+`tsconfig.base.json`, tiene que estar `vitest.config.base.mjs`: ahí viaja el
+**umbral de cobertura del total** que el marco reparte, para que un paquete nuevo no
+lo tenga que inventar. El número que un paquete se pone a sí mismo termina siendo el
+que la medición dio ese día — así llegó el consumidor a tener `functions: 70.6`
+fijado en su propio valor medido, un umbral cumplido por construcción.
 
 Lo que llega en `.github/workflows/ci.yml` es un **llamador delgado**: hereda del marco el
 carril de docs y la validación de OpenSpec con `uses: {{ORG}}/Projects/...@v1`, y deja el
@@ -282,6 +287,15 @@ Un buscar-y-reemplazar no los resuelve: son decisiones.
   componentes de UI generados. Poné los generados reales de este proyecto; lintar un
   generado es ruido permanente.
 - **`.prettierignore` → mismos generados** (dos líneas comentadas, misma razón).
+- **`vitest.config.base.mjs` → conectarlo desde cada paquete**. El archivo llega con el
+  umbral del total del marco (80 en las cuatro métricas), `all: true` y el `projectRoot` del
+  reporter lcov en la raíz del monorepo. Lo que falta es la línea que lo importa desde la
+  config de cada paquete (`import { coberturaDelMarco } from "../vitest.config.base.mjs"`).
+  El umbral **no se baja**: si un paquete todavía no llega, se declara la deuda en SU
+  `package.json` con `projects.cobertura.deuda = { motivo, fecha }` y el marco la reporta en
+  cada corrida hasta que se paga o vence. Bajar el umbral acá tampoco serviría de atajo: la
+  action `cobertura-diff` mide el total por su cuenta desde el lcov y contra el 80 del
+  marco, así que el umbral local solo puede **subir** la exigencia.
 - **`dependabot.yml` → versiones ignoradas de node**. La lista filtra las **impares**
   (no-LTS, soporte corto); las pares llegan como PR automático. Ajustala si el proyecto
   arranca en otra mayor.
@@ -420,6 +434,10 @@ vez**; después ninguno pide que alguien se acuerde de nada.
       `claude.yml` falla a propósito cuando alguien lo menciona, en vez de dejar la mención
       sin respuesta
 - [ ] `pnpm lint` y `pnpm format:check` corren y pasan en el repo vacío
+- [ ] La config de cobertura de cada paquete importa `coberturaDelMarco` de
+      `vitest.config.base.mjs`. Sin esa línea el paquete no tiene umbral de total propio, y
+      el primer PR que lo deje por debajo de 80 se enterará por el rojo del marco en vez de
+      por su propia suite local
 - [ ] Cada paquete declara `typecheck`, `test` y `build` (o su excepción está escrita con el
       motivo en `EXCEPCIONES` del `ci.yml`). No hace falta acordarse: el CI lo exige y falla
       nombrando el `package.json` incompleto

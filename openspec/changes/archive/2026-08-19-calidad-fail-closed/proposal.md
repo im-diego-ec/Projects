@@ -78,6 +78,15 @@ sube con cada tanda de pruebas. Exigirlo de golpe dejaría el pipeline en rojo
 durante semanas, y un rojo permanente termina siendo un rojo que todos aprenden a
 ignorar: peor que no tener la compuerta.
 
+**Y esa transición lleva fecha** (corrección del 2026-08-20, hallazgo B1 de la
+auditoría de cierre de v1). El piso es el mecanismo con el que un paquete camina
+hacia el 80, no un permiso para quedarse abajo: mientras un paquete no llegue,
+declara en su manifiesto el motivo y la fecha en la que llega, y el día que esa
+fecha vence la integración compara contra el mínimo y no contra el piso. Sin ese
+plazo el piso ES el mínimo de hecho, que es justo lo que la auditoría midió: `web`
+en verde con 70,69% de funciones contra un mínimo declarado de 80. La decisión y su
+alternativa descartada están en el design (D5c).
+
 ## Capabilities
 
 ### Modified Capabilities

@@ -70,8 +70,27 @@ export function escribir(dir, ruta, contenido) {
   writeFileSync(destino, contenido);
 }
 
+/**
+ * El texto de un fixture, NORMALIZADO A LF.
+ *
+ * POR QUE LA NORMALIZACION, y con que medicion. Los repos temporales ya se
+ * crean con `core.autocrlf=false` (ver CONFIG), pero eso no alcanza: el fixture
+ * se lee DEL CHECKOUT de este repositorio, y projects no versiona `.gitattributes`,
+ * asi que en una maquina con `core.autocrlf=true` —el default de Git para
+ * Windows— el archivo llega en CRLF. Las pruebas que escriben contenido a mano
+ * lo escriben en LF, y el diff resultante ve el archivo entero reescrito: el
+ * caso "un cambio que solo BORRA lineas" pasaba a tener 2 lineas AGREGADAS y
+ * salia EXIT 1. Medido en este checkout: 90 de 91 pruebas verdes, y la unica
+ * roja lo era por el fin de linea del disco, no por el codigo.
+ *
+ * Las dos rondas anteriores lo trataron como ruido del entorno y lo rodearon a
+ * mano (normalizar los fixtures, correr, restaurar). Un banco que necesita ese
+ * rito no es un banco: cada corrida en Windows deja al que la mira decidiendo
+ * si el rojo cuenta, y esa decision es exactamente lo que un codigo de salida
+ * existe para no tener que tomar.
+ */
 export function fixture(nombre) {
-  return readFileSync(join(FIXTURES, nombre), "utf8");
+  return readFileSync(join(FIXTURES, nombre), "utf8").replace(/\r\n/g, "\n");
 }
 
 export function copiarFixture(dir, nombre, ruta) {
