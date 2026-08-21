@@ -41,10 +41,14 @@ miente desde el día 1.
 4. **Generar el artefacto del marco**: `gh workflow run actualizar-marco.yml` y mergear el
    PR que abre (o esperar la corrida semanal). Hasta que ese archivo exista, la línea
    `@.projects/AGENTS-marco.md` de arriba no carga nada y el CI lo avisa en cada corrida.
-5. Pedir el acceso al canal donde el marco avisa cada versión que publica. Este repo
-   consume `@v1`, que es un tag **móvil**: sin ese aviso, el proyecto se entera de un
-   comportamiento nuevo del marco el día que un check lo pone en rojo. Qué hacer con cada
-   aviso está en el artefacto del marco.
+5. Revisar que Dependabot tenga acceso al repo del marco y que el marco esté en **su
+   propio grupo** (`.github/dependabot.yml`). Este repo consume el marco por **versión
+   exacta**, así que cada versión nueva llega como **PR de Dependabot**: el rojo de un
+   check nuevo aparece DENTRO del PR, que es donde se puede leer antes de mergear. Dos
+   cosas que hay que hacer bien o el aviso no llega: sin el acceso, Dependabot no ve el
+   repo del marco; y si el marco comparte grupo con las demás actions, un PR del grupo
+   trabado deja de proponer el bump (medido el 2026-08-21). Qué hacer con cada versión
+   está en el artefacto del marco.
 6. Borrar esta sección y este párrafo. **Recién ahí** corre la verificación final:
    `grep -rnE "\{\{[A-Z0-9_]+\}\}" --exclude-dir=node_modules --exclude-dir=.git .` no debe
    devolver nada (esta sección es la única que menciona la doble llave a propósito; el
