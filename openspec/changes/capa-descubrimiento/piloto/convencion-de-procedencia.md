@@ -244,16 +244,24 @@ después es una reconstrucción.
 
 ### El formato
 
-Cuatro columnas y **una fila por par ítem-escenario**:
+**Cinco** columnas y **una fila por par ítem-escenario**. La quinta la agregó el
+2026-08-21, cuando G3b —la firma del PO— pasó a ser eliminatoria para el brazo B y su
+evidencia se quedó sin domicilio: el pre-registro la mandaba a «una columna nueva» de
+esta tabla y esta sección decía «cuatro columnas». Acá está, con nombre.
 
-| ítem | origen | sección del insumo | escenario |
-|---|---|---|---|
-| `I017` | `corpus` | PRD, «Recepción de mercadería», punto 3 | Una recepción sin orden firmada |
-| `I017` | `corpus` | PRD, «Recepción de mercadería», punto 3 | Una orden firmada que llega después de la mercadería |
-| `I023` | `corpus` | PRD, «Recepción de mercadería», punto 5 | fuera de alcance declarado: la rebanada corta antes del pago a proveedor |
-| `I031` | `corpus` | (sin insumo intermedio: control) | pregunta abierta: quién autoriza una recepción parcial cuando el jefe de bodega no está |
-| `I044` | `derivado` | PRD, «Recepción de mercadería», punto 3 | pregunta abierta: si la orden llega después, ¿la recepción queda pendiente o se acepta y se concilia? |
-| `L003` | `elicitado` | PRD, «Recepción de mercadería», punto 7 | Una recepción parcial autorizada por el suplente del jefe de bodega |
+La marca del PO es **describe** / **no describe** / **no puedo saberlo**, y
+«no puedo saberlo» cuenta como **no firmado**. Las filas que NO son un escenario —fuera de alcance declarado y pregunta abierta— llevan un guion: no hay nada que el negocio pueda reconocer como verdadero o falso, y marcarlas «describe» infla la firma con filas que no la merecen. Se anota **antes** de ver el veredicto
+de los otros criterios: firmar sabiendo que un brazo ganó mide la expectativa del PO y
+no los escenarios.
+
+| ítem | origen | sección del insumo | escenario | marca del PO |
+|---|---|---|---|---|
+| `I017` | `corpus` | PRD, «Recepción de mercadería», punto 3 | Una recepción sin orden firmada | describe |
+| `I017` | `corpus` | PRD, «Recepción de mercadería», punto 3 | Una orden firmada que llega después de la mercadería | describe |
+| `I023` | `corpus` | PRD, «Recepción de mercadería», punto 5 | fuera de alcance declarado: la rebanada corta antes del pago a proveedor | — |
+| `I031` | `corpus` | (sin insumo intermedio: control) | pregunta abierta: quién autoriza una recepción parcial cuando el jefe de bodega no está | — |
+| `I044` | `derivado` | PRD, «Recepción de mercadería», punto 3 | pregunta abierta: si la orden llega después, ¿la recepción queda pendiente o se acepta y se concilia? | — |
+| `L003` | `elicitado` | PRD, «Recepción de mercadería», punto 7 | Una recepción parcial autorizada por el suplente del jefe de bodega | no puedo saberlo |
 
 **La primera columna admite dos series, y solo una entra a G2.** `I0xx` es un ítem
 del inventario del corpus; `L0xx` es una entrada de la lista de observación, o sea
