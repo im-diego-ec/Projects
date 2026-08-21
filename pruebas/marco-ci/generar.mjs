@@ -151,35 +151,69 @@ const ENVOLTORIOS = [
 //
 // El veredicto no sale del paquete aca: sale de si la entrada autoriza algo sin
 // pinar. Un allowlist que permite el ejecutor con cualquier argumento es lo MENOS
-// pinado que se puede escribir, asi que es rojo aunque no nombre ningun paquete.
+// pinado que se puede escribir, asi que hay hallazgo aunque no nombre ningun paquete.
+//
+// Y DESDE EL 2026-08-21 EL EJE TIENE TRES VEREDICTOS Y NO DOS, porque la decision de
+// Builder 1 sobre el residuo A16 los separo:
+//   · "rojo"    -> el paquete se LEE y no esta pinado. Es lo que el paso verifica
+//     completo, y sigue saliendo ::error::.
+//   · "aviso"   -> la entrada trae un ejecutor y no se puede leer QUE corre. El
+//     permiso es el mas ancho posible y el paso lo dice, pero por ::warning::: la
+//     clase no se cierra por lectura, asi que enforzarla solo en las ortografias que
+//     este lector alcanza seria enforzar una ortografia y llamarla compuerta.
+//   · "residuo" -> el paso no anota NADA, y esta MEDIDO. Es el comodin SEPARADO sobre
+//     un gestor con subcomando: mismo permiso que su hermana pegada, cero salida. Se
+//     genera a proposito para que el dia que el check lo vea, el banco se caiga y el
+//     residuo se cierre en el diff en vez de descubrirse por casualidad.
 const POSICIONES_DEL_COMODIN = [
   {
     nombre: "comodin pegado al EJECUTOR, sin paquete",
     partes: (ort) => [ort],
-    rojo: true,
+    clase: "aviso",
   },
   {
     nombre: "comodin pegado al SUBCOMANDO, sin paquete",
     partes: (ort, sub) => (sub === "" ? null : [ort, sub]),
-    rojo: true,
+    clase: "aviso",
   },
   {
     nombre: "comodin pegado a un paquete SIN version",
     partes: (ort, sub) => [ort, sub, "openspec"],
-    rojo: true,
+    clase: "rojo",
   },
   {
     nombre: "comodin pegado a un paquete pinado",
     partes: (ort, sub) => [ort, sub, "openspec@1.9.0"],
-    rojo: false,
+    clase: "verde",
+  },
+  {
+    // LA ASIMETRIA MEDIDA, de los dos lados y en el mismo eje. Un ejecutor DIRECTO no
+    // tiene subcomando, asi que el comodin separado cae en el lugar del paquete y el
+    // lector lo lee: avisa.
+    nombre: "comodin SEPARADO de un ejecutor directo, sin paquete",
+    partes: (ort, sub) => (sub === "" ? [ort] : null),
+    separado: true,
+    clase: "aviso",
+  },
+  {
+    // Y en un gestor CON subcomando el token que sigue no es ningun subcomando del
+    // alfabeto, asi que no hay ocurrencia y la entrada sale muda. Mismo permiso.
+    nombre: "comodin SEPARADO de un gestor con subcomando, sin paquete",
+    partes: (ort, sub) => (sub === "" ? null : [ort]),
+    separado: true,
+    clase: "residuo",
   },
 ];
 
 /**
  * El corpus completo: producto de los ejes contra el alfabeto PROPIO del banco.
  *
- * Cada entrada trae el archivo donde se escribe, su linea y si el check TIENE que
- * ponerse rojo. Son dos familias:
+ * Cada entrada trae el archivo donde se escribe, su linea y su CLASE: `rojo` (el
+ * check tiene que ponerse rojo), `aviso` (tiene que anotar sin poner rojo),
+ * `residuo` (esta medido que no anota nada, y esta acá para que se vea el dia que
+ * empiece) o `verde` (la forma correcta, que no puede ensuciarse). `rojo` sigue
+ * viajando como booleano ademas de la clase, porque es la pregunta que la mitad de
+ * los casos hace. Son dos familias:
  *
  *   · INVOCACION — la de siempre, ahora cruzada tambien por el eje de las
  *     ortografias que cada gestor deja en el PATH (el sufijo de ejecutable de
@@ -199,10 +233,17 @@ const POSICIONES_DEL_COMODIN = [
 export function corpus(alfabeto = alfabetoPropio()) {
   const entradas = [];
   let n = 0;
-  const anotar = (archivoDe, linea, rojo, nota) => {
+  const anotar = (archivoDe, linea, clase, nota) => {
     n += 1;
     const id = `g${String(n).padStart(4, "0")}`;
-    entradas.push({ id: id, archivo: archivoDe(id), linea: linea, rojo: rojo, nota: nota });
+    entradas.push({
+      id: id,
+      archivo: archivoDe(id),
+      linea: linea,
+      clase: clase,
+      rojo: clase === "rojo",
+      nota: nota,
+    });
   };
 
   for (const par of alfabeto) {
@@ -226,7 +267,7 @@ export function corpus(alfabeto = alfabetoPropio()) {
             anotar(
               envoltorio.archivo,
               linea,
-              paquete.rojo,
+              paquete.rojo ? "rojo" : "verde",
               `${rotulo} · ${bandera.nota} · ${paquete.nota} · ${envoltorio.nombre}`,
             );
           }
@@ -237,10 +278,15 @@ export function corpus(alfabeto = alfabetoPropio()) {
         const partes = posicion.partes(ortografia, par.sub);
         if (partes === null) continue;
         const comando = partes.filter((p) => p !== "").join(" ");
+        // Las dos ortografias del comodin del anfitrion: pegada al ultimo token
+        // (":*", que es la que la doc de Claude Code muestra) y separada por un
+        // espacio (" *"). Escriben el MISMO permiso y el lector no las ve igual: esa
+        // diferencia es el residuo A16, y esta linea es la que la genera.
+        const entrada = posicion.separado ? `Bash(${comando} *)` : `Bash(${comando}:*)`;
         anotar(
           (id) => `.claude/settings.${id}.json`,
-          `      ${comoJson(`Bash(${comando}:*)`)},`,
-          posicion.rojo,
+          `      ${comoJson(entrada)},`,
+          posicion.clase,
           `${rotulo} · ${posicion.nombre}`,
         );
       }

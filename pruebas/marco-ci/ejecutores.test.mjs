@@ -90,6 +90,21 @@ function correrLector(entradas) {
 
 test.after(limpiarTodo);
 
+/**
+ * La anotacion MAS FUERTE que el paso emitio sobre esta corrida, o "nada".
+ *
+ * Hace falta desde el modo aviso del 2026-08-21: el codigo de salida distingue dos
+ * estados y ahora hacen falta tres. Un aviso ruidoso y un silencio salen los dos
+ * exit 0, y la diferencia entre los dos es toda la diferencia entre un residuo
+ * DECLARADO y un agujero. Se lee del prefijo de linea de Actions y no de la prosa del
+ * mensaje: el texto de un mensaje cambia con cada arreglo, el prefijo es el contrato.
+ */
+function anotacion(salida) {
+  if (/^::error\b/m.test(salida)) return "error";
+  if (/^::warning\b/m.test(salida)) return "warning";
+  return "nada";
+}
+
 // ---------------------------------------------------------------- regresion
 for (const caso of casos()) {
   test(`ejecutores · ${caso.origen} · ${caso.id}`, () => {
@@ -99,12 +114,30 @@ for (const caso of casos()) {
       caso.exit,
       `${caso.id}: se esperaba exit ${caso.exit} y salio ${exit} (${caso.por_que}).\n${salida}`,
     );
+    // El campo es OPCIONAL: donde el caso lo declara, es lo que lo sostiene. Donde no,
+    // alcanza el exit y no se afirma nada sobre la anotacion.
+    if (caso.anota !== undefined) {
+      assert.equal(
+        anotacion(salida),
+        caso.anota,
+        `${caso.id}: se esperaba la anotacion "${caso.anota}" y salio "${anotacion(salida)}" (${caso.por_que}).\n${salida}`,
+      );
+    }
   });
 }
 
 // ------------------------------------------------------------ corpus generado
-const ROJAS = CORPUS.filter((entrada) => entrada.rojo);
-const VERDES = CORPUS.filter((entrada) => !entrada.rojo);
+//
+// CUATRO BUCKETS DESDE EL 2026-08-21, y no dos. El modo aviso del residuo A16 rompio
+// la particion binaria: hay entradas que TIENEN que anotar sin poner rojo, y hay
+// entradas que —esta medido— no anotan nada. Meterlas todas en VERDES las haria pasar
+// por la puerta de atras: el test de las verdes solo mira el exit, asi que una entrada
+// muda y una que avisa le dan lo mismo, y la diferencia entre las dos es exactamente
+// la diferencia entre un residuo declarado y un agujero.
+const ROJAS = CORPUS.filter((entrada) => entrada.clase === "rojo");
+const AVISOS = CORPUS.filter((entrada) => entrada.clase === "aviso");
+const RESIDUOS = CORPUS.filter((entrada) => entrada.clase === "residuo");
+const VERDES = CORPUS.filter((entrada) => entrada.clase === "verde");
 
 test("corpus generado · cruza todos los ejes contra el alfabeto del banco", () => {
   assert.ok(
@@ -113,6 +146,13 @@ test("corpus generado · cruza todos los ejes contra el alfabeto del banco", () 
   );
   assert.ok(ROJAS.length > 500, `el corpus rojo quedo corto: ${ROJAS.length}`);
   assert.ok(VERDES.length > 300, `el corpus verde quedo corto: ${VERDES.length}`);
+  assert.ok(AVISOS.length > 0, "sin entradas de aviso, la decision del modo aviso no se mide");
+  assert.ok(RESIDUOS.length > 0, "sin entradas de residuo, el agujero medido no queda fijado");
+  assert.equal(
+    ROJAS.length + AVISOS.length + RESIDUOS.length + VERDES.length,
+    CORPUS.length,
+    "hay entradas del corpus sin clase: una entrada que ningun bucket recorre es una pregunta que el banco no hace",
+  );
 });
 
 // LA INDEPENDENCIA, hecha mecanica y no confiada a la prosa. El generador no
@@ -189,6 +229,51 @@ test("corpus generado · el lector no deja pasar ninguna entrada sin pinar", () 
 test("corpus generado · el lector no se pone rojo sobre ninguna entrada pinada", () => {
   const { exit, salida } = correrLector(VERDES);
   assert.equal(exit, 0, `el lector salio ${exit} sobre ${VERDES.length} entradas pinadas:\n${salida}`);
+});
+
+// LAS ENTRADAS DE AVISO: exit 0 —no son compuerta— y ::warning:: en CADA UNA. Las dos
+// mitades importan y por motivos opuestos. Sin el exit 0, la decision del modo aviso no
+// se aplico. Sin el warning por entrada, la decision se convirtio en "no mirar", que es
+// otra cosa: el permiso mas ancho que se puede escribir en un allowlist saldria en
+// silencio y nadie lo sabria. Se compara por CONJUNTO de rutas y no por cantidad,
+// porque lo unico que caza un miembro nuevo es saber CUAL falta.
+test("corpus generado · el lector AVISA sobre cada permiso indeterminado, sin ponerse rojo", () => {
+  const { exit, salida } = correrLector(AVISOS);
+  assert.equal(exit, 0, `el lector salio ${exit} sobre ${AVISOS.length} entradas de aviso:\n${salida.slice(0, 4000)}`);
+  const conAviso = new Set();
+  for (const linea of salida.split("\n")) {
+    const marca = linea.match(/^::warning file=([^,]+),/);
+    if (marca) conAviso.add(marca[1]);
+  }
+  const mudas = AVISOS.filter((entrada) => !conAviso.has(entrada.archivo));
+  assert.deepEqual(
+    mudas.map((entrada) => `${entrada.id} (${entrada.nota}): ${entrada.linea}`),
+    [],
+    "estas entradas autorizan descargar y ejecutar sin pinar y el lector no anoto nada sobre ellas. Un aviso que no sale no es modo aviso: es el agujero de siempre, con permiso",
+  );
+});
+
+// EL RESIDUO A16, FIJADO COMO CASO. Estas entradas escriben el MISMO permiso que las de
+// aviso —el comodin separado sobre un gestor con subcomando autoriza cualquier
+// subcomando, el de ejecutar incluido— y esta medido que el lector no las ve: el
+// alfabeto compara por igualdad exacta y el token que sigue al gestor no es ninguno de
+// sus subcomandos. El caso afirma el AGUJERO a proposito, que es la unica forma de que
+// el dia que se cierre se vea en el diff. Si este test se cae, el residuo se cerro:
+// mover la clase a AVISOS y bajar la fila del backlog de docs/reglas-no-escritas.md.
+test("corpus generado · el residuo A16 sigue MUDO, y queda fijado en vez de olvidado", () => {
+  const { exit, salida } = correrLector(RESIDUOS);
+  assert.equal(exit, 0, `el residuo no puede poner rojo nada:\n${salida.slice(0, 2000)}`);
+  const anotadas = new Set();
+  for (const linea of salida.split("\n")) {
+    const marca = linea.match(/^::(?:warning|error) file=([^,]+),/);
+    if (marca) anotadas.add(marca[1]);
+  }
+  const vistas = RESIDUOS.filter((entrada) => anotadas.has(entrada.archivo));
+  assert.deepEqual(
+    vistas.map((entrada) => `${entrada.id} (${entrada.nota}): ${entrada.linea}`),
+    [],
+    "el check EMPEZO a ver estas entradas, o sea que el residuo A16 se cerro. No es una falla: es la buena noticia. Arreglo: movelas de la clase \"residuo\" a \"aviso\" en generar.mjs y baja su fila del backlog en docs/reglas-no-escritas.md",
+  );
 });
 
 // EL INVARIANTE DEL PREFILTRO, ahora derivado y no enumerado.
