@@ -74,7 +74,24 @@ grep -rn "projects/.github/workflows\|projects/actions" .github/workflows/
 Despues sustitui (en Git Bash; en PowerShell usa el editor o `Edit`):
 
 ```bash
-sed -i "s|\(im-diego-ec/Projects/[^@]*\)@v1|\1@<SHA-COMPLETO>|g" .github/workflows/*.yml
+sed -i -E "s|(im-diego-ec/Projects/[^@\"[:space:]]*)@v[0-9]+(\.[0-9]+\.[0-9]+)?|\1@<SHA-COMPLETO>|g" .github/workflows/*.yml
+
+# VERIFICA QUE NINGUN REF QUEDO PARTIDO, no solo que hubo reemplazos.
+#
+# El patron de este paso decia `@v1` a secas, de cuando los consumidores pinaban
+# el tag movil. Desde la 1.4.0 pinan @vX.Y.Z, y sobre `@v1.4.1` ese patron NO
+# falla ni deja la linea intacta: matchea el prefijo `v1` y deja el resto
+# colgando, o sea `@<SHA-COMPLETO>.4.1`. Medido el 2026-08-21. GitHub no resuelve
+# ese ref y el ensayo muere con un error que parece un typo en la ruta del repo,
+# a tres pasos de distancia de la linea que lo causo.
+#
+# Por eso la verificacion no cuenta reemplazos: comprueba que cada `uses:` del
+# marco termine EXACTAMENTE en el marcador y que no quede ningun resto de version
+# pegado atras.
+grep -nE "im-diego-ec/Projects/[^@]*@" .github/workflows/*.yml
+if grep -qE "@<SHA-COMPLETO>." .github/workflows/*.yml; then
+  echo "ROJO: un ref quedo partido (quedo texto despues del marcador)"; exit 1
+fi
 ```
 
 **Verificacion del paso 2** — no puede quedar ni un `@v1` sin pinear, ni una sola

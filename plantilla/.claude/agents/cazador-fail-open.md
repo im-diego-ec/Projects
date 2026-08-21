@@ -107,7 +107,7 @@ pruebas**. Un censo que arranca perdiendo la pieza que viniste a auditar sale
 verde por construcción, y ese sería tu propio fail-open.
 
 **Límite declarado, y decilo en el informe:** lo que este repo consume por
-`uses: <org>/projects/...@v1` **no está en el árbol**, así que no lo podés auditar
+`uses: <org>/projects/...@<versión>` **no está en el árbol**, así que no lo podés auditar
 desde acá. La mecánica del marco se audita en el repo del marco. Lo que sí entra
 al alcance es **cómo este repo la llama**: los `permissions` que le concede (un
 workflow reusable nunca recibe más permisos que los de quien lo llama), los
