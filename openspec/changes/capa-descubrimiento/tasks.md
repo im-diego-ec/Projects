@@ -32,16 +32,18 @@ grepeando su salida.
 
 ## 0. Pre-registro (BLOQUEANTE: antes de correr un solo brazo)
 
-- [ ] 0.1 Elegir la rebanada con el PO y un builder: qué entrevistas, qué proceso
-      end-to-end, dónde corta y por qué es representativa del material de Supply
-      Chain. Evidencia: la sección 1 de `piloto/pre-registro.md`.
+- [ ] 0.1 Elegir la rebanada con el PO y un builder: qué **piezas del corpus**, qué
+      proceso end-to-end, dónde corta, por qué es representativa del corpus de
+      Supply Chain y si el prototipo la cubre. Evidencia: la sección 1 de
+      `piloto/pre-registro.md`, que es donde vive la tabla vigente con sus cinco
+      filas.
 - [ ] 0.2 Declarar los dos brazos, quién corre cada uno y el orden (A primero), y
       escribir el sesgo que ese orden introduce **a favor del brazo B**. Un sesgo
       declarado se puede corregir al leer; uno tapado invalida la medición.
       Evidencia: sección 2 del pre-registro.
 - [ ] 0.3 Nombrar al scorer —el builder que **no** corre ninguno de los dos
       brazos— y dejar por escrito que arma el inventario de materia prima desde
-      las transcripciones **antes** de ver cualquier salida. Con tres personas el
+      el **corpus** **antes** de ver cualquier salida. Con tres personas el
       rol choca con la firma del veredicto, y eso no se arregla nombrando gente:
       hay que **elegir** cuál de las dos combinaciones se usa y **escribir el
       conflicto que queda**, pegado al ciego imperfecto que `design.md` ya
@@ -49,11 +51,15 @@ grepeando su salida.
       conflicto residual escrito, y el commit del inventario anterior al de las
       salidas.
 - [ ] 0.4 Escribir la tabla de los siete criterios (G0–G6) con sus umbrales ya
-      fijados, tal como están en `design.md` D6, la regla de veredicto, y el
-      comando exacto que produce la evidencia de cada uno, diciendo también
-      cuáles **no** tienen comando y dependen de lectura humana. Un criterio sin
-      comando no es menos válido: es menos verificable, y eso hay que saberlo
-      antes de correr y no al puntuar. Evidencia: sección 4 del pre-registro.
+      fijados **en `piloto/pre-registro.md`, sección 4, que es el pre-registro
+      vigente**, la regla de veredicto, y el comando exacto que produce la
+      evidencia de cada uno, diciendo también cuáles **no** tienen comando y
+      dependen de lectura humana. Un criterio sin comando no es menos válido: es
+      menos verificable, y eso hay que saberlo antes de correr y no al puntuar. La
+      tabla de `design.md` D6 quedó como historia del diseño viejo y **no** es el
+      gate: sus umbrales son los de la pregunta anterior, cuando el insumo eran
+      transcripciones y las salidas eran tres. Evidencia: sección 4 del
+      pre-registro.
 - [ ] 0.5 Planilla de horas por sesión, vacía, con las columnas ya definidas (rol,
       brazo, fecha, horas de reloj). Sin esto, G4 se mide de memoria y la memoria
       siempre favorece a lo nuevo. Evidencia: sección 5 del pre-registro.
@@ -100,32 +106,49 @@ G2 ni G4.
 
 ## 1. Lo que este change NO decide (pendiente de OK humano explícito)
 
-Ninguna de estas cuatro se resuelve por defecto, y ninguna la toma un agente.
+Ninguna se resuelve por defecto y ninguna la toma un agente. La tabla completa, con
+las seis decisiones, quién decide cada una y su estado, vive en la sección 7 del
+pre-registro: acá están las que quedan por tomar y su evidencia.
 
 - [ ] 1.1 **Dependencia de terceros** (⚠️ de `AGENTS.md`): OK para usar la
       herramienta en el piloto, y —por separado, y solo si las **dos** rebanadas
       dan verde— OK para que su pin entre al carril que consumen todos. Evidencia:
       el OK en la sesión, con la versión y el alcance de módulos escritos.
-- [ ] 1.2 **Material con datos de personas**: dónde viven las transcripciones, y
-      si pueden pasar por un modelo. El repositorio no es su custodio (D3) y el
-      piloto no arranca sin esta decisión tomada por una persona. Evidencia: la
-      decisión escrita en el pre-registro, con quién la tomó.
-- [ ] 1.3 **Correr el piloto**: consume tiempo del PO y de dos builders.
-      Evidencia: el OK y las fechas reservadas.
-- [ ] 1.4 **Cadena de herramientas**: confirmar si la instalación exige Python y
-      `uv` además de Node, y para qué módulo. Hoy está declarado como
-      incertidumbre en `design.md`. Evidencia: la instalación corrida en una
-      máquina limpia, con lo que pidió de verdad.
+- [ ] 1.2 **Material con datos de personas**: dónde vive el corpus, y si puede
+      pasar por un modelo. El repositorio no es su custodio (D3) y el piloto no
+      arranca sin esta decisión tomada por una persona. Evidencia: la decisión
+      escrita en el pre-registro, con quién la tomó. **RESUELTA** el 2026-08-21
+      (pre-registro, decisión 1.2); su residuo abrió la decisión 1.5, que sigue
+      bloqueante.
+- [ ] 1.3 **Correr el piloto**: consume tiempo del PO y de dos builders, e incluye
+      confirmar el reparto de roles de la sección 2 del pre-registro. Evidencia: el
+      OK y las fechas reservadas.
+- [ ] 1.4 **Cadena de herramientas**, dos mitades y ninguna opcional: (a) la
+      instalación ensayada **en la máquina que va a correr el brazo B**, con lo que
+      pidió de verdad —el ensayo del 2026-08-20 ya midió que pide `uv`, y no midió
+      el caso sin `uv`—; y (b) **si la fase 1 ingiere un corpus terminado en vez de
+      elicitar**, que es lo que puede tumbar el brazo B y no se cierra leyendo el
+      README. Evidencia: los dos resultados escritos en la sección 6 del
+      pre-registro, con su código de salida.
+- [ ] 1.5 **Despersonalización del corpus** (decisión 1.5 del pre-registro,
+      **bloqueante**): si las piezas que entran a la sesión traen nombres de
+      empleados y juicios sobre su propio trabajo. La toma PO con Builder 1, y hasta
+      que esté tomada el inventario del scorer —que lleva **cita textual** de cada
+      ítem— no tiene domicilio legal en ningún repositorio. Evidencia: la decisión
+      escrita en el pre-registro, con quién la tomó y cuándo.
 
 ## 2. El piloto (arranca el lunes 2026-08-24)
 
-- [ ] 2.1 **Brazo A (control)**: desde las transcripciones directo a `proposal.md`
-      y deltas de specs de la rebanada, con la asistencia de agente habitual.
+- [ ] 2.1 **Brazo A (control)**: desde el **corpus** de la rebanada, leído directo,
+      a las **cinco** salidas —proposal, deltas, tabla de trazabilidad, design y
+      tasks—, con el protocolo del control escrito en la sección 2 del
+      pre-registro. Ahí está el conjunto de salidas vigente, y ahí está por qué el
+      control lee el corpus y no transcripciones: el descubrimiento ya está hecho.
       Evidencia: los artefactos del brazo A, y las horas anotadas por sesión en la
       planilla.
-- [ ] 2.2 **Brazo B**: fases 1 y 2 de la herramienta sobre el **mismo** material
-      → informe de descubrimiento, brief y PRD; y desde el PRD, `proposal.md` y
-      deltas. Evidencia: los artefactos del brazo B y sus horas.
+- [ ] 2.2 **Brazo B**: fases 1 y 2 de la herramienta sobre el **mismo corpus**
+      → informe de descubrimiento, brief y PRD; y desde ahí, las mismas cinco
+      salidas. Evidencia: los artefactos del brazo B y sus horas.
 - [ ] 2.3 Registrar **cada** edición que haya hecho falta hacer sobre el
       directorio de instalación de la herramienta para cortar en el PRD (G0). Si
       la lista queda vacía, decirlo explícitamente: es el resultado esperado y hay
@@ -141,10 +164,10 @@ Ninguna de estas cuatro se resuelve por defecto, y ninguna la toma un agente.
 
 ## 3. Medición y veredicto
 
-- [ ] 3.1 El scorer arma el inventario de materia prima desde las transcripciones
-      y clasifica cada ítem (regla de negocio / contexto / preferencia).
-      Evidencia: `piloto/mediciones.md`, sección inventario, con el id de cada
-      ítem.
+- [ ] 3.1 El scorer arma el inventario de materia prima **desde el corpus** y
+      clasifica cada ítem (regla de negocio / contexto / preferencia), con su
+      `origen` según la convención. Evidencia: `piloto/mediciones.md`, sección
+      inventario, con el id de cada ítem.
 - [ ] 3.2 Puntuar G1 (procedencia 100%) y G2 (caídos en silencio) contra ese
       inventario, ítem por ítem y para los dos brazos. Evidencia: las dos listas
       con veredicto por ítem.

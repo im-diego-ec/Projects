@@ -133,10 +133,12 @@ verificación de qué exige de verdad la cadena de herramientas:
    descubrimiento entra —solo si las **dos** rebanadas del piloto dan verde, y con
    un OK aparte— al carril de todos los consumidores. Se pina por versión exacta y
    se declara su alcance de módulos.
-2. **Material con datos de personas**: dónde viven las transcripciones y si
-   pueden pasar por un modelo. El repositorio no es su custodio y este change no
-   lo decide por defecto.
-3. **Correr el piloto**: consume tiempo del PO y de un builder, y su
+2. **Material con datos de personas**: dónde vive el corpus y si puede pasar por un
+   modelo. El repositorio no es su custodio y este change no lo decide por defecto.
+   **Contestada por Builder 1 el 2026-08-21** —el descubrimiento vive fuera del
+   repositorio y entra como insumo al inicio de la sesión—, con un residuo que
+   sigue abierto y es bloqueante: si lo que entra está **despersonalizado**.
+3. **Correr el piloto**: consume tiempo del PO y de dos builders, y su
    pre-registro se commitea antes de la primera sesión.
 
 **Lo que este change NO promete.** La capa puede garantizar que un escenario
@@ -155,13 +157,17 @@ existe, está revisada, es citable y **no es contrato**. Se archiva —o sea, su
 deltas se funden en los specs vivos— **solo si las dos rebanadas del piloto dan
 verde**: la primera con el orden A → B y la segunda con el orden invertido.
 
-- **El piloto arranca el lunes 2026-08-24** con las transcripciones reales de
-  Supply Chain. No depende de que el proyecto exista: corre fuera de todo
+- **El piloto arranca el lunes 2026-08-24** con el corpus de descubrimiento que el
+  PO ya produjo para Supply Chain: documentos, procesos, casos borde y un prototipo
+  con feedback de usuario. No depende de que el proyecto exista: corre fuera de todo
   repositorio y su huella es cero hasta el veredicto.
-- **El gate está pre-registrado** en `design.md` (D6): siete criterios
-  eliminatorios con sus umbrales escritos **antes** de correr, y el pre-registro
-  commiteado antes de la primera sesión — el sello de tiempo de git es la
-  evidencia de que no se acomodó después.
+- **El gate está pre-registrado en `piloto/pre-registro.md`** (sección 4), que es el
+  documento vigente: siete criterios eliminatorios con sus umbrales escritos
+  **antes** de correr, y commiteados antes de la primera sesión — el sello de tiempo
+  de git es la evidencia de que no se acomodó después. La tabla de `design.md` (D6)
+  quedó como historia del diseño viejo, de cuando el insumo eran transcripciones y
+  el descubrimiento todavía no estaba hecho; donde las dos difieran, manda el
+  pre-registro.
 - **La fecha de veredicto es el 2026-09-21** (28 días desde el arranque, la misma
   ventana que el marco ya usa para estrenar en modo aviso). El campo
   `veredicto_antes_de` del frontmatter no es decorativo: el requirement 2 de este
