@@ -593,3 +593,47 @@ test("un archivo cuyo rastreo no se pudo determinar no cuenta, y lo dice en vez 
   assert.equal(sinSaber.estado, "rojo");
   assert.match(sinSaber.hallazgos.map((h) => h.mensaje).join("\n"), /no se pudo determinar si git rastrea/);
 });
+
+// ---------------------------------------------------------------------------
+// REGRESION DEL 2026-08-21. El modo aviso de A01 aflojo mas de lo que decia:
+// nueve ortografias del amortiguador PUESTO EN EL PASO DEL VEREDICTO —el que
+// cobra needs.<job>.result— pasaron de exit 1 a exit 0, mientras las mismas
+// seis a nivel JOB seguian en rojo. O sea que el corte quedo justo al reves de
+// lo que el texto del check afirmaba.
+//
+// El banco de arriba NO lo cazo, y por eso 372 pruebas salieron verdes con la
+// regresion adentro: el test de continue-on-error existente pone el
+// amortiguador en el job de la constitucion y en el paso de la INVOCACION,
+// nunca en el paso de ci-ok que cobra. Estos casos fijan ese eje.
+//
+// La distincion que hay que preservar: que el paso EXISTA y este neutralizado
+// es un hecho sintactico del YAML —decidible, y por lo tanto rojo— y es otra
+// clase que «no hay ningun paso que cobre», que es el residuo de lectura.
+const AMORTIGUADORES_DEL_VEREDICTO = [
+  ["continue-on-error: true", "        continue-on-error: true\n"],
+  ['continue-on-error: "true"', '        continue-on-error: "true"\n'],
+  ["continue-on-error: ${{ true }}", "        continue-on-error: ${{ true }}\n"],
+  ["continue-on-error: 'true'", "        continue-on-error: 'true'\n"],
+  ["continue-on-error: ${{ 1 == 1 }}", "        continue-on-error: ${{ 1 == 1 }}\n"],
+  ["continue-on-error: yes", "        continue-on-error: yes\n"],
+  ["if: false", "        if: false\n"],
+  ['if: "false"', '        if: "false"\n'],
+  ["if: ${{ false }}", "        if: ${{ false }}\n"],
+];
+
+for (const [nombre, linea] of AMORTIGUADORES_DEL_VEREDICTO) {
+  test(`el PASO del veredicto amortiguado con ${nombre} es ROJO, no aviso`, () => {
+    // El amortiguador va en el paso que compara, que es el que el ruleset
+    // termina cobrando. Sin este rojo, desbloquear un merge cuesta una linea.
+    const ci = CI_CABLEADO.replace("      - run: |\n", "      - run: |\n".replace("      - run: |\n", "") + "      -\n" + linea + "        run: |\n");
+    const raiz = repoConWorkflows({
+      ".projects-valores.json": VALORES_DEL_PROYECTO,
+      [`${DIR_WORKFLOWS}/ci.yml`]: ci,
+    });
+    const corrida = correrCableado(raiz);
+    assert.equal(corrida.status, 1, `deberia ser rojo y salio ${corrida.status}: ${corrida.stdout}`);
+    // Y el mensaje tiene que NOMBRAR el amortiguador, no decir que no hay
+    // ningun paso que consulte: eso mandaba a agregar un paso que ya existia.
+    assert.match(corrida.stdout, /neutralizado|amortiguad|continue-on-error|apaga/i);
+  });
+}
