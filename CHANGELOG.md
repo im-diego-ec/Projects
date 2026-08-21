@@ -35,6 +35,71 @@ mueve sobre un cambio incompatible.
 
 ## [No publicado]
 
+## [1.4.0] — 2026-08-21
+
+### Corregido
+
+- **Un paso amortiguado del veredicto vuelve a ser ROJO, y no el residuo de lectura.**
+  La 1.3.0 salió sana, pero el modo aviso que se le agregó después aflojó más de lo que
+  su propio texto decía: **nueve ortografías** del amortiguador puesto en el *paso* de
+  `ci-ok` que cobra `needs.<job>.result` pasaron de exit 1 a exit 0, mientras las mismas
+  seis a nivel *job* seguían en rojo. El corte quedó justo al revés de lo que el check
+  afirmaba.
+
+  Importa porque `continue-on-error: true` en ese paso es **la línea más barata para
+  desbloquear un merge**: con la regresión, el marco decía «cableado y esperado por
+  ci-ok» en amarillo sobre un repo cuyo check requerido está demostrablemente
+  neutralizado.
+
+  La causa era una clase confundida: `textosVivosDe()` descartaba el paso amortiguado
+  **antes** de clasificar, así que «hay un paso que cobra y alguien lo tapó» y «no hay
+  ningún paso que cobre» caían en el mismo veredicto. Son dos cosas distintas: que el
+  paso exista y esté neutralizado **se lee del YAML** —decidible, y por lo tanto rojo—
+  mientras la segunda es el residuo de lectura que el check declara.
+
+  Verificado con nueve pruebas nuevas que **fallan contra el árbol roto** (38 tests, 29
+  pass, 9 fail) y pasan acá (38/38). Y sobre un espejo de solo lectura del consumidor,
+  idéntico antes y después: no se le agregó ni se le quitó ningún rojo.
+
+- **Un fallo de E/S vuelve a ser rojo, y sin el residuo equivocado pegado.** El bucket
+  que no pudo **leer** un archivo (`ENOENT`) había caído en la misma bolsa que los dos
+  productores indecidibles del check de ejecutores: pasó de rojo a aviso, con el texto
+  del residuo A16 —que habla de la ortografía del comodín— colgado de un error de
+  lectura. No poder leer un archivo es un hecho decidido, y el propio paso ya trata el
+  `rc>1` de `git grep` como rojo con ese mismo argumento.
+
+### Añadido
+
+- **El descubrimiento se produce fuera del repositorio y entra como insumo de la
+  sesión.** Regla nueva en el delta de `gobierno-contribucion`, con dos más que viajan
+  con ella: el descubrimiento llega al contrato **con procedencia** y no lo reemplaza, y
+  **el estado experimental de un change caduca por fecha**. Son deltas de un change
+  activo: **no rigen para los consumidores hasta que el change se archive**.
+
+### Para consumidores
+
+**Qué cambia de verdad para un repo que consume el marco.** Dos cosas, y las dos son
+correcciones que van en la dirección de más rigor, no de menos:
+
+1. Si tu `ci-ok` tiene un `continue-on-error` o un `if` constante falso **en el paso que
+   compara el resultado**, eso pasa a ser **rojo**. Antes salía en amarillo diciendo que
+   el cableado estaba bien. Si te aparece, el arreglo es sacarle el `continue-on-error`
+   al paso que compara, **no agregar otro paso**.
+2. Si el check de ejecutores no puede **leer** uno de tus archivos, eso pasa a ser rojo
+   en vez de aviso. Suele significar que el paso corre después de un borrado.
+
+**Lo que NO cambia:** los dos residuos declarados en la 1.3.0 siguen declarados y siguen
+en modo aviso. El de A01 es el paso que consulta el resultado en su propio `if`; el de
+A16 es el comodín del allowlist escrito separado del gestor. Los dos están medidos, con
+su fila en `docs/reglas-no-escritas.md`, y ninguno se cerró en esta versión.
+
+**Y desde esta versión el marco se distribuye por versión exacta.** El PR de bump lo
+abre Dependabot en cada repo, en vez de que el tag móvil `v1` empuje el cambio a todos a
+la vez. El motivo, medido el 2026-08-20: un check nuevo enrojeció a un consumidor que el
+día anterior pasaba, y nadie lo pidió. Con el bump por PR, el rojo aparece **dentro del
+PR**, que es donde se puede mirar antes de mergear. El tag `v1` sigue existiendo y deja
+de ser el canal de distribución.
+
 ### Cambiado
 
 - **Dos checks pasan a MODO AVISO en la parte que no pueden verificar, y lo dicen
