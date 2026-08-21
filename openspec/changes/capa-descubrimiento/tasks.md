@@ -61,18 +61,22 @@ grepeando su salida.
       transcripciones y las salidas eran tres. Evidencia: sección 4 del
       pre-registro.
 - [ ] 0.5 Planilla de horas por sesión, vacía, con las columnas ya definidas (rol,
-      brazo, fecha, horas de reloj). Sin esto, G4 se mide de memoria y la memoria
-      siempre favorece a lo nuevo. Evidencia: sección 5 del pre-registro.
+      brazo, fecha, **categoría**, horas de reloj). Sin esto, G4 se mide de memoria
+      y la memoria siempre favorece a lo nuevo. Y sin la categoría, el marcado de
+      escenarios que exige la vara del PO (G3b) le come el techo de horas al brazo
+      **más prolijo**, que es lo contrario de lo que G4 busca. Evidencia: sección 5
+      del pre-registro, y `piloto/horas.csv` con el encabezado y cero filas.
 - [ ] 0.6 Pinar la versión exacta de la herramienta y anotarla. Evidencia: sección
       6 del pre-registro con la versión, y el comando de instalación registrado.
 - [ ] 0.7 Commitear el pre-registro **completo** antes de la primera sesión del
       piloto. Evidencia: la fecha del commit del pre-registro es anterior a la
       fecha de la primera entrada de la planilla de horas.
 
-Las cuatro que siguen se agregaron al bloque 0 después de escribirlo, porque el
+Las seis que siguen se agregaron al bloque 0 después de escribirlo, porque el
 bloque se podía tildar entero sin que existiera ninguna de ellas: la checklist
 habría dicho «pre-registro hecho» sobre un pre-registro que no permite medir G1,
-G2 ni G4.
+G2 ni G4. Las dos últimas se agregaron el 2026-08-21, al releer el instrumento
+entero: el inventario del que cuelgan G1 y G2 no tenía dónde vivir.
 
 - [ ] 0.8 Convención de identificadores del material y formato de la tabla de
       trazabilidad, con su domicilio decidido: la tabla vive **con el change**, al
@@ -107,6 +111,24 @@ G2 ni G4.
       de git y sin él el criterio queda no medido, que por la regla de veredicto
       cuenta en contra. Evidencia: el primer commit del espacio, y el código de
       salida de `node piloto/arnes/verificar-brazo.mjs <espacio> B`.
+- [ ] 0.12 Domicilio del inventario, declarado antes de que exista: `inventario.md`
+      en el **espacio de trabajo propio del scorer**, fuera de todo repositorio del
+      área y con su `git init`, y su commit es el **primero** de ese espacio. No va a
+      `piloto/` porque lleva la **cita textual** de cada ítem del corpus, y eso es
+      material del corpus entrando al repositorio: lo prohíbe D3 y no lo autorizó la
+      decisión 1.5, que sigue bloqueante. Lo que viaja a Projects es `mediciones.md`,
+      despersonalizado y después. Sin este domicilio, el archivo del que cuelgan G1
+      y G2 no tiene ningún lugar legal donde commitearse el lunes. Evidencia: la
+      sección 3 del pre-registro, y el `git log` del espacio del scorer con el
+      inventario como primer commit, anterior a los commits de salidas de los dos
+      brazos.
+- [ ] 0.13 Spot-check de granularidad del inventario por el PO, antes de la primera
+      sesión: que una lista de doce casos borde no haya quedado comprimida en un
+      ítem. No revisa clasificaciones —las gobierna la rúbrica—, y es la única
+      segunda mirada que el equipo puede poner sobre el punto donde el piloto es más
+      fácil de arruinar sin mala fe. Es **propuesta**: la confirma la decisión 1.3.
+      Evidencia: el visto del PO con fecha, anterior a la primera fila de
+      `horas.csv`.
 
 ## 1. Lo que este change NO decide (pendiente de OK humano explícito)
 
@@ -167,23 +189,48 @@ pre-registro: acá están las que quedan por tomar y su evidencia.
       de que alguien se acordara de algo (insumo de G5). Al final de un piloto de
       cuatro semanas esa lista se reconstruye mal. Evidencia: la lista con fecha
       por ítem.
+- [ ] 2.6 Anotar, en el momento y en `lista-de-observacion.md` del espacio del
+      brazo, **cada pregunta que la herramienta o el brazo le haga al PO y que el
+      corpus no contestaba**, con su `L0xx`, su fecha, la pregunta textual y la
+      respuesta en una línea. Es lo que le da ancla a un escenario `elicitado`
+      —satisface G1 y queda afuera de G2 y G3— y es lo que el PO revisa al firmar:
+      una entrada que no reconozca es un hallazgo de G3. Anotada después de entregar
+      las salidas no es una elicitación, es una reconstrucción. Evidencia: la lista
+      con una entrada por pregunta y las horas del PO imputadas a `elicitacion`.
 
 ## 3. Medición y veredicto
 
 - [ ] 3.1 El scorer arma el inventario de materia prima **desde el corpus** y
       clasifica cada ítem (regla de negocio / contexto / preferencia), con su
-      `origen` según la convención. Evidencia: `piloto/mediciones.md`, sección
-      inventario, con el id de cada ítem.
-- [ ] 3.2 Puntuar G1 (procedencia 100%) y G2 (caídos en silencio) contra ese
-      inventario, ítem por ítem y para los dos brazos. Evidencia: las dos listas
+      `origen` según la convención. Vive en `inventario.md` del espacio del scorer
+      (0.12) y su commit es anterior al de las salidas de los dos brazos. Evidencia:
+      ese `git log`, y después `piloto/mediciones.md` con el inventario ya
+      despersonalizado y el id de cada ítem.
+- [ ] 3.2 Puntuar G1 (100% de escenarios con ítem asociado, `I0xx` o `L0xx`) y G2
+      (caídos en silencio) contra ese inventario, ítem por ítem y para los dos
+      brazos. G1 es **simétrico**: se exige el 100% en las **dos** tablas, y si la
+      del control no llega, las comparativas de G2 y G4 quedan **no medidas** —una
+      tabla A subllenada le regalaría a B la comparativa—. Evidencia: las dos listas
       con veredicto por ítem.
-- [ ] 3.3 Puntuar G3 (invención): afirmaciones de regla de negocio sin origen
-      rastreable y sin marca de supuesto, con la **cita textual** de cada una.
-      Evidencia: la lista; para el brazo B el umbral es cero absoluto.
-- [ ] 3.4 Cerrar G4: horas de la planilla, y los gates de siempre sobre la salida
-      del brazo B —`openspec validate --strict` y el guardrail de deltas—
-      verificados **por código de salida**. Evidencia: las horas y los dos exit
-      codes, con el comando exacto.
+- [ ] 3.3 Puntuar G3, las dos mitades. **G3a (invención)**: enumerar **todas** las
+      afirmaciones de regla de negocio del delta, una por línea y con veredicto por
+      afirmación —no solo las falladas: una omisión invisible favorece al veredicto
+      que el scorer firma—, con la **cita textual**, el ancla invocada y lo que esa
+      ancla dice de verdad. **G3b (fidelidad al negocio)**: las tres marcas del PO
+      por escenario, anotadas **antes** de ver los otros criterios. Evidencia: la
+      lista completa y la columna del PO; para el brazo B el umbral es cero absoluto
+      en G3a y 100% «describe» en G3b, y las dos son eliminatorias.
+- [ ] 3.4 Cerrar G4: horas de la planilla **por categoría** —`conversion` y
+      `elicitacion` entran a la comparación, `marcado` queda afuera—, y los gates de
+      siempre sobre la salida del brazo B —`openspec validate --strict` y el
+      guardrail de deltas— verificados **por código de salida**. Evidencia: las
+      horas y los dos exit codes, con el comando exacto.
+- [ ] 3.4b Reportar, **sin umbral y por brazo**, la distribución de los ítems de
+      regla de negocio entre `cubierto` / `fuera de alcance declarado` / `pregunta
+      abierta`. No hace fallar nada por sí sola, y sin ella un verde con un delta
+      hueco es ilegible: ninguna de las siete celdas mide cuánto se convirtió, y un
+      brazo que puntúa mucho y convierte poco pasa los siete gates. Evidencia: los
+      tres números y el total, para los dos brazos, en `piloto/veredicto.md`.
 - [ ] 3.5 Cerrar G5: la lista del 2.5 con su columna de destino («check propuesto»
       o «queda fuera, y por qué»). Si todo queda fuera, el techo del veredicto es
       amarillo y hay que escribirlo así. Evidencia: la lista completa.

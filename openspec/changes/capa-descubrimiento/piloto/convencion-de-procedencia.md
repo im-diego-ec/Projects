@@ -11,7 +11,7 @@ veredicto_antes_de: 2026-09-21
 # capa-descubrimiento — Convención de procedencia
 
 Este archivo también es pre-registro, y va junto con `pre-registro.md`. Cierra
-cuatro huecos que dejan sin vara a la mitad del gate:
+cinco huecos que dejan sin vara a la mitad del gate:
 
 - La tarea 3.1 pide «el id de cada ítem» y G1 exige 100% de escenarios con ítem
   asociado y cero `n/a`, pero ninguna línea del change dice **cómo se nombra un
@@ -36,8 +36,17 @@ cuatro huecos que dejan sin vara a la mitad del gate:
   no tiene. Aplicada tal cual a un corpus de documentos, la gramática del
   identificador no nombra nada: G1 y G2 quedan otra vez sin vara, esta vez por una
   razón de forma y no de disciplina. La parte 1 crece para cubrirlo.
+- **El quinto se abrió el mismo día, al releer el instrumento entero contra la
+  pregunta nueva:** el pre-registro **permite** que la herramienta le elicite al PO
+  cosas que el corpus no contesta —prohibirlo sería medirla amputada— y con dos
+  valores de `origen` esa elicitación era **inutilizable**. Un escenario nacido de
+  una respuesta fresca no tenía ancla posible: rompía G1, o se forzaba sobre un
+  ancla vecina y se volvía hallazgo de G3, o quedaba como pregunta abierta aunque
+  el PO ya la hubiera contestado. Y el costo de elicitar sí se cobraba en las horas
+  del PO: el instrumento medía el costo y no tenía casilla para el valor. La parte 1
+  agrega el tercer valor `elicitado` con su lista de observación.
 
-Ninguno de los cuatro es una preferencia de estilo. Los cuatro son la diferencia
+Ninguno de los cinco es una preferencia de estilo. Los cinco son la diferencia
 entre un criterio medible y un criterio que se puede acomodar sin mentir.
 
 **Y hay una distinción que con un corpus preexistente pasa de ser útil a ser el
@@ -99,12 +108,51 @@ secretos: se verifica que existe y dónde, no se lo trae al contexto.
 ### El campo `origen`, que es la vara nueva de G3
 
 Cada ítem del inventario declara, además de su clase, **de dónde salió**. Toma
-exactamente uno de dos valores y no hay tercero:
+exactamente uno de tres valores y no hay cuarto:
 
 | Valor | Qué significa | Qué exige |
 |---|---|---|
 | `corpus` | la afirmación **está** en el corpus | un ancla que la resuelve, y la cita textual en el inventario |
 | `derivado` | la afirmación la infirió quien convertía: un builder o un agente | el ancla de lo que sí dice el corpus, más la frase que se agregó |
+| `elicitado` | la afirmación la **contestó el PO durante el piloto**, porque el corpus no la tenía | una entrada de la lista de observación como ancla (`L0xx`), con su brazo y su fecha |
+
+**Por qué `elicitado` es un valor y no un caso raro de los otros dos.** El
+pre-registro permite a propósito que la herramienta le elicite al PO cosas que el
+corpus no contesta: prohibirlo sería medirla amputada, porque eso es justamente lo
+que su fase 1 promete. Pero con dos valores nada más, un escenario nacido de una
+respuesta fresca del PO **no tenía a dónde ir**, y las tres salidas posibles eran
+malas: rompía G1 (que exige 100% de escenarios con ítem asociado), o se forzaba
+sobre un ancla vecina del corpus y se convertía en un hallazgo de G3, o quedaba como
+pregunta abierta aunque el PO ya la hubiera contestado. Y el costo de esa
+elicitación **sí** se cobra en las horas de G4. El instrumento medía el costo y no
+tenía casilla para el valor.
+
+`elicitado` es esa casilla, y viene con su frontera: **satisface la asociación de
+G1 y queda afuera de los denominadores de G2 y de G3.** G2 cuenta ítems del corpus
+que se cayeron —una respuesta que el corpus no tenía no se pudo caer del corpus— y
+G3 cuenta afirmaciones presentadas como dichas por el corpus cuando el corpus no las
+dice. Un `elicitado` bien declarado no miente sobre su origen: dice que salió de una
+pregunta, con la pregunta escrita.
+
+**La lista de observación, que es lo que hace auditable el valor nuevo.** Cada
+elicitación se anota en el momento, en `lista-de-observacion.md` del espacio de ese
+brazo, y viaja a `piloto/` como evidencia ya despersonalizada. Una entrada por
+pregunta, con identificador `L` más tres dígitos, monótono y sin reutilización:
+
+| Campo | Qué va |
+|---|---|
+| `L0xx` | el identificador, que es lo que se cita como ancla |
+| fecha y brazo | cuándo y en cuál de los dos brazos ocurrió |
+| la pregunta | textual, como la formuló la herramienta o quien corría el brazo |
+| la respuesta | la del PO, en una línea |
+
+**Y el residuo, dicho antes de que alguien lo use:** `elicitado` podría volverse la
+puerta de servicio de la invención («se lo pregunté al PO») si nadie lo revisara.
+Lo que lo cierra es que la lista de observación es **corta, fechada y del PO**: al
+firmar la fidelidad al negocio, el PO ve las entradas `L0xx` que se le atribuyen, y
+**una que no reconozca es un hallazgo de G3**, no una diferencia de memoria. Un
+`elicitado` que el PO no reconoce es una afirmación inventada con una cita falsa
+encima, que es peor que una invención declarada.
 
 **Por qué esto es el centro y no un detalle contable.** Con un corpus ya escrito,
 la invención dejó de verse como un escenario colgando de la nada: ahora se ve como
@@ -133,7 +181,7 @@ delta**, en su tabla de trazabilidad, porque es el único que sabe qué agregó:
 `derivado` que descubre el scorer al puntuar ya es un hallazgo de G3, no una
 declaración.
 
-### Las tres reglas duras
+### Las reglas duras
 
 1. **Un identificador es inmutable desde el commit del inventario.** No se
    renumera, no se reutiliza y no se recicla. Renumerar rompe en silencio todas
@@ -153,6 +201,13 @@ declaración.
    propio identificador. Al revés no hay corrección posible, porque «encontré el
    ancla después» y «acomodé la cita» se ven igual, y esa es justamente la cuenta
    que G3 mide.
+5. **Un ítem `elicitado` se declara el día que se elicita, no al puntuar.** Su
+   ancla `L0xx` tiene fecha, y una entrada de la lista de observación que aparece
+   después de que el brazo entregó sus salidas no es una elicitación: es una
+   reconstrucción. Vale la misma dirección única que la regla 4: un `derivado` que
+   resulta haber sido preguntado se corrige agregando la entrada `L0xx` **con la
+   fecha en que se preguntó**, y si esa fecha no existe, el ítem se queda
+   `derivado`.
 
 ### Cómo se cita en el delta
 
@@ -198,19 +253,31 @@ Cuatro columnas y **una fila por par ítem-escenario**:
 | `I023` | `corpus` | PRD, «Recepción de mercadería», punto 5 | fuera de alcance declarado: la rebanada corta antes del pago a proveedor |
 | `I031` | `corpus` | (sin insumo intermedio: control) | pregunta abierta: quién autoriza una recepción parcial cuando el jefe de bodega no está |
 | `I044` | `derivado` | PRD, «Recepción de mercadería», punto 3 | pregunta abierta: si la orden llega después, ¿la recepción queda pendiente o se acepta y se concilia? |
+| `L003` | `elicitado` | PRD, «Recepción de mercadería», punto 7 | Una recepción parcial autorizada por el suplente del jefe de bodega |
+
+**La primera columna admite dos series, y solo una entra a G2.** `I0xx` es un ítem
+del inventario del corpus; `L0xx` es una entrada de la lista de observación, o sea
+algo que el PO contestó durante el piloto porque el corpus no lo tenía. Las dos
+sirven para satisfacer la asociación de G1 —un escenario citado es un escenario
+rastreable, sin importar cuál de las dos cosas cita—, y **solo `I0xx` entra al
+denominador de G2**: una respuesta que el corpus nunca tuvo no se pudo caer del
+corpus.
 
 **La segunda columna es nueva y es la que agrega la pregunta del piloto.** Antes
 alcanzaban tres: con un material que había que elicitar, lo único que se podía
 fallar era no citar nada. Con un corpus ya escrito, lo que se puede fallar es
 citar de más, y sin esta columna un ítem inferido y un ítem levantado se ven
-idénticos en la tabla. Los valores son los dos de la parte 1 y ninguno más.
+idénticos en la tabla. Los valores son los **tres** de la parte 1 y ninguno más, y
+cada uno tiene que ser coherente con la serie de la primera columna: `elicitado` va
+con un `L0xx` y con nada más, y un `L0xx` no puede declararse `corpus`.
 
 **Lo que la columna nueva NO cambia: las cuentas de G1 y de G2.** G1 sigue
 contando escenarios que aparecen en al menos una fila; G2 sigue contando
-identificadores del inventario que aparecen en **cero** filas. Se dice explícito
+identificadores **del inventario** que aparecen en **cero** filas. Se dice explícito
 porque un cambio de formato que además mueve un denominador vuelve incomparable
 todo lo anterior, y acá no se mueve ninguno: la columna agrega una lectura, no un
-criterio.
+criterio. Las entradas `L0xx` tampoco lo mueven, justamente porque no están en el
+inventario.
 
 **Una fila por par, y no una fila por ítem**, porque eso es lo que hace contables
 las dos direcciones a la vez. Con una fila por ítem y una lista de escenarios
@@ -345,6 +412,19 @@ prototipo se inventarían **las decisiones**, no los elementos, y una decisión 
 solo se puede leer de la ausencia de algo nace como `derivado`, nunca como
 `corpus`, porque «el botón no está» y «no se puede hacer eso» no son la misma
 afirmación.
+
+**Y hay un camino honesto que hasta ahora no estaba dicho, y sin decirlo el
+prototipo entero se hundía en `derivado`.** Una regla que el prototipo codifica y
+que una pieza de **feedback confirma** es `corpus`, con el ancla en el feedback
+(`F0x-...`), no en el prototipo. El prototipo muestra la regla; el feedback es
+alguien diciéndola. Ejemplo: el prototipo no tiene botón para recibir sin orden, y
+una pieza de feedback dice «está bien que no te deje recibir sin la orden» — eso es
+`corpus`, anclado al feedback. Sin esta línea, todo lo que el prototipo codifica
+—que es la pieza con más autoridad de facto del corpus, porque ya pasó por usuarios—
+nacía como supuesto o como invención, y G2 lo habría contado como caído o G3 como
+inventado en los dos brazos por igual. El requisito es estricto y no se relaja: la
+confirmación tiene que ser una pieza de feedback **citable**, no la impresión de
+quien mira la pantalla.
 
 **Y el feedback de usuario sobre el prototipo se clasifica como lo que es: dicho
 por una persona.** Vale la rúbrica entera sin excepción, incluida la regla de que
