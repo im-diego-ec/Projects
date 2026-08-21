@@ -944,6 +944,17 @@ jobs:
 
           echo "el censo de fuentes esta cableado"
 
+      # DONDE ESTA EL PASO, Y POR QUE NO ESTA ACA. Es ahora el job
+      # `constitucion_cableada`, mas abajo. El motivo lo midio la ronda 3 de la
+      # refutacion y no es cosmetico: GitHub resuelve y DESCARGA las actions de un job
+      # en "Set up job", ANTES de correr un solo paso y sin mirar el `if` de ningun
+      # paso. Una action que no existe en la ref con la que se la nombra no produce un
+      # paso rojo: mata el job entero. Mientras el tag movil no traiga
+      # actions/constitucion, este paso se llevaba puestos los otros catorce checks de
+      # higiene del propio Projects, y por eso la compuerta nunca se ejercito como
+      # compuerta: toda su evidencia era local. Un job aparte se puede saltear —un job
+      # salteado no descarga nada— y el veredicto agregado cobra el salteo.
+
       # HUECO 6 — el marco declara desde su primera version que el paquete del
       # CLI es @fission-ai/openspec y que el nombre pelado "openspec" en npm es
       # un placeholder ajeno, y la guia de upgrade lo lleva ademas como item de
@@ -1552,6 +1563,77 @@ jobs:
       #   - El plano de la historia mira el RANGO del cambio, no la historia
       #     entera del repo. Un secreto anterior a la adopcion del check solo
       #     aparece si todavia esta en el arbol.
+      # HUECO 5 — el umbral del total del marco vivia en UN solo lugar (la
+      # constante del comparador de cobertura) y el andamio no lo repartia, asi
+      # que cada proyecto nuevo se inventaba el numero. El que se inventa
+      # termina siendo el que la medicion daba ese dia: el consumidor llego a
+      # tener functions: 70.6 fijado en su propio valor medido, o sea un umbral
+      # cumplido por construccion. Ahora el andamio lo trae, y como eso son DOS
+      # copias del mismo numero en dos archivos, este check las compara. Dos
+      # numeros que tienen que coincidir y que nadie compara son un numero que
+      # va a divergir.
+      #
+      # Solo aplica al repo que DISTRIBUYE el andamio (Projects). En un consumidor
+      # no hay plantilla/ que comparar, y el paso lo dice en vez de callarse.
+      - name: El andamio reparte el umbral del total del marco
+        if: '!cancelled()'
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          COMPARADOR="actions/cobertura-diff/medir-cobertura-diff.mjs"
+          BASE_VITEST="plantilla/vitest.config.base.mjs"
+
+          if [ ! -f "${COMPARADOR}" ]; then
+            echo "::notice::este repo no distribuye el comparador de cobertura del marco: no hay umbral que comparar — verificacion omitida"
+            exit 0
+          fi
+
+          # El [[:space:]]* del final absorbe el retorno de carro: en un
+          # checkout de Windows sin .gitattributes el archivo llega en CRLF y un
+          # ancla al ";$" pelado no matchea nunca. Ahi el check se caeria por un
+          # motivo que no es el suyo.
+          DEL_MARCO="$(sed -n 's/^const MINIMO_DEL_MARCO = \([0-9][0-9]*\);[[:space:]]*$/\1/p' "${COMPARADOR}" | head -n 1)"
+          if [ -z "${DEL_MARCO}" ]; then
+            echo "::error::no se pudo leer MINIMO_DEL_MARCO de ${COMPARADOR}. Si la constante se renombro o cambio de forma, actualiza este check en el mismo PR: un check que no puede leer el numero no puede declarar que coincide con nada"
+            exit 1
+          fi
+          echo "minimo del marco, segun el comparador: ${DEL_MARCO}"
+
+          if [ ! -f "plantilla/.github/workflows/ci.yml" ]; then
+            echo "::notice::este repo no distribuye un andamio (plantilla/): el umbral del total se lo reparte el marco, no este repo — verificacion omitida"
+            exit 0
+          fi
+
+          if [ ! -f "${BASE_VITEST}" ]; then
+            echo "::error::el andamio no reparte ninguna configuracion de cobertura del total: falta ${BASE_VITEST}. Sin eso cada proyecto nuevo inventa su umbral, y el que se inventa es el que la medicion dio ese dia: un umbral cumplido por construccion. Arreglo: agregar ${BASE_VITEST} con thresholds en ${DEL_MARCO} para lines, functions, branches y statements"
+            exit 1
+          fi
+
+          DEL_ANDAMIO="$(sed -n 's/^export const MINIMO_DEL_MARCO = \([0-9][0-9]*\);[[:space:]]*$/\1/p' "${BASE_VITEST}" | head -n 1)"
+          if [ -z "${DEL_ANDAMIO}" ]; then
+            echo "::error::${BASE_VITEST} no declara MINIMO_DEL_MARCO de forma legible, asi que no se puede comprobar que reparta el mismo numero que el comparador. Arreglo: dejalo como 'export const MINIMO_DEL_MARCO = ${DEL_MARCO};'"
+            exit 1
+          fi
+
+          if [ "${DEL_ANDAMIO}" != "${DEL_MARCO}" ]; then
+            echo "::error file=${BASE_VITEST}::el andamio reparte un umbral de total de ${DEL_ANDAMIO}% y el comparador del marco exige ${DEL_MARCO}%: un proyecto creado hoy nace con su suite local pidiendo un numero y la integracion pidiendo otro. Arreglo: dejar los dos en el mismo valor, cambiados en el mismo PR"
+            exit 1
+          fi
+
+          # Las cuatro metricas y all:true. Sin all:true el reporte solo trae
+          # los archivos que alguna prueba importo y el total sube por omision:
+          # el umbral quedaria puesto sin medir el codigo que a nadie molesta.
+          FALTAN=()
+          for CLAVE in "lines: minimo" "functions: minimo" "branches: minimo" "statements: minimo" "all: true"; do
+            if ! grep -qF "${CLAVE}" "${BASE_VITEST}"; then FALTAN+=("${CLAVE}"); fi
+          done
+          if [ ${#FALTAN[@]} -gt 0 ]; then
+            echo "::error file=${BASE_VITEST}::a la configuracion de cobertura del andamio le falta: ${FALTAN[*]}. Las cuatro metricas y all:true son lo que hace que el umbral mida algo"
+            exit 1
+          fi
+
+          echo "el andamio reparte el umbral del total (${DEL_ANDAMIO}%) y coincide con el del comparador"
       - name: Sin secretos en el repo (arbol y historia del cambio)
         if: '!cancelled()'
         shell: bash
@@ -2050,12 +2132,492 @@ jobs:
             process.exit(salida);
           '
 
+      # HUECO 9 — el allowlist del agente es la unica parte del scaffold que NO
+      # se regenera, y a proposito: la asimetria es lo que ordena la decision.
+      # UN PERMISO DE MAS ES UN RIESGO; UNO DE MENOS ES FRICCION. Un mecanismo
+      # no puede fallar cerrado en las dos direcciones, asi que el de mas es
+      # rojo y el de menos es aviso — y ninguno de los dos se resuelve pisando
+      # el archivo, porque igualar borraria entradas legitimas del proyecto (el
+      # identificador de un servidor MCP es de instalacion) y porque la salida
+      # mas barata bajo friccion es settings.local.json, que el .gitignore
+      # excluye: el marco estaria CAUSANDO la evasion que quiere evitar, y
+      # sacando el allowlist de la revision cruzada.
+      #
+      # LA PROPIEDAD ES SOBRE EL VERBO, no sobre una lista de comandos
+      # prohibidos que alguien tendria que acordarse de ampliar cuando aparezca
+      # la herramienta siguiente. Es el mismo criterio del paso vecino de
+      # ejecutores pinados, que mira el EJECUTOR y no el paquete. Y se suma un
+      # segundo caso que ninguna lista de verbos veria: un comodin en la
+      # posicion del subcomando ("terraform *") autoriza TODOS los subcomandos
+      # de esa herramienta, apply incluido.
+      #
+      # POR QUE EL PERFIL DE PRODUCCION NO ES ROJO POR SI SOLO. La constitucion
+      # AUTORIZA expresamente leer produccion por CLI (validate, plan,
+      # describe-*), y la plantilla del marco trae esas entradas: hacerlas rojas
+      # seria un check que contradice la regla que dice defender, y de los que
+      # alguien apaga al tercer PR. Lo que hace este paso con ellas es dejarlas
+      # a la VISTA en cada corrida (::notice::) y exigir que el subcomando este
+      # clavado — con el perfil de prod, un subcomando abierto es exactamente la
+      # entrada que puede terminar en un apply, y escribir en produccion exige
+      # el OK explicito de una persona en esa sesion.
+      #
+      # LO QUE NO SE MIRA ACA, porque ya tiene dueno: que la invocacion de un
+      # ejecutor que descarga lleve version exacta lo caza "Ejecutores de
+      # paquetes pinados" sobre los archivos rastreados. Meterlo tambien aca
+      # seria doble contabilidad, y en una doble contabilidad la declaracion
+      # siempre pierde contra el check.
+      #
+      # Y EL PISO RECOMENDADO TAMPOCO SE MIDE ACA, por lo mismo, aunque hasta el
+      # 2026-08-20 este paso lo hacia con una lista literal escrita a mano.
+      # El piso lo DECLARA el manifiesto del canonico y lo mide quien lo
+      # transporta (`actions/constitucion`). Las dos copias ya habian divergido en
+      # las DOS direcciones —el manifiesto declaraba `Bash(pnpm build)` que este
+      # paso no miraba, y este paso exigia `openspec` que el manifiesto no
+      # declaraba— y estaba medido que mutar el manifiesto no movia el veredicto
+      # de este paso ni un milimetro: seguia midiendo su propio arreglo. Este paso
+      # se queda con lo que SOLO el puede decir, que es si una entrada del
+      # allowlist autoriza una escritura.
+      #
+      # LIMITES DECLARADOS (esto LEE la forma de las entradas, no ejecuta nada):
+      #   - No se modela la precedencia de "deny" ni de "ask". Una entrada de
+      #     allow que autoriza una escritura es el hallazgo, y el arreglo es
+      #     ACOTARLA (un allowlist es una lista blanca: acotar siempre esta
+      #     disponible) o declarar el desvio con su motivo. Taparla con un deny
+      #     deja el permiso ancho y la excepcion sin motivo escrito.
+      #   - Las tools que escriben en el ARBOL de trabajo quedan fuera a
+      #     proposito: el arbol es revisable por diff y CI es su compuerta. La
+      #     frontera que importa es el estado que vive FUERA del arbol (una
+      #     nube, un remoto, un tercero, una persona real).
+      #   - settings.local.json esta en el .gitignore de todos los repos del
+      #     area, asi que queda fuera del universo. Es la misma evasion limpia
+      #     que ya declara el censo de fuentes.
+      #   - Reconoce verbos que escriben; no prueba que el resto no pueda.
+      - name: Permisos del agente sin escritura
+        if: '!cancelled()'
+        shell: bash
+        env:
+          RUTA_ALLOWLIST: .claude/settings.json
+          RUTA_VALORES: .projects-valores.json
+          RUTA_DESVIOS: .projects-desvios.json
+        run: |
+          set -euo pipefail
+
+          # SIN SKIP POR SCAFFOLD, a diferencia del paso vecino que comprueba el
+          # cableado de la constitucion: el marco tambien tiene un agente y la
+          # propiedad le aplica igual. Este es el unico de los dos que Projects SI se
+          # puede comer, y hoy se lo come diciendo la verdad incomoda — su .claude
+          # no esta rastreado, asi que sale el aviso de abajo en su propio repo.
+          if ! command -v node > /dev/null 2>&1; then
+            echo "::error::no hay 'node' en el PATH y sin el no se puede leer el allowlist del agente. Arreglo: agrega 'uses: actions/setup-node@v7' a este job, antes de este paso"
+            exit 1
+          fi
+
+          # Lo NO RASTREADO no se puede mirar, y callarse seria declararlo sano.
+          # Es el mismo limite que ya declara el paso de ejecutores pinados: un
+          # repo con .claude entero fuera del control de versiones esconde de
+          # los dos checks justo el archivo donde aparecio el problema.
+          if ! git ls-files --error-unmatch "${RUTA_ALLOWLIST}" > /dev/null 2>&1; then
+            echo "::warning file=${RUTA_ALLOWLIST}::este repo no rastrea ${RUTA_ALLOWLIST}: el allowlist de su agente no esta versionado, no pasa por la revision cruzada y este check no tiene nada que mirar. Es AVISO y no fallo porque el marco no puede exigir el archivo de una herramienta que el proyecto quizas no use; lo que no hace es callarse y declararlo sano. Arreglo: versiona el allowlist del agente — si en cambio los permisos se acumulan en settings.local.json, ese archivo esta en el .gitignore y queda fuera de la revision de todos"
+            exit 0
+          fi
+
+          # El programa va inline por el mismo motivo que los pasos hermanos, y
+          # viaja entre comillas SIMPLES de shell: adentro no hay ni una comilla
+          # simple literal (va por String.fromCharCode) y los $ de sus
+          # expresiones regulares son del lenguaje, no del shell.
+          # shellcheck disable=SC2016
+          node -e '
+            const { readFileSync, existsSync } = require("node:fs");
+
+            const RUTA = process.env.RUTA_ALLOWLIST;
+            const RUTA_VALORES = process.env.RUTA_VALORES;
+            const RUTA_DESVIOS = process.env.RUTA_DESVIOS;
+
+            const escapar = (valor) =>
+              String(valor).replace(/%/g, "%25").replace(/\r/g, "%0D").replace(/\n/g, "%0A");
+
+            const morir = (mensaje) => {
+              console.log("::error title=Permisos del agente::" + escapar(mensaje));
+              process.exit(1);
+            };
+
+            // EL VOCABULARIO DE VERBOS QUE ESCRIBEN. Las formas con guion
+            // cubren el dialecto de los CLI de nube (create-*, put-*,
+            // terminate-*) sin enumerar un solo servicio: ahi el verbo va
+            // pegado al sustantivo y una lista de comandos envejeceria en cada
+            // release del proveedor.
+            const VERBOS = /^(apply|destroy|push|merge|create|delete|remove|rm|put|update|modify|write|upload|publish|deploy|drop|truncate|terminate|revoke|rotate|send|invite|migrate|seed|(create|delete|put|update|modify|set|start|stop|terminate|run|send|invoke|attach|detach|associate|disassociate|register|deregister|enable|disable|tag|untag|copy|restore|reboot|import|export)-[a-z0-9-]+)$/;
+
+            // Cuando la invocacion habla HTTP (el CLI de la plataforma, curl),
+            // el verbo no viaja en la posicion del subcomando sino en la
+            // bandera del metodo.
+            const METODOS = /^(POST|PUT|PATCH|DELETE)$/i;
+
+            // Las tools de un servidor MCP no tienen subcomandos: el verbo es
+            // un segmento de su nombre. "read", "list", "get" y "search" no
+            // estan aca a proposito.
+            const VERBOS_MCP = /^(send|create|update|delete|trash|write|post|share|schedule|invite|remove|add|set|archive|move|upload|copy|respond|react|draft|publish|resolve|assign|snooze|label|pin)$/;
+
+            let ajustes;
+            try {
+              ajustes = JSON.parse(readFileSync(RUTA, "utf8"));
+            } catch (error) {
+              morir(RUTA + " esta rastreado y no se pudo leer o no parsea (" + error.message + "), asi que no se puede afirmar que el allowlist del agente no autorice una escritura. Lo no verificable es rojo, nunca exito mudo. Arreglo: corregi el JSON");
+            }
+
+            const permisos = ajustes && typeof ajustes === "object" ? ajustes.permissions : null;
+            const allow = permisos && Array.isArray(permisos.allow)
+              ? permisos.allow.filter((x) => typeof x === "string").map((x) => x.trim()).filter(Boolean)
+              : [];
+
+            // El perfil de produccion es un valor DEL PROYECTO: sale de su
+            // archivo de valores y nunca esta escrito en el marco (los handles
+            // y las cuentas reales viven del lado del consumidor).
+            function buscar(doc, nombre) {
+              if (!doc || typeof doc !== "object") return undefined;
+              if (doc[nombre] !== undefined) return doc[nombre];
+              if (doc.marco && typeof doc.marco === "object" && doc.marco[nombre] !== undefined) return doc.marco[nombre];
+              if (doc.valores && typeof doc.valores === "object" && doc.valores[nombre] !== undefined) return doc.valores[nombre];
+              return undefined;
+            }
+
+            // TODO FAIL-OPEN ES RUIDOSO, y este era el contraejemplo. Hasta el
+            // 2026-08-20 el ::warning:: cubria SOLO el caso "existe y no
+            // parsea": si el archivo no estaba, o estaba y no declaraba
+            // PERFIL_PROD, la variable quedaba en "" y la deteccion se apagaba en
+            // silencio. Medido, mismo allowlist y mismo dia: sin el archivo, el
+            // paso informaba "0 corre(n) con el perfil de produccion" sobre un
+            // allowlist que contenia a la vista Bash(AWS_PROFILE=la organización-prod
+            // terraform plan *); con el archivo, "1 corre(n)". Un conteo falso
+            // reportado como hecho es peor que no reportarlo, y es exactamente el
+            // fail-open silencioso del incidente del 2026-08-05.
+            let PERFIL_PROD = "";
+            let porqueSinPerfil = "";
+            if (!existsSync(RUTA_VALORES)) {
+              porqueSinPerfil = RUTA_VALORES + " no existe en este repo";
+            } else {
+              try {
+                const valores = JSON.parse(readFileSync(RUTA_VALORES, "utf8"));
+                const crudo = buscar(valores, "PERFIL_PROD");
+                if (typeof crudo === "string" && crudo.trim() !== "") PERFIL_PROD = crudo.trim();
+                else porqueSinPerfil = RUTA_VALORES + " no declara PERFIL_PROD (o lo declara vacio)";
+              } catch (error) {
+                // El rojo por el JSON roto lo da la verificacion de la
+                // constitucion: repetirlo aca seria contar dos veces el mismo
+                // problema.
+                porqueSinPerfil = RUTA_VALORES + " no parsea (" + error.message + ")";
+              }
+            }
+            if (PERFIL_PROD === "") {
+              console.log("::warning file=" + escapar(RUTA_VALORES) + "::" + escapar(porqueSinPerfil + ", asi que este paso NO sabe cual es el perfil de produccion del proyecto y la deteccion de entradas que corren con el esta APAGADA en esta corrida. El conteo de mas abajo va a decir 0 y ese 0 no significa que no haya ninguna: significa que no se busco. Arreglo: declara PERFIL_PROD en " + RUTA_VALORES));
+            }
+
+            // Los desvios los VALIDA `actions/constitucion` en el job de la
+            // constitucion del consumidor (la forma de las DOS clases, el motivo,
+            // y el vencimiento de los que nombran una regla del canonico, que es
+            // lo unico que puede decir quien tiene el canonico a mano). Aca solo
+            // se consumen los que nombran un permiso, y se exige lo unico que
+            // este paso necesita: que el motivo este. La forma se valida en UN
+            // solo lado a proposito.
+            const declarados = new Map();
+            if (existsSync(RUTA_DESVIOS)) {
+              let doc = null;
+              try {
+                doc = JSON.parse(readFileSync(RUTA_DESVIOS, "utf8"));
+              } catch (error) {
+                console.log("::warning file=" + escapar(RUTA_DESVIOS) + "::" + escapar(RUTA_DESVIOS + " no parsea (" + error.message + "), asi que en este paso ningun desvio absorbe nada y toda entrada declarada va a salir como hallazgo sin desvio. El rojo por el JSON roto lo da el job de la constitucion del marco (actions/constitucion)"));
+              }
+              const lista = doc && Array.isArray(doc.desvios) ? doc.desvios : [];
+              for (const cruda of lista) {
+                const permiso = cruda && typeof cruda.permiso === "string" ? cruda.permiso.trim() : "";
+                const motivo = cruda && typeof cruda.motivo === "string" ? cruda.motivo.trim() : "";
+                const quien = cruda && typeof cruda.aprobado_por === "string" ? cruda.aprobado_por.trim() : "";
+                if (!permiso || !motivo) continue;
+                declarados.set(permiso, { motivo: motivo, quien: quien, usado: false });
+              }
+            }
+
+            const hallazgos = [];
+            const absorbidos = [];
+            const aLaVista = [];
+
+            function marcar(entrada, porque, conPerfilProd) {
+              const d = declarados.get(entrada);
+              if (d) {
+                d.usado = true;
+                absorbidos.push({ entrada: entrada, porque: porque, motivo: d.motivo, quien: d.quien });
+                return;
+              }
+              hallazgos.push({ entrada: entrada, porque: porque, prod: conPerfilProd === true });
+            }
+
+            // El allowlist admite "cmd args *" y "cmd args:*": las dos formas
+            // significan "y lo que siga". Solo se normaliza el separador del
+            // FINAL, para no tocar los dos puntos de una URL o de una ruta.
+            // Las asignaciones de entorno del principio se apartan porque no
+            // son el comando (AWS_PROFILE=... terraform plan).
+            function partir(interno) {
+              const plano = String(interno).replace(/:[ \t]*\*[ \t]*$/, " *");
+              const brutos = plano.split(/[ \t]+/).filter(Boolean);
+              const entorno = [];
+              let i = 0;
+              while (i < brutos.length && /^[A-Za-z_][A-Za-z0-9_]*=/.test(brutos[i])) {
+                entorno.push(brutos[i]);
+                i += 1;
+              }
+              return { entorno: entorno, palabras: brutos.slice(i) };
+            }
+
+            for (const entrada of allow) {
+              const bash = entrada.match(/^Bash(\((.*)\))?$/);
+              if (bash) {
+                const interno = bash[2] === undefined ? "*" : bash[2];
+                const partido = partir(interno);
+                const palabras = partido.palabras;
+                const prod = PERFIL_PROD !== "" && partido.entorno.some((e) => e.slice(e.indexOf("=") + 1) === PERFIL_PROD);
+
+                if (palabras.length === 0 || palabras[0].indexOf("*") >= 0) {
+                  marcar(entrada, "autoriza cualquier comando de shell sin acotar la herramienta, y cualquiera incluye los que escriben", prod);
+                  continue;
+                }
+                const herramienta = palabras[0];
+
+                // Primer token que no es bandera ni asignacion: ahi va el
+                // subcomando. Un comodin en ESA posicion autoriza todos los
+                // subcomandos de la herramienta, los que escriben incluidos.
+                let posicion = null;
+                for (let i = 1; i < palabras.length; i += 1) {
+                  const p = palabras[i];
+                  if (p.charAt(0) === "-" || p.indexOf("=") > 0) continue;
+                  posicion = p;
+                  break;
+                }
+                if (posicion !== null && posicion.indexOf("*") >= 0) {
+                  marcar(entrada, "deja el subcomando de \"" + herramienta + "\" en comodin, asi que autoriza TODOS sus subcomandos y entre ellos los que escriben", prod);
+                  continue;
+                }
+
+                let verbo = null;
+                for (let i = 1; i < palabras.length && verbo === null; i += 1) {
+                  const limpio = palabras[i].toLowerCase().replace(/[^a-z0-9-]/g, "");
+                  if (limpio !== "" && VERBOS.test(limpio)) verbo = palabras[i];
+                }
+                if (verbo === null) {
+                  for (let i = 1; i < palabras.length && verbo === null; i += 1) {
+                    const p = palabras[i];
+                    const pegado = p.match(/^(?:-X|--method)=(.*)$/);
+                    if (pegado && METODOS.test(pegado[1])) { verbo = p; continue; }
+                    if (/^(-X|--method)$/.test(p) && i + 1 < palabras.length && METODOS.test(palabras[i + 1])) {
+                      verbo = p + " " + palabras[i + 1];
+                    }
+                  }
+                }
+                if (verbo !== null) {
+                  marcar(entrada, "autoriza \"" + herramienta + " ... " + verbo + "\" sin preguntar, y ese verbo ESCRIBE", prod);
+                  continue;
+                }
+                if (prod) {
+                  aLaVista.push(entrada);
+                }
+                continue;
+              }
+
+              const mcp = entrada.match(/^mcp__(.+?)__(.+)$/);
+              if (mcp) {
+                const tool = mcp[2];
+                let verbo = null;
+                for (const segmento of tool.toLowerCase().split("_")) {
+                  if (segmento !== "" && VERBOS_MCP.test(segmento) && verbo === null) verbo = segmento;
+                }
+                if (verbo !== null) {
+                  marcar(entrada, "autoriza la tool \"" + tool + "\" de un servidor MCP y su verbo (\"" + verbo + "\") escribe fuera del repo: actuar sobre un sistema de terceros o contactar a una persona real es una frontera del marco, no un detalle de configuracion", false);
+                }
+                continue;
+              }
+              // El resto de las tools (lectura y edicion del arbol de trabajo)
+              // queda fuera del alcance declarado arriba.
+            }
+
+            let salida = 0;
+
+            for (const h of hallazgos) {
+              salida = 1;
+              const cola = h.prod
+                ? " Ademas corre con el perfil de PRODUCCION: escribir en produccion exige el OK explicito de una persona en esa sesion, y un permiso pre-aprobado es exactamente lo contrario de pedirlo."
+                : "";
+              console.log(
+                "::error file=" + escapar(RUTA) + ",title=Permiso de escritura sin desvio declarado::" +
+                escapar(
+                  "la entrada \"" + h.entrada + "\" del allowlist " + h.porque + ", asi que el agente puede hacerlo sin que nadie confirme." + cola +
+                  " Arreglo, una de dos: ACOTALA a las operaciones de lectura que el trabajo necesita de verdad (un allowlist es una lista blanca: siempre se puede escribir el subcomando exacto en vez del comodin), o si esa autorizacion es deliberada declarala como desvio en " + RUTA_DESVIOS +
+                  " con su motivo escrito: { \"permiso\": \"" + h.entrada + "\", \"motivo\": \"por que este proyecto la necesita\", \"aprobado_por\": \"<quien>\", \"fecha\": \"AAAA-MM-DD\" }. Taparla con una entrada de \"deny\" no cuenta: deja el permiso ancho y la excepcion sin motivo escrito"
+                )
+              );
+            }
+
+            for (const a of absorbidos) {
+              // El desvio vivo se reimprime en CADA corrida: una excepcion que
+              // nadie vuelve a ver es una excepcion que nadie vuelve a
+              // discutir.
+              console.log("::notice title=Permiso de escritura con desvio declarado::" + escapar(a.motivo + " (permiso \"" + a.entrada + "\"" + (a.quien ? ", aprobado por " + a.quien : "") + ")"));
+            }
+
+            // Un desvio de permiso que ya no absorbe nada esta repartiendo
+            // permiso sobre la nada, igual que una declaracion muerta del
+            // detector de secretos: si se queda, el dia que alguien vuelva a
+            // agregar esa entrada se la traga en silencio.
+            for (const [permiso, d] of declarados) {
+              if (d.usado) continue;
+              salida = 1;
+              const detalle = allow.indexOf(permiso) >= 0
+                ? "esa entrada sigue en el allowlist pero ya no autoriza ninguna escritura, asi que el desvio no hace falta"
+                : "esa entrada ya no esta en el allowlist";
+              console.log(
+                "::error file=" + escapar(RUTA_DESVIOS) + ",title=Desvio de permiso muerto::" +
+                escapar("el desvio del permiso \"" + permiso + "\" no absorbe ningun hallazgo: " + detalle + ". Arreglo: borra esa entrada de " + RUTA_DESVIOS + " (motivo que tenia escrito: " + d.motivo + ")")
+              );
+            }
+
+            for (const entrada of aLaVista) {
+              console.log("::notice title=Permiso con el perfil de produccion::" + escapar("la entrada \"" + entrada + "\" corre con el perfil de produccion. El marco autoriza LEER produccion por CLI, asi que no es un hallazgo — se imprime en cada corrida para que quede a la vista y no se descubra el dia que importa"));
+            }
+
+            // EL PISO RECOMENDADO NO SE MIDE ACA. Lo declara el manifiesto del
+            // canonico y lo mide `actions/constitucion`, que es la pieza que lo
+            // transporta al consumidor. Ver el comentario largo del encabezado de
+            // este paso: cuando se declaraba en un lado y se verificaba con un
+            // literal en el otro, las dos copias divergieron.
+
+            // La verdad de lo que se probo, ni una palabra mas.
+            console.log(
+              "== permisos del agente == " + allow.length + " entrada(s) del allowlist leidas: " +
+              hallazgos.length + " autoriza(n) una escritura sin desvio declarado, " + absorbidos.length + " con desvio y motivo escrito, " +
+              aLaVista.length + " corre(n) con el perfil de produccion" +
+              (PERFIL_PROD === "" ? " (deteccion APAGADA: ver el aviso de arriba, ese 0 no significa que no haya ninguna)" : "") + ". " +
+              "Es lectura de la FORMA de las entradas y no ejecucion: reconoce verbos que escriben y comodines en la posicion del subcomando, NO prueba que el resto de las entradas no pueda escribir. El piso recomendado de permisos lo mide actions/constitucion, que es donde vive su unica declaracion"
+            );
+            process.exit(salida);
+          '
+
+  # ---------------------------------------------------------------------------
+  # HUECO 8 — de las cuatro formas de distribucion del marco, *scaffold* dice
+  # textualmente "No se actualiza solo", y ahi viven los AGENTS.md: o sea LAS
+  # REGLAS QUE EL AGENTE LEE. En un area que implementa con agentes eso no es
+  # un detalle de documentacion — una regla que no entra al contexto de la
+  # sesion no existe, por bien escrita que este en otro repo. La divergencia
+  # ya corre en las dos direcciones: un consumidor perdio la mitad de una
+  # regla que era la leccion de un incidente, y otro llego a decir lo
+  # contrario de la regla que nacio de otro.
+  #
+  # LO QUE VERIFICA ESTE PASO ES EL CABLEADO, no el artefacto. El artefacto
+  # lo verifica el modo `verificar` de la misma action, que es la unica pieza
+  # que lo compara contra el RE-RENDER del canonico: el texto viaja DENTRO de
+  # la composite action porque el GITHUB_TOKEN de un consumidor no lee otro
+  # repositorio (comprobado el 2026-08-14: da 404).
+  #
+  # POR QUE ESTE PASO ES UN `uses:` Y NO UN `grep`, y es la refutacion mas
+  # cara de la auditoria del 2026-08-20. Hasta esa fecha aca habia dos cosas
+  # y las dos salian verdes sobre repos donde nada verificaba nada:
+  #
+  #   1. un paso que leia el artefacto y su sello, y salia exit 0 MUDO —cero
+  #      ::error::, cero ::warning::, tambien con la version ya exigible—
+  #      contra el unico esquema de `superficies` que el scaffold emite. Y
+  #      cuando el artefacto SI estaba, lo rechazaba: exigia sha de 64 hex del
+  #      cuerpo y la action emite 12 hex del canonico. Ese paso se borro.
+  #   2. su reemplazo: un `grep -rE 'uses:.*actions/constitucion'` sobre
+  #      .github/workflows, que afirmaba "la verificacion esta cableada" con
+  #      solo encontrar la linea. Se midieron CINCO configuraciones donde el
+  #      grep sale exit 0 y nada verifica: el consumidor que tiene el ci.yml
+  #      viejo mas el actualizar-marco.yml del propio marco (modo ESCRIBIR, y
+  #      su encabezado dice textual "este workflow no verifica"); un job con
+  #      `if: false`; la unica invocacion en un `on: workflow_dispatch`; el
+  #      archivo en un subdirectorio de .github/workflows, que GitHub Actions
+  #      NUNCA ejecuta ("workflows must be defined at the top level of the
+  #      .github/workflows/ directory") pero grep -r recorre igual; y la
+  #      perilla, un plantilla/.github/workflows/ci.yml vacio y SIN RASTREAR
+  #      que apagaba el check entero porque el skip se decidia con `test -f`.
+  #
+  # Un grep no puede distinguir ninguno de los cinco: los cinco tienen la
+  # linea. Lo que separa un cableado de su apariencia es la ESTRUCTURA —en que
+  # archivo esta, con que evento corre, con que modo se invoca, si el job esta
+  # apagado y si el veredicto agregado lo espera— y eso hay que parsearlo. El
+  # lector de YAML (sin dependencias, Node pelado) vive en la action, con su
+  # banco de pruebas y un caso por cada una de las cinco configuraciones.
+  #
+  # POR QUE VIVE EN LA ACTION Y SE INVOCA DESDE ACA. El programa necesita un
+  # archivo y un banco de pruebas, y un heredoc no puede cerrar dentro de un
+  # bloque de YAML indentado — de ahi los `node -e` inline de los pasos
+  # hermanos, que por eso mismo no tienen banco. Este paso corre en el carril
+  # INDEPENDIENTE: el consumidor lo hereda por llamar a este workflow, asi que
+  # borrar su job de la constitucion no apaga al que denuncia que falta. Eso
+  # es lo contrario de la circularidad medida, donde marco-ci delegaba en la
+  # action y la action se invocaba solo desde el workflow que declara no
+  # verificar.
+  #
+  # LA ASIMETRIA DEL VEREDICTO, y reemplaza a la ventana de gracia que este
+  # carril no puede leer (el calendario vive en el manifiesto del canonico,
+  # que viaja con la action):
+  #   · repo que NO versiona .projects-valores.json -> ::warning::. Todavia no
+  #     adopto la constitucion; el rojo por no haber adoptado no es de un
+  #     check nuevo del pipeline, es del PR de migracion.
+  #   · repo que SI lo versiona y no tiene un cableado que cuente -> ::error::,
+  #     y cada invocacion que no cuenta sale con el motivo exacto por el que no
+  #     cuenta. El pecado del paso anterior no era el color: era el silencio.
+  #
+  # SKIP DEL DISTRIBUIDOR, ahora como PROPIEDAD POSITIVA y con tres candados:
+  # el repo que reparte el scaffold es el marco y no es consumidor de su propia
+  # porcion, pero para saltearse el check tiene que (1) RASTREAR
+  # plantilla/.github/workflows/ci.yml, (2) no versionar .projects-valores.json y
+  # (3) repartir un scaffold que SI cablea la verificacion. Un repo adoptado no
+  # se apaga agregando un archivo, y un distribuidor que reparte un scaffold sin
+  # el cableado es rojo en vez de silencio.
+  #
+  # LO QUE VERIFICA ESTE JOB ES EL CABLEADO, y corre en el carril INDEPENDIENTE: el
+  # consumidor lo hereda por llamar a este workflow, asi que borrar su job de la
+  # constitucion no apaga al que denuncia que falta.
+  #
+  # POR QUE ES UN JOB Y NO UN PASO DE `higiene`. Porque un paso no se puede saltear a
+  # tiempo: GitHub resuelve y descarga las actions de un job en "Set up job", antes de
+  # evaluar el `if` de cualquier paso. Con la action todavia ausente del tag movil, el
+  # paso mataba el job de higiene entero en el CI de Projects — o sea que la compuerta
+  # jamas se ejercito como compuerta, que es el hallazgo 7 de la ronda 3.
+  #
+  # POR QUE EL `if` NOMBRA AL REPO DEL MARCO, y por que no es una perilla. `uses:` no
+  # admite expresiones (la referencia lo prohibe) y una ruta local dentro de un workflow
+  # reusable se resuelve contra el repo de QUIEN LLAMA, no contra el del reusable. Las
+  # dos formas son entonces incompatibles en un mismo paso: el consumidor necesita la
+  # ref publicada y el marco necesita su arbol. La particion es TOTAL —el que no corre
+  # aca corre en el ci.yml del marco por ruta local, `./actions/constitucion`— y el
+  # veredicto de abajo lo COBRA: si este job se saltea sin ser el marco, es rojo.
+  # Cuando el tag movil traiga la action, este `if` se borra y queda un solo camino.
+  # ---------------------------------------------------------------------------
+  constitucion_cableada:
+    name: constitucion-cableada
+    if: ${{ !cancelled() && github.repository != 'im-diego-ec/Projects' }}
+    runs-on: ${{ inputs.runner }}
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with: { node-version: "22" }
+      - name: Constitucion del marco cableada
+        uses: im-diego-ec/Projects/actions/constitucion@v1
+        with:
+          modo: cableado
+          # La rama por defecto sale del evento y no de una constante: un `push`
+          # que no dispara en la rama protegida no es una compuerta, y cual es esa
+          # rama lo sabe GitHub. Si el evento no la trae (un workflow_call sin
+          # repositorio en el payload) la action cae a "main", que es la unica rama
+          # permanente que el marco admite.
+          rama_por_defecto: ${{ github.event.repository.default_branch }}
+
   # Veredicto agregado DEL MARCO. Reporta siempre (docs o codigo). No conoce el
   # build/test del producto: ese lo agrega el ci-ok del repo consumidor, que es
   # el check requerido por el ruleset.
   marco_ok:
     name: marco-ok
-    needs: [cambios, openspec, higiene]
+    needs: [cambios, openspec, higiene, constitucion_cableada]
     if: always()
     runs-on: ${{ inputs.runner }}
     steps:
@@ -2065,6 +2627,19 @@ jobs:
           [ "${{ needs.cambios.result }}" = "success" ] || { echo "::error::la deteccion de cambios fallo"; exit 1; }
           [ "${{ needs.openspec.result }}" = "success" ] || { echo "::error::la validacion de OpenSpec fallo"; exit 1; }
           [ "${{ needs.higiene.result }}" = "success" ] || { echo "::error::los checks de higiene del marco fallaron"; exit 1; }
+          # El salteo del carril del consumidor tiene UNA sola excusa valida, y se
+          # comprueba aca en vez de confiarse: el repo del marco, que verifica su
+          # cableado por ruta local en su propio ci.yml. Cualquier otro salteo es un
+          # fail-open, y un fail-open silencioso es indistinguible de que la compuerta
+          # no exista.
+          if [ "${{ needs.constitucion_cableada.result }}" != "success" ]; then
+            if [ "${{ needs.constitucion_cableada.result }}" = "skipped" ] && [ "${{ github.repository }}" = "im-diego-ec/Projects" ]; then
+              echo "constitucion-cableada: salteado a proposito en el repo del marco, que lo corre por ruta local en su ci.yml"
+            else
+              echo "::error::la comprobacion del cableado de la constitucion termino en '${{ needs.constitucion_cableada.result }}' en ${{ github.repository }}: un salteo solo es valido en el repo que distribuye el marco"
+              exit 1
+            fi
+          fi
           if [ "${{ needs.cambios.outputs.solo_docs }}" = "true" ]; then
             echo "carril de docs: el consumidor puede omitir su build/test"
           else

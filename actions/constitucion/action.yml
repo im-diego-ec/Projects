@@ -1,0 +1,255 @@
+name: Constitucion del marco
+description: >-
+  Renderiza la porcion del marco de la constitucion en el repo consumidor, o
+  verifica que la presente sea la que el marco publica para su version.
+author: la organización
+
+# ---------------------------------------------------------------------------
+# PERMISOS MINIMOS QUE DEBE CONCEDER EL CONSUMIDOR
+#
+#   permissions:
+#     contents: read   # el checkout previo; esta action no llama a la API
+#
+#   El modo escribir necesita ademas 'contents: write' y 'pull-requests: write'
+#   EN EL WORKFLOW QUE ABRE EL PR, no aca: esta action escribe en el arbol de
+#   trabajo y nada mas. No commitea, no pushea y no abre PRs.
+#
+# QUE HACE, EN UNA LINEA
+#   canonico/ + .projects-valores.json + .projects-desvios.json  ->  un artefacto por
+#   superficie de agente declarada, o el veredicto de si el presente coincide.
+#
+# POR QUE EL CANONICO VIAJA ADENTRO. El GITHUB_TOKEN de un consumidor no lee otro
+# repositorio: si el texto viviera en Projects y el consumidor tuviera que ir a
+# buscarlo, haria falta un token con acceso cruzado. Con GITHUB_ACTION_PATH el
+# texto llega con la action, en la misma resolucion de @v1 que ya ocurre. Es el
+# mismo transporte de guardrail-deltas y por la misma razon.
+#
+# POR QUE ESTA ACTION LLEVA PLACEHOLDERS Y LAS OTRAS NO. actions/README.md dice
+# que las actions no llevan {{...}} porque una pieza referenciada es la misma para
+# todos los repos. Esta es la excepcion declarada: lo que viaja adentro no es
+# codigo de la action sino TEXTO PARA UN PROYECTO, y el render contra los valores
+# del consumidor es justamente lo que reemplaza al scaffold copiado a mano. La
+# convencion de dobles llaves es la misma del scaffold, sin dialecto nuevo.
+#
+# ESTA ES LA UNICA PIEZA QUE VERIFICA LA CONSTITUCION, desde el 2026-08-20. Habia
+# tambien un paso inline en el marco-ci.yml que heredan todos los consumidores, y la
+# auditoria de cierre de v1 midio que las dos verdades ya discrepaban en esquema
+# (objetos {nombre,cadena} contra nombres sueltos), en severidad (atraso con ventana
+# contra error seco) y en formato de sello (64 hex del cuerpo contra los 12 hex del
+# canonico que esta action emite) — o sea que un artefacto recien generado por este
+# codigo salia rechazado por el otro carril, con un mensaje que mandaba a correr el
+# escritor que acababa de generarlo. El paso se borro y esta action se cableo al
+# ci.yml del scaffold. La razon de que sobreviva ESTA y no el paso: es la unica que
+# compara el artefacto contra el RE-RENDER del canonico. Verificar contra la fuente es
+# estrictamente mas fuerte que verificar contra el sello que trae el propio archivo,
+# porque recomputar un sello es un `git commit` y cambiar el canonico no.
+#
+# DONDE ESTA EL ROJO Y DONDE EL AVISO (regla 3 del marco: fail-open ruidoso)
+#   · artefacto ausente o atrasado -> ::warning:: hasta el exigible_desde de la
+#     version pendiente mas vieja, ::error:: desde esa fecha. NUNCA verde mudo: no
+#     hay rama de "este repo no aplica", porque el repo que no lo tiene es
+#     exactamente el que hay que avisar.
+#   · .projects-valores.json ausente -> en modo verificar entra por la MISMA ventana que
+#     el artefacto faltante (aviso, despues rojo): es un atraso de adopcion, no una
+#     manipulacion, y un rojo seco el primer dia es un endurecimiento estrenado sin
+#     modo aviso. En modo escribir sigue siendo rojo: no hay con que renderizar.
+#   · marcador del scaffold sin resolver -> ::error::, y en modo escribir NO se emite
+#     nada. Un valor cuyo TEXTO es el propio marcador (lo que la plantilla entrega tal
+#     cual) no cuenta como valor: medido, antes de este arreglo el artefacto salia con
+#     27 lineas de dobles llaves y exit 0 en los dos modos.
+#   · cuerpo distinto del re-render de su version -> ::error:: siempre, con el
+#     diff. La ventana de gracia es para reglas nuevas, no para ediciones a mano.
+#   · cadena de carga rota (el archivo existe y ningun agente lo importa) ->
+#     ::error::. Un import que no resuelve no emite ninguna senal por si mismo.
+#   · desvio sin motivo, o cuya regla ya no existe -> ::error:: (desvio muerto,
+#     con el motivo que tenia escrito en el mensaje).
+#   · desvio valido -> ::notice:: en CADA corrida. Un motivo que envejecio mal
+#     tiene que quedar a la vista en vez de fosilizarse.
+#   · valor declarado que el canonico ya no usa -> ::warning:: (sobra, igual que
+#     una exclusion muerta).
+#
+# LIMITES DECLARADOS
+#   · Esto garantiza que el TEXTO llegue, integro y al dia, a la superficie que el
+#     agente carga. No garantiza que el agente lo OBEDEZCA en el turno 40 de una
+#     sesion larga. Cierra el hueco de DISTRIBUCION, no el de comportamiento.
+#   · Solo cubre las superficies que el repositorio DECLARA. Una herramienta nueva
+#     que alguien enchufe sin declararla queda fuera y el marco no puede verla.
+#   · Fin de linea, espacios al final de linea y lineas en blanco al final del
+#     archivo no son divergencia. Un reflujo de prosa del formateador SI lo es: el
+#     mecanismo para eso es .projects/ en el .prettierignore del proyecto, igual que
+#     los artefactos del CLI de OpenSpec.
+#   · Si el consumidor borra el artefacto Y el uses: del workflow, lo caza el modo
+#     "cableado" de esta misma action, que corre desde el marco-ci.yml —el carril que
+#     el consumidor hereda por llamar al workflow reusable— y PARSEA los workflows en
+#     vez de grepearlos: un job con `if: false`, una invocacion en modo escribir, un
+#     archivo en un subdirectorio que GitHub no ejecuta, un archivo que git no
+#     rastrea, un workflow al que un filtro de paths/branches/types saca del camino
+#     del cambio, un continue-on-error que no se pueda demostrar falso o un ci-ok que
+#     no mire el resultado del job cuentan como NO cableado, cada uno con su motivo
+#     impreso. Lo que sigue fuera de alcance es un cableado que llegue por un
+#     workflow reusable de terceros (haria falta leer otro repositorio) y el
+#     contenido de un `run:`: se verifica que el veredicto CONSULTE
+#     needs.<job>.result, no lo que su script hace con el valor — cerrar eso exige
+#     decidir el comportamiento de un shell arbitrario, y la salida estructural es
+#     que el veredicto lo emita el marco en vez del run: de cada consumidor.
+#   · El motivo de un desvio se verifica que EXISTA, no que sea sincero, y nada
+#     limita cuantos declara un proyecto.
+# ---------------------------------------------------------------------------
+
+inputs:
+  modo:
+    description: >-
+      "verificar" (default) compara lo presente contra lo que el marco publica y
+      falla segun la tabla de arriba. "escribir" renderiza los artefactos en el
+      arbol de trabajo y no falla por estar atrasado, porque justamente lo arregla.
+      "cableado" no mira el artefacto: PARSEA los workflows RASTREADOS del repo y
+      verifica que alguno invoque de verdad el modo verificar. Las cinco
+      condiciones son conjuntas: (1) el archivo esta rastreado por git y en el
+      primer nivel de .github/workflows; (2) el workflow SE DISPARA en el camino
+      del cambio, o sea que ninguna clave de filtro de su evento —types, branches,
+      branches-ignore, paths, paths-ignore, tags— lo saca de ahi; (3) invoca en
+      modo verificar; (4) no hay if constante falso, ni un continue-on-error que
+      no se pueda demostrar falso, ni un needs a un job que nunca corre; y (5) un
+      rojo de ese job IMPIDE que el veredicto agregado ci-ok salga verde, que son
+      dos cosas y no una: ci-ok tiene que correr aunque su dependencia falle
+      (if: always()) y tiene que CONSULTAR needs.<job>.result, porque un job
+      salteado reporta Success para GitHub y entonces el needs solo no bloquea
+      nada. Lo invoca el marco-ci.yml, que es el carril INDEPENDIENTE: borrar el
+      job de la constitucion no apaga al que denuncia que falta.
+    required: false
+    default: verificar
+  rama_por_defecto:
+    description: >-
+      Nombre de la rama por defecto del repositorio, para decidir si un workflow que
+      corre en "push" se dispara en el camino del cambio. Lo usa el modo "cableado" y
+      la deteccion de pins del modo verificar. Vacio = "main", la unica rama
+      permanente que el marco admite. El llamador pasa la expresion
+      "github.event.repository.default_branch" (entre dobles llaves, en SU workflow) en
+      vez de cablear una constante: cual es esa rama lo sabe GitHub, no el marco.
+
+      Y OJO CON LAS DOBLES LLAVES EN ESTE ARCHIVO, que es lo que costo el rojo del
+      2026-08-20: GitHub evalua las expresiones TAMBIEN dentro de las descriptions de
+      los inputs, y el contexto `github` NO existe en la metadata de una composite
+      action. Escribir la expresion aca no dio un aviso ni un paso rojo: tiro la action
+      entera en «Set up job», antes de correr un solo paso
+      (TemplateValidationException: Unrecognized named-value: 'github'), y con ella
+      todos los checks del PR. La expresion se NOMBRA en prosa aca; sus llaves viven en
+      el workflow que invoca.
+    required: false
+    default: main
+  valores:
+    description: >-
+      Ruta del JSON con los valores del proyecto (los placeholders de dobles
+      llaves). Vive FUERA de .projects/ a proposito: ese directorio es desechable y
+      el modo escribir lo reemplaza, asi que una entrada guardada adentro se
+      perderia con un render autoconsistente y todos los semaforos en verde.
+    required: false
+    default: .projects-valores.json
+  desvios:
+    description: >-
+      Ruta del JSON con los desvios declarados. DOS CLASES, y cada entrada nombra UNA
+      sola: {"regla": "<id del canonico>"} o {"permiso": "<entrada exacta del
+      allowlist>"}, las dos con "motivo", "aprobado_por" y "fecha". Aca se valida la
+      FORMA de las dos y el VENCIMIENTO de las de regla (un desvio cuya regla ya no
+      existe es rojo, con el motivo que tenia escrito). Que un desvio de permiso
+      absorba un hallazgo de verdad lo decide el paso "Permisos del agente sin
+      escritura", que es el unico que ve el allowlist y sus hallazgos. Ausente
+      equivale a cero desvios.
+    required: false
+    default: .projects-desvios.json
+  superficies:
+    description: >-
+      Lista separada por comas de las superficies de instrucciones a emitir. Vacio
+      = lo que declare "superficies" en el archivo de valores y, si el archivo NO
+      declara la clave, el default del marco (claude-code,cursor). Declararla
+      VACIA en el archivo de valores no es un default: es rojo, porque un repo
+      sin superficie declarada es un repo donde las reglas no llegan a ninguna
+      parte, y eso no puede ser indistinguible de no haber llenado el archivo.
+    required: false
+    default: ""
+  allowlist:
+    description: >-
+      Ruta del allowlist del agente. De ahi se mide el PISO RECOMENDADO de permisos
+      que declara el manifiesto del canonico, y se mide ACA porque aca esta su UNICA
+      declaracion: hasta el 2026-08-20 el paso de permisos del workflow reusable
+      llevaba una copia literal del piso y las dos contabilidades ya habian divergido
+      en las dos direcciones. Si el archivo no esta, el piso no se mide y se DICE
+      (::notice::): "no habia allowlist para mirar" no es "el allowlist esta sano". Un
+      item sin cubrir es SIEMPRE ::warning:: y jamas rojo.
+    required: false
+    default: .claude/settings.json
+  raiz:
+    description: Raiz del repo consumidor, relativa al working directory del job.
+    required: false
+    default: "."
+  salida_corregida:
+    description: >-
+      Directorio donde el modo verificar deja el artefacto AL DIA para subirlo con
+      upload-artifact. Vacio = $RUNNER_TEMP/.projects-al-dia. Un repo sin el workflow
+      de actualizacion lo baja de ahi y lo aplica a mano.
+    required: false
+    default: ""
+
+outputs:
+  estado:
+    description: '"al-dia", "aviso", "rojo" o "escrito".'
+    value: ${{ steps.constitucion.outputs.estado }}
+  version:
+    description: Version del canonico que trae esta copia del marco.
+    value: ${{ steps.constitucion.outputs.version }}
+  exigible_desde:
+    description: Fecha desde la cual esa version deja de ser aviso y pasa a fallar.
+    value: ${{ steps.constitucion.outputs.exigible_desde }}
+  superficies:
+    description: Superficies efectivamente emitidas, separadas por comas.
+    value: ${{ steps.constitucion.outputs.superficies }}
+  artefactos:
+    description: Rutas de los artefactos, separadas por comas.
+    value: ${{ steps.constitucion.outputs.artefactos }}
+  corregidos:
+    description: Directorio con los artefactos al dia (modo verificar).
+    value: ${{ steps.constitucion.outputs.corregidos }}
+  piso_permisos:
+    description: >-
+      JSON con el piso RECOMENDADO de permisos del agente que publica el canonico,
+      como lista de { nombre, entrada, cubre }. La MEDICION contra el allowlist la
+      hace esta misma action (ver el input "allowlist"): esta salida queda para que un
+      consumidor lo lea si lo necesita, no como una segunda contabilidad. Cuando el
+      piso se declaraba aca y se verificaba en un const literal de marco-ci.yml, las
+      dos copias divergieron en las dos direcciones, y en una doble contabilidad la
+      declaracion siempre pierde contra el check.
+    value: ${{ steps.constitucion.outputs.piso_permisos }}
+  rojos:
+    description: Cantidad de hallazgos que fallan el job.
+    value: ${{ steps.constitucion.outputs.rojos }}
+  avisos:
+    description: Cantidad de hallazgos en nivel aviso.
+    value: ${{ steps.constitucion.outputs.avisos }}
+
+runs:
+  using: composite
+  steps:
+    # GITHUB_ACTION_PATH apunta a la copia de ESTA action, no al repo del
+    # consumidor: el canonico y el script viajan con la action y nadie vendora una
+    # copia que se pueda quedar vieja.
+    - name: Constitucion del marco
+      id: constitucion
+      shell: bash
+      env:
+        CONSTITUCION_MODO: ${{ inputs.modo }}
+        CONSTITUCION_RAIZ: ${{ inputs.raiz }}
+        CONSTITUCION_RAMA_POR_DEFECTO: ${{ inputs.rama_por_defecto }}
+        CONSTITUCION_VALORES: ${{ inputs.valores }}
+        CONSTITUCION_DESVIOS: ${{ inputs.desvios }}
+        CONSTITUCION_SUPERFICIES: ${{ inputs.superficies }}
+        CONSTITUCION_ALLOWLIST: ${{ inputs.allowlist }}
+        CONSTITUCION_SALIDA_CORREGIDA: ${{ inputs.salida_corregida }}
+      run: |
+        set -euo pipefail
+
+        if ! command -v node > /dev/null 2>&1; then
+          echo "::error::no hay 'node' en el PATH y sin el no se puede renderizar la constitucion. Arreglo: agrega 'uses: actions/setup-node@v7' a este job, antes de este paso"
+          exit 1
+        fi
+
+        node "${GITHUB_ACTION_PATH}/constitucion.mjs"
