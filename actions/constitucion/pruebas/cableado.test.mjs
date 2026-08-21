@@ -425,17 +425,26 @@ test("el needs TRANSITIVO cuenta: ci-ok -> intermedio -> constitucion", () => {
   assert.equal(corrida.status, 0, corrida.stdout);
 });
 
-test("un veredicto agregado MUDO no cuenta: corre siempre y no mira a nadie", () => {
+test("un veredicto agregado MUDO es AVISO con el arreglo y el residuo, y ya no rojo", () => {
   // El hallazgo 3 de la ronda 3, en el mismo banco que los otros: hasta ese dia este
   // era el fixture «sano», y con el la constitucion podia salir en rojo y `ci-ok`
   // verde. El aviso tiene que nombrar el arreglo, no solo negar el cableado.
+  //
+  // Y DESDE EL 2026-08-21 es AVISO Y NO ROJO (residuo A01, decision del Builder 1). La regla
+  // que produce este hallazgo lee el texto de los pasos para decidir si alguno cobra el
+  // rojo, y su lado de aceptacion quedo refutado: 70 falsos verdes sobre 2928 casos,
+  // con `if: needs.<job>.result == success` satisfaciendo la compuerta salteandose. El
+  // hallazgo se conserva entero —motivo, arreglo y las dos formas del nombre— y lo
+  // unico que cambia es que ya no se presenta como compuerta.
   const raiz = repoConWorkflows(
     { ".projects-valores.json": VALORES_DEL_PROYECTO, [`${DIR_WORKFLOWS}/ci.yml`]: CI_CON_VEREDICTO_MUDO });
   const corrida = correrCableado(raiz);
-  assert.equal(corrida.status, 1, corrida.stdout);
+  assert.equal(corrida.status, 0, corrida.stdout);
+  assert.doesNotMatch(corrida.stdout, /::error::/, corrida.stdout);
   assert.match(corrida.stdout, /NINGUN paso vivo suyo consulta/);
   assert.match(corrida.stdout, /needs\.<job>\.result/);
   assert.match(corrida.stdout, /needs\.constitucion\.result/);
+  assert.match(corrida.stdout, /70 falsos verdes sobre 2928/, corrida.stdout);
 });
 
 test("un continue-on-error: true sobre el job o el paso deja el cableado vivo pero inofensivo", () => {
