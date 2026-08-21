@@ -5,8 +5,8 @@ name: Actualizar el marco
 # trae SOLA: corre la action del marco en modo escribir y abre un PR con el
 # artefacto regenerado.
 #
-# POR QUE EXISTE. El resto del marco llega por referencia: el CI apunta a @v1
-# y una correccion alla aparece aca sin que nadie abra un PR. La constitucion
+# POR QUE EXISTE. El resto del marco llega por referencia, y desde la 1.4.0 por
+# VERSION EXACTA: el bump lo propone Dependabot como PR. La constitucion
 # no puede funcionar asi —es texto que los agentes CARGAN, y tiene que estar
 # en el arbol de este repo—, asi que el camino normal seria "acordate de
 # regenerarla cuando el marco publique". Un ritual que alguien debe recordar
@@ -14,7 +14,7 @@ name: Actualizar el marco
 #
 # EL CHECK ES OTRA COSA, Y LLEGA POR OTRO CARRIL. Que el artefacto exista,
 # este al dia y siga cargado lo verifica el job de marco del ci.yml (llega por
-# uses: ...@v1, a todos, sin configurar nada). Este workflow no verifica: solo
+# uses: ...@<version>, con el bump por PR). Este workflow no verifica: solo
 # propone el arreglo. Borrarlo no deja el repo sin control — deja el repo
 # esperando que alguien regenere a mano hasta que el check pase de aviso a
 # rojo.
@@ -47,7 +47,8 @@ name: Actualizar el marco
 # ningun lado.
 #
 # CONTRATO QUE USA ESTE ARCHIVO, para que un cambio del marco no lo deje roto
-# en silencio: la action {{ORG}}/Projects/actions/constitucion@v1 con
+# en silencio: la action {{ORG}}/Projects/actions/constitucion, pinada arriba a la
+# version exacta del marco, con
 # "modo: escribir" lee .projects-valores.json y .projects-desvios.json de la raiz y
 # escribe el artefacto de cada superficie que ese archivo declara. Escribe en
 # el arbol de trabajo y NADA MAS: no commitea, no pushea y no abre PRs — eso
@@ -135,7 +136,7 @@ jobs:
           node-version: "22"
 
       - name: Regenerar la porcion del marco
-        uses: "{{ORG}}/Projects/actions/constitucion@v1"
+        uses: "{{ORG}}/Projects/actions/constitucion@v1.4.1"
         with:
           modo: escribir
 
