@@ -165,12 +165,20 @@ for (const forma of ["true", "${{ true }}", '"true"', "${{ vars.X }}", "yes", "1
 }
 
 // --- B1, E1: el PASO del veredicto neutralizado --------------------------------------
+//
+// CORREGIDOS el 2026-08-21. Estos dos tests afirmaban que el motivo dijera
+// "NINGUN paso vivo consulta...", y esa frase era el defecto, no la propiedad: el
+// paso EXISTE y consulta, lo que pasa es que alguien lo amortiguo. Decirle a quien
+// lee el mensaje que agregue un paso que ya esta escrito lo manda a hacer trabajo
+// hecho, y ademas mezcla dos clases: que el paso este tapado se LEE del YAML
+// (decidible, rojo) y "no hay ningun paso que cobre" es el residuo de lectura.
+// Lo que se afirma ahora es que el motivo NOMBRE el amortiguador.
 test("(B1) un continue-on-error en el PASO del veredicto: el paso que compara no cobra nada", () => {
   const veredicto = cuenta(
     workflow({ veredicto: VEREDICTO_SANO.replace("      - run:", "      - continue-on-error: true\n        run:") }),
   );
   assert.equal(veredicto.cuenta, false, veredicto.motivos);
-  assert.match(veredicto.motivos, /NINGUN paso vivo/);
+  assert.match(veredicto.motivos, /neutralizado|amortiguad|continue-on-error|apaga/i);
 });
 
 test("(E1) un if: false en el PASO del veredicto: consultar en un paso que no corre es no consultar", () => {
@@ -178,7 +186,7 @@ test("(E1) un if: false en el PASO del veredicto: consultar en un paso que no co
     workflow({ veredicto: VEREDICTO_SANO.replace("      - run:", "      - if: false\n        run:") }),
   );
   assert.equal(veredicto.cuenta, false, veredicto.motivos);
-  assert.match(veredicto.motivos, /NINGUN paso vivo/);
+  assert.match(veredicto.motivos, /neutralizado|amortiguad|continue-on-error|apaga/i);
 });
 
 // --- C1, C2, D1: la referencia que no decide nada -----------------------------------
@@ -201,7 +209,7 @@ for (const [nombre, pasos] of REFERENCIAS_MUDAS) {
       }),
     );
     assert.equal(veredicto.cuenta, false, veredicto.motivos);
-    assert.match(veredicto.motivos, /NINGUN paso vivo/);
+    assert.match(veredicto.motivos, /neutralizado|amortiguad|continue-on-error|apaga/i);
   });
 }
 

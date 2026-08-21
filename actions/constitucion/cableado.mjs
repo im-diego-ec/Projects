@@ -951,6 +951,33 @@ export function correAunConFallo(job) {
  * verificamos qué hace el run»: la lectura sí se verifica, y también que el paso que
  * lee esté vivo y no amortiguado.
  */
+/**
+ * Los textos de los pasos que SI consultarian el resultado pero estan
+ * neutralizados, con el motivo. Existe porque tirar esta informacion convertia dos
+ * casos distintos en el mismo veredicto: «hay un paso que cobra y alguien lo
+ * amortiguo» es un hecho SINTACTICO del YAML —decidible, y por lo tanto rojo— y «no
+ * hay ningun paso que cobre» es el limite de lectura que este check declara como
+ * residuo. Medido el 2026-08-21: sin esta distincion, 9 ortografias del amortiguador
+ * a nivel PASO pasaron de exit 1 a exit 0, incluida la mas barata de todas, poner
+ * continue-on-error: true en el paso del veredicto para desbloquear un merge.
+ */
+export function textosAmortiguadosDe(job) {
+  const trozos = [];
+  let motivo = '';
+  for (const paso of Array.isArray(job?.steps) ? job.steps : []) {
+    if (paso === null || typeof paso !== 'object') continue;
+    const apagado = ifApagado(paso.if);
+    const tapado = tapaElRojoEn(paso);
+    if (!apagado && !tapado) continue;
+    if (!motivo) motivo = apagado ? `su if lo apaga (${JSON.stringify(paso.if)})` : 'su continue-on-error tapa el rojo';
+    for (const clave of ['run', 'if']) {
+      const valor = paso[clave];
+      if (typeof valor !== 'string') continue;
+      for (const linea of valor.split('\n')) trozos.push(sinComentario(linea));
+    }
+  }
+  return { texto: trozos.join('\n'), motivo };
+}
 export function textosVivosDe(job) {
   const trozos = [];
   for (const paso of Array.isArray(job?.steps) ? job.steps : []) {
@@ -1090,6 +1117,20 @@ export function vigilaElResultado(jobs, veredicto, compuerta) {
   const texto = textosVivosDe(job);
   const consultados = eslabones.filter((eslabon) => consultaElResultado(texto, eslabon));
   if (consultados.length === 0) {
+    // ANTES de declarar el residuo de lectura: mirar si el paso que cobra EXISTE y
+    // esta neutralizado. Si existe, esto no es un limite de lectura, es un
+    // amortiguador puesto a mano, y va en ROJO.
+    const amortiguado = textosAmortiguadosDe(job);
+    const tapados = amortiguado.texto
+      ? eslabones.filter((eslabon) => consultaElResultado(amortiguado.texto, eslabon))
+      : [];
+    if (tapados.length > 0) {
+      return {
+        vigila: false,
+        clase: 'estructura',
+        porque: `"${veredicto}" TIENE un paso que consulta needs.${tapados.join(', ')}.result, pero ese paso esta neutralizado: ${amortiguado.motivo}. Un paso amortiguado se ejecuta y su rojo no detiene el job, asi que el veredicto sale VERDE con la compuerta en rojo y el check requerido del ruleset no bloquea nada. Esto NO es el residuo de lectura de este check: que el paso exista y este tapado se lee del YAML, asi que es rojo. Arreglo: sacale el continue-on-error o el if al paso que compara, no agregues otro paso`,
+      };
+    }
     return {
       vigila: false,
       // CLASE "lectura", igual que la hoja de transportaElRojo y por el mismo motivo:
