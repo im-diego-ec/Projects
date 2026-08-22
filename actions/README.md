@@ -4,7 +4,7 @@ Piezas **referenciadas**: los proyectos no las copian, las consumen con `uses:`.
 Un arreglo acá llega a todos los repos en su próximo run, sin PR en cada uno.
 
 ```yaml
-uses: im-diego-ec/Projects/actions/<nombre>@v1.5.0
+uses: im-diego-ec/Projects/actions/<nombre>@v1.6.0
 ```
 
 | Action | Qué hace | Falla el job |
@@ -53,7 +53,7 @@ jobs:
       contents: read
     steps:
       - uses: actions/checkout@v7
-      - uses: im-diego-ec/Projects/actions/guardrail-deltas@v1.5.0
+      - uses: im-diego-ec/Projects/actions/guardrail-deltas@v1.6.0
 ```
 
 Inputs (todos opcionales): `directorio-changes` (`openspec/changes`),
@@ -128,7 +128,7 @@ jobs:
       solo_docs: ${{ steps.detectar.outputs.solo_docs }}
     steps:
       - id: detectar
-        uses: im-diego-ec/Projects/actions/carril-docs@v1.5.0
+        uses: im-diego-ec/Projects/actions/carril-docs@v1.6.0
 
   build_test:
     needs: cambios
@@ -160,7 +160,7 @@ jobs:
       - uses: actions/checkout@v7
         with: { fetch-depth: 0 }   # sin esto, el commit anterior no esta en el clon
       - id: detectar
-        uses: im-diego-ec/Projects/actions/carril-docs@v1.5.0
+        uses: im-diego-ec/Projects/actions/carril-docs@v1.6.0
 ```
 
 ### Uso en `workflow_run` (la compuerta de deploy)
@@ -184,7 +184,7 @@ jobs:
       solo_docs: ${{ steps.detectar.outputs.solo_docs }}
     steps:
       - id: detectar
-        uses: im-diego-ec/Projects/actions/carril-docs@v1.5.0
+        uses: im-diego-ec/Projects/actions/carril-docs@v1.6.0
 ```
 
 Un despliegue por `workflow_dispatch` **no** debe pasar por esta action: si
@@ -264,7 +264,7 @@ jobs:
         with: { node-version: "22", cache: pnpm }
       - run: pnpm install --frozen-lockfile
       # DESPUES del install: el censo interroga al toolchain ya instalado.
-      - uses: im-diego-ec/Projects/actions/censo-fuentes@v1.5.0
+      - uses: im-diego-ec/Projects/actions/censo-fuentes@v1.6.0
 ```
 
 ### Inputs
@@ -471,7 +471,7 @@ jobs:
       - uses: actions/setup-node@v7
         with: { node-version: "22" }
       # ...instalar dependencias y correr las pruebas CON cobertura...
-      - uses: im-diego-ec/Projects/actions/cobertura-diff@v1.5.0
+      - uses: im-diego-ec/Projects/actions/cobertura-diff@v1.6.0
 ```
 
 ### Por qué un comparador propio y no una herramienta externa
@@ -713,7 +713,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
       - id: mensaje
-        uses: im-diego-ec/Projects/actions/aviso-version@v1.5.0
+        uses: im-diego-ec/Projects/actions/aviso-version@v1.6.0
         with:
           version: ${{ github.event.release.tag_name }}
       - shell: bash
@@ -839,13 +839,20 @@ arreglo mecánicamente obvio para un rojo de "editado a mano" sería recomputar 
 hash y volver a estampar; la autoridad sobre el cuerpo es el re-render, que no se
 puede falsificar sin cambiar el canónico.
 
-**El rojo lo dispara una fecha, no el release.** Cada versión del canónico declara
-`publicada` y `exigible_desde`, y la propia action rechaza un manifiesto con menos
-de 28 días entre las dos (la puerta de atrás se llama `"urgente": true` y sale por
-`::warning::`, nunca muda). Entre las dos fechas, un artefacto ausente o atrasado
-es `::warning::`; desde `exigible_desde`, `::error::`. Si el consumidor acumuló
+**Un artefacto ausente o atrasado es `::error::`, desde el día en que la versión se
+publica.** Hubo hasta el 2026-08-22 una ventana de gracia obligatoria de 28 días, con
+una puerta `"urgente": true` para saltársela; se retiró porque su justificación
+—«el marco se consume por un tag móvil, así que una verificación nueva aparece en el
+pipeline de cada proyecto sin que nadie la haya leído»— dejó de ser cierta cuando la
+distribución pasó a versión exacta. Con pin exacto, el aviso previo **es el PR de
+bump**, y lo único que la ventana seguía produciendo era un repo atrasado y verde
+durante cuatro semanas.
+
+El estreno con aviso **sigue siendo posible y es opt-in de quien publica**: una versión
+que declara un `exigible_desde` posterior a su `publicada` avisa hasta esa fecha, y la
+corrida nombra el día desde el cual el mismo estado es rojo. Si el consumidor acumuló
 varias versiones sin adoptar, manda la fecha de la **más vieja pendiente**. Lo que
-**no** tiene es rama silenciosa de "este repo no aplica": el repo sin artefacto es
+**no** existe es rama silenciosa de "este repo no aplica": el repo sin artefacto es
 exactamente el que hay que avisar.
 
 Límites declarados, en el encabezado del `action.yml` y acá: esto garantiza que el
