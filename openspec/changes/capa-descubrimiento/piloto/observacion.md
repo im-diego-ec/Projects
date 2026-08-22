@@ -81,7 +81,42 @@ umbral; hace falta que la razón esté escrita al lado del identificador.
 - **No dice si la herramienta pierde más material que una persona.** Sí dice si perdió
   reglas de negocio, que es una pregunta absoluta.
 
-## Los primeros treinta minutos: probar la ingesta con UNA pieza
+## La ingesta ya está probada: la herramienta pide los documentos ella misma
+
+**Medido el 2026-08-22 sobre la skill instalada**, no sobre la web. `bmad-prd` declara esto
+como su **primer movimiento**:
+
+> *«**Brain dump.** Always the first move… Ask for verbal context *and* any existing inputs
+> they want you to read — product brief, research, customer transcripts, competitive
+> analysis, prior PRD draft, design docs. **Paths or paste; big docs are fine, you will
+> subagent-extract.**»*
+
+Nombra por su nombre los tipos de pieza que PO tiene —investigación, transcripciones,
+documentos de diseño— y dice que los documentos grandes están bien. Y su regla interna es
+**«Extract, don't ingest»**: manda cada documento a un subagente que extrae, y el principal
+arma el PRD con los extractos.
+
+Así que no hay prueba que hacer antes: **se entra por `bmad-prd` y se le dan las piezas**.
+La fase 1 (Analysis) se saltea, está marcada opcional por el propio proveedor.
+
+### Y trae una respuesta a la pregunta 3 por su cuenta
+
+Tiene un paso llamado **Input reconciliation** que corre un subagente por cada documento
+entregado y **reporta los huecos**: *«Surface gaps — especially qualitative ideas (tone,
+voice, feel) the FR structure silently drops»*.
+
+O sea que la herramienta dice ella misma qué dejó afuera. **Eso no reemplaza al inventario
+del PO: lo cruza.** Dos fuentes independientes para la misma pregunta valen más que
+cualquiera de las dos sola — si la herramienta dice «no dejé nada» y el inventario muestra
+tres piezas sin escenario, esa diferencia es el hallazgo.
+
+### Dos cosas de configuración que cuestan minutos y se pagan caro
+
+| Qué | Por qué |
+|---|---|
+| **El idioma sale en inglés por defecto.** En `_bmad/bmm/config.yaml`, `communication_language` y `document_output_language` vienen en `English` | La sesión es con PO y los specs del área están en castellano. Si no se cambia, la herramienta saluda, pregunta y **escribe los documentos en inglés**. Son dos líneas |
+| **El `.memlog.md` es la memoria de la corrida**, y la herramienta lo dice: *«whatever isn't logged is lost on resume»* | Si la sesión se corta, lo que sobrevive es ese archivo. Necesita `uv` para escribirse, que ya está instalado (0.12.0) |
+
 
 **Antes de abrir el corpus entero.** Se entra por la fase 2 de la herramienta
 (`bmad-prd`), no por la fase 1: el mapa de workflows del proveedor marca la fase 1 como
