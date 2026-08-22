@@ -56,8 +56,8 @@ la skill ya está distribuida, así que una segunda casa divergiría — y «la
 divergencia entre dos casas es cuestión de tiempo» es una frase que este repo ya
 escribió sobre otro tema.
 
-De los 189 archivos y 960K de la skill, **solo 9 archivos (63K) necesitan poder
-actualizarse solos.**
+De los 189 archivos y 960K de la skill, **solo 10 archivos (22.671 bytes) necesitan
+poder actualizarse solos** — el desglose exacto está en el `design.md`, D1.
 
 ### 1. Una sección de marca en el canónico de la constitución
 
@@ -78,12 +78,21 @@ todas nativas de ESLint.
 Y la compuerta ya existe: el andamio corre `pnpm lint` dentro de `build_test`,
 que cuelga de `ci-ok`. No hay que construir el gate, hay que cargarle las reglas.
 
-Medido contra el consumidor real: **27 avisos en 4 archivos, cero falsos
-positivos.** El arreglo son unos cinco `className` y cinco hex.
+Medido contra el consumidor real: **27 hits**, repartidos en dos familias que viven en
+archivos disjuntos —los 5 de blanco sobre naranja en 4 archivos, y el resto en otros
+4—, o sea **8 archivos** en total. El arreglo son unos cinco `className` y cinco hex.
+
+> Dos correcciones a la primera versión de este párrafo, porque decía «27 avisos en 4
+> archivos, cero falsos positivos». **«Avisos» es imposible**: el lint corre con
+> `--max-warnings=0`. Y **el selector de píxeles crudos sí tiene falsos positivos** si
+> viaja tal como está en el `_adherence`: caza los `matchMedia("(min-width: 768px)")`
+> del consumidor, que son legítimos. Por eso ese selector se acota a atributos de
+> estilo, y el desglose por regla va en la tarea 1.4 y no en una cifra global.
 
 ### 3. `actions/marca`: los tokens y los logos como artefacto regenerado
 
-Los 7 CSS de tokens y los 3 logos SVG **tienen que estar en el árbol** para que
+Los 6 CSS de tokens que sí son marca, su punto de entrada, y los 3 logos SVG
+**tienen que estar en el árbol** para que
 el build los use; no se pueden referenciar por `uses:` como un workflow. Se
 regeneran desde un canónico pinado, y el check compara contra el **re-render**,
 no contra un sello guardado — porque recomputar un sello es un commit y cambiar
@@ -94,10 +103,12 @@ el canónico no.
 - **Capability afectada:** `calidad-codigo`. **No nace una capability nueva**: su
   requirement «Lint y formato configurados para todos los paquetes» ya es la casa
   de este tipo de garantía.
-- **Consumidores existentes:** el que hay hoy no adoptó la constitución hasta
-  hace dos días y tiene 27 hits. Por eso el estreno es **en modo aviso con fecha
-  impresa en cada corrida**, por la propia doctrina del marco: un endurecimiento
-  que enrojece a un repo que ayer pasaba se estrena avisando.
+- **Consumidores existentes: no se enteran, y el motivo es estructural.** El bloque
+  de reglas vive en el `eslint.config.mjs` del **andamio**, que se copia una vez al
+  crear el repo: un repo que ya existe **no lo recibe nunca**. Sus violaciones —27 en
+  el caso real— aparecen el día que su dueño decida adoptar el bloque, en un PR suyo.
+  El estreno con fecha existe, pero recién en el bloque 3 y por otra vía; el `design.md`
+  D8 explica por qué en el lint no puede haberlo.
 - **Proyectos nuevos:** nacen con el texto y con el rojo, sin transición.
 - **Repos sin frontend:** el bloque de reglas se saltea solo por `files`. No
   exige que nadie lo apague.
@@ -124,9 +135,19 @@ saber antes de aprobar:
    `sha256` de cada CSS tal como se tomó, con fecha. No detecta el desvío; hace
    **contestable** la pregunta «qué snapshot es este», que hoy no se puede
    contestar de ninguna forma.
-2. **Un valor de marca equivocado pero coherente no lo caza ningún linter.**
-   `#EDECE8` en vez de `#F9F8F6` pasa verde para siempre. Lo cierra la pieza 3 y
-   solo ella.
+2. **Un valor de marca equivocado pero coherente no lo caza ningún linter**, y la
+   primera versión de este proposal decía que «lo cierra la pieza 3 y solo ella».
+   **Era falso, y la contradicción era interna:** el defecto medido —`bg: "#EDECE8"`
+   donde la marca dice `#F9F8F6`— vive en el archivo de configuración de estilos, que
+   el design saca del alcance del linter a propósito (es el lugar legítimo de esos
+   valores) y que la pieza 3 nunca mira, porque escribe y barre **CSS**. O sea que el
+   cuarto hallazgo de la tabla de arriba quedaba verde para siempre, y el delta lo
+   garantizaba por escrito.
+
+   **Se cierra, pero hace falta decir cómo:** el archivo de configuración es el lugar
+   correcto para esos valores **y** sus valores tienen que coincidir con los tokens del
+   canónico pinado. Eso es sintácticamente decidible —se leen los dos y se comparan— y
+   por eso entra como escenario del segundo requirement en vez de quedar como límite.
 3. **Un token eliminado en una versión futura** sale del canónico, el CSS deja de
    definirlo, y el `var(--token-viejo)` del proyecto resuelve a nada: silencioso,
    en runtime, invisible al diff. Hace falta una regla de `var()` huérfano, y va
