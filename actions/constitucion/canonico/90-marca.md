@@ -54,9 +54,8 @@ que conocer **sin haber invocado nada**.
 
 - **Lo que el marco NO trae.** La tipografía llega sin archivos propios: el sistema
   declara que la carga de un proveedor externo porque la marca no entregó los binarios.
-  Mientras ese hueco esté abierto el marco **no** pone en rojo a nadie por la tipografía
-  —poner su sello sobre una sustitución la convertiría en la norma— y el aviso sale en
-  cada corrida. Cerrarlo es un archivo que la marca tiene que entregar. Con los iconos
-  pasa lo mismo, y ahí el sistema los toma sin versión fija, que otra regla ya prohíbe.
-
----
+  Mientras ese hueco esté abierto el marco **no** pone en rojo a nadie por la tipografía:
+  poner su sello sobre una sustitución la convertiría en la norma. Cerrarlo es un archivo
+  que la marca tiene que entregar. Con los iconos pasa lo mismo, y ahí el sistema los toma
+  de un proveedor sin fijar versión, que es lo contrario de lo que este marco pide para
+  todo lo que ejecuta.

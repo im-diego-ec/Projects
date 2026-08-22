@@ -42,7 +42,9 @@ name: Marco CI (reusable)
 #
 #   jobs:
 #     marco:
-#       uses: {{ORG}}/Projects/.github/workflows/marco-ci.yml@v1
+#       # VERSION EXACTA, nunca @v1: un consumidor pinado al tag movil NO recibe PR
+#       # de bump de Dependabot ni aparece en el censo, y no falla — se queda callado.
+#       uses: {{ORG}}/Projects/.github/workflows/marco-ci.yml@vX.Y.Z
 #       # Opcional: solo si el default no sirve para este repo.
 #       # with:
 #       #   version_openspec: "1.9.0"
@@ -966,7 +968,7 @@ jobs:
             echo "::error::este repo no invoca el censo de fuentes en ningun flujo: sin ese paso, un archivo que ninguna herramienta mira no produce rojo en ningun lado y la verificacion de alcance queda declarada pero apagada. Arreglo: pega el paso de abajo en el job que ya corre lint y typecheck, DESPUES de instalar dependencias (el censo interroga al toolchain ya instalado)"
             echo "== paso a agregar =="
             echo "      - name: Ningun archivo fuera del alcance de la verificacion"
-            echo "        uses: im-diego-ec/Projects/actions/censo-fuentes@v1.5.0"
+            echo "        uses: im-diego-ec/Projects/actions/censo-fuentes@v1.6.0"
             exit 1
           fi
 
@@ -2737,7 +2739,7 @@ jobs:
         with: { node-version: "22" }
       # Version exacta, no @v1: ver el motivo largo en el paso de deltas de OpenSpec.
       - name: Constitucion del marco cableada
-        uses: im-diego-ec/Projects/actions/constitucion@v1.5.0
+        uses: im-diego-ec/Projects/actions/constitucion@v1.6.0
         with:
           modo: cableado
           # La rama por defecto sale del evento y no de una constante: un `push`

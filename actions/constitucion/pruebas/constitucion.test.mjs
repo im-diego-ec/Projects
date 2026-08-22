@@ -23,7 +23,6 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 
 import {
-  DIAS_DE_GRACIA_MINIMOS,
   SUPERFICIES,
   SUPERFICIES_POR_DEFECTO,
   artefactoDe,
@@ -680,19 +679,39 @@ test("una superficie que el marco no sabe emitir es roja, no un silencio", () =>
 });
 
 // ---------------------------------------------------------------------------
-// La ventana de gracia existe de verdad (D6)
+// LA VENTANA DE GRACIA ES OPT-IN, NO OBLIGATORIA (change ventana-vencida).
+//
+// Hasta el 2026-08-22 habia un piso de 28 dias y una puerta `urgente` para
+// saltarselo. Se retiro la POLITICA y quedo el MECANISMO: una version que quiera
+// estrenarse con aviso declara un `exigible_desde` futuro, y eso lo fijan las
+// pruebas de mas arriba (VERSIONES_UNA_EN_VENTANA + DENTRO_DE_LA_VENTANA), que
+// siguen siendo la propiedad correcta. Lo que estas tres fijan es el default
+// nuevo y sus dos bordes.
 // ---------------------------------------------------------------------------
 
-test("una version con menos de 28 dias de gracia es un canonico invalido", () => {
-  const problemas = validarManifiesto({
-    versiones: [{ version: "1.3.0", publicada: "2026-08-19", exigible_desde: "2026-08-20" }],
-  });
-  assert.equal(problemas.length, 1);
-  assert.match(problemas[0], new RegExp(String(DIAS_DE_GRACIA_MINIMOS)));
+test("cero dias de gracia es lo NORMAL: exigible el dia que se publica", () => {
+  assert.deepEqual(
+    validarManifiesto({
+      versiones: [{ version: "1.3.0", publicada: "2026-08-19", exigible_desde: "2026-08-19" }],
+    }),
+    [],
+  );
 });
 
-test("la puerta de atras se llama urgente y no pasa muda", () => {
-  const versiones = [{ version: "1.3.0", publicada: "2026-08-19", exigible_desde: "2026-08-20", urgente: true }];
+test("un exigible_desde ANTERIOR a la publicacion sigue siendo invalido", () => {
+  // El piso se fue; el sinsentido no. Una version no puede ser exigible antes de
+  // existir, y sin esta asercion la validacion aceptaria cualquier fecha.
+  const problemas = validarManifiesto({
+    versiones: [{ version: "1.3.0", publicada: "2026-08-19", exigible_desde: "2026-08-18" }],
+  });
+  assert.equal(problemas.length, 1);
+  assert.match(problemas[0], /ANTERIOR a/);
+});
+
+test("el campo urgente ya no cambia nada: ni valida distinto ni avisa", () => {
+  // Era la puerta de atras del piso de 28 dias. Sin piso no hay puerta, y un
+  // aviso que nombra una puerta inexistente ensena a ignorar avisos.
+  const versiones = [{ version: "1.3.0", publicada: "2026-08-19", exigible_desde: "2026-08-19", urgente: true }];
   assert.deepEqual(validarManifiesto({ versiones }), []);
 
   const canonico = canonicoTemporal({ versiones });
@@ -701,7 +720,24 @@ test("la puerta de atras se llama urgente y no pasa muda", () => {
     archivos: { ...CADENA_SANA, ".projects/AGENTS-marco.md": artefactoAlDia(canonico) },
     hoy: PASADO_EL_PLAZO,
   });
-  assert.equal(de(resultado, "version-urgente")[0].nivel, "warning");
+  assert.deepEqual(de(resultado, "version-urgente"), []);
+});
+
+test("un artefacto atrasado es ROJO el mismo dia, sin ventana que lo tape", () => {
+  // El corazon del change: antes esto era warning durante 28 dias.
+  const versiones = [
+    { version: "1.3.0", publicada: "2026-08-19", exigible_desde: "2026-08-19" },
+    { version: "1.4.0", publicada: "2026-08-20", exigible_desde: "2026-08-20" },
+  ];
+  const canonico = canonicoTemporal({ versiones });
+  const viejo = artefactoAlDia(canonico).replace(/version=1\.4\.0/, "version=1.3.0");
+  const resultado = correr({
+    canonico,
+    archivos: { ...CADENA_SANA, ".projects/AGENTS-marco.md": viejo },
+    hoy: new Date("2026-08-20T00:00:00Z"),
+  });
+  const atrasado = resultado.hallazgos.filter((h) => h.nivel === "error");
+  assert.ok(atrasado.length >= 1, JSON.stringify(resultado.hallazgos));
 });
 
 test("un manifiesto sin versiones, con fechas mal o desordenado, es invalido", () => {
