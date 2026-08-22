@@ -41,6 +41,8 @@ mueve sobre un cambio incompatible.
 
 ## [No publicado]
 
+## [1.4.2] — 2026-08-22
+
 ### Corregido
 
 - **El pin de version exacta dejo de ser una media verdad.** La 1.4.0 movio la
@@ -72,16 +74,31 @@ mueve sobre un cambio incompatible.
   consumidores lo tenia. Una regla que nombra un dueno inexistente entrena a ignorar el
   resto del archivo.
 
-### Retirado
+### Acotado (y no retirado: se intento y no se pudo)
 
-- **El tag movil `v1`.** Apuntaba al mismo commit que `v1.4.1`, no lo consumia ningun
-  repo del censo, y su existencia sostenia dos afirmaciones falsas: que el canal de
-  distribucion seguia siendo el push (no lo es desde la 1.4.0) y que el pin exacto
-  alcanzaba (no alcanzaba, ver arriba). `projects-release` paso de **seis pasos a cinco**:
-  el que lo movia no existe, y con el desaparecio una de las tres precondiciones.
+- **El tag movil `v1` queda reducido a UNA linea, y el intento de borrarlo fallo por
+  una razon que vale escribir.** La idea era pinar tambien las dos invocaciones
+  internas por version exacta y borrar el ref. El CI de este mismo PR lo refuto:
+  *"Unable to resolve action ...@v1.4.2, unable to find version v1.4.2"*. El tag se
+  crea **despues** de mergear el PR de release, asi que una linea que pina la version
+  que se esta cortando pone en rojo al PR que la corta — **circular por construccion**,
+  no por orden de los pasos.
 
-  La compuerta humana no se perdio: se movio al merge del PR de release a `main`, que
-  ya exige el OK y ocurre ANTES de que el tag exista.
+  Y no hay rodeo: GitHub no admite expresiones en `uses:`, asi que un workflow reusable
+  no puede referenciar su propio ref; y una ruta local dentro de un reusable se resuelve
+  contra el arbol de QUIEN LLAMA. O sea que `@v1` no era descuido del autor original:
+  era el unico mecanismo disponible para que el workflow y sus actions avanzaran juntos.
+
+  Queda entonces en **una** invocacion —`actions/guardrail-deltas`, la unica cuyo ref se
+  resuelve durante el CI del propio marco; la de `actions/constitucion` no, porque su
+  job se saltea aca— y el paso 5 del release la mueve. El banco la exceptua **por lista
+  exacta** (archivo, ref y action): una segunda `@v1` da rojo, verificado con el control.
+
+  El skew que queda, dicho entero: un consumidor pinado a `marco-ci.yml@vX.Y.Z` recibe
+  ese workflow en X.Y.Z y `guardrail-deltas` en la ultima 1.x. Acotado a un verificador
+  de deltas. La version derivada —la particion que ya usa la constitucion— elimina el
+  skew y deja morir a `v1`, y no entro aca porque toca la logica del veredicto agregado
+  que heredan todos los consumidores, a dos dias del piloto.
 
 ### Anadido
 
@@ -96,10 +113,12 @@ mueve sobre un cambio incompatible.
 
 **Dos cosas, y las dos hay que hacerlas.**
 
-1. **Si tu `uses:` del marco dice `@v1`, cambialo a la version exacta.** El tag ya no
-   existe: la corrida falla con "Unable to resolve action" o "workflow not found", que
-   parece un typo en la ruta y no menciona el tag. Al 2026-08-21 los repos con esa
-   linea son `intranet#1` y `riesgos-investigaciones#2`, los dos en PRs sin mergear.
+1. **Si tu `uses:` del marco dice `@v1`, cambialo a la version exacta.** El tag sigue
+   existiendo —por una linea interna del marco, ver arriba— asi que tu pipeline NO se
+   rompe. Lo que pasa es peor de tan callado: Dependabot no propone bump para un tag
+   mayor, asi que ese repo no recibe versiones nuevas por PR y **no aparece en el censo**.
+   Al 2026-08-22 los repos con esa linea son `intranet#1` y `riesgos-investigaciones#2`,
+   los dos en PRs sin mergear.
 2. **Regenera la porcion del marco de tu constitucion.** El texto canonico cambio, asi
    que tu artefacto quedo atrasado: el check lo dice en `::warning::` y pasa a rojo el
    `exigible_desde` que el propio aviso imprime. La forma de que deje de ser manual es
