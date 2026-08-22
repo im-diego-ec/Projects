@@ -81,6 +81,31 @@ umbral; hace falta que la razón esté escrita al lado del identificador.
 - **No dice si la herramienta pierde más material que una persona.** Sí dice si perdió
   reglas de negocio, que es una pregunta absoluta.
 
+## Los primeros treinta minutos: probar la ingesta con UNA pieza
+
+**Antes de abrir el corpus entero.** Se entra por la fase 2 de la herramienta
+(`bmad-prd`), no por la fase 1: el mapa de workflows del proveedor marca la fase 1 como
+opcional y dice que `bmad-prd` hace *source-extract* de documentos en su Discovery, y que
+«ninguna de las dos skills requiere la otra».
+
+Lo que **no** está medido es si source-extrae un corpus cualquiera —entrevistas, mapas de
+proceso, planillas— o solamente un documento con la forma que la herramienta espera. Así
+que la primera prueba es con **una sola pieza**:
+
+1. Elegí una pieza del inventario, la más típica.
+2. Entrá por `bmad-prd` y dale esa pieza como fuente.
+3. Anotá **qué hizo**: la leyó y extrajo, o te empezó a preguntar como si no existiera.
+
+**Si te pregunta en vez de leer, ese es el resultado del lunes** — y es un resultado útil,
+porque dice qué forma tendría que tener un corpus para que la herramienta lo aproveche. No
+es un fracaso del día: es lo que veníamos a averiguar. Lo que sí sería un desperdicio es
+descubrirlo a las cuatro horas de haberle dado todo.
+
+Antes había un brazo manual al que caerse. Ahora no hay, y por eso esta prueba va primero
+y con una pieza sola.
+
+---
+
 ## Lo que hace falta antes de abrir el material
 
 | # | Qué | Quién |
