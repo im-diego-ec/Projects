@@ -112,10 +112,32 @@ tres piezas sin escenario, esa diferencia es el hallazgo.
 
 ### Dos cosas de configuración que cuestan minutos y se pagan caro
 
-| Qué | Por qué |
-|---|---|
-| **El idioma sale en inglés por defecto.** En `_bmad/bmm/config.yaml`, `communication_language` y `document_output_language` vienen en `English` | La sesión es con PO y los specs del área están en castellano. Si no se cambia, la herramienta saluda, pregunta y **escribe los documentos en inglés**. Son dos líneas |
-| **El `.memlog.md` es la memoria de la corrida**, y la herramienta lo dice: *«whatever isn't logged is lost on resume»* | Si la sesión se corta, lo que sobrevive es ese archivo. Necesita `uv` para escribirse, que ya está instalado (0.12.0) |
+**El idioma. Builder 1 lo confirmó el 2026-08-22: entrada y salida en castellano.** Sale en
+inglés por defecto, así que es lo primero que se cambia, antes de la primera pregunta.
+En `_bmad/bmm/config.yaml`, dos líneas:
+
+```yaml
+communication_language: spanish
+document_output_language: spanish
+```
+
+Son **nombres de idioma en texto libre**, no códigos de locale. Y son dos campos separados
+a propósito —la herramienta permite conversar en uno y escribir en otro—: acá los dos van
+en castellano, porque los specs del área están en castellano y la sesión es con PO.
+
+`bmad-prd` **sí respeta la config**: su skill dice que resuelve `{communication_language}` y
+que se queda en él «for every turn for the entire run, not just the greeting». Verificado
+leyendo la skill instalada, no la web.
+
+**La excepción conocida, para que no sorprenda:** hay un bug abierto del proveedor
+(issue #1457) por el cual **`bmad-help` ignora la config** y contesta en inglés. Es solo
+esa skill —el reporte identifica que su `help.md` no carga la variable— y no afecta al
+flujo del PRD. Si se usa `bmad-help` y contesta en inglés, es eso y no una config mal
+puesta.
+
+**El `.memlog.md` es la memoria de la corrida**, y la herramienta lo dice textual:
+*«whatever isn't logged is lost on resume»*. Si la sesión se corta, lo que sobrevive es ese
+archivo. Necesita `uv` para escribirse, que ya está instalado (0.12.0).
 
 
 **Antes de abrir el corpus entero.** Se entra por la fase 2 de la herramienta
