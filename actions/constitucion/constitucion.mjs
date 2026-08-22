@@ -108,10 +108,20 @@ import { fileURLToPath } from "node:url";
 // motivo por el que hay un solo verificador del artefacto.
 import { invocacionesDe, leerWorkflows, main as mainCableado } from "./cableado.mjs";
 
-/** Días mínimos entre `publicada` y `exigible_desde`. Es `AGENTS.md` de Projects («un
- *  endurecimiento se estrena en modo aviso») convertido en campo obligatorio: el rojo
- *  lo dispara una fecha, no el release. */
-export const DIAS_DE_GRACIA_MINIMOS = 28;
+/* LA VENTANA DE GRACIA YA NO ES OBLIGATORIA, y conviene saber por qué antes de
+ * volver a ponerla. Había un piso de 28 días entre `publicada` y `exigible_desde`,
+ * más una puerta `"urgente": true` para saltárselo. Su justificación estaba escrita
+ * —«el marco se consume por un tag móvil, así que una verificación nueva aparece en
+ * el pipeline de cada proyecto sin que nadie la haya leído»— y CADUCÓ el 2026-08-21,
+ * cuando la distribución pasó a versión exacta: desde entonces nada aparece en el
+ * pipeline de nadie, llega dentro de un PR de bump. El «modo aviso» ERA el PR.
+ *
+ * Lo que quedaba del piso era su otro efecto: un repo podía estar atrasado y VERDE
+ * durante cuatro semanas. Así que se retiró la política y se dejó el mecanismo:
+ * `hallazgoPorFecha` sigue teniendo sus dos ramas, y una versión que de verdad
+ * quiera estrenarse con aviso declara un `exigible_desde` futuro y lo consigue. Es
+ * opt-in y es de quien publica; ya no es el trato por defecto de cada cambio de
+ * texto. Ver el change ventana-vencida. */
 
 const MS_POR_DIA = 86400000;
 
@@ -335,11 +345,13 @@ export function validarManifiesto(manifiesto) {
     if (!esFecha(entrada?.exigible_desde)) {
       problemas.push(`la version ${etiqueta} no declara \`exigible_desde\` como AAAA-MM-DD`);
     }
+    // Una ventana de CERO dias (exigible = publicada) es lo normal desde el
+    // 2026-08-22: no se valida contra ningun piso. Lo que sigue siendo invalido es
+    // una fecha ANTERIOR a la publicacion, que no significa nada.
     if (esFecha(entrada?.publicada) && esFecha(entrada?.exigible_desde)) {
-      const dias = Math.round((aFecha(entrada.exigible_desde) - aFecha(entrada.publicada)) / MS_POR_DIA);
-      if (dias < DIAS_DE_GRACIA_MINIMOS && entrada.urgente !== true) {
+      if (aFecha(entrada.exigible_desde) < aFecha(entrada.publicada)) {
         problemas.push(
-          `la version ${etiqueta} deja ${dias} dias de gracia y el minimo es ${DIAS_DE_GRACIA_MINIMOS}: el dia que se publica una regla nadie se pone rojo. Si el cambio es urgente de verdad, se declara \`"urgente": true\` y se justifica en la seccion "Para consumidores" del CHANGELOG`,
+          `la version ${etiqueta} declara \`exigible_desde\` (${entrada.exigible_desde}) ANTERIOR a \`publicada\` (${entrada.publicada}): una version no puede ser exigible antes de existir`,
         );
       }
     }
@@ -979,16 +991,6 @@ export function verificar({
   for (const problema of canonico.problemas) {
     hallazgos.push({ nivel: "error", codigo: "canonico-invalido", mensaje: problema });
   }
-  for (const entrada of canonico.versiones) {
-    if (entrada.urgente === true) {
-      hallazgos.push({
-        nivel: "warning",
-        codigo: "version-urgente",
-        mensaje: `la version ${entrada.version} del canonico acorto la ventana de gracia con "urgente": true (exigible desde ${entrada.exigible_desde}). La puerta de atras existe y se nombra: su justificacion esta en la seccion "Para consumidores" del CHANGELOG de Projects`,
-      });
-    }
-  }
-
   // EL PISO RECOMENDADO DE PERMISOS DEL AGENTE, medido acá porque acá está su única
   // declaración (el manifiesto del canónico, que viaja con esta action). El paso del
   // workflow reusable tenía su propia copia literal y las dos ya habían divergido en
@@ -1047,6 +1049,8 @@ export function verificar({
         hoy,
         mensaje:
           "falta .projects-valores.json: sin los valores de este proyecto el marco no puede renderizar su porcion de la constitucion, asi que los agentes de este repo estan trabajando sin las reglas del area. Es un archivo de ESTE repo y vive fuera de .projects/ a proposito (.projects/ es desechable y el modo escribir lo reemplaza entero)",
+        arreglo:
+          "crear .projects-valores.json en la raiz con los valores de este proyecto (hay una plantilla comentada en plantilla/.projects-valores.json del marco, y `projects init` lo escribe solo en un repo nuevo) y despues correr el modo escribir. Correr el modo escribir ANTES no sirve: sin valores no hay con que renderizar",
       }),
     );
     return veredicto();
@@ -1259,7 +1263,7 @@ export function verificar({
         codigo: "artefacto-adelantado",
         mensaje: `${comun}. Queda como AVISO porque la causa benigna es posible: este repo ESCRIBE el artefacto con una ref que no usa para verificarlo (${divergentes
           .map((p) => `${p.ruta}#${p.job} -> ${p.ref}`)
-          .join(", ")}), asi que el que lo escribio puede ser una copia del marco mas nueva que la que verifica. Arreglo: dejalas en la misma ref —el tag movil del marco— y regenera el artefacto con el modo escribir; mientras esten distintas, el cuerpo de este artefacto no lo compara nadie`,
+          .join(", ")}), asi que el que lo escribio puede ser una copia del marco mas nueva que la que verifica. Arreglo: dejalas en la MISMA version exacta del marco (@vX.Y.Z; nunca @v1, que es interno del marco y no recibe PR de bump) y regenera el artefacto con el modo escribir; mientras esten distintas, el cuerpo de este artefacto no lo compara nadie`,
       });
       continue;
     }
@@ -1309,7 +1313,7 @@ export function verificar({
  * desde `exigible_desde`, `::error::`. Nunca verde: el ausente no tiene rama
  * silenciosa de «no aplica».
  */
-export function hallazgoPorFecha({ codigo, ruta, pendiente, hoy, mensaje }) {
+export function hallazgoPorFecha({ codigo, ruta, pendiente, hoy, mensaje, arreglo }) {
   const fecha = pendiente?.exigible_desde;
   const exigible = esFecha(fecha) ? aFecha(fecha) <= hoy : true;
   const cola = esFecha(fecha)
@@ -1320,7 +1324,11 @@ export function hallazgoPorFecha({ codigo, ruta, pendiente, hoy, mensaje }) {
   return {
     nivel: exigible ? "error" : "warning",
     codigo,
-    mensaje: `${mensaje}. ${cola}. Arreglo: correr el modo escribir de esta action (el PR semanal de actualizacion lo hace solo) o bajar el artefacto corregido que este job sube`,
+    // El arreglo por defecto sirve para un artefacto ATRASADO o AUSENTE. No sirve
+    // para el repo que todavia no declaro sus valores: ahi el modo escribir no tiene
+    // con que renderizar, y mandarlo a correrlo es mandarlo a un segundo error. Por
+    // eso el caso puede traer el suyo.
+    mensaje: `${mensaje}. ${cola}. Arreglo: ${arreglo ?? "correr el modo escribir de esta action (el PR semanal de actualizacion lo hace solo) o bajar el artefacto corregido que este job sube"}`,
   };
 }
 

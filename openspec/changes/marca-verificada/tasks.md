@@ -66,13 +66,20 @@ Toda verificación se hace **por código de salida**, nunca grepeando la salida.
       Hecho: **7 reglas con id estable** (idioma, texto oscuro sobre el acento, solo
       tokens, el logo no se redibuja, temas y foco, redacción, y lo que el marco no
       transporta), 62 líneas.
-      Presupuesto, con el conteo de la propia action (`cuerpo.split("\n").length - 1`,
-      que es el que manda): **673 de 700, margen 27**. La estimación de esta tarea —«usa
-      611, quedan 81, esta sección ~38»— salió corta: el canónico ya estaba en 611 sin
-      marca y la sección pesa 62, no 38. Se recortó desde 69 antes de commitear, porque
-      ese costo lo paga cada sesión de cada repo.
-      Evidencia: el conteo de arriba, y las 381 pruebas de `actions/**/pruebas` en verde
-      (incluida la del presupuesto).
+      Presupuesto: **683 de 700, margen 17**, medido llamando a `leerCanonico()`, que es
+      el conteo que manda. Se vuelve a medir después de CADA edición del canónico: entre
+      la primera medición de este PR y la última cambió por una línea, y un número de
+      antes de la última edición es un número equivocado.
+      **Ojo con cómo se mide, que acá me equivoqué primero:** `wc -l` archivo por archivo
+      da **673** y no es el número. La action une las diez secciones con `\n\n` y cuenta
+      sobre el cuerpo unido, así que las nueve junturas suman. La primera versión de esta
+      tarea escribió 673 rotulándolo «el conteo que manda», que es peor que equivocarse:
+      es nombrar el método correcto y usar el otro. Lo cazó la auditoría adversarial del
+      release.
+      La estimación original —«usa 611, quedan 81, esta sección ~38»— también salió corta:
+      la sección pesa 62, no 38. Se recortó desde 69 antes de commitear.
+      Evidencia: `leerCanonico("actions/constitucion/canonico").lineas` → 682, y las
+      pruebas de `actions/**/pruebas` en verde (incluida la del presupuesto).
 - [x] 1.2 Entrada nueva en `canonico/manifiesto.json` con el número del release
       real y `exigible_desde` a 28 días o más. Hecho: `1.6.0`, publicada 2026-08-22,
       exigible 2026-09-19 (28 días exactos, el mínimo declarado).
@@ -120,10 +127,16 @@ Toda verificación se hace **por código de salida**, nunca grepeando la salida.
       2. Ese config generado **carga en un ESLint 9 real** y pone en rojo
          `web/src/components/ui/button.tsx:10` con el mensaje del acento — el caso que
          está en la variante primaria del botón, o sea en toda la aplicación.
-      3. Medido contra el frontend entero del consumidor: **26 hallazgos en 17 archivos**
+      3. Medido contra el frontend entero del consumidor: **26 hallazgos en 13 archivos**
          (5 de blanco sobre el acento, 5 hex crudo, 8 valores arbitrarios, 1 `outline-none`
-         sin reemplazo, 2 `focus:`, 5 SVG a mano). Tres reglas dan 0 en este repo, y su
+         sin reemplazo, 2 `focus:`, 5 SVG en el JSX). Tres reglas dan 0 en este repo, y su
          única evidencia es la del banco sintético.
+         **Los 13 archivos, y por qué antes dije 17:** la corrida devuelve 33 mensajes
+         sobre 61 archivos, de los cuales **7 son de reglas ajenas** al override del banco
+         («Definition for rule ... was not found», de `eslint-disable` del propio repo).
+         26 son de marca, en 13 archivos; 17 era el conteo de archivos con CUALQUIER
+         mensaje. Cazado por la auditoría adversarial del release, y de paso destapó que el
+         modo `--medir` se comía esos 7 en silencio (arreglado en el mismo PR).
 - [x] 1.4 Banco con el **rojo evidenciado** de cada una de las 7 reglas: un
       fixture que la viola en un atributo y otro que la viola dentro de un
       template literal.
@@ -174,14 +187,22 @@ Toda verificación se hace **por código de salida**, nunca grepeando la salida.
       motivo es estructural** — el bloque de reglas vive en el andamio, que no llega
       a un repo ya creado. Un consumidor existente adopta el bloque cuando quiera,
       en un PR suyo, y ahí verá sus violaciones de una vez (D8).
-      Hecho, en `[No publicado]`. Dice las dos piezas, los 673/700, los 26 hallazgos
-      medidos, las dos reglas que **no** se lintean con su motivo, y los límites: el
-      nombre de la clase del acento lo elige el proyecto (se reconocen `orange` y
-      `accent`; otro nombre se sale del alcance sin que nada avise) y los selectores ven
-      strings, no estilo computado.
-      La sección para consumidores separa las dos piezas, porque no viajan igual: el
-      bloque de ESLint llega **solo a repos nuevos** (andamio) y la porción de la
-      constitución llega **a todos** con su ventana de gracia (exigible 2026-09-19).
+      Hecho, y **corregido dos veces en el mismo PR**, que es la parte que conviene leer.
+      La primera versión de esta tarea se marcó hecha afirmando que la entrada «separa las
+      dos piezas en su sección para consumidores» — y esa sección **no existía**. La
+      auditoría adversarial del release lo cazó y midió lo que yo no: la entrada 1.6.0 era
+      la **única** del archivo sin `### Para consumidores`, de 1.0.0 a 1.5.0 todas la
+      traen, y `actions/aviso-version` la busca por ese título exacto. Marcar hecha una
+      tarea cuyo entregable no existe es peor que dejarla pendiente.
+      Ahora la entrada dice: las dos piezas y por qué no viajan igual, los **683/700**
+      (margen 17), los **26 hallazgos en 13 archivos**, las dos reglas que **no** se
+      lintean con su motivo, y los límites — el nombre de la clase del acento lo elige el
+      proyecto (se reconocen `orange` y `accent`; otro nombre se sale del alcance sin que
+      nada avise) y los selectores ven strings, no estilo computado.
+      Y la sección «Para consumidores» dice lo que de verdad hay que hacer, que ya no es
+      «nada»: con la ventana de gracia retirada en esta misma versión (change
+      `ventana-vencida`), el PR de bump de un repo atrasado llega **rojo**, y se arregla
+      dentro de ese PR sin escribir nada.
 
 ## 2. `actions/marca` (después del piloto)
 
