@@ -76,6 +76,13 @@ al final (paso 7), cuando el check nuevo ya haya corrido al menos una vez.
 
 ---
 
+> **Si el repo es NUEVO, esta skill no es el camino.** Un proyecto que nace del
+> andamio se instancia con `projects init`:
+> `node <clon-del-marco>/herramientas/projects-init.mjs --valores valores.json --destino .`
+> Esta skill es para adoptar el marco en un repo que YA tiene su propio `ci.yml` y su
+> historia, que es un problema distinto: hay que reemplazar mecánica existente sin
+> romper lo que ya corre.
+
 ## Paso 2 — Reemplazar los jobs de marco por la llamada al reusable
 
 Sale del `ci.yml` del consumidor **toda la mecanica del marco**: deteccion del

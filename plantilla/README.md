@@ -23,6 +23,27 @@ proyecto —stack, ambientes, sus reglas propias— y lo común llega regenerado
 
 ---
 
+## 0. El atajo: `projects init`
+
+Las secciones 1, 2 y 2.5 de abajo son **transcripción**, y hay una herramienta que
+las hace en un comando. Desde la raíz del repo nuevo, con un clon del marco:
+
+```bash
+node <clon-del-marco>/herramientas/projects-init.mjs --ejemplo > valores.json
+# llenar valores.json con la tabla de la seccion 2
+node <clon-del-marco>/herramientas/projects-init.mjs --valores valores.json --destino .
+```
+
+Hace el copiado (sección 1), la sustitución de los 22 marcadores (sección 2), el
+`openspec init` con el pin del marco (sección 4) y el render de la constitución
+(sección 2.5). Falla cerrado y verifica releyendo el árbol.
+
+**Las secciones de abajo siguen siendo la fuente de verdad de los VALORES** —qué
+poner en cada uno, con ejemplo y caso borde— y el camino manual completo, que es el
+fallback. Lo que la herramienta no hace está en la sección 5.
+
+---
+
 ## 1. Copiar
 
 ```bash
