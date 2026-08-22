@@ -20,10 +20,24 @@ escrito en otro contexto: «pondría las decisiones en dos casas, y la divergenc
 entre dos casas es cuestión de tiempo». El primer principio del README del marco
 es **referenciar > copiar**.
 
-**El recorte, medido.** De 189 archivos y 960K, **9 archivos y 63K** necesitan
-poder actualizarse solos: 7 CSS de tokens (13.862 bytes) menos `fonts.css` (D5),
-más 3 logos SVG (9.156 bytes). Todo lo demás —45 componentes, 24 guidelines HTML,
-el bundle, el documento maestro de 1.082 líneas— se lee, no se copia.
+**El recorte, medido.** De 189 archivos y 960K, **10 archivos y 22.671 bytes**
+necesitan poder actualizarse solos:
+
+| Qué | Cuántos | Bytes |
+|---|---|---|
+| `tokens/*.css` menos `fonts.css` (D5) | 6 | 13.176 |
+| `styles.css` (el punto de entrada) | 1 | 339 |
+| `assets/*.svg` | 3 | 9.156 |
+| **Total transportado** | **10** | **22.671** |
+
+Todo lo demás —45 componentes, 15 guidelines HTML, el bundle, el documento maestro de
+1.082 líneas, y los 3 PNG de 71.360 bytes que van por scaffold (D9)— se lee o se copia
+una vez, no se mantiene.
+
+> La primera versión de este documento decía «9 archivos y 63K», y las dos cifras
+> estaban mal: los 13.862 bytes que citaba como «7 CSS de tokens» son en realidad los
+> **ocho** archivos CSS (los 7 de `tokens/` más `styles.css`), y el total no cerraba con
+> sus propios sumandos. Se corrige acá y en los otros dos documentos.
 
 **Alternativa descartada: vendorar el kit completo en `plantilla/`.** Agrega 24
 HTML que el censo de fuentes y `format:check` tendrían que excluir a mano, y
@@ -79,15 +93,37 @@ dura del design system— **no existe en el `_adherence`**. Hay que escribirla.
 
 Sin estas dos, el estreno mide mal y el equipo lo nota en la primera semana.
 
-**1. Los gemelos de `TemplateElement`.** De los cinco casos reales de blanco
-sobre naranja en el consumidor, **tres están dentro de un template literal**. El
-`_adherence` solo mira `Literal`, así que no los vería. Cada selector de texto
-lleva su gemelo sobre `TemplateElement`.
+**1. Los gemelos de `TemplateElement`.** Cada selector de texto lleva su gemelo
+sobre `TemplateElement`.
+
+**Y acá hay que corregir una medición de la primera versión de este documento**,
+porque sostenía la decisión correcta con el dato equivocado. Decía que «tres de los
+cinco casos están dentro de un template literal» y que un selector sobre `Literal` no
+los vería. **Es falso:** en `${sel ? "bg-la organización-orange text-white" : "..."}` el string
+es un `Literal` **dentro de la expresión** del template, no un `TemplateElement`. Un
+selector sobre `Literal` caza los cinco, y el gemelo caza **cero de esos cinco**.
+
+El gemelo sigue haciendo falta, por otro caso: el texto escrito **en la parte estática**
+de un template —los quasis— sí es `TemplateElement`, y ahí es donde aparecen los hex
+crudos de las plantillas de HTML. Es cobertura del contrato, no la corrección de una
+medición.
+
+**Y queda un hueco que ningún selector cierra por separado:** la forma partida, con la
+clase de fondo en un `Literal` de una expresión y el texto en el quasi estático. Los dos
+selectores por separado no la ven. Se declara acá en vez de descubrirse después.
 
 **2. El alcance por ruta, no solo el ancla del patrón.** El archivo de
 configuración de estilos del proyecto es el **lugar legítimo** de los colores de
 la marca. Una regla que lo enrojece está mal escrita. El alcance se acota con
 `files`, no con un regex más astuto.
+
+**Pero excluirlo del linter no es dejarlo sin verificar**, y la primera versión de
+este diseño confundía las dos cosas: el proposal prometía que la pieza 3 cerraba el
+caso del «valor coherente pero equivocado» —`#EDECE8` por `#F9F8F6`— y ese valor vive
+justo en el archivo que este punto excluye. La pieza 3 escribe y barre CSS; nunca lo
+mira. Se cierra en la action, comparando los valores del config contra los tokens del
+canónico pinado: es decidible leyendo los dos archivos, y ahí el lugar sigue siendo
+legítimo mientras el valor coincida.
 
 ## D5 — `fonts.css` no entra: es una sustitución, no la marca
 
@@ -125,6 +161,21 @@ pinada y compara. No se guarda un hash junto al archivo.
 **Por qué.** Es la lección que la action hermana ya tiene escrita: «recomputar un
 sello es un `git commit` y cambiar el canónico no». Un sello guardado se puede
 actualizar sin que el contenido sea correcto; un re-render no.
+
+**El discriminador, que la primera versión de este documento no nombró.** Un archivo
+que quedó **atrás** de la versión pinada también difiere del re-render, así que
+«difiere» no alcanza para decidir entre «alguien lo editó» y «quedó viejo» — y
+confundirlos pone en rojo a quien no hizo nada. Lo que los separa es la **versión que
+el propio artefacto declara en su encabezado**, exactamente como hace la action
+hermana: «version ${cab.version} y el marco publica la ${canonico.version}».
+
+No es un sello: un sello es un hash del contenido y se puede recomputar con un commit.
+La versión declarada es un dato que el generador escribe y que sirve para **elegir qué
+pregunta hacer**, no para acreditar que el contenido está bien. Eso último lo sigue
+acreditando el re-render.
+
+Y si el artefacto no declara versión, es **rojo**: sin ese dato los dos casos son
+indistinguibles y la ventana de gracia no se puede aplicar a nadie.
 
 **Lo que esto cierra y lo que no**, y la diferencia importa:
 
@@ -179,11 +230,23 @@ existe. Los 27 hits del consumidor actual no se disparan por este change: se
 dispararían el día que alguien decida adoptar el bloque en ese repo, y ese es un PR
 suyo, con su propio criterio y su propio momento.
 
-**Dónde el estreno con fecha SÍ es necesario:** en el bloque 3, el job
-`marca_cableada` de `marco-ci.yml`, que es lo único que alcanza a un consumidor
-existente sin que él haya movido un archivo. Ahí el aviso no es una severidad de
-eslint sino una anotación del workflow, así que sí se puede avisar sin fallar, y ahí
-va la fecha y la ventana de 28 días del ledger.
+**Dónde el estreno con fecha SÍ es necesario:** en el bloque 3, la comprobación de
+cableado que vive en `marco-ci.yml`, que es lo único que alcanza a un consumidor
+existente sin que él haya movido un archivo. Ahí el aviso no es una severidad de eslint
+sino una anotación del workflow, así que sí se puede avisar sin fallar, y ahí va la
+fecha y la ventana de 28 días del ledger.
+
+**Y esto tiene una consecuencia que hay que decir, porque la frase «es un PR suyo, con
+su propio criterio» sola sería engañosa:** el consumidor actual hereda `marco-ci.yml`,
+así que el bloque 3 **sí le llega**. Va a ver el aviso sin haber movido un archivo, y
+va a quedar en rojo cuando venza la ventana, por reglas que su `eslint.config.mjs` no
+tiene. Las dos cosas no se pueden sostener a la vez, así que se decide:
+
+**El bloque 3 no se estrena hasta que el consumidor existente haya adoptado el bloque
+de reglas, o hasta que se declare explícitamente que queda fuera.** No es una
+dependencia técnica: es que un aviso que nombra una regla que el repo no puede cumplir
+sin un PR aparte es un aviso que enseña a ignorar los avisos. Queda como precondición
+escrita del bloque 3 y no como algo que se resuelva el día del release.
 
 **La lección, escrita porque se repitió:** «se estrena en modo aviso» es una
 doctrina correcta que no se puede aplicar a ciegas. Depende de que el mecanismo
@@ -202,11 +265,22 @@ cuesta nada.
 
 ## Lo que falta y no lo resuelve este design
 
-**El sistema de diseño entrega dos de las cinco piezas de marca que la hoja de
-marca declara.** Faltan `la organización-workmark-dark`, `la organización-workmark-light` y
-`la organización-star-orange`. Los tres son derivables sin dibujar: en el componente
-`Wordmark` la estrella es un único `<path>` con relleno de acento y las letras son
-un grupo aparte en `currentColor`, limpiamente separables.
+**Hay dos fuentes que declaran las piezas de marca y no coinciden.** Eso es en sí un
+hallazgo, y conviene que quede escrito antes de que alguien lo descubra pidiendo un
+archivo:
+
+| Fuente | Qué declara |
+|---|---|
+| `uploads/ORG-MASTER.md:158` (§1.9), la «Única Fuente de la Verdad» del sistema | **tres**: `la organización-logo-dark`, `la organización-logo-light`, `la organización-star-orange` |
+| La hoja de marca que entregó Builder 1 el 2026-08-22 | **cinco**: las dos anteriores más `la organización-workmark-dark` y `la organización-workmark-light`, y la estrella compartida |
+| Lo que `assets/` **entrega** | **tres**: `la organización-logo-dark`, `la organización-logo-light` y `la organización-logo-mono-black` — este último no lo declara ninguna de las dos fuentes |
+
+Contra el documento maestro falta **una** pieza: `la organización-star-orange`. Contra la hoja de
+marca faltan **tres**. Y sobra una que ninguna fuente pide.
+
+Las que faltan son derivables sin dibujar: en el componente `Wordmark` la estrella es un
+único `<path>` con relleno de acento y las letras son un grupo aparte en `currentColor`,
+limpiamente separables.
 
 **Pero publicar assets de marca es del dueño de la marca, no del marco.** Queda
 nombrado acá para que la decisión exista; el change no la toma. Y la pieza que más
