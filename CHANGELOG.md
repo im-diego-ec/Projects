@@ -41,6 +41,42 @@ mueve sobre un cambio incompatible.
 
 ## [No publicado]
 
+### Añadido
+
+- **`projects init`: el andamio se instancia en un comando** (`herramientas/projects-init.mjs`).
+  Adoptar el marco eran ~30 actos manuales —copiar 23 archivos, sustituir 89 ocurrencias de
+  22 marcadores en 15 archivos, `openspec init`, y el render de la constitución—. Nada de
+  eso es una decisión: es transcripción. Y la transcripción a mano falla en silencio,
+  porque el check del marco verifica **la ausencia** de marcadores y no la corrección de
+  los valores que los reemplazaron.
+
+  Falla cerrado en todo, incluido el caso que más importa: **cero sustituciones es error**.
+  Si el patrón dejara de matchear, «no encontré nada» saldría en verde y el repo nuevo
+  nacería lleno de llaves. Verifica releyendo el árbol escrito, no su propio resultado.
+
+  Lo que **no** hace, declarado: no decide (los 22 valores los llena un humano, y la tabla
+  de `plantilla/README.md` sección 2 sigue siendo la fuente de verdad), no borra bloques
+  —los tres marcadores con camino «si no existe» los **nombra** en vez de adivinar el
+  borrado— y no toca GitHub.
+
+  Se estrena como **piloto acotado**, con el camino manual intacto al lado. Le corresponde
+  un change de OpenSpec con el gate del PO, y entra como el primer change del proyecto que
+  la usa.
+
+### Para consumidores
+
+**Nada que hacer.** `projects init` es una herramienta de builder: se corre desde un clon del
+marco y **no se consume por `uses:`**, así que no hace falta una versión nueva para usarla.
+Un repo ya creado no la necesita.
+
+> **Y una nota de proceso, porque el hueco fue propio.** Esta entrada llega en un PR
+> posterior al que introdujo la herramienta, contra la regla que este mismo archivo declara
+> («el CHANGELOG es obligatorio en el PR que introduce el cambio, no en el release»). Se
+> mergeó una herramienta de 348 líneas y **ningún check se puso rojo**: la regla está
+> enunciada y no tiene enforcement. Queda anotada como fila del backlog en
+> `docs/reglas-no-escritas.md`, que es donde el marco lleva la cuenta de lo que todavía
+> depende de que alguien se acuerde.
+
 ## [1.4.2] — 2026-08-22
 
 ### Corregido
