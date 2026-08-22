@@ -1482,7 +1482,7 @@ export const JOB_SUGERIDO = [
   // Version exacta y no @v1: el tag mayor se retira, y un snippet que sugiere un
   // ref inexistente manda al consumidor a un error que parece un typo en la ruta.
   // La version la exige el banco del andamio contra el CHANGELOG.
-  `      - uses: im-diego-ec/Projects/${SEGMENTO_ACTION}@v1.4.2`,
+  `      - uses: im-diego-ec/Projects/${SEGMENTO_ACTION}@v1.5.0`,
   "        with:",
   "          modo: verificar",
   "",
