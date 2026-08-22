@@ -41,6 +41,8 @@ mueve sobre un cambio incompatible.
 
 ## [No publicado]
 
+## [1.4.2] — 2026-08-22
+
 ### Corregido
 
 - **El pin de version exacta dejo de ser una media verdad.** La 1.4.0 movio la
