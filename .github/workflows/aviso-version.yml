@@ -4,7 +4,7 @@ name: Aviso de version a consumidores
 # QUE ES ESTO
 #
 # El CHANGELOG y la pagina del release son superficie de CONSULTA. Nadie los
-# consulta a tiempo: con un tag movil, un consumidor recibe comportamiento nuevo
+# consulta a tiempo: hasta la 1.3.0, con el tag movil, un consumidor recibia comportamiento nuevo
 # —incluido un check que lo pone en rojo— SIN HABER LEIDO NADA. Paso el
 # 2026-08-19: al mover v1, el segundo consumidor quedo a un push de un rojo que
 # nadie le anuncio. Este workflow convierte la publicacion de una version en una
