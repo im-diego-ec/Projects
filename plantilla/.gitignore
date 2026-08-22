@@ -40,6 +40,14 @@ infra-prod/tfplan*
 **/.claude/first-run
 **/.claude/assistant-daemon-state.json
 
+# RESIDUOS DE CORRER LOS CHECKS DEL MARCO EN LOCAL. En CI viven en RUNNER_TEMP;
+# en una maquina esa variable no esta seteada y caen en el directorio de trabajo.
+# Sin estas dos lineas, un `git add -A` despues de correr un check local commitea
+# basura: paso el 2026-08-21 con aviso-version.json, cuya prosa el detector de
+# secretos tokenizo como nombres de paquete.
+pendientes.txt
+aviso-version.json
+
 # Lockfile espurio: en un workspace pnpm el unico lockfile valido es el de la
 # raiz. Uno dentro de un paquete lo genera un `pnpm install` corrido ahi y hace
 # que local y CI resuelvan dependencias distinto. Se ignora en cualquier nivel
