@@ -992,7 +992,34 @@ esta.
 | Comando de instalación, copiado verbatim del ensayo | `npx --yes bmad-method@6.11.0 install --yes --modules bmm --tools claude-code --directory .` |
 | Código de salida de la instalación | **0**. Ensayado el 2026-08-20 en la máquina de @builder-uno, en un directorio desechable |
 | Qué pidió de verdad la instalación | **`uv`, la cadena de Python.** Ver el detalle abajo |
-| Si la fase 1 ingiere un corpus terminado en vez de elicitar | PENDIENTE (decide: quien corra el brazo B, tarea 1.4). Es el riesgo de la sección 2 |
+| Si la fase 1 ingiere un corpus terminado en vez de elicitar | **REPLANTEADO el 2026-08-22: la pregunta estaba en la fase equivocada.** No hay que hacer que la fase 1 ingiera: se **entra por la fase 2**. Ver abajo |
+
+> **Replanteo del 2026-08-22, contra la referencia del proveedor.** El riesgo estaba mal
+> ubicado: la fase 1 (Analysis) está marcada **«Optional»** en el mapa de workflows de la
+> herramienta, y sobre la fase 2 dice, textual:
+>
+> > *«Upstream: `bmad-product-brief` (Phase 1) produces a `product-brief.md` that `bmad-prd`
+> > can source-extract during Discovery… **Neither skill requires the other — start with
+> > `bmad-prd` directly if you already know what you're building.**»*
+>
+> O sea que el camino no es hacer que la fase 1 tragüe un corpus terminado: es **saltear la
+> fase 1 y entrar por `bmad-prd`**, que hace *source-extract* de documentos en su paso de
+> Discovery. Y eso coincide con lo que `design.md` ya había decidido en su tabla de solape:
+> la fase 1 es «hueco puro → se adopta» y la fase 2 «se adopta como INSUMO, jamás como
+> contrato». El diseño lo tenía bien; esta fila lo había framado en la fase equivocada.
+>
+> **Lo que esto NO acredita, y por eso la fila no se marca RESUELTA:** es documentación del
+> proveedor, no una medición. Dice que `bmad-prd` puede *source-extract* un
+> `product-brief.md` —un documento con la forma que la herramienta espera—. **No dice que
+> source-extraiga un corpus cualquiera**: entrevistas, mapas de proceso, planillas. Eso
+> sigue sin medirse.
+>
+> **Pero deja de ser un pre-requisito y pasa a ser la primera observación del lunes.** Si la
+> herramienta no digiere el material del PO tal como viene, eso ES el resultado —y es un
+> resultado útil, porque dice qué forma tendría que tener un corpus para que sirva—. Antes,
+> con el brazo manual, había a qué caerse; ahora no hay, y justamente por eso conviene que
+> la primera media hora del lunes sea exactamente esta prueba, con una pieza sola, antes de
+> abrir el corpus entero.
 
 **La fila nueva es la que puede tumbar el brazo B, y no se cierra leyendo el
 README.** El ensayo del 2026-08-20 midió que la herramienta se **instala** (exit
