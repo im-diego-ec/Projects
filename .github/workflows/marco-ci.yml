@@ -305,8 +305,36 @@ jobs:
       # DENTRO de la action, asi que ningun proyecto vendora una copia que se
       # pueda quedar vieja.
       #
-      # La ref es literal por obligacion: GitHub NO admite expresiones en el
-      # campo "uses". Y es la VERSION EXACTA, no el tag mayor.
+      # ESTA LINEA ES LA UNICA DEL MARCO QUE SIGUE USANDO @v1, Y NO ES UN OLVIDO.
+      #
+      # GitHub no admite expresiones en `uses:`, asi que un workflow reusable NO
+      # PUEDE referenciar su propio ref. Y una ruta local dentro de un reusable se
+      # resuelve contra el arbol de QUIEN LLAMA, no contra el del reusable (esta
+      # documentado dos veces en este repo, con el 404 medido el 2026-08-14).
+      #
+      # Se intento pinar la version exacta el 2026-08-22 y CI lo refuto en el acto:
+      # "Unable to resolve action im-diego-ec/Projects@v1.4.2, unable to find
+      # version v1.4.2". El tag se crea DESPUES de mergear el PR de release, asi que
+      # una linea que pina la version que se esta cortando pone en rojo al propio PR
+      # que la corta. Es circular por construccion, no por orden de los pasos.
+      #
+      # Por que aca y no en la otra invocacion interna (actions/constitucion, mas
+      # abajo): ese job se SALTEA en el repo del marco y corre por ruta local en su
+      # ci.yml, asi que su ref nunca se resuelve durante el CI de projects. Este paso
+      # vive en el job de OpenSpec, que si corre aca.
+      #
+      # EL RESIDUO, dicho entero: un consumidor pinado a marco-ci.yml@vX.Y.Z recibe
+      # ESTE workflow en X.Y.Z y esta action en la ultima 1.x. Es un skew real y es
+      # la razon por la que v1 no se pudo retirar del todo. Esta acotado a UNA action
+      # —un verificador de deltas, no logica de producto— y el banco del pinado lo
+      # exceptua por lista, con nombre y archivo, para que una tercera invocacion
+      # interna no herede la excepcion en silencio.
+      #
+      # La version derivada: aplicar la misma particion que usa la constitucion —
+      # saltear el paso cuando el repo es el del marco y correr la action por ruta
+      # local en el ci.yml de projects—. Eso elimina el skew y deja morir a v1. No se
+      # hizo en la 1.4.2 porque toca la logica del veredicto agregado que heredan
+      # todos los consumidores, a dos dias del piloto. Fila en reglas-no-escritas.
       #
       # Apuntaba a @v1 para que la action y este workflow avanzaran juntos sin
       # tocar la linea en cada release. Eso dejo de ser cierto en la 1.4.0, cuando
@@ -320,7 +348,7 @@ jobs:
       # No depende de que alguien se acuerde: pruebas/andamio/pinado.test.mjs exige
       # que todo `uses:` del marco sea igual a la version mas alta del CHANGELOG.
       - name: Deltas de OpenSpec sin perdida de escenarios
-        uses: im-diego-ec/Projects/actions/guardrail-deltas@v1.4.2
+        uses: im-diego-ec/Projects/actions/guardrail-deltas@v1
         with:
           instalar-node: "false"
 
