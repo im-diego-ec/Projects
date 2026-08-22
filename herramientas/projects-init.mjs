@@ -192,9 +192,9 @@ const EJEMPLO = {
   GENERAR_CLIENTE_DATOS: "prisma generate",
   EQUIPO_BUILDERS: "builders",
   EQUIPO_PO: "po",
-  BUILDER_1: "builder-uno",
-  BUILDER_2: "builder-dos",
-  PO: "po",
+  BUILDER_1: "handle-del-builder-1",
+  BUILDER_2: "handle-del-builder-2",
+  PO: "handle-del-po",
   CUENTA_DEV: "111111111111",
   CUENTA_PROD: "222222222222",
   REGION: "us-east-1",
@@ -204,7 +204,7 @@ const EJEMPLO = {
   DOMINIO_DEV: "agenda-dev.ejemplo.com",
   DOMINIO_PROD: "agenda.ejemplo.com",
   CANAL_ALERTAS: "#alertas-prod",
-  ID_MCP_SLACK: "54dff332-0a44-4f19-afcd-344d8cec4404",
+  ID_MCP_SLACK: "00000000-0000-0000-0000-000000000000",
 };
 
 function argumentos(argv) {
@@ -335,8 +335,12 @@ function main(argv) {
   console.log("  1. Proteccion de main con `ci-ok` como unico check requerido (.github/proteccion-main.md)");
   console.log("  2. Acceso de Dependabot al repo privado del marco, en el repo DEL MARCO");
   console.log("  3. `vars` y `secrets` del repo en Actions");
-  console.log("  4. Los tres handles de CODEOWNERS existen en la org y tienen escritura");
-  console.log("     (un handle mal escrito NO falla: GitHub deja de asignar revisores, en silencio)");
+  console.log("  4. Los handles de CODEOWNERS existen en la org, ESTAN EN SU EQUIPO y tienen escritura");
+  console.log("     Tres formas de que el review cruzado no exista y ningun check lo diga:");
+  console.log("     un handle mal escrito, un equipo VACIO, y un equipo sin permiso de escritura");
+  console.log("     (GitHub simplemente no asigna a nadie, sin aviso)");
+  console.log("  5. El issue macro en el Project del area, y las labels `area:*` del repo:");
+  console.log("     la constitucion que este repo hereda las exige en sus dos dimensiones");
   for (const [k, texto] of Object.entries(CON_LIMPIEZA_MANUAL)) {
     console.log(`  · ${k} = "${valores[k]}" — ${texto}`);
   }

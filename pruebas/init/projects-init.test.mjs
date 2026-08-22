@@ -290,3 +290,34 @@ test("un archivo de valores incompleto aborta sin escribir NADA en el destino", 
   assert.match(salida, /No se escribio nada/i);
   assert.deepEqual(fs.readdirSync(destino), [], "el destino tenia que quedar intacto");
 });
+
+// ══════════════════ El repo del marco no nombra a personas ══════════════════
+
+test("el ejemplo no nombra a ninguna persona: formas por rol, no handles reales", () => {
+  // Projects quedo con CERO nombres propios cuando se extrajo, y su AGENTS.md lo
+  // declara: "handles por rol, nunca nombres propios". El ejemplo de esta
+  // herramienta los habia reintroducido —tres handles de personas y el UUID real
+  // de un servidor MCP— o sea que el marco predicaba la regla y la rompia en la
+  // pieza que estrenaba. Esto es el enforcement, porque el review no lo cazo.
+  //
+  // LIMITE DECLARADO: verifica la CONVENCION (los campos de persona empiezan con
+  // `handle-`), no la ausencia de todo nombre posible. Un nombre propio que
+  // empiece con `handle-` pasaria; es texto, no una firma. Lo que cierra es el
+  // caso real: pegar el handle que uno tiene a mano.
+  const salida = execFileSync(process.execPath, [path.join(RAIZ, "herramientas/projects-init.mjs"), "--ejemplo"], {
+    encoding: "utf8",
+  });
+  const v = JSON.parse(salida);
+  for (const k of ["BUILDER_1", "BUILDER_2", "PO"]) {
+    assert.match(
+      v[k],
+      /^handle-/,
+      `${k} = ${JSON.stringify(v[k])} parece un handle real. Los campos de persona del ejemplo van por ROL: "handle-del-po", no el handle de nadie`,
+    );
+  }
+  assert.equal(
+    v.ID_MCP_SLACK,
+    "00000000-0000-0000-0000-000000000000",
+    "el id del MCP del ejemplo tiene que ser el UUID nulo, no el de un servidor real",
+  );
+});
