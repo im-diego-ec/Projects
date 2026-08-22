@@ -320,7 +320,7 @@ jobs:
       # No depende de que alguien se acuerde: pruebas/andamio/pinado.test.mjs exige
       # que todo `uses:` del marco sea igual a la version mas alta del CHANGELOG.
       - name: Deltas de OpenSpec sin perdida de escenarios
-        uses: im-diego-ec/Projects/actions/guardrail-deltas@v1.4.1
+        uses: im-diego-ec/Projects/actions/guardrail-deltas@v1.4.2
         with:
           instalar-node: "false"
 
@@ -938,7 +938,7 @@ jobs:
             echo "::error::este repo no invoca el censo de fuentes en ningun flujo: sin ese paso, un archivo que ninguna herramienta mira no produce rojo en ningun lado y la verificacion de alcance queda declarada pero apagada. Arreglo: pega el paso de abajo en el job que ya corre lint y typecheck, DESPUES de instalar dependencias (el censo interroga al toolchain ya instalado)"
             echo "== paso a agregar =="
             echo "      - name: Ningun archivo fuera del alcance de la verificacion"
-            echo "        uses: im-diego-ec/Projects/actions/censo-fuentes@v1.4.1"
+            echo "        uses: im-diego-ec/Projects/actions/censo-fuentes@v1.4.2"
             exit 1
           fi
 
@@ -2709,7 +2709,7 @@ jobs:
         with: { node-version: "22" }
       # Version exacta, no @v1: ver el motivo largo en el paso de deltas de OpenSpec.
       - name: Constitucion del marco cableada
-        uses: im-diego-ec/Projects/actions/constitucion@v1.4.1
+        uses: im-diego-ec/Projects/actions/constitucion@v1.4.2
         with:
           modo: cableado
           # La rama por defecto sale del evento y no de una constante: un `push`
