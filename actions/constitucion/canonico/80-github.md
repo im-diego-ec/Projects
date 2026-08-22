@@ -41,3 +41,5 @@
 
 - **Labels** de dos dimensiones: el campo Type para la naturaleza; `area:*` para el
   dominio. Sin milestones (deploy continuo).
+
+---

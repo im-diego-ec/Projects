@@ -45,14 +45,19 @@ author: la organización
 # porque recomputar un sello es un `git commit` y cambiar el canonico no.
 #
 # DONDE ESTA EL ROJO Y DONDE EL AVISO (regla 3 del marco: fail-open ruidoso)
-#   · artefacto ausente o atrasado -> ::warning:: hasta el exigible_desde de la
-#     version pendiente mas vieja, ::error:: desde esa fecha. NUNCA verde mudo: no
-#     hay rama de "este repo no aplica", porque el repo que no lo tiene es
-#     exactamente el que hay que avisar.
-#   · .projects-valores.json ausente -> en modo verificar entra por la MISMA ventana que
-#     el artefacto faltante (aviso, despues rojo): es un atraso de adopcion, no una
-#     manipulacion, y un rojo seco el primer dia es un endurecimiento estrenado sin
-#     modo aviso. En modo escribir sigue siendo rojo: no hay con que renderizar.
+#   · artefacto ausente o atrasado -> ::error:: desde el dia que la version se
+#     publica. NUNCA verde mudo: no hay rama de "este repo no aplica", porque el
+#     repo que no lo tiene es exactamente el que hay que avisar; y desde el
+#     2026-08-22 tampoco hay ventana en la que estar atrasado sea verde. Una
+#     version PUEDE declarar un exigible_desde futuro y entonces avisa hasta esa
+#     fecha, pero es opt-in de quien publica y no el trato por defecto: con
+#     distribucion por version exacta, el aviso previo ya lo da el PR de bump.
+#   · .projects-valores.json ausente -> ::error:: en los dos modos. Es un atraso de
+#     adopcion y no una manipulacion, pero desde que la ventana de gracia se retiro
+#     (2026-08-22) no hay estado intermedio: un repo que consume el marco sin declarar
+#     sus valores tiene a sus agentes trabajando sin las reglas del area, y eso no es
+#     algo que convenga dejar en amarillo. El rojo trae su arreglo PROPIO —crear el
+#     archivo, no correr el escritor— porque el escritor sin valores no puede hacer nada.
 #   · marcador del scaffold sin resolver -> ::error::, y en modo escribir NO se emite
 #     nada. Un valor cuyo TEXTO es el propio marcador (lo que la plantilla entrega tal
 #     cual) no cuenta como valor: medido, antes de este arreglo el artefacto salia con
@@ -229,7 +234,9 @@ outputs:
     description: Version del canonico que trae esta copia del marco.
     value: ${{ steps.constitucion.outputs.version }}
   exigible_desde:
-    description: Fecha desde la cual esa version deja de ser aviso y pasa a fallar.
+    description: >-
+      Fecha desde la cual esa version es exigible. Normalmente es la de su
+      publicacion; solo difiere si quien publico declaro un estreno con aviso.
     value: ${{ steps.constitucion.outputs.exigible_desde }}
   superficies:
     description: Superficies efectivamente emitidas, separadas por comas.

@@ -118,9 +118,13 @@ alguno quedo atras. Corrilo despues de editar, antes del PR.
 
 **Y el canonico de la constitucion**, si el texto de `actions/constitucion/canonico/`
 cambio en esta version: `manifiesto.json` necesita una entrada nueva en `versiones`
-con `publicada` y `exigible_desde` (28 dias minimo, y la puerta `"urgente": true` se
-justifica en la seccion «Para consumidores»). Sin esa entrada, el artefacto de los
-consumidores queda distinto del canonico y el check no puede decir por que.
+con `publicada` y `exigible_desde`, y lo normal es que las dos sean la MISMA fecha: un
+cambio del canonico es exigible el dia que se publica (la ventana de gracia obligatoria
+de 28 dias se retiro el 2026-08-22 — ver el change ventana-vencida). Poner un
+`exigible_desde` futuro sigue siendo posible y es una decision deliberada de estrenar
+con aviso, que se justifica en la seccion «Para consumidores». Sin esa entrada, el
+artefacto de los consumidores queda distinto del canonico y el check no puede decir por
+que.
 
 ### Cortar el CHANGELOG
 

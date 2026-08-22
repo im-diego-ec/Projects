@@ -152,7 +152,7 @@ test("el escaneo encuentra pines: un cero aca es el banco roto, no el arbol limp
     pines.length >= 15,
     `solo encontre ${pines.length} pin(es) del marco en lineas \`uses:\` de ${SUPERFICIES.join(", ")}. ` +
       "El andamio referencia el marco en ci.yml (el reusable + tres actions) y en " +
-      "actualizar-marco.yml, asi que menos de cinco significa que este banco dejo de mirar " +
+      "actualizar-marco.yml, asi que menos de quince significa que este banco dejo de mirar " +
       "donde deberia: revisá SUPERFICIES y el regex PIN antes de creerle al verde",
   );
 });
@@ -191,5 +191,101 @@ test("todo ref de un `uses:` del marco es una version exacta o un marcador", () 
     [],
     "un ref que no es `vX.Y.Z` ni un marcador (`{{...}}`, `<...>`) no lo resuelve GitHub: el " +
       "`uses:` muere con un error que parece un typo en la ruta del repo",
+  );
+});
+
+// ---------------------------------------------------------------------------
+// LA CLASE «v1 SE RETIRO», y por que esta guarda vive aca.
+//
+// El tag movil `v1` dejo de ser el CANAL de distribucion el 2026-08-21 pero NO se
+// pudo retirar: sobrevive porque marco-ci.yml referencia a una action hermana
+// (guardrail-deltas) por @v1, y un pin a la version que se esta cortando pone en
+// rojo al PR que la corta. Ese hecho quedo escrito en varios archivos, y la
+// afirmacion FALSA de que el tag «se retiro» aparecio CINCO veces en archivos
+// distintos: se arreglaba en uno y sobrevivia en otro (la skill del release,
+// AGENTS.md, README, claude.yml y —cazada por la auditoria adversarial del release
+// 1.6.0— actions/aviso-version/aviso-version.mjs, donde ademas era una REGRESION:
+// un commit reemplazo un texto correcto por uno falso).
+//
+// Estas dos aserciones convierten esa disciplina en un check. La primera es
+// completamente decidible; la segunda declara su limite.
+// ---------------------------------------------------------------------------
+
+const SUPERFICIES_DE_PROSA = [
+  ".github/workflows",
+  "actions",
+  "plantilla",
+  ".claude/skills",
+  "docs",
+  "herramientas",
+  "openspec/changes",
+  "openspec/specs",
+];
+
+test("v1 sigue vivo donde el marco dice que vive: EXACTAMENTE una invocacion interna", () => {
+  const marcoCi = fs.readFileSync(path.join(RAIZ, ".github/workflows/marco-ci.yml"), "utf8");
+  const porV1 = [...marcoCi.matchAll(/uses:\s*\S+@v1\s*$/gm)];
+  assert.equal(
+    porV1.length,
+    1,
+    "marco-ci.yml tiene que tener EXACTAMENTE una invocacion por @v1. Cero significa " +
+      "que alguien lo retiro y el paso 5 del release quedo moviendo un tag que nadie " +
+      "usa; dos o mas significa que la excepcion se extendio sin decidirlo",
+  );
+  assert.match(
+    porV1[0][0],
+    /guardrail-deltas@v1/,
+    "la unica invocacion por @v1 tiene que ser guardrail-deltas: es la unica cuyo ref " +
+      "se resuelve durante el CI del propio marco, que es lo que vuelve circular al " +
+      "pin exacto",
+  );
+});
+
+test("ningun archivo del marco afirma que v1 se retiro", () => {
+  // LIMITE DECLARADO, leelo antes de confiar: esta es una lista de las formas EXACTAS
+  // que ya aparecieron, no un detector de la idea. Una redaccion nueva que diga lo
+  // mismo con otras palabras se escapa. Es a proposito: decidir si una frase afirma o
+  // niega algo no se resuelve con un escaneo de texto, y un check que se pone rojo
+  // cuando la documentacion esta BIEN escrita ensena a ignorarlo — el mismo
+  // razonamiento por el que este banco no mira la prosa de los pines. Lo que SI
+  // garantiza: que la frase que ya se colo cinco veces no se cuele una sexta copiada.
+  const FALSAS = [
+    "el tag movil `v1` se retiro",
+    "el tag movil v1 se retiro",
+    "el tag `v1` se retiro",
+    "v1 se retiro: no existe",
+    "el retiro de `v1`",
+    "el tag mayor se retira",
+    "se retiró del todo cuando",
+  ];
+  // El archive queda fuera: ahi el texto viejo es historia inmutable. El CHANGELOG
+  // tampoco se escanea (no esta en las superficies) y con razon: la entrada de la
+  // 1.6.0 CITA estas frases justamente para explicar que se arreglaron.
+  const EXENTOS = [path.sep + "archive" + path.sep];
+
+  const candidatos = [
+    ...SUPERFICIES_DE_PROSA.flatMap(archivosDe),
+    path.join(RAIZ, "AGENTS.md"),
+    path.join(RAIZ, "README.md"),
+  ];
+
+  // Cero candidatos seria un banco roto, no un arbol limpio.
+  assert.ok(candidatos.length > 50, `solo ${candidatos.length} archivos escaneados: el recorrido se rompio`);
+
+  const encontradas = [];
+  for (const abs of candidatos) {
+    if (!fs.existsSync(abs) || EXENTOS.some((e) => abs.includes(e))) continue;
+    const texto = fs.readFileSync(abs, "utf8");
+    for (const f of FALSAS) {
+      if (texto.includes(f)) {
+        encontradas.push(`${path.relative(RAIZ, abs).replace(/\\/g, "/")}: "${f}"`);
+      }
+    }
+  }
+  assert.deepEqual(
+    encontradas,
+    [],
+    "v1 NO se retiro: sobrevive en una linea de marco-ci.yml y el paso 5 del release lo " +
+      "mueve. Lo correcto es decir que dejo de ser el CANAL de distribucion",
   );
 });
