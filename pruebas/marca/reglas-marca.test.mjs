@@ -321,6 +321,15 @@ const MUTACIONES = [
       ),
   },
   {
+    nombre: "un selector se queda con un mensaje que no dice que hacer",
+    rompe: "todo selector trae un mensaje que dice que hacer",
+    mutar: (s) =>
+      s.replace(
+        '            "SVG dibujado en el JSX. El logo y los iconos se usan desde el sistema; una ilustracion propia va en un archivo .svg importado.",',
+        '            "No.",',
+      ),
+  },
+  {
     nombre: "una regla del canonico se queda sin decidir",
     rompe: "toda regla de marca del canonico tiene decidido su estado frente al linter",
     mutar: (s) =>

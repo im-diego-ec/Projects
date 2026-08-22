@@ -94,7 +94,18 @@ if (medir) {
       porRegla.get(i).push(`${path.relative(path.resolve(repo), r.filePath).replace(/\\/g, "/")}:${m.line}`);
     }
   }
+  // Los mensajes que NO son de ninguno de nuestros selectores caen en el bucket
+  // -1, que el loop de abajo no imprime. Se reportan APARTE en vez de
+  // desaparecer: por este camino se iria un error de parseo, y entonces el conteo
+  // saldria bajo sin que nada avise.
+  const huerfanos = porRegla.get(-1) ?? [];
   console.log(`archivos analizados: ${res.length}`);
+  if (huerfanos.length) {
+    console.log(
+      `AVISO: ${huerfanos.length} mensaje(s) que no son de estas reglas y NO se cuentan ` +
+        `(reglas ajenas al override, o errores de parseo). Los primeros: ${huerfanos.slice(0, 3).join(", ")}`,
+    );
+  }
   let total = 0;
   for (const [i, s] of selectores.entries()) {
     const hits = porRegla.get(i) ?? [];

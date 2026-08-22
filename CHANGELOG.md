@@ -41,6 +41,10 @@ mueve sobre un cambio incompatible.
 
 ## [No publicado]
 
+Nada todavía.
+
+## [1.6.0] — 2026-08-22
+
 ### Añadido
 
 - **La identidad visual del área entra al marco, en dos piezas, cada una capaz de
@@ -56,8 +60,8 @@ mueve sobre un cambio incompatible.
      siete reglas con id estable —idioma, texto oscuro sobre el acento, solo tokens, el
      logo no se redibuja, temas y foco, redacción, y lo que el marco *no* trae—. Llegan a
      cada repo consumidor en su artefacto de agente, o sea a cada sesión de cada builder.
-     El canónico queda en **673 de 700 líneas** de presupuesto: ese costo lo paga cada
-     sesión, y por eso el presupuesto existe.
+     El canónico queda en **683 de 700 líneas** de presupuesto, margen 17: ese costo lo
+     paga cada sesión de cada repo, y por eso el presupuesto existe.
 
   2. **En el andamio de ESLint** (`plantilla/eslint.config.mjs`): diez selectores en
      `no-restricted-syntax`, severidad `error`, con alcance propio (`files` al fuente de
@@ -70,17 +74,19 @@ mueve sobre un cambio incompatible.
   La regla que más importa no existía en el kit del sistema y se escribió acá: **texto
   blanco sobre el naranja de marca da 2.9:1 y falla WCAG AA**; el oscuro da 6.7:1. Medido
   contra el frontend del un consumidor, el bloque encuentra **26 violaciones
-  reales en 17 archivos**, cinco de ellas de esa regla —una en la variante primaria del
-  botón, o sea en toda la aplicación— y cinco SVG dibujados a mano donde va el logo del
-  sistema.
+  reales en 13 archivos**, cinco de ellas de esa regla —una en la variante primaria del
+  botón, o sea en toda la aplicación— y cinco SVG dibujados en el JSX donde va un
+  componente del sistema.
 
-  **Qué tiene que hacer un consumidor: nada.** El bloque de ESLint llega por el andamio, o
-  sea a repos **nuevos**, que nacen con cero violaciones; por eso `error` desde el día uno
-  no es un endurecimiento estrenado sin modo aviso (y tampoco había opción: con
-  `--max-warnings=0` un `warn` ya es un rojo, solo peor explicado). Un repo que ya existe
-  no recibe este archivo y adopta el bloque cuando quiera, en su propio PR. La porción de
-  la constitución sí llega a todos, con su **ventana de gracia normal**: publicada
-  2026-08-22, exigible 2026-09-19.
+  **Las dos piezas no viajan igual, y eso decide qué le pasa a cada repo.** El bloque de
+  ESLint llega por el andamio, o sea a repos **nuevos**, que nacen con cero violaciones;
+  por eso `error` desde el día uno no es un endurecimiento estrenado sin modo aviso (y
+  tampoco había opción: con `--max-warnings=0` un `warn` ya es un rojo, solo peor
+  explicado). Un repo que ya existe no recibe ese archivo y adopta el bloque cuando
+  quiera, en su propio PR. La porción de la constitución sí llega a todos — y con el
+  cambio de política de esta misma versión (ver «Cambiado»), su atraso es **rojo desde el
+  día que se publica**, no un aviso con fecha. Lo que hay que hacer está en «Para
+  consumidores».
 
   Los límites están escritos en el propio archivo, que es donde alguien los va a leer: el
   nombre de la clase del acento lo elige el proyecto (se reconocen `orange` y `accent`;
@@ -114,6 +120,100 @@ mueve sobre un cambio incompatible.
   Los selectores se **leen** del andamio en las dos piezas, nunca se copian: una copia se
   desincroniza y a partir de ahí la prueba pasa contra un archivo que ya no es el que se
   distribuye.
+
+### Cambiado
+
+- **La ventana de gracia de la constitución se retira: un artefacto atrasado es rojo el
+  día que la versión se publica.** Había un piso obligatorio de 28 días entre `publicada`
+  y `exigible_desde`, más una puerta `"urgente": true` para saltárselo. Se retira la
+  **política**; el **mecanismo** sobrevive como opt-in.
+
+  El motivo está escrito y es que la razón de la ventana **caducó**. El spec vivo la
+  justificaba así: «el marco se consume por un tag móvil, así que una verificación nueva
+  aparece en el pipeline de cada proyecto sin que nadie la haya leído». Eso dejó de ser
+  cierto el 2026-08-21, cuando la distribución pasó a versión exacta: desde entonces nada
+  aparece en el pipeline de nadie, **llega dentro de un PR de bump**. El «modo aviso» ERA
+  el PR. Lo único que la ventana seguía produciendo era su otro efecto: un repo podía
+  estar atrasado y **verde** durante cuatro semanas.
+
+  Y un segundo efecto, más silencioso: la fecha que un consumidor veía no salía de la
+  versión que le llegaba, salía de la **entrada pendiente más vieja**. Quien cortaba una
+  versión no decidía la ventana que su consumidor iba a percibir: la heredaba de un
+  release anterior.
+
+  **Qué sobrevive, y por qué no se borró el mecanismo:** `AGENTS.md` sigue diciendo que
+  un endurecimiento «se estrena en modo aviso», así que borrarlo dejaría esa regla sin
+  forma de cumplirse. Una versión que declare un `exigible_desde` posterior a su
+  `publicada` sigue avisando hasta esa fecha. Es **opt-in de quien publica** y ya no el
+  trato por defecto de cada cambio de texto.
+
+  Detalles: se va la constante del piso de 28 días y el aviso `version-urgente` (la puerta
+  de atrás de una puerta que ya no existe); las tres entradas del manifiesto pasan a
+  `exigible_desde` = `publicada` — `publicada` **no se toca**, guarda la fecha real: lo que
+  cambió es una política y el campo de política se alinea con ella. El output
+  `exigible_desde` de la action **se queda** (se consideró quitarlo y se descartó: quitar
+  un output es breaking por la letra de `AGENTS.md` y el beneficio era cero). La propiedad
+  queda **enunciada en un spec vivo**, donde no estaba: vivía solo en el código y en la
+  documentación de su action. Change: `ventana-vencida`.
+
+### Corregido
+
+- **La afirmación «el tag móvil `v1` se retiró» era falsa y estaba en cinco archivos.**
+  `v1` dejó de ser el **canal** el 2026-08-21 pero no se pudo retirar: sobrevive porque
+  `marco-ci.yml` referencia a una action hermana por `@v1`, y un pin a la versión que se
+  está cortando pone en rojo al PR que la corta. La frase se arregló tres veces en
+  archivos distintos y volvía a aparecer en otro; en `actions/aviso-version` era además
+  una **regresión** (un commit reemplazó un texto que era correcto). Corregida en
+  `aviso-version`, `cableado.mjs`, `AGENTS.md` y `docs/reglas-no-escritas.md`.
+
+  Y lo que impide la sexta vez: **dos aserciones nuevas** en
+  `pruebas/andamio/pinado.test.mjs`. Una es completamente decidible —`marco-ci.yml` tiene
+  que tener **exactamente una** invocación por `@v1` y tiene que ser `guardrail-deltas`—;
+  la otra es una lista de las formas exactas que ya aparecieron, **con su límite escrito**:
+  no detecta una redacción nueva, sí impide que la que ya se coló cinco veces se cuele
+  copiada.
+
+- **Dos mensajes le recomendaban `@v1` a un consumidor, que es lo que el marco llama «el
+  modo de falla más callado de todo el bootstrap».** Un repo pinado al tag móvil no recibe
+  PR de bump de Dependabot y no aparece en el censo — y no falla, se queda callado. Uno era
+  un `::warning::` que se imprime **en el pipeline del consumidor** diciéndole que dejara
+  sus invocaciones «en el tag móvil del marco»; el otro, el snippet de ejemplo del
+  encabezado de `marco-ci.yml`, o sea el que un consumidor copia. Los dos ahora dicen
+  versión exacta. El segundo lo encontró la aserción nueva de arriba en su primera
+  corrida, porque el banco de pines excluye los comentarios a propósito.
+
+- **Tres números publicados estaban mal, todos medidos con el método equivocado.** El
+  presupuesto del canónico era **683 de 700** (margen 17) y no 673: la action une las diez
+  secciones y cuenta sobre el cuerpo unido, así que sumar `wc -l` por archivo da otro
+  número — y la primera versión rotulaba ese número como «el conteo que manda», que es
+  peor que equivocarse. Los hallazgos de marca son **26 en 13 archivos** y no en 17: de los
+  33 mensajes de la corrida, 7 son de reglas ajenas al override y 17 era el conteo de
+  archivos con cualquier mensaje. Y el modo `--medir` del banco **se comía esos 7 en
+  silencio** (caían en un bucket que el reporte no imprimía): ahora los reporta, porque por
+  ese mismo camino se iría un error de parseo y el conteo saldría bajo sin que nada avise.
+
+  Los tres los encontró una auditoría adversarial del propio release, con seis lentes
+  independientes y un escéptico por hallazgo. Sin ella se publicaban.
+
+### Para consumidores
+
+**Hay una acción, y es de un minuto.** Si tu repo consume el marco y su porción de la
+constitución quedó atrás, **el PR de bump a 1.6.0 llega ROJO** (antes llegaba amarillo con
+una fecha: eso es lo que cambió). Se arregla dentro del mismo PR y **sin escribir nada**:
+
+1. Bajá el artefacto `constitucion-al-dia` que el propio job sube, y aplicalo; **o**
+2. corré `actions/constitucion` en modo `escribir` (si tu repo tiene el workflow semanal
+   de actualización del marco, lo hace solo).
+
+Medido contra el un consumidor, cuyo artefacto declara `1.3.0`: dos hallazgos,
+y el modo `escribir` lo deja al día en sus dos superficies en una corrida.
+
+**El bloque de reglas de ESLint de la marca NO te llega.** Vive en el andamio, que se copia
+al crear un repo. Un repo que ya existe lo adopta cuando quiera, en un PR suyo, y ahí ve
+todas sus violaciones de una vez en vez de una por semana.
+
+**Nada más cambió para vos:** ningún nombre de job, ningún `input`, ningún `output`,
+ningún permiso de token. Un repo que no mergea el bump no cambia de color.
 
 ## [1.5.0] — 2026-08-22
 

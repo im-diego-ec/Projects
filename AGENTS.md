@@ -120,8 +120,8 @@ trae un check nuevo, el rojo aparece **dentro de ese PR**.
 > línea.** Hasta la 1.3.0 era el canal:
 > apuntaba al último release de la 1.x y los consumidores recibían todo sin tocar
 > nada. Cambió porque el 2026-08-19 un check nuevo enrojeció un repo que el día
-> anterior pasaba, y nadie lo había pedido. Y se retiró del todo cuando se midió que
-> el tag tenía un segundo rol sin escribir: `marco-ci.yml` referenciaba a sus propias
+> anterior pasaba, y nadie lo había pedido. Y **no se pudo retirar** cuando se midió
+> que el tag tenía un segundo rol sin escribir: `marco-ci.yml` referenciaba a sus propias
 > actions hermanas por `@v1`. El pin exacto del consumidor era una **media
 > verdad**.
 >
