@@ -137,33 +137,52 @@ gh repo create im-diego-ec/<proyecto> --private --clone
 cd <proyecto>
 ```
 
-### 3.1 Primero el esqueleto de aplicación
+### 3.1 Traé del starter SÓLO la aplicación
+
+⚠️ **El starter está archivado** (read-only desde el 2026-08-14, último commit el
+2026-07-09) y trae tres cosas que **no** son de tu proyecto: la infraestructura de otro,
+la convención vieja de specs, y un README que describe un ambiente desplegado que no es
+tuyo. Nada de eso se arregla en el starter, porque un repo archivado no acepta PRs.
+
+Así que **no se copia el árbol entero: se extrae la lista**.
 
 ```bash
-git clone --depth 1 git@github.com:im-diego-ec/projects-starter.git /tmp/starter
-(cd /tmp/starter && git archive HEAD) | tar -x -C .
-git add -A && git commit -m "chore: esqueleto de aplicacion desde projects-starter"
+git clone --depth 1 https://github.com/im-diego-ec/projects-starter.git /tmp/starter
+(cd /tmp/starter && git archive HEAD -- \
+    api web package.json pnpm-workspace.yaml pnpm-lock.yaml \
+    docker-compose.yml comandos-levantar-servicios.txt) | tar -x -C .
+git add -A && git commit -m "chore: aplicacion base desde projects-starter (archivado)"
 ```
+
+Medido: entran **32 archivos**, y **no entra ninguno** de `infra/`, `spec/`, `.github/`,
+`AGENTS.md`, `tsconfig.base.json`, `.gitignore` ni `README.md`.
+
+**Eso resuelve seis problemas de una**, y por eso la lista es explícita y no un
+`cp -r` con borrados después:
+
+| No entra | Por qué importa |
+|---|---|
+| `infra/` | Es el Terraform de **otro proyecto**, aplicable, en la **misma cuenta dev**. Y su README es el inventario de ese ambiente vivo —VPC, endpoint de la base, ECR, bucket, ARN del rol— más el camino a sus secretos |
+| `.github/workflows/deploy.yml` | El deploy de esa arquitectura (App Runner + CloudFront), apuntando a esos mismos recursos por secret |
+| `spec/` | La convención **vieja**. Hoy la fuente de verdad es `openspec/`, que `projects init` deja armado |
+| `README.md` | Dice «la infraestructura **ya está** creada» y que desplegar es «solo hacer push a `main`». Sobre los recursos de ese otro proyecto habría sido verdad |
+| `AGENTS.md` · `tsconfig.base.json` · `.gitignore` · `.github/workflows/ci.yml` | Son los **cuatro que colisionan** con el andamio. No trayéndolos, `projects init` corre limpio y **no hace falta `--forzar`** |
 
 **Commiteá antes de seguir.** Ese commit es lo que convierte un pisado silencioso en
-cuatro líneas de `git status` (ver 3.3).
+cuatro líneas de `git status`.
 
-### 3.2 Borrá tres cosas del starter, antes de cualquier otra cosa
+### 3.2 Qué heredás, dicho de frente
 
-```bash
-rm -rf infra/ spec/ .github/workflows/deploy.yml
-```
+El starter está congelado, así que lo que trae es lo que había en julio:
 
-- ⚠️ **`infra/` no es un molde: es la infraestructura de parqueadero con los nombres
-  puestos.** `variables.tf` trae `default = "la organización-parqueaderos"`, `main.tf` crea el
-  bucket `${var.project}-web`, el rol OIDC apunta a parqueadero, no declara backend
-  remoto de tfstate, y declara `db_password` — que contradice la regla del área (IAM
-  auth, sin password). Y como los dos proyectos viven en la **misma cuenta dev**, un
-  `terraform plan` desde ahí razona sobre recursos de otro proyecto. La infra del
-  proyecto nuevo se escribe cuando toque, con su propio backend y su prefijo.
-- **`spec/`** es la convención vieja. Hoy la fuente de verdad es `openspec/`, que
-  `projects init` deja armado.
-- **`deploy.yml`** del starter no es el del área.
+| Pieza | Estado |
+|---|---|
+| `pnpm@9.15.0` | Fijado en su `package.json` |
+| `hashicorp/aws 5.100.0` | Un **major completo** atrás de lo que corre el consumidor de referencia (6.x). No te afecta hasta que escribas infra |
+| Cobertura | **No trae proveedor** (`@vitest/coverage-v8`: cero en el lockfile) — se agrega en la fase 4 |
+| Pruebas | Un solo archivo, 2 tests, sobre 11 archivos TS/TSX |
+
+Nada de esto bloquea el arranque. Está acá para que no te sorprenda después.
 
 ### 3.3 Después el andamio del marco
 
@@ -172,10 +191,14 @@ node <ruta-al-clon-de-projects>/herramientas/projects-init.mjs \
   --valores <ruta>/valores.json --destino .
 ```
 
-**Este orden es el correcto, y no por simetría.** Hay exactamente **4 archivos** que
-existen en las dos piezas: `.github/workflows/ci.yml`, `.gitignore`, `AGENTS.md`,
-`tsconfig.base.json`. En este orden, `projects init` **aborta con exit 1 y te los
-lista**:
+Con la extracción selectiva de 3.1 **no hay colisiones y no hace falta `--forzar`**.
+
+<details>
+<summary><b>Si en cambio copiaste el árbol entero</b> — el camino largo, y su rescate</summary>
+
+Hay exactamente **4 archivos** que existen en las dos piezas:
+`.github/workflows/ci.yml`, `.gitignore`, `AGENTS.md`, `tsconfig.base.json`. Si están,
+`projects init` **aborta con exit 1 y te los lista**:
 
 ```
 ::error::el destino ya tiene 4 archivo(s) del andamio. Se aborta para no sobreescribir trabajo:
@@ -186,29 +209,25 @@ lista**:
 Si de verdad queres sobreescribirlos: --forzar
 ```
 
-Acá pisar es lo que querés: el andamio gana y lo que se pierde es barato (un
-`ci.yml` stub de 18 líneas, un `AGENTS.md` genérico, un `.gitignore` subconjunto, y
-un `tsconfig.base.json` cuyos `compilerOptions` son los mismos). Así que:
-
-```bash
-node <ruta-al-clon-de-projects>/herramientas/projects-init.mjs \
-  --valores <ruta>/valores.json --destino . --forzar
-```
+En ese orden pisar es lo que querés —el andamio gana y lo que se pierde es barato— así
+que se corre otra vez con `--forzar`. Y hay que borrar a mano lo que no debió entrar:
+`rm -rf infra/ spec/ .github/workflows/deploy.yml`, y el `README.md` del starter.
 
 ⚠️ **El orden inverso pisa en silencio.** Si corrés `init` primero y traés el starter
-encima con `cp -r` o `tar`, se sobreescriben los mismos 4 archivos con **exit 0 y sin
-una sola línea de aviso**: `ci.yml` pasa de **399 a 18 líneas** y `AGENTS.md` deja de
-encadenar con `.projects/AGENTS-marco.md`. O sea: perdés el pipeline entero y la mitad
-de las reglas que tus agentes leen, y la sesión no te lo dice. El guard que avisaría
-vive **dentro del archivo que se reemplaza**, así que muere con él. Si tenés que
-hacerlo en ese orden, `tar --keep-old-files` te nombra los 4 y sale exit 2 sin pisar
-nada.
+encima con `cp -r` o `tar`, se sobreescriben los mismos 4 archivos con **exit 0 y sin una
+sola línea de aviso**: `ci.yml` pasa de 399 a 18 líneas y `AGENTS.md` deja de encadenar
+con `.projects/AGENTS-marco.md`. Perdés el pipeline entero y la mitad de las reglas que tus
+agentes leen, y la sesión no te lo dice — **el guard que avisaría vive dentro del archivo
+que se reemplaza**, así que muere con él. Si tenés que hacerlo en ese orden,
+`tar --keep-old-files` te nombra los 4 y sale exit 2 sin pisar nada.
 
 **Si ya pisaste:** con el andamio commiteado, `git status` te nombra los 4 y
 `git restore` los devuelve. Si **no** estaba commiteado no hay nada que restaurar
 (`git restore` falla con *pathspec did not match*) y el rescate es volver a correr
-`projects init ... --forzar`, que es idempotente. Ese comando sirve en los dos casos:
-si dudás, usá ese.
+`projects init ... --forzar`, que es idempotente. Ese comando sirve en los dos casos: si
+dudás, usá ese.
+
+</details>
 
 ### 3.4 Qué escribió init
 
@@ -426,7 +445,7 @@ o apuntan al lugar equivocado.
 
 | Qué | Síntoma | Dónde |
 |---|---|---|
-| Traer el starter **sobre** el andamio | Exit 0, sin una línea de aviso. `ci.yml` 399 → 18 líneas | 3.3 |
+| Traer el starter **sobre** el andamio | Exit 0, sin una línea de aviso. `ci.yml` 399 → 18 líneas. **La extracción selectiva de 3.1 lo evita** | 3.3 |
 | `pnpm lint` del starter | Verde sin lintear nada: el `eslint` que invoca no está instalado | 4.1 |
 | `test` sin `--coverage` | Verde, y la compuerta del marco falla por «no se encontró reporte» | 4.4 |
 | `vitest.config.base.mjs` | Llega a la raíz y **nadie lo extiende** | 4.4 |
