@@ -80,6 +80,29 @@ del prompt del bot. Un repo ya creado no cambia.
 
 ### Añadido
 
+- **`docs/censo-de-consumidores.md`: el censo, lo que se midió de él y su plan B.** El
+  censo —saber quién consume el marco— se apoya desde la 1.4.0 en los PRs de bump de
+  Dependabot. Tres intentos, tres causas distintas: la falta de acceso al repo privado y
+  el grupo único `patterns: ["*"]` están arreglados; el tercero sigue **sin explicación**
+  —Dependabot ve el marco, lo evalúa en su grupo y dice `No update needed for 1.4.1` con
+  la 1.4.2 publicada 30 minutos antes—.
+
+  El documento deja el log, las cuatro hipótesis descartadas **con su evidencia** (el
+  manifiesto equivocado, el límite de PRs abiertos, el grupo, y la release draft) y las dos
+  que no se pueden decidir desde afuera.
+
+  Y nombra el punto ciego estructural, que es lo que importa más que el bug: **el censo
+  depende del comportamiento de un tercero que el marco no puede verificar**, así que su
+  silencio es indistinguible de «no hay consumidores». Eso es la forma de fail-open que
+  este marco declara inaceptable en todo lo demás.
+
+  El plan B separa las dos preguntas que hoy están mezcladas: **quién consume** (que la
+  adopción puede anotar, sin credenciales) y **quién está al día** (que vive en el repo del
+  consumidor, donde su dueño lo ve). La versión que se cumple sola necesita una credencial
+  con lectura sobre la organización, y eso es decisión del Builder 1, no de un PR.
+
+### Añadido
+
 - **`projects init`: el andamio se instancia en un comando** (`herramientas/projects-init.mjs`).
   Adoptar el marco eran ~30 actos manuales —copiar 23 archivos, sustituir 89 ocurrencias de
   22 marcadores en 15 archivos, `openspec init`, y el render de la constitución—. Nada de
