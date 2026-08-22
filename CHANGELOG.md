@@ -41,7 +41,67 @@ mueve sobre un cambio incompatible.
 
 ## [No publicado]
 
-Nada todavía.
+### Añadido
+
+- **`docs/arrancar-un-proyecto.md`: el paso a paso de arrancar un proyecto desde cero,
+  medido ejecutándolo.** Era el hueco más grande de la documentación del marco y estaba
+  escrito en su propio índice: `docs/README.md` decía «Arrancando un proyecto: los tres
+  ADRs y de ahí a las plantillas, que se copian» —consejo de antes de que existiera
+  `projects init`— y la skill `projects-adoptar` es explícitamente para un repo que **ya
+  existe**. Nadie había escrito el camino del proyecto nuevo.
+
+  La guía se midió corriendo los comandos, no leyendo los archivos: 37 agentes, cada
+  afirmación con su comando y su salida, y un escéptico por afirmación que volvió a
+  correr todo. De 30 afirmaciones propuestas, **20 tenían el hecho bien y la instrucción
+  mal** — o sea que una guía escrita «de memoria» habría sido plausible y falsa en dos
+  tercios de sus pasos.
+
+  Lo que la medición destapó, y que ahora la guía dice con el mensaje exacto que se ve:
+
+  1. **El marco no trae la aplicación.** `projects init` escribe 49 archivos y ninguno es
+     código de producto: sin `package.json` ni lockfile, el `pnpm install
+     --frozen-lockfile` del pipeline muere en su cuarto paso. El esqueleto es
+     `projects-starter`, y son **dos piezas** con **4 archivos en colisión**.
+  2. **El orden entre las dos es asimétrico.** Starter primero: `projects init` aborta con
+     exit 1 y te lista los 4. Al revés: `tar`/`cp` los pisa con **exit 0 y sin una sola
+     línea de aviso**, `ci.yml` pasa de 399 a 18 líneas y se pierde el eslabón hasta la
+     porción del marco. El guard que avisaría vive **dentro del archivo que se
+     reemplaza**.
+  3. **El bootstrap va a `main` por push DIRECTO, no por PR.** Medido sobre el mismo
+     árbol: por PR la compuerta de cobertura sale 1; por push sale `NO APLICABLE` y 0.
+     Y `ci-ok` no aparece en la lista del ruleset hasta que el CI corrió una vez.
+  4. **Once fallos silenciosos**, en una tabla: desde `pnpm lint` del starter saliendo
+     verde sin lintear nada, hasta `ID_MCP_SLACK` mal puesto dejando cinco entradas de
+     allowlist que no matchean nada. Todos pasan en verde o apuntan al lugar equivocado.
+
+### Corregido
+
+- **El andamio mandaba a un primerizo a cuatro caminos muertos, y le escondía los dos
+  pasos que deciden si su primer CI sale verde.** La lista de pendientes manuales que
+  imprime `projects init` decía que el acceso de Dependabot se arregla «en el repo DEL
+  MARCO» —es un ajuste de la **organización**—, no mencionaba que Dependabot **no se
+  enciende solo** en un repo nuevo (y sin él el repo no recibe versiones ni aparece en
+  el censo), pedía «las labels `area:*`» sin decir que son **seis**, con nombres y
+  colores exactos, que **no se heredan de ningún molde**, y dejaba fuera el orden
+  push-antes-que-ruleset. Ahora los seis items traen su comando.
+
+- **Y le faltaba lo que hace roja la primera corrida: el propio marco reparte tres
+  archivos que su compuerta de cobertura reclama.** `eslint.config.mjs`,
+  `vitest.config.base.mjs` y las herramientas de agente son **300 de las 402 líneas** que
+  el primer diff reclama sin pruebas, y ninguna prueba puede cubrirlas. Nadie lo había
+  visto porque el consumidor de referencia no tiene dos de esos tres archivos. `projects
+  init` ahora imprime el bloque de excluidos listo para pegar, y avisa que
+  `vitest.config.base.mjs` llega a la raíz y **nadie lo extiende solo** — la única
+  referencia a ese archivo en todo el árbol estaba dentro de su propio comentario.
+
+- **La protección de `main` del andamio se auto-encerraba si se aplicaba literal.**
+  `proteccion-main.md` traía una tabla de 8 reglas, las 8 en 🔴, y arriba decía «pasá los
+  🔴 a 🟢». Aplicarlas todas —aprobación requerida + review de code owner + bypass
+  vacía— con un equipo de una persona **deja el repo sin ninguna vía de integrar**. El
+  único ruleset que funciona en la organización tiene **4** de esas reglas y deja las
+  aprobaciones en 0. Ahora el documento separa las cuatro que se encienden de las cuatro
+  que se difieren, cada una con su motivo escrito en la misma tabla.
+
 
 ## [1.6.0] — 2026-08-22
 
