@@ -277,11 +277,17 @@ jobs:
       - uses: actions/setup-node@v7
         with: { node-version: "${{ inputs.version_node }}" }
 
+      # El pin viaja por `env` y no interpolado en el `run`: es la convencion de este
+      # archivo, y sin el bloque la variable saldria VACIA y el mensaje sugeriria
+      # `openspec@ init` — una invocacion sin pinar, justo lo que otro paso de este
+      # mismo workflow pone en rojo.
       - name: Exigir OpenSpec en el repo
         shell: bash
+        env:
+          VERSION_OPENSPEC: ${{ inputs.version_openspec }}
         run: |
           [ -d openspec ] || {
-            echo "::error::el repo no tiene openspec/ — el marco Projects exige que las specs vivan en el repo"
+            echo "::error::el repo no tiene openspec/ — el marco Projects exige que las specs vivan en el repo. Arreglo: corre \`npx --yes @fission-ai/openspec@${VERSION_OPENSPEC} init --tools claude\` en la raiz y commitea el directorio openspec/ que crea. Es el paso que le falta a un repo recien creado desde el andamio: la plantilla no trae openspec/ a proposito, porque el CLI lo genera junto a las skills y los comandos"
             exit 1
           }
 
