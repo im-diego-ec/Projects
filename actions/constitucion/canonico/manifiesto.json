@@ -44,6 +44,11 @@
       "version": "1.4.2",
       "publicada": "2026-08-22",
       "exigible_desde": "2026-09-19"
+    },
+    {
+      "version": "1.6.0",
+      "publicada": "2026-08-22",
+      "exigible_desde": "2026-09-19"
     }
   ]
 }
