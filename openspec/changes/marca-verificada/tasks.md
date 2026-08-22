@@ -26,15 +26,16 @@ Toda verificación se hace **por código de salida**, nunca grepeando la salida.
 
 ## 0. Lo que hay que contestar antes de escribir una línea
 
-- [ ] 0.1 **¿La skill `la organización-design` está publicada a nivel organización?** El
-      manifiesto de esta máquina la marca `creatorType: "user"`. Si no lo está, la
-      sección del canónico apuntaría a un manual que un builder nuevo no tiene, y
-      el texto miente desde el día uno. Evidencia: la respuesta escrita acá, con
-      fecha. **Decide: Builder 1.**
-- [ ] 0.2 **¿Quién es dueño del design system?** Su documento maestro asigna la
-      propiedad a un «Core Team» de seis personas que no existe. Sin dueño, la
-      pregunta «¿esto sigue vigente?» no tiene destinatario. Evidencia: el nombre
-      escrito acá. **Decide: Builder 1.**
+- [x] 0.1 **La skill `la organización-design` SÍ está publicada a nivel organización.**
+      Contestado por Builder 1 el 2026-08-22. El `creatorType: "user"` del manifiesto de
+      esta máquina era un indicio, no una prueba: dice quién la creó, no quién la tiene.
+      Con esto la sección del canónico puede apuntar a la skill como manual sin mentir:
+      un builder nuevo la tiene.
+- [x] 0.2 **El dueño del design system es Builder 1.** Contestado el 2026-08-22. El «Core
+      Team» de seis personas del documento maestro no existe y no se sustituye por otra
+      ficción: la propiedad es de una persona nombrada, que es a quien se le pregunta
+      «¿esto sigue vigente?» y quien decide sobre las piezas que faltan y sobre el hueco
+      de la tipografía.
 - [ ] 0.3 Tomar el snapshot: copiar los 6 CSS de tokens que sí son marca (D5), su
       punto de entrada y los 3 SVG —10 archivos, 22.671 bytes— a un directorio de
       trabajo y registrar el `sha256` de cada uno con la fecha. Evidencia: la
@@ -42,6 +43,22 @@ Toda verificación se hace **por código de salida**, nunca grepeando la salida.
 
 ## 1. Lo que se puede hacer hoy (cero bytes de mecánica heredada)
 
+- [ ] 1.0 **El idioma del área, que hoy no está declarado en ningún lado.** El canónico
+      entero está en castellano y las reglas de UX writing del design system son
+      específicas del castellano —sentence case, CTAs predicativos, «guiamos, no
+      culpamos», locale `es-EC`— pero el marco NO lo dice: no está en el canónico, no es
+      un marcador, y no es una clave de `.projects-valores.json`. Es un supuesto que todos
+      cumplen y nadie escribió.
+      Va en `90-marca.md` como **enunciado plano con su `projects:regla id`, NO como
+      marcador**: un placeholder nuevo en el canónico es rojo sin ventana para todo
+      consumidor cuyo archivo de valores no tenga la clave (ver 1.1). Y no hace falta
+      parametrizarlo, porque la escapatoria ya existe: un proyecto que necesite otro
+      idioma lo declara en `.projects-desvios.json` y la constitución renderiza «⛔ DESVÍO
+      DECLARADO».
+      Lo pidió Builder 1 el 2026-08-22, preguntando si el marco no podía dejarlo por default
+      «y si se necesita se cambia en el init». La respuesta es que sí, pero por enunciado
+      y no por parámetro. Evidencia: la regla renderizada en el artefacto del andamio
+      instanciado.
 - [ ] 1.1 `actions/constitucion/canonico/90-marca.md`: las reglas duras
       **enunciadas** más el puntero a la skill como manual. **Cero hex, cero
       nombres de token, cero placeholders nuevos** —un placeholder nuevo es rojo
