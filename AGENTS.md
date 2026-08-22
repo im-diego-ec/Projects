@@ -109,16 +109,27 @@ proyecto aprendiendo por su cuenta lo mismo, tarde y caro.
 
 ---
 
-## Versionado: semver y el tag mayor móvil
+## Versionado: semver y el bump por PR
 
-Los proyectos consumen `@v1`. **`v1` es un tag móvil** que apunta siempre al
-último release de la línea 1.x: los consumidores reciben correcciones y
-funcionalidad nueva **sin tocar nada**, y ese es exactamente el valor de lo
-referenciado.
+Los proyectos consumen **la versión exacta** (`@vX.Y.Z`) y reciben cada versión
+nueva como **PR de Dependabot en su propio repo**. Nada del marco cambia en un
+consumidor sin que exista un PR que alguien pueda leer y mergear: si una versión
+trae un check nuevo, el rojo aparece **dentro de ese PR**.
 
-- Cada release lleva un tag inmutable `vX.Y.Z`, y `v1` se **mueve** a él.
-- **MAJOR** (`v2`): cambio incompatible. `v1` deja de moverse; los consumidores
-  migran deliberadamente, guiados por una nota de migración en `docs/`.
+> **El tag mayor móvil `v1` se retiró el 2026-08-21.** Hasta la 1.3.0 era el canal:
+> apuntaba al último release de la 1.x y los consumidores recibían todo sin tocar
+> nada. Cambió porque el 2026-08-19 un check nuevo enrojeció un repo que el día
+> anterior pasaba, y nadie lo había pedido. Y se retiró del todo cuando se midió que
+> el tag tenía un segundo rol sin escribir: `marco-ci.yml` referenciaba a sus propias
+> actions hermanas por `@v1`, así que el pin exacto del consumidor era una **media
+> verdad**. No propongas recrearlo.
+
+- Cada release lleva un tag inmutable `vX.Y.Z`, y **el release mueve los pines
+  internos** del marco a esa versión. No depende de que nadie se acuerde:
+  `pruebas/andamio/pinado.test.mjs` los compara contra el CHANGELOG.
+- **MAJOR** (`v2`): cambio incompatible. Los consumidores migran deliberadamente,
+  guiados por una nota de migración en `docs/`, y el PR de bump del major es donde
+  cada uno decide cuándo.
 - **MINOR**: capacidad nueva compatible (un `input` opcional, un workflow
   nuevo, un check adicional que no rompe lo verde de nadie).
 - **PATCH**: corrección de comportamiento dentro del contrato.
@@ -126,10 +137,11 @@ referenciado.
   el release. Es la única superficie por la que un consumidor se entera de qué
   se movió bajo sus pies.
 
-### Qué es BREAKING para `@v1`
+### Qué es BREAKING
 
-Un cambio es breaking si un repo consumidor que **no modifica una sola línea**
-puede quedar roto, o —peor— seguir en verde haciendo algo distinto:
+Un cambio es breaking si un repo consumidor **que mergea el PR de bump sin leerlo**
+puede quedar roto, o —peor— seguir en verde haciendo algo distinto. El bump por PR
+da la oportunidad de leer; no obliga a nadie a usarla, así que la vara no baja:
 
 - Quitar o renombrar un `input`, `secret` u `output` de un workflow reusable, o
   volver requerido uno que era opcional.
@@ -143,12 +155,13 @@ puede quedar roto, o —peor— seguir en verde haciendo algo distinto:
   endurecimiento es el objetivo, se estrena en modo aviso y el endurecimiento
   va en el major siguiente.
 
-Ante la duda: **es breaking**. Mover `v1` sobre un cambio incompatible es
-romper repos ajenos en silencio.
+Ante la duda: **es breaking**. Se nombra en la sección «Para consumidores» del
+CHANGELOG con lo que hay que hacer, que es la superficie que el PR de bump pone
+adelante.
 
-### Antes de mover `v1`
+### Antes de publicar una versión
 
-Projects se prueba **contra un consumidor real** antes de que el tag se mueva: el
+Projects se prueba **contra un consumidor real** antes de publicar: el
 change se valida en un repo que ya lo usa (apuntando al SHA o al tag exacto),
 no solo en el CI de este repo. El marco se **dogfoodea**: el CI de Projects usa
 los mismos workflows reusables que publica. Si un guardrail no sirve para este
