@@ -31,7 +31,6 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 
 import {
-  DIAS_DE_GRACIA_MINIMOS,
   artefactoDe,
   clasificarDesvios,
   leerCanonico,
@@ -290,15 +289,31 @@ test("el desvio muerto sigue siendo rojo con su motivo, y ahora es el UNICO vere
 // piezas exhibía las dos.
 // ---------------------------------------------------------------------------
 
-test("sin el archivo de valores, modo verificar avisa dentro de la ventana y no revienta", () => {
+test("sin el archivo de valores, modo verificar es ROJO y dice como ADOPTAR", () => {
+  // ESTA PRUEBA CAMBIO DE SIGNO EL 2026-08-22, y el motivo importa. Antes fijaba
+  // «un repo que todavia no adopto no arranca en rojo»: entraba por la ventana de
+  // gracia. Con la ventana retirada (change ventana-vencida) el rojo llega el primer
+  // dia, y entonces lo que hay que fijar es OTRA cosa —que el rojo sea accionable—,
+  // porque un rojo con un arreglo que no funciona es peor que un aviso.
+  //
+  // El caso concreto: el arreglo generico manda a correr el modo escribir, y para
+  // este caso NO PUEDE funcionar (sin valores no hay con que renderizar). Mandaria al
+  // consumidor a un segundo error, a un paso de distancia del primero.
   const raiz = repoTemporal({ valores: null, archivos: {} });
   const corrida = spawnSync(process.execPath, [SCRIPT], {
     encoding: "utf8",
     env: { ...process.env, CONSTITUCION_RAIZ: raiz, GITHUB_OUTPUT: "", GITHUB_STEP_SUMMARY: "" },
   });
-  assert.equal(corrida.status, 0, corrida.stdout + corrida.stderr);
-  assert.match(corrida.stdout, /::warning::[^\n]*\.projects-valores\.json/);
-  assert.equal(/::error::/.test(corrida.stdout), false, "un repo que todavia no adopto no arranca en rojo");
+  assert.notEqual(corrida.status, 0, "un repo que consume el marco sin declarar sus valores es rojo");
+  const linea = corrida.stdout.split("\n").find((l) => /^::error::.*\.projects-valores\.json/.test(l));
+  assert.ok(linea, corrida.stdout + corrida.stderr);
+  assert.match(linea, /crear \.projects-valores\.json/, "el rojo tiene que decir que hay que CREAR el archivo");
+  assert.match(linea, /projects init/, "y nombrar la herramienta que lo hace solo en un repo nuevo");
+  assert.match(
+    linea,
+    /ANTES no sirve/,
+    "y advertir explicitamente que correr el escritor primero no sirve: es el error al que el arreglo generico mandaba",
+  );
 });
 
 test("sin el archivo de valores, pasado el plazo es rojo y no se calla", () => {
@@ -500,13 +515,13 @@ test("el calendario del canonico esta escrito UNA sola vez, en el manifiesto", (
     assert.equal(/exigible_desde/.test(texto), false, `${ruta} lleva su propia copia del calendario`);
     assert.equal(/CALENDARIO/.test(texto), false, `${ruta} lleva su propia copia del calendario`);
   }
-  assert.equal(DIAS_DE_GRACIA_MINIMOS, 28);
+  // El piso de 28 dias se retiro el 2026-08-22 (change ventana-vencida): una
+  // entrada con CERO dias de gracia ya NO es un problema, es el default. Lo que
+  // esta prueba sigue custodiando es lo suyo —que ningun workflow lleve su propia
+  // copia del calendario— y para eso hace falta que el calendario que SI se
+  // verifica siga siendo el del manifiesto.
   const sinVentana = validarManifiesto({ versiones: [{ version: "1.3.0", publicada: "2026-08-20", exigible_desde: "2026-08-20" }] });
-  assert.equal(
-    sinVentana.some((p) => /0 dias de gracia y el minimo es 28/.test(p)),
-    true,
-    sinVentana.join(" · "),
-  );
+  assert.deepEqual(sinVentana, [], sinVentana.join(" · "));
 });
 
 test("el piso de permisos esta escrito UNA sola vez: ningun workflow lleva su copia", () => {

@@ -174,7 +174,8 @@ export function construirMensaje({ version, seccion, urlRelease, urlChangelog, l
 
   const partes = [
     `Projects ${version} publicado.` +
-      " El bump llega a cada repo como PR de Dependabot, sobre la version exacta. El tag movil \`v1\` se retiro.",
+      " El bump llega a cada repo como PR de Dependabot, sobre la version exacta." +
+      " El tag movil \`v1\` sigue existiendo y ya no es el canal de distribucion.",
   ];
 
   if (breaking.length) {

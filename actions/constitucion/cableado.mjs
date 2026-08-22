@@ -1479,10 +1479,12 @@ export const JOB_SUGERIDO = [
   "      - uses: actions/checkout@v7",
   "      - uses: actions/setup-node@v7",
   '        with: { node-version: "22" }',
-  // Version exacta y no @v1: el tag mayor se retira, y un snippet que sugiere un
-  // ref inexistente manda al consumidor a un error que parece un typo en la ruta.
+  // Version exacta y no @v1: el tag mayor EXISTE pero es interno del marco, y un
+  // consumidor pinado a @v1 no recibe PR de bump de Dependabot ni aparece en el
+  // censo — el modo de falla mas callado del bootstrap (README.md, «Nunca @v1 en el
+  // repo de un proyecto»).
   // La version la exige el banco del andamio contra el CHANGELOG.
-  `      - uses: im-diego-ec/Projects/${SEGMENTO_ACTION}@v1.5.0`,
+  `      - uses: im-diego-ec/Projects/${SEGMENTO_ACTION}@v1.6.0`,
   "        with:",
   "          modo: verificar",
   "",
