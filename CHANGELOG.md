@@ -41,65 +41,7 @@ mueve sobre un cambio incompatible.
 
 ## [No publicado]
 
-### Corregido
-
-- **El prompt del bot de GitHub le decía que `v1` no existe.** `claude.yml` inyectaba «el
-  tag movil v1 se retiro: no existe, y no propongas moverlo ni recrearlo», y `v1` existe
-  (`= v1.4.2`) porque el paso 5 del release **lo mueve**. Lo escribí cuando creía que se
-  retiraba; cuando el CI lo refutó corregí la skill de release, `AGENTS.md` y el `README`,
-  **y me salté este archivo**. Un agente que le creyera congelaría `guardrail-deltas` en el
-  próximo release. Es la misma clase que vengo arreglando toda la semana —prosa que
-  contradice la línea que anota— cometida por mí, a medias.
-
-- **El ejemplo de `projects init` nombraba a tres personas y un servidor MCP real.** Projects
-  quedó con **cero nombres propios** cuando se extrajo, y su `AGENTS.md` lo declara:
-  «handles por rol, nunca nombres propios». El `--ejemplo` los reintrodujo, o sea que el
-  marco predicaba la regla y la rompía en la pieza que estrenaba. Ahora van formas
-  (`handle-del-po`) y el UUID nulo, **con una prueba que lo mantiene**: poner un handle real
-  pone el banco en rojo, verificado con el control.
-
-### Añadido
-
-- **El `.gitignore` del andamio ignora los residuos de correr los checks en local.** En CI
-  viven en `RUNNER_TEMP`; en una máquina esa variable no está seteada y `pendientes.txt` y
-  `aviso-version.json` caen en el directorio de trabajo. Sin esas dos líneas un `git add -A`
-  los commitea: pasó el 2026-08-21, y la prosa del segundo hizo que el detector de secretos
-  tokenizara nombres de paquete inexistentes.
-
-- **El checklist final de `projects init` nombra las tres formas de que el review cruzado no
-  exista** y ningún check lo diga: un handle mal escrito, un equipo **vacío**, y un equipo
-  sin permiso de escritura. Medido el 2026-08-22: el equipo `po` de la organización tiene
-  **cero miembros**, así que hoy el gate del PO no existe y nada se pone rojo. Y agrega el
-  issue macro en el Project y las labels `area:*`, que la constitución exige y el checklist
-  no pedía.
-
-### Para consumidores
-
-**Nada que hacer.** Los cuatro son del repo del marco, del andamio para proyectos NUEVOS, y
-del prompt del bot. Un repo ya creado no cambia.
-
-### Añadido
-
-- **`docs/censo-de-consumidores.md`: el censo, lo que se midió de él y su plan B.** El
-  censo —saber quién consume el marco— se apoya desde la 1.4.0 en los PRs de bump de
-  Dependabot. Tres intentos, tres causas distintas: la falta de acceso al repo privado y
-  el grupo único `patterns: ["*"]` están arreglados; el tercero sigue **sin explicación**
-  —Dependabot ve el marco, lo evalúa en su grupo y dice `No update needed for 1.4.1` con
-  la 1.4.2 publicada 30 minutos antes—.
-
-  El documento deja el log, las cuatro hipótesis descartadas **con su evidencia** (el
-  manifiesto equivocado, el límite de PRs abiertos, el grupo, y la release draft) y las dos
-  que no se pueden decidir desde afuera.
-
-  Y nombra el punto ciego estructural, que es lo que importa más que el bug: **el censo
-  depende del comportamiento de un tercero que el marco no puede verificar**, así que su
-  silencio es indistinguible de «no hay consumidores». Eso es la forma de fail-open que
-  este marco declara inaceptable en todo lo demás.
-
-  El plan B separa las dos preguntas que hoy están mezcladas: **quién consume** (que la
-  adopción puede anotar, sin credenciales) y **quién está al día** (que vive en el repo del
-  consumidor, donde su dueño lo ve). La versión que se cumple sola necesita una credencial
-  con lectura sobre la organización, y eso es decisión del Builder 1, no de un PR.
+## [1.5.0] — 2026-08-22
 
 ### Añadido
 
@@ -123,20 +65,72 @@ del prompt del bot. Un repo ya creado no cambia.
   un change de OpenSpec con el gate del PO, y entra como el primer change del proyecto que
   la usa.
 
+- **`docs/censo-de-consumidores.md`: el censo, lo que se midió de él y su plan B.** El
+  censo —saber quién consume el marco— se apoya desde la 1.4.0 en los PRs de bump de
+  Dependabot. Tres intentos, tres causas distintas: la falta de acceso al repo privado y
+  el grupo único `patterns: ["*"]` están arreglados; el tercero sigue **sin explicación**
+  —Dependabot ve el marco, lo evalúa en su grupo y dice `No update needed for 1.4.1` con
+  la 1.4.2 publicada 30 minutos antes—.
+
+  El documento deja el log, las cuatro hipótesis descartadas **con su evidencia** (el
+  manifiesto equivocado, el límite de PRs abiertos, el grupo, y la release draft) y las dos
+  que no se pueden decidir desde afuera.
+
+  Y nombra el punto ciego estructural, que es lo que importa más que el bug: **el censo
+  depende del comportamiento de un tercero que el marco no puede verificar**, así que su
+  silencio es indistinguible de «no hay consumidores». Eso es la forma de fail-open que
+  este marco declara inaceptable en todo lo demás.
+
+  El plan B separa las dos preguntas que hoy están mezcladas: **quién consume** (que la
+  adopción puede anotar, sin credenciales) y **quién está al día** (que vive en el repo del
+  consumidor, donde su dueño lo ve). La versión que se cumple sola necesita una credencial
+  con lectura sobre la organización, y eso es decisión del Builder 1, no de un PR.
+
+- **El `.gitignore` del andamio ignora los residuos de correr los checks en local.** En CI
+  viven en `RUNNER_TEMP`; en una máquina esa variable no está seteada y `pendientes.txt` y
+  `aviso-version.json` caen en el directorio de trabajo. Sin esas dos líneas un `git add -A`
+  los commitea: pasó el 2026-08-21, y la prosa del segundo hizo que el detector de secretos
+  tokenizara nombres de paquete inexistentes.
+
+- **El checklist final de `projects init` nombra las tres formas de que el review cruzado no
+  exista** y ningún check lo diga: un handle mal escrito, un equipo **vacío**, y un equipo
+  sin permiso de escritura. Medido el 2026-08-22: el equipo `po` de la organización tiene
+  **cero miembros**, así que hoy el gate del PO no existe y nada se pone rojo. Y agrega el
+  issue macro en el Project y las labels `area:*`, que la constitución exige y el checklist
+  no pedía.
+
+### Corregido
+
+- **El prompt del bot de GitHub le decía que `v1` no existe.** `claude.yml` inyectaba «el
+  tag movil v1 se retiro: no existe, y no propongas moverlo ni recrearlo», y `v1` existe
+  (`= v1.4.2`) porque el paso 5 del release **lo mueve**. Lo escribí cuando creía que se
+  retiraba; cuando el CI lo refutó corregí la skill de release, `AGENTS.md` y el `README`,
+  **y me salté este archivo**. Un agente que le creyera congelaría `guardrail-deltas` en el
+  próximo release. Es la misma clase que vengo arreglando toda la semana —prosa que
+  contradice la línea que anota— cometida por mí, a medias.
+
+- **El ejemplo de `projects init` nombraba a tres personas y un servidor MCP real.** Projects
+  quedó con **cero nombres propios** cuando se extrajo, y su `AGENTS.md` lo declara:
+  «handles por rol, nunca nombres propios». El `--ejemplo` los reintrodujo, o sea que el
+  marco predicaba la regla y la rompía en la pieza que estrenaba. Ahora van formas
+  (`handle-del-po`) y el UUID nulo, **con una prueba que lo mantiene**: poner un handle real
+  pone el banco en rojo, verificado con el control.
+
 ### Para consumidores
 
-**Nada que hacer.** `projects init` es una herramienta de builder: se corre desde un clon del
-marco y **no se consume por `uses:`**, así que no hace falta una versión nueva para usarla.
-Un repo ya creado no la necesita.
+**Nada que hacer, y esta vez el motivo es estructural y no una casualidad.** Todo lo de
+esta versión es del repo del marco (`herramientas/`, `docs/`, el prompt del bot) o del
+**andamio para proyectos NUEVOS** (`plantilla/`). Un repo ya creado no consume ninguna de
+las dos cosas: el andamio se copió una vez y desde entonces es del proyecto.
 
-> **Y una nota de proceso, porque el hueco fue propio.** Esta entrada llega en un PR
-> posterior al que introdujo la herramienta, contra la regla que este mismo archivo declara
-> («el CHANGELOG es obligatorio en el PR que introduce el cambio, no en el release»). Se
-> mergeó una herramienta de 348 líneas y **ningún check se puso rojo**: la regla está
-> enunciada y no tiene enforcement. Queda anotada como fila del backlog en
-> `docs/reglas-no-escritas.md`, que es donde el marco lleva la cuenta de lo que todavía
-> depende de que alguien se acuerde.
+`projects init` es una herramienta de **builder**: se corre desde un clon del marco y no se
+consume por `uses:`, así que ni siquiera hace falta esta versión para usarla.
 
+> **Una nota de proceso, porque el hueco fue propio.** La entrada de `projects init` llegó en
+> un PR posterior al que introdujo la herramienta, contra la regla que este mismo archivo
+> declara. Se mergeó una herramienta de 348 líneas y **ningún check se puso rojo**: la
+> regla está enunciada y no tiene enforcement. Es la fila 20 del backlog de
+> `docs/reglas-no-escritas.md`, con su versión derivada.
 ## [1.4.2] — 2026-08-22
 
 ### Corregido
