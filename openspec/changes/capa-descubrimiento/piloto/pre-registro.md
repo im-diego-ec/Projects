@@ -3,12 +3,47 @@ artefacto: pre-registro
 dri: Builder 1
 aprueba: Builder 2 (builder par)
 informado: PO
-estado: pendiente-de-completar
+estado: no-corrido (el experimento se descartó el 2026-08-22; ver el encabezado)
 experimental: true
 veredicto_antes_de: 2026-09-21
 ---
 
-# capa-descubrimiento — Pre-registro del piloto
+# capa-descubrimiento — el experimento que no se corrió
+
+> ## ⚠️ ESTE DOCUMENTO NO RIGE EL LUNES
+> 
+> El 2026-08-22 Builder 1 decidió que el arranque **no es un experimento**: se usa la
+> herramienta sobre el corpus completo y se observa el resultado. Sin brazo manual, sin
+> comparación y sin veredicto.
+> 
+> **Lo que rige es [`observacion.md`](observacion.md)**, que son dos páginas: qué se anota
+> mientras pasa y qué se contesta al final.
+> 
+> **Este archivo se conserva y no se borra**, por dos razones concretas. La primera es que
+> el razonamiento costó días y sirve el día que haya que decidir si la herramienta entra al
+> carril de todos: acá está medido el sesgo de orden, el walkover del control, por qué un
+> techo decidido después no mide nada, y las seis correcciones del 2026-08-21. La segunda es
+> que un experimento descartado con su motivo escrito es información; borrado, es una
+> decisión que nadie va a poder revisar.
+> 
+> **Y la ventana seguía abierta cuando se decidió**, que es lo que hace legítimo el cambio y
+> no una racionalización: `horas.csv` tenía el encabezado y **cero filas de datos**. La regla
+> del propio documento —«un hueco se cierra editando este archivo y commiteándolo, siempre
+> antes de la primera sesión»— se cumplió.
+> 
+> **Qué se perdió al quitar el brazo manual**, dicho sin adorno: no se va a saber si la
+> herramienta sale más barata que hacerlo a mano, ni si pierde más material que una persona,
+> ni si la confusión «el corpus es el contrato» la trae la herramienta o el simple hecho de
+> tener un corpus.
+> 
+> **Y qué se ganó**, que tampoco es poco: muere el sesgo de orden —el defecto más grande de
+> este diseño, medido en la sección de más abajo—, muere el walkover del control, y muere el
+> ciego imperfecto. Para las preguntas de calidad de la salida, **un solo brazo es mejor que
+> dos corridos en orden por la misma persona.**
+
+---
+
+## Lo que sigue: el diseño del experimento, como historia
 
 ## Media página, para leer el lunes a la mañana
 
@@ -202,13 +237,20 @@ antes de arrancar. Los dos brazos trabajan sobre **exactamente** el mismo
 material: si los insumos difieren, la comparación mide dos cosas distintas y no
 hay corrección posible después.
 
+> **Resuelto el 2026-08-22 por Builder 1: no hay rebanada, entra el corpus completo.** Con eso
+> se caen cuatro de las cinco filas —no hay que elegir piezas, ni proceso, ni corte, ni
+> argumentar representatividad, porque no hay muestreo—. La consecuencia que sí queda y
+> está escrita en `observacion.md`: sin un corte declarado, un ítem que no se convirtió se
+> puede explicar con «eso quedaba afuera» y no hay contra qué comprobarlo. El arreglo es
+> escribir el motivo ítem por ítem.
+
 | Qué se declara | Valor |
 |---|---|
-| Piezas del corpus incluidas, por identificador | PENDIENTE (decide: PO (PO) con un builder, tarea 0.1) |
-| Proceso end-to-end elegido | PENDIENTE (decide: PO (PO), tarea 0.1) |
-| Dónde corta, dicho por el extremo que queda afuera | PENDIENTE (decide: PO (PO), tarea 0.1) |
-| Por qué es representativa del corpus de Supply Chain | PENDIENTE (decide: PO (PO), tarea 0.1) |
-| Si el prototipo cubre esta rebanada, y en qué parte | PENDIENTE (decide: PO (PO), tarea 0.1) |
+| Piezas del corpus incluidas, por identificador | **TODAS.** Resuelto: Builder 1, 2026-08-22 |
+| Proceso end-to-end elegido | **Todos los que aparezcan en el corpus.** No hay selección |
+| Dónde corta, dicho por el extremo que queda afuera | **No corta.** Nada queda afuera por diseño |
+| Por qué es representativa del corpus de Supply Chain | **No aplica**: es el corpus, no una muestra de él |
+| Si el prototipo cubre esta rebanada, y en qué parte | PENDIENTE (PO) |
 
 Las piezas se nombran con los identificadores de `convencion-de-procedencia.md`,
 nunca con el nombre del archivo ni de quien habló. La tabla que traduce
@@ -1037,7 +1079,7 @@ sin medirse es el caso sin `uv`.
 ## 7. Las decisiones humanas del bloque 1
 
 Ninguna se resuelve por defecto y ninguna la toma un agente. De las seis, **una
-sigue siendo bloqueante dura** para el lunes.
+seguía siendo bloqueante dura** para el lunes, y se resolvió el 2026-08-22: era la 1.5.
 
 | | Decisión | Quién | Cuándo | Estado |
 |---|---|---|---|---|
@@ -1045,7 +1087,7 @@ sigue siendo bloqueante dura** para el lunes.
 | 1.2 | Dónde vive el corpus de descubrimiento y si puede pasar por un modelo. El repositorio no es su custodio (D3) | Builder 1, con el PO | antes de abrir el material | **RESUELTA: la contestó Builder 1 el 2026-08-21.** Ver abajo |
 | 1.3 | Correr el piloto: reserva de tiempo del PO y de dos builders, y confirmación del reparto de roles de la sección 2 | Builder 1, PO (PO), Builder 2 | antes de la primera sesión | PENDIENTE |
 | 1.4 | Cadena de herramientas: instalación ensayada en la máquina del brazo B, **y** si la fase 1 ingiere un corpus terminado | quien corra el brazo B | antes de la primera sesión | **PARCIAL**: instalación ensayada el 2026-08-20 (exit 0, pide `uv`; sección 6). Sigue PENDIENTE si el brazo B corre en otra máquina, PENDIENTE el caso sin `uv`, y PENDIENTE la ingesta del corpus |
-| 1.5 | Si las piezas del corpus que entran a la sesión están **despersonalizadas**, o si traen nombres de empleados y juicios sobre su propio trabajo | PO (PO), con Builder 1 | antes de abrir el material | PENDIENTE. **Bloqueante**: es el residuo que la respuesta de 1.2 no cubre, y depende de ver el corpus |
+| 1.5 | Si las piezas del corpus que entran a la sesión están **despersonalizadas**, o si traen nombres de empleados y juicios sobre su propio trabajo | PO (PO), con Builder 1 | antes de abrir el material | **RESUELTA: la contestó Builder 1 el 2026-08-22.** El corpus entra despersonalizado. Ver abajo, incluido lo que la respuesta NO cubre |
 | 1.6 | El inventario de piezas del corpus con su identificador y su letra de tipo (`E`/`D`/`P`/`F`), que es lo que la sección 1 va a citar | PO (PO), al entregar el corpus | antes de la primera sesión | PENDIENTE |
 
 ### 1.2, resuelta: lo que contestó Builder 1 el 2026-08-21
@@ -1090,6 +1132,41 @@ hoy en el canónico transportado, y la versión del canónico que haría falta y
 
 Cuando una decisión se resuelve, se escribe acá **quién la tomó y en qué fecha**.
 Una decisión sin autor es una decisión que nadie va a poder discutir en seis meses.
+
+---
+
+### 1.5, resuelta: lo que contestó Builder 1 el 2026-08-22
+
+La pregunta era si las piezas que entran a la sesión traen nombres de empleados y
+juicios sobre el trabajo de esas personas. La respuesta:
+
+> El corpus **ya viene despersonalizado**.
+
+Con eso la decisión queda cerrada y el material puede abrirse. Pero la respuesta es
+sobre **cómo llega el corpus**, no sobre una verificación hecha, y esa diferencia
+cambia dónde queda el riesgo:
+
+- **Lo que cubre:** la entrega. PO prepara el material despersonalizado antes de
+  entregarlo, así que la sesión no es el lugar donde se decide qué se anonimiza. Eso
+  era lo que la decisión preguntaba y está contestado.
+- **Lo que NO cubre, y se dice en vez de disimularse:** no hay nada que lo
+  compruebe. Si una pieza llega con un nombre adentro, ningún check lo caza —el
+  corpus vive fuera del repositorio por D3, así que no hay CI que lo mire— y el
+  nombre entra a la sesión igual. La respuesta traslada el cuidado al momento de la
+  entrega, que es el lugar correcto, pero lo deja como **disciplina**.
+
+**El guardarraíl más barato, y es de una persona, no de código:** quien recibe el
+corpus lo mira antes de abrirlo en una sesión, y anota el resultado —«revisadas N
+piezas, cero nombres» o «encontré uno en I004, lo devolví»— junto al inventario de
+la decisión 1.6. Dos minutos, y convierte una afirmación en una observación con
+fecha. Sin eso, la primera vez que aparezca un nombre nadie va a poder decir si la
+entrega falló o si nadie miró.
+
+**Y no es una regla de este piloto.** Que el descubrimiento entre despersonalizado
+es la contracara de la regla que contestó la 1.2 —el descubrimiento se produce
+fuera del repositorio y entra como insumo de la sesión—: si el repositorio no es su
+custodio, el único momento en que alguien controla su contenido es la entrega. Vale
+para todo proyecto que arranque así, no solo para éste.
 
 ---
 
