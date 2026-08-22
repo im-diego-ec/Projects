@@ -41,6 +41,80 @@ mueve sobre un cambio incompatible.
 
 ## [No publicado]
 
+### Añadido
+
+- **La identidad visual del área entra al marco, en dos piezas, cada una capaz de
+  sostenerse sola.** Las aplicaciones del área son casi todas interfaz, así que la marca
+  es parte del contrato y no un detalle de acabado. El manual completo —189 archivos:
+  tokens en tres capas, componentes, tipografía, data viz— es la skill `la organización-design` de
+  la organización, y **el marco no la copia**: una copia de 960K se desincroniza el primer
+  día y nadie se entera. Lo que el marco transporta es el mínimo que un agente tiene que
+  saber **sin haber invocado nada**, más las reglas que un árbol de sintaxis puede decidir
+  solo.
+
+  1. **En la constitución** (`actions/constitucion/canonico/90-marca.md`, 62 líneas):
+     siete reglas con id estable —idioma, texto oscuro sobre el acento, solo tokens, el
+     logo no se redibuja, temas y foco, redacción, y lo que el marco *no* trae—. Llegan a
+     cada repo consumidor en su artefacto de agente, o sea a cada sesión de cada builder.
+     El canónico queda en **673 de 700 líneas** de presupuesto: ese costo lo paga cada
+     sesión, y por eso el presupuesto existe.
+
+  2. **En el andamio de ESLint** (`plantilla/eslint.config.mjs`): diez selectores en
+     `no-restricted-syntax`, severidad `error`, con alcance propio (`files` al fuente de
+     la interfaz, sin apoyarse en la lista global de `ignores`, que un repo puede haber
+     recortado). Cubren cinco de las siete reglas; las otras dos **no** se lintean y está
+     dicho por qué: el idioma no lo juzga un árbol, y la tipografía no se pone en rojo
+     mientras la marca no entregue los archivos —poner el sello sobre una sustitución la
+     convertiría en la norma—.
+
+  La regla que más importa no existía en el kit del sistema y se escribió acá: **texto
+  blanco sobre el naranja de marca da 2.9:1 y falla WCAG AA**; el oscuro da 6.7:1. Medido
+  contra el frontend del un consumidor, el bloque encuentra **26 violaciones
+  reales en 17 archivos**, cinco de ellas de esa regla —una en la variante primaria del
+  botón, o sea en toda la aplicación— y cinco SVG dibujados a mano donde va el logo del
+  sistema.
+
+  **Qué tiene que hacer un consumidor: nada.** El bloque de ESLint llega por el andamio, o
+  sea a repos **nuevos**, que nacen con cero violaciones; por eso `error` desde el día uno
+  no es un endurecimiento estrenado sin modo aviso (y tampoco había opción: con
+  `--max-warnings=0` un `warn` ya es un rojo, solo peor explicado). Un repo que ya existe
+  no recibe este archivo y adopta el bloque cuando quiera, en su propio PR. La porción de
+  la constitución sí llega a todos, con su **ventana de gracia normal**: publicada
+  2026-08-22, exigible 2026-09-19.
+
+  Los límites están escritos en el propio archivo, que es donde alguien los va a leer: el
+  nombre de la clase del acento lo elige el proyecto (se reconocen `orange` y `accent`;
+  otro nombre se sale del alcance **sin que nada avise**), y los selectores ven strings en
+  el código, no estilo computado.
+
+  **Cómo se verificó.** `pruebas/marca/reglas-marca.test.mjs` (10 pruebas, en CI, cero
+  dependencias): que el bloque exista con alcance propio y severidad `error`, que cada
+  regex **compile** —uno roto hace tirar a ESLint en cada corrida de cada consumidor—, que
+  acepte su caso violatorio y rechace los legítimos, un **control no-op** de trabajo
+  honesto que ningún regex debe morder, y que toda regla de marca de la constitución tenga
+  **decidido** su estado frente al linter (decir «no» vale; dejarlo sin decir, no).
+
+  Y la que hace que las nueve anteriores signifiquen algo: **cada comprobación muerde**.
+  Ocho mutaciones —el bloque retirado entero, sin `files`, en `warn`, un selector sin su
+  caso, un regex roto, un regex que deja de detectar su violación, un regex ensanchado que
+  muerde trabajo honesto, y una regla del canónico sin decidir— tienen que poner en rojo
+  la comprobación que les toca, y si el ancla de una mutación se mueve eso también es
+  rojo. Se mutan **copias** en un directorio temporal: el andamio del repo no se toca, así
+  que un fallo a mitad de camino no puede dejarlo modificado.
+
+  `pruebas/marca/banco-eslint.mjs` (10 casos violatorios, 18 legítimos y un control, con
+  ESLint 9 real): cierra el hueco que la guarda de CI **no puede** cerrar. El marco no
+  tiene `package.json` ni `node_modules` —es una propiedad, no un descuido— así que su CI
+  no puede invocar ESLint y no puede verificar que `Literal`, `TemplateElement`, `JSXText`
+  y `JSXOpeningElement` seleccionen los nodos que creemos. Este banco se corre a mano
+  contra un repo que tenga las dependencias, y su salida va como evidencia al PR. Trae
+  además un modo `--medir` que cuenta violaciones por regla en un árbol real, que es la
+  única forma de saber si las reglas encuentran algo o son teoría.
+
+  Los selectores se **leen** del andamio en las dos piezas, nunca se copian: una copia se
+  desincroniza y a partir de ahí la prueba pasa contra un archivo que ya no es el que se
+  distribuye.
+
 ## [1.5.0] — 2026-08-22
 
 ### Añadido
