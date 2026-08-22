@@ -1,6 +1,6 @@
 ---
 name: projects-release
-description: Cortar y publicar una version del marco Projects — CHANGELOG, pines internos, PR de release, tag inmutable vX.Y.Z y notas del release en GitHub. Usar cuando haya que publicar una version del marco o cuando alguien pregunte como se saca una version de Projects. El tag movil v1 se RETIRO: no hay ningun paso que lo mueva.
+description: Cortar y publicar una version del marco Projects — CHANGELOG, pines internos, PR de release, tag inmutable vX.Y.Z y notas del release en GitHub. Usar cuando haya que publicar una version del marco o cuando alguien pregunte como se saca una version de Projects. El tag movil v1 dejo de ser el canal de distribucion pero SIGUE EXISTIENDO por una razon estructural, y el paso 5 lo mueve.
 allowed-tools: Bash(git:*), Bash(gh:*), Bash(grep:*), Bash(sed:*), Bash(awk:*), Bash(mktemp:*), Bash(node:*), Bash(head:*), Bash(wc:*), Read, Edit
 metadata:
   author: Transformación Digital y Data
@@ -9,7 +9,7 @@ metadata:
 
 # Cortar una version del marco
 
-Publicar una version de Projects son **cinco pasos con orden obligatorio**. No es un
+Publicar una version de Projects son **seis pasos con orden obligatorio**. No es un
 `git tag` con ceremonia: cada consumidor pina la **version exacta**
 (`uses: im-diego-ec/Projects/...@vX.Y.Z`) y recibe la version nueva como
 **PR de Dependabot** en su repo. Un release a medias no deja un repo a medias:
@@ -22,16 +22,33 @@ nuevo enrojecio a un consumidor que el dia anterior pasaba y nadie lo habia
 pedido: con el bump por PR, ese rojo aparece **dentro del PR**, que es donde se
 puede leer antes de mergear.
 
-**`v1` se retiro por completo** y esta skill ya no tiene un paso que lo mueva. La
-razon de fondo la encontro una revision del 2026-08-21: el tag no solo era el canal
-hacia afuera, tambien era como `marco-ci.yml` referenciaba a sus PROPIAS actions
-hermanas. O sea que un consumidor pinado a `marco-ci.yml@v1.4.1` recibia el workflow
-de la 1.4.1 y las actions de lo que `v1` apuntara en ese momento: el pin exacto era
-una **media verdad**. Retirarlo no fue limpieza, fue el arreglo.
+**`v1` dejo de ser el canal, pero NO se pudo retirar.** El 2026-08-21 se descubrio
+que el tag tenia un segundo rol: `marco-ci.yml` referenciaba a sus PROPIAS actions
+hermanas por `@v1`, asi que un consumidor pinado a `marco-ci.yml@v1.4.1` recibia el
+workflow de la 1.4.1 y las actions de lo que `v1` apuntara en ese momento — el pin
+exacto era una **media verdad**.
 
-El costo es que ahora el release tiene que mover esos pines internos. No depende de
+Se intento pinar esas dos lineas a la version exacta, y el CI del PR de release
+1.4.2 lo refuto en el acto: *"Unable to resolve action ...@v1.4.2, unable to find
+version v1.4.2"*. **El tag se crea despues de mergear**, asi que una linea que pina
+la version que se esta cortando pone en rojo al PR que la corta. Es circular por
+construccion. Y no hay salida: GitHub no admite expresiones en `uses:`, asi que un
+workflow reusable no puede referenciar su propio ref, y una ruta local dentro de un
+reusable se resuelve contra el arbol de quien LLAMA.
+
+Asi que `@v1` sobrevive en **una sola linea** —`actions/guardrail-deltas`, la unica
+invocacion interna cuyo ref se resuelve durante el CI del propio marco— y el **paso
+5 la mueve**. El banco del pinado la exceptua por lista exacta: archivo, ref y
+action, para que una segunda no herede la excepcion en silencio.
+
+El resto de los pines SI son exactos, y el release tiene que moverlos. No depende de
 que nadie se acuerde: `pruebas/andamio/pinado.test.mjs` exige que todo `uses:` del
-marco sea igual a la version mas alta del CHANGELOG, y se pone rojo si no.
+marco —salvo esa excepcion nombrada— sea igual a la version mas alta del CHANGELOG.
+
+La version derivada, que dejaria morir a `v1`: aplicar al guardrail la misma
+particion que ya usa la constitucion —saltear el paso cuando el repo es el del marco,
+y correr la action por ruta local en el `ci.yml` de projects—. Toca la logica del
+veredicto agregado que heredan todos los consumidores, asi que no entro en la 1.4.2.
 
 Todos los comandos se corren **desde la raiz del repo del marco**
 (`im-diego-ec/Projects`), sobre `main` actualizado, y **en Git Bash** (usan
@@ -237,7 +254,41 @@ Los tags de este repo son **ligeros** (`v1.0.0`, `v1.1.0` y `v1.2.0` lo son:
 
 ---
 
-## Paso 5 — Publicar las notas del release en GitHub
+## Paso 5 — Mover `v1`, que existe para UNA linea
+
+`v1` ya no es el canal de distribucion: los consumidores pinan la version exacta y
+reciben el bump por PR de Dependabot. Sigue existiendo por el motivo estructural del
+preambulo, y lo consume **una sola linea del marco**:
+
+```bash
+grep -n 'guardrail-deltas@v1' .github/workflows/marco-ci.yml
+```
+
+Si no se mueve, esa action se congela en la version donde quedo el tag y el resto del
+marco avanza sin ella. **Ligero, sin `-m` y sin `-a`** (ver la trampa 2):
+
+```bash
+git tag -f v1 <SHA>
+git push origin v1 --force
+```
+
+**Verificacion del paso 5:**
+
+```bash
+git cat-file -t v1              # commit  (si dice "tag", ver trampa 2)
+git rev-parse v1                # <SHA>
+git rev-parse v1^{commit}       # el MISMO <SHA>
+git ls-remote --tags origin v1  # UNA sola linea refs/tags/v1
+```
+
+No exige un OK aparte: a diferencia de cuando era el canal, moverlo ya no empuja
+comportamiento a ningun consumidor pinado. Mueve una action dentro de un workflow que
+el consumidor recibe recien cuando mergea su PR de bump. El OK vive en el merge del
+paso 3.
+
+---
+
+## Paso 6 — Publicar las notas del release en GitHub
 
 **Este es el paso que se olvido en la practica.** No lo dejes para despues: es
 el ultimo, no produce ningun diff local, y por eso el repo se ve terminado sin
@@ -330,7 +381,7 @@ version. Esa comprobacion es el final del procedimiento, no un adorno.
 ### Trampa 2 — el tag se crea LIGERO, nunca anotado
 
 **Que hacer.** `git tag vX.Y.Z <SHA>` — sin `-m` y sin `-a`. La trampa se aprendio
-con el tag movil `v1`, que ya no existe, pero vale igual para el inmutable: la
+con el tag movil `v1`, y vale igual para el inmutable: la
 convencion de este repo es que TODOS los tags son ligeros.
 
 **Que pasa si le ponen `-m`.** `-m` implica `-a`: git crea un **objeto tag** y
@@ -378,7 +429,7 @@ llamando `## [No publicado]`, el aviso de version se pone **rojo** por no encont
 entrada de `X.Y.Z`, y un consumidor que abre el CHANGELOG en ese tag no encuentra la
 version que le acaba de llegar.
 
-El orden 1 → 5 de esta skill es el orden. No se reordena por comodidad.
+El orden 1 → 6 de esta skill es el orden. No se reordena por comodidad.
 
 ---
 
@@ -394,5 +445,6 @@ El orden 1 → 5 de esta skill es el orden. No se reordena por comodidad.
 - [ ] Merge a `main` y `<SHA>` anotado
 - [ ] `vX.Y.Z` creado y pusheado — `git cat-file -t` dice `commit`
 - [ ] `vX.Y.Z` creado **inmediatamente despues del merge**, no mañana (trampa 3)
+- [ ] `v1` movido LIGERO al mismo SHA — `git cat-file -t v1` dice `commit` y los dos `rev-parse` coinciden
 - [ ] `gh release list` **muestra la version**, `isDraft` es `false` y el cuerpo de las notas no esta vacio
 - [ ] Si existe el aviso de version: la corrida salio y no quedo en `::warning::`

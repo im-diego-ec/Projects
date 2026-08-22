@@ -137,10 +137,11 @@ El `ci.yml` que el scaffold trae ya apunta a la **versión exacta** del marco y 
 lo único de CI que se copia: un llamador delgado. El proyecto nace consumiendo la
 mecánica del marco por referencia, no con una copia que se va a quedar vieja.
 
-> **Nunca `@v1`.** El tag mayor móvil se retiró: no existe. Y aunque existiera,
-> Dependabot no propone bump para un tag mayor —para él ya es la mayor vigente—,
-> así que un repo pinado así no recibe versiones nuevas por PR y no aparece en el
-> censo. Es el modo de falla más callado de todo el bootstrap.
+> **Nunca `@v1` en el repo de un proyecto.** El tag existe, pero solo para una línea
+> interna del marco (ver `AGENTS.md`). Para un consumidor es una trampa: Dependabot no
+> propone bump para un tag mayor —para él ya es la mayor vigente—, así que un repo pinado
+> así no recibe versiones nuevas por PR y **no aparece en el censo de consumidores**. Es
+> el modo de falla más callado de todo el bootstrap.
 
 ## Cómo lo consume un proyecto EXISTENTE
 
@@ -159,9 +160,9 @@ Sin big bang: se adopta por partes, empezando por lo referenciado.
 
    jobs:
      marco:
-       # La version exacta, no el tag mayor: `v1` se retiro, y un tag movil
-       # no produce PR de Dependabot (para el ya es la mayor vigente), asi que
-       # el repo no recibiria versiones nuevas ni apareceria en el censo.
+       # La version exacta, no el tag mayor: un tag movil no produce PR de
+       # Dependabot (para el ya es la mayor vigente), asi que el repo no
+       # recibiria versiones nuevas ni apareceria en el censo.
        uses: im-diego-ec/Projects/.github/workflows/marco-ci.yml@v1.4.1
 
      build_test:          # lo del producto: lint, typecheck, test, build

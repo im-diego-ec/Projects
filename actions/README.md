@@ -4,7 +4,7 @@ Piezas **referenciadas**: los proyectos no las copian, las consumen con `uses:`.
 Un arreglo acá llega a todos los repos en su próximo run, sin PR en cada uno.
 
 ```yaml
-uses: im-diego-ec/Projects/actions/<nombre>@v1.4.1
+uses: im-diego-ec/Projects/actions/<nombre>@v1.4.2
 ```
 
 | Action | Qué hace | Falla el job |
@@ -53,7 +53,7 @@ jobs:
       contents: read
     steps:
       - uses: actions/checkout@v7
-      - uses: im-diego-ec/Projects/actions/guardrail-deltas@v1.4.1
+      - uses: im-diego-ec/Projects/actions/guardrail-deltas@v1.4.2
 ```
 
 Inputs (todos opcionales): `directorio-changes` (`openspec/changes`),
@@ -128,7 +128,7 @@ jobs:
       solo_docs: ${{ steps.detectar.outputs.solo_docs }}
     steps:
       - id: detectar
-        uses: im-diego-ec/Projects/actions/carril-docs@v1.4.1
+        uses: im-diego-ec/Projects/actions/carril-docs@v1.4.2
 
   build_test:
     needs: cambios
@@ -160,7 +160,7 @@ jobs:
       - uses: actions/checkout@v7
         with: { fetch-depth: 0 }   # sin esto, el commit anterior no esta en el clon
       - id: detectar
-        uses: im-diego-ec/Projects/actions/carril-docs@v1.4.1
+        uses: im-diego-ec/Projects/actions/carril-docs@v1.4.2
 ```
 
 ### Uso en `workflow_run` (la compuerta de deploy)
@@ -184,7 +184,7 @@ jobs:
       solo_docs: ${{ steps.detectar.outputs.solo_docs }}
     steps:
       - id: detectar
-        uses: im-diego-ec/Projects/actions/carril-docs@v1.4.1
+        uses: im-diego-ec/Projects/actions/carril-docs@v1.4.2
 ```
 
 Un despliegue por `workflow_dispatch` **no** debe pasar por esta action: si
@@ -264,7 +264,7 @@ jobs:
         with: { node-version: "22", cache: pnpm }
       - run: pnpm install --frozen-lockfile
       # DESPUES del install: el censo interroga al toolchain ya instalado.
-      - uses: im-diego-ec/Projects/actions/censo-fuentes@v1.4.1
+      - uses: im-diego-ec/Projects/actions/censo-fuentes@v1.4.2
 ```
 
 ### Inputs
@@ -471,7 +471,7 @@ jobs:
       - uses: actions/setup-node@v7
         with: { node-version: "22" }
       # ...instalar dependencias y correr las pruebas CON cobertura...
-      - uses: im-diego-ec/Projects/actions/cobertura-diff@v1.4.1
+      - uses: im-diego-ec/Projects/actions/cobertura-diff@v1.4.2
 ```
 
 ### Por qué un comparador propio y no una herramienta externa
@@ -713,7 +713,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
       - id: mensaje
-        uses: im-diego-ec/Projects/actions/aviso-version@v1.4.1
+        uses: im-diego-ec/Projects/actions/aviso-version@v1.4.2
         with:
           version: ${{ github.event.release.tag_name }}
       - shell: bash
