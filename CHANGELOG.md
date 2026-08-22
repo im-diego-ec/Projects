@@ -41,6 +41,43 @@ mueve sobre un cambio incompatible.
 
 ## [No publicado]
 
+### Corregido
+
+- **El prompt del bot de GitHub le decía que `v1` no existe.** `claude.yml` inyectaba «el
+  tag movil v1 se retiro: no existe, y no propongas moverlo ni recrearlo», y `v1` existe
+  (`= v1.4.2`) porque el paso 5 del release **lo mueve**. Lo escribí cuando creía que se
+  retiraba; cuando el CI lo refutó corregí la skill de release, `AGENTS.md` y el `README`,
+  **y me salté este archivo**. Un agente que le creyera congelaría `guardrail-deltas` en el
+  próximo release. Es la misma clase que vengo arreglando toda la semana —prosa que
+  contradice la línea que anota— cometida por mí, a medias.
+
+- **El ejemplo de `projects init` nombraba a tres personas y un servidor MCP real.** Projects
+  quedó con **cero nombres propios** cuando se extrajo, y su `AGENTS.md` lo declara:
+  «handles por rol, nunca nombres propios». El `--ejemplo` los reintrodujo, o sea que el
+  marco predicaba la regla y la rompía en la pieza que estrenaba. Ahora van formas
+  (`handle-del-po`) y el UUID nulo, **con una prueba que lo mantiene**: poner un handle real
+  pone el banco en rojo, verificado con el control.
+
+### Añadido
+
+- **El `.gitignore` del andamio ignora los residuos de correr los checks en local.** En CI
+  viven en `RUNNER_TEMP`; en una máquina esa variable no está seteada y `pendientes.txt` y
+  `aviso-version.json` caen en el directorio de trabajo. Sin esas dos líneas un `git add -A`
+  los commitea: pasó el 2026-08-21, y la prosa del segundo hizo que el detector de secretos
+  tokenizara nombres de paquete inexistentes.
+
+- **El checklist final de `projects init` nombra las tres formas de que el review cruzado no
+  exista** y ningún check lo diga: un handle mal escrito, un equipo **vacío**, y un equipo
+  sin permiso de escritura. Medido el 2026-08-22: el equipo `po` de la organización tiene
+  **cero miembros**, así que hoy el gate del PO no existe y nada se pone rojo. Y agrega el
+  issue macro en el Project y las labels `area:*`, que la constitución exige y el checklist
+  no pedía.
+
+### Para consumidores
+
+**Nada que hacer.** Los cuatro son del repo del marco, del andamio para proyectos NUEVOS, y
+del prompt del bot. Un repo ya creado no cambia.
+
 ### Añadido
 
 - **`docs/censo-de-consumidores.md`: el censo, lo que se midió de él y su plan B.** El
