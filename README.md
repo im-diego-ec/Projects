@@ -82,43 +82,38 @@ pina la versión; la herramienta genera.
 
 ## Cómo lo consume un proyecto NUEVO
 
-El proyecto nace **dentro** del marco: el scaffold se copia antes del primer
-commit de código.
+El proyecto nace **dentro** del marco: el scaffold se instancia antes del primer
+commit de código. **Lo mecánico lo hace `projects init`**; lo que queda es decidir
+valores y tocar GitHub, que son actos humanos.
+
+```bash
+git clone --depth 1 https://github.com/im-diego-ec/Projects /tmp/projects
+
+# 1. El esqueleto de valores, con una clave por decisión
+node /tmp/projects/herramientas/projects-init.mjs --ejemplo > valores.json
+
+# 2. Llenarlo (qué va en cada uno: plantilla/README.md sección 2)
+
+# 3. Instanciar, desde la raíz del repo nuevo
+node /tmp/projects/herramientas/projects-init.mjs --valores valores.json --destino .
+```
+
+Eso copia los 22 archivos del andamio —dotfiles incluidos, que es donde falla el
+copiado a mano— sustituye las 89 ocurrencias de los 22 marcadores, corre
+`openspec init` con el pin del marco y renderiza la porción del marco de la
+constitución. **Falla cerrado**: un valor que falta, un marcador que sobrevive o un
+destino que ya tiene andamio abortan sin escribir nada, con el nombre de lo que
+falta. Y verifica lo que hizo releyendo el árbol, no confiando en su propio
+resultado.
+
+Lo que **no** hace, porque no es transcripción:
 
 1. **Crear el repo vacío** en la organización.
-2. **Copiar el contenido de `plantilla/`** a la raíz del repo nuevo —dotfiles
-   incluidos (`.claude/`, `.github/` con su `workflows/ci.yml`, `.gitignore`,
-   `.prettierrc`) y sin su propio `README.md`, que es la guía del bootstrap y no
-   el README del proyecto.
-3. **Sustituir los placeholders** (tabla abajo). Nada de `{{...}}` debe
-   sobrevivir al primer commit; la verificación es
-   `grep -rnE "\{\{[A-Z0-9_]+\}\}" .` —con mayúsculas obligatorias, para no
-   confundirlos con las expresiones `${{ ... }}` de GitHub Actions—.
-4. **Inicializar OpenSpec en el repo.** El andamio **no** trae `openspec/`, y el
-   marco lo exige: el job de OpenSpec hace `[ -d openspec ] || exit 1`, así que
-   sin este paso el primer PR sale rojo. Con el CLI en la versión pinada:
-
-   ```bash
-   npx --yes @fission-ai/openspec@1.9.0 init --tools claude
-   ```
-
-   Eso crea `openspec/` y, en la misma corrida, **las skills y comandos** del punto
-   siguiente — no se copian desde acá.
-5. **Renderizar la porción del marco de la constitución.** Es un artefacto
-   generado, no un archivo del scaffold: el agente del proyecto lo CARGA todos los
-   días, así que si falta, trabaja sin la mitad de las reglas. Desde un clon del
-   marco, sobre la raíz del repo nuevo:
-
-   ```bash
-   CONSTITUCION_MODO=escribir node <clon-del-marco>/actions/constitucion/constitucion.mjs
-   ```
-
-   Tarda un segundo y **no necesita ningún permiso de GitHub**. El workflow
-   `actualizar-marco.yml` del andamio hace lo mismo por PR y de forma recurrente,
-   pero para eso la organización tiene que tener habilitado *Allow GitHub Actions
-   to create and approve pull requests*: si está apagado, ese camino da **403** con
-   un error que no menciona el permiso. Este paso local no depende de eso.
-6. **Cargar `vars` y `secrets`** del repo en GitHub Actions: todo lo que el
+2. **Decidir los valores.** Los 22 salen de la tabla de `plantilla/README.md`
+   sección 2, con ejemplo y caso borde cada uno. Tres tienen un camino "si no
+   existe" que exige borrar bloques a mano: la herramienta los **nombra al final**
+   en vez de adivinar el borrado.
+3. **Cargar `vars` y `secrets`** del repo en GitHub Actions: todo lo que el
    pipeline consume en runtime (URLs de sondas, ARNs, log groups, tokens) va
    ahí, nunca hardcodeado en el scaffold.
 7. **Aplicar la protección de `main`** como acto humano deliberado, con el
@@ -132,11 +127,16 @@ commit de código.
    proponerlos. En los dos casos el repo simplemente **no recibe versiones nuevas
    y no aparece en el censo de consumidores**, sin avisar.
 
-> Los comandos exactos —incluida la variante de Windows, que necesita
-> `robocopy` porque `cp` deja dotfiles atrás— y la tabla completa de
-> placeholders con sus casos borde viven en
-> **[`plantilla/README.md`](plantilla/README.md)**: esa es la guía operativa
-> del bootstrap y manda sobre este resumen.
+> **La tabla de los 22 valores**, con qué poner, ejemplo y caso borde de cada uno,
+> vive en **[`plantilla/README.md`](plantilla/README.md)** sección 2. Ese archivo es
+> la fuente de verdad de los valores y manda sobre este resumen; también documenta
+> el camino **manual**, que sigue siendo válido y es el fallback si `projects init`
+> falla.
+
+> **`projects init` se estrenó el 2026-08-22 como piloto acotado**, con el camino manual
+> intacto al lado. Es superficie nueva del marco: lo que le corresponde es un change
+> de OpenSpec con el gate del PO, y entra como el primer change del proyecto que la
+> usa. Hasta entonces, si hace algo raro, el camino manual es el que manda.
 
 El `ci.yml` que el scaffold trae ya apunta a la **versión exacta** del marco y es
 lo único de CI que se copia: un llamador delgado. El proyecto nace consumiendo la
@@ -274,6 +274,8 @@ diff.
 ├── plantilla/             # SCAFFOLD: el árbol que se copia UNA vez al crear un proyecto,
 │                          #   con su propio README como guía del bootstrap y un
 │                          #   .github/workflows/ci.yml que ya llama al marco por versión exacta
+├── herramientas/          # projects-init.mjs: instancia el andamio en un repo nuevo en un comando
+│                          #   (copia + 22 marcadores + openspec init + render de la constitucion)
 ├── pruebas/                # el banco de los pasos INLINE de marco-ci.yml y del pinado del andamio:
 │                          #   ese código no puede salir de su bloque `run:` (cuando un consumidor
 │                          #   llama al reusable, el árbol checkouteado es el DEL CONSUMIDOR), así
