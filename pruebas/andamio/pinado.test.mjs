@@ -44,9 +44,20 @@ import path from "node:path";
 
 const RAIZ = path.resolve(import.meta.dirname, "..", "..");
 
-// Las superficies que un proyecto nuevo COPIA (`plantilla/`) o de las que un
-// agente copia el snippet al adoptar (`.claude/skills/`).
-const SUPERFICIES = ["plantilla", ".claude/skills"];
+// Las superficies donde un `uses:` del marco importa:
+//  · .github/workflows — los pines VIVOS. marco-ci.yml es el workflow reusable que
+//    consumen los proyectos, y adentro invoca a sus propias actions hermanas. Esta
+//    superficie faltaba en la primera version de este banco, y era justo donde
+//    estaban los dos `uses:` a @v1 que se descubrieron el 2026-08-21.
+//  · actions — la documentacion de las actions y el snippet que la action EMITE
+//    cuando falla. Lo que el consumidor copia y pega sale de aca.
+//  · plantilla — lo que un proyecto nuevo copia.
+//  · .claude/skills — el snippet que un agente pega al adoptar.
+const SUPERFICIES = [".github/workflows", "actions", "plantilla", ".claude/skills"];
+
+// Los bancos de prueba quedan fuera: sus fixtures usan `@v1` a proposito, porque lo
+// que prueban es el PARSEO de un ref cualquiera.
+const FUERA = /[\\/]pruebas[\\/]/;
 
 // `projects/<algo>@<ref>`, cortando el ref en el primer caracter que no puede ser
 // parte de un ref de git.
@@ -77,6 +88,7 @@ function archivosDe(dir) {
     if (!e.isFile()) continue;
     const p = path.join(e.parentPath ?? e.path, e.name);
     if (/\.(png|jpg|jpeg|gif|ico|woff2?|zip|gz)$/i.test(p)) continue;
+    if (FUERA.test(p)) continue;
     salida.push(p);
   }
   return salida;
@@ -91,6 +103,10 @@ function pinesDeUses() {
       const lineas = fs.readFileSync(abs, "utf8").split("\n");
       for (let i = 0; i < lineas.length; i++) {
         if (!lineas[i].includes("uses:")) continue;
+        // Las lineas de COMENTARIO quedan fuera: un comentario que explica por que no
+        // se usa `@v1` tiene que poder escribir `@v1`. Es el mismo limite que la
+        // prosa, declarado arriba.
+        if (/^\s*(#|\/\/|\*|\/\*)/.test(lineas[i])) continue;
         const m = lineas[i].match(PIN);
         if (!m) continue;
         pines.push({ archivo: rel, linea: i + 1, ref: m[2] });
@@ -110,7 +126,7 @@ function pinesDeUses() {
 test("el escaneo encuentra pines: un cero aca es el banco roto, no el arbol limpio", () => {
   const pines = pinesDeUses();
   assert.ok(
-    pines.length >= 5,
+    pines.length >= 15,
     `solo encontre ${pines.length} pin(es) del marco en lineas \`uses:\` de ${SUPERFICIES.join(", ")}. ` +
       "El andamio referencia el marco en ci.yml (el reusable + tres actions) y en " +
       "actualizar-marco.yml, asi que menos de cinco significa que este banco dejo de mirar " +

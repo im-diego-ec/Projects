@@ -1,6 +1,6 @@
 ---
 name: projects-validar-consumidor
-description: Probar un cambio del marco Projects contra un repo consumidor real ANTES de mover el tag movil v1 — rama temporal con el uses pineado al SHA, PR en borrador NO MERGEAR, evidencia de los jobs y cierre con --delete-branch. Usar antes de cualquier release del marco o cuando haya que verificar que un workflow o action nueva funciona en un repo de verdad.
+description: Probar un cambio del marco Projects contra un repo consumidor real ANTES de publicar la version — rama temporal con el uses pineado al SHA, PR en borrador NO MERGEAR, evidencia de los jobs y cierre con --delete-branch. Usar antes de cualquier release del marco o cuando haya que verificar que un workflow o action nueva funciona en un repo de verdad.
 allowed-tools: Bash(git:*), Bash(gh:*), Bash(grep:*), Bash(sed:*), Read, Edit
 metadata:
   author: Transformación Digital y Data
@@ -115,7 +115,7 @@ git commit -m "chore(ci): pin temporal a projects@<sha-corto> para validar el ma
 git push -u origin chore/validar-projects-<sha-corto>
 gh pr create --draft \
   --title "NO MERGEAR — validacion de projects@<sha-corto>" \
-  --body "Pin TEMPORAL de los workflows del marco al SHA <SHA-COMPLETO> para validar un cambio de Projects antes de mover el tag v1. Este PR NO se mergea: se cierra con --delete-branch cuando la evidencia este recogida. Ver <enlace al PR del marco>."
+  --body "Pin TEMPORAL de los workflows del marco al SHA <SHA-COMPLETO> para validar un cambio de Projects antes de publicar la version. Este PR NO se mergea: se cierra con --delete-branch cuando la evidencia este recogida. Ver <enlace al PR del marco>."
 ```
 
 **Borrador y titulo explicito no son cortesia:** el PR va a estar verde, y un PR

@@ -300,11 +300,21 @@ jobs:
       # pueda quedar vieja.
       #
       # La ref es literal por obligacion: GitHub NO admite expresiones en el
-      # campo "uses". Apunta a @v1 —el mismo tag movil que consumen los
-      # proyectos— asi la action y este workflow avanzan juntos y no hay que
-      # tocar esta linea en cada release.
+      # campo "uses". Y es la VERSION EXACTA, no el tag mayor.
+      #
+      # Apuntaba a @v1 para que la action y este workflow avanzaran juntos sin
+      # tocar la linea en cada release. Eso dejo de ser cierto en la 1.4.0, cuando
+      # la distribucion paso a version exacta: un consumidor pinado a
+      # marco-ci.yml@v1.4.1 recibia ESTE workflow de la 1.4.1 y esta action de lo
+      # que `v1` apuntara EN ESE MOMENTO. O sea que el pin exacto que el consumidor
+      # creia tener era una media verdad, y llegaba comportamiento nuevo sin que
+      # nadie lo revisara — exactamente lo que la 1.4.0 venia a eliminar.
+      #
+      # El costo de la version exacta es que el release tiene que mover esta linea.
+      # No depende de que alguien se acuerde: pruebas/andamio/pinado.test.mjs exige
+      # que todo `uses:` del marco sea igual a la version mas alta del CHANGELOG.
       - name: Deltas de OpenSpec sin perdida de escenarios
-        uses: im-diego-ec/Projects/actions/guardrail-deltas@v1
+        uses: im-diego-ec/Projects/actions/guardrail-deltas@v1.4.1
         with:
           instalar-node: "false"
 
@@ -922,7 +932,7 @@ jobs:
             echo "::error::este repo no invoca el censo de fuentes en ningun flujo: sin ese paso, un archivo que ninguna herramienta mira no produce rojo en ningun lado y la verificacion de alcance queda declarada pero apagada. Arreglo: pega el paso de abajo en el job que ya corre lint y typecheck, DESPUES de instalar dependencias (el censo interroga al toolchain ya instalado)"
             echo "== paso a agregar =="
             echo "      - name: Ningun archivo fuera del alcance de la verificacion"
-            echo "        uses: im-diego-ec/Projects/actions/censo-fuentes@v1"
+            echo "        uses: im-diego-ec/Projects/actions/censo-fuentes@v1.4.1"
             exit 1
           fi
 
@@ -2691,8 +2701,9 @@ jobs:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7
         with: { node-version: "22" }
+      # Version exacta, no @v1: ver el motivo largo en el paso de deltas de OpenSpec.
       - name: Constitucion del marco cableada
-        uses: im-diego-ec/Projects/actions/constitucion@v1
+        uses: im-diego-ec/Projects/actions/constitucion@v1.4.1
         with:
           modo: cableado
           # La rama por defecto sale del evento y no de una constante: un `push`

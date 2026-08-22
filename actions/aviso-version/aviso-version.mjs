@@ -174,13 +174,13 @@ export function construirMensaje({ version, seccion, urlRelease, urlChangelog, l
 
   const partes = [
     `Projects ${version} publicado.` +
-      " El bump llega a cada repo como PR de Dependabot: el tag \`v1\` sigue existiendo y ya no es el canal de distribucion.",
+      " El bump llega a cada repo como PR de Dependabot, sobre la version exacta. El tag movil \`v1\` se retiro.",
   ];
 
   if (breaking.length) {
     partes.push(
       "",
-      "BREAKING para `@v1` — esto NO debería haberse publicado sobre `v1`:",
+      "BREAKING — un consumidor que mergee este bump se puede romper:",
       ...breaking.map((l) => (l.startsWith("-") ? l : `- ${l}`))
     );
   }
@@ -316,8 +316,10 @@ export async function main(env = process.env) {
   }
   if (armado.breaking) {
     console.log(
-      `::warning::la entrada [${version}] declara cambios BREAKING para @v1. El aviso los pone primero. ` +
-        "Arreglo, si de verdad lo son: `v1` no se mueve sobre un cambio incompatible — se abre linea mayor"
+      `::warning::la entrada [${version}] declara cambios BREAKING. El aviso los pone primero. ` +
+        "Con el bump por PR el consumidor puede NO mergearlo, asi que un breaking ya no rompe a nadie sin aviso; " +
+        "igual se nombra en la seccion \"Para consumidores\" con lo que hay que hacer, porque quedarse en la version " +
+        "vieja tampoco es gratis"
     );
   }
 
