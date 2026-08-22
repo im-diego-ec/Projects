@@ -65,6 +65,26 @@ const PIN = /projects(\/[^\s"'`]*)?@([^\s"'`,)\]]+)/;
 
 const VERSION_EXACTA = /^v\d+\.\d+\.\d+$/;
 const MAYOR_MOVIL = /^v\d+$/;
+
+// LA UNICA EXCEPCION, por lista y no por regla. `marco-ci.yml` es un workflow
+// reusable y GitHub no le permite referenciar su propio ref (`uses:` no admite
+// expresiones), asi que una linea que pine la version que se esta cortando pone en
+// rojo al PR que la corta: medido el 2026-08-22 con "Unable to resolve action
+// ...@v1.4.2". El motivo largo esta en el comentario de esa linea.
+//
+// Va por lista exacta a proposito: si manana aparece una segunda invocacion interna
+// con @v1, esto se pone ROJO en vez de dejarla heredar la excepcion. Es la
+// diferencia entre una excepcion declarada y un agujero.
+const EXCEPCIONES = [
+  { archivo: ".github/workflows/marco-ci.yml", ref: "v1", accion: "actions/guardrail-deltas" },
+];
+function esExcepcion(p) {
+  // Se compara TAMBIEN la action. Un primer intento comparaba solo archivo y ref, y
+  // el control lo refuto en el acto: una segunda invocacion interna con @v1 en el
+  // MISMO archivo quedaba exenta sin declararse. Una excepcion que no nombra que
+  // exime no es una excepcion, es un agujero con comentario.
+  return EXCEPCIONES.some((e) => e.archivo === p.archivo && e.ref === p.ref && e.accion === p.accion);
+}
 // Marcadores legitimos DENTRO de un `uses:`: el `{{ORG}}` del andamio lo
 // sustituye la adopcion, `<SHA-COMPLETO>` es el hueco que rellena el ensayo
 // contra un consumidor real, y `vX.Y.Z` es como la documentacion escribe «una
@@ -109,7 +129,10 @@ function pinesDeUses() {
         if (/^\s*(#|\/\/|\*|\/\*)/.test(lineas[i])) continue;
         const m = lineas[i].match(PIN);
         if (!m) continue;
-        pines.push({ archivo: rel, linea: i + 1, ref: m[2] });
+        // m[1] es la ruta dentro del repo del marco ("/actions/guardrail-deltas" o
+        // "/.github/workflows/marco-ci.yml"), sin la barra inicial. La necesita la
+        // lista de excepciones para nombrar QUE exime.
+        pines.push({ archivo: rel, linea: i + 1, ref: m[2], accion: (m[1] ?? "").slice(1) });
       }
     }
   }
@@ -134,8 +157,8 @@ test("el escaneo encuentra pines: un cero aca es el banco roto, no el arbol limp
   );
 });
 
-test("ningun `uses:` del marco apunta al tag mayor movil (@v1)", () => {
-  const moviles = pinesDeUses().filter((p) => MAYOR_MOVIL.test(p.ref));
+test("ningun `uses:` del marco apunta al tag mayor movil (@v1), salvo la excepcion declarada", () => {
+  const moviles = pinesDeUses().filter((p) => MAYOR_MOVIL.test(p.ref) && !esExcepcion(p));
   assert.deepEqual(
     moviles.map((p) => `${p.archivo}:${p.linea} → @${p.ref}`),
     [],
@@ -161,7 +184,7 @@ test("todo `uses:` con version exacta apunta a la version publicada mas alta", (
 
 test("todo ref de un `uses:` del marco es una version exacta o un marcador", () => {
   const raros = pinesDeUses().filter(
-    (p) => !VERSION_EXACTA.test(p.ref) && !MARCADOR.test(p.ref),
+    (p) => !VERSION_EXACTA.test(p.ref) && !MARCADOR.test(p.ref) && !esExcepcion(p),
   );
   assert.deepEqual(
     raros.map((p) => `${p.archivo}:${p.linea} → @${p.ref}`),
