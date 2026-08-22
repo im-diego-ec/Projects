@@ -117,13 +117,21 @@ nueva como **PR de Dependabot en su propio repo**. Nada del marco cambia en un
 consumidor sin que exista un PR que alguien pueda leer y mergear: si una versión
 trae un check nuevo, el rojo aparece **dentro de ese PR**.
 
-> **El tag mayor móvil `v1` se retiró el 2026-08-21.** Hasta la 1.3.0 era el canal:
+> **El tag mayor móvil `v1` dejó de ser el canal el 2026-08-21, y sobrevive en una sola
+> línea.** Hasta la 1.3.0 era el canal:
 > apuntaba al último release de la 1.x y los consumidores recibían todo sin tocar
 > nada. Cambió porque el 2026-08-19 un check nuevo enrojeció un repo que el día
 > anterior pasaba, y nadie lo había pedido. Y se retiró del todo cuando se midió que
 > el tag tenía un segundo rol sin escribir: `marco-ci.yml` referenciaba a sus propias
-> actions hermanas por `@v1`, así que el pin exacto del consumidor era una **media
-> verdad**. No propongas recrearlo.
+> actions hermanas por `@v1`. El pin exacto del consumidor era una **media
+> verdad**.
+>
+> Se intentó pinarlas por versión exacta y el CI del release 1.4.2 lo refutó: el tag se
+> crea **después** del merge, así que la línea pone en rojo al PR que la corta, y GitHub
+> no admite expresiones en `uses:` para que un reusable referencie su propio ref. Así que
+> `@v1` sobrevive en **una** línea (`actions/guardrail-deltas`), exceptuada por lista
+> exacta en `pruebas/andamio/pinado.test.mjs`, y el paso 5 del release la mueve. **No la
+> uses para nada más**: una segunda `@v1` pone rojo el banco, a propósito.
 
 - Cada release lleva un tag inmutable `vX.Y.Z`, y **el release mueve los pines
   internos** del marco a esa versión. No depende de que nadie se acuerde:
