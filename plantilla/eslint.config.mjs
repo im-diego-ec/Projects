@@ -158,6 +158,146 @@ export default tseslint.config(
     },
   },
 
+  // [FRONT] IDENTIDAD VISUAL DEL AREA. Solo las reglas de marca que un ARBOL DE
+  // SINTAXIS puede decidir por si solo. El manual completo (tokens, componentes,
+  // tipografia, data viz) es la skill `la organización-design` de la organizacion; lo que
+  // no se negocia vive en la constitucion del marco, seccion "Identidad visual y
+  // el idioma del producto".
+  //
+  // QUE CUBRE Y QUE NO, contra las 7 reglas de esa seccion:
+  //   marca-texto-oscuro-sobre-acento .... cubierta (1, 2)
+  //   marca-solo-tokens .................. cubierta (3, 4, 5)
+  //   marca-tema-y-foco .................. a medias (6, 7): el foco si; "los dos
+  //                                        temas con su interruptor" no lo
+  //                                        decide un arbol.
+  //   marca-redaccion .................... a medias (8, 9): el formateo y los
+  //                                        rotulos si; "mayuscula solo al
+  //                                        principio de la frase" no.
+  //   marca-el-logo-no-se-redibuja ....... cubierta (10)
+  //   marca-idioma-castellano ............ NO: un arbol no juzga idioma. La fija
+  //                                        el instalador al crear el repo.
+  //   marca-lo-que-el-marco-no-transporta  NO, y a proposito: mientras la marca
+  //                                        no entregue los archivos de la
+  //                                        tipografia, el marco NO pone en rojo
+  //                                        a nadie por tipografia. Poner el
+  //                                        sello sobre una sustitucion la
+  //                                        convertiria en la norma.
+  //
+  // POR QUE EN "error" Y NO EN AVISO. No hay opcion intermedia: este repo corre
+  // `eslint . --max-warnings=0` (politica 1, arriba), asi que un "warn" YA es un
+  // rojo. Y no hace falta estreno gradual: este archivo llega por el andamio, o
+  // sea a un repo NUEVO, con cero violaciones. Un repo que ya existe no lo
+  // recibe y adopta el bloque cuando quiera, en su propio PR.
+  //
+  // EL ALCANCE ES PROPIO, NO HEREDADO. Se acota con `files` al fuente de la
+  // interfaz y NO se apoya en la lista global de `ignores` de arriba: un repo
+  // puede haberla recortado (el un consumidor borro "**/*.config.js")
+  // y entonces estas reglas morderian la configuracion de estilos, que es el
+  // UNICO lugar legitimo donde los valores de marca se escriben. Que esos
+  // valores COINCIDAN con los del sistema no lo puede ver un linter: eso lo
+  // verifica la revision de artefactos.
+  //
+  // LIMITES DECLARADOS, y conviene leerlos antes de confiar:
+  //   - El nombre de la clase del acento lo elige el proyecto. Aca se reconocen
+  //     "orange" y "accent" en el nombre. Un proyecto que llame a su acento de
+  //     otra forma se sale del alcance SIN QUE NADA AVISE. Derivarlo del token
+  //     en vez de enumerarlo exige que el marco transporte los tokens, que es la
+  //     pieza siguiente.
+  //   - Los selectores ven strings en el codigo, no estilo computado: un color
+  //     que llega por variable, por props o desde el servidor no se ve aca.
+  {
+    files: ["{{PAQUETE_WEB}}/src/**/*.{ts,tsx}"],
+    rules: {
+      "no-restricted-syntax": [
+        "error",
+        // (1)(2) BLANCO SOBRE EL ACENTO. La regla mas dura del sistema y la que
+        // mas veces se rompio: blanco sobre naranja da 2.9:1 y FALLA WCAG AA; el
+        // texto oscuro da 6.7:1. No existia en el kit del sistema, se escribio
+        // aca. Van dos selectores porque la clase puede estar en un string
+        // suelto (el caso comun, incluso DENTRO de una plantilla: ahi la parte
+        // variable es un Literal) o en la parte fija de una plantilla.
+        {
+          selector: String.raw`Literal[value=/(?=[\s\S]*\b(?:bg|from|to|via)-(?:[a-z]+-)?(?:orange|accent))(?=[\s\S]*\btext-white\b)/]`,
+          message:
+            "Texto blanco sobre el acento de marca: 2.9:1, falla WCAG AA. Sobre el naranja va texto OSCURO (6.7:1).",
+        },
+        {
+          selector: String.raw`TemplateElement[value.raw=/(?=[\s\S]*\b(?:bg|from|to|via)-(?:[a-z]+-)?(?:orange|accent))(?=[\s\S]*\btext-white\b)/]`,
+          message:
+            "Texto blanco sobre el acento de marca, en la parte fija de una plantilla: 2.9:1, falla WCAG AA. Sobre el naranja va texto OSCURO.",
+        },
+        // (3)(4) COLOR ESCRITO A MANO. Un hex no es un atajo: es un valor que
+        // nadie va a poder cambiar cuando la marca cambie, y que ningun check
+        // distingue de un error de tipeo.
+        {
+          selector: String.raw`Literal[value=/#(?:[0-9a-fA-F]{3,4}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})\b/]`,
+          message:
+            "Color escrito a mano. Los colores vienen de los tokens del sistema (clase o variable). El unico lugar donde se escribe un hex es la configuracion de estilos.",
+        },
+        {
+          selector: String.raw`TemplateElement[value.raw=/#(?:[0-9a-fA-F]{3,4}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})\b/]`,
+          message:
+            "Color escrito a mano dentro de una plantilla. Los colores vienen de los tokens del sistema.",
+        },
+        // (5) MEDIDA O Z-INDEX A MANO. El valor arbitrario entre corchetes es la
+        // forma que tiene Tailwind de decir "me salgo de la escala". La escala es
+        // el token; salirse es la excepcion que se justifica, no el default. Los
+        // ejes que NO estan en la lista (grid-cols, aspect, ...) quedan
+        // permitidos a proposito: ahi el valor arbitrario es lo normal.
+        {
+          selector: String.raw`Literal[value=/\b(?:w|h|p|px|py|pt|pb|pl|pr|m|mx|my|mt|mb|ml|mr|gap|text|bg|border|rounded|shadow|leading|tracking|z|top|left|right|bottom|inset)-\[/]`,
+          message:
+            "Medida o color fuera de la escala del sistema (valor arbitrario entre corchetes). Usa el token; si la escala de verdad no alcanza, se amplia la escala, no el caso.",
+        },
+        // (6) EL FOCO QUE SE APAGA SIN REEMPLAZO. Deja la interfaz inusable con
+        // teclado, y es una forma de romperla que NO se ve mirandola. El
+        // reemplazo se busca en TODO el string, no solo en lo que sigue: el
+        // orden de las clases no cambia el resultado.
+        {
+          selector: String.raw`Literal[value=/^(?![\s\S]*(?:focus-visible:|\bring-))[\s\S]*\boutline-none\b/]`,
+          message:
+            "outline-none sin un foco visible que lo reemplace. El sistema exige anillo doble en :focus-visible; sin eso la interfaz queda inusable con teclado.",
+        },
+        // (7) focus: DONDE VA focus-visible:. La variante focus: dispara tambien
+        // con el mouse, asi que el anillo aparece donde no corresponde y el
+        // final previsible es que alguien lo apague para todos. Las variantes
+        // compuestas (group-focus:, peer-focus:) quedan fuera a proposito.
+        {
+          selector: String.raw`Literal[value=/(?:^|\s)focus:(?:ring|outline|border)/]`,
+          message:
+            "Usa focus-visible: y no focus: para el anillo de foco: focus: dispara con el mouse y termina en que alguien lo apague para todos.",
+        },
+        // (8) FECHA U HORA SIN LOCALE. Sin locale explicito el resultado depende
+        // de la maquina que corre el codigo: sale distinto en el navegador de un
+        // usuario, en CI y en el contenedor.
+        {
+          selector: String.raw`CallExpression[callee.property.name=/^toLocale(?:Date|Time)String$/]:not([arguments.length>0])`,
+          message:
+            "Fecha u hora formateada sin locale explicito: el resultado depende de la maquina. Usa Intl.DateTimeFormat con su locale.",
+        },
+        // (9) ROTULO QUE NO DICE QUE VA A PASAR. Un boton nombra su accion
+        // (Guardar, Crear cuenta); "Aceptar" y "Click aqui" no dicen nada. La
+        // lista es corta y exacta a proposito: "Aceptar terminos" SI es un
+        // rotulo valido y no dispara.
+        {
+          selector: String.raw`JSXText[value=/^\s*(?:Aceptar|OK|Ok|Click aqu[i\u00ed]|Clic aqu[i\u00ed]|Haz clic aqu[i\u00ed])\s*$/]`,
+          message:
+            "El rotulo tiene que decir que va a pasar (Guardar, Crear cuenta), no Aceptar ni Click aqui.",
+        },
+        // (10) EL LOGO NO SE REDIBUJA. Un SVG a mano "que se parece" es otra
+        // marca con el mismo nombre: paso tres veces en el consumidor de
+        // referencia, con una estrella de lineas rectas donde la oficial tiene
+        // curvas. La salida existe y es mejor practica igual: una ilustracion
+        // propia vive en un archivo .svg que se importa, no en el JSX.
+        {
+          selector: String.raw`JSXOpeningElement[name.name="svg"]`,
+          message:
+            "SVG dibujado en el JSX. El logo y los iconos se usan desde el sistema; una ilustracion propia va en un archivo .svg importado.",
+        },
+      ],
+    },
+  },
+
   // Debe ir al final: apaga reglas de formato que colisionan con Prettier.
   prettier
 );

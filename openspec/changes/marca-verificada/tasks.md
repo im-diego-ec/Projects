@@ -43,7 +43,7 @@ Toda verificación se hace **por código de salida**, nunca grepeando la salida.
 
 ## 1. Lo que se puede hacer hoy (cero bytes de mecánica heredada)
 
-- [ ] 1.0 **El idioma del área, que hoy no está declarado en ningún lado.** El canónico
+- [x] 1.0 **El idioma del área, que hoy no está declarado en ningún lado.** El canónico
       entero está en castellano y las reglas de UX writing del design system son
       específicas del castellano —sentence case, CTAs predicativos, «guiamos, no
       culpamos», locale `es-EC`— pero el marco NO lo dice: no está en el canónico, no es
@@ -57,41 +57,131 @@ Toda verificación se hace **por código de salida**, nunca grepeando la salida.
       DECLARADO».
       Lo pidió Builder 1 el 2026-08-22, preguntando si el marco no podía dejarlo por default
       «y si se necesita se cambia en el init». La respuesta es que sí, pero por enunciado
-      y no por parámetro. Evidencia: la regla renderizada en el artefacto del andamio
-      instanciado.
-- [ ] 1.1 `actions/constitucion/canonico/90-marca.md`: las reglas duras
+      y no por parámetro. Evidencia: quedó como `marca-idioma-castellano` en
+      `90-marca.md`, enunciado plano con su id, sin marcador nuevo.
+- [x] 1.1 `actions/constitucion/canonico/90-marca.md`: las reglas duras
       **enunciadas** más el puntero a la skill como manual. **Cero hex, cero
       nombres de token, cero placeholders nuevos** —un placeholder nuevo es rojo
       sin ventana para todo consumidor— y solo los marcadores que ya existen.
-      Presupuesto: el manifiesto declara 700 líneas y el canónico usa 611 por `wc -l`
-      (619 por el conteo de la propia action, que es el que manda), así que quedan **81**
-      y esta sección usa ~38. Evidencia: la corrida de la action reportando el conteo por
-      debajo del presupuesto — no un `wc -l` a mano, que fue de dónde salió la cifra
-      equivocada de la primera versión.
-- [ ] 1.2 Entrada nueva en `canonico/manifiesto.json` con el número del release
-      real y `exigible_desde` a 28 días o más. Evidencia: `openspec validate` en
-      cero y la corrida de la action reportando la fecha.
-- [ ] 1.3 El bloque `[FRONT]` en `plantilla/eslint.config.mjs` con las 7 reglas **en
+      Hecho: **7 reglas con id estable** (idioma, texto oscuro sobre el acento, solo
+      tokens, el logo no se redibuja, temas y foco, redacción, y lo que el marco no
+      transporta), 62 líneas.
+      Presupuesto, con el conteo de la propia action (`cuerpo.split("\n").length - 1`,
+      que es el que manda): **673 de 700, margen 27**. La estimación de esta tarea —«usa
+      611, quedan 81, esta sección ~38»— salió corta: el canónico ya estaba en 611 sin
+      marca y la sección pesa 62, no 38. Se recortó desde 69 antes de commitear, porque
+      ese costo lo paga cada sesión de cada repo.
+      Evidencia: el conteo de arriba, y las 381 pruebas de `actions/**/pruebas` en verde
+      (incluida la del presupuesto).
+- [x] 1.2 Entrada nueva en `canonico/manifiesto.json` con el número del release
+      real y `exigible_desde` a 28 días o más. Hecho: `1.6.0`, publicada 2026-08-22,
+      exigible 2026-09-19 (28 días exactos, el mínimo declarado).
+      **Por qué la entrada va en ESTE PR y no al cortar la versión**: cambiar el canónico
+      sin su entrada de versión haría que el artefacto ya generado de un consumidor deje
+      de coincidir con el re-render, y la action lo reportaría como «editado a mano» —el
+      mensaje equivocado para lo que en realidad pasó—. Es el mismo defecto que el delta
+      de este change arregla en los specs.
+      Evidencia: `openspec validate --all --strict` → 14/14, y la suite de la action en
+      verde.
+- [x] 1.3 El bloque `[FRONT]` en `plantilla/eslint.config.mjs` con las 7 reglas **en
       severidad de error** —no hay modo aviso posible: el lint corre con
       `--max-warnings=0`, así que un `warn` ya es un rojo (D8)—,
       **con los gemelos de `TemplateElement`** (D4.1) y el `files` que excluye el
       archivo de configuración de estilos (D4.2). La regla de blanco sobre naranja
-      hay que escribirla: no existe en el `_adherence`. Evidencia: el lint del
-      andamio instanciado en cero.
-- [ ] 1.4 Banco con el **rojo evidenciado** de cada una de las 7 reglas: un
+      hay que escribirla: no existe en el `_adherence`.
+
+      **Lo hecho NO es 1 regla = 1 selector, y conviene leer por qué.** Son **10
+      selectores que cubren 5 de las 7 reglas**; las otras dos quedan fuera a propósito y
+      el archivo lo dice en su encabezado:
+      · `marca-idioma-castellano`: un árbol de sintaxis no juzga idioma. La fija el
+        instalador al crear el repo.
+      · `marca-lo-que-el-marco-no-transporta`: es la regla que declara que **el marco no
+        pone en rojo a nadie por tipografía** mientras la marca no entregue los archivos.
+        Lintear la tipografía habría contradicho al canónico en el mismo PR que lo
+        escribe. Por eso el bloque no tiene regla de `font-family`, aunque el
+        `_adherence` sí la tiene.
+      Y dos reglas se llevan más de un selector: la del acento y la de tokens necesitan su
+      gemelo de `TemplateElement` (D4.1), y la de tokens suma el barrido de valores
+      arbitrarios entre corchetes (`z-[9999]`, `w-[13px]`), que es la forma en que
+      Tailwind dice «me salgo de la escala».
+      También se descartó una regla que estaba escrita y guardaba nada: prohibir el import
+      profundo de `la organización-design`. El design system no llega a un consumidor como paquete
+      de node, así que el patrón no podía coincidir con ninguna ruta real.
+
+      Alcance: `files: ["{{PAQUETE_WEB}}/src/**/*.{ts,tsx}"]` **propio**, no heredado del
+      `ignores` global (D4.2). El motivo medido: el un consumidor borró
+      `**/*.config.js` de su lista, así que apoyarse en ella habría dejado las reglas
+      mordiendo la configuración de estilos, que es el único lugar legítimo donde los
+      valores de marca se escriben.
+
+      Evidencia, en tres planos:
+      1. `projects init` instancia el andamio y el config generado queda **sin un solo
+         marcador** y sintácticamente válido.
+      2. Ese config generado **carga en un ESLint 9 real** y pone en rojo
+         `web/src/components/ui/button.tsx:10` con el mensaje del acento — el caso que
+         está en la variante primaria del botón, o sea en toda la aplicación.
+      3. Medido contra el frontend entero del consumidor: **26 hallazgos en 17 archivos**
+         (5 de blanco sobre el acento, 5 hex crudo, 8 valores arbitrarios, 1 `outline-none`
+         sin reemplazo, 2 `focus:`, 5 SVG a mano). Tres reglas dan 0 en este repo, y su
+         única evidencia es la del banco sintético.
+- [x] 1.4 Banco con el **rojo evidenciado** de cada una de las 7 reglas: un
       fixture que la viola en un atributo y otro que la viola dentro de un
-      template literal. Evidencia: el banco falla contra los fixtures y pasa
-      contra el árbol limpio, con los dos códigos de salida anotados.
-- [ ] 1.5 Control de que el bloque no es un no-op: un fixture con el bloque
+      template literal.
+      Hecho en `pruebas/marca/banco-eslint.mjs`, con ESLint 9 de verdad: **10 casos
+      violatorios** (uno por selector, no por regla, por lo dicho en 1.3), **18 casos
+      legítimos** y un control no-op con un componente completo. El caso del atributo y
+      el del template literal están los dos, y son nodos distintos del árbol: el atributo
+      `className="..."` es un `Literal`, la parte fija de una plantilla es un
+      `TemplateElement`. Cada caso violatorio tiene que disparar **su** selector **una
+      vez** y ningún otro: la contaminación entre reglas también es rojo.
+      **Por qué este banco no corre en CI**: el marco no tiene `package.json` ni
+      `node_modules`, y eso es una propiedad —no le impone dependencias a nadie, ni a sí
+      mismo—. Se corre a mano contra un repo que las tenga y su salida va al PR. Trae un
+      modo `--medir` que cuenta violaciones por regla en un árbol real, que es de donde
+      salieron los 26 hallazgos de 1.3.
+      Los selectores se **leen** del andamio (`pruebas/marca/extraer.mjs`), nunca se
+      copian: una copia se desincroniza y desde ahí el banco pasa contra un archivo que ya
+      no es el que se distribuye.
+      Evidencia: `node pruebas/marca/banco-eslint.mjs --repo <consumidor>` → BANCO VERDE
+      (29 líneas OK), y sin `--repo` sale 2 con el motivo escrito.
+- [x] 1.5 Control de que el bloque no es un no-op: un fixture con el bloque
       **retirado** tiene que dar rojo en la verificación. Sin esto, borrar el
       bloque deja el pipeline verde para siempre.
+      Hecho, y más ancho de lo pedido: la guarda de CI
+      (`pruebas/marca/reglas-marca.test.mjs`, 10 pruebas, cero dependencias) tiene una
+      prueba que muta **copias** del andamio en un directorio temporal y exige que **cada
+      una de sus nueve comprobaciones muerda**. Las ocho mutaciones: el bloque retirado
+      entero (el caso que pide esta tarea), sin `files`, en `warn`, un selector nuevo sin
+      su caso, un regex roto, un regex que deja de detectar su propia violación, un regex
+      ensanchado que muerde trabajo honesto, y una regla del canónico sin decidir.
+      Dos detalles que costaron una corrida cada uno, anotados para el que venga:
+      · Si el ancla de una mutación se mueve, eso también es rojo. Una mutación que no
+        cambia nada dejaría de estar probando la mordida de nada, en silencio.
+      · Quitar el `]` de una clase de caracteres **no** sirve como mutación de «regex
+        roto»: el resultado sigue siendo un regex válido y la comprobación pasa con razón.
+        Hace falta un paréntesis sin cerrar.
+      Se mutan copias, no el archivo del repo: un fallo a mitad de camino no puede dejar
+      el andamio modificado, y la prueba lo verifica al final.
+      Evidencia: `node --test pruebas/marca/reglas-marca.test.mjs` → 10/10.
 - [ ] 1.6 Subir los 5 pines del andamio al release. No depende de acordarse:
       `pruebas/andamio/pinado.test.mjs` los compara contra el CHANGELOG.
-- [ ] 1.7 Entrada en el CHANGELOG **en este mismo PR**, con su sección «Para
+      **Pendiente a propósito: esta tarea es del corte de versión, no de este bloque.**
+      Nada de lo del bloque 1 llega a un consumidor hasta que se publique una versión, así
+      que en `main` es inerte. La entrada del CHANGELOG ya está (1.7) y de ahí sale el
+      número cuando se corte.
+- [x] 1.7 Entrada en el CHANGELOG **en este mismo PR**, con su sección «Para
       consumidores» diciendo qué tiene que hacer un repo existente: **nada, y el
       motivo es estructural** — el bloque de reglas vive en el andamio, que no llega
       a un repo ya creado. Un consumidor existente adopta el bloque cuando quiera,
       en un PR suyo, y ahí verá sus violaciones de una vez (D8).
+      Hecho, en `[No publicado]`. Dice las dos piezas, los 673/700, los 26 hallazgos
+      medidos, las dos reglas que **no** se lintean con su motivo, y los límites: el
+      nombre de la clase del acento lo elige el proyecto (se reconocen `orange` y
+      `accent`; otro nombre se sale del alcance sin que nada avise) y los selectores ven
+      strings, no estilo computado.
+      La sección para consumidores separa las dos piezas, porque no viajan igual: el
+      bloque de ESLint llega **solo a repos nuevos** (andamio) y la porción de la
+      constitución llega **a todos** con su ventana de gracia (exigible 2026-09-19).
 
 ## 2. `actions/marca` (después del piloto)
 
@@ -121,6 +211,21 @@ Toda verificación se hace **por código de salida**, nunca grepeando la salida.
       garantía que nadie comprueba y basta con que alguien agregue `fonts.css` al
       canónico para que la promesa se rompa en silencio. Evidencia: un fixture con una
       pieza marcada como sustitución dentro del canónico da rojo.
+- [ ] 2.9 **«Nombra el token que corresponde usar»: encontrado al releer el delta contra
+      lo construido en el bloque 1, y no lo cierra el linter.** El scenario «Un valor de
+      color escrito a mano donde hay un token» pide que el reporte nombre el token que
+      corresponde. El bloque 1 reporta el archivo, la línea y **dónde está el catálogo**,
+      pero no el token: los mensajes de `no-restricted-syntax` son **estáticos por
+      selector**, no se computan desde el texto que coincidió, así que ningún arreglo de
+      redacción alcanza. Para nombrar el token hace falta el mapa hex → token, que llega
+      con el canónico de la 2.1, y un verificador que pueda computar el mensaje: la action
+      de la 2.5 ya hace exactamente eso para CSS.
+      Se cierra extendiendo ese barrido a `.ts`/`.tsx`, con el linter quedando como la
+      compuerta que corta el paso y la action como la que dice cuál era el token.
+      Si al llegar acá se decide que no vale la pena, la alternativa NO es dejar el
+      scenario a medias: es que el PO ajuste el scenario. Un scenario que nadie satisface
+      es peor que uno más chico. Evidencia: un fixture con un hex de marca en un `.tsx`
+      reportado con el nombre del token, o el scenario ajustado con el OK del PO.
 
 ## 3. El job en la mecánica compartida (release aparte)
 
