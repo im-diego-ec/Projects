@@ -191,14 +191,30 @@ function correrCallado(comando, argumentos, opciones = {}) {
 const toplevel = correrCallado("git", ["rev-parse", "--show-toplevel"], { cwd: ESPACIO });
 const raizEspacio = toplevel.codigo === 0 ? resolve(toplevel.texto.trim()) : null;
 
-if (raizEspacio && raizEspacio === resolve(RAIZ_MARCO)) {
-  console.error("✗ el espacio apunta al repositorio del marco (Projects). D5 lo prohíbe: el piloto");
-  console.error("  no escribe una línea en Projects, en plantilla/ ni en los consumidores");
-  process.exit(1);
-}
-if (raizEspacio && existsSync(join(raizEspacio, "plantilla"))) {
-  console.error(`✗ el espacio vive en un repositorio que tiene plantilla/ (${raizEspacio}):`);
-  console.error("  tiene pinta de ser el marco o un scaffold, y D5 lo prohíbe");
+// D5 dice «fuera de TODO repositorio», asi que la guarda se DERIVA de eso y no enumera
+// casos prohibidos. Enumeraba dos —que el espacio fuera Projects, o que tuviera plantilla/— y
+// eso dejaba pasar el mas probable: armar el laboratorio dentro de un repo CONSUMIDOR.
+// un-proyecto-anterior no es Projects y no tiene plantilla/, asi que la version anterior salia
+// exit 0 sobre un espacio que D5 prohibe. Es el mismo defecto que este marco corrige en
+// todas sus otras superficies: una lista de lo prohibido siempre le falta un caso, y el que
+// le falta es el que alguien va a hacer.
+//
+// Los dos mensajes especificos se conservan porque dicen MAS que el general: si el espacio
+// es el marco, saberlo ahorra el diagnostico.
+if (raizEspacio) {
+  if (raizEspacio === resolve(RAIZ_MARCO)) {
+    console.error("✗ el espacio apunta al repositorio del marco (Projects). D5 lo prohíbe: el piloto");
+    console.error("  no escribe una línea en Projects, en plantilla/ ni en los consumidores");
+  } else if (existsSync(join(raizEspacio, "plantilla"))) {
+    console.error(`✗ el espacio vive en un repositorio que tiene plantilla/ (${raizEspacio}):`);
+    console.error("  tiene pinta de ser el marco o un scaffold, y D5 lo prohíbe");
+  } else {
+    console.error(`✗ el espacio vive DENTRO de un repositorio de git (${raizEspacio}).`);
+    console.error("  D5 dice «fuera de todo repositorio», sin excepciones: el piloto no escribe una");
+    console.error("  línea en ningún repo, ni en el marco ni en un consumidor. Un consumidor no es");
+    console.error("  Projects y no tiene plantilla/, así que era justo el caso que se colaba.");
+    console.error("  Arreglo: mové el espacio a un directorio que no esté bajo ningún repo.");
+  }
   process.exit(1);
 }
 
