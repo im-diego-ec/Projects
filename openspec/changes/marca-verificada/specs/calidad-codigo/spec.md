@@ -33,7 +33,7 @@ perilla que alguien tenga que apagar.
 
 #### Scenario: El lugar legítimo de los valores de marca
 - **WHEN** el archivo de configuración de estilos del proyecto declara los colores de la marca, que es donde el sistema espera que estén
-- **THEN** el lint NO lo reporta — la regla acota su alcance por ruta, porque una regla que enrojece el único lugar correcto entrena a ignorarla
+- **THEN** el lint NO lo reporta — la regla acota su alcance por ruta, porque una regla que enrojece el único lugar correcto entrena a ignorarla. Que el VALOR declarado ahí sea el de la marca lo verifica el segundo requirement, no el lint: quedar fuera del linter no es quedar sin verificar
 
 #### Scenario: Un repositorio sin interfaz de usuario
 - **WHEN** se ejecuta el lint en un repositorio que no tiene paquete de interfaz
@@ -69,16 +69,24 @@ error de construcción y sin aparecer en el diff del archivo regenerado.
 - **THEN** la verificación termina en cero
 
 #### Scenario: Alguien editó el artefacto a mano
-- **WHEN** un archivo de identidad visual del repositorio difiere del resultado de regenerarlo
+- **WHEN** un archivo de identidad visual difiere del resultado de regenerarlo **y declara la misma versión** que el canónico pinado
 - **THEN** la verificación lo reporta nombrando el archivo y la diferencia, y termina con código distinto de cero
 
 #### Scenario: El artefacto quedó atrás de la versión pinada
-- **WHEN** el repositorio tiene una versión del artefacto anterior a la que su pin del marco declara
+- **WHEN** un archivo de identidad visual difiere del resultado de regenerarlo **y declara una versión anterior** a la del canónico pinado
 - **THEN** la verificación avisa con la fecha desde la cual será un fallo, y pasa a fallar a partir de esa fecha
+
+#### Scenario: El artefacto no declara de qué versión salió
+- **WHEN** un archivo de identidad visual del repositorio no declara la versión del canónico que lo generó
+- **THEN** la verificación lo reporta como fallo — sin ese dato los dos casos anteriores son indistinguibles, y tratar «atrasado» como «editado a mano» pondría en rojo a quien no hizo nada
 
 #### Scenario: Una referencia a un token que el canónico ya no define
 - **WHEN** el repositorio refiere un token de diseño que la versión pinada del canónico no define
 - **THEN** la verificación lo reporta con su archivo y su línea — no se deja que resuelva a nada en tiempo de ejecución
+
+#### Scenario: Un valor de marca declarado en el lugar correcto pero equivocado
+- **WHEN** el archivo de configuración de estilos del proyecto declara un color de marca cuyo valor NO coincide con el token equivalente del canónico pinado
+- **THEN** la verificación lo reporta nombrando el archivo, el valor declarado y el del canónico — el lugar es legítimo, el valor no
 
 #### Scenario: La huella de la fuente no está registrada
 - **WHEN** el canónico transporta un archivo de identidad visual sin registrar la huella de la fuente de la que se tomó
