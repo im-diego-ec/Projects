@@ -8,6 +8,33 @@ experimental: true
 veredicto_antes_de: 2026-09-21
 ---
 
+> ## ⚠️ Lo que cambió el 2026-08-22: el lunes no es un experimento
+>
+> Builder 1 decidió que el arranque **usa la herramienta sobre el corpus completo y se observa**.
+> Sin brazo manual, sin comparación y sin veredicto. Lo que rige el lunes es
+> [`piloto/observacion.md`](piloto/observacion.md).
+>
+> **Los bloques que dejan de aplicar, y por qué**, para que nadie los tilde por inercia:
+>
+> | Bloque | Estado |
+> |---|---|
+> | **3. Medición y veredicto** | No aplica la parte del veredicto. Las mediciones absolutas sobreviven como las cinco preguntas de `observacion.md` |
+> | **4b. La segunda rebanada con el orden invertido** | No aplica: existía para acotar el sesgo de orden, y sin dos brazos no hay orden que invertir |
+> | **5. SOLO si las DOS rebanadas dieron VERDE** | No aplica: no hay verde que habilite nada. Lo que decida si esto entra al carril de todos va a necesitar más de una corrida, y eso se replantea cuando haya datos |
+> | **6. SOLO si el veredicto es AMARILLO o ROJO** | No aplica por lo mismo |
+> | **0. Pre-registro** | Se cumple con `observacion.md` commiteado antes de la primera hora. Deja de ser una puerta —no hay veredicto que proteger— pero sigue siendo lo que separa una observación de una impresión |
+>
+> **El bloque 4 (caducidad del estado experimental) SÍ aplica**: es independiente del
+> veredicto por diseño, y su fecha (`veredicto_antes_de: 2026-09-21`) sigue corriendo.
+>
+> **Lo que sigue pendiente y de verdad puede tumbar el lunes** no es ninguno de los
+> anteriores: es la fila de la decisión 1.4 que dice que **no está medido que la herramienta
+> acepte un corpus terminado** como entrada de su fase 1. El ensayo del 2026-08-20 midió que
+> se instala (exit 0), no que ingiera. Si la herramienta insiste en elicitar en vez de
+> ingerir, no hay brazo manual al que caerse. Se cierra probándolo, no leyendo el README.
+
+---
+
 El orden manda, y acá manda más que de costumbre porque **la mitad de los bloques
 no se ejecuta**: el 5 y el 6 son excluyentes y los decide el veredicto del
 piloto. Nada del bloque 5 se adelanta «para tenerlo listo»: adelantar la
