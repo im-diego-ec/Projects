@@ -263,6 +263,30 @@ divergencia se detecta. Los PNG son 71K de binario que cambian una vez por déca
 el scaffold es el transporte correcto, y es el único grupo donde un fail-open no
 cuesta nada.
 
+## D10 — El idioma se declara, no se parametriza; y el marco no configura herramientas ajenas
+
+**Decisión.** El área trabaja en castellano, y eso se enuncia en el canónico con su id de
+regla. No es un marcador ni una clave del archivo de valores.
+
+**Por qué no un marcador.** Un placeholder nuevo en el canónico es **rojo sin ventana**
+para todo consumidor cuyo `.projects-valores.json` no tenga esa clave. El costo de
+parametrizar algo que nadie va a cambiar es enrojecer a todos por una flexibilidad que
+nadie pidió.
+
+**Y no hace falta, porque la escapatoria ya existe.** Un proyecto que necesite otro idioma
+lo declara en `.projects-desvios.json` y la constitución renderiza «⛔ DESVÍO DECLARADO — la
+regla X NO rige en este repositorio». Es el mecanismo que el marco ya tiene para
+exactamente esto, y hoy está vacío.
+
+**El límite, que es la parte que hay que decir:** el marco **no puede** poner el idioma por
+default dentro de la configuración de una herramienta que no instala. El
+`_bmad/bmm/config.yaml` lo genera el instalador de esa herramienta, y `projects init` no la
+instala. Lo que el enunciado sí cambia: poner el idioma en una herramienta nueva deja de
+ser «acordate» y pasa a ser «copiá el valor que el repo ya declara». Es menos de lo que la
+pregunta pedía y hay que decirlo así, en vez de vender una automatización que no existe.
+
+---
+
 ## Lo que falta y no lo resuelve este design
 
 **Hay dos fuentes que declaran las piezas de marca y no coinciden.** Eso es en sí un
