@@ -372,7 +372,7 @@ Un buscar-y-reemplazar no los resuelve: son decisiones.
 | El resto de `.github/workflows/*` (deploy, verificación, cron) | Del proyecto: dependen de su topología de infraestructura. La MECANICA del marco no se copia nunca: `ci.yml` ya la consume por `uses: ...@<versión>`. |
 | Las skills y comandos **de OpenSpec** (`.claude/skills/openspec-*`, `.claude/commands/`) | **Regenerado**: los genera el CLI de OpenSpec en la versión que pina el marco. No se vendoran ni se editan a mano. Lo que sí llega en el scaffold son las dos piezas escritas a mano del marco (sección 3), que ningún CLI regenera. |
 | `.projects/AGENTS-marco.md` | **Generado por el marco** en el repo nuevo: lo escribe `actualizar-marco.yml` (sección 2.5). Las entradas del render sí llegan en el scaffold. |
-| `openspec/` | Lo inicializa el CLI de OpenSpec en el repo nuevo. Los specs del MARCO son canónicos y viven en Projects. |
+| `openspec/` | Lo inicializa el CLI de OpenSpec en el repo nuevo, con la versión que pina el marco: `npx --yes @fission-ai/openspec@1.9.0 init --tools claude`. **No es opcional**: el job de OpenSpec del marco hace `[ -d openspec ] \|\| exit 1`, así que sin este paso el primer PR sale rojo. La misma corrida genera las skills y comandos de la fila de arriba. Los specs del MARCO son canónicos y viven en Projects. |
 | `infra/`, `infra-prod/` | Terraform del proyecto. El marco fija que la IaC es Terraform y los nombres de esas dos carpetas (`dependabot.yml` y `AGENTS.md` ya los asumen). |
 | `README.md` del proyecto | Se escribe a mano: qué hace la app, ambientes, correr en local, verificar, pipeline, estructura. |
 | `docs/adr/`, `docs/runbooks/`, `docs/postmortems/`, `docs/accesos.md` | Carpetas vacías al inicio; `AGENTS.md` ya las nombra como destino de ADRs, runbooks, post-mortems y matriz de accesos. Las plantillas de post-mortem y runbook están en `docs/plantillas/` de Projects: se copian cuando hace falta la primera, no al crear el repo. |
@@ -430,9 +430,18 @@ vez**; después ninguno pide que alguien se acuerde de nada.
 - [ ] `.projects-valores.json` con los valores reales y las superficies que el equipo usa. De
       ahí sale el texto de la constitución que los agentes cargan todos los días: es la
       única sustitución que conviene releer
-- [ ] `.projects/AGENTS-marco.md` existe (lo generó `gh workflow run actualizar-marco.yml` y su
-      PR está mergeado) y `AGENTS.md` sigue teniendo la línea que lo importa, fuera de todo
-      bloque de código. El CI lo verifica: primero avisando, después en rojo
+- [ ] `openspec/` inicializado con el CLI en la versión que pina el marco (sección 4). Sin
+      esto el primer PR sale rojo: el marco exige que las specs vivan en el repo
+- [ ] `.projects/AGENTS-marco.md` existe y `AGENTS.md` sigue teniendo la línea que lo importa,
+      fuera de todo bloque de código. El CI lo verifica: primero avisando, después en rojo.
+      **Generalo en LOCAL**, que tarda un segundo y no pide ningún permiso:
+      `CONSTITUCION_MODO=escribir node <clon-del-marco>/actions/constitucion/constitucion.mjs`
+      desde la raíz de este repo. El `gh workflow run actualizar-marco.yml` hace lo mismo
+      por PR y de forma recurrente, pero exige que la organización tenga habilitado *Allow
+      GitHub Actions to create and approve pull requests*: al 2026-08-21 está **apagado**, y
+      con eso apagado ese camino devuelve **403** con un error que no nombra el permiso. Que
+      el workflow quede cableado sigue siendo lo que hace que el artefacto no dependa de que
+      alguien se acuerde — pero el primer commit no tiene que esperarlo
 - [ ] Secret `CLAUDE_CODE_OAUTH_TOKEN` cargado y la GitHub App de Claude instalada sobre el
       repo, si el equipo quiere el bot de `@claude` en issues y PRs. Sin los dos,
       `claude.yml` falla a propósito cuando alguien lo menciona, en vez de dejar la mención

@@ -60,10 +60,10 @@ pinada.
 
 | Forma | Qué es | Dónde vive en Projects | Cómo llega al proyecto | Cómo se actualiza |
 |---|---|---|---|---|
-| **Referenciado** | Workflows reusables y composite actions: la mecánica de CI/CD que no debe divergir | `.github/workflows/`, `actions/` | `uses: im-diego-ec/Projects/.github/workflows/marco-ci.yml@v1` | **Solo**, cuando el tag mayor `v1` se mueve. El proyecto no toca nada |
+| **Referenciado** | Workflows reusables y composite actions: la mecánica de CI/CD que no debe divergir | `.github/workflows/`, `actions/` | `uses: im-diego-ec/Projects/.github/workflows/marco-ci.yml@vX.Y.Z`, **por versión exacta** | Por **PR de Dependabot** en el repo del proyecto. Un check nuevo aparece en rojo DENTRO de ese PR, que es donde se puede leer antes de mergear |
 | **Scaffold** | Plantilla de arranque: constitución, gobernanza, configuración, plantillas de docs | `plantilla/` | Se copia **una vez** al crear el repo y se sustituyen sus placeholders | No se actualiza solo. A partir de la copia es del proyecto; la divergencia se revisa cada trimestre |
 | **Canónico** | Los specs del marco (OpenSpec): el comportamiento que Projects garantiza | `openspec/specs/` | **No se copia.** El proyecto lee acá; sus specs describen SU dominio | Change de OpenSpec en este repo, con aprobación del PO |
-| **Regenerado** | Skills y comandos del CLI de OpenSpec | En ningún lado: Projects pina la **versión** (el default del input `version_openspec`) | Cada repo los regenera con el CLI pinado | Subiendo el pin acá y regenerando en cada repo |
+| **Regenerado** | Skills y comandos del CLI de OpenSpec, **y la porción del marco de la constitución** (`.projects/AGENTS-marco.md` y su render para Cursor) | El pin del CLI (el default del input `version_openspec`); el texto de la constitución, en `actions/constitucion/canonico/` | Cada repo los regenera: las skills con el CLI pinado, la constitución con `actions/constitucion` en modo escribir | Subiendo el pin acá y regenerando en cada repo. El check del marco avisa cuando el artefacto quedó atrás |
 
 Por qué las skills **no** se vendoran: cada `SKILL.md` que genera el CLI trae
 `generatedBy: "<versión>"` en su cabecera. En el repo de origen quedaron skills
@@ -94,14 +94,43 @@ commit de código.
    sobrevivir al primer commit; la verificación es
    `grep -rnE "\{\{[A-Z0-9_]+\}\}" .` —con mayúsculas obligatorias, para no
    confundirlos con las expresiones `${{ ... }}` de GitHub Actions—.
-4. **Regenerar las skills y comandos de OpenSpec** con el CLI en la versión
-   que pina el marco — no se copian desde acá.
-5. **Cargar `vars` y `secrets`** del repo en GitHub Actions: todo lo que el
+4. **Inicializar OpenSpec en el repo.** El andamio **no** trae `openspec/`, y el
+   marco lo exige: el job de OpenSpec hace `[ -d openspec ] || exit 1`, así que
+   sin este paso el primer PR sale rojo. Con el CLI en la versión pinada:
+
+   ```bash
+   npx --yes @fission-ai/openspec@1.9.0 init --tools claude
+   ```
+
+   Eso crea `openspec/` y, en la misma corrida, **las skills y comandos** del punto
+   siguiente — no se copian desde acá.
+5. **Renderizar la porción del marco de la constitución.** Es un artefacto
+   generado, no un archivo del scaffold: el agente del proyecto lo CARGA todos los
+   días, así que si falta, trabaja sin la mitad de las reglas. Desde un clon del
+   marco, sobre la raíz del repo nuevo:
+
+   ```bash
+   CONSTITUCION_MODO=escribir node <clon-del-marco>/actions/constitucion/constitucion.mjs
+   ```
+
+   Tarda un segundo y **no necesita ningún permiso de GitHub**. El workflow
+   `actualizar-marco.yml` del andamio hace lo mismo por PR y de forma recurrente,
+   pero para eso la organización tiene que tener habilitado *Allow GitHub Actions
+   to create and approve pull requests*: si está apagado, ese camino da **403** con
+   un error que no menciona el permiso. Este paso local no depende de eso.
+6. **Cargar `vars` y `secrets`** del repo en GitHub Actions: todo lo que el
    pipeline consume en runtime (URLs de sondas, ARNs, log groups, tokens) va
    ahí, nunca hardcodeado en el scaffold.
-6. **Aplicar la protección de `main`** como acto humano deliberado, con el
+7. **Aplicar la protección de `main`** como acto humano deliberado, con el
    veredicto agregado de CI (`ci-ok`) como único check requerido, y
    documentarla en el repo con su estado real.
+8. **Dejar el canal del marco abierto**, que es el paso que nadie extraña porque
+   su falta no produce ningún rojo: darle a **Dependabot acceso al repo privado**
+   del marco, y en `.github/dependabot.yml` dejar el marco en **su propio grupo**
+   (el andamio ya viene así). Sin lo primero no hay PRs de bump; con el marco
+   dentro del grupo `*`, un PR trabado por cualquier otra action deja de
+   proponerlos. En los dos casos el repo simplemente **no recibe versiones nuevas
+   y no aparece en el censo de consumidores**, sin avisar.
 
 > Los comandos exactos —incluida la variante de Windows, que necesita
 > `robocopy` porque `cp` deja dotfiles atrás— y la tabla completa de
@@ -109,15 +138,20 @@ commit de código.
 > **[`plantilla/README.md`](plantilla/README.md)**: esa es la guía operativa
 > del bootstrap y manda sobre este resumen.
 
-El `ci.yml` que el scaffold trae ya apunta a `@v1` y es lo único de CI que se
-copia: un llamador delgado. El proyecto nace consumiendo la mecánica del marco
-por referencia, no con una copia que se va a quedar vieja.
+El `ci.yml` que el scaffold trae ya apunta a la **versión exacta** del marco y es
+lo único de CI que se copia: un llamador delgado. El proyecto nace consumiendo la
+mecánica del marco por referencia, no con una copia que se va a quedar vieja.
+
+> **Nunca `@v1`.** El tag mayor móvil se retiró: no existe. Y aunque existiera,
+> Dependabot no propone bump para un tag mayor —para él ya es la mayor vigente—,
+> así que un repo pinado así no recibe versiones nuevas por PR y no aparece en el
+> censo. Es el modo de falla más callado de todo el bootstrap.
 
 ## Cómo lo consume un proyecto EXISTENTE
 
 Sin big bang: se adopta por partes, empezando por lo referenciado.
 
-1. **Apuntar los jobs de marco a `@v1`.** El `ci.yml` del proyecto deja de
+1. **Apuntar los jobs de marco a la versión exacta** (`@vX.Y.Z`, nunca `@v1`). El `ci.yml` del proyecto deja de
    contener la mecánica (detección del carril de docs, guardrail de deltas,
    validación estricta de OpenSpec) y pasa a llamarla:
    ```yaml
@@ -130,7 +164,10 @@ Sin big bang: se adopta por partes, empezando por lo referenciado.
 
    jobs:
      marco:
-       uses: im-diego-ec/Projects/.github/workflows/marco-ci.yml@v1
+       # La version exacta, no el tag mayor: `v1` se retiro, y un tag movil
+       # no produce PR de Dependabot (para el ya es la mayor vigente), asi que
+       # el repo no recibiria versiones nuevas ni apareceria en el censo.
+       uses: im-diego-ec/Projects/.github/workflows/marco-ci.yml@v1.4.1
 
      build_test:          # lo del producto: lint, typecheck, test, build
        name: build-test
@@ -228,17 +265,24 @@ diff.
 │   ├── CODEOWNERS         # review cruzado de builders + gate del PO sobre los specs
 │   ├── PULL_REQUEST_TEMPLATE.md   # pide distribución, impacto en consumidores y veredicto de breaking
 │   ├── proteccion-main.md # estado REAL del ruleset de main y los pasos para aplicarlo
-│   └── workflows/         # REFERENCIADO: marco-ci.yml (reusable, @v1) + ci.yml (el CI propio, dogfooding)
-│                          #   + aviso-version.yml: al publicar un release avisa a los consumidores
+│   └── workflows/         # REFERENCIADO: marco-ci.yml (el reusable que consumen los proyectos)
+│                          #   + ci.yml (el CI propio, dogfooding) + aviso-version.yml (avisa cada
+│                          #   release a los consumidores) + claude.yml (el bot @claude, acotado)
 ├── actions/               # REFERENCIADO: composite actions (una carpeta por action, con su action.yml)
 │   └── README.md          #   catálogo: qué hace cada una, inputs/outputs y permisos mínimos
 ├── plantilla/             # SCAFFOLD: el árbol que se copia UNA vez al crear un proyecto,
 │                          #   con su propio README como guía del bootstrap y un
-│                          #   .github/workflows/ci.yml que ya llama al marco por @v1
+│                          #   .github/workflows/ci.yml que ya llama al marco por versión exacta
+├── pruebas/                # el banco de los pasos INLINE de marco-ci.yml y del pinado del andamio:
+│                          #   ese código no puede salir de su bloque `run:` (cuando un consumidor
+│                          #   llama al reusable, el árbol checkouteado es el DEL CONSUMIDOR), así
+│                          #   que se prueba leyendo el YAML y corriendo el script contra fixtures
+├── .claude/                # skills del marco (projects-adoptar, projects-release, projects-archive-change,
+│                          #   projects-validar-consumidor) + el subagente cazador-fail-open
 ├── openspec/              # CANÓNICO: el contrato del marco
 │   ├── config.yaml        #   contexto y reglas de OpenSpec para este repo
 │   ├── specs/             #   los specs vivos del marco (una carpeta por capability)
-│   └── changes/           #   vacío hasta el primer change: así se cambia Projects
+│   └── changes/           #   los changes en vuelo (5 activos) y su historia en changes/archive/
 └── docs/                  # el porqué: ADRs, reglas no escritas, upgrade del CLI y plantillas
                            #   de documentos de proceso (post-mortem, runbook)
 ```
@@ -262,12 +306,19 @@ describen su dominio, y estas describen el carril por el que ese dominio viaja.
   API, ni utilidades compartidas. Projects gobierna **cómo se construye y se
   entrega** el software, no qué hace el software. Un paquete compartido de
   código sería otro repo, con otro ciclo de vida.
-- **No impone stack.** El repo de origen usa React, Express, Prisma y
-  Terraform, y eso quedó fijado en **su** `AGENTS.md`, no acá. Un proyecto que
-  adopte Projects con otro stack sigue obteniendo lo mismo: el flujo de specs, la
-  gobernanza, los guardrails, el veredicto único de CI, la promoción por
-  ambientes. Lo específico del stack entra al scaffold como parámetro o como
-  sección que el proyecto reemplaza.
+- **No impone el stack de aplicación — pero sí fija el de plataforma.** La
+  distinción importa y este README la tenía mal hasta el 2026-08-21, cuando Builder 1
+  lo señaló. **Lo que el marco FIJA** y no es elección del proyecto: **Terraform**
+  como IaC, **GitHub Actions** como pipeline, **pnpm con workspaces** como gestor,
+  **Zod** para validar todo input externo, y **ECS Express + RDS** como primera
+  opción de infraestructura. Está en `plantilla/AGENTS.md`, que es el archivo que
+  el proyecto hereda, y apartarse se pregunta **antes** de implementar.
+  **Lo que el proyecto elige**: el framework de frontend, el ORM, el runtime del
+  backend más allá de Node, y su dominio entero. El repo de origen usa React,
+  Express y Prisma; nada obliga a repetirlo.
+  Un proyecto con otro stack de aplicación sigue obteniendo lo mismo: el flujo de
+  specs, la gobernanza, los guardrails, el veredicto único de CI, la promoción por
+  ambientes.
 - **No es un sustituto del criterio del equipo.** Los guardrails atrapan lo que
   ya nos pasó. Lo que no nos pasó todavía lo caza una revisión adversarial: en
   el repo de origen, un change pasó `validate --strict` **y** el guardrail de
