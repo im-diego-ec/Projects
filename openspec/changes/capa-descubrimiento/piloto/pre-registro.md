@@ -992,7 +992,7 @@ esta.
 | Comando de instalación, copiado verbatim del ensayo | `npx --yes bmad-method@6.11.0 install --yes --modules bmm --tools claude-code --directory .` |
 | Código de salida de la instalación | **0**. Ensayado el 2026-08-20 en la máquina de @builder-uno, en un directorio desechable |
 | Qué pidió de verdad la instalación | **`uv`, la cadena de Python.** Ver el detalle abajo |
-| Si la fase 1 ingiere un corpus terminado en vez de elicitar | **REPLANTEADO el 2026-08-22: la pregunta estaba en la fase equivocada.** No hay que hacer que la fase 1 ingiera: se **entra por la fase 2**. Ver abajo |
+| Si la fase 1 ingiere un corpus terminado en vez de elicitar | **RESUELTA el 2026-08-22, contra la skill INSTALADA.** La pregunta estaba en la fase equivocada: se entra por la fase 2, y su primer movimiento pide documentos existentes por nombre. Ver abajo |
 
 > **Replanteo del 2026-08-22, contra la referencia del proveedor.** El riesgo estaba mal
 > ubicado: la fase 1 (Analysis) está marcada **«Optional»** en el mapa de workflows de la
