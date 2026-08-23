@@ -65,6 +65,8 @@ fase 7, cuando el primer change de OpenSpec necesita al PO.
 | 2 · Los 21 valores | — | | | |
 | 3 · El repo | 2 comandos | | | |
 | 3.1 · Qué quedó en el repo | — | | | |
+| 3.2 · Escritura de los equipos | — | | | |
+| 3.3 · Si el repo ya existía | *no aplica: se crea repo nuevo* | — | — | — |
 | 4 · El lockfile | 1 comando | | | |
 | 4.1 · Comprobarlo antes de pushear | — | | | |
 | 5 · Primer push a `main` | — | | | |
