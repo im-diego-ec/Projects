@@ -24,6 +24,57 @@ Marcas que vas a encontrar:
 
 ---
 
+## Antes de empezar: las tres cosas que la guía da por sentadas
+
+### 1. El clon del marco
+
+Toda la guía dice `<ruta-al-clon-de-projects>`. Ese clon **no viene de ningún lado**: lo traés
+vos, una vez, y te sirve para todos los proyectos.
+
+```bash
+gh repo clone im-diego-ec/Projects
+```
+
+Anotá la ruta donde quedó. Es la que vas a pegar cada vez que la guía diga
+`<ruta-al-clon-de-projects>`.
+
+### 2. Las herramientas
+
+Cuatro comandos. Si alguno no contesta lo que dice acá, resolvelo **antes** de la fase 0:
+todo lo que sigue lo usa.
+
+```bash
+node --version                      # 22 o más (el CI usa 22)
+pnpm --version                      # 9.15.0 — lo fija el andamio con packageManager
+gh auth status                      # autenticado. Necesitás scope admin:org (fase 3.2) y
+                                    # admin del repo (fase 6)
+git config --get commit.gpgsign     # tiene que decir true: el marco exige commits firmados
+```
+
+⚠️ Si `commit.gpgsign` no está en `true`, lo vas a descubrir en la fase 5, cuando el primer
+commit falle — o peor, cuando entre sin firma y el ruleset la exija más adelante.
+
+### 3. El mapa
+
+Ocho fases, de la 0 a la 7. Las **[otro]** arrancan primero porque bloquean el final, no
+el arranque.
+
+| Fase | Qué | Quién |
+|---|---|---|
+| 0 | Verificar lo que ya está hecho a nivel organización | **[vos]**, 4 comandos |
+| 1 | Arrancar lo que depende de otra persona | **[otro]** |
+| 2 | Juntar los 21 valores | **[vos]** |
+| 3 | Crear el repo y correr `projects init` | **[vos]**, 2 comandos |
+| 4 | `pnpm install` y comprobar en local | **[vos]**, 1 comando |
+| 5 | El primer push, directo a `main` | **[vos]** + **[auto]** |
+| 6 | Settings del repo | **[vos]**, algunos con OK |
+| 7 | El primer change de OpenSpec | **[vos]** + **[otro]** |
+
+**La fase 5 es donde el primer CI sale rojo, y es esperado.** Está explicado en 5.1; no es
+que hayas hecho algo mal.
+
+---
+
 ## Fase 0 — Verificar, no hacer · 4 comandos, 30 segundos · **[vos]**
 
 Cuatro de los pendientes que `projects init` te va a listar **ya están hechos a nivel
@@ -145,14 +196,10 @@ node <ruta-al-clon-de-projects>/herramientas/projects-init.mjs \
   --valores <ruta>/valores.json --destino .
 ```
 
-Eso es todo. **No hay una segunda pieza que traer.**
+Eso es todo. **No hay una segunda pieza que traer**: `projects init` escribe **69 archivos
+con 116 sustituciones** — la mecánica **y** los tres paquetes con sus pruebas pasando.
 
-Hasta el 2026-08-22 acá había una fase entera: el andamio traía la mecánica y no la
-aplicación, así que había que clonar un segundo repo (`projects-starter`), extraer de
-él una lista exacta para no arrastrar la infraestructura de otro proyecto, y resolver
-cuatro archivos en colisión. Ese repo **se borró**, y su reemplazo es el andamio: hoy
-`projects init` escribe **69 archivos con 116 sustituciones** — la mecánica **y** los tres
-paquetes con sus pruebas pasando.
+Si el repo que querés usar **ya existía**, el primer comando falla: eso es la 3.3.
 
 ### 3.1 Qué quedó en el repo
 
@@ -171,6 +218,55 @@ y el render de la constitución.
 **La tabla «Stack fijado» del `AGENTS.md` llega LLENA**, no con huecos, porque el andamio
 implementa ese stack. Lo que hay que hacer es **borrar la fila —y su paquete— de lo que
 este proyecto no vaya a tener**, no llenarla.
+
+### 3.2 Los equipos necesitan escritura sobre el repo, y nadie lo hace solo
+
+`projects init` escribe un `.github/CODEOWNERS` que nombra a los equipos de la organización.
+**Un equipo sin permiso de escritura sobre el repo es ignorado como code owner por GitHub,
+sin ningún aviso** — lo dice el comentario del propio archivo. O sea: el review cruzado
+que el marco promete queda asignado a nadie, el PR se ve perfectamente normal, y no hay
+rojo que lo delate.
+
+`gh repo create` **no** le da acceso a ningún equipo, y crear el repo desde la interfaz
+tampoco. Es un paso propio.
+
+Es **cambio de configuración de repo: pedí el OK antes** (frontera ⚠️ del marco).
+
+```bash
+gh api --method PUT orgs/im-diego-ec/teams/builders/repos/im-diego-ec/<proyecto> -f permission=push
+gh api --method PUT orgs/im-diego-ec/teams/po/repos/im-diego-ec/<proyecto> -f permission=push
+```
+
+Verificalo, porque es exactamente de las cosas que fallan en silencio:
+
+```bash
+gh api orgs/im-diego-ec/teams/builders/repos --jq '[.[].name]'
+gh api orgs/im-diego-ec/teams/po/repos --jq '[.[].name]'
+```
+
+El repo nuevo tiene que aparecer en las **dos** listas. Y si el equipo `po` todavía está
+vacío (fase 1), el gate del PO tampoco se asigna: son dos condiciones y hacen falta las
+dos — el equipo con acceso, y el equipo con gente.
+
+### 3.3 Si el repo ya existía
+
+No es el caso normal, pero pasa: alguien crea el repo cuando se decide el proyecto,
+semanas antes de que empiece. `gh repo create` contra un nombre que ya existe devuelve
+**422 `name already exists on this account`** y no hace nada.
+
+Un comando lo dice antes, y no toca nada:
+
+```bash
+gh repo view im-diego-ec/<proyecto> --json name,isEmpty,defaultBranchRef
+```
+
+- **`Could not resolve to a Repository`** → no existe, seguí la fase 3 tal cual.
+- **Contesta** → existe. Cambiá el primer comando por `gh repo clone` y dejá el resto
+  igual: `projects init` escribe sobre el checkout, no necesita un repo virgen.
+
+Si lo que hay es un `README.md` de placeholder, dejá que el andamio lo reemplace. Lo que
+**no** se hace es borrar y recrear el repo para tener un arranque limpio: se pierde la
+historia y cualquier issue que lo referencie, y no compra nada que este camino no dé.
 
 ---
 
@@ -373,6 +469,8 @@ o apuntan al lugar equivocado.
 | `ID_MCP_SLACK` mal | Cinco entradas de allowlist que no matchean nada; permisos a mano para siempre | Fase 2 |
 | `pnpm lint` sin generar el cliente de datos | 8 errores de tipos apuntando a `$disconnect`, no a «falta generar». `pnpm verificar` lo hace en orden | Fase 4.1 |
 | Equipo `po` vacío | GitHub no asigna a nadie. El gate del PO no existe y nada lo dice | Fase 1 |
+| **Equipos sin escritura sobre el repo** | GitHub **ignora** al code owner sin avisar: el review cruzado queda asignado a nadie y el PR se ve normal. `gh repo create` no da acceso a ningún equipo | Fase 3.2 |
+| **El repo destino ya existía** | `gh repo create` devuelve 422 `name already exists` y corta el primer comando ejecutable de la guía | Fase 3.3 |
 | Handle de GitHub equivocado | Asigna a un tercero real, o a nadie | Fase 1 |
 | `@v1` en vez de versión exacta | No falla: el repo simplemente **no recibe versiones nuevas** ni aparece en el censo | Fase 6.3 |
 | Dependabot apagado | Igual que arriba, y no hay aviso | Fase 6.3 |
@@ -387,3 +485,13 @@ o apuntan al lugar equivocado.
 **Canónico.** Se actualiza cuando alguien arranca un proyecto y encuentra algo que
 acá no está — que es exactamente para lo que sirve el primer ensayo. Si un paso te
 trabó, la corrección va en el mismo PR que la arregla.
+
+**Y para que ese ensayo deje evidencia y no una anécdota**: llená el
+[registro de fricción](plantillas/registro-de-friccion.md) *mientras* corrés esta
+guía, no después. Se guarda en `docs/adopciones/AAAA-MM-DD-<proyecto>.md`.
+
+Sus dos reglas de uso, acá también porque son las que se rompen: **no arregles la
+guía mientras la corrés** —arreglar sobre la marcha te deja un documento que
+funciona para vos y para nadie más, y borra el dato que vinimos a buscar— y **un
+tropiezo cuyo arreglo empieza con «hay que recordar que…» no va a la guía**: va como
+fila al backlog de [reglas no escritas](reglas-no-escritas.md#backlog-de-automatización).
