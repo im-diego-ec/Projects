@@ -19,23 +19,23 @@ configuración.
 **Se encienden ahora.** Son las cuatro que el repo de referencia tiene funcionando,
 y alcanzan para que nada entre a `main` sin pasar por un PR verde:
 
-| Regla | Estado | Nota |
-|---|---|---|
-| Requiere pull request para integrar | 🔴 pendiente | Con **aprobaciones requeridas = 0** (ver abajo) |
-| Check requerido: **`ci-ok`** | 🔴 pendiente | Nombre exacto. Ver abajo por qué no puede ser otro |
-| Prohibido borrar `main` | 🔴 pendiente | |
-| Prohibido force-push | 🔴 pendiente | |
+| Regla                                    | Estado       | Nota                                                  |
+| ---------------------------------------- | ------------ | ----------------------------------------------------- |
+| Requiere pull request para integrar      | 🔴 pendiente | Con **aprobaciones requeridas = 0** (ver abajo)       |
+| Check requerido: **`ci-ok`**             | 🔴 pendiente | Nombre exacto. Ver abajo por qué no puede ser otro    |
+| Prohibido borrar `main`                  | 🔴 pendiente |                                                       |
+| Prohibido force-push                     | 🔴 pendiente |                                                       |
 | Sin bypass para nadie (admins incluidos) | 🔴 pendiente | Toda excepción concedida se escribe acá con su motivo |
 
 **Se dejan apagadas a propósito, y el motivo va escrito acá el día que se aplica la
 protección** — no en un TODO aparte:
 
-| Regla | Estado | Por qué no todavía |
-|---|---|---|
-| 1 aprobación requerida | 🔴 diferida | Con un solo builder efectivo, exigir una aprobación y dejar la bypass list vacía **bloquea todo merge sin salida**. Se enciende cuando el segundo builder esté operativo |
-| Review de code owner requerido | 🔴 diferida | Es lo que convierte `CODEOWNERS` en gate; sin la fila de arriba no agrega nada, y con el equipo del PO vacío tampoco asignaría a nadie |
-| Rama al día antes del merge | 🔴 diferida | Útil con varios PRs en vuelo; con uno solo agrega una vuelta de CI por merge |
-| Commits firmados | 🔴 diferida | Exige que cada quien tenga su clave configurada; se enciende cuando todos la tengan, no antes |
+| Regla                          | Estado      | Por qué no todavía                                                                                                                                                       |
+| ------------------------------ | ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| 1 aprobación requerida         | 🔴 diferida | Con un solo builder efectivo, exigir una aprobación y dejar la bypass list vacía **bloquea todo merge sin salida**. Se enciende cuando el segundo builder esté operativo |
+| Review de code owner requerido | 🔴 diferida | Es lo que convierte `CODEOWNERS` en gate; sin la fila de arriba no agrega nada, y con el equipo del PO vacío tampoco asignaría a nadie                                   |
+| Rama al día antes del merge    | 🔴 diferida | Útil con varios PRs en vuelo; con uno solo agrega una vuelta de CI por merge                                                                                             |
+| Commits firmados               | 🔴 diferida | Exige que cada quien tenga su clave configurada; se enciende cuando todos la tengan, no antes                                                                            |
 
 ⚠️ **Encender las diferidas antes de tiempo es la forma más fácil de auto-encerrarse.**
 Se probó: aprobación requerida + code owner + bypass vacía, con un equipo de una

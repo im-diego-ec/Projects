@@ -41,40 +41,6 @@ mueve sobre un cambio incompatible.
 
 ## [No publicado]
 
-### Corregido
-
-- **La guía mandaba a copiar un repo archivado entero, y ese repo lleva adentro la
-  infraestructura de otro proyecto.** `projects-starter` —el esqueleto de aplicación—
-  está **archivado y read-only** desde el 2026-08-14, con su último commit el 2026-07-09.
-  Se intentó arreglarlo ahí y GitHub lo rechazó: *«This repository was archived so it is
-  read-only»*. Así que el arreglo tenía que estar en el punto de uso.
-
-  La guía ahora **extrae de la lista** en vez de copiar el árbol: entran 32 archivos —los
-  dos paquetes, el `package.json`, el workspace, el lockfile y el compose— y no entra
-  nada más. Medido.
-
-  **Eso resuelve seis problemas de una**, y por eso la lista es explícita y no un
-  `cp -r` con borrados después:
-
-  1. **`infra/`** es el Terraform de otro proyecto, **aplicable**, en la misma cuenta de
-     dev. Y su README es el **inventario de ese ambiente vivo** —VPC, endpoint de la base,
-     URI del ECR con el número de cuenta, bucket, ARN del rol de deploy— más el camino
-     para conseguir sus secretos. No hay valores versionados; hay un mapa completo.
-  2. **`deploy.yml`** es el deploy de esa arquitectura (App Runner + CloudFront), y
-     apunta a esos mismos recursos por secret.
-  3. **`spec/`** es la convención vieja; hoy la fuente de verdad es `openspec/`.
-  4. **El `README.md` del starter** dice que «la infraestructura ya está creada» y que
-     desplegar es «solo hacer push a `main`». Sobre los recursos de ese otro proyecto
-     habría sido verdad.
-  5. y 6. Los **cuatro archivos que colisionaban** con el andamio no se traen, así que
-     `projects init` corre limpio y **`--forzar` deja de ser parte del camino normal**. La
-     trampa del orden inverso —que pisa con exit 0 y sin un solo aviso— queda como nota
-     plegada para quien copie el árbol entero de todas formas.
-
-  Y la guía dice ahora **qué se hereda de un repo congelado**, en vez de dejarlo para la
-  sorpresa: `pnpm@9.15.0`, `hashicorp/aws` 5.100.0 —un major completo atrás del
-  consumidor de referencia—, sin proveedor de cobertura y con un solo archivo de pruebas.
-
 ### Añadido
 
 - **`docs/arrancar-un-proyecto.md`: el paso a paso de arrancar un proyecto desde cero,
@@ -108,7 +74,98 @@ mueve sobre un cambio incompatible.
      verde sin lintear nada, hasta `ID_MCP_SLACK` mal puesto dejando cinco entradas de
      allowlist que no matchean nada. Todos pasan en verde o apuntan al lugar equivocado.
 
+- **El andamio trae el esqueleto de aplicación: `projects init` deja un repo que se pone
+  verde.** Hasta hoy escribía 49 archivos de mecánica y **ninguno de producto** — sin
+  `package.json` ni lockfile, el `pnpm install --frozen-lockfile` del pipeline moría en su
+  cuarto paso, y el camino era clonar **otro** repo. Ese otro repo (`projects-starter`)
+  está archivado, read-only, y se va a borrar: esto es su reemplazo, y vive donde no puede
+  derivar sin que nadie se entere.
+
+  El andamio pasó de **23 a 70 archivos**. `projects init` escribe **69 con 116
+  sustituciones**, y el repo queda con 87 contando lo que agregan `openspec init` y el
+  render de la constitución.
+
+  **Medido de punta a punta sobre un repo recién instanciado**, con `projects init` +
+  `pnpm install` + un comando:
+
+  ```
+  pnpm verificar  ->  exit 0
+  ```
+
+  Eso es: generar el cliente de datos, `eslint . --max-warnings=0` sobre 25 archivos
+  realmente linteados, `prettier --check`, el typecheck de los tres paquetes, las pruebas
+  **con cobertura** y el build. Más las tres actions del marco en verde, incluida
+  `cobertura-diff` **en su peor caso** —todo el esqueleto como líneas agregadas: 318/318— y
+  el censo de fuentes con 32 fuentes en alcance.
+
+  **Sin deuda de cobertura y sin bajar un umbral.** El código heredado del starter daba
+  **39,18 %** de líneas; el esqueleto nace con `api` en 100/93,54/100/100 (46 pruebas) y
+  `web` en 100 en las cuatro (8 pruebas), contra el mínimo de 80. Se escribieron las
+  pruebas que faltaban en vez de declarar deuda: una fecha de deuda escrita en una
+  plantilla es una bomba de relojería, porque el proyecto que nazca después de ese día
+  arranca con el plazo vencido por una promesa que nadie de ese proyecto hizo.
+
+  Y aparecieron las piezas que la constitución **exige** y el esqueleto heredado no tenía:
+  `lib/log.ts` (todo log pasa por ahí), `middleware/errorHandler.ts`,
+  `middleware/requestId.ts` y `lib/asyncHandler.ts`, cada una con su prueba. Más el
+  paquete `e2e/` con Playwright, que el stack fija y que hasta ahora existía sólo como dos
+  excepciones en el `ci.yml` apuntando a un directorio inexistente.
+
+  **La tabla «Stack fijado» del `AGENTS.md` del andamio deja de llegar con huecos y llega
+  llena**, porque ahora el andamio **implementa** ese stack. La instrucción se invierte: ya
+  no es «llenala», es «borrá la fila —y su paquete— de lo que este proyecto no vaya a
+  tener».
+
 ### Corregido
+
+- **La suite local que el marco manda correr antes de cada push salía ROJA en un repo
+  nuevo, con un error que apuntaba al lugar equivocado.** `pnpm verificar` no generaba el
+  cliente de datos antes de lintear, así que quien clonaba, instalaba y corría exactamente
+  lo que la regla le dice recibía **8 errores de tipos de Prisma sin resolver**, con el
+  mensaje señalando `$disconnect` y no «te falta generar el cliente». El CI **sí** lo hacía
+  bien —tiene su paso de generación antes—, así que el CI quedaba verde y la compuerta
+  local roja: el trampolín inverso al habitual, y igual de confuso.
+  Ahora `verificar` arranca con `datos`, que corre **lo mismo** que el paso del CI
+  (`--filter` por nombre de manifiesto **con `--fail-if-no-match`**, porque `--filter` sin
+  esa bandera sale 0 cuando no matchea nada). Lo encontré tropezando con él.
+
+- **Tres archivos que el propio marco reparte no pasaban sus propias compuertas**, y nadie
+  lo había visto porque hasta hoy el andamio no traía `package.json` y por lo tanto nunca
+  se había linteado ni formateado a sí mismo: el script de la skill de archive no declaraba
+  entorno Node (**26 errores** de lint), 7 archivos del andamio no pasaban su propio
+  `prettier`, y los 24 que escribe `openspec init` tampoco.
+
+- **La guía mandaba a copiar un repo archivado entero, y ese repo lleva adentro la
+  infraestructura de otro proyecto.** `projects-starter` —el esqueleto de aplicación—
+  está **archivado y read-only** desde el 2026-08-14, con su último commit el 2026-07-09.
+  Se intentó arreglarlo ahí y GitHub lo rechazó: *«This repository was archived so it is
+  read-only»*. Así que el arreglo tenía que estar en el punto de uso.
+
+  La guía ahora **extrae de la lista** en vez de copiar el árbol: entran 32 archivos —los
+  dos paquetes, el `package.json`, el workspace, el lockfile y el compose— y no entra
+  nada más. Medido.
+
+  **Eso resuelve seis problemas de una**, y por eso la lista es explícita y no un
+  `cp -r` con borrados después:
+
+  1. **`infra/`** es el Terraform de otro proyecto, **aplicable**, en la misma cuenta de
+     dev. Y su README es el **inventario de ese ambiente vivo** —VPC, endpoint de la base,
+     URI del ECR con el número de cuenta, bucket, ARN del rol de deploy— más el camino
+     para conseguir sus secretos. No hay valores versionados; hay un mapa completo.
+  2. **`deploy.yml`** es el deploy de esa arquitectura (App Runner + CloudFront), y
+     apunta a esos mismos recursos por secret.
+  3. **`spec/`** es la convención vieja; hoy la fuente de verdad es `openspec/`.
+  4. **El `README.md` del starter** dice que «la infraestructura ya está creada» y que
+     desplegar es «solo hacer push a `main`». Sobre los recursos de ese otro proyecto
+     habría sido verdad.
+  5. y 6. Los **cuatro archivos que colisionaban** con el andamio no se traen, así que
+     `projects init` corre limpio y **`--forzar` deja de ser parte del camino normal**. La
+     trampa del orden inverso —que pisa con exit 0 y sin un solo aviso— queda como nota
+     plegada para quien copie el árbol entero de todas formas.
+
+  Y la guía dice ahora **qué se hereda de un repo congelado**, en vez de dejarlo para la
+  sorpresa: `pnpm@9.15.0`, `hashicorp/aws` 5.100.0 —un major completo atrás del
+  consumidor de referencia—, sin proveedor de cobertura y con un solo archivo de pruebas.
 
 - **El andamio mandaba a un primerizo a cuatro caminos muertos, y le escondía los dos
   pasos que deciden si su primer CI sale verde.** La lista de pendientes manuales que
@@ -135,7 +192,6 @@ mueve sobre un cambio incompatible.
   único ruleset que funciona en la organización tiene **4** de esas reglas y deja las
   aprobaciones en 0. Ahora el documento separa las cuatro que se encienden de las cuatro
   que se difieren, cada una con su motivo escrito en la misma tabla.
-
 
 ## [1.6.0] — 2026-08-22
 
@@ -565,7 +621,6 @@ desaparece sin que toques nada.
 extension del archivo, asi que una superficie de agente nueva que renderice a `.txt` o
 `.toml` vuelve a caer. La version derivada exige que `actions/constitucion` publique sus
 rutas como output. Esta como fila **17** de `docs/reglas-no-escritas.md`, con su medicion.
-
 
 ## [1.4.0] — 2026-08-21
 

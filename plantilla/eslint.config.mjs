@@ -66,13 +66,23 @@ export default tseslint.config(
   },
 
   // Entorno Node: el backend, los scripts operativos (.mjs one-off, migraciones
-  // de datos) y la suite E2E (el runner orquesta el navegador DESDE Node).
+  // de datos), la suite E2E (el runner orquesta el navegador DESDE Node) y las
+  // herramientas de agente que reparte el marco.
+  //
+  // LA ULTIMA ENTRADA NO ES DECORATIVA, y se descubrio corriendo el lint sobre un
+  // repo recien instanciado: el andamio reparte .claude/skills/projects-archive-change/
+  // aplicar-deltas.mjs, que es un script de Node (usa process y console), y sin este
+  // glob `pnpm lint` sale con 26 errores de no-undef sobre un archivo que el propio
+  // marco escribio. O sea: el repo nuevo nacia ROJO antes de tener una linea de
+  // codigo de producto. El arreglo es declarar su entorno, NO agregarlo a los
+  // ignores: el archivo es codigo real y el linter tiene que mirarlo.
   {
     files: [
       "{{PAQUETE_API}}/**/*.ts",
       "{{PAQUETE_API}}/scripts/**/*.mjs",
       "scripts/**/*.mjs",
       "{{PAQUETE_E2E}}/**/*.mjs",
+      ".claude/skills/**/*.mjs",
     ],
     languageOptions: { globals: { ...globals.node } },
   },
