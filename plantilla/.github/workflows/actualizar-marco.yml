@@ -1,16 +1,36 @@
 name: Actualizar el marco
 
 # ---------------------------------------------------------------------------
-# Trae al dia la porcion del marco de la constitucion de {{PROYECTO}}, y la
-# trae SOLA: corre la action del marco en modo escribir y abre un PR con el
-# artefacto regenerado.
+# Propone al dia la porcion del marco de la constitucion de {{PROYECTO}}: corre
+# la action del marco en modo escribir y abre un PR con el artefacto regenerado.
 #
 # POR QUE EXISTE. El resto del marco llega por referencia, y desde la 1.4.0 por
-# VERSION EXACTA: el bump lo propone Dependabot como PR. La constitucion
-# no puede funcionar asi —es texto que los agentes CARGAN, y tiene que estar
-# en el arbol de este repo—, asi que el camino normal seria "acordate de
-# regenerarla cuando el marco publique". Un ritual que alguien debe recordar
-# no cuenta como enforcement: por eso lo hace este workflow.
+# VERSION EXACTA: el bump lo propone Dependabot como PR. La constitucion no
+# puede funcionar asi —es texto que los agentes CARGAN, y tiene que estar en el
+# arbol de este repo—, asi que el camino normal seria "acordate de regenerarla
+# cuando el marco publique". Un ritual que alguien debe recordar no cuenta como
+# enforcement: por eso existe este archivo.
+#
+# LO QUE HOY NO HACE, medido y no deducido: NO mueve el pin, y sin mover el pin
+# no puede traer una version nueva. Corre la action de la version que este repo
+# YA tiene pinada, y el canonico viaja DENTRO de esa action — asi que en modo
+# escribir regenera el artefacto de la version que ya estaba. Medido el
+# 2026-08-22 con el pin en 1.4.1: salida «version 1.3.0, sha 22b7d8ee231f»,
+# byte por byte identica, sin cambios y sin PR. Para su propio caso de uso
+# —"el marco publico, traeme la constitucion al dia"— es un no-op.
+#
+# El resultado es un bloqueo circular: el PR de bump de Dependabot nace ROJO
+# (pin nuevo, artefacto viejo), este workflow corre el pin VIEJO y por eso no
+# puede ayudar, y el artefacto solo se regenera con el pin nuevo — que vive
+# dentro del PR rojo. Mientras se cierre a mano, el arreglo es bajar el artifact
+# `constitucion-al-dia` que sube el job de marco del ci.yml y commitearlo sobre
+# el PR del bump.
+#
+# LA SALIDA ESTA DECIDIDA Y NO IMPLEMENTADA: **Projects ADR 004** — este mismo
+# workflow mueve el pin Y regenera, y abre UN PR que nace verde. Se construye
+# cuando exista el segundo consumidor del marco. Hasta entonces este parrafo es
+# la advertencia, no la promesa.
+#
 #
 # EL CHECK ES OTRA COSA, Y LLEGA POR OTRO CARRIL. Que el artefacto exista,
 # este al dia y siga cargado lo verifica el job de marco del ci.yml (llega por
@@ -61,7 +81,10 @@ name: Actualizar el marco
 
 on:
   # Semanal, el mismo dia que llegan los PRs de dependencias: el lunes es el
-  # dia de mirar lo que entro solo.
+  # dia de mirar lo que entro solo. El evento que de verdad importa NO es el
+  # calendario sino "el marco publico una version": el cron es la aproximacion
+  # barata mientras no exista el aviso de publicacion (fila 14 del backlog de
+  # reglas no escritas del marco).
   schedule:
     - cron: "17 12 * * 1"
   # Para el bootstrap del repo y para adoptar una version sin esperar al lunes.
