@@ -626,6 +626,58 @@ nada: es algo que notaste vos.
 
 #### 5 · Pedirle a BMAD el PRD
 
+##### Antes: qué se decide acá, y qué ya está decidido
+
+Es la duda más razonable de un proyecto nuevo: *¿le digo que es un sistema web, o le cuento el
+proceso y que él decida si conviene un portal o un chatbot?* La respuesta corta es **ninguna de
+las dos**, y por tres motivos distintos.
+
+**1. La forma no se decide acá, y no la decide una herramienta.** El stack está fijado por el
+marco: app web —React con Vite adelante, Express de API, Postgres por Prisma, Clerk para
+identidad— sobre ECS y RDS. Apartarse de eso es una frontera ⚠️ que **se pregunta antes de
+implementar**, y la contesta una persona. Así que no le preguntes «¿portal o chatbot?»: no es
+su decisión. Y si al leer los documentos tu conclusión honesta es que esto no debería ser una
+app web, eso **para el trabajo y se pregunta** — no se resuelve dentro de un PRD.
+
+**2. La estructura inicial y el login YA están.** No son un change, ni un spec, ni una tarea
+pendiente. Después de la fase 3 ya tenés corriendo, con sus pruebas pasando:
+
+| Ya existe | Qué es |
+|---|---|
+| Una página con el nombre del proyecto | Y el estado del API leído en vivo |
+| **Botón de ingreso y menú de usuario** | `ClerkProvider` cableado; `SignedOut` muestra *Sign in*, `SignedIn` muestra el usuario |
+| `GET /api/health` | Abierto, es lo que verifica el pipeline |
+| `GET /api/hello` | **Detrás de `requireAuth`**: la cadena de identidad ya funciona de punta a punta |
+| `requestId`, `errorHandler`, logging | La mecánica de observabilidad que el marco exige |
+
+Así que la pregunta «¿cómo sabe que no hay nada y tiene que crear la estructura y poner el
+login?» no tiene que contestarse: **no hay nada que crear ahí**.
+
+**3. Lo que el proyecto especifica es su negocio, y nada más.** Los ocho specs del marco
+—`calidad-codigo`, `despliegue-ci`, `observabilidad`, `pipeline-entrega`…— hablan de **cómo se
+trabaja y cómo se opera**, y llegan por referencia. El `openspec/specs/` del proyecto nace
+vacío y es para **el comportamiento del producto**. Por eso el primer change de un proyecto
+nuevo **no es «la base»**: es la primera rebanada de negocio, igual que en un proyecto que ya
+existe.
+
+##### Por qué un change sobre algo que ya existe se entiende más fácil
+
+En un sistema en marcha el change se ve solo: *«ahora hay dos edificios y el estacionamiento es
+por separado»* — hay un spec, y esto lo cambia. En un proyecto nuevo es **exactamente el mismo
+trabajo**, con una sola diferencia: el spec **nace** en ese change en vez de modificarse.
+
+| | Proyecto que ya existe | Proyecto nuevo |
+|---|---|---|
+| El delta dice | `MODIFIED` sobre un requirement vigente | `ADDED`: la capability nace acá |
+| Todo lo demás | igual | igual |
+
+No hay un modo «arranque» distinto. Lo que se siente distinto es solo que la primera vez no hay
+nada contra qué contrastar, y para eso está la lista del paso 4.
+
+**Lo que sí es decisión del día uno y va en el primer change**: qué roles existen y quién puede
+qué, y las reglas del proceso. Lo que es decisión **técnica** —¿hace falta una cola?, ¿otra
+base?— es frontera ⚠️: se pregunta, y va a `design.md` con su ADR. Nunca al PRD.
+
 ##### Antes: ¿una rebanada o todo el sistema?
 
 Un proyecto nuevo es grande y la pregunta aparece sola. **BMAD no parte el trabajo en
@@ -687,6 +739,9 @@ trabajo de negocio ya está hecho.
 Lo que hay que especificar ahora es solo esto: recepción de mercadería, desde que
 llega el camión hasta que se concilia con la orden de compra. Corta antes del pago
 al proveedor.
+
+No propongas tecnología ni arquitectura: la forma ya está decidida y no es parte de
+esto. Lo que necesito es el comportamiento que el negocio necesita.
 ```
 
 Deja `prd.md`, `addendum.md` y `.memlog.md` (este último es su bitácora de decisiones, no el
