@@ -41,6 +41,25 @@ mueve sobre un cambio incompatible.
 
 ## [No publicado]
 
+### Corregido
+
+- **La guía no avisaba que el primer CI de un repo nuevo sale ROJO, y sale rojo siempre.**
+  El andamio reparte **3 recuadros 🕳️** —2 en `AGENTS.md`, 1 en `.github/proteccion-main.md`—
+  que un humano tiene que resolver, y el marco los cuenta: mientras existan, el job «Sin
+  marcadores del scaffold sin resolver» falla. En 351 líneas la guía no lo mencionaba una
+  vez, así que el primer push del lunes iba a dar un rojo sin explicación.
+
+  Y no es evitable adelantándose: uno de los tres recuadros manda a aplicar la protección de
+  rama, y eso **no se puede hacer hasta que el CI haya corrido** —el check `ci-ok` no existe
+  en el ruleset hasta que alguna corrida lo reporte—. **El primer rojo es estructural.** La
+  guía ahora trae la secuencia de cuatro pasos que lo apaga y el comando para comprobar que
+  no quedó ninguno.
+
+- **La guía seguía pidiendo decidir el board de los issues macro, que ya se decidió.** Los
+  pendientes macro van al Project del área y los sub-issues no van al board — la regla de la
+  constitución, que no cambió. Lo que sí queda como decisión es si el proyecto nuevo entra
+  al project existente, porque renombrarlo toca a otro repo.
+
 ### Cambiado
 
 - **La guía de arranque se acortó a la mitad, porque el andamio ya hace lo que ella
