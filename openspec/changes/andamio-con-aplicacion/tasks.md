@@ -71,31 +71,65 @@ otro proyecto, y copiarlo al marco sería mover el problema, no resolverlo.
 Cada uno se escribe con el material de partida presente en un directorio de
 trabajo, para que el primer rojo sea el real.
 
-- [ ] 2.1 **Enmascaramiento en los manifiestos del andamio.** Detecta `|| true`,
+- [x] 2.1 **Enmascaramiento en los manifiestos del andamio.** Detecta `|| true`,
       `; exit 0`, `--passWithNoTests` y la familia. Evidencia: contra los
       manifiestos del starter da rojo nombrando **tres** hallazgos
       (`api:lint`, `web:lint`, `web:test`); contra los corregidos, verde.
-- [ ] 2.2 **Los scripts que el pipeline invoca están declarados.** Se LEEN del
+      **Hecho** en `pruebas/andamio/manifiestos.test.mjs`. Detecta cinco formas de
+      enmascarar un código de salida —`|| true`, `|| exit 0`, `; exit 0`,
+      `--passWithNoTests`, `|| :`— y el mensaje de cada hallazgo dice **por qué** esa forma
+      tapa el fallo, no solo que está prohibida.
+      Evidencia del rojo: la prueba «el rojo histórico» reconstruye los manifiestos tal como
+      llegaron el 2026-08-22 y exige los **tres** hallazgos por nombre —`api:lint`,
+      `web:lint`, `web:test`—. Contra el andamio real, verde.
+- [x] 2.2 **Los scripts que el pipeline invoca están declarados.** Se LEEN del
       `ci.yml` del andamio (`SCRIPTS`, `EXCEPCIONES`, y los dos de la raíz) y se
       buscan en los manifiestos; una excepción que no corresponde a un paquete
       del workspace es rojo. Evidencia: contra el starter da rojo por
       `format:check` ausente en la raíz, `typecheck` ausente en `web` y la
       excepción de E2E sin paquete; contra el esqueleto absorbido, verde.
-- [ ] 2.3 **Cada paquete verificable extiende `coberturaDelMarco()`** y su script
+      **Hecho.** Los scripts se **leen** del `ci.yml` del andamio: `SCRIPTS` por paquete,
+      `EXCEPCIONES`, y los `pnpm <script>` de la raíz (excluyendo los que llevan argumentos,
+      que no son scripts del manifiesto). Una excepción cuyo paquete el workspace no declara
+      es roja: una excepción sin paquete es una compuerta apagada para nadie.
+      **Y acá apareció un defecto mío que cazó la propia prueba de mordida:** la escapatoria
+      del marcador estaba escrita como «si el lado izquierdo es un marcador, aplica a todos»,
+      así que `{{PAQUETE_E2E}}:test` eximía a los **tres** paquetes de tener `test` y dos
+      mutaciones no mordían. Ahora un marcador `{{PAQUETE_FOO}}` resuelve al directorio
+      `foo` —es derivable, y es la convención del andamio— y la excepción queda acotada a un
+      paquete.
+- [x] 2.3 **Cada paquete verificable extiende `coberturaDelMarco()`** y su script
       `test` emite cobertura. Evidencia: quitar el import en una copia del
       andamio da rojo nombrando el paquete; quitar `--coverage` del script,
       también.
-- [ ] 2.4 **Ningún marcador en RUTAS del andamio** (D3). Evidencia: renombrar un
+      **Hecho**, y exige las dos mitades: que el script `test` incluya `--coverage` —sin eso
+      no se emite lcov y la compuerta del marco da rojo por «no se encontró ningún reporte»—
+      y que alguna config del paquete extienda `coberturaDelMarco()`, sin lo cual se pierden
+      el `all: true` y el `projectRoot` del monorepo.
+      Evidencia: las dos mutaciones muerden, una por mitad.
+- [x] 2.4 **Ningún marcador en RUTAS del andamio** (D3). Evidencia: renombrar un
       directorio de la copia a `{{PAQUETE_API}}` da rojo; el andamio real, verde.
       Y la prueba deja escrito en su encabezado por qué existe: hoy
       `marcadoresQueSobreviven()` lee solo contenido y firmaría «cero» sobre ese
       repositorio.
-- [ ] 2.5 **Control de que estos controles no son no-op**: mutar copias del
+      **Hecho.** Recorre las **rutas** del andamio, no el contenido, y el encabezado de la
+      comprobación dice por qué: `projects init` sustituye contenido y copia rutas **tal cual**,
+      así que un directorio `{{PAQUETE_API}}` llegaría literal al repo nuevo y
+      `marcadoresQueSobreviven()` —que solo lee contenido— firmaría «cero» sobre ese
+      repositorio.
+      Evidencia: renombrar `api/` en una copia muerde.
+- [x] 2.5 **Control de que estos controles no son no-op**: mutar copias del
       andamio —un manifiesto sin `test`, un `|| true` reintroducido, un paquete
       sin cobertura cableada, un marcador en una ruta— y exigir que **cada
       mutación muerda**. Se mutan copias, nunca el árbol del repo, y la prueba
       verifica al final que el andamio quedó intacto.
 
+      **Hecho, y pagó su costo en la primera corrida:** de las 8 mutaciones, **dos no
+      mordían**, y las dos por el mismo defecto mío en la exención por marcador (ver 2.2).
+      Sin esta tarea, dos de las cuatro comprobaciones habrían entrado a `main` pasando
+      siempre — que es exactamente el fail-open que el bloque entero existe para no tener.
+      Se mutan copias en un directorio temporal, nunca el árbol del repo, y la prueba
+      verifica al final que el andamio quedó intacto.
 ## 3. Absorber el esqueleto, corregido
 
 - [ ] 3.1 Los tres paquetes en directorios **literales** `api/`, `web/`, `e2e/`
