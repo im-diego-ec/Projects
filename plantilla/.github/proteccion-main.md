@@ -60,17 +60,20 @@ caro y más silencioso de la configuración inicial.
 1. **Settings → Rules → Rulesets → New ruleset → New branch ruleset**.
 2. Nombre: `main-protegida`. Enforcement status: **Active**.
 3. Target branches: **Include default branch**.
-4. Reglas a marcar:
+4. Reglas a marcar — **solo estas cuatro**, que son las de la primera tabla:
    - Restrict deletions
    - Block force pushes
-   - Require signed commits
-   - Require a pull request before merging → Required approvals: **1** →
-     Require review from Code Owners
-   - Require status checks to pass → Require branches to be up to date before
-     merging → agregar el check **`ci-ok`** (aparece en la lista recién después
-     de la primera corrida de CI: si no está, abrí un PR cualquiera primero)
-5. **Bypass list: vacía.**
-6. Actualizar la tabla de estado real en el mismo PR.
+   - Require a pull request before merging → **Required approvals: `0`**
+   - Require status checks to pass → agregar el check **`ci-ok`** (aparece en la
+     lista recién después de la primera corrida de CI: si no está, abrí un PR
+     cualquiera primero)
+5. **Reglas que NO se marcan todavía**, y son exactamente las de la segunda
+   tabla: `Require signed commits`, `Required approvals: 1`,
+   `Require review from Code Owners` y `Require branches to be up to date before
+   merging`. Marcarlas ahora es el auto-encierro que advierte la nota ⚠️ de más
+   arriba — no es una omisión de esta lista, es su punto.
+6. **Bypass list: vacía.**
+7. Actualizar la tabla de estado real en el mismo PR.
 
 ## Contrastar lo escrito contra la configuración real
 
