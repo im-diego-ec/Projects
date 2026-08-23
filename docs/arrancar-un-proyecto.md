@@ -154,6 +154,32 @@ cuatro archivos en colisión. Ese repo **se borró**, y su reemplazo es el andam
 `projects init` escribe **69 archivos con 116 sustituciones** — la mecánica **y** los tres
 paquetes con sus pruebas pasando.
 
+**Si el repo YA existe, el primer comando falla.** Pasa seguido: alguien crea el repo
+cuando se decide el proyecto, semanas antes de que empiece. `gh repo create` contra un
+nombre que ya existe devuelve **422 `name already exists on this account`** y no hace nada
+— no es destructivo, pero corta acá, en el primer comando ejecutable de toda la guía.
+Comprobalo antes, que es un comando y no toca nada:
+
+```bash
+gh repo view po/<proyecto> --json name,isEmpty,defaultBranchRef
+```
+
+Si el repo **no existe** (`Could not resolve to a Repository`), seguí con los dos comandos
+de arriba tal cual. Si **existe**, salteá `gh repo create` y clonalo — `projects init` no
+necesita un repo virgen, escribe sobre el checkout:
+
+```bash
+gh repo clone po/<proyecto>
+cd <proyecto>
+node <ruta-al-clon-de-projects>/herramientas/projects-init.mjs \
+  --valores <ruta>/valores.json --destino .
+```
+
+Si lo que hay es un `README.md` de placeholder, lo normal es dejar que el andamio lo
+reemplace. Lo que **no** se hace es borrar y recrear el repo para tener un arranque
+limpio: se pierde la historia y cualquier issue que lo referencie, y no compra nada que
+este camino no dé.
+
 ### 3.1 Qué quedó en el repo
 
 **87 archivos.** El mensaje dice `escritos 69` y **está bien**: 69 son los del andamio, y
@@ -171,6 +197,35 @@ y el render de la constitución.
 **La tabla «Stack fijado» del `AGENTS.md` llega LLENA**, no con huecos, porque el andamio
 implementa ese stack. Lo que hay que hacer es **borrar la fila —y su paquete— de lo que
 este proyecto no vaya a tener**, no llenarla.
+
+### 3.2 Los equipos necesitan escritura sobre el repo, y nadie lo hace solo
+
+`projects init` escribe un `.github/CODEOWNERS` que nombra a los equipos de la organización.
+**Un equipo sin permiso de escritura sobre el repo es ignorado como code owner por GitHub,
+sin ningún aviso** — lo dice el comentario del propio archivo. O sea: el review cruzado
+que el marco promete queda asignado a nadie, el PR se ve perfectamente normal, y no hay
+rojo que lo delate.
+
+`gh repo create` **no** le da acceso a ningún equipo, y crear el repo desde la interfaz
+tampoco. Es un paso propio.
+
+Es **cambio de configuración de repo: pedí el OK antes** (frontera ⚠️ del marco).
+
+```bash
+gh api --method PUT orgs/im-diego-ec/teams/builders/repos/im-diego-ec/<proyecto> -f permission=push
+gh api --method PUT orgs/im-diego-ec/teams/po/repos/im-diego-ec/<proyecto> -f permission=push
+```
+
+Verificalo, porque es exactamente de las cosas que fallan en silencio:
+
+```bash
+gh api orgs/im-diego-ec/teams/builders/repos --jq '[.[].name]'
+gh api orgs/im-diego-ec/teams/po/repos --jq '[.[].name]'
+```
+
+El repo nuevo tiene que aparecer en las **dos** listas. Y si el equipo `po` todavía está
+vacío (fase 1), el gate del PO tampoco se asigna: son dos condiciones y hacen falta las
+dos — el equipo con acceso, y el equipo con gente.
 
 ---
 
@@ -373,6 +428,8 @@ o apuntan al lugar equivocado.
 | `ID_MCP_SLACK` mal | Cinco entradas de allowlist que no matchean nada; permisos a mano para siempre | Fase 2 |
 | `pnpm lint` sin generar el cliente de datos | 8 errores de tipos apuntando a `$disconnect`, no a «falta generar». `pnpm verificar` lo hace en orden | Fase 4.1 |
 | Equipo `po` vacío | GitHub no asigna a nadie. El gate del PO no existe y nada lo dice | Fase 1 |
+| **Equipos sin escritura sobre el repo** | GitHub **ignora** al code owner sin avisar: el review cruzado queda asignado a nadie y el PR se ve normal. `gh repo create` no da acceso a ningún equipo | Fase 3.2 |
+| **El repo destino ya existía** | `gh repo create` devuelve 422 `name already exists` y corta el primer comando ejecutable de la guía | Fase 3 |
 | Handle de GitHub equivocado | Asigna a un tercero real, o a nadie | Fase 1 |
 | `@v1` en vez de versión exacta | No falla: el repo simplemente **no recibe versiones nuevas** ni aparece en el censo | Fase 6.3 |
 | Dependabot apagado | Igual que arriba, y no hay aviso | Fase 6.3 |
