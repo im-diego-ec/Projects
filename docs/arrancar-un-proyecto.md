@@ -55,11 +55,12 @@ uv --version                        # la herramienta de descubrimiento lo exige 
 ⚠️ Si `commit.gpgsign` no está en `true`, lo vas a descubrir en la fase 5, cuando el primer
 commit falle — o peor, cuando entre sin firma y el ruleset la exija más adelante.
 
-### 3. El corpus de descubrimiento
+### 3. Los documentos del negocio, si ya existen
 
-Si el proyecto ya tiene descubrimiento hecho —documentos, procesos levantados, casos
-borde, un prototipo—, **ese material es el insumo de la sesión y no va al repositorio**.
-Tenelo a mano y numerado antes de empezar; la mecánica completa está en la **fase 7.1**.
+Si el PO ya hizo el trabajo de negocio —entrevistó gente, levantó los procesos, escribió
+los casos raros, hizo un prototipo—, esos archivos son tu punto de partida. **No van al
+repositorio**: pueden tener nombres de empleados, clientes y proveedores reales.
+Tenelos a mano antes de empezar. Cómo se convierten en specs está en la **fase 7.1**.
 
 ### 4. El mapa
 
@@ -464,148 +465,167 @@ Los seis pasos y quién aprueba cada uno están en
 los revisa **el otro builder**. Los comandos `/opsx:*` que el andamio dejó en
 `.claude/commands/` cubren el ciclo.
 
-### 7.1 De dónde salen los specs: cargar el corpus en la herramienta
+### 7.1 De los documentos del negocio a los specs, paso por paso
 
-Los pasos de arriba dicen **cómo** se escribe un change. Esta sección dice **de dónde
-sale lo que se escribe**, que es la pregunta que la guía no contestaba.
+Esta sección es para el caso más común: **el PO ya hizo el trabajo de negocio** —entrevistó
+gente, levantó los procesos, escribió los casos raros, hizo un prototipo— y vos tenés que
+convertir eso en specs de OpenSpec.
 
-La regla del área, y no es negociable: **el corpus de descubrimiento se produce fuera
-del repositorio y entra como insumo al inicio de la sesión que lo consume. El
-repositorio no es su custodio.** Lo que el repo conserva son los **artefactos
-derivados** y la **trazabilidad por identificador**. Vale igual para un proyecto
-nuevo, para un agregado y para un deploy.
+Antes de los pasos, tres palabras que se usan abajo:
 
-#### Dos directorios, y lo único que cruza
-
-```
-~/descubrimiento-<proyecto>/     ← FUERA del repo. Acá vive el corpus y acá se
-                                   instala la herramienta. Nada de esto se commitea
-                                   en el repo del proyecto.
-   _bmad/  .claude/skills/       la instalación
-   _bmad-output/                 lo que produce: brief, PRD
-   corpus/                       los documentos del PO
-
-<proyecto>/                      ← EL REPO. Acá entra SOLO lo derivado:
-   openspec/changes/<nombre>/
-      proposal.md                escrito a partir del PRD
-      specs/<capability>/spec.md los deltas
-      trazabilidad.md            la tabla que dice de dónde salió cada escenario
-```
-
-**Lo que cruza son los cuatro archivos de la derecha. El corpus no cruza, el PRD no
-cruza y la instalación no cruza.**
-
-#### Por qué la herramienta NO se instala dentro del repo
-
-No es prolijidad: está medido y el CI se pone rojo.
-
-| Qué pasa | Medido |
+| Palabra | Qué es |
 |---|---|
-| El check «Sin marcadores del scaffold sin resolver» da **ROJO** | 2 archivos de la herramienta traen marcadores entre dobles llaves (`BODY`, `CHIPS`, `GOALBAR`, `M`, `N`, `TOTAL`) en `bmad-brainstorming/scripts/brain.py` y en `bmad-create-epics-and-stories/templates/epics-template.md`. Es un rojo permanente sobre archivos que nadie escribió ni puede arreglar |
-| `git add` falla con `Filename too long` | En los `__pycache__` de la herramienta, a una profundidad de ruta normal en Windows. Se arregla con `__pycache__/` y `*.pyc` en el `.gitignore` |
+| **BMAD** | La herramienta de descubrimiento. Es conversacional: le hablás y te va escribiendo documentos. Nadie del equipo la usó todavía |
+| **PRD** | *Product Requirements Document.* Un documento en prosa que dice qué tiene que hacer el sistema. **Lo escribe BMAD** leyendo los documentos del PO. **No es un spec y no es contrato**: es material de lectura |
+| **Delta** | El archivo de OpenSpec que dice qué cambia en los specs vivos. **Esto sí es el contrato**, y lo aprueba el PO |
 
-#### Instalar la herramienta, en el directorio de afuera
+Y la advertencia que evita la confusión más cara:
+
+> **BMAD no genera specs de OpenSpec, y no hay ningún comando que convierta lo uno en lo
+> otro.** BMAD llega hasta el PRD. De ahí en adelante lo escribís vos —con tu agente, con
+> los comandos `/opsx:*`— leyendo el PRD. Ese último paso es trabajo, y es así a propósito:
+> el contrato lo firma una persona, no una herramienta.
+
+#### El flujo completo, y quién hace cada tramo
+
+```
+documentos del PO  ──►  BMAD  ──►  PRD  ──►  vos leyendo el PRD  ──►  specs
+   (ya existen)          (1-4)     (4)            (5)                  (6)
+   ─────────── afuera del repo ───────────    ────── dentro del repo ──────
+```
+
+#### 1 · Un directorio aparte, fuera del repo
 
 ```bash
-mkdir ~/descubrimiento-<proyecto> && cd ~/descubrimiento-<proyecto>
+mkdir ~/descubrimiento-<proyecto>
+cd ~/descubrimiento-<proyecto>
+```
+
+⚠️ **Fuera del repo, y no es prolijidad: está medido que el CI se pone rojo.** Si instalás
+BMAD dentro del repo del proyecto, dos de sus archivos traen marcadores entre dobles llaves
+y el check «Sin marcadores del scaffold sin resolver» da **rojo** para siempre, sobre
+archivos que nadie escribió ni puede arreglar. Y en Windows `git add` falla con
+`Filename too long` en los `__pycache__` de la herramienta.
+
+#### 2 · Instalar BMAD ahí
+
+```bash
 npx --yes bmad-method@6.11.0 install --yes --modules bmm --tools claude-code --directory .
 ```
 
-Versión exacta, no el nombre pelado: es la regla del marco para todo ejecutor que
-descarga. Salida medida el 2026-08-20: **código 0**, unas 49 skills, `_bmad/` y
-`_bmad-output/`, ~2,9 MB.
+Versión exacta, nunca el nombre pelado: es la regla del marco para todo comando que
+descarga. Ensayado el 2026-08-20: **termina bien**, escribe unas 49 skills y ~2,9 MB.
+Necesita `uv` (lo verificaste en «Antes de empezar»).
 
-⚠️ **Exige `uv`**, la cadena de Python: el instalador imprime `🐍 REQUIRED: uv` y
-provisiona el intérprete él mismo (no hace falta Python instalado). Sin `uv` lo que
-se cae son dos skills de build **al activarse**, no la instalación.
+#### 3 · Poner los documentos del PO, numerados
 
-#### Por dónde se entra: `bmad-prd`, no la fase 1
-
-Éste es el punto que más fácil se hace mal. La fase 1 (Analysis) está marcada
-**«Optional»** por el proveedor, y sobre la fase 2 dice, textual:
-
-> *«Neither skill requires the other — start with `bmad-prd` directly if you already
-> know what you're building.»*
-
-El paso **Discovery** de `bmad-prd` hace *source-extract* de documentos existentes, y
-**los pide por nombre**. O sea: cuando el descubrimiento ya está hecho, no se elicita
-de nuevo — se entra por `bmad-prd` y se le nombran los documentos.
-
-🛑 **Lo que no se hace: editar el prompt de una skill** para que trague el corpus. Eso
-no es usar la herramienta, es mantener un fork ajeno — y es exactamente lo que el
-criterio G0 del piloto mide. Si la herramienta no digiere el material como viene, **ese
-es el resultado** y se anota; no se la parchea.
-
-#### Ejemplo, con una pieza sola
-
-El PO entrega el corpus y **numera las piezas al entregarlas** (`D` documento,
-`E` entrevista, `P` prototipo, `F` feedback):
+Copialos a un subdirectorio y **numeralos al copiarlos**. La letra dice de qué tipo es cada
+pieza, y el número es el orden en que el PO te los entregó:
 
 ```
-corpus/
-  D01-procesos-recepcion.md
+documentos/
+  D01-procesos-recepcion.md        D = documento
   D02-casos-borde-recepcion.md
-  P01-prototipo/
-  F01-feedback-usuario.md
+  P01-prototipo/                   P = prototipo
+  F01-feedback-usuario.md          F = feedback sobre el prototipo
 ```
 
-Se abre `bmad-prd` y en su paso de Discovery se le nombran las piezas:
+Los números no son burocracia: son lo que después te deja decir «esto salió de acá» sin
+copiar el documento al repo. **Los documentos nunca entran al repositorio** — pueden tener
+nombres de empleados, de clientes y de proveedores reales.
+
+#### 4 · Pedirle a BMAD el PRD, entrando por `bmad-prd`
+
+⚠️ **Acá está el error fácil.** BMAD tiene una fase 1 (Analysis) que sirve para *elicitar*,
+o sea para sacarle la información a alguien preguntándole. **Vos no necesitás eso**: el
+trabajo ya está hecho. Esa fase está marcada «Optional» por el proveedor, que dice textual:
+
+> *«Neither skill requires the other — start with `bmad-prd` directly if you already know
+> what you're building.»*
+
+Así que se entra por **`bmad-prd`**, que en su primer paso te pide los documentos **por
+nombre**. Le decís algo así:
 
 ```
-Los documentos de entrada son corpus/D01-procesos-recepcion.md y
-corpus/D02-casos-borde-recepcion.md. No hay product-brief previo: el
-descubrimiento ya está hecho y estos documentos son la fuente.
-Alcance de esta rebanada: recepción de mercadería, de la llegada del camión
-hasta la conciliación con la orden. Corta antes del pago a proveedor.
+Los documentos de entrada son documentos/D01-procesos-recepcion.md y
+documentos/D02-casos-borde-recepcion.md. No hay documento previo de BMAD:
+el trabajo de negocio ya está hecho y estos archivos son la fuente.
+Lo que hay que especificar ahora es solo esto: recepción de mercadería,
+desde que llega el camión hasta que se concilia con la orden de compra.
+Corta antes del pago al proveedor.
 ```
 
-De ahí sale el PRD en `_bmad-output/`. El PRD **es insumo, nunca contrato**: un
-documento con forma de spec se lee como spec aunque nadie lo haya aprobado. El
-contrato son los deltas que apruebe el PO.
+BMAD te deja el PRD en `_bmad-output/`. **Ese archivo se queda afuera del repo.**
 
-#### Cómo se cita, y por qué la tabla es obligatoria
+🛑 **Si BMAD no entiende tus documentos, no le toques el prompt de una skill.** En el
+momento en que editás una skill dejás de usar una herramienta y empezás a mantener un fork
+ajeno, que es lo que nadie quiere. Si no los digiere, **eso es el resultado** — anotalo y
+seguí a mano.
 
-Cada escenario del delta cita el **ítem** que lo origina, y cada ítem declara su
-**origen**: `corpus` si el material lo dice, `derivado` si lo infirió quien convertía,
-`elicitado` si lo contestó el PO en la sesión porque el corpus no lo tenía.
+#### 5 · Leer el PRD y escribir los specs · **este paso es a mano**
 
-- **Ancla**: la pieza, guion, y el localizador **que la pieza ya trae** — `D01-3.2` es
-  «el punto 3.2 del documento D01». Nunca un número que inventás vos.
-- **Ítem**: `I` más tres dígitos, sin reutilizar.
-- La tabla que traduce `D01` a un archivo concreto **vive con el corpus, fuera del
-  repo**. Sin ella el identificador es una etiqueta sin contenido, y eso es a
-  propósito: es el mismo límite que el marco acepta para los secretos.
+No hay comando. Abrís el PRD y escribís, en el repo del proyecto:
 
-`openspec/changes/<nombre>/trazabilidad.md`:
+```
+<proyecto>/openspec/changes/<nombre-del-change>/
+   proposal.md                      por qué y qué cambia
+   specs/<capability>/spec.md       los deltas, con sus #### Scenario:
+   trazabilidad.md                  de dónde salió cada escenario
+```
 
-| ítem | origen | sección del insumo | escenario |
-|---|---|---|---|
-| `I017` | `corpus` | PRD, «Recepción», punto 3 | Una recepción sin orden firmada |
-| `I023` | `corpus` | PRD, «Recepción», punto 5 | fuera de alcance declarado: la rebanada corta antes del pago |
-| `I044` | `derivado` | PRD, «Recepción», punto 3 | pregunta abierta: si la orden llega después, ¿queda pendiente o se concilia? |
+Los comandos `/opsx:*` que el andamio dejó en `.claude/commands/` cubren este ciclo; el PRD
+es lo que leés para llenarlos.
 
-Tres reglas que hacen que esto sirva de algo:
+**Por qué a mano y no automático**, porque la pregunta es razonable: BMAD también sabe
+partir el trabajo en épicas, pero lo hace **después** de decidir la arquitectura, y esa
+parte no la adoptamos —el marco ya tiene `design.md`, `tasks.md` y review cruzado—. Tomar
+sus épicas sin su arquitectura es justo el orden que la propia herramienta abandonó. Así
+que el PRD **informa** el recorte y el recorte lo firma quien escribe el `tasks.md`.
 
-1. **La última columna no puede quedar vacía ni decir `n/a`.** Toma una de tres formas:
-   el título del escenario, `fuera de alcance declarado: <razón>`, o
-   `pregunta abierta: <la pregunta>`. Con `n/a` un ítem que se perdió y una pregunta
-   abierta se ven igual.
-2. **Un ítem `derivado` no puede sostener un escenario sin marca de supuesto.** Puede
-   quedar como pregunta abierta, o el escenario lleva la marca. Lo que no puede es
-   leerse como si el corpus lo hubiera dicho: eso es invención con cita falsa encima.
-3. **Una pregunta abierta impide el archive.** Se puede proponer y diseñar con dudas;
-   no se pueden convertir en contrato por omisión.
+#### 6 · La tabla de trazabilidad, que es el único archivo nuevo
 
-#### La primera media hora
+Es una tabla de tres columnas que contesta, para cada escenario, **de dónde salió**. Va en
+el repo, al lado de los deltas, y viaja en el mismo PR.
 
-Hay algo que **no está medido**: que la herramienta digiera un corpus cualquiera
-—procesos, casos borde, un prototipo—. La documentación del proveedor solo dice que
-extrae de un `product-brief.md`, que es un documento con la forma que ella espera.
+Numerás las afirmaciones que sacaste de los documentos (`I001`, `I002`, …) y cada una dice
+si el documento **lo dice** o si **lo deduciste vos**:
 
-Así que la primera media hora se gasta en esa prueba, **con una pieza sola**, antes de
-abrir el corpus entero. Si no lo digiere, eso es el resultado —y es un resultado útil,
-porque dice qué forma tendría que tener un corpus para servir—. Lo que no se puede
-hacer es descubrirlo a mitad de la tarde y llamarlo «un problema de setup».
+| de dónde | qué dice el documento | qué escribí |
+|---|---|---|
+| `I017` · lo dice `D01-3.2` | no se recibe sin orden firmada | escenario: *Una recepción sin orden firmada* |
+| `I023` · lo dice `D01-5.1` | el pago al proveedor lo hace contabilidad | fuera de alcance: corta antes del pago |
+| `I044` · **lo deduje yo** | el documento no dice qué pasa si la orden llega después | pregunta abierta: ¿queda pendiente o se concilia? |
+
+`D01-3.2` significa «el punto 3.2 del documento D01» — el número lo trae el documento, no lo
+inventás vos. La tabla que dice qué archivo es `D01` **se queda afuera del repo**, con los
+documentos.
+
+Tres reglas, y las tres existen para que la tabla sirva de algo:
+
+1. **La última columna nunca queda vacía ni dice `n/a`.** O es un escenario, o es
+   `fuera de alcance: <razón>`, o es `pregunta abierta: <la pregunta>`. Con `n/a` no se
+   distingue lo que dejaste afuera a propósito de lo que se te perdió.
+2. **Lo que deduciste vos no puede quedar escrito como si el documento lo dijera.** O lo
+   dejás como pregunta abierta, o el escenario lleva la marca de supuesto. Escribirlo como
+   dicho es lo peor que puede pasar acá: queda indistinguible de un requerimiento real.
+3. **Una pregunta abierta impide archivar el change.** Podés proponer y diseñar con dudas;
+   no podés convertirlas en contrato callándolas.
+
+Si algo no estaba en los documentos y el PO te lo contestó en la sesión, anotalo igual y
+marcá que salió de una pregunta, con la pregunta escrita. La gramática completa de los
+identificadores está en
+[`convencion-de-procedencia.md`](../openspec/changes/capa-descubrimiento/piloto/convencion-de-procedencia.md);
+para arrancar alcanza lo de esta tabla.
+
+#### Lo primero que hacés, y lleva media hora
+
+**No está medido que BMAD sepa leer documentos como los del PO.** La documentación del
+proveedor dice que lee un documento con **su** formato; que digiera procesos levantados,
+listas de casos raros y un prototipo, no lo probó nadie.
+
+Así que la primera media hora es exactamente esa prueba: **un documento solo**, antes de
+abrirle todo. Si no lo entiende, ya sabés a qué te enfrentás y lo anotás. Lo que no se
+puede es descubrirlo a media tarde y llamarlo «un problema de instalación».
 
 ---
 
@@ -627,9 +647,10 @@ o apuntan al lugar equivocado.
 | Labels `area:*` ausentes | La constitución las exige y nadie las crea | Fase 6.2 |
 | Los 3 recuadros 🕳️ del andamio | El primer CI sale **rojo** en «Sin marcadores del scaffold sin resolver», y uno de los tres no se puede borrar antes de que el CI corra | Fase 5.1 |
 | Primer PR con el bootstrap adentro | Rojo en cobertura: el diff agrega el esqueleto entero | Fase 5 |
-| **La herramienta de descubrimiento instalada DENTRO del repo** | El check de marcadores del scaffold da **rojo** por 2 archivos de la herramienta, y `git add` falla con `Filename too long` en sus `__pycache__`. Se instala afuera | Fase 7.1 |
-| **Entrar por la fase 1 de la herramienta** | Está marcada «Optional» y no ingiere un corpus terminado. Se entra por `bmad-prd`, que pide los documentos por nombre | Fase 7.1 |
-| **Editar el prompt de una skill** para que trague el corpus | Deja de ser una herramienta adoptada y pasa a ser un fork ajeno que hay que mantener. Si no digiere el material, ESO es el resultado | Fase 7.1 |
+| **BMAD instalado DENTRO del repo** | El check de marcadores del scaffold da **rojo** por 2 archivos de BMAD, y `git add` falla con `Filename too long` en sus `__pycache__`. Se instala en un directorio aparte | Fase 7.1 |
+| **Entrar por la fase 1 de BMAD** | Sirve para sacarle información a alguien preguntándole, y el trabajo ya está hecho. Se entra por `bmad-prd`, que pide los documentos por nombre | Fase 7.1 |
+| **Esperar que BMAD genere los specs de OpenSpec** | No los genera, y no hay comando que convierta el PRD en deltas. El paso 5 es a mano, y es así a propósito | Fase 7.1 |
+| **Editar el prompt de una skill de BMAD** | Dejás de usar una herramienta y empezás a mantener un fork ajeno. Si no entiende los documentos, ESO es el resultado: se anota y se sigue a mano | Fase 7.1 |
 
 ---
 
