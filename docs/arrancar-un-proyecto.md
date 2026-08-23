@@ -707,14 +707,56 @@ Más `.claude/settings.json`, y los **12 comandos `/opsx:*`** y las 12 skills `o
 dejó `openspec init` (lo corre `projects init` en su último paso; si ese paso falló, no están y
 hay que correrlo a mano).
 
-Primero copiás la lista al repo, que es el único archivo del descubrimiento que se commitea:
+##### 7.a El nombre del change, que es lo primero que hay que elegir
 
-```bash
-mkdir -p openspec/changes/<nombre-del-change>
-cp ~/descubrimiento-<proyecto>/lista-de-cobertura.md openspec/changes/<nombre-del-change>/cobertura.md
+**El nombre del change es la rebanada que vas a especificar, no el proyecto.** Es el error
+más natural: uno viene de pensar «el sistema de compras» y ese es el nombre del *repo*, no de
+un change. Un change es un pedazo que se propone, se aprueba, se implementa y se archiva; si
+su nombre abarca todo el sistema, nunca va a poder cerrarse.
+
+| ❌ | ✅ |
+|---|---|
+| `primera-version-del-sistema-de-compras` | `recepcion-de-mercaderia` |
+| `compras` | `conciliacion-orden-remito` |
+
+Es el mismo alcance que declaraste en el prompt del paso 5. Si ahí escribiste *«recepción de
+mercadería, desde que llega el camión hasta que se concilia con la orden»*, el change se llama
+`recepcion-de-mercaderia`.
+
+Reglas del nombre: **kebab-case** (minúsculas y guiones), sin espacios, sin acentos, sin
+mayúsculas. Si le pasás una descripción en vez de un nombre, el comando lo deriva solo
+(*«agregar autenticación de usuarios»* → `add-user-auth`); si le pasás algo que no es
+kebab-case, lo rechaza y te pide otro.
+
+Y **la fecha no la pones vos**: los changes archivados llevan prefijo
+(`2026-08-13-carril-docs-completo`) y lo agrega `openspec archive` al cerrar. Mientras el
+change está vivo, es solo el nombre.
+
+##### 7.b Crear el change
+
+**El directorio lo crea el comando, no vos con `mkdir`.**
+
+```
+/opsx:new recepcion-de-mercaderia
 ```
 
-Y el prompt. Le pasás **tres cosas, no una**: el PRD, los documentos originales y la lista.
+⚠️ **No uses `/opsx:propose`.** Los dos crean el change, pero `propose` *«genera todos los
+artefactos en un solo paso»* — proposal, deltas, `design.md` y `tasks.md` juntos —, y eso es
+exactamente lo que rompe el gate del PO: aprueba un proposal cuyo diseño ya está escrito.
+`/opsx:new` crea el change, muestra la plantilla del primer artefacto y **para**; sus propias
+reglas dicen «no crear ningún artefacto todavía».
+
+Recién con el directorio creado, copiás la lista — el único archivo del descubrimiento que se
+commitea:
+
+```bash
+cp ~/descubrimiento-<proyecto>/lista-de-cobertura.md \
+   openspec/changes/recepcion-de-mercaderia/cobertura.md
+```
+
+##### 7.c El prompt
+
+Le pasás **tres cosas, no una**: el PRD, los documentos originales y la lista.
 
 ```
 Este es el PRD de este proyecto, ya revisado por mí:
@@ -723,12 +765,13 @@ Este es el PRD de este proyecto, ya revisado por mí:
 Los documentos originales del negocio, que son la fuente de todo, están en:
   ~/descubrimiento-<proyecto>/documentos/
 
-Y la lista de cobertura ya está en openspec/changes/<nombre>/cobertura.md, con
-sus dos primeras columnas llenas.
+Y la lista de cobertura ya está en
+openspec/changes/recepcion-de-mercaderia/cobertura.md, con sus dos primeras
+columnas llenas.
 
 Escribí SOLO el proposal y los deltas de specs de este change:
-  openspec/changes/<nombre>/proposal.md
-  openspec/changes/<nombre>/specs/<capability>/spec.md
+  openspec/changes/recepcion-de-mercaderia/proposal.md
+  openspec/changes/recepcion-de-mercaderia/specs/<capability>/spec.md
 
 NO escribas design.md ni tasks.md todavía: el PO tiene que aprobar el proposal y
 los deltas primero, y si el design ya está escrito su aprobación es un trámite.
@@ -742,15 +785,15 @@ cuál es y por qué hace falta.
 puede citar el PRD pero no de qué documento del PO salió cada cosa, y la lista queda
 apuntando al intermediario en vez de a la fuente.
 
-⚠️ **`openspec new change` deja el CI rojo hasta que el change tenga su delta.** Se crea y se
-completa en la misma sesión, o se trabaja en una rama sin PR abierto todavía.
+⚠️ **Crear el change deja el CI rojo hasta que tenga su delta.** Se crea y se completa en la
+misma sesión, o se trabaja en una rama sin PR abierto todavía.
 
 #### 8 · La tercera columna, y con eso el PR
 
 Misma sesión del proyecto, con los deltas ya escritos:
 
 ```
-Llená la columna "destino" de openspec/changes/<nombre>/cobertura.md.
+Llená la columna "destino" de openspec/changes/recepcion-de-mercaderia/cobertura.md.
 
 Cada fila recibe exactamente una de tres formas, y ninguna otra:
 - el título del escenario que la implementa;
@@ -857,6 +900,8 @@ o apuntan al lugar equivocado.
 | **Armar la lista de cobertura leyendo el PRD** | Deja de servir para lo único que sirve: detectar lo que el PRD perdió. Sale de los documentos originales | Fase 7.1, paso 4 |
 | **Pasarle a la sesión el PRD y no los documentos** | Puede citar el PRD pero no la fuente: la lista de cobertura queda apuntando al intermediario | Fase 7.1, paso 7 |
 | **Pedir los cuatro artefactos de OpenSpec de una** | El PO gatea proposal y specs; si el design ya está escrito, su aprobación es un trámite | Fase 7.1, paso 7 |
+| **Usar `/opsx:propose` en vez de `/opsx:new`** | `propose` genera los cuatro artefactos en un solo paso, que es justo lo de la fila de arriba. `new` crea el change y para | Fase 7.1, paso 7.b |
+| **Nombrar el change como el proyecto** | Un change se propone, se aprueba y se archiva; si su nombre abarca todo el sistema no puede cerrarse nunca. El nombre es la rebanada | Fase 7.1, paso 7.a |
 | **Editar el prompt de una skill de BMAD** | Dejás de usar una herramienta y empezás a mantener un fork ajeno. Si no entiende los documentos, ESO es el resultado: se anota y se sigue a mano | Fase 7.1 |
 
 ---
