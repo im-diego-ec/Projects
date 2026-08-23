@@ -87,6 +87,23 @@ seis meses después necesita saber de qué clase de pieza vino sin ir a buscarla
 | `P` | el prototipo | el rótulo que el prototipo ya le pone a la pantalla o al control: `P01-detalle-de-recepcion` |
 | `F` | el feedback de usuario sobre el prototipo | igual que `E` si está grabado; igual que `D` si está escrito |
 
+> **Nota fechada del 2026-08-23 — la guía de arranque usa un juego REDUCIDO de letras.**
+> `docs/arrancar-un-proyecto.md` reparte solo **`D`** (cualquier cosa escrita) y **`P`** (el
+> prototipo), y define `E` como la tercera que se agrega el día que exista una grabación. El
+> motivo es el principio que esta misma tabla usa sin enunciarlo: **una letra existe solo si el
+> localizador se resuelve distinto.** Con esa vara `F` no sobrevive —su propia celda dice
+> «igual que `E` si está grabado; igual que `D` si está escrito», o sea que no tiene regla
+> propia— y `E` no tiene ninguna instancia en el material de este piloto, que no incluye
+> grabaciones.
+>
+> **Esta tabla NO se modifica** y sigue siendo la normativa del piloto. La nota queda por
+> escrito porque este archivo es pre-registro y una simplificación silenciosa es exactamente
+> lo que un pre-registro existe para impedir. Lo que hay que dejar dicho es que **no mueve
+> ningún denominador**: G1 cuenta escenarios con ítem asociado, G2 cuenta identificadores del
+> inventario que no aparecen en ninguna fila y G3 cuenta afirmaciones presentadas como dichas
+> por el material. Ninguna de las tres lee la letra. Es simplificación de forma, no de
+> medición.
+
 **El localizador es siempre algo que la pieza ya nombra, nunca un número que el
 scorer inventa.** Un ancla inventada es una cita que nadie puede resolver: el
 lector abre el documento y no encuentra el «3.2» porque el «3.2» lo puso el
