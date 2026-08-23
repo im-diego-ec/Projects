@@ -41,6 +41,31 @@ mueve sobre un cambio incompatible.
 
 ## [No publicado]
 
+### Cambiado
+
+- **La guía de arranque se acortó a la mitad, porque el andamio ya hace lo que ella
+  explicaba.** `projects-starter` se borró el 2026-08-23, así que la fase 3 —clonar un
+  segundo repo, extraer de él una lista exacta, resolver cuatro archivos en colisión— y
+  casi toda la fase 4 —escribir los scripts del CI, cablear la cobertura, instalar el
+  proveedor, declarar los excluidos, decidir qué hacer con la deuda heredada— **dejaron de
+  existir como trabajo**.
+
+  Lo que queda:
+
+  | Fase | Antes | Ahora |
+  |---|---|---|
+  | 3 · El repo | Clonar, extraer 32 archivos de una lista, commitear, correr init | `gh repo create` + `projects init` |
+  | 4 · Que el CI arranque | Cinco sub-pasos | `pnpm install`, y nada más |
+
+  Y la tabla de fallos silenciosos perdió cuatro filas que **ya no pueden pasar** (traer el
+  esqueleto sobre el andamio, el `pnpm lint` que salía verde sin lintear, el `test` sin
+  `--coverage`, el `vitest.config.base.mjs` huérfano) y ganó una nueva: correr
+  `pnpm lint` sin generar el cliente de datos, que da 8 errores apuntando a `$disconnect`
+  en vez de a «falta generar». `pnpm verificar` lo hace en el orden correcto.
+
+  La referencia al repo borrado sobrevive en **una** frase de la guía, y es a propósito:
+  explica qué había ahí antes y por qué ya no hace falta.
+
 ### Añadido
 
 - **`docs/arrancar-un-proyecto.md`: el paso a paso de arrancar un proyecto desde cero,
