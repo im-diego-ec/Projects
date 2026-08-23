@@ -1,0 +1,409 @@
+// GUARDA DE LOS MANIFIESTOS DEL ANDAMIO.
+//
+// POR QUE EXISTE, y es un hueco que se abrio el 2026-08-22. Hasta ese dia el
+// andamio traia solo mecanica: ningun package.json, ningun script, ninguna
+// config de cobertura. Desde que absorbio el esqueleto de aplicacion, reparte
+// manifiestos — y un manifiesto es exactamente donde vive un fail-open barato.
+// El material que se absorbio traia TRES, medidos: `"lint": "eslint . || true"`
+// en los dos paquetes y `"test": "vitest run --passWithNoTests"` en el front.
+// Se corrigieron al absorberlos; lo que faltaba era algo que muerda si vuelven.
+//
+// Y no es hipotetico: un `|| true` es la forma mas facil de poner verde una
+// compuerta sin arreglar nada, y en un andamio se multiplica por cada repo que
+// nazca de el.
+//
+// LO QUE VERIFICA. Cuatro propiedades sobre el andamio, cada una LEIDA del
+// arbol y no repetida aca:
+//   1. ningun script de ningun manifiesto enmascara su codigo de salida;
+//   2. los scripts que el pipeline invoca estan declarados donde los busca, y
+//      ninguna excepcion del ci.yml apunta a un paquete que no existe;
+//   3. cada paquete verificable extiende la cobertura del marco Y emite reporte;
+//   4. ningun MARCADOR vive en una RUTA del andamio.
+//
+// Mas una quinta que hace que las cuatro signifiquen algo: cada una MUERDE. Se
+// mutan copias en un directorio temporal —nunca el arbol del repo— y se exige
+// que la comprobacion que le toca reporte el problema.
+import test from "node:test";
+import assert from "node:assert/strict";
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+
+const RAIZ = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
+const ANDAMIO = path.join(RAIZ, "plantilla");
+
+// ---------------------------------------------------------------------------
+// Lectura del andamio. Todo sale del arbol: los paquetes del workspace, los
+// scripts que el ci.yml exige y sus excepciones. Repetir cualquiera de esos
+// aca seria una segunda declaracion que puede divergir de la primera.
+// ---------------------------------------------------------------------------
+
+/** El paquete al que apunta un lado izquierdo de EXCEPCIONES.
+ *
+ *  Un marcador `{{PAQUETE_FOO}}` resuelve al directorio `foo`: es la convencion del
+ *  andamio (el valor de la clave ES el nombre del directorio) y es derivable, asi que
+ *  la excepcion queda acotada a UN paquete. La primera version de esto aceptaba
+ *  cualquier marcador como "aplica a todos", y con eso eximia a los tres paquetes de
+ *  tener `test`: dos mutaciones no mordian. Lo cazo la propia prueba de mordida.
+ */
+function paqueteDeExcepcion(lado) {
+  const m = lado.match(/^{{PAQUETE_([A-Z0-9_]+)}}$/);
+  return m ? m[1].toLowerCase() : lado;
+}
+
+/** Los paquetes declarados en el workspace, en orden de aparicion. */
+function paquetesDeclarados(raiz) {
+  const f = path.join(raiz, "pnpm-workspace.yaml");
+  if (!fs.existsSync(f)) return [];
+  return [...fs.readFileSync(f, "utf8").matchAll(/^\s*-\s*"([^"]+)"\s*$/gm)].map((m) => m[1]);
+}
+
+/** Lo que el ci.yml del andamio exige: los scripts por paquete, las excepciones
+ *  declaradas, y los scripts que invoca en la RAIZ. */
+function exigenciasDelPipeline(raiz) {
+  const f = path.join(raiz, ".github/workflows/ci.yml");
+  const texto = fs.readFileSync(f, "utf8");
+
+  const mScripts = texto.match(/^\s*SCRIPTS:\s*"([^"]*)"/m);
+  const mExcepciones = texto.match(/^\s*EXCEPCIONES:\s*"([^"]*)"/m);
+
+  return {
+    porPaquete: mScripts ? mScripts[1].split(/\s+/).filter(Boolean) : [],
+    excepciones: mExcepciones ? mExcepciones[1].split(/\s+/).filter(Boolean) : [],
+    // `- run: pnpm <script>` en la raiz. Se excluyen los que llevan argumentos
+    // (`pnpm install --frozen-lockfile`, `pnpm --filter ...`): esos no son
+    // scripts del manifiesto.
+    enLaRaiz: [...texto.matchAll(/^\s*-\s*run:\s*pnpm\s+([a-z][a-z0-9:-]*)\s*$/gm)].map((m) => m[1]),
+  };
+}
+
+/** Todos los manifiestos del andamio: la raiz y cada paquete que exista. */
+function manifiestos(raiz) {
+  const salida = [];
+  const raizPkg = path.join(raiz, "package.json");
+  if (fs.existsSync(raizPkg)) {
+    salida.push({ nombre: "(raiz)", ruta: raizPkg, json: JSON.parse(fs.readFileSync(raizPkg, "utf8")) });
+  }
+  for (const p of paquetesDeclarados(raiz)) {
+    const f = path.join(raiz, p, "package.json");
+    if (fs.existsSync(f)) salida.push({ nombre: p, ruta: f, json: JSON.parse(fs.readFileSync(f, "utf8")) });
+  }
+  return salida;
+}
+
+/** Los archivos del andamio, como rutas relativas con separador "/". */
+function rutasDelAndamio(raiz) {
+  const salida = [];
+  for (const e of fs.readdirSync(raiz, { withFileTypes: true, recursive: true })) {
+    const abs = path.join(e.parentPath ?? e.path, e.name);
+    salida.push(path.relative(raiz, abs).split(path.sep).join("/"));
+  }
+  return salida;
+}
+
+// ---------------------------------------------------------------------------
+// Las comprobaciones. En funciones, para que las corran DOS clientes: el
+// andamio de verdad (sin problema) y las copias mutadas (con problema). Una
+// comprobacion escrita dos veces se desincroniza y la mitad de mutacion deja de
+// significar algo.
+//
+// Cada una devuelve null si esta bien, o el texto del problema.
+// ---------------------------------------------------------------------------
+
+// Las formas de enmascarar un codigo de salida que ya se vieron en este arbol o
+// que son un clasico. La lista es EXACTA a proposito: un detector de la idea
+// ("¿este script puede tapar un fallo?") no es decidible con un escaneo de
+// texto, y un check que se pone rojo con un script bien escrito ensena a
+// ignorarlo. Lo que garantiza esta lista es que las tres que ya se colaron no se
+// cuelen otra vez.
+const ENMASCARAMIENTOS = [
+  { patron: "|| true", que: "el `|| true` traga el fallo y el script sale 0 igual" },
+  { patron: "|| exit 0", que: "sale 0 aunque el comando de adentro fallara" },
+  { patron: "; exit 0", que: "el `exit 0` final descarta el codigo del comando anterior" },
+  { patron: "--passWithNoTests", que: "pasa en verde con CERO pruebas ejecutadas" },
+  { patron: "|| :", que: "el `:` es un no-op que devuelve 0: mismo efecto que `|| true`" },
+];
+
+const COMPROBACIONES = {
+  "el andamio trae manifiestos, y estan donde el workspace dice": (raiz) => {
+    const ms = manifiestos(raiz);
+    if (ms.length === 0) {
+      return "el andamio no trae ningun package.json: o se rompio el recorrido, o el andamio " +
+        "volvio a ser solo mecanica. Las tres comprobaciones de abajo no verificarian nada";
+    }
+    const declarados = paquetesDeclarados(raiz);
+    const faltantes = declarados.filter((p) => !fs.existsSync(path.join(raiz, p, "package.json")));
+    return faltantes.length
+      ? `el workspace declara paquetes sin manifiesto: ${faltantes.join(", ")}. Un paquete ` +
+          "declarado y ausente hace que el censo del ci.yml le exija scripts a un directorio que no existe"
+      : null;
+  },
+
+  "ningun script de ningun manifiesto enmascara su codigo de salida": (raiz) => {
+    const hallazgos = [];
+    for (const m of manifiestos(raiz)) {
+      for (const [nombre, cuerpo] of Object.entries(m.json.scripts ?? {})) {
+        for (const e of ENMASCARAMIENTOS) {
+          if (String(cuerpo).includes(e.patron)) {
+            hallazgos.push(`${m.nombre}:${nombre} usa "${e.patron}" — ${e.que}`);
+          }
+        }
+      }
+    }
+    return hallazgos.length ? hallazgos.join("\n  ") : null;
+  },
+
+  "los scripts que el pipeline invoca estan declarados donde los busca": (raiz) => {
+    const { porPaquete, excepciones, enLaRaiz } = exigenciasDelPipeline(raiz);
+    const problemas = [];
+
+    if (porPaquete.length === 0 && enLaRaiz.length === 0) {
+      return "no pude leer del ci.yml del andamio ni SCRIPTS ni un solo `pnpm <script>` en la " +
+        "raiz: el extractor se rompio y esta comprobacion pasaria vacuamente";
+    }
+
+    const ms = manifiestos(raiz);
+    const raizM = ms.find((m) => m.nombre === "(raiz)");
+    for (const s of enLaRaiz) {
+      if (!raizM?.json.scripts?.[s]) problemas.push(`la raiz no declara "${s}", y el ci.yml lo invoca`);
+    }
+
+    // Las excepciones vienen como "<paquete>:<script>", y el paquete puede venir
+    // como marcador porque el andamio no esta instanciado.
+    const exentos = new Set();
+    const declarados = paquetesDeclarados(raiz);
+    for (const e of excepciones) {
+      const [pkg, script] = e.split(":");
+      const esMarcador = /^\{\{.+\}\}$/.test(pkg);
+      // Un marcador se resuelve al valor de su clave, y por convencion del
+      // andamio ese valor es el nombre del DIRECTORIO. Se acepta si alguno de
+      // los paquetes declarados podria ser ese.
+      if (!esMarcador && !declarados.includes(pkg)) {
+        problemas.push(
+          `la excepcion "${e}" del ci.yml apunta al paquete "${pkg}", que el workspace no declara. ` +
+            "Una excepcion sin paquete es una compuerta apagada para nadie",
+        );
+      }
+      if (esMarcador && declarados.length === 0) {
+        problemas.push(`la excepcion "${e}" usa un marcador y el workspace no declara ningun paquete`);
+      }
+      exentos.add(script);
+    }
+
+    for (const m of ms) {
+      if (m.nombre === "(raiz)") continue;
+      for (const s of porPaquete) {
+        if (m.json.scripts?.[s]) continue;
+        // Exento solo si la excepcion nombra a ESTE paquete.
+        const exentoDeEste = excepciones.some((e) => {
+          const [lado, script] = e.split(":");
+          return script === s && paqueteDeExcepcion(lado) === m.nombre;
+        });
+        if (!exentoDeEste) {
+          problemas.push(`el paquete "${m.nombre}" no declara "${s}", que el ci.yml le exige`);
+        }
+      }
+    }
+    return problemas.length ? problemas.join("\n  ") : null;
+  },
+
+  "cada paquete verificable extiende la cobertura del marco y emite reporte": (raiz) => {
+    const { porPaquete, excepciones } = exigenciasDelPipeline(raiz);
+    if (!porPaquete.includes("test")) {
+      return 'el ci.yml del andamio ya no exige el script "test" por paquete: esta comprobacion ' +
+        "quedo sin sujeto y hay que revisarla, no borrarla";
+    }
+    const problemas = [];
+    for (const m of manifiestos(raiz)) {
+      if (m.nombre === "(raiz)") continue;
+      // Un paquete exento de "test" no tiene cobertura que cablear.
+      const exento = excepciones.some((e) => {
+        const [lado, script] = e.split(":");
+        return script === "test" && paqueteDeExcepcion(lado) === m.nombre;
+      });
+      if (exento || !m.json.scripts?.test) continue;
+
+      if (!String(m.json.scripts.test).includes("--coverage")) {
+        problemas.push(
+          `el script "test" de "${m.nombre}" no emite cobertura (le falta --coverage). Pasa en ` +
+            "verde y no deja lcov, y la compuerta del marco da rojo por falta de reporte",
+        );
+      }
+
+      const dir = path.join(raiz, m.nombre);
+      const configs = fs
+        .readdirSync(dir, { withFileTypes: true })
+        .filter((e) => e.isFile() && /^(vitest|vite)\.config\.(ts|mts|js|mjs)$/.test(e.name))
+        .map((e) => fs.readFileSync(path.join(dir, e.name), "utf8"));
+      if (configs.length === 0) {
+        problemas.push(`"${m.nombre}" corre pruebas y no tiene config de vitest ni de vite`);
+      } else if (!configs.some((c) => c.includes("coberturaDelMarco"))) {
+        problemas.push(
+          `ninguna config de "${m.nombre}" extiende coberturaDelMarco(): sin eso se pierden el ` +
+            "`all: true` y el projectRoot del monorepo, y la medicion sale por rutas ambiguas",
+        );
+      }
+    }
+    return problemas.length ? problemas.join("\n  ") : null;
+  },
+
+  "ningun marcador vive en una RUTA del andamio": (raiz) => {
+    // POR QUE ESTA. `projects init` sustituye el CONTENIDO de los archivos y copia
+    // las RUTAS tal cual. Un directorio llamado {{PAQUETE_API}} llegaria literal
+    // al repo nuevo, y el check de marcadores sobrevivientes —que lee contenido—
+    // firmaria "cero" sobre ese repositorio.
+    const conMarcador = rutasDelAndamio(raiz).filter((r) => r.includes("{{"));
+    return conMarcador.length
+      ? `estas rutas del andamio llevan un marcador: ${conMarcador.join(", ")}. Las rutas se ` +
+          "copian tal cual, asi que llegarian literales al repo nuevo y el check de marcadores " +
+          "sobrevivientes no las ve porque solo lee contenido"
+      : null;
+  },
+};
+
+// ---------------------------------------------------------------------------
+// 1. El andamio de verdad pasa todas.
+// ---------------------------------------------------------------------------
+for (const [nombre, comprobar] of Object.entries(COMPROBACIONES)) {
+  test(nombre, () => {
+    assert.equal(comprobar(ANDAMIO), null);
+  });
+}
+
+// ---------------------------------------------------------------------------
+// 2. Cada comprobacion muerde. Se mutan COPIAS: el andamio del repo no se toca,
+//    asi que un fallo a mitad de camino no puede dejarlo modificado.
+// ---------------------------------------------------------------------------
+
+function copiar(origen, destino) {
+  fs.mkdirSync(destino, { recursive: true });
+  for (const e of fs.readdirSync(origen, { withFileTypes: true })) {
+    const a = path.join(origen, e.name);
+    const b = path.join(destino, e.name);
+    if (e.isDirectory()) copiar(a, b);
+    else fs.copyFileSync(a, b);
+  }
+}
+
+function editarJson(raiz, rel, f) {
+  const p = path.join(raiz, rel);
+  const j = JSON.parse(fs.readFileSync(p, "utf8"));
+  f(j);
+  fs.writeFileSync(p, JSON.stringify(j, null, 2) + "\n", "utf8");
+}
+
+const MUTACIONES = [
+  {
+    nombre: "vuelve un `|| true` al script lint de un paquete",
+    rompe: "ningun script de ningun manifiesto enmascara su codigo de salida",
+    mutar: (raiz) => editarJson(raiz, "api/package.json", (j) => (j.scripts.lint += " || true")),
+  },
+  {
+    nombre: "vuelve el --passWithNoTests al front",
+    rompe: "ningun script de ningun manifiesto enmascara su codigo de salida",
+    mutar: (raiz) => editarJson(raiz, "web/package.json", (j) => (j.scripts.test = "vitest run --passWithNoTests")),
+  },
+  {
+    nombre: "la raiz pierde un script que el ci.yml invoca",
+    rompe: "los scripts que el pipeline invoca estan declarados donde los busca",
+    mutar: (raiz) => editarJson(raiz, "package.json", (j) => delete j.scripts["format:check"]),
+  },
+  {
+    nombre: "un paquete pierde un script que el ci.yml le exige",
+    rompe: "los scripts que el pipeline invoca estan declarados donde los busca",
+    mutar: (raiz) => editarJson(raiz, "web/package.json", (j) => delete j.scripts.typecheck),
+  },
+  {
+    nombre: "el script test de un paquete deja de emitir cobertura",
+    rompe: "cada paquete verificable extiende la cobertura del marco y emite reporte",
+    mutar: (raiz) => editarJson(raiz, "api/package.json", (j) => (j.scripts.test = "vitest run")),
+  },
+  {
+    nombre: "un paquete deja de extender coberturaDelMarco()",
+    rompe: "cada paquete verificable extiende la cobertura del marco y emite reporte",
+    mutar: (raiz) => {
+      const p = path.join(raiz, "api/vitest.config.ts");
+      fs.writeFileSync(p, fs.readFileSync(p, "utf8").split("coberturaDelMarco").join("otraCosa"), "utf8");
+    },
+  },
+  {
+    nombre: "un marcador se cuela en el nombre de un directorio",
+    rompe: "ningun marcador vive en una RUTA del andamio",
+    mutar: (raiz) => fs.renameSync(path.join(raiz, "api"), path.join(raiz, "{{PAQUETE_API}}")),
+  },
+  {
+    nombre: "el andamio se queda sin manifiestos",
+    rompe: "el andamio trae manifiestos, y estan donde el workspace dice",
+    mutar: (raiz) => {
+      for (const rel of ["package.json", "api/package.json", "web/package.json", "e2e/package.json"]) {
+        const p = path.join(raiz, rel);
+        if (fs.existsSync(p)) fs.unlinkSync(p);
+      }
+    },
+  },
+];
+
+test("cada comprobacion muerde: el andamio mutado da rojo donde corresponde", () => {
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "projects-manifiestos-"));
+  const antes = fs.readFileSync(path.join(ANDAMIO, "package.json"), "utf8");
+  try {
+    for (const [i, m] of MUTACIONES.entries()) {
+      const copia = path.join(tmp, `m${i}`);
+      copiar(ANDAMIO, copia);
+      m.mutar(copia);
+      const problema = COMPROBACIONES[m.rompe](copia);
+      assert.ok(
+        problema !== null,
+        `la mutacion "${m.nombre}" NO puso en rojo a "${m.rompe}": esa comprobacion pasa ` +
+          "siempre y no esta verificando nada",
+      );
+    }
+  } finally {
+    fs.rmSync(tmp, { recursive: true, force: true });
+  }
+  // El andamio del repo no se toco en ningun momento.
+  assert.equal(fs.readFileSync(path.join(ANDAMIO, "package.json"), "utf8"), antes);
+});
+
+// ---------------------------------------------------------------------------
+// 3. El rojo HISTORICO, que es la razon de que esto exista.
+//
+// Los manifiestos que se absorbieron el 2026-08-22 traian tres fail-opens. Esta
+// prueba los reconstruye textualmente y exige que la comprobacion los cace: es
+// la evidencia de que el check habria mordido el dia que hizo falta, y no una
+// afirmacion sobre el pasado.
+// ---------------------------------------------------------------------------
+test("el rojo historico: los tres fail-opens del esqueleto que se absorbio", () => {
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "projects-historico-"));
+  try {
+    const copia = path.join(tmp, "origen");
+    copiar(ANDAMIO, copia);
+    // Tal como venian, textual.
+    editarJson(copia, "api/package.json", (j) => {
+      j.scripts.lint = "eslint . || true";
+      j.scripts.test = "vitest run";
+    });
+    editarJson(copia, "web/package.json", (j) => {
+      j.scripts.lint = "eslint . || true";
+      j.scripts.test = "vitest run --passWithNoTests";
+    });
+
+    const enmascarados = COMPROBACIONES["ningun script de ningun manifiesto enmascara su codigo de salida"](copia);
+    assert.ok(enmascarados, "los tres fail-opens del origen tienen que salir en rojo");
+    for (const esperado of ["api:lint", "web:lint", "web:test"]) {
+      assert.ok(
+        enmascarados.includes(esperado),
+        `el hallazgo "${esperado}" no aparece en el rojo:\n${enmascarados}`,
+      );
+    }
+
+    const sinCobertura = COMPROBACIONES["cada paquete verificable extiende la cobertura del marco y emite reporte"](copia);
+    assert.ok(
+      sinCobertura && sinCobertura.includes("api"),
+      `el "test" pelado de api tenia que salir en rojo por no emitir cobertura:\n${sinCobertura}`,
+    );
+  } finally {
+    fs.rmSync(tmp, { recursive: true, force: true });
+  }
+});

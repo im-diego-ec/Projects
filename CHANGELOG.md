@@ -89,32 +89,37 @@ mueve sobre un cambio incompatible.
   en el PR donde lo toca, con el arreglo en el mensaje. **Agregar es barato; quitar exige
   decirlo.**
 
-### Cambiado
+- **Los manifiestos del andamio tienen guarda: hasta hoy nada mordía si alguien les metía
+  un `|| true`.** El hueco se abrió el 2026-08-22, cuando el andamio pasó de traer solo
+  mecánica a repartir `package.json` — y un manifiesto es exactamente donde vive un
+  fail-open barato. En un andamio, además, se multiplica por cada repo que nazca de él.
 
-- **La guía de arranque se acortó a la mitad, porque el andamio ya hace lo que ella
-  explicaba.** `projects-starter` se borró el 2026-08-23, así que la fase 3 —clonar un
-  segundo repo, extraer de él una lista exacta, resolver cuatro archivos en colisión— y
-  casi toda la fase 4 —escribir los scripts del CI, cablear la cobertura, instalar el
-  proveedor, declarar los excluidos, decidir qué hacer con la deuda heredada— **dejaron de
-  existir como trabajo**.
+  `pruebas/andamio/manifiestos.test.mjs` (7 pruebas, cero dependencias) verifica cuatro
+  propiedades, **todas leídas del árbol** y ninguna repetida en la prueba:
 
-  Lo que queda:
+  1. **Ningún script enmascara su código de salida.** Cinco formas —`|| true`,
+     `|| exit 0`, `; exit 0`, `--passWithNoTests`, `|| :`— y el mensaje de cada hallazgo
+     dice **por qué** esa forma tapa el fallo.
+  2. **Los scripts que el pipeline invoca están declarados donde los busca.** Se leen del
+     `ci.yml`: `SCRIPTS` por paquete, `EXCEPCIONES`, y los `pnpm <script>` de la raíz. Una
+     excepción cuyo paquete el workspace no declara es roja: es una compuerta apagada para
+     nadie.
+  3. **Cada paquete verificable emite cobertura Y extiende `coberturaDelMarco()`.** Sin
+     `--coverage` no hay lcov; sin la base, se pierden el `all: true` y el `projectRoot`.
+  4. **Ningún marcador vive en una RUTA.** `projects init` sustituye contenido y copia rutas
+     **tal cual**, así que un directorio `{{PAQUETE_API}}` llegaría literal al repo nuevo y
+     el check de marcadores sobrevivientes —que solo lee contenido— firmaría «cero».
 
-  | Fase | Antes | Ahora |
-  |---|---|---|
-  | 3 · El repo | Clonar, extraer 32 archivos de una lista, commitear, correr init | `gh repo create` + `projects init` |
-  | 4 · Que el CI arranque | Cinco sub-pasos | `pnpm install`, y nada más |
+  **Y el rojo histórico, que es la razón de que esto exista:** una prueba reconstruye los
+  manifiestos tal como llegaron y exige los **tres** fail-opens por nombre (`api:lint`,
+  `web:lint`, `web:test`). No es una afirmación sobre el pasado: es la evidencia de que el
+  check habría mordido el día que hizo falta.
 
-  Y la tabla de fallos silenciosos perdió cuatro filas que **ya no pueden pasar** (traer el
-  esqueleto sobre el andamio, el `pnpm lint` que salía verde sin lintear, el `test` sin
-  `--coverage`, el `vitest.config.base.mjs` huérfano) y ganó una nueva: correr
-  `pnpm lint` sin generar el cliente de datos, que da 8 errores apuntando a `$disconnect`
-  en vez de a «falta generar». `pnpm verificar` lo hace en el orden correcto.
-
-  La referencia al repo borrado sobrevive en **una** frase de la guía, y es a propósito:
-  explica qué había ahí antes y por qué ya no hace falta.
-
-### Añadido
+  **Las 8 mutaciones muerden, y dos no mordían al principio.** Las dos por el mismo defecto
+  mío: la escapatoria del marcador estaba escrita como «si el lado izquierdo es un marcador,
+  aplica a todos», así que `{{PAQUETE_E2E}}:test` eximía a los **tres** paquetes de tener
+  `test`. Sin la prueba de mordida, dos de las cuatro comprobaciones habrían entrado a
+  `main` pasando siempre — el fail-open que el bloque entero existe para no tener.
 
 - **`docs/arrancar-un-proyecto.md`: el paso a paso de arrancar un proyecto desde cero,
   medido ejecutándolo.** Era el hueco más grande de la documentación del marco y estaba
@@ -189,7 +194,49 @@ mueve sobre un cambio incompatible.
   no es «llenala», es «borrá la fila —y su paquete— de lo que este proyecto no vaya a
   tener».
 
+### Cambiado
+
+- **La guía de arranque se acortó a la mitad, porque el andamio ya hace lo que ella
+  explicaba.** `projects-starter` se borró el 2026-08-23, así que la fase 3 —clonar un
+  segundo repo, extraer de él una lista exacta, resolver cuatro archivos en colisión— y
+  casi toda la fase 4 —escribir los scripts del CI, cablear la cobertura, instalar el
+  proveedor, declarar los excluidos, decidir qué hacer con la deuda heredada— **dejaron de
+  existir como trabajo**.
+
+  Lo que queda:
+
+  | Fase | Antes | Ahora |
+  |---|---|---|
+  | 3 · El repo | Clonar, extraer 32 archivos de una lista, commitear, correr init | `gh repo create` + `projects init` |
+  | 4 · Que el CI arranque | Cinco sub-pasos | `pnpm install`, y nada más |
+
+  Y la tabla de fallos silenciosos perdió cuatro filas que **ya no pueden pasar** (traer el
+  esqueleto sobre el andamio, el `pnpm lint` que salía verde sin lintear, el `test` sin
+  `--coverage`, el `vitest.config.base.mjs` huérfano) y ganó una nueva: correr
+  `pnpm lint` sin generar el cliente de datos, que da 8 errores apuntando a `$disconnect`
+  en vez de a «falta generar». `pnpm verificar` lo hace en el orden correcto.
+
+  La referencia al repo borrado sobrevive en **una** frase de la guía, y es a propósito:
+  explica qué había ahí antes y por qué ya no hace falta.
+
 ### Corregido
+
+- **La guía no avisaba que el primer CI de un repo nuevo sale ROJO, y sale rojo siempre.**
+  El andamio reparte **3 recuadros 🕳️** —2 en `AGENTS.md`, 1 en `.github/proteccion-main.md`—
+  que un humano tiene que resolver, y el marco los cuenta: mientras existan, el job «Sin
+  marcadores del scaffold sin resolver» falla. En 351 líneas la guía no lo mencionaba una
+  vez, así que el primer push del lunes iba a dar un rojo sin explicación.
+
+  Y no es evitable adelantándose: uno de los tres recuadros manda a aplicar la protección de
+  rama, y eso **no se puede hacer hasta que el CI haya corrido** —el check `ci-ok` no existe
+  en el ruleset hasta que alguna corrida lo reporte—. **El primer rojo es estructural.** La
+  guía ahora trae la secuencia de cuatro pasos que lo apaga y el comando para comprobar que
+  no quedó ninguno.
+
+- **La guía seguía pidiendo decidir el board de los issues macro, que ya se decidió.** Los
+  pendientes macro van al Project del área y los sub-issues no van al board — la regla de la
+  constitución, que no cambió. Lo que sí queda como decisión es si el proyecto nuevo entra
+  al project existente, porque renombrarlo toca a parqueadero.
 
 - **La suite local que el marco manda correr antes de cada push salía ROJA en un repo
   nuevo, con un error que apuntaba al lugar equivocado.** `pnpm verificar` no generaba el
