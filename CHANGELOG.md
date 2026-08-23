@@ -221,6 +221,26 @@ mueve sobre un cambio incompatible.
 
 ### Corregido
 
+- **El documento de protección de `main` del andamio se contradecía a sí mismo, y en la
+  dirección peligrosa.** Su primera tabla declara cuatro reglas «se encienden ahora»; la
+  segunda declara cuatro **diferidas** con su motivo, y una nota ⚠️ avisa que encenderlas
+  antes de tiempo *«es la forma más fácil de auto-encerrarse»* — probado: aprobación
+  requerida + code owner + bypass vacía, con un equipo de una persona, deja el repo sin
+  ninguna vía de integrar.
+
+  Y el paso 4 de «Aplicarla desde cero» mandaba marcar **las ocho**, diferidas incluidas.
+  Quien aplicara ese paso al pie de la letra se auto-encerraba el mismo día, y el propio
+  documento lo llamaba *«exactamente ese error»* doce líneas más arriba.
+
+  El paso 4 ahora lista **solo las cuatro** de la primera tabla, con `Required approvals: 0`
+  explícito, y un paso 5 nuevo nombra las cuatro que **no** se marcan todavía — para que su
+  ausencia se lea como decisión y no como olvido de la lista.
+
+  Lo encontró el barrido de verificación de la víspera del primer ensayo de adopción; un
+  escéptico independiente lo bajó de «rompe el arranque» a fricción porque
+  `docs/arrancar-un-proyecto.md` ya advierte *«no apliques las 8 reglas»* antes de linkear
+  al documento. La guía madre lo neutralizaba; el documento seguía mintiendo solo.
+
 - **La guía no avisaba que el primer CI de un repo nuevo sale ROJO, y sale rojo siempre.**
   El andamio reparte **3 recuadros 🕳️** —2 en `AGENTS.md`, 1 en `.github/proteccion-main.md`—
   que un humano tiene que resolver, y el marco los cuenta: mientras existan, el job «Sin
