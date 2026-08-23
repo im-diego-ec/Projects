@@ -387,3 +387,13 @@ o apuntan al lugar equivocado.
 **Canónico.** Se actualiza cuando alguien arranca un proyecto y encuentra algo que
 acá no está — que es exactamente para lo que sirve el primer ensayo. Si un paso te
 trabó, la corrección va en el mismo PR que la arregla.
+
+**Y para que ese ensayo deje evidencia y no una anécdota**: llená el
+[registro de fricción](plantillas/registro-de-friccion.md) *mientras* corrés esta
+guía, no después. Se guarda en `docs/adopciones/AAAA-MM-DD-<proyecto>.md`.
+
+Sus dos reglas de uso, acá también porque son las que se rompen: **no arregles la
+guía mientras la corrés** —arreglar sobre la marcha te deja un documento que
+funciona para vos y para nadie más, y borra el dato que vinimos a buscar— y **un
+tropiezo cuyo arreglo empieza con «hay que recordar que…» no va a la guía**: va como
+fila al backlog de [reglas no escritas](reglas-no-escritas.md#backlog-de-automatización).
