@@ -16,12 +16,11 @@ Marcas que vas a encontrar:
 | **[auto]** | Lo hace una herramienta o el pipeline |
 | ⚠️ | Falla **en silencio** o con un error que apunta al lugar equivocado |
 
-> **Lo primero que hay que entender, porque decide el orden de todo lo demás:** el
-> marco trae la **mecánica** (pipeline, reglas, guardrails) y **no trae la
-> aplicación**. `projects init` escribe 49 archivos y **ni uno** es código de producto:
-> no hay `package.json`, no hay `pnpm-lock.yaml`, no hay `api/` ni `web/`. El
-> esqueleto de aplicación es otro repo, `projects-starter`. Son **dos piezas**, y
-> el orden entre ellas importa (fase 3).
+> **Lo primero que hay que entender:** `projects init` deja el repo **completo** — la
+> mecánica (pipeline, reglas, guardrails) **y** la aplicación (los tres paquetes con sus
+> pruebas pasando). Un solo comando, una sola fuente. Hasta el 2026-08-22 el esqueleto de
+> aplicación vivía en otro repo que había que clonar aparte; ese repo se borró y su
+> reemplazo es el andamio.
 
 ---
 
@@ -130,206 +129,94 @@ sobrevivan marcadores `{{...}}`, y un UUID de ceros no es un marcador.
 
 ---
 
-## Fase 3 — El repo y las dos piezas, en este orden · **[vos]**
+## Fase 3 — El repo · **[vos]** · dos comandos
 
 ```bash
 gh repo create im-diego-ec/<proyecto> --private --clone
 cd <proyecto>
-```
-
-### 3.1 Traé del starter SÓLO la aplicación
-
-⚠️ **El starter está archivado** (read-only desde el 2026-08-14, último commit el
-2026-07-09) y trae tres cosas que **no** son de tu proyecto: la infraestructura de otro,
-la convención vieja de specs, y un README que describe un ambiente desplegado que no es
-tuyo. Nada de eso se arregla en el starter, porque un repo archivado no acepta PRs.
-
-Así que **no se copia el árbol entero: se extrae la lista**.
-
-```bash
-git clone --depth 1 https://github.com/im-diego-ec/projects-starter.git /tmp/starter
-(cd /tmp/starter && git archive HEAD -- \
-    api web package.json pnpm-workspace.yaml pnpm-lock.yaml \
-    docker-compose.yml comandos-levantar-servicios.txt) | tar -x -C .
-git add -A && git commit -m "chore: aplicacion base desde projects-starter (archivado)"
-```
-
-Medido: entran **32 archivos**, y **no entra ninguno** de `infra/`, `spec/`, `.github/`,
-`AGENTS.md`, `tsconfig.base.json`, `.gitignore` ni `README.md`.
-
-**Eso resuelve seis problemas de una**, y por eso la lista es explícita y no un
-`cp -r` con borrados después:
-
-| No entra | Por qué importa |
-|---|---|
-| `infra/` | Es el Terraform de **otro proyecto**, aplicable, en la **misma cuenta dev**. Y su README es el inventario de ese ambiente vivo —VPC, endpoint de la base, ECR, bucket, ARN del rol— más el camino a sus secretos |
-| `.github/workflows/deploy.yml` | El deploy de esa arquitectura (App Runner + CloudFront), apuntando a esos mismos recursos por secret |
-| `spec/` | La convención **vieja**. Hoy la fuente de verdad es `openspec/`, que `projects init` deja armado |
-| `README.md` | Dice «la infraestructura **ya está** creada» y que desplegar es «solo hacer push a `main`». Sobre los recursos de ese otro proyecto habría sido verdad |
-| `AGENTS.md` · `tsconfig.base.json` · `.gitignore` · `.github/workflows/ci.yml` | Son los **cuatro que colisionan** con el andamio. No trayéndolos, `projects init` corre limpio y **no hace falta `--forzar`** |
-
-**Commiteá antes de seguir.** Ese commit es lo que convierte un pisado silencioso en
-cuatro líneas de `git status`.
-
-### 3.2 Qué heredás, dicho de frente
-
-El starter está congelado, así que lo que trae es lo que había en julio:
-
-| Pieza | Estado |
-|---|---|
-| `pnpm@9.15.0` | Fijado en su `package.json` |
-| `hashicorp/aws 5.100.0` | Un **major completo** atrás de lo que corre el consumidor de referencia (6.x). No te afecta hasta que escribas infra |
-| Cobertura | **No trae proveedor** (`@vitest/coverage-v8`: cero en el lockfile) — se agrega en la fase 4 |
-| Pruebas | Un solo archivo, 2 tests, sobre 11 archivos TS/TSX |
-
-Nada de esto bloquea el arranque. Está acá para que no te sorprenda después.
-
-### 3.3 Después el andamio del marco
-
-```bash
 node <ruta-al-clon-de-projects>/herramientas/projects-init.mjs \
   --valores <ruta>/valores.json --destino .
 ```
 
-Con la extracción selectiva de 3.1 **no hay colisiones y no hace falta `--forzar`**.
+Eso es todo. **No hay una segunda pieza que traer.**
 
-<details>
-<summary><b>Si en cambio copiaste el árbol entero</b> — el camino largo, y su rescate</summary>
+Hasta el 2026-08-22 acá había una fase entera: el andamio traía la mecánica y no la
+aplicación, así que había que clonar un segundo repo (`projects-starter`), extraer de
+él una lista exacta para no arrastrar la infraestructura de otro proyecto, y resolver
+cuatro archivos en colisión. Ese repo **se borró**, y su reemplazo es el andamio: hoy
+`projects init` escribe **69 archivos con 116 sustituciones** — la mecánica **y** los tres
+paquetes con sus pruebas pasando.
 
-Hay exactamente **4 archivos** que existen en las dos piezas:
-`.github/workflows/ci.yml`, `.gitignore`, `AGENTS.md`, `tsconfig.base.json`. Si están,
-`projects init` **aborta con exit 1 y te los lista**:
+### 3.1 Qué quedó en el repo
 
-```
-::error::el destino ya tiene 4 archivo(s) del andamio. Se aborta para no sobreescribir trabajo:
-  - .github/workflows/ci.yml
-  - .gitignore
-  - AGENTS.md
-  - tsconfig.base.json
-Si de verdad queres sobreescribirlos: --forzar
-```
+**87 archivos.** El mensaje dice `escritos 69` y **está bien**: 69 son los del andamio, y
+los otros los escriben `openspec init` (que init ya corrió, con el pin del marco `1.9.0`)
+y el render de la constitución.
 
-En ese orden pisar es lo que querés —el andamio gana y lo que se pierde es barato— así
-que se corre otra vez con `--forzar`. Y hay que borrar a mano lo que no debió entrar:
-`rm -rf infra/ spec/ .github/workflows/deploy.yml`, y el `README.md` del starter.
+| Directorio | Qué hay |
+|---|---|
+| `api/` | Express + TS + Prisma + Clerk, con `lib/log.ts`, `middleware/errorHandler.ts`, `requestId.ts`, `asyncHandler.ts` — y **46 pruebas** |
+| `web/` | React + Vite + Tailwind + Clerk, con **8 pruebas** |
+| `e2e/` | Playwright, con una prueba de humo |
+| `.github/`, `eslint.config.mjs`, `AGENTS.md`, … | La mecánica del marco |
+| `.projects/`, `.cursor/rules/` | La porción de la constitución, renderizada al día |
 
-⚠️ **El orden inverso pisa en silencio.** Si corrés `init` primero y traés el starter
-encima con `cp -r` o `tar`, se sobreescriben los mismos 4 archivos con **exit 0 y sin una
-sola línea de aviso**: `ci.yml` pasa de 399 a 18 líneas y `AGENTS.md` deja de encadenar
-con `.projects/AGENTS-marco.md`. Perdés el pipeline entero y la mitad de las reglas que tus
-agentes leen, y la sesión no te lo dice — **el guard que avisaría vive dentro del archivo
-que se reemplaza**, así que muere con él. Si tenés que hacerlo en ese orden,
-`tar --keep-old-files` te nombra los 4 y sale exit 2 sin pisar nada.
-
-**Si ya pisaste:** con el andamio commiteado, `git status` te nombra los 4 y
-`git restore` los devuelve. Si **no** estaba commiteado no hay nada que restaurar
-(`git restore` falla con *pathspec did not match*) y el rescate es volver a correr
-`projects init ... --forzar`, que es idempotente. Ese comando sirve en los dos casos: si
-dudás, usá ese.
-
-</details>
-
-### 3.4 Qué escribió init
-
-**49 archivos.** El mensaje dice `escritos 22 archivos` y **está bien**: 22 son los
-del andamio, y los otros 27 los escribe por otros dos caminos — las herramientas de
-OpenSpec y el render de la constitución. No falta nada.
-
-**No hace falta `openspec init` a mano:** init ya lo corrió, con el pin del marco
-(`1.9.0`). Y el andamio nace pinado a la versión publicada del marco, así que su
-artefacto de constitución arranca al día.
+**La tabla «Stack fijado» del `AGENTS.md` llega LLENA**, no con huecos, porque el andamio
+implementa ese stack. Lo que hay que hacer es **borrar la fila —y su paquete— de lo que
+este proyecto no vaya a tener**, no llenarla.
 
 ---
 
-## Fase 4 — Lo que falta para que el CI arranque verde · **[vos]**
-
-Acá es donde un primerizo pierde la mañana. Nada de esto lo trae ninguna de las dos
-piezas.
-
-### 4.1 Los scripts de raíz que el pipeline invoca, y sus dependencias
-
-El `package.json` del starter no tiene los scripts que el `ci.yml` del marco llama.
-Agregalos, junto a las devDependencies del linter y el formateador (`@eslint/js`,
-`eslint`, `eslint-config-prettier`, `globals`, `prettier`, `typescript-eslint`).
-
-⚠️ **`pnpm lint` del starter sale VERDE sin lintear una sola línea.** Los scripts de
-`api` y `web` invocan un `eslint` que no está instalado, y el error queda tapado.
-Verde que no verifica nada.
-
-### 4.2 Regenerá el lockfile en el MISMO commit
+## Fase 4 — Un solo comando, y es el lockfile · **[vos]**
 
 ```bash
 pnpm install
-git add package.json pnpm-lock.yaml
+git add -A && git commit -m "chore: bootstrap del proyecto con el marco"
 ```
 
-⚠️ Sin esto, el CI muere en su cuarto paso:
+⚠️ **Esto no es opcional y es lo único que falta.** El andamio trae los manifiestos con
+sus rangos pero **no el lockfile**: un lockfile fija versiones exactas y no convive con
+marcadores. El CI corre `pnpm install --frozen-lockfile`, así que sin este paso el primer
+push **muere en su cuarto paso**:
 
 ```
 ERR_PNPM_OUTDATED_LOCKFILE  Cannot install with "frozen-lockfile" because
 pnpm-lock.yaml is not up to date with <ROOT>/package.json
 ```
 
-El disparador no es «tocaste un `package.json`»: es **cambiaste una dependencia
-declarada**, en la raíz o en cualquier paquete.
+El lockfile entra al commit fundacional y queda versionado desde el primer día.
 
-### 4.3 Los excluidos de cobertura del propio andamio
-
-⚠️ **El marco reparte tres archivos que su propia compuerta de cobertura reclama y
-que ninguna prueba puede cubrir.** En un repo nuevo el primer diff agrega todo, así
-que los reclama uno por uno: **300 de las 402 líneas en rojo son del marco, no
-tuyas**. En el `package.json` de la raíz:
-
-```json
-"projects": { "cobertura": { "excluidos": [
-  { "patron": "eslint.config.mjs", "motivo": "config del linter: corre al arrancar eslint, no bajo pruebas" },
-  { "patron": "vitest.config.base.mjs", "motivo": "config de cobertura del marco: es lo que MIDE, no algo medible" },
-  { "patron": ".claude/skills/**/*.mjs", "motivo": "herramientas de agente que reparte el marco; no son codigo de producto" }
-] } }
-```
-
-Y en cada paquete, los suyos de configuración (`vite.config.ts`,
-`tailwind.config.js`, `postcss.config.js` en web; `prisma.config.ts`,
-`vitest.config.ts` en api).
-
-### 4.4 Cableá la cobertura, que llega y nadie la consume
-
-⚠️ El andamio deja `vitest.config.base.mjs` en la raíz — es la pieza que da
-`all: true` y el `projectRoot` correcto — y **la única referencia a ese archivo en
-todo el árbol está dentro de su propio comentario**. Ni `api` ni `web` lo extienden.
-Y el starter **no trae proveedor de cobertura** (`@vitest/coverage-v8`: cero
-ocurrencias en el lockfile).
+### 4.1 Comprobalo antes de pushear, con un comando
 
 ```bash
-pnpm --filter <api> add -D @vitest/coverage-v8   # la version acompaña a la de vitest
-pnpm --filter <web> add -D @vitest/coverage-v8
+pnpm verificar
 ```
 
-Después, en la config de vitest de cada paquete, importá `coberturaDelMarco()` de
-`../vitest.config.base.mjs`, y cambiá el script `test` a **`vitest run --coverage`**.
-⚠️ Sin `--coverage` no se emite `lcov.info`, y la compuerta del marco da rojo por
-«no se encontró ningún reporte». El `test` del starter es `vitest run` pelado: pasa
-en verde y no deja nada que medir.
+**Tiene que salir 0.** Corre, en este orden: generar el cliente de datos, `eslint .
+--max-warnings=0`, `prettier --check`, el typecheck de los tres paquetes, las pruebas
+**con cobertura**, y el build. Es la misma cosa que el CI, y la regla del área es correrla
+**antes** de cada push — el CI es la corrida final, no el banco de pruebas.
 
-### 4.5 La deuda de cobertura que heredás
+> **Ojo con el orden, que costó una corrida descubrirlo:** el primer paso de `verificar`
+> es `datos` (generar el cliente de Prisma) y está ahí por una razón. Si corrés
+> `pnpm lint` a secas justo después de instalar, sin generar, te salen **8 errores de
+> tipos sin resolver** apuntando a `$disconnect` — y el mensaje no dice «te falta generar
+> el cliente». `verificar` lo hace en el orden correcto.
 
-Con la cobertura bien cableada, el código **que trae el starter** reprueba 3 de los 4
-umbrales: **39,18 % de líneas contra 80**. `server.ts` y `lib/prisma.ts` están al
-0 %. Es código que no escribiste. Dos caminos:
+### 4.2 Lo que YA viene hecho, y que antes había que hacer a mano
 
-- **Declarar la deuda** (lo honesto el día 1), en el `package.json` del paquete:
-  ```json
-  "projects": { "cobertura": { "deuda": {
-    "motivo": "heredado del esqueleto projects-starter: server.ts y lib/prisma.ts llegan sin pruebas",
-    "fecha": "2026-09-30"
-  } } }
-  ```
-  La fecha **no es libre**: el 2026-09-30 es cuando se cierra sola la ventana de
-  gracia de la cobertura del marco. Pedir más plazo que eso es pedir algo que la
-  compuerta no da. Y ⚠️ **son dos compuertas distintas**: la deuda apaga la del
-  marco, no los umbrales locales de vitest — esos hay que bajarlos a lo que el
-  paquete mide hoy, o el `test` del paquete sigue rojo.
-- **Escribir las pruebas** antes del primer push.
+Está acá para que no lo busques:
+
+- Los **scripts que el CI invoca** (`lint`, `format:check`) y las devDependencies del
+  linter y el formateador.
+- Los **excluidos de cobertura del andamio** (`eslint.config.mjs`,
+  `vitest.config.base.mjs`, las herramientas de agente), con su motivo escrito. Son
+  archivos que el marco reparte y que ninguna prueba puede cubrir.
+- El **cableado de `vitest.config.base.mjs`** en cada paquete y el proveedor de cobertura.
+  Los scripts `test` ya corren `--coverage`: sin eso no se emite `lcov` y la compuerta del
+  marco da rojo por «no se encontró ningún reporte».
+- Los **umbrales en verde sin deuda declarada**: `api` en 100 % de líneas, `web` en 100 %
+  en las cuatro métricas, contra un mínimo de 80.
 
 ---
 
@@ -445,17 +332,14 @@ o apuntan al lugar equivocado.
 
 | Qué | Síntoma | Dónde |
 |---|---|---|
-| Traer el starter **sobre** el andamio | Exit 0, sin una línea de aviso. `ci.yml` 399 → 18 líneas. **La extracción selectiva de 3.1 lo evita** | 3.3 |
-| `pnpm lint` del starter | Verde sin lintear nada: el `eslint` que invoca no está instalado | 4.1 |
-| `test` sin `--coverage` | Verde, y la compuerta del marco falla por «no se encontró reporte» | 4.4 |
-| `vitest.config.base.mjs` | Llega a la raíz y **nadie lo extiende** | 4.4 |
 | `ID_MCP_SLACK` mal | Cinco entradas de allowlist que no matchean nada; permisos a mano para siempre | Fase 2 |
+| `pnpm lint` sin generar el cliente de datos | 8 errores de tipos apuntando a `$disconnect`, no a «falta generar». `pnpm verificar` lo hace en orden | Fase 4.1 |
 | Equipo `po` vacío | GitHub no asigna a nadie. El gate del PO no existe y nada lo dice | Fase 1 |
 | Handle de GitHub equivocado | Asigna a un tercero real, o a nadie | Fase 1 |
-| `@v1` en vez de versión exacta | No falla: el repo simplemente **no recibe versiones nuevas** ni aparece en el censo | 6.3 |
-| Dependabot apagado | Igual que arriba, y no hay aviso | 6.3 |
-| Labels `area:*` ausentes | La constitución las exige y nadie las crea | 6.2 |
-| Primer PR con el bootstrap adentro | Rojo en cobertura por archivos **del marco** | Fase 5 |
+| `@v1` en vez de versión exacta | No falla: el repo simplemente **no recibe versiones nuevas** ni aparece en el censo | Fase 6.3 |
+| Dependabot apagado | Igual que arriba, y no hay aviso | Fase 6.3 |
+| Labels `area:*` ausentes | La constitución las exige y nadie las crea | Fase 6.2 |
+| Primer PR con el bootstrap adentro | Rojo en cobertura: el diff agrega el esqueleto entero | Fase 5 |
 
 ---
 

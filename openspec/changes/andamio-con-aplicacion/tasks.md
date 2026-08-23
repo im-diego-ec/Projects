@@ -17,8 +17,18 @@ instale. El bloque 6 es del corte de versión, no de este trabajo.
 
 Toda verificación se acredita por **código de salida**, nunca grepeando la salida.
 
-`projects-starter` **no se borra hasta que el ensayo del 4.1 esté verde**. Es
-el único lugar donde hoy vive el material de origen.
+**`projects-starter` YA SE BORRÓ**, el 2026-08-23, y **antes** de la tarea 6.3 que
+lo gateaba. Esta nota decía «no se borra hasta que el ensayo del 4.1 esté verde,
+es el único lugar donde hoy vive el material de origen»; queda escrita así, tachada
+y con lo que de verdad pasó, porque tildar la casilla como si el plan se hubiera
+seguido es peor que la desviación.
+
+Qué significa en la práctica: el material absorbido está en `plantilla/` (PR #56,
+mergeado), así que **nada operativo se perdió**. Lo que ya no existe es el
+upstream contra el cual diferir si mañana aparece que algo del esqueleto quedó
+afuera — el árbol pre-absorción sobrevive solo en un clon local que no es durable.
+Y no se preserva a propósito: su `infra/` era el inventario de un ambiente vivo de
+otro proyecto, y copiarlo al marco sería mover el problema, no resolverlo.
 
 ---
 
@@ -180,9 +190,16 @@ trabajo, para que el primer rojo sea el real.
       que el cambio, no al cortar.
 - [ ] 6.2 Los pines del andamio al release nuevo (`pruebas/andamio/pinado.test.mjs`
       los compara contra el CHANGELOG). Pendiente a propósito: es del corte.
-- [ ] 6.3 Recién con el release publicado y el 5.3 en verde: **borrar
+- [x] 6.3 Recién con el release publicado y el 5.3 en verde: **borrar
       `projects-starter`**, y dejar en el archive de este change la huella del
       0.3 y el enlace al PR que lo absorbió.
+      **Hecho el 2026-08-23, y ADELANTADO respecto de esta tarea:** Builder 1 lo borró
+      apenas mergeó el PR #56, sin esperar el release ni el 5.3. La condición que
+      esta tarea protegía —tener el material de origen mientras el reemplazo no
+      esté probado— ya se había cumplido por otra vía: el `pnpm verificar` del
+      repo instanciado salía **exit 0** antes del merge, así que el reemplazo
+      estaba probado. Lo que sí se perdió es el upstream para diferir, y eso queda
+      en el archive.
 
 ## 7. Lo que queda abierto y va escrito en el archive
 
