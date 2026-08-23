@@ -626,6 +626,29 @@ nada: es algo que notaste vos.
 
 #### 5 · Pedirle a BMAD el PRD
 
+##### Antes: ¿una rebanada o todo el sistema?
+
+Un proyecto nuevo es grande y la pregunta aparece sola. **BMAD no parte el trabajo en
+changes, y eso es una decisión del marco, no una limitación.** Sus «épicas» viven en su fase
+3, *después* de decidir la arquitectura —v6 las movió ahí a propósito, porque la arquitectura
+cambia cómo conviene partir—, y esa fase no se adopta: el marco ya tiene `design.md`,
+`tasks.md` y review cruzado. Así que **el PRD informa el recorte y el recorte lo firmás vos.**
+
+Dos formas de trabajar, y las dos son válidas:
+
+| | Cómo | Cuándo conviene |
+|---|---|---|
+| **Una rebanada** | Un `bmad-prd` con un alcance angosto declarado en el Brain dump. Un PRD, un change | Cuando querés recorrer el camino completo y ver dónde se traba |
+| **Todo el área** | Un `bmad-prd` con el alcance grande, y después vos lo cortás en varios changes | Cuando ya conocés la herramienta y querés el mapa entero antes de empezar |
+
+**Para el primer día, la rebanada angosta.** Un PRD del sistema entero te consume el día en
+BMAD y no llegás a la mitad de OpenSpec; una rebanada de punta a punta te enseña todo el
+camino en una tarde. Y hay una razón medida además de la práctica: el alcance **no se ensancha
+mientras trabajás**, porque ensancharlo convierte «esto no lo cubrimos» en «eso quedaba
+afuera», y ahí se pierde justo el hallazgo.
+
+Las rebanadas que siguen son otro `bmad-prd` con otro alcance, u otro corte del mismo PRD.
+
 ⚠️ **BMAD tiene una fase 1 (Analysis) y no la vas a usar.** Sirve para *elicitar*, o sea
 para sacarle la información a alguien preguntándole, y ese trabajo ya está hecho. El
 proveedor la marca «Optional» y dice textual:
@@ -645,14 +668,21 @@ nombre. Lo que va a pasar, en orden:
 | 5 | **Stakes calibration** y **Working mode** | Contestás. Apunta a 2 o 3 idas y vueltas, no diez |
 | 6 | El trabajo del modo elegido, y escribe la salida | Leés |
 
+**¿Se le pasa un directorio o los archivos uno por uno?** No está verificado que la skill
+acepte un directorio como tal; lo que sí es seguro es que la sesión **es Claude Code**, así
+que puede listar el directorio y leer los archivos por su cuenta. Por eso el prompt de abajo
+nombra el directorio **y le pide explícitamente que los liste**: si la skill solo maneja
+rutas, la sesión las enumera sola. Para la prueba de media hora, en cambio, pasale **un solo
+archivo por su ruta**.
+
 El prompt de arranque:
 
 ```
 Usá bmad-prd para armar el PRD.
 
-Los documentos de entrada son documentos/D01-procesos-recepcion.md y
-documentos/D02-casos-borde-recepcion.md. No hay documento previo de BMAD: el
-trabajo de negocio ya está hecho y estos archivos son la fuente.
+Los documentos de entrada son TODOS los archivos del directorio documentos/ —
+listalos y leelos todos, son la fuente. No hay documento previo de BMAD: el
+trabajo de negocio ya está hecho.
 
 Lo que hay que especificar ahora es solo esto: recepción de mercadería, desde que
 llega el camión hasta que se concilia con la orden de compra. Corta antes del pago
@@ -745,6 +775,16 @@ artefactos en un solo paso»* — proposal, deltas, `design.md` y `tasks.md` jun
 exactamente lo que rompe el gate del PO: aprueba un proposal cuyo diseño ya está escrito.
 `/opsx:new` crea el change, muestra la plantilla del primer artefacto y **para**; sus propias
 reglas dicen «no crear ningún artefacto todavía».
+
+**¿Y OpenSpec no se queja de un archivo que él no creó?** No, y está medido: el change
+`capa-descubrimiento` del propio marco tiene **seis archivos extra** adentro (un directorio
+`piloto/` completo) y `openspec validate --all --strict` da *16 passed, 0 failed*, exit 0.
+OpenSpec **ni lee ni valida** los archivos que no son sus artefactos — simplemente los ignora.
+
+**Y por qué ahí y no en `docs/`:** porque la lista habla de los deltas. Cuando el delta cambia,
+la lista cambia con él; tiene que viajar en el mismo PR, pasar por el mismo review y archivarse
+con el change. En `docs/` se separaría de lo único que le da sentido y nada las mantendría
+juntas.
 
 Recién con el directorio creado, copiás la lista — el único archivo del descubrimiento que se
 commitea:
@@ -862,6 +902,7 @@ Se dice en vez de rellenarse, porque un hueco declarado se resuelve en dos minut
 y una invención plausible cuesta la tarde:
 
 - Si además de invocar la skill por nombre existe un comando `/bmad-prd`.
+- Si el Brain dump acepta un **directorio** como entrada o solo rutas de archivo sueltas.
 - Qué pregunta exactamente en **Stakes calibration** y en **Working mode**, y qué modos hay.
 - Cuántas idas y vueltas toma el flujo completo más allá de las 2 o 3 declaradas.
 - Qué hace si un documento de entrada no se puede leer: no hay manejo de error descrito.
