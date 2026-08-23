@@ -196,6 +196,36 @@ mueve sobre un cambio incompatible.
 
 ### Cambiado
 
+- **El workflow que traía la constitución al día no la traía: para su propio caso de uso
+  era un no-op, y ahora lo dice.** `actualizar-marco.yml` del andamio corre la action de
+  la versión que el repo **ya tiene pinada**, y el canónico viaja *dentro* de esa action —
+  así que en modo escribir regenera el artefacto de la versión que ya estaba. Medido el
+  2026-08-22 con el pin en `1.4.1`: salida «version 1.3.0, sha 22b7d8ee231f», byte por
+  byte idéntica, sin cambios y sin PR. Su encabezado, mientras tanto, prometía traer la
+  constitución al día **«SOLA»**.
+
+  El bloqueo es circular, y conviene conocerlo antes del primer bump: el PR de Dependabot
+  nace **rojo** (pin nuevo, artefacto viejo), este workflow corre el pin **viejo** y por
+  eso no puede ayudar, y el artefacto solo se regenera con el pin nuevo — que vive adentro
+  del PR rojo.
+
+  **Este PR cambia prosa y cero comportamiento**: el diff del workflow es 100% comentarios.
+  Lo que queda escrito es el límite con su medición, el arreglo mientras tanto —bajar el
+  artifact `constitucion-al-dia` que sube el job de marco y commitearlo sobre el PR del
+  bump— y el destino, decidido en **[ADR 004](docs/adr/004-pin-y-constitucion-en-un-solo-pr.md)**:
+  que ese mismo workflow mueva el pin **y** regenere, y abra **un** PR que nazca verde. Se
+  construye cuando exista el segundo consumidor del marco; con uno solo, sus defectos se
+  descubrirían en el único consumidor que hay.
+
+  De paso se corrige el comentario del disparador: el evento que importa no es que sea
+  lunes, sino que **el marco publicó una versión**. El cron queda como aproximación barata
+  mientras no exista el aviso de publicación (fila 14 del backlog), pero deja de pretender
+  que hace algo que medimos que no hace.
+
+  La mitad no automatizada entra al backlog como **fila 21**, no como buena intención en el
+  ADR: una decisión estructural que depende de que alguien la recuerde no está tomada, está
+  deseada.
+
 - **La guía de arranque se acortó a la mitad, porque el andamio ya hace lo que ella
   explicaba.** `projects-starter` se borró el 2026-08-23, así que la fase 3 —clonar un
   segundo repo, extraer de él una lista exacta, resolver cuatro archivos en colisión— y
