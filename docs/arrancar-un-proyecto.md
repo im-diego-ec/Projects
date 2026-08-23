@@ -540,18 +540,26 @@ Necesita `uv` (lo verificaste en «Antes de empezar»).
 
 #### 3 · Poner los documentos del PO, numerados
 
-Copialos a un subdirectorio y **numeralos al copiarlos**. La letra dice de qué tipo es cada
-pieza; el número es el orden en que el PO te los entregó:
+Copialos a un subdirectorio y **numeralos al copiarlos**. Son **dos letras**, y el número es
+el orden en que el PO te los entregó:
 
 ```
 documentos/
-  D01-procesos-recepcion.md        D = documento
+  D01-procesos-recepcion.md        D = cualquier cosa escrita
   D02-casos-borde-recepcion.md
-  P01-prototipo/                   P = prototipo
-  F01-feedback-usuario.md          F = feedback sobre el prototipo
+  D03-feedback-usuario.md
+  P01-prototipo/                   P = el prototipo
 ```
 
-**Para qué sirven los números, que si no se dice parecen burocracia:** son la única forma de
+**Por qué solo dos letras.** Una letra existe **únicamente si el localizador se resuelve de
+otra manera**, y con eso el juego se reduce solo: en algo escrito el localizador es el
+encabezado o el punto numerado que el archivo ya trae (`D01-3.2`); en el prototipo es el
+rótulo de la pantalla o del control (`P01-detalle-de-recepcion`). El feedback escrito **es**
+algo escrito, así que es `D`; el que vive dentro del prototipo es parte de `P`. Si algún día
+aparece una **grabación**, ahí sí hace falta una tercera —`E`, con el localizador en
+`hhmmss`— porque se resuelve distinto de las dos.
+
+**Y para qué sirven los números, que si no se dice parecen burocracia:** son la única forma de
 escribir «esto salió de acá» en el repo **sin copiar el documento al repo**. Los documentos
 no entran nunca —pueden tener nombres de empleados, clientes y proveedores reales—, así que
 lo que viaja es el código. `D01-3.2` se lee «el punto 3.2 del documento D01», y el `3.2` lo
@@ -586,9 +594,14 @@ Reglas:
   con ~ (D01-~14) para que se sepa que ese número lo pusiste vos.
 - Si la afirmación NO está en el documento y la estás infiriendo, escribí en "de
   dónde" la palabra DEDUCIDO y el ancla de lo que sí dice el documento.
-- "qué dice": la afirmación en una línea. DESPERSONALIZADA: hablá de roles ("el
-  jefe de bodega", "compras"), nunca de nombres de personas, clientes o
-  proveedores. Este archivo va a entrar al repositorio.
+- "qué dice": la CITA TEXTUAL del documento, no un resumen tuyo. Si el pasaje es
+  largo, la oración que contiene la afirmación, no el párrafo entero. Copiá las
+  palabras como están.
+- Y con una sola excepción, que es obligatoria: reemplazá todo nombre de persona,
+  cliente o proveedor real por su ROL ENTRE CORCHETES — «[jefe de bodega]»,
+  «[proveedor]». Los corchetes importan: son lo que deja ver que ahí hubo un
+  reemplazo, y sin ellos no se distingue una cita de una paráfrasis. Este archivo
+  SÍ entra al repositorio, y los documentos no.
 - "destino": dejala VACÍA. Se llena más adelante.
 
 No leas ni uses ningún PRD para esto: la lista tiene que salir de los documentos
@@ -597,6 +610,19 @@ originales, que son la fuente. Si algo no está en los documentos, no lo agregue
 
 ⚠️ **Lo más importante de ese prompt es «no uses ningún PRD».** Si la lista se arma leyendo
 el PRD, deja de servir para lo único que sirve: detectar lo que el PRD perdió.
+
+Lo que tiene que salir, con las tres primeras filas de ejemplo:
+
+| id | de dónde | qué dice | destino |
+|---|---|---|---|
+| `I001` | `D01-3.2` | «No se recibe mercadería sin la orden de compra firmada.» | |
+| `I002` | `D01-3.2` | «La firma la da [jefe de bodega] o su suplente.» | |
+| `I003` | `DEDUCIDO` desde `D01-3.2` | el documento no dice qué pasa si la orden llega después de la mercadería | |
+
+Fijate en tres cosas del ejemplo, porque son las que se rompen: el **mismo ancla** `D01-3.2`
+sostiene dos filas —el pasaje decía dos cosas—; el corchete de `[jefe de bodega]` deja ver
+dónde hubo un reemplazo; y la fila `DEDUCIDO` **no** lleva comillas, porque no es una cita de
+nada: es algo que notaste vos.
 
 #### 5 · Pedirle a BMAD el PRD
 
