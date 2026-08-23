@@ -487,13 +487,26 @@ Y la advertencia que evita la confusión más cara:
 > agente **dentro del repo**, leyendo el PRD. Ese paso es trabajo, y es así a propósito: el
 > contrato lo firma una persona.
 
+#### Dos sesiones, y qué se hace en cada una
+
+Es la pregunta que más marea, así que va primero:
+
+| Sesión | Dónde se abre | Qué se hace ahí |
+|---|---|---|
+| **La del descubrimiento** | `~/descubrimiento-<proyecto>` | Instalar BMAD, la **lista de cobertura**, el PRD y sus vueltas de pulido (pasos 1 a 6) |
+| **La del proyecto** | La carpeta del repo | El proposal, los deltas, y la **tercera columna** de la lista (pasos 7 y 8) |
+
+**Los documentos del PO no se mueven nunca**: viven en la carpeta del descubrimiento y no
+entran al repo. Lo que cruza son tres cosas: lo que el agente lee (el PRD y los documentos)
+y **un archivo que se commitea**: la lista de cobertura.
+
 #### El camino completo
 
 ```
-documentos     ──►  BMAD   ──►  PRD  ──►  lista de   ──►  sesión en   ──►  proposal
-  del PO           (1-4)       (4-5)      cobertura       el repo          + deltas
-                                            (6)             (7)             (7-8)
- ──────────── un directorio aparte ────────────    ─────── dentro del repo ───────
+documentos     ──►  lista de   ──►  BMAD  ──►  PRD  ──►  sesión en   ──►  proposal   ──►  lista
+  del PO           cobertura         (5)      (5-6)      el repo          + deltas       completa
+   (3)             col. 1-2                                 (7)             (7)          col. 3 (8)
+ ─────────────── sesión del descubrimiento ───────────    ────── sesión del proyecto ──────
 ```
 
 ---
@@ -512,8 +525,8 @@ y el check «Sin marcadores del scaffold sin resolver» da **rojo** para siempre
 archivos que nadie escribió ni puede arreglar. Y en Windows `git add` falla con
 `Filename too long` en los `__pycache__` de la herramienta.
 
-El `git init` de acá **no** es para versionar nada del proyecto: es para poder volver atrás
-si BMAD sobrescribe algo (ver el paso 5).
+El `git init` de acá **no** versiona nada del proyecto: es para poder volver atrás si BMAD
+sobrescribe algo (paso 6).
 
 #### 2 · Instalar BMAD ahí
 
@@ -544,10 +557,48 @@ no entran nunca —pueden tener nombres de empleados, clientes y proveedores rea
 lo que viaja es el código. `D01-3.2` se lee «el punto 3.2 del documento D01», y el `3.2` lo
 trae el documento: no lo inventás vos.
 
-Y son lo que permite **contar** al final: si un número no aparece en ningún lado, eso es
-algo que el PO dijo y se perdió en el camino.
+#### 4 · La lista de cobertura · **sesión del descubrimiento**
 
-#### 4 · Pedirle a BMAD el PRD
+**Qué es:** la lista de todo lo que dicen los documentos del PO, numerada, para poder
+verificar después que nada se perdió. Tiene tres columnas y **acá se llenan las dos
+primeras**; la tercera se llena en el paso 8, cuando existan los escenarios.
+
+**Por qué va acá y no después del PRD:** con la lista hecha primero te sirve **dos veces** —
+para revisar que el PRD no perdió nada (paso 6) y para revisar que los specs no perdieron
+nada (paso 8). Hecha después, solo sirve para lo segundo.
+
+Es trabajo mecánico y le sale bien a un agente. En la sesión del descubrimiento, este prompt:
+
+```
+Leé todos los archivos de documentos/ y armá la lista de cobertura en
+lista-de-cobertura.md, con este formato exacto:
+
+| id | de dónde | qué dice | destino |
+|---|---|---|---|
+
+Reglas:
+- Una fila por AFIRMACIÓN, no por documento ni por párrafo. Si un pasaje dice dos
+  cosas, son dos filas. Si un documento lista doce casos borde, son doce filas.
+- id: I001, I002, … correlativo, sin saltos y sin reutilizar.
+- "de dónde": el código del documento, guion, y el localizador QUE EL DOCUMENTO YA
+  TRAE (un número de punto, un encabezado, el rótulo de una pantalla). Ejemplo:
+  D01-3.2. Si el documento no numera nada, usá el ordinal del párrafo y marcalo
+  con ~ (D01-~14) para que se sepa que ese número lo pusiste vos.
+- Si la afirmación NO está en el documento y la estás infiriendo, escribí en "de
+  dónde" la palabra DEDUCIDO y el ancla de lo que sí dice el documento.
+- "qué dice": la afirmación en una línea. DESPERSONALIZADA: hablá de roles ("el
+  jefe de bodega", "compras"), nunca de nombres de personas, clientes o
+  proveedores. Este archivo va a entrar al repositorio.
+- "destino": dejala VACÍA. Se llena más adelante.
+
+No leas ni uses ningún PRD para esto: la lista tiene que salir de los documentos
+originales, que son la fuente. Si algo no está en los documentos, no lo agregues.
+```
+
+⚠️ **Lo más importante de ese prompt es «no uses ningún PRD».** Si la lista se arma leyendo
+el PRD, deja de servir para lo único que sirve: detectar lo que el PRD perdió.
+
+#### 5 · Pedirle a BMAD el PRD
 
 ⚠️ **BMAD tiene una fase 1 (Analysis) y no la vas a usar.** Sirve para *elicitar*, o sea
 para sacarle la información a alguien preguntándole, y ese trabajo ya está hecho. El
@@ -557,90 +608,69 @@ proveedor la marca «Optional» y dice textual:
 > what you're building.»*
 
 **`bmad-prd` es una skill de Claude Code, no un comando de terminal.** Se invoca por su
-nombre, dentro de una sesión abierta en el directorio de arriba: *«usá `bmad-prd` para armar
-el PRD»*.
-
-Lo que va a pasar, en orden:
+nombre. Lo que va a pasar, en orden:
 
 | | Qué hace | Qué hacés vos |
 |---|---|---|
 | 1 | Arranca sola: resuelve su configuración, lee el nombre y el idioma y te saluda | Nada |
 | 2 | Detecta la intención: **Create** si no hay PRD, **Update** si ya hay, **Validate** si solo querés crítica | Nada. Si queda ambigua, pregunta |
-| 3 | **Brain dump.** Es su primer movimiento y el que importa: te pide que cuentes con tus palabras qué están construyendo, y que le pases los documentos | Le pasás **rutas de archivo** o el texto pegado. No hace falta ningún formato particular |
-| 4 | Dispara búsquedas web por su cuenta para mapear el mercado; te llega solo un resumen | Nada |
-| 5 | **Stakes calibration** y **Working mode** | Contestás. El diseño busca llegar acá en 2 o 3 idas y vueltas, no diez |
+| 3 | **Brain dump.** Es su primer movimiento y el que importa | Le pasás **rutas de archivo** o el texto pegado. No hace falta ningún formato particular |
+| 4 | Dispara búsquedas web por su cuenta; te llega solo un resumen | Nada |
+| 5 | **Stakes calibration** y **Working mode** | Contestás. Apunta a 2 o 3 idas y vueltas, no diez |
 | 6 | El trabajo del modo elegido, y escribe la salida | Leés |
+
+El prompt de arranque:
+
+```
+Usá bmad-prd para armar el PRD.
+
+Los documentos de entrada son documentos/D01-procesos-recepcion.md y
+documentos/D02-casos-borde-recepcion.md. No hay documento previo de BMAD: el
+trabajo de negocio ya está hecho y estos archivos son la fuente.
+
+Lo que hay que especificar ahora es solo esto: recepción de mercadería, desde que
+llega el camión hasta que se concilia con la orden de compra. Corta antes del pago
+al proveedor.
+```
 
 Deja `prd.md`, `addendum.md` y `.memlog.md` (este último es su bitácora de decisiones, no el
 PRD). **Los tres se quedan afuera del repo.**
-
-En el paso 3 le decís algo así:
-
-```
-Los documentos de entrada son documentos/D01-procesos-recepcion.md y
-documentos/D02-casos-borde-recepcion.md. No hay documento previo de BMAD:
-el trabajo de negocio ya está hecho y estos archivos son la fuente.
-Lo que hay que especificar ahora es solo esto: recepción de mercadería,
-desde que llega el camión hasta que se concilia con la orden de compra.
-Corta antes del pago al proveedor.
-```
 
 🛑 **Si BMAD no entiende tus documentos, no le toques el prompt de una skill.** En el momento
 en que editás una skill dejás de usar una herramienta y empezás a mantener un fork ajeno. Si
 no los digiere, **eso es el resultado** — se anota y se sigue a mano.
 
-#### 5 · Pulir el PRD hasta que quede
+#### 6 · Pulir el PRD, y contrastarlo contra la lista
 
-**Se invoca la misma skill otra vez.** No hay una skill aparte para editar: `bmad-prd`
-detecta que ya existe un `prd.md`, entra en modo **Update**, y hace un paso de **Reconcile**
-— compara el PRD con lo que le decís y **muestra los conflictos antes de aplicar nada**.
-
-Si lo que querés es que lo critique **sin tocarlo**, existe el modo **Validate**: corre un
-checklist de calidad y devuelve un reporte aparte, sin modificar el `prd.md`.
-
-⚠️ **No hay deshacer.** Está buscado y no existe: `.memlog.md` es bitácora de decisiones, no
-historial de versiones, y la skill no menciona backup ni git en ninguna parte. Por eso el
-`git init` del paso 1:
+**Antes de cada pedido grande, commiteá.** No hay deshacer: `.memlog.md` es bitácora de
+decisiones, no historial de versiones, y la skill no menciona backup ni git.
 
 ```bash
 git add -A && git commit -m "prd antes de pedir cambios"
 ```
 
-Hacelo **antes de cada pedido grande**. Es la única vuelta atrás que vas a tener.
+**Se invoca la misma skill otra vez.** No hay una skill aparte para editar: `bmad-prd`
+detecta que ya existe un `prd.md`, entra en modo **Update**, y hace un paso de **Reconcile**
+— compara el PRD con lo que le decís y **muestra los conflictos antes de aplicar nada**. Si
+lo que querés es que lo critique **sin tocarlo**, existe el modo **Validate**.
 
-#### 6 · La lista de cobertura, **antes** de escribir el proposal
+Y acá es donde la lista del paso 4 se cobra sola:
 
-Esto es lo que en los documentos del piloto se llama «tabla de trazabilidad», y se entiende
-mejor por lo que hace: **es la lista de todo lo que dicen los documentos del PO, para poder
-verificar después que nada se perdió.**
+```
+Compará prd.md contra lista-de-cobertura.md y decime, en una lista corta:
+1. qué filas de la lista NO aparecen de ninguna forma en el PRD;
+2. qué afirma el PRD que no tenga ninguna fila que lo respalde.
+No corrijas nada todavía. Solo el reporte.
+```
 
-Se arma en **dos momentos**, y por eso confunde si se cuenta como uno.
+Lo primero es lo que el PRD perdió; lo segundo es lo que el PRD agregó por su cuenta. Las
+dos cosas son decisiones tuyas, no de la herramienta: con el reporte en la mano volvés a
+`bmad-prd` y le pedís los cambios.
 
-**Momento 1, acá, antes del proposal.** Numerás las afirmaciones que sacaste de los
-documentos. Es trabajo mecánico y le sale bien a un agente: *«leé los documentos y hacé la
-lista numerada de todo lo que afirman, con el punto exacto de dónde sale cada cosa»*.
+#### 7 · La sesión del proyecto: proposal y deltas
 
-| | de dónde | qué dice |
-|---|---|---|
-| `I017` | lo dice `D01-3.2` | no se recibe mercadería sin orden firmada |
-| `I023` | lo dice `D01-5.1` | el pago al proveedor lo hace contabilidad |
-| `I044` | **lo deduje yo** | el documento no dice qué pasa si la orden llega después |
-
-**Hacer esta lista primero cambia el resultado**, y es la razón de ponerla acá y no después:
-el proposal se escribe **contra una lista**, no contra la impresión que te dejó leer el PRD.
-
-**Momento 2**, en el paso 8: cada renglón recibe su destino.
-
-**Y una cosa que hay que saber: esto no es un artefacto de OpenSpec.** Ningún comando la
-valida, `validate --strict` no la mira, no existe un check que la revise. Es una convención
-del área. Lo único que sí es regla del marco es la consecuencia: **una pregunta abierta
-impide archivar el change.**
-
-#### 7 · La sesión en el repo del proyecto
-
-Acá cruzás del directorio de afuera al repo. Abrís una sesión de agente **en la carpeta del
-repo**, y eso importa: la sesión carga sola toda la constitución, porque el andamio dejó la
-cadena armada.
+Acá cruzás. Abrís una sesión de agente **en la carpeta del repo**, y eso importa: hereda sola
+toda la constitución, porque el andamio dejó la cadena armada.
 
 ```
 CLAUDE.md  ──importa──►  AGENTS.md  ──importa──►  .projects/AGENTS-marco.md
@@ -651,56 +681,82 @@ Más `.claude/settings.json`, y los **12 comandos `/opsx:*`** y las 12 skills `o
 dejó `openspec init` (lo corre `projects init` en su último paso; si ese paso falló, no están y
 hay que correrlo a mano).
 
-Lo que le pasás a la sesión son **dos cosas, no una**:
+Primero copiás la lista al repo, que es el único archivo del descubrimiento que se commitea:
 
-1. el **PRD** ya revisado, y
-2. los **documentos originales** del PO.
-
-**El PRD solo no alcanza.** Si es lo único que entra, la sesión puede citar el PRD pero no de
-qué documento del PO salió cada cosa, y la lista de cobertura queda apuntando al
-intermediario en vez de a la fuente.
-
-Y le pedís **el proposal y los deltas, nada más**:
-
-```
-/opsx:propose
+```bash
+mkdir -p openspec/changes/<nombre-del-change>
+cp ~/descubrimiento-<proyecto>/lista-de-cobertura.md openspec/changes/<nombre-del-change>/cobertura.md
 ```
 
-⚠️ **No le pidas los cuatro artefactos de una.** En un proyecto el PO aprueba **proposal y
-specs**, y `CODEOWNERS` los gatea (`/openspec/changes/**/proposal.md` y
-`/openspec/changes/**/specs/`). Si `design.md` y `tasks.md` llegan en el mismo PR, el PO
-aprueba un proposal cuyo diseño ya está escrito: su aprobación pasa a ser un trámite.
-Proposal + deltas → gate del PO → recién ahí design y tasks.
+Y el prompt. Le pasás **tres cosas, no una**: el PRD, los documentos originales y la lista.
+
+```
+Este es el PRD de este proyecto, ya revisado por mí:
+  ~/descubrimiento-<proyecto>/prd.md
+
+Los documentos originales del negocio, que son la fuente de todo, están en:
+  ~/descubrimiento-<proyecto>/documentos/
+
+Y la lista de cobertura ya está en openspec/changes/<nombre>/cobertura.md, con
+sus dos primeras columnas llenas.
+
+Escribí SOLO el proposal y los deltas de specs de este change:
+  openspec/changes/<nombre>/proposal.md
+  openspec/changes/<nombre>/specs/<capability>/spec.md
+
+NO escribas design.md ni tasks.md todavía: el PO tiene que aprobar el proposal y
+los deltas primero, y si el design ya está escrito su aprobación es un trámite.
+
+Cada escenario que escribas tiene que corresponder a una o más filas de
+cobertura.md. Si necesitás afirmar algo que no tiene fila, no lo inventes: decime
+cuál es y por qué hace falta.
+```
+
+**El PRD solo no alcanza**, y por eso van los documentos: si es lo único que entra, la sesión
+puede citar el PRD pero no de qué documento del PO salió cada cosa, y la lista queda
+apuntando al intermediario en vez de a la fuente.
 
 ⚠️ **`openspec new change` deja el CI rojo hasta que el change tenga su delta.** Se crea y se
 completa en la misma sesión, o se trabaja en una rama sin PR abierto todavía.
 
-#### 8 · Cerrar la lista de cobertura, y con eso el PR
+#### 8 · La tercera columna, y con eso el PR
 
-Cada renglón de la lista del paso 6 recibe ahora su destino. Tres formas y ninguna más:
+Misma sesión del proyecto, con los deltas ya escritos:
 
-| Forma | Cuándo |
-|---|---|
-| el título del escenario | terminó en el contrato |
-| `fuera de alcance: <razón>` | es real y lo dejaste afuera a propósito |
-| `pregunta abierta: <la pregunta>` | el documento no lo resolvía |
+```
+Llená la columna "destino" de openspec/changes/<nombre>/cobertura.md.
 
-**Un renglón sin destino es algo que se perdió**, y eso es exactamente lo que la lista existe
-para encontrar. Por eso está prohibido `n/a`: colapsa «lo dejé afuera a propósito» con «se me
-pasó», que son cosas distintas.
+Cada fila recibe exactamente una de tres formas, y ninguna otra:
+- el título del escenario que la implementa;
+- "fuera de alcance: <razón>", si la afirmación es real y la dejamos afuera a
+  propósito;
+- "pregunta abierta: <la pregunta>", si el documento no la resolvía.
 
-Dos reglas más, y las dos son sobre honestidad y no sobre formato:
+Prohibido "n/a", prohibido dejarla vacía y prohibido inventar un escenario para
+llenarla: si una fila no tiene destino, DEJALA VACÍA y listámela aparte. Una fila
+sin destino es algo que se perdió, y encontrarlo es para lo que existe esta lista.
 
-1. **Lo que deduciste vos no puede quedar escrito como si el documento lo dijera.** O queda
-   como pregunta abierta, o el escenario lleva la marca de supuesto. Escribirlo como dicho
-   deja una invención indistinguible de un requerimiento real.
-2. **Si algo no estaba en los documentos y el PO te lo contestó en la sesión**, anotalo igual
-   y marcá que salió de una pregunta, con la pregunta escrita.
+No toques las dos primeras columnas: están congeladas desde el paso 4.
 
-El archivo va en el repo, al lado de los deltas, y viaja en el mismo PR: cuando el delta
-cambia, la lista cambia con él. Su dueño es quien escribe el delta — una lista que llena un
-tercero después es una reconstrucción. Y su lector es el PO en el review: es lo que le
-permite revisar **por contenido** en vez de por confianza.
+Y para las filas cuyo "de dónde" dice DEDUCIDO: no pueden quedar como un escenario
+normal. O van como "pregunta abierta", o el escenario lleva escrita la marca de
+supuesto. Escribir una deducción como si el documento la dijera deja una invención
+indistinguible de un requerimiento real.
+```
+
+Las filas que te devuelva sin destino son el resultado más valioso del día: es lo que el PO
+dijo y no llegó a ningún lado. Cada una se resuelve —entra como escenario, se declara fuera
+de alcance, o se convierte en pregunta abierta— y recién entonces el PR está completo.
+
+**Una pregunta abierta impide archivar el change.** Podés proponer y diseñar con dudas; no
+podés convertirlas en contrato callándolas. Es la única parte de todo esto que es regla del
+marco: el resto es convención, y **ningún comando valida esta lista** — `validate --strict`
+no la mira.
+
+La lista viaja en el mismo PR que los deltas: cuando el delta cambia, la lista cambia con él.
+Su dueño es quien escribe el delta —una lista que llena un tercero después es una
+reconstrucción— y su lector es el PO en el review, porque es lo que le permite revisar **por
+contenido** en vez de por confianza.
 
 Y lo que la lista **no** compra, dicho para que nadie se confíe: garantiza que cada escenario
 tenga **procedencia**, no que la procedencia sea **buena**. Un documento puede contener una
@@ -771,7 +827,8 @@ o apuntan al lugar equivocado.
 | **BMAD instalado DENTRO del repo** | El check de marcadores del scaffold da **rojo** por 2 archivos de BMAD, y `git add` falla con `Filename too long` en sus `__pycache__`. Se instala en un directorio aparte | Fase 7.1 |
 | **Entrar por la fase 1 de BMAD** | Sirve para sacarle información a alguien preguntándole, y el trabajo ya está hecho. Se entra por `bmad-prd`, que pide los documentos por nombre | Fase 7.1 |
 | **Esperar que BMAD genere los specs de OpenSpec** | No los genera, y no hay comando que convierta el PRD en deltas. El paso 7 es a mano, y es así a propósito | Fase 7.1 |
-| **Pedirle a BMAD un cambio sin commitear antes** | No hay deshacer: `.memlog.md` es bitácora de decisiones, no historial de versiones, y la skill no menciona backup | Fase 7.1, paso 5 |
+| **Pedirle a BMAD un cambio sin commitear antes** | No hay deshacer: `.memlog.md` es bitácora de decisiones, no historial de versiones, y la skill no menciona backup | Fase 7.1, paso 6 |
+| **Armar la lista de cobertura leyendo el PRD** | Deja de servir para lo único que sirve: detectar lo que el PRD perdió. Sale de los documentos originales | Fase 7.1, paso 4 |
 | **Pasarle a la sesión el PRD y no los documentos** | Puede citar el PRD pero no la fuente: la lista de cobertura queda apuntando al intermediario | Fase 7.1, paso 7 |
 | **Pedir los cuatro artefactos de OpenSpec de una** | El PO gatea proposal y specs; si el design ya está escrito, su aprobación es un trámite | Fase 7.1, paso 7 |
 | **Editar el prompt de una skill de BMAD** | Dejás de usar una herramienta y empezás a mantener un fork ajeno. Si no entiende los documentos, ESO es el resultado: se anota y se sigue a mano | Fase 7.1 |
