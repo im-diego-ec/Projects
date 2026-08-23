@@ -24,7 +24,7 @@ Marcas que vas a encontrar:
 
 ---
 
-## Antes de empezar: las tres cosas que la guía da por sentadas
+## Antes de empezar: las cuatro cosas que la guía da por sentadas
 
 ### 1. El clon del marco
 
@@ -49,12 +49,19 @@ pnpm --version                      # 9.15.0 — lo fija el andamio con packageM
 gh auth status                      # autenticado. Necesitás scope admin:org (fase 3.2) y
                                     # admin del repo (fase 6)
 git config --get commit.gpgsign     # tiene que decir true: el marco exige commits firmados
+uv --version                        # la herramienta de descubrimiento lo exige (fase 7.1)
 ```
 
 ⚠️ Si `commit.gpgsign` no está en `true`, lo vas a descubrir en la fase 5, cuando el primer
 commit falle — o peor, cuando entre sin firma y el ruleset la exija más adelante.
 
-### 3. El mapa
+### 3. El corpus de descubrimiento
+
+Si el proyecto ya tiene descubrimiento hecho —documentos, procesos levantados, casos
+borde, un prototipo—, **ese material es el insumo de la sesión y no va al repositorio**.
+Tenelo a mano y numerado antes de empezar; la mecánica completa está en la **fase 7.1**.
+
+### 4. El mapa
 
 Ocho fases, de la 0 a la 7. Las **[otro]** arrancan primero porque bloquean el final, no
 el arranque.
@@ -457,6 +464,149 @@ Los seis pasos y quién aprueba cada uno están en
 los revisa **el otro builder**. Los comandos `/opsx:*` que el andamio dejó en
 `.claude/commands/` cubren el ciclo.
 
+### 7.1 De dónde salen los specs: cargar el corpus en la herramienta
+
+Los pasos de arriba dicen **cómo** se escribe un change. Esta sección dice **de dónde
+sale lo que se escribe**, que es la pregunta que la guía no contestaba.
+
+La regla del área, y no es negociable: **el corpus de descubrimiento se produce fuera
+del repositorio y entra como insumo al inicio de la sesión que lo consume. El
+repositorio no es su custodio.** Lo que el repo conserva son los **artefactos
+derivados** y la **trazabilidad por identificador**. Vale igual para un proyecto
+nuevo, para un agregado y para un deploy.
+
+#### Dos directorios, y lo único que cruza
+
+```
+~/descubrimiento-<proyecto>/     ← FUERA del repo. Acá vive el corpus y acá se
+                                   instala la herramienta. Nada de esto se commitea
+                                   en el repo del proyecto.
+   _bmad/  .claude/skills/       la instalación
+   _bmad-output/                 lo que produce: brief, PRD
+   corpus/                       los documentos del PO
+
+<proyecto>/                      ← EL REPO. Acá entra SOLO lo derivado:
+   openspec/changes/<nombre>/
+      proposal.md                escrito a partir del PRD
+      specs/<capability>/spec.md los deltas
+      trazabilidad.md            la tabla que dice de dónde salió cada escenario
+```
+
+**Lo que cruza son los cuatro archivos de la derecha. El corpus no cruza, el PRD no
+cruza y la instalación no cruza.**
+
+#### Por qué la herramienta NO se instala dentro del repo
+
+No es prolijidad: está medido y el CI se pone rojo.
+
+| Qué pasa | Medido |
+|---|---|
+| El check «Sin marcadores del scaffold sin resolver» da **ROJO** | 2 archivos de la herramienta traen marcadores entre dobles llaves (`BODY`, `CHIPS`, `GOALBAR`, `M`, `N`, `TOTAL`) en `bmad-brainstorming/scripts/brain.py` y en `bmad-create-epics-and-stories/templates/epics-template.md`. Es un rojo permanente sobre archivos que nadie escribió ni puede arreglar |
+| `git add` falla con `Filename too long` | En los `__pycache__` de la herramienta, a una profundidad de ruta normal en Windows. Se arregla con `__pycache__/` y `*.pyc` en el `.gitignore` |
+
+#### Instalar la herramienta, en el directorio de afuera
+
+```bash
+mkdir ~/descubrimiento-<proyecto> && cd ~/descubrimiento-<proyecto>
+npx --yes bmad-method@6.11.0 install --yes --modules bmm --tools claude-code --directory .
+```
+
+Versión exacta, no el nombre pelado: es la regla del marco para todo ejecutor que
+descarga. Salida medida el 2026-08-20: **código 0**, unas 49 skills, `_bmad/` y
+`_bmad-output/`, ~2,9 MB.
+
+⚠️ **Exige `uv`**, la cadena de Python: el instalador imprime `🐍 REQUIRED: uv` y
+provisiona el intérprete él mismo (no hace falta Python instalado). Sin `uv` lo que
+se cae son dos skills de build **al activarse**, no la instalación.
+
+#### Por dónde se entra: `bmad-prd`, no la fase 1
+
+Éste es el punto que más fácil se hace mal. La fase 1 (Analysis) está marcada
+**«Optional»** por el proveedor, y sobre la fase 2 dice, textual:
+
+> *«Neither skill requires the other — start with `bmad-prd` directly if you already
+> know what you're building.»*
+
+El paso **Discovery** de `bmad-prd` hace *source-extract* de documentos existentes, y
+**los pide por nombre**. O sea: cuando el descubrimiento ya está hecho, no se elicita
+de nuevo — se entra por `bmad-prd` y se le nombran los documentos.
+
+🛑 **Lo que no se hace: editar el prompt de una skill** para que trague el corpus. Eso
+no es usar la herramienta, es mantener un fork ajeno — y es exactamente lo que el
+criterio G0 del piloto mide. Si la herramienta no digiere el material como viene, **ese
+es el resultado** y se anota; no se la parchea.
+
+#### Ejemplo, con una pieza sola
+
+El PO entrega el corpus y **numera las piezas al entregarlas** (`D` documento,
+`E` entrevista, `P` prototipo, `F` feedback):
+
+```
+corpus/
+  D01-procesos-recepcion.md
+  D02-casos-borde-recepcion.md
+  P01-prototipo/
+  F01-feedback-usuario.md
+```
+
+Se abre `bmad-prd` y en su paso de Discovery se le nombran las piezas:
+
+```
+Los documentos de entrada son corpus/D01-procesos-recepcion.md y
+corpus/D02-casos-borde-recepcion.md. No hay product-brief previo: el
+descubrimiento ya está hecho y estos documentos son la fuente.
+Alcance de esta rebanada: recepción de mercadería, de la llegada del camión
+hasta la conciliación con la orden. Corta antes del pago a proveedor.
+```
+
+De ahí sale el PRD en `_bmad-output/`. El PRD **es insumo, nunca contrato**: un
+documento con forma de spec se lee como spec aunque nadie lo haya aprobado. El
+contrato son los deltas que apruebe el PO.
+
+#### Cómo se cita, y por qué la tabla es obligatoria
+
+Cada escenario del delta cita el **ítem** que lo origina, y cada ítem declara su
+**origen**: `corpus` si el material lo dice, `derivado` si lo infirió quien convertía,
+`elicitado` si lo contestó el PO en la sesión porque el corpus no lo tenía.
+
+- **Ancla**: la pieza, guion, y el localizador **que la pieza ya trae** — `D01-3.2` es
+  «el punto 3.2 del documento D01». Nunca un número que inventás vos.
+- **Ítem**: `I` más tres dígitos, sin reutilizar.
+- La tabla que traduce `D01` a un archivo concreto **vive con el corpus, fuera del
+  repo**. Sin ella el identificador es una etiqueta sin contenido, y eso es a
+  propósito: es el mismo límite que el marco acepta para los secretos.
+
+`openspec/changes/<nombre>/trazabilidad.md`:
+
+| ítem | origen | sección del insumo | escenario |
+|---|---|---|---|
+| `I017` | `corpus` | PRD, «Recepción», punto 3 | Una recepción sin orden firmada |
+| `I023` | `corpus` | PRD, «Recepción», punto 5 | fuera de alcance declarado: la rebanada corta antes del pago |
+| `I044` | `derivado` | PRD, «Recepción», punto 3 | pregunta abierta: si la orden llega después, ¿queda pendiente o se concilia? |
+
+Tres reglas que hacen que esto sirva de algo:
+
+1. **La última columna no puede quedar vacía ni decir `n/a`.** Toma una de tres formas:
+   el título del escenario, `fuera de alcance declarado: <razón>`, o
+   `pregunta abierta: <la pregunta>`. Con `n/a` un ítem que se perdió y una pregunta
+   abierta se ven igual.
+2. **Un ítem `derivado` no puede sostener un escenario sin marca de supuesto.** Puede
+   quedar como pregunta abierta, o el escenario lleva la marca. Lo que no puede es
+   leerse como si el corpus lo hubiera dicho: eso es invención con cita falsa encima.
+3. **Una pregunta abierta impide el archive.** Se puede proponer y diseñar con dudas;
+   no se pueden convertir en contrato por omisión.
+
+#### La primera media hora
+
+Hay algo que **no está medido**: que la herramienta digiera un corpus cualquiera
+—procesos, casos borde, un prototipo—. La documentación del proveedor solo dice que
+extrae de un `product-brief.md`, que es un documento con la forma que ella espera.
+
+Así que la primera media hora se gasta en esa prueba, **con una pieza sola**, antes de
+abrir el corpus entero. Si no lo digiere, eso es el resultado —y es un resultado útil,
+porque dice qué forma tendría que tener un corpus para servir—. Lo que no se puede
+hacer es descubrirlo a mitad de la tarde y llamarlo «un problema de setup».
+
 ---
 
 ## Los fallos silenciosos, en una tabla
@@ -477,6 +627,9 @@ o apuntan al lugar equivocado.
 | Labels `area:*` ausentes | La constitución las exige y nadie las crea | Fase 6.2 |
 | Los 3 recuadros 🕳️ del andamio | El primer CI sale **rojo** en «Sin marcadores del scaffold sin resolver», y uno de los tres no se puede borrar antes de que el CI corra | Fase 5.1 |
 | Primer PR con el bootstrap adentro | Rojo en cobertura: el diff agrega el esqueleto entero | Fase 5 |
+| **La herramienta de descubrimiento instalada DENTRO del repo** | El check de marcadores del scaffold da **rojo** por 2 archivos de la herramienta, y `git add` falla con `Filename too long` en sus `__pycache__`. Se instala afuera | Fase 7.1 |
+| **Entrar por la fase 1 de la herramienta** | Está marcada «Optional» y no ingiere un corpus terminado. Se entra por `bmad-prd`, que pide los documentos por nombre | Fase 7.1 |
+| **Editar el prompt de una skill** para que trague el corpus | Deja de ser una herramienta adoptada y pasa a ser un fork ajeno que hay que mantener. Si no digiere el material, ESO es el resultado | Fase 7.1 |
 
 ---
 
