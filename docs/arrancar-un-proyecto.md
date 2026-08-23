@@ -46,7 +46,8 @@ todo lo que sigue lo usa.
 ```bash
 node --version                      # 22 o más (el CI usa 22)
 pnpm --version                      # 9.15.0 — lo fija el andamio con packageManager
-gh auth status                      # autenticado, y con scope admin:org para la fase 6
+gh auth status                      # autenticado. Necesitás scope admin:org (fase 3.2) y
+                                    # admin del repo (fase 6)
 git config --get commit.gpgsign     # tiene que decir true: el marco exige commits firmados
 ```
 
