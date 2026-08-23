@@ -192,9 +192,99 @@ jobs:
   # Cuando un repo consumidor copie esta forma, aca ademas cuelga su build-test
   # (ver el encabezado de marco-ci.yml): el carril de docs lo deja "skipped" y
   # el veredicto lo cuenta como exito SOLO si la deteccion dijo solo-docs.
+  # EL CHANGELOG ES OBLIGATORIO EN EL PR QUE INTRODUCE EL CAMBIO, y hasta hoy la
+  # regla estaba enunciada y sin check (fila 20 del backlog de
+  # docs/reglas-no-escritas.md).
+  #
+  # POR QUE IMPORTA MAS QUE UNA FORMALIDAD. El CHANGELOG es la UNICA superficie por
+  # la que un consumidor se entera de que el marco se movio bajo sus pies: pina una
+  # version exacta y recibe el bump como PR de Dependabot, y lo que lee antes de
+  # mergear es esa entrada.
+  #
+  # Y YA FALLO, MEDIDO: el 2026-08-22 se mergeo `herramientas/projects-init.mjs` —una
+  # herramienta nueva de 348 lineas— con la seccion `## [No publicado]` VACIA, y
+  # ningun check se puso rojo; la entrada llego en un PR posterior. Peor que el
+  # olvido es lo que habilita: la precondicion 2 de la skill `projects-release` dice que
+  # si la seccion en vuelo esta vacia «no hay version que cortar», asi que un release
+  # sobre un main con cambios sin anotar PASA esa precondicion mirando el lugar
+  # equivocado.
+  #
+  # POR QUE ES ROJO Y NO AVISO. El backlog proponia estrenarlo en modo aviso una
+  # semana, por la regla del marco sobre endurecimientos. No aplica aca: esa regla
+  # protege a los CONSUMIDORES de un rojo que nadie les anuncio, y este check vive en
+  # el ci.yml de Projects, no viaja a ningun consumidor. Los unicos afectados son los
+  # builders que lo estan agregando, y un aviso dirigido a quien lo escribio no avisa.
+  #
+  # LO QUE MIRA Y LO QUE NO. Mira que el PR TOQUE el CHANGELOG. NO puede juzgar si lo
+  # que escribiste es bueno ni si esta en la seccion correcta: eso es del review. La
+  # frontera esta ahi a proposito — un check que intenta leer la calidad de una
+  # entrada se pone rojo con entradas buenas, y eso ensena a ignorarlo.
+  changelog:
+    name: changelog-en-el-pr
+    # Solo en PRs: en un push a main el PR ya se mergeo y no hay diff que mirar.
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          # El diff se compara contra la base del PR, y con el default (1) ese
+          # commit no esta en el clon.
+          fetch-depth: 0
+
+      - name: El PR que cambia el marco toca el CHANGELOG
+        shell: bash
+        env:
+          BASE: ${{ github.event.pull_request.base.sha }}
+          CABEZA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+
+          # Las superficies cuyo cambio LLEGA a un consumidor. `docs/` y `openspec/`
+          # quedan fuera a proposito: no viajan por el carril referenciado, asi que un
+          # PR que solo toca documentacion o especificacion no le mueve el piso a
+          # nadie. `pruebas/` tambien: es el banco del marco, no lo que se distribuye.
+          SUPERFICIES="actions .github/workflows plantilla herramientas"
+
+          if ! git cat-file -e "${BASE}^{commit}" 2>/dev/null; then
+            echo "::error::no pude resolver el commit base del PR (${BASE}). Sin el no hay diff que mirar, y este check NO se declara verde por no haber podido medir. Arreglo: el checkout de este job necesita fetch-depth: 0"
+            exit 1
+          fi
+
+          CAMBIADOS="$(git diff --name-only "${BASE}" "${CABEZA}")"
+
+          # "Cero archivos cambiados" jamas se reporta como exito: seria un diff que
+          # no se pudo leer, no un PR vacio (un PR vacio no existe).
+          if [ -z "${CAMBIADOS}" ]; then
+            echo "::error::el diff entre ${BASE} y ${CABEZA} salio vacio. Un PR sin archivos cambiados no existe, asi que esto es un diff que no se pudo leer"
+            exit 1
+          fi
+
+          TOCA_MARCO=""
+          for s in ${SUPERFICIES}; do
+            if echo "${CAMBIADOS}" | grep -qE "^${s}/"; then
+              TOCA_MARCO="${TOCA_MARCO} ${s}"
+            fi
+          done
+
+          if [ -z "${TOCA_MARCO}" ]; then
+            echo "este PR no toca ninguna superficie que viaje a un consumidor (${SUPERFICIES}): el CHANGELOG no es obligatorio"
+            exit 0
+          fi
+
+          if echo "${CAMBIADOS}" | grep -qE '^CHANGELOG\.md$'; then
+            echo "el PR toca${TOCA_MARCO} y tambien el CHANGELOG: OK"
+            exit 0
+          fi
+
+          echo "::error::este PR cambia el marco (${TOCA_MARCO# }) y NO toca CHANGELOG.md. El CHANGELOG es la unica superficie por la que un consumidor se entera de que el marco se movio bajo sus pies, y se escribe en el PR que introduce el cambio, no al cortar la version. Arreglo: agrega tu entrada en la seccion '## [No publicado]', diciendo que tiene que hacer un consumidor (normalmente: nada)"
+          exit 1
+
   ci_ok:
     name: ci-ok
-    needs: [marco, pruebas_actions, constitucion]
+    needs: [marco, pruebas_actions, constitucion, changelog]
     if: always()
     runs-on: ubuntu-latest
     steps:
@@ -217,5 +307,23 @@ jobs:
             echo "::error::el cableado de la constitucion (modo cableado, por ruta local) termino en '${{ needs.constitucion.result }}'"
             exit 1
           }
+          # El job del CHANGELOG se saltea a proposito en un push a main: ahi el PR ya
+          # se mergeo y no hay diff que mirar. Un "skipped" cuenta como exito SOLO en
+          # ese caso; en un pull_request, un salteo significa que alguien le puso un
+          # if al job, y eso es apagarlo.
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            [ "${{ needs.changelog.result }}" = "success" ] || {
+              echo "::error::el check del CHANGELOG en el PR termino en '${{ needs.changelog.result }}'"
+              exit 1
+            }
+          else
+            case "${{ needs.changelog.result }}" in
+              success | skipped) ;;
+              *)
+                echo "::error::el check del CHANGELOG termino en '${{ needs.changelog.result }}'"
+                exit 1
+                ;;
+            esac
+          fi
           echo "marco: OK (solo_docs=${{ needs.marco.outputs.solo_docs }}, deteccion_confiable=${{ needs.marco.outputs.deteccion_confiable }})"
           echo "Projects no tiene build/test de producto: el veredicto es el del marco mas su banco de pruebas"

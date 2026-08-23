@@ -41,6 +41,54 @@ mueve sobre un cambio incompatible.
 
 ## [No publicado]
 
+### Añadido
+
+- **El CHANGELOG dejó de ser una regla sin check.** «Se escribe en el PR que introduce el
+  cambio» estaba enunciado en `AGENTS.md` y en el encabezado de este archivo, y **ya había
+  fallado, medido**: el 2026-08-22 se mergeó `projects init` —348 líneas— con la sección
+  `## [No publicado]` vacía, y ningún check se puso rojo.
+
+  Peor que el olvido es lo que habilitaba: la precondición 2 de `projects-release` dice que si
+  la sección en vuelo está vacía «no hay versión que cortar», así que **un release sobre un
+  main con cambios sin anotar pasaba esa precondición mirando el lugar equivocado**.
+
+  El job `changelog-en-el-pr` exige que un PR que toque `actions/`, `.github/workflows/`,
+  `plantilla/` o `herramientas/` toque también `CHANGELOG.md`. `docs/`, `openspec/` y
+  `pruebas/` quedan fuera **a propósito**: no viajan por el carril referenciado, así que no
+  le mueven el piso a ningún consumidor.
+
+  **Estrenado en rojo, no en aviso**, contra lo que el propio backlog proponía: la regla del
+  modo aviso protege a los **consumidores** de un rojo que nadie les anunció, y este check
+  vive en el `ci.yml` de Projects — no viaja a ninguno. Un aviso dirigido a quien lo escribió
+  no avisa nada.
+
+  Y lo que mira está acotado: **que el PR toque el CHANGELOG**, no si lo que escribiste es
+  bueno. Eso es del review, y un check que intenta leer la calidad de una entrada se pone
+  rojo con entradas buenas — que es como se enseña a ignorarlo.
+
+  Banco en `pruebas/ci-del-marco/`, 8 casos, que **extrae el script del YAML** en vez de
+  copiarlo: las cuatro superficies que disparan, las tres que no, que un
+  `plantilla/CHANGELOG.md` no cuenta (el ancla está al inicio de la ruta), el fail-closed
+  cuando la base no resuelve, y que un diff vacío no se reporte como éxito.
+
+- **Ninguna sección del canónico puede desaparecer en silencio.** `leerCanonico()` deriva
+  las secciones del árbol, y esa decisión no se toca: agregar una entra al render por
+  existir. Lo que el trade nunca nombró es su otra mitad — **derivar del árbol hace gratis
+  agregar y ciego borrar**.
+
+  Medido: la única aserción sobre el canónico real exigía `secciones.length >= 2`, así que
+  **borrar `90-marca.md`** —las siete reglas de identidad visual que llegan a cada repo—
+  **dejaba las 383 pruebas del marco en verde**. Del lado del consumidor tampoco se ve: su
+  artefacto queda distinto, lo regenera, y pierde las reglas sin un solo aviso.
+
+  `actions/constitucion/pruebas/inventario-canonico.test.mjs` declara las 10 secciones con
+  una frase de qué trae cada una, y el rojo **nombra qué se pierde**, no solo que falta un
+  archivo. El inventario vive **en la prueba y no en el manifiesto**: ponerlo ahí sería
+  revertir esa decisión para todos los consumidores y sumar un campo que hay que mantener.
+  Acá cuesta lo mismo —una línea al agregar una sección— pero lo paga quien toca el canónico,
+  en el PR donde lo toca, con el arreglo en el mensaje. **Agregar es barato; quitar exige
+  decirlo.**
+
 ### Cambiado
 
 - **La guía de arranque se acortó a la mitad, porque el andamio ya hace lo que ella
