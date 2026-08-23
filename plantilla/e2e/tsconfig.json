@@ -1,0 +1,21 @@
+{
+  // Programa de tipos de la suite E2E. Existe por una razon concreta: es lo que
+  // habilita el lint type-aware sobre estos archivos (projectService autodetecta
+  // este tsconfig). Sin informacion de tipos, no-floating-promises no existe y un
+  // `await` olvidado en un helper no sale como rojo del PR sino como flake
+  // intermitente en la promocion, que es la peor forma de descubrirlo.
+  //
+  // Y es tambien lo que mantiene estos archivos DENTRO del alcance del censo de
+  // fuentes del marco: playwright.config.ts cae en el ignore "**/*.config.ts" del
+  // linter, asi que el compilador es el unico que lo mira.
+  "extends": "../tsconfig.base.json",
+  "compilerOptions": {
+    "noEmit": true,
+    // Playwright orquesta el navegador DESDE Node: process.env es la unica API de
+    // plataforma que usa esta suite. Sin "dom" a proposito — el codigo habla con
+    // la pagina por la API de Playwright, nunca por globals del navegador; si
+    // alguien escribe `document.x` aca, es un error y tiene que salir en rojo.
+    "types": ["node"]
+  },
+  "include": ["**/*.ts"]
+}

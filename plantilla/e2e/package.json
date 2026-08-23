@@ -1,0 +1,24 @@
+{
+  "name": "{{PAQUETE_E2E}}",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "playwright test",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.58.2",
+    "@types/node": "^22.10.5",
+    "typescript": "^5.7.3"
+  },
+  "projects": {
+    "cobertura": {
+      "excluidos": [
+        {
+          "patron": "**/*.ts",
+          "motivo": "Este paquete es ENTERO codigo de prueba: no se sirve a ningun usuario y no hay producto que cubrir. La suite corre con navegadores contra un ambiente YA DESPLEGADO, por eso ci.yml declara e2e:test y e2e:build como excepciones y ningun reporte de cobertura del CI la reclama jamas. La exclusion es LOAD-BEARING en las dos compuertas del marco, medido quitandola: censo-fuentes da rojo por playwright.config.ts (esta en el programa de tipos, pero el analizador lo ignora por el patron '**/*.config.ts' de eslint.config.mjs) y cobertura-diff da rojo por sus 11 lineas agregadas sin ningun dato de cobertura. El patron cubre todo el paquete a proposito y no solo esos dos archivos: un helper .ts que se agregue manana tampoco va a aparecer en ningun lcov, y una exclusion que hay que ampliar cada vez que se agrega un archivo termina siendo una exclusion mas amplia escrita a las apuradas. Lo que SI se le exige a este paquete y corre en cada PR es typecheck: sin programa de tipos, no-floating-promises no existe y un await olvidado aparece como flake en la promocion en vez de como rojo del PR."
+        }
+      ]
+    }
+  }
+}
