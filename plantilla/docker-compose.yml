@@ -1,0 +1,40 @@
+# PostgreSQL local para desarrollar {{PROYECTO}}. Se levanta con:
+#   docker compose up -d
+#
+# POR QUE EXISTE. El stack fija PostgreSQL via Prisma, y las migraciones se
+# ensayan contra una base real antes de tocar dev. Sin esto, `prisma migrate
+# dev` no tiene contra que correr y la unica base disponible seria la de un
+# ambiente compartido: dev es staging de todo el equipo, no el banco de pruebas
+# de una rama.
+#
+# ESTO ES SOLO PARA LA MAQUINA DE QUIEN DESARROLLA. Los ambientes reales corren
+# Aurora Serverless v2 con IAM auth y se crean por Terraform (infra/ para dev,
+# infra-prod/ para produccion). Nada de este archivo se despliega.
+#
+# EL NOMBRE DE LA BASE ESTA ACOPLADO, y por eso es literal y no un marcador:
+# tiene que coincidir con el DATABASE_URL de api/.env.example. Son dos archivos
+# distintos y el marco no verifica que digan lo mismo, asi que cambiarlo aca
+# obliga a cambiarlo alla en el MISMO commit; si no, el primer `pnpm dev` del
+# repo nuevo falla al conectar y el error no dice por que.
+services:
+  db:
+    image: postgres:16
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: la organización
+    ports:
+      # El puerto estandar de Postgres. Si otro proyecto del area ya lo tiene
+      # tomado en esta maquina, `docker compose up -d` falla con "port is
+      # already allocated": se cambia el lado IZQUIERDO (el del host) aca y el
+      # puerto del DATABASE_URL de api/.env, que es el mismo acople de arriba.
+      - "5432:5432"
+    volumes:
+      # Volumen nombrado: los datos sobreviven a `docker compose down`. Compose
+      # le pone como prefijo el nombre del directorio del proyecto, asi que dos
+      # repos del area no se pisan los datos. Para empezar de cero:
+      # `docker compose down -v` (borra la base local, no pregunta).
+      - pgdata:/var/lib/postgresql/data
+volumes:
+  pgdata:

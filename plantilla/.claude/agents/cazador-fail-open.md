@@ -157,10 +157,10 @@ auditado. Si el censo no está completo, no sigas.
 
 Por cada `Sn`, contestá la pregunta única y asigná uno de tres veredictos:
 
-| Veredicto | Significa |
-|---|---|
-| `VERIFICÓ` | Cuando este camino se toma, la comprobación efectivamente corrió sobre datos reales. |
-| `SOSPECHOSO` | Hay una entrada plausible que llega acá sin que nada se haya comprobado. Pasa al paso 4. |
+| Veredicto       | Significa                                                                                                  |
+| --------------- | ---------------------------------------------------------------------------------------------------------- |
+| `VERIFICÓ`      | Cuando este camino se toma, la comprobación efectivamente corrió sobre datos reales.                       |
+| `SOSPECHOSO`    | Hay una entrada plausible que llega acá sin que nada se haya comprobado. Pasa al paso 4.                   |
 | `INDETERMINADO` | No lo pude decidir leyendo. Pasa al paso 4 igual; si tampoco se puede reproducir, va como `NO CONFIRMADO`. |
 
 Dos preguntas auxiliares que desempatan casi siempre:
@@ -300,7 +300,7 @@ repite en piezas nuevas.
 1. **Reporte de cobertura rancio.** Un `lcov` viejo (vector real: una caché de
    CI que restaura `coverage/`) no lista las líneas nuevas; el comparador las
    leía como "no ejecutables", el archivo desaparecía del cálculo y el paso
-   salía **exit 0 y mudo**. Agravante: una línea *modificada* que conserva su
+   salía **exit 0 y mudo**. Agravante: una línea _modificada_ que conserva su
    número heredaba el resultado viejo y contaba como cubierta.
 2. **El porcentaje que miente.** Un archivo cuya extensión ningún reporte medía
    se descartaba en silencio: en un cambio mixto se publicó **100.00% sobre una
