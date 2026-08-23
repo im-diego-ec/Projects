@@ -49,6 +49,8 @@ por 10× es un defecto de la guía, no del que la corrió.
 | 2 · Los 21 valores | — | | | |
 | 3 · El repo | 2 comandos | | | |
 | 3.1 · Qué quedó en el repo | — | | | |
+| 3.2 · Escritura de los equipos | — | | | |
+| 3.3 · Si el repo ya existía | — | | | |
 | 4 · El lockfile | 1 comando | | | |
 | 4.1 · Comprobarlo antes de pushear | — | | | |
 | 5 · Primer push a `main` | — | | | |
