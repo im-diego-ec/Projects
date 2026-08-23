@@ -41,6 +41,40 @@ mueve sobre un cambio incompatible.
 
 ## [No publicado]
 
+### Corregido
+
+- **La guía mandaba a copiar un repo archivado entero, y ese repo lleva adentro la
+  infraestructura de otro proyecto.** `projects-starter` —el esqueleto de aplicación—
+  está **archivado y read-only** desde el 2026-08-14, con su último commit el 2026-07-09.
+  Se intentó arreglarlo ahí y GitHub lo rechazó: *«This repository was archived so it is
+  read-only»*. Así que el arreglo tenía que estar en el punto de uso.
+
+  La guía ahora **extrae de la lista** en vez de copiar el árbol: entran 32 archivos —los
+  dos paquetes, el `package.json`, el workspace, el lockfile y el compose— y no entra
+  nada más. Medido.
+
+  **Eso resuelve seis problemas de una**, y por eso la lista es explícita y no un
+  `cp -r` con borrados después:
+
+  1. **`infra/`** es el Terraform de otro proyecto, **aplicable**, en la misma cuenta de
+     dev. Y su README es el **inventario de ese ambiente vivo** —VPC, endpoint de la base,
+     URI del ECR con el número de cuenta, bucket, ARN del rol de deploy— más el camino
+     para conseguir sus secretos. No hay valores versionados; hay un mapa completo.
+  2. **`deploy.yml`** es el deploy de esa arquitectura (App Runner + CloudFront), y
+     apunta a esos mismos recursos por secret.
+  3. **`spec/`** es la convención vieja; hoy la fuente de verdad es `openspec/`.
+  4. **El `README.md` del starter** dice que «la infraestructura ya está creada» y que
+     desplegar es «solo hacer push a `main`». Sobre los recursos de ese otro proyecto
+     habría sido verdad.
+  5. y 6. Los **cuatro archivos que colisionaban** con el andamio no se traen, así que
+     `projects init` corre limpio y **`--forzar` deja de ser parte del camino normal**. La
+     trampa del orden inverso —que pisa con exit 0 y sin un solo aviso— queda como nota
+     plegada para quien copie el árbol entero de todas formas.
+
+  Y la guía dice ahora **qué se hereda de un repo congelado**, en vez de dejarlo para la
+  sorpresa: `pnpm@9.15.0`, `hashicorp/aws` 5.100.0 —un major completo atrás del
+  un consumidor—, sin proveedor de cobertura y con un solo archivo de pruebas.
+
 ### Añadido
 
 - **`docs/arrancar-un-proyecto.md`: el paso a paso de arrancar un proyecto desde cero,
