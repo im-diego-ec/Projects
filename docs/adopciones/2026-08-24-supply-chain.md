@@ -20,7 +20,7 @@ Va como fila al [backlog](../reglas-no-escritas.md#backlog-de-automatización).
 | | |
 |---|---|
 | Proyecto | Supply Chain |
-| Repo destino | *a decidir* — `im-diego-ec/Procurement` existe y está vacío |
+| Repo destino | *a decidir* — `im-diego-ec/Procurement` existe y **no está vacío**: un `README.md` de 13 bytes y un solo commit («Initial commit», 2026-08-14, autor `po`). Tiene rama `main`, así que `projects init` aterriza sobre historia existente, no sobre un repo virgen |
 | Fecha | 2026-08-24 |
 | Quién ejecuta | @builder-uno (builder) |
 | Quién acompaña | @po (PO) — primer día en la organización |
@@ -38,6 +38,23 @@ Va como fila al [backlog](../reglas-no-escritas.md#backlog-de-automatización).
   Exposición real medida: nula. No es un tropiezo del ensayo.
 - El andamio **no trae `infra/` ni pipeline de deploy**, aunque la constitución los
   exige. Es hueco conocido, no hallazgo.
+
+## Lo que falta ANTES de empezar (medido el 2026-08-23, solo Builder 1 puede)
+
+Sin esto el ejercicio se traba, y ninguno se arregla desde la sesión de agente.
+
+| Qué | Estado medido | Cómo se verifica |
+|---|---|---|
+| `po` miembro de la organización | **NO** — y sin invitación pendiente, pese a haber creado `Procurement` el 2026-08-14 | `gh api orgs/im-diego-ec/members/po --include` → `404` |
+| Team `po` con miembros | **VACÍO** (el team existe, id 18994571) | `gh api orgs/im-diego-ec/teams/po/members` → `[]` |
+| Acceso del team al repo destino | **NO** — en `Procurement` los colaboradores son builder-uno (admin), builder-dos (read) y la-organizacion (admin); ningún team | `gh api repos/.../Procurement/collaborators` |
+| Labels `area:*` en el repo destino | pendiente (fase 6.2 de la guía las crea) | `gh label list --repo ...` |
+| Los dos secrets de la fase 6.4 | pendiente (ninguno gatea el pipeline) | `gh secret list --repo ...` — verificar EXISTENCIA, nunca el valor |
+
+**Por qué el team `po` vacío importa más de lo que parece**: CODEOWNERS le da al PO la propiedad de
+proposals y specs, y ahí su aprobación **es** el gate. Con el team vacío, GitHub no le pide review a
+nadie para esas rutas — el gate existe en el archivo y no existe en la práctica. Se nota recién en la
+fase 7, cuando el primer change de OpenSpec necesita al PO.
 
 ## El reloj, fase por fase
 
