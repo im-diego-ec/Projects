@@ -41,6 +41,40 @@ mueve sobre un cambio incompatible.
 
 ## [No publicado]
 
+### Añadido
+
+- **Los manifiestos del andamio tienen guarda: hasta hoy nada mordía si alguien les metía
+  un `|| true`.** El hueco se abrió el 2026-08-22, cuando el andamio pasó de traer solo
+  mecánica a repartir `package.json` — y un manifiesto es exactamente donde vive un
+  fail-open barato. En un andamio, además, se multiplica por cada repo que nazca de él.
+
+  `pruebas/andamio/manifiestos.test.mjs` (7 pruebas, cero dependencias) verifica cuatro
+  propiedades, **todas leídas del árbol** y ninguna repetida en la prueba:
+
+  1. **Ningún script enmascara su código de salida.** Cinco formas —`|| true`,
+     `|| exit 0`, `; exit 0`, `--passWithNoTests`, `|| :`— y el mensaje de cada hallazgo
+     dice **por qué** esa forma tapa el fallo.
+  2. **Los scripts que el pipeline invoca están declarados donde los busca.** Se leen del
+     `ci.yml`: `SCRIPTS` por paquete, `EXCEPCIONES`, y los `pnpm <script>` de la raíz. Una
+     excepción cuyo paquete el workspace no declara es roja: es una compuerta apagada para
+     nadie.
+  3. **Cada paquete verificable emite cobertura Y extiende `coberturaDelMarco()`.** Sin
+     `--coverage` no hay lcov; sin la base, se pierden el `all: true` y el `projectRoot`.
+  4. **Ningún marcador vive en una RUTA.** `projects init` sustituye contenido y copia rutas
+     **tal cual**, así que un directorio `{{PAQUETE_API}}` llegaría literal al repo nuevo y
+     el check de marcadores sobrevivientes —que solo lee contenido— firmaría «cero».
+
+  **Y el rojo histórico, que es la razón de que esto exista:** una prueba reconstruye los
+  manifiestos tal como llegaron y exige los **tres** fail-opens por nombre (`api:lint`,
+  `web:lint`, `web:test`). No es una afirmación sobre el pasado: es la evidencia de que el
+  check habría mordido el día que hizo falta.
+
+  **Las 8 mutaciones muerden, y dos no mordían al principio.** Las dos por el mismo defecto
+  mío: la escapatoria del marcador estaba escrita como «si el lado izquierdo es un marcador,
+  aplica a todos», así que `{{PAQUETE_E2E}}:test` eximía a los **tres** paquetes de tener
+  `test`. Sin la prueba de mordida, dos de las cuatro comprobaciones habrían entrado a
+  `main` pasando siempre — el fail-open que el bloque entero existe para no tener.
+
 ### Corregido
 
 - **La guía no avisaba que el primer CI de un repo nuevo sale ROJO, y sale rojo siempre.**
