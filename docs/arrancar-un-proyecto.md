@@ -77,10 +77,17 @@ GitHub pertenece a **otra persona**. Los tres handles "obvios" (`builder-uno`,
 `builder-dos`, `dserrano`) existen en GitHub y son de terceros reales. Poner uno de esos
 en `CODEOWNERS` no falla: asigna a un desconocido, o a nadie, sin decir nada.
 
-**2. El board donde van los issues macro.** Hoy el único project del área es
-*«Roadmap del área»* (project 2), que es de otro repo. Decidí si el proyecto
-nuevo entra ahí (y se renombra, lo que toca a otro repo) o si se crea uno propio.
-Es una decisión, no un comando.
+**2. El issue macro en el Project del equipo.** Los pendientes macro **no** viven en el
+repo: van al Project del área, y los hijos —los sub-issues por bloque— no van al board.
+Decidido el 2026-08-23; la regla es la de la constitución y no cambió.
+
+Hoy el único project del área es *«Roadmap del área»* (project 2). Si el proyecto
+nuevo entra ahí, se renombra, y eso toca a otro repo: por eso está en esta fase y no en
+la última.
+
+```bash
+gh project list --owner po
+```
 
 ---
 
@@ -246,6 +253,37 @@ push a main  →  CI corre  →  arreglar en main con más pushes directos hasta
 Desde ese momento el proceso normal rige sin excepciones, y el primer PR de verdad ya
 lleva un diff chico donde la compuerta de cobertura mide lo que tiene que medir.
 
+### 5.1 Tu primer CI va a salir ROJO en un job, y es esperado
+
+⚠️ **El job «Sin marcadores del scaffold sin resolver» falla, y está bien.** El andamio
+reparte **3 recuadros 🕳️** —2 en `AGENTS.md`, 1 en `.github/proteccion-main.md`— que un
+humano tiene que resolver y borrar. El marco los cuenta y los lee como bootstrap a medias:
+mientras existan, ese job es rojo. **No es un defecto de tu repo ni del andamio.**
+
+Y hay una razón por la que **no se pueden borrar todos antes del primer push**: el recuadro
+de `proteccion-main.md` te manda aplicar la protección de rama, y eso **no se puede hacer
+hasta que el CI haya corrido una vez** — el check `ci-ok` no existe en la lista del ruleset
+hasta que alguna corrida lo haya reportado. El primer rojo es estructural.
+
+**La secuencia que lo apaga:**
+
+1. **Push a `main`** → el CI corre. Rojo en «Sin marcadores», verde en el resto.
+2. **Aplicá la protección** (fase 6.1, las 4 reglas). Ahora `ci-ok` existe en el ruleset.
+3. **Resolvé y borrá los 3 recuadros**, que es trabajo real:
+   - `AGENTS.md`, «Antes del primer commit»: revisá la tabla del stack y **borrá la fila**
+     de lo que este proyecto no vaya a tener.
+   - `AGENTS.md`, «reglas de este repo»: escribí las propias, o borrá el recuadro si
+     todavía no hay ninguna.
+   - `.github/proteccion-main.md`: pasá los 🔴 a 🟢 con la fecha, y escribí el motivo de
+     las diferidas.
+4. **Push de nuevo** → verde.
+
+Antes del segundo push, comprobá que no quedó ninguno. Sin salida es lo que buscás:
+
+```bash
+grep -rn "🕳" --include="*.md" .
+```
+
 ---
 
 ## Fase 6 — Settings del repo · **[vos]**, y algunos exigen OK
@@ -339,6 +377,7 @@ o apuntan al lugar equivocado.
 | `@v1` en vez de versión exacta | No falla: el repo simplemente **no recibe versiones nuevas** ni aparece en el censo | Fase 6.3 |
 | Dependabot apagado | Igual que arriba, y no hay aviso | Fase 6.3 |
 | Labels `area:*` ausentes | La constitución las exige y nadie las crea | Fase 6.2 |
+| Los 3 recuadros 🕳️ del andamio | El primer CI sale **rojo** en «Sin marcadores del scaffold sin resolver», y uno de los tres no se puede borrar antes de que el CI corra | Fase 5.1 |
 | Primer PR con el bootstrap adentro | Rojo en cobertura: el diff agrega el esqueleto entero | Fase 5 |
 
 ---
