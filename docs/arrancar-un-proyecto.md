@@ -55,7 +55,8 @@ commit falle — o peor, cuando entre sin firma y el ruleset la exija más adela
 
 ### 3. El mapa
 
-Siete fases. Las **[otro]** arrancan primero porque bloquean el final, no el arranque.
+Ocho fases, de la 0 a la 7. Las **[otro]** arrancan primero porque bloquean el final, no
+el arranque.
 
 | Fase | Qué | Quién |
 |---|---|---|
@@ -70,6 +71,7 @@ Siete fases. Las **[otro]** arrancan primero porque bloquean el final, no el arr
 
 **La fase 5 es donde el primer CI sale rojo, y es esperado.** Está explicado en 5.1; no es
 que hayas hecho algo mal.
+
 ---
 
 ## Fase 0 — Verificar, no hacer · 4 comandos, 30 segundos · **[vos]**
