@@ -1,0 +1,46 @@
+{
+  "name": "{{PROYECTO}}",
+  "private": true,
+  "packageManager": "pnpm@9.15.0",
+  "scripts": {
+    "dev": "pnpm --parallel -r dev",
+    "lint": "eslint . --max-warnings=0",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "typecheck": "pnpm -C api run typecheck && pnpm -C web run typecheck && pnpm -C e2e run typecheck",
+    "test": "pnpm -C api run test && pnpm -C web run test",
+    "build": "pnpm -C api run build && pnpm -C web run build",
+    "datos": "pnpm --filter {{PAQUETE_API}} --fail-if-no-match exec {{GENERAR_CLIENTE_DATOS}}",
+    "verificar": "pnpm datos && pnpm lint && pnpm format:check && pnpm typecheck && pnpm test && pnpm build",
+    "e2e": "pnpm -C e2e run test"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.17.0",
+    "@tanstack/eslint-plugin-query": "^5.62.1",
+    "eslint": "^9.17.0",
+    "eslint-config-prettier": "^9.1.0",
+    "eslint-plugin-react-hooks": "^5.1.0",
+    "eslint-plugin-react-refresh": "^0.5.3",
+    "globals": "^15.14.0",
+    "prettier": "^3.4.2",
+    "typescript-eslint": "^8.19.0"
+  },
+  "projects": {
+    "cobertura": {
+      "excluidos": [
+        {
+          "patron": "eslint.config.mjs",
+          "motivo": "Configuracion del propio linter: la ejecuta eslint al arrancar, no una prueba. Ninguna suite puede importarla para medirla y la raiz del monorepo no emite reporte de cobertura. Queda DENTRO del alcance del censo de fuentes (el linter si la examina) y fuera de la medicion de cobertura: son dos cosas distintas."
+        },
+        {
+          "patron": "vitest.config.base.mjs",
+          "motivo": "Configuracion de cobertura que reparte el marco: es lo que MIDE, no algo medible. Cubrirla con una prueba seria probar el instrumento con el instrumento. La lee el linter y no necesita programa de tipos, que es justo por lo que es .mjs y no .ts."
+        },
+        {
+          "patron": ".claude/skills/**/*.mjs",
+          "motivo": "Herramientas de agente que reparte el marco (no las escribe este proyecto y no son codigo de producto: no se sirven a ningun usuario). Su verificacion vive en el repo del marco, que tiene sus propias pruebas; medirlas aca seria contabilizar dos veces codigo ajeno."
+        }
+      ]
+    }
+  }
+}

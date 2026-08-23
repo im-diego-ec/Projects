@@ -22,3 +22,18 @@ openspec/changes/archive
 
 # Misma razon, para la superficie de Cursor cuando el proyecto la declara.
 .cursor/rules/00-marco.mdc
+
+# EL ANDAMIO DE AGENTES QUE ESCRIBE EL CLI DE OPENSPEC. Lo genera `openspec init`
+# —que `projects init` corre por nosotros con la version que pina el marco— y lo
+# reescribe cada `openspec update`. Son archivos de una herramienta de terceros:
+# no pasan `prettier --check` tal como los escribe, y formatearlos no arregla
+# nada porque el siguiente update devuelve el diff. Mismo criterio que `.projects/`.
+#
+# MEDIDO, no supuesto: en un repo recien nacido del andamio, con el pin 1.9.0,
+# son 24 archivos y hacian fallar `pnpm format:check` en el primer PR.
+#
+# El alcance es PRECISO a proposito: no se ignora `.claude/` entero, porque ahi
+# tambien viven el agente y la skill que reparte el marco (cazador-fail-open.md,
+# projects-archive-change/) y esos SI se formatean y SI se revisan.
+.claude/commands/opsx
+.claude/skills/openspec-*

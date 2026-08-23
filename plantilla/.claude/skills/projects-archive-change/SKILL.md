@@ -350,13 +350,13 @@ contenido nuevo — es la pregunta que sale en review todas las veces.
 
 ## Trampas conocidas, resumidas
 
-| Trampa | Sintoma exacto | Que hacer |
-|---|---|---|
-| `openspec archive` en Windows | Imprime `Specs updated successfully` y hace rollback: `git status --short` no muestra ni un cambio en `openspec/specs/` | No usar el CLI para archivar en Windows. Usar esta skill |
-| Script de archive que no aplica nada | "deltas aplicados" con cero operaciones y exit 0 | El script de esta skill sale 1 en ese caso. Si ves un verde con 0 operaciones, el script esta roto |
-| MODIFIED que omite escenarios | `validate --strict` en **verde** y aun asi el spec vivo pierde escenarios al archivar | Comparar titulo por titulo antes de aplicar + conteo de escenarios antes/despues |
-| Retitulado sin declarar | El guardrail **no avisa** cuando el titulo del delta no existe en el spec vivo | Declarar el par FROM/TO en `## RENAMED Requirements` |
-| Capability nueva | Nace con `Purpose: TBD` y nadie lo nota | `grep -rn "Purpose: TBD" openspec/specs/` y completarlo en el mismo PR |
+| Trampa                               | Sintoma exacto                                                                                                          | Que hacer                                                                                          |
+| ------------------------------------ | ----------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------- |
+| `openspec archive` en Windows        | Imprime `Specs updated successfully` y hace rollback: `git status --short` no muestra ni un cambio en `openspec/specs/` | No usar el CLI para archivar en Windows. Usar esta skill                                           |
+| Script de archive que no aplica nada | "deltas aplicados" con cero operaciones y exit 0                                                                        | El script de esta skill sale 1 en ese caso. Si ves un verde con 0 operaciones, el script esta roto |
+| MODIFIED que omite escenarios        | `validate --strict` en **verde** y aun asi el spec vivo pierde escenarios al archivar                                   | Comparar titulo por titulo antes de aplicar + conteo de escenarios antes/despues                   |
+| Retitulado sin declarar              | El guardrail **no avisa** cuando el titulo del delta no existe en el spec vivo                                          | Declarar el par FROM/TO en `## RENAMED Requirements`                                               |
+| Capability nueva                     | Nace con `Purpose: TBD` y nadie lo nota                                                                                 | `grep -rn "Purpose: TBD" openspec/specs/` y completarlo en el mismo PR                             |
 
 ## Estado de verificacion del script
 
@@ -365,16 +365,16 @@ cubre**: no es una composite action del marco ni un paquete de este repo, y su
 unica verificacion es la de abajo. Se verifico a mano el 2026-08-19 sobre fixtures
 sinteticas, en estos casos:
 
-| Caso | Resultado esperado | Verificado |
-|---|---|---|
-| RENAMED + MODIFIED + REMOVED + ADDED en una capability | 4 operaciones, requirement reemplazado completo, escenario nuevo presente | ✔ |
-| Capability nueva (solo ADDED, sin spec vivo) | Se crea el spec con `Purpose: TBD` y `::warning::` nombrandolo | ✔ |
-| Delta sin ninguna seccion de operaciones | exit 1 por la guarda de cero operaciones; el spec vivo intacto | ✔ |
-| MODIFIED contra un requirement inexistente | exit 1 al planificar, **sin escribir ni un archivo** (md5 del spec vivo sin cambio) | ✔ |
-| Change que existe pero sin carpeta `specs/` | exit 1 diciendo que el change EXISTE y no lleva deltas | ✔ |
-| Corrido fuera de la raiz del repo | exit **2** nombrando la causa real (no estas en la raiz), sin concluir nada sobre el change | ✔ |
-| Nombre del change con typo | exit **2** listando los changes activos, sin concluir que el change no tenga deltas | ✔ |
-| Archivos con CRLF (Windows) | Aplica igual: el lector normaliza los saltos de linea | ✔ |
+| Caso                                                   | Resultado esperado                                                                          | Verificado |
+| ------------------------------------------------------ | ------------------------------------------------------------------------------------------- | ---------- |
+| RENAMED + MODIFIED + REMOVED + ADDED en una capability | 4 operaciones, requirement reemplazado completo, escenario nuevo presente                   | ✔          |
+| Capability nueva (solo ADDED, sin spec vivo)           | Se crea el spec con `Purpose: TBD` y `::warning::` nombrandolo                              | ✔          |
+| Delta sin ninguna seccion de operaciones               | exit 1 por la guarda de cero operaciones; el spec vivo intacto                              | ✔          |
+| MODIFIED contra un requirement inexistente             | exit 1 al planificar, **sin escribir ni un archivo** (md5 del spec vivo sin cambio)         | ✔          |
+| Change que existe pero sin carpeta `specs/`            | exit 1 diciendo que el change EXISTE y no lleva deltas                                      | ✔          |
+| Corrido fuera de la raiz del repo                      | exit **2** nombrando la causa real (no estas en la raiz), sin concluir nada sobre el change | ✔          |
+| Nombre del change con typo                             | exit **2** listando los changes activos, sin concluir que el change no tenga deltas         | ✔          |
+| Archivos con CRLF (Windows)                            | Aplica igual: el lector normaliza los saltos de linea                                       | ✔          |
 
 Los tres codigos de salida son distintos a proposito: **0** aplico, **1** el
 change esta mal (o el script esta roto), **2** el que se equivoco fue quien lo
