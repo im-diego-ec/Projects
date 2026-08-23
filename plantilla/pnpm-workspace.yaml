@@ -1,0 +1,40 @@
+# LA UNICA declaracion del workspace de {{PROYECTO}}. Vive en la raiz y en
+# ningun otro lugar: un pnpm-workspace.yaml dentro de un paquete no declara un
+# workspace anidado, lo unico que hace es que ese directorio resuelva
+# dependencias distinto que la raiz (y el .gitignore del marco ya ignora el
+# lockfile espurio que aparece cuando alguien corre `pnpm install` ahi).
+#
+# De aca sale la lista de paquetes que el CI del marco DERIVA con
+# `pnpm list -r --depth -1 --json` para exigirle a cada uno los scripts
+# typecheck, test y build. O sea: agregar un paquete a esta lista lo mete solo
+# en la verificacion, y no hay una segunda lista en el CI que alguien tenga que
+# acordarse de actualizar.
+#
+# Los nombres de aca son DIRECTORIOS, no los marcadores {{PAQUETE_API}} /
+# {{PAQUETE_WEB}}: `projects init` copia las rutas tal cual y solo sustituye el
+# contenido de los archivos. Los marcadores nombran el PAQUETE (el campo "name"
+# de su package.json), que es lo que matchea `pnpm --filter`.
+packages:
+  - "web"
+  - "api"
+  # SUITE E2E: Playwright contra un ambiente YA DESPLEGADO, no contra localhost.
+  # Esta declarada porque .github/workflows/ci.yml trae dos entradas de
+  # EXCEPCIONES para este paquete ({{PAQUETE_E2E}}:test y {{PAQUETE_E2E}}:build)
+  # y una excepcion que no corresponde a ningun paquete del workspace es ROJA a
+  # proposito. O sea: el andamio no puede traer esas excepciones y NO traer el
+  # paquete — el repo nuevo naceria en rojo por algo que el andamio escribio.
+  # Si un proyecto de verdad no tiene suite E2E, son cuatro cosas en el mismo PR:
+  # borrar e2e/, borrar esta linea, borrar esas dos entradas de ci.yml y borrar
+  # el glob "{{PAQUETE_E2E}}/**/*.mjs" del entorno Node de eslint.config.mjs.
+  - "e2e"
+
+# NO HAY LISTA DE APROBACION DE SCRIPTS DE INSTALACION, y es una decision. El
+# starter traia un `allowBuilds` con @clerk/shared, @prisma/client,
+# @prisma/engines, esbuild y prisma dentro de api/pnpm-workspace.yaml. Con el
+# pnpm pinado en package.json (9.15.0) esa lista es INERTE: el bloqueo de
+# scripts de postinstall llego en la mayor 10, y el un consumidor del
+# marco corre esta misma pila (prisma + esbuild) en verde sin declarar ninguna.
+# Se deja escrita aca en prosa para que el dato no se pierda: al subir la mayor
+# de pnpm —sesion dedicada, como manda la politica de dependencias— hay que
+# declarar esos cinco paquetes con la clave que use esa version, o `prisma
+# generate` y el build del front se quedan sin binarios.

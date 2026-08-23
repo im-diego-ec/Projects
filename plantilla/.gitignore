@@ -42,11 +42,19 @@ infra-prod/tfplan*
 
 # RESIDUOS DE CORRER LOS CHECKS DEL MARCO EN LOCAL. En CI viven en RUNNER_TEMP;
 # en una maquina esa variable no esta seteada y caen en el directorio de trabajo.
-# Sin estas dos lineas, un `git add -A` despues de correr un check local commitea
+# Sin estas lineas, un `git add -A` despues de correr un check local commitea
 # basura: paso el 2026-08-21 con aviso-version.json, cuya prosa el detector de
 # secretos tokenizo como nombres de paquete.
+#
+# La lista se amplio el 2026-08-22 corriendo el job de higiene completo sobre un
+# repo recien nacido del andamio: "artefactos regenerados al dia" deja
+# declarados.txt y divergentes.txt, y el detector de secretos deja declarados.txt
+# tambien. Quedaban los dos SIN rastrear y visibles en git status, o sea a un
+# `git add -A` de entrar al repo. Medido, no supuesto.
 pendientes.txt
 aviso-version.json
+declarados.txt
+divergentes.txt
 
 # Lockfile espurio: en un workspace pnpm el unico lockfile valido es el de la
 # raiz. Uno dentro de un paquete lo genera un `pnpm install` corrido ahi y hace

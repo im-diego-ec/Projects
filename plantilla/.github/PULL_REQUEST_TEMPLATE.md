@@ -5,6 +5,7 @@
 <!-- Link o ruta al change que respalda este PR, p.ej. openspec/changes/<nombre>.
      Si es un PR directo (bugfix, deps, refactor sin cambio observable, docs),
      escribí "PR directo" y por qué no necesita change. -->
+
 openspec/changes/
 
 ## Qué resuelve

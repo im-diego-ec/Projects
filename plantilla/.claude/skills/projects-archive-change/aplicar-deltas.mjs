@@ -138,7 +138,9 @@ if (!existsSync(CHANGES)) {
   console.error(
     `::error::no existe "${CHANGES}" desde este directorio: NO estas en la raiz del repo (o OPENSPEC_CHANGES apunta mal). No se concluyo nada sobre el change "${CHANGE}".`
   );
-  console.error("Corre el script desde la raiz del repo (donde vive openspec/), o exporta OPENSPEC_CHANGES.");
+  console.error(
+    "Corre el script desde la raiz del repo (donde vive openspec/), o exporta OPENSPEC_CHANGES."
+  );
   process.exit(2);
 }
 
@@ -146,13 +148,19 @@ if (!existsSync(dirChange)) {
   const disponibles = readdirSync(CHANGES, { withFileTypes: true })
     .filter((e) => e.isDirectory() && e.name !== "archive")
     .map((e) => e.name);
-  console.error(`::error::no existe el change "${CHANGE}" en ${CHANGES}: revisa el nombre. NO se concluyo que no tenga deltas.`);
-  console.error(`changes activos: ${disponibles.length > 0 ? disponibles.join(", ") : "(ninguno)"}`);
+  console.error(
+    `::error::no existe el change "${CHANGE}" en ${CHANGES}: revisa el nombre. NO se concluyo que no tenga deltas.`
+  );
+  console.error(
+    `changes activos: ${disponibles.length > 0 ? disponibles.join(", ") : "(ninguno)"}`
+  );
   process.exit(2);
 }
 
 if (!existsSync(dirDeltas)) {
-  console.error(`::error::el change "${CHANGE}" EXISTE pero no tiene carpeta de deltas (${dirDeltas}): no hay NADA que aplicar.`);
+  console.error(
+    `::error::el change "${CHANGE}" EXISTE pero no tiene carpeta de deltas (${dirDeltas}): no hay NADA que aplicar.`
+  );
   console.error(
     "Si el change de verdad no lleva deltas de spec, archivalo solo con `git mv` y decilo en el PR. Este script no se usa en ese caso."
   );
@@ -176,7 +184,9 @@ for (const { capability, ruta } of deltasDe(dirDeltas)) {
   // aplicar no se ignora en silencio (seria perder contrato sin avisar).
   for (const m of delta.matchAll(/^## (.+?) Requirements[ \t]*$/gm)) {
     if (!SECCIONES.includes(m[1].trim())) {
-      errores.push(`${capability}: seccion desconocida "## ${m[1]} Requirements" — este script no la sabe aplicar`);
+      errores.push(
+        `${capability}: seccion desconocida "## ${m[1]} Requirements" — este script no la sabe aplicar`
+      );
     }
   }
 
@@ -198,15 +208,19 @@ for (const { capability, ruta } of deltasDe(dirDeltas)) {
       `${capability}: capability NUEVA, nace con "Purpose: TBD" — completalo en el MISMO PR del archive`
     );
   } else {
-    errores.push(`${capability}: no existe el spec vivo ${rutaViva} y el delta trae operaciones que lo necesitan`);
+    errores.push(
+      `${capability}: no existe el spec vivo ${rutaViva} y el delta trae operaciones que lo necesitan`
+    );
     continue;
   }
 
   const ops = [];
 
   for (const { de, a } of renames) {
-    if (!bloqueDe(vivo, de)) errores.push(`${capability}: RENAMED FROM "${de}" no existe en el spec vivo`);
-    else if (bloqueDe(vivo, a)) errores.push(`${capability}: RENAMED TO "${a}" ya existe en el spec vivo`);
+    if (!bloqueDe(vivo, de))
+      errores.push(`${capability}: RENAMED FROM "${de}" no existe en el spec vivo`);
+    else if (bloqueDe(vivo, a))
+      errores.push(`${capability}: RENAMED TO "${a}" ya existe en el spec vivo`);
     else {
       vivo = vivo.replace(
         new RegExp(`^### Requirement: ${esc(de)}[ \\t]*$`, "m"),
@@ -249,7 +263,10 @@ for (const { capability, ruta } of deltasDe(dirDeltas)) {
   }
   if (nuevos.length > 0) {
     const conNuevos = insertarEnRequirements(vivo, nuevos);
-    if (conNuevos === null) errores.push(`${capability}: el spec vivo no tiene seccion "## Requirements" donde insertar los ADDED`);
+    if (conNuevos === null)
+      errores.push(
+        `${capability}: el spec vivo no tiene seccion "## Requirements" donde insertar los ADDED`
+      );
     else vivo = conNuevos;
   }
 
@@ -294,7 +311,9 @@ for (const { capability, rutaViva, ops, creada } of plan) {
 }
 
 if (SIMULACRO) {
-  console.log(`\n[simulacro] ${operaciones} operacion(es) planificadas y NO escritas. Corre sin --simulacro para aplicarlas.`);
+  console.log(
+    `\n[simulacro] ${operaciones} operacion(es) planificadas y NO escritas. Corre sin --simulacro para aplicarlas.`
+  );
   process.exit(0);
 }
 
@@ -304,4 +323,6 @@ for (const { rutaViva, contenido } of plan) {
 }
 
 console.log(`\n✓ ${operaciones} operacion(es) aplicadas en ${plan.length} spec(s) vivo(s)`);
-console.log("Falta: mover el change con `git mv`, validar --all --strict, correr el guardrail de deltas y completar los Purpose TBD.");
+console.log(
+  "Falta: mover el change con `git mv`, validar --all --strict, correr el guardrail de deltas y completar los Purpose TBD."
+);
