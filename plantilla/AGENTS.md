@@ -26,11 +26,19 @@ repo, no un matiz.
 
 ## 🕳️ Antes del primer commit (borrar esta sección cuando esté hecho)
 
-El scaffold llega con huecos a propósito: una plantilla que trae el stack de otro proyecto
-miente desde el día 1.
+El scaffold llega con huecos a propósito: lo que solo este proyecto sabe, no lo puede
+adivinar una plantilla. Lo que SI llega resuelto es la base técnica — el andamio trae el
+esqueleto de aplicación con sus tres paquetes y las compuertas en verde.
 
-1. Llenar **Stack fijado** (la sección siguiente). Sin eso, las reglas del marco que
-   nombran "el stack" no tienen referente.
+Mientras esta sección exista, el CI sale ROJO: el marco cuenta los símbolos de hueco del
+scaffold y los lee como bootstrap a medias. Es a propósito, y es la razón por la que el
+commit fundacional entra a `main` por push directo y la protección de rama se aplica
+después. (Este párrafo no nombra el símbolo con el símbolo, justamente para no sumar uno
+más al conteo.)
+
+1. Revisar **Stack fijado** (la sección siguiente): llega LLENA con la base que el andamio
+   implementa. Lo que hay que hacer es borrar la fila —y su paquete— de lo que este
+   proyecto no vaya a tener, no llenarla.
 2. Reemplazar todos los placeholders de doble llave del repo, **incluidos los valores de
    `.projects-valores.json`** (la lista completa, con qué poner en cada uno, está en el README
    del scaffold de Projects). Ese archivo es el que el marco lee para renderizar su porción de
@@ -58,27 +66,39 @@ miente desde el día 1.
 
 ## Stack fijado
 
-> 🕳️ **COMPLETAR AL CREAR EL PROYECTO.** Llená cada fila con la herramienta elegida y
-> borrá las filas que no apliquen (un proyecto sin frontend no tiene fila Frontend).
-> El valor de esta tabla no es la lista: es que **queda congelada**. Una vez llena,
-> introducir un framework, ORM, base de datos o servicio que no esté acá es una decisión y
-> no una implementación — las fronteras del marco dicen cómo se pide.
+> **ESTA TABLA LLEGA LLENA, y eso es nuevo.** El andamio ya no trae solo la mecánica:
+> trae el esqueleto de aplicación que corresponde a cada fila (`web/`, `api/`, `e2e/`),
+> con pruebas que pasan y las compuertas del marco en verde. O sea que la tabla no es una
+> intención, es la descripción de lo que hay en el repo. Borrá la fila —y su paquete— de lo
+> que este proyecto de verdad no vaya a tener.
+>
+> El valor de esta tabla no es la lista: es que **queda congelada**. Introducir un
+> framework, ORM, base de datos o servicio que no esté acá es una decisión y no una
+> implementación — las fronteras del marco dicen cómo se pide.
 
-| Capa | Herramienta |
-|---|---|
-| Frontend | 🕳️ |
-| Backend | 🕳️ |
-| Datos | 🕳️ |
-| Auth | 🕳️ |
-| Validación de input externo | 🕳️ (por defecto del marco: **Zod**) |
-| Infra | **AWS** + **Terraform** (IaC; `infra/` dev, `infra-prod/` producción) |
-| CI/CD | **GitHub Actions** (promoción por ambientes, workflows reusables del marco) |
-| Package manager | **pnpm** con workspaces (monorepo: {{PAQUETES}}) |
-| Tests | 🕳️ (unit/integración) + 🕳️ (E2E contra dev) |
+| Capa                        | Herramienta                                                           |
+| --------------------------- | --------------------------------------------------------------------- |
+| Frontend                    | **React + TypeScript + Vite + Tailwind + shadcn/ui**                  |
+| Backend                     | **Node + TypeScript + Express**                                       |
+| Datos                       | **PostgreSQL** vía **Prisma**                                         |
+| Auth                        | **Clerk** (componentes en el front; JWT verificado offline en el API) |
+| Validación de input externo | **Zod**                                                               |
+| Infra                       | **AWS** + **Terraform** (IaC; `infra/` dev, `infra-prod/` producción) |
+| CI/CD                       | **GitHub Actions** (promoción por ambientes, workflows del marco)     |
+| Package manager             | **pnpm** con workspaces (monorepo: web, api, e2e)                     |
+| Tests                       | **Vitest** (unit/integración) + **Playwright** (E2E contra dev)       |
 
-Las filas **Infra**, **CI/CD** y **Package manager** llegan llenas porque no son elección
-del proyecto: Terraform como IaC, GitHub Actions como pipeline y pnpm con workspaces los
-fija el marco. Todo lo demás lo decide el proyecto una vez, acá.
+Ninguna de estas filas es elección del proyecto: las fija el área y el andamio las entrega
+implementadas. Lo que el proyecto decide es lo que viene ENCIMA — sus modelos, sus
+endpoints, sus pantallas.
+
+Los nombres de la fila **Package manager** son DIRECTORIOS y están escritos literales a
+propósito: `projects init` copia las rutas tal cual y solo sustituye el contenido de los
+archivos, así que los tres paquetes se llaman `web/`, `api/` y `e2e/` en todo repo nacido
+del andamio. (Hubo acá un marcador del scaffold: una celda de tabla con un marcador no
+puede quedar bien alineada de los dos lados de la sustitución, así que `prettier --check`
+—que el CI corre sobre todo el árbol— salía rojo en el primer PR del repo nuevo por un
+espacio. Medido, no supuesto.)
 
 pnpm está fijado porque el CI que trae el scaffold lo ejecuta directamente (`corepack
 enable`, `pnpm install --frozen-lockfile`, y `pnpm list -r` para derivar de pnpm —y no de

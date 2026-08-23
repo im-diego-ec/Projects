@@ -93,7 +93,7 @@ jobs:
       # un repo sin el workflow semanal de actualizacion lo baja de aca y lo aplica
       # a mano, y esa es la salida que el mensaje de fallo promete. Sin
       # if: !cancelled() no se subiria justo en la corrida que lo necesita.
-      - if: '!cancelled()'
+      - if: "!cancelled()"
         uses: actions/upload-artifact@v5
         with:
           name: constitucion-al-dia
