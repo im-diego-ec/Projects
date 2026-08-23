@@ -1,0 +1,87 @@
+# Registro de fricción — adopción de Supply Chain
+
+Instancia de [la plantilla](../plantillas/registro-de-friccion.md), con la cabecera
+ya llena con lo que se sabe al 2026-08-23. **Es el primer ensayo del marco desde
+cero**: la guía nunca se corrió completa por alguien que no la escribió.
+
+## Las dos reglas de uso, que son las que se rompen
+
+**1. No arregles la guía mientras la corrés.** Anotá y seguí. Arreglar sobre la
+marcha deja un documento que funciona para quien lo arregló y para nadie más, y borra
+el dato que vinimos a buscar: *dónde* se traba alguien que no lo escribió.
+
+**2. Un tropiezo cuyo arreglo empieza con «hay que recordar que…» no va a la guía.**
+Va como fila al [backlog](../reglas-no-escritas.md#backlog-de-automatización).
+
+---
+
+## Cabecera
+
+| | |
+|---|---|
+| Proyecto | Supply Chain |
+| Repo destino | *a decidir* — `im-diego-ec/Procurement` existe y está vacío |
+| Fecha | 2026-08-24 |
+| Quién ejecuta | @builder-uno (builder) |
+| Quién acompaña | @po (PO) — primer día en la organización |
+| Versión del marco pinada | `v1.6.0` (es lo que escriben los `uses:` del andamio) |
+| Commit de Projects del que salió el andamio | *llenar con* `git -C <projects> rev-parse --short HEAD` *antes de correr `projects init`* |
+| Máquina / SO | Windows 11 |
+| Sesión de agente | **nueva** · modelo y effort: |
+
+**Lo que ya se sabe de este arranque, para no medirlo como sorpresa:**
+
+- El primer CI **sale rojo en un job y es esperado** (fase 5.1): tres recuadros 🕳️ del
+  andamio, y uno de los tres no se puede borrar antes de que el CI haya corrido.
+- El repo nuevo va a mostrar **2 alertas críticas de seguridad** el día uno: vitest del
+  andamio ([projects#62](https://github.com/im-diego-ec/Projects/issues/62)).
+  Exposición real medida: nula. No es un tropiezo del ensayo.
+- El andamio **no trae `infra/` ni pipeline de deploy**, aunque la constitución los
+  exige. Es hueco conocido, no hallazgo.
+
+## El reloj, fase por fase
+
+| Fase | Promete | Real | ¿Se trabó? | ¿Debería haber sido automático? |
+|---|---|---|---|---|
+| 0 · Verificar, no hacer | 30 s | | | |
+| 1 · Arrancar lo asíncrono | — | | | |
+| 2 · Los 21 valores | — | | | |
+| 3 · El repo | 2 comandos | | | |
+| 3.1 · Qué quedó en el repo | — | | | |
+| 4 · El lockfile | 1 comando | | | |
+| 4.1 · Comprobarlo antes de pushear | — | | | |
+| 5 · Primer push a `main` | — | | | |
+| 5.1 · El primer CI sale rojo | — | | | |
+| 6.1 · Protección de `main` | — | | | |
+| 6.2 · Las seis labels | — | | | |
+| 6.3 · Dependabot | — | | | |
+| 6.4 · Los dos secrets | — | | | |
+| 7 · Primer change de OpenSpec | — | | | |
+
+**Total real punta a punta**: ____ · **de eso, esperando a otra persona**: ____
+
+## Los tropiezos
+
+### T1 · fase __
+
+- **Qué esperaba que pasara**:
+- **Qué pasó** (salida textual):
+- **Cómo lo saqué**:
+- **Cuánto costó**: ____ min
+- **Clase**: [ ] `guía` · [ ] `andamio` · [ ] `marco` · [ ] `entorno` · [ ] `github` · [ ] `humano`
+- **¿Arreglo directo o necesita decisión?**:
+
+*(copiar el bloque por cada tropiezo)*
+
+## Lo que NO se probó
+
+-
+
+## Cierre
+
+1. **Qué se arregla en la guía** (PR, citando los tropiezos por número):
+2. **Qué se arregla en el andamio o en el marco** (issue o change):
+3. **Qué queda como disciplina declarada** (fila en el backlog):
+
+**Veredicto en una línea** — ¿un builder que recién conoce el marco podría arrancar un
+proyecto solo con la guía, hoy?
