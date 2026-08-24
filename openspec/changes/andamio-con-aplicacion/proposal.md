@@ -111,7 +111,7 @@ ruta— y el ensayo de bootstrap que las acredita por código de salida.
 
 - **Capability afectada**: `calidad-codigo` (tres requirements nuevos y dos
   modificados; la justificación de la elección está en el design, D0).
-- **`plantilla/`** pasa de 22 archivos a **~58**: los 32 del material de partida
+- **`plantilla/`** pasa de 22 archivos a **~58**: los 32 del esqueleto absorbido
   menos el `pnpm-workspace.yaml` suelto que se disuelve, más el paquete `e2e` y
   las pruebas nuevas. Es el cambio más grande que el andamio recibió, y el
   primero que le agrega código ejecutable. El número exacto se fija en el PR;

@@ -55,8 +55,8 @@ volvió check automático — y porque esos checks se pagaron caro una vez y no
 tiene sentido volver a pagarlos en cada proyecto nuevo.
 
 El marco no se diseñó de arriba hacia abajo: **cada guardrail nació de un
-incidente documentado**. Una muestra, toda trazable a los post-mortems y a los
-changes archivados de otro repo:
+incidente documentado**, y cada uno se puede leer como lo que enseñó y lo que
+quedó construido:
 
 | Incidente | Lo que enseñó | Guardrail que quedó |
 |---|---|---|
@@ -91,9 +91,9 @@ pinada.
 | **Regenerado** | Skills y comandos del CLI de OpenSpec, **y la porción del marco de la constitución** (`.projects/AGENTS-marco.md` y su render para Cursor) | El pin del CLI (el default del input `version_openspec`); el texto de la constitución, en `actions/constitucion/canonico/` | Cada repo los regenera: las skills con el CLI pinado, la constitución con `actions/constitucion` en modo escribir | Subiendo el pin acá y regenerando en cada repo. El check del marco avisa cuando el artefacto quedó atrás |
 
 Por qué las skills **no** se vendoran: cada `SKILL.md` que genera el CLI trae
-`generatedBy: "<versión>"` en su cabecera. En otro repo quedaron skills
-generadas por la 1.6.0 mientras CI validaba con la 1.9.0 — copiarlas al marco
-habría congelado esa divergencia para todos los proyectos a la vez. El marco
+`generatedBy: "<versión>"` en su cabecera. Un repo puede quedarse con skills
+generadas por una versión mientras su CI valida con otra — copiarlas al marco
+congelaría esa divergencia para todos los proyectos a la vez. El marco
 pina la versión; la herramienta genera.
 
 > **Gotcha operativo:** para que un repo privado pueda hacer `uses:` de este,
@@ -219,8 +219,8 @@ Sin big bang: se adopta por partes, empezando por lo referenciado.
    Si exige un job que solo reporta en uno —`build-test`, por ejemplo, que en
    un PR de solo docs queda `skipped` y nunca reporta— ese carril queda
    bloqueado para siempre esperando una señal que no llega. Es el error más
-   caro de la migración, y ya se cometió una vez: el ruleset de otro repo
-   vivió una semana pidiendo el check equivocado.
+   caro de la migración, y ya se cometió una vez: un ruleset vivió una semana
+   pidiendo el check equivocado.
 
 > **Regla dura:** el proyecto **no edita el marco desde su repo**. Si necesita
 > algo distinto, o es un **parámetro** que le falta al workflow, o es un
@@ -342,15 +342,15 @@ describen su dominio, y estas describen el carril por el que ese dominio viaja.
   opción de infraestructura. Está en `plantilla/AGENTS.md`, que es el archivo que
   el proyecto hereda, y apartarse se pregunta **antes** de implementar.
   **Lo que el proyecto elige**: el framework de frontend, el ORM, el runtime del
-  backend más allá de Node, y su dominio entero. El otro repo usa React,
+  backend más allá de Node, y su dominio entero. El andamio trae React,
   Express y Prisma; nada obliga a repetirlo.
   Un proyecto con otro stack de aplicación sigue obteniendo lo mismo: el flujo de
   specs, la gobernanza, los guardrails, el veredicto único de CI, la promoción por
   ambientes.
 - **No es un sustituto del criterio del equipo.** Los guardrails atrapan lo que
-  ya nos pasó. Lo que no nos pasó todavía lo caza una revisión adversarial: en
-  otro repo, un change pasó `validate --strict` **y** el guardrail de
-  deltas en verde y aun así tenía dos bloqueantes de contrato. Herramientas
+  ya nos pasó. Lo que no nos pasó todavía lo caza una revisión adversarial: ya
+  hubo un change que pasó `validate --strict` **y** el guardrail de deltas en
+  verde y aun así tenía dos bloqueantes de contrato. Herramientas
   verdes no bastan para specs que cambian contrato.
 - **No es un repo donde se hacen parches de proyecto.** Nadie edita Projects para
   destrabar un proyecto: se parametriza o se propone un change.

@@ -116,7 +116,7 @@ mueve sobre un cambio incompatible.
 
 - **El canal de distribución del marco tenía un retraso de hasta nueve días, y nadie lo
   sabía.** El PR del bump es la única forma en que un consumidor se entera de que el marco se
-  movió. Medido el 2026-08-24 en el log de Dependabot del un consumidor, con la
+  movió. Medido el 2026-08-24 en el log de Dependabot de un consumidor, con la
   1.6.0 publicada desde el 22 y disponible:
 
   ```
@@ -166,8 +166,7 @@ que se copia una vez al crear el repositorio y no vuelve. Y el canónico de la c
 **no cambió**, así que el artefacto que ya tenés sigue siendo el correcto y el check no se
 mueve.
 
-Verificado contra el un consumidor antes de publicar: corrida
-[32681956360](https://github.com/im-diego-ec/un-proyecto-anterior/actions/runs/32681956360),
+Verificado contra un consumidor real antes de publicar, en la corrida `32681956360`:
 **8/8 verde sin tocar una línea de código** de ese repositorio. Y esa corrida vale más que el
 verde del CI de Projects para el caso de los marcadores: en Projects el paso se exime a sí mismo
 por ser el repositorio que distribuye el andamio, así que allá no mira. En el consumidor
@@ -223,7 +222,7 @@ es el mismo que el marco ya paga por `ci.yml` y por `CODEOWNERS`.
   cuenta real y un `apply` con OK humano.
 
   Dos decisiones de forma que vale conocer: los pendientes van **juntos** en un
-  `pendientes.tf` y no repartidos en ocho archivos como en el un consumidor —copiar
+  `pendientes.tf` y no repartidos en ocho archivos como en el consumidor —copiar
   su división de archivos sería copiar su respuesta—; y el marcador del bucket del state va
   **dentro del valor**, así `terraform init` falla en vez de crear un state en el lugar
   equivocado. En producción eso además evita el modo de falla peligroso: escribir el state de
@@ -528,8 +527,8 @@ es el mismo que el marco ya paga por `ci.yml` y por `CODEOWNERS`.
      plegada para quien copie el árbol entero de todas formas.
 
   Y la guía dice ahora **qué se hereda de un repo congelado**, en vez de dejarlo para la
-  sorpresa: `pnpm@9.15.0`, `hashicorp/aws` 5.100.0 —un major completo atrás del
-  un consumidor—, sin proveedor de cobertura y con un solo archivo de pruebas.
+  sorpresa: `pnpm@9.15.0`, `hashicorp/aws` 5.100.0 —un major completo atrás de lo que
+  corre el consumidor—, sin proveedor de cobertura y con un solo archivo de pruebas.
 
 - **El andamio mandaba a un primerizo a cuatro caminos muertos, y le escondía los dos
   pasos que deciden si su primer CI sale verde.** La lista de pendientes manuales que
@@ -544,7 +543,7 @@ es el mismo que el marco ya paga por `ci.yml` y por `CODEOWNERS`.
   archivos que su compuerta de cobertura reclama.** `eslint.config.mjs`,
   `vitest.config.base.mjs` y las herramientas de agente son **300 de las 402 líneas** que
   el primer diff reclama sin pruebas, y ninguna prueba puede cubrirlas. Nadie lo había
-  visto porque el un consumidor no tiene dos de esos tres archivos. `projects
+  visto porque el consumidor no tiene dos de esos tres archivos. `projects
   init` ahora imprime el bloque de excluidos listo para pegar, y avisa que
   `vitest.config.base.mjs` llega a la raíz y **nadie lo extiende solo** — la única
   referencia a ese archivo en todo el árbol estaba dentro de su propio comentario.
@@ -587,7 +586,7 @@ es el mismo que el marco ya paga por `ci.yml` y por `CODEOWNERS`.
 
   La regla que más importa no existía en el kit del sistema y se escribió acá: **texto
   blanco sobre el naranja de marca da 2.9:1 y falla WCAG AA**; el oscuro da 6.7:1. Medido
-  contra el frontend del un consumidor, el bloque encuentra **26 violaciones
+  contra el frontend de un consumidor, el bloque encuentra **26 violaciones
   reales en 13 archivos**, cinco de ellas de esa regla —una en la variante primaria del
   botón, o sea en toda la aplicación— y cinco SVG dibujados en el JSX donde va un
   componente del sistema.
@@ -719,7 +718,7 @@ una fecha: eso es lo que cambió). Se arregla dentro del mismo PR y **sin escrib
 2. corré `actions/constitucion` en modo `escribir` (si tu repo tiene el workflow semanal
    de actualización del marco, lo hace solo).
 
-Medido contra el un consumidor, cuyo artefacto declara `1.3.0`: dos hallazgos,
+Medido contra un consumidor cuyo artefacto declara `1.3.0`: dos hallazgos,
 y el modo `escribir` lo deja al día en sus dos superficies en una corrida.
 
 **El bloque de reglas de ESLint de la marca NO te llega.** Vive en el andamio, que se copia
@@ -948,7 +947,7 @@ qué nace el **próximo** proyecto.
 Y una cosa que conviene revisar igual, porque no la caza ningún check del marco: que
 tu `.github/dependabot.yml` tenga al marco en **su propio grupo**. Si comparte el
 grupo `*` con las demás actions, un PR del grupo trabado deja de proponer el bump del
-marco — medido el 2026-08-21 en un-proyecto-anterior, donde la 1.4.1 no se propuso por
+marco — medido el 2026-08-21 en un repo consumidor, donde la 1.4.1 no se propuso por
 un PR abierto de `actions/upload-artifact`.
 
 ## [1.4.1] — 2026-08-21
@@ -1818,8 +1817,8 @@ conciliar las copias: fue **dejar una**.
 
 ### Para consumidores
 
-**Esta acción obligatoria YA ESTÁ HECHA en `un-proyecto-anterior`.** El repo tenía
-cinco invocaciones sin versión exacta en `.claude/settings.json` —`npx --yes
+**Esta acción obligatoria YA ESTÁ HECHA en el repo donde se detectó.** Ese repo
+tenía cinco invocaciones sin versión exacta en `.claude/settings.json` —`npx --yes
 openspec ...`, con el nombre pelado que en npm es de otra persona— y el PR #155 las
 pinó a `@fission-ai/openspec@1.9.0` el 2026-08-20, antes de que este tag se moviera.
 Medido hoy sobre su `main`: 5 de 5 pinadas, 0 sin pinar.
@@ -1839,7 +1838,7 @@ externas al marco son todas `@v1`**: ningún repo está pinado a un SHA, así qu
 existe consumidor a salvo del movimiento del tag.
 
 Verificado cuando el check se escribió: sobre `projects` pasaba en verde (8
-invocaciones, 5 con versión literal y 3 por variable) y sobre `un-proyecto-anterior`
+invocaciones, 5 con versión literal y 3 por variable) y sobre el repo consumidor
 daba rojo exactamente en las cinco líneas reales, sin un solo falso positivo — el
 `pnpm exec playwright` del deploy, el `pnpm exec prisma generate` del Dockerfile y
 los `tsc`/`vitest`/`eslint` de los `scripts` de cada `package.json` no se tocan,
@@ -1847,7 +1846,7 @@ porque ninguno pasa por un ejecutor que descargue.
 
 Volver a medir después de completar el alfabeto (`npm x`, `bun x`, banderas
 intermedias, comodín del allowlist) **no movió esos números**: `projects` sigue en
-verde con las mismas 8 invocaciones y cero avisos, y `un-proyecto-anterior` sigue en
+verde con las mismas 8 invocaciones y cero avisos, y el consumidor sigue en
 rojo con exactamente las mismas 5 líneas. El alfabeto nuevo no agrega hallazgos al
 consumidor real; cierra formas que hoy no usa y que habrían entrado en verde.
 
@@ -1861,7 +1860,7 @@ un archivo así **sí** apagaría el detector si el check no lo mirara.
 **Del detector de secretos hay una acción obligatoria y también tiene orden.** Un
 repo con falsos positivos sin declarar da rojo apenas el check aterrice, así que
 el PR que agrega su `.projects-falsos-positivos.json` **se mergea ANTES de que se
-mueva `v1`** — mismo precedente, misma razón. En `un-proyecto-anterior` son **tres
+mueva `v1`** — mismo precedente, misma razón. En el consumidor son **tres
 declaraciones**, medidas y no estimadas: la sonda de auth de `deploy.yml` (token
 basura literal, existe para que el API responda 401 exacto) y la misma frase de
 prosa del spec de observabilidad en dos lugares (el spec vivo y su copia
@@ -1872,7 +1871,7 @@ sobrevive al tercer PR o alguien lo apaga.
 **No se encontró ningún secreto real** en los archivos rastreados de ninguno de
 los repos revisados. Verificado antes de publicar, con el `run:` del paso
 ejecutado tal cual: `projects` con el paso ya adentro pasa en verde en los dos planos;
-`un-proyecto-anterior` da rojo en sus tres hallazgos y pasa a verde con las tres
+el consumidor da rojo en sus tres hallazgos y pasa a verde con las tres
 declaraciones, cada una visible en el resumen de la corrida; un repo con un
 secreto sintético en el árbol da rojo; uno con el secreto **borrado** en el commit
 siguiente tiene el árbol limpio y lo caza igual el plano de la historia; y un repo
@@ -1915,7 +1914,7 @@ juntos.
 `openspec-validar-tras-editar` queda divergente y hay que reemitirlo.** Es el
 mecanismo funcionando, no un efecto colateral: el texto del canónico cambió, así que
 el artefacto de una versión anterior ya no coincide con el re-render. Medido sobre la
-rama de migración de `un-proyecto-anterior`: exit 1 con `artefacto-divergente` en sus dos
+rama de migración de un consumidor: exit 1 con `artefacto-divergente` en sus dos
 superficies, y el diff es **exactamente** esa regla y nada más (14 líneas nuevas, 6
 borradas, más el `sha` de la cabecera, que identifica al canónico). El arreglo es
 correr el modo escribir —lo hace solo el PR semanal de actualización— o bajar el
@@ -1925,8 +1924,8 @@ artefacto al día que el propio job sube como `constitucion-al-dia`.
 desde el día uno, rojo para nadie.** Medido sobre los dos repos reales antes de
 publicar: los dos salen `::warning::` con la fecha en que pasa a fallar, ninguno
 sale rojo. Sigue valiendo con el check de cableado nuevo, y las dos mitades están
-medidas contra los árboles reales y no estimadas: en el `main` de
-`un-proyecto-anterior` no hay un solo archivo `.projects*`
+medidas contra los árboles reales y no estimadas: en el `main` del
+consumidor no hay un solo archivo `.projects*`
 (`git ls-tree -r --name-only origin/main | grep '^\.projects'` → sin coincidencias), así
 que cae en la rama del **aviso**; y su rama de migración, que sí versiona
 `.projects-valores.json`, ya declara el job `constitucion` con `modo: verificar` y lo
@@ -2181,7 +2180,7 @@ repo ya propagan su código de salida, el check sale verde solo. Se verificó
 contra el consumidor real: 28 scripts de 4 manifiestos, cero enmascaramiento.
 
 **El consumidor actual da rojo hasta que se ponga al día, y por eso el orden es
-primero el consumidor.** `un-proyecto-anterior` hoy no cablea el censo, así que el
+primero el consumidor.** El consumidor hoy no cablea el censo, así que el
 check de cableado lo pone rojo, y su censo encuentra 23 archivos fuera del
 alcance: dos componentes de dominio tragados por un ignore pensado para
 generados, los tres scripts de `api` fuera de todo programa de tipos, los cuatro
@@ -2198,7 +2197,7 @@ consumidores que no controlamos.
 ### Antes de mover `v1`
 
 - El PR del consumidor con los dos pasos cableados tiene que estar **mergeado
-  primero**. Si el tag se mueve antes, `un-proyecto-anterior` queda roto sin haber
+  primero**. Si el tag se mueve antes, ese repo queda roto sin haber
   tocado una línea, que es exactamente la definición de breaking de `AGENTS.md`.
 - **El scaffold todavía no cablea ninguno de los dos pasos**: tal como está,
   todo proyecto nuevo nacería rojo el día uno por el check de cableado. Hay que
@@ -2211,9 +2210,9 @@ consumidores que no controlamos.
 ## [1.1.0] — 2026-08-18
 
 **El marco empieza a hacerse cumplir solo.** Tres checks nuevos que cierran
-huecos donde el marco afirmaba algo y nada lo verificaba. Validado contra el
-consumidor real antes de mover el tag móvil: `un-proyecto-anterior` quedó verde de
-punta a punta con el job `higiene` corriendo.
+huecos donde el marco afirmaba algo y nada lo verificaba. Validado contra un
+consumidor real antes de mover el tag móvil: quedó verde de punta a punta con el
+job `higiene` corriendo.
 
 ### Añadido
 
@@ -2241,9 +2240,9 @@ punta a punta con el job `higiene` corriendo.
 
 ### Para consumidores
 
-**Checks 2 y 3: nada que hacer.** Se verificó contra el consumidor real antes de
-publicar: `un-proyecto-anterior` los pasa sin tocar una línea (con un hallazgo real
-de `shellcheck` que se arregló en su propio repo, no acá).
+**Checks 2 y 3: nada que hacer.** Se verificó contra un consumidor real antes de
+publicar: los pasa sin tocar una línea (con un hallazgo real de `shellcheck` que
+se arregló en su propio repo, no acá).
 
 **Check 1 (artefactos regenerados): puede pedir una acción de una sola vez.** Un
 repo cuyos artefactos vengan de una versión anterior del CLI dará rojo hasta que
@@ -2279,7 +2278,7 @@ proyectos.
 consumen con `uses: im-diego-ec/Projects/...@v1`, y `v1` es un tag
 **móvil**: apunta siempre a la última `1.x`.
 
-Validado contra un consumidor real antes de publicarse: `un-proyecto-anterior`
+Validado contra un consumidor real antes de publicarse: ese repo
 reemplazó sus jobs de marco por el reusable y quedó verde de punta a punta —los
 tres jobs del marco más su `build-test` completo (Postgres, Prisma, lint,
 typecheck, tests y builds)—. Esa validación encontró y corrigió un defecto de
@@ -2378,7 +2377,7 @@ tenga que acordarse de escribirlo.
 
 ### Añadido — canónico (`openspec/specs/`)
 
-Los ocho specs del marco, destilados de los specs vivos de otro repo:
+Los ocho specs del marco, extraídos de specs que ya estaban vivos en un proyecto real:
 `calidad-codigo`, `despliegue-ci`, `gestion-secretos`, `gobierno-contribucion`,
 `observabilidad`, `operacion-infra`, `pipeline-entrega` y
 `verificacion-desplegada`. `openspec/changes/` queda vacío a propósito: el
@@ -2394,10 +2393,10 @@ escritas, con su estado de enforcement y el backlog de automatización—;
 trampas; y las plantillas de post-mortem y de runbook, que se copian al proyecto
 cuando hace falta la primera (no al crear el repo).
 
-### Contexto de origen
+### De dónde salen las reglas
 
-El marco se destila del estado **actual** de `un-proyecto-anterior` (primer commit
-2026-07-03), no de un starter previo: `projects-starter` quedó archivado el
+El marco se escribe desde el estado **actual** de proyectos que ya corren en
+producción, no desde un starter previo: `projects-starter` quedó archivado el
 2026-08-14. Cada guardrail que entra a Projects trae su incidente detrás —la tabla
 del README los enumera con fecha— y esa trazabilidad es un requisito, no un
 adorno: el post-mortem es el proposal del change que crea el guardrail.

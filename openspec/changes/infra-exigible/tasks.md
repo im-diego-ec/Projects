@@ -43,7 +43,7 @@ un PR por bloque con `Closes #<sub-issue>` desde su creación.
       de alarmas.
 
 - [x] **1.4** ~~Sumar al `.gitignore`~~ **YA ESTABA HECHO**: del andamio el `state` y los `.tfvars`, que en el
-      un consumidor ya están ignorados y conviene que **nazcan** así.
+      consumidor medido ya están ignorados y conviene que **nazcan** así.
       el `.gitignore` del andamio ya traía las siete reglas de Terraform —`.terraform`,
       `*.tfstate*` y `*.tfvars` para los dos directorios— para directorios que no existían.
       **Evidencia**: `grep -nE "tfstate|tfvars|terraform" plantilla/.gitignore`.
@@ -79,7 +79,7 @@ un PR por bloque con `Closes #<sub-issue>` desde su creación.
       el banco de la 2.1 y la verificación contra el consumidor.
 
 - [ ] **2.3** **MOVIDA A ISSUE PROPIO (#73)**, y el motivo es que su compuerta no es técnica:
-      abre una rama temporal en un-proyecto-anterior y eso exige el OK de @builder-uno, aunque
+      abre una rama temporal en un repo consumidor y eso exige el OK de @builder-uno, aunque
       el PR sea borrador y no se mergee. Un bloque no se cierra con una tarea pendiente de un
       gate humano adentro, y dejarla acá habría hecho que el PR del bloque 2 cerrara un issue
       incompleto.

@@ -5,9 +5,9 @@
 # como modificadas en vez de eliminadas— sin que nada haya cambiado en el codigo.
 # Paso el 2026-08-19, despues de un simple 'git reset --hard'.
 #
-# La leccion venia de un-proyecto-anterior, que recibio su .gitattributes esa
-# misma manana. Al marco no volvio: es el patron que este repo existe para
-# romper, esta vez sobre si mismo.
+# La leccion ya estaba aprendida en otra parte esa misma manana, y al marco
+# no habia vuelto: es exactamente el patron que este repo existe para romper,
+# esta vez sobre si mismo.
 * text=auto eol=lf
 
 # Binarios: sin conversion ni diff de texto.

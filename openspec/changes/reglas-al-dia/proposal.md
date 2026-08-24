@@ -52,7 +52,7 @@ agente que mañana trabaje en ese repo lee una constitución que autoriza
 exactamente lo que ese incidente prohibió, y nada en el repositorio lo señala.
 
 **3. En el consumidor viejo la divergencia ya corre en las dos direcciones.**
-`un-proyecto-anterior/AGENTS.md:127` dice «los Deploy se serializan (cola)» donde
+Su `AGENTS.md:127` dice «los Deploy se serializan (cola)» donde
 `plantilla/AGENTS.md:196` dice «(cola, **nunca cancelación**)»: falta
 exactamente la mitad que ES la lección del 2026-08-13, cuando dos deploys
 concurrentes sobre dev salieron **los dos verdes** y dejaron la configuración
@@ -66,7 +66,7 @@ A eso se suma que tres reglas fijadas hoy —escalar de modelo exige OK humano
 previo, cambiar settings de un repo exige OK humano previo, y la infraestructura
 base es primera opción y apartarse se pregunta ANTES— no llegaron a ningún
 archivo, y la primera está **contradicha** por el texto vigente
-(`plantilla/AGENTS.md:139-141` y `un-proyecto-anterior/AGENTS.md:100-102` dicen
+(`plantilla/AGENTS.md:139-141` y el `AGENTS.md:100-102` de ese consumidor dicen
 «escala por sesión cuando la tarea lo paga», sin compuerta). Un agente que lea
 la constitución vigente escala solo, y lo hace bien según lo escrito.
 
@@ -161,7 +161,7 @@ antes de su fecha de exigibilidad. Desde esa fecha sí se pone rojo, y eso es el
 diseño: el rojo del día 28 es para el repo que ignoró cuatro pull requests.
 
 **Efecto neto para un proyecto**: las correcciones del marco dejan de depender
-de que alguien las copie. En el mismo PR de migración, `un-proyecto-anterior`
+de que alguien las copie. En el mismo PR de migración, el consumidor viejo
 recupera «cola, **nunca cancelación**», el nombre del check requerido `ci-ok`, el
 porqué de los invariantes de propiedades y la regla de ejecutores pinados —cuya
 ausencia hoy convive con un allowlist que autoriza `npx --yes openspec`—, e

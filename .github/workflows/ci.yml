@@ -37,6 +37,11 @@ permissions:
 
 jobs:
   marco:
+    # SIN timeout-minutes, y no es un olvido: un job que llama a un workflow reusable
+    # solo admite name, uses, with, secrets, needs, if, permissions, strategy y
+    # concurrency — la referencia de GitHub no lista `timeout-minutes` entre ellas. El
+    # techo de esta llamada lo ponen los cinco jobs de marco-ci.yml, que desde este
+    # cambio lo llevan todos.
     uses: ./.github/workflows/marco-ci.yml
     # Sin "with": el CI del marco corre con los defaults que exporta, que es
     # justamente lo que hay que probar. Si un default no sirve para Projects,
@@ -59,6 +64,11 @@ jobs:
   # se prueba con casos controlados".
   pruebas_actions:
     name: pruebas-actions
+    # TECHO DE TIEMPO. El default de GitHub son 360 minutos por job: un runner colgado
+    # se lleva seis horas de cola y mantiene su GITHUB_TOKEN valido todo ese rato. El
+    # criterio de los numeros de este archivo es el mismo que el de claude.yml — el
+    # doble largo de lo que el job tarda cuando anda bien, no un numero redondo—.
+    timeout-minutes: 15
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -224,6 +234,10 @@ jobs:
   # siguen valiendo.
   pruebas_init:
     name: pruebas-init (${{ matrix.so }})
+    # 20 y no 15: la pata de windows-latest arranca mas lento que las otras dos, y el
+    # techo se pone sobre la mas lenta o deja de ser techo y pasa a ser un rojo con el
+    # nombre equivocado.
+    timeout-minutes: 20
     strategy:
       fail-fast: false
       matrix:
@@ -268,41 +282,50 @@ jobs:
   # Los pines que este paso mira son los que el marco EJECUTA y los que REPARTE.
   higiene:
     name: higiene-del-marco
+    timeout-minutes: 10
     runs-on: ubuntu-latest
     permissions:
       contents: read
     steps:
       - uses: actions/checkout@v7
 
-      # AGENTS.md:257 declara la frontera textual: "Agregar una dependencia o una
+      # AGENTS.md declara la frontera textual: "Agregar una dependencia o una
       # action de terceros al marco: entra al pipeline de todos los consumidores.
       # Se pina por SHA, no por tag movil ajeno." Nada la verificaba.
+      # VA SIN NUMERO DE LINEA A PROPOSITO, igual que la nota de win32 del job
+      # pruebas-init: AGENTS.md se edita seguido y el puntero se pudre. El ancla es
+      # `grep -n 'action de terceros al marco' AGENTS.md`.
       #
       # POR QUE IMPORTA MAS QUE UN PIN CUALQUIERA. Es la unica clase de cambio que
       # llega a todos los consumidores a la vez sin que nadie mergee nada: mover un
       # tag ajeno no abre un PR, no produce diff y no dispara aviso. La asimetria
       # lo dice sola — la unica action de terceros que el repo trata como tal
-      # (anthropics/claude-code-action, .github/workflows/claude.yml:178) esta
+      # (anthropics/claude-code-action, la unica linea que devuelve
+      # `grep -n 'claude-code-action@' .github/workflows/claude.yml`) esta
       # pinada por SHA con su comentario `# v1.0.196` al lado, y las de GitHub,
       # que corren en cada job de cada repo, no.
       #
-      # ESTADO MEDIDO EL 2026-08-24, ya contando los tres uses: que agrega este
-      # mismo cambio (26 de 28 uses ajenos van por tag movil):
+      # ESTADO MEDIDO EL 2026-08-24, contando el `uses: actions/setup-node@v7` que este
+      # mismo cambio agrega al job higiene de marco-ci.yml (27 de 29 uses ajenos van
+      # por tag movil):
       #     15  actions/checkout@v7
-      #     10  actions/setup-node@v7
+      #     11  actions/setup-node@v7
       #      1  actions/upload-artifact@v5
-      # De esos 26, DIEZ viajan: 8 en plantilla/.github/workflows/ (que el andamio
+      # De esos 27, DIEZ viajan: 8 en plantilla/.github/workflows/ (que el andamio
       # copia a cada proyecto nuevo) y 2 en los action.yml de cobertura-diff y
-      # guardrail-deltas (que ejecuta cada consumidor de @v1). Los otros 16 solo
-      # corren aca, en .github/workflows/.
+      # guardrail-deltas (que ejecuta cada consumidor). Los otros 17 solo corren aca,
+      # en .github/workflows/.
       #
       # OJO CON EL 8, que no es el 14 del censo de `uses:` del andamio y por eso
       # se explica en vez de dejarlo raro: plantilla/.github/workflows/ tiene 14
       # `uses:`, pero 5 son marcadores sin resolver ({{ORG}}/Projects/...) que
       # este paso saltea porque no son referencias, y 1 es el
       # anthropics/claude-code-action que ya va por SHA. Quedan 8 pendientes.
-      # La cuenta sale del propio paso: sus 26 anotaciones ::warning agrupadas
-      # por archivo dan 16 / 8 / 2 (medido el 2026-08-24).
+      #
+      # LOS NUMEROS NO SE MANTIENEN A MANO: los mide este mismo paso, y sus anotaciones
+      # ::warning agrupadas por archivo dan 17 / 8 / 2 (medido el 2026-08-24). Si un
+      # cambio agrega un `uses:` ajeno, la corrida imprime el total nuevo y este parrafo
+      # queda viejo a la vista, que es preferible a un total que nadie puede reproducir.
       #
       # Si, este paso se denuncia a si mismo: el checkout de arriba es uno de los
       # 26. Eso es lo que tiene que hacer — un auditor que se exceptua deja de ser
@@ -427,6 +450,100 @@ jobs:
 
           echo "::warning::${PENDIENTES} de ${TOTAL} uses: a organizaciones ajenas van por tag movil y no por SHA, contra la frontera que AGENTS.md declara. Este paso avisa y todavia no rompe, a proposito: los SHA se resuelven con red y estrenar el rojo dejaria al marco y al andamio en rojo sin poder cerrarlo. Los comandos exactos estan arriba; cuando no quede ninguno, este paso pasa a ::error:: y exit 1"
 
+      # EL MARCO NO SE AUTO-IDENTIFICA POR UN SLUG LITERAL.
+      #
+      # QUE CIERRA. marco-ci.yml decidia dos cosas comparando `github.repository`
+      # contra el slug del repo escrito literal: si el job constitucion-cableada corre,
+      # y si marco-ok acepta que se haya salteado. Un literal se vuelve mentira en
+      # cuanto el arbol cambia de cuenta —ya paso una vez, en el renombrado— y el modo
+      # de falla es el peor posible: en una copia a OtraCuenta/Projects el literal deja
+      # de coincidir, el job ARRANCA, y "Set up job" descarga y ejecuta una composite
+      # action de la cuenta ORIGINAL en cada PR de cada repo que consuma esa copia.
+      # Nada lo miraba: `grep -rn 'github.repository' pruebas/ actions/*/pruebas/` da
+      # cero lineas, hoy tambien.
+      #
+      # POR QUE VIVE ACA Y NO EN pruebas/. El banco de marco-ci.yml extrae el bloque
+      # `run:` de un PASO y lo corre contra fixtures; las dos comparaciones del slug no
+      # estan en un `run:` sino en el `if` de un job y en una expresion, que ese
+      # extractor no alcanza. Un paso que lee el arbol si las ve, y ademas ve la
+      # proxima, que puede aparecer en cualquiera de los cuatro workflows.
+      #
+      # LA PROPIEDAD QUE SE VERIFICA, y por que se puede: fuera de un `uses:`, el marco
+      # NO escribe su propio slug. Las comparaciones se derivan de
+      # `github.repository_owner`. Los `uses:` quedan exentos POR LA REFERENCIA, no por
+      # comodidad: GitHub prohibe expresiones ahi, asi que ese literal es la unica
+      # forma que existe — y por eso el comentario de esas lineas trae el comando que
+      # una copia corre para cambiarlas.
+      #
+      # Las lineas de COMENTARIO tambien quedan fuera: un comentario que explica por
+      # que el slug no puede ir en el codigo tiene que poder escribirlo, y sin esta
+      # regla este mismo bloque pondria rojo el paso. Es el mismo limite que ya declara
+      # el paso de ejecutores pinados de marco-ci.yml.
+      #
+      # ALCANCE DECLARADO: solo .github/workflows/, que es donde viven las
+      # comparaciones. plantilla/ queda fuera a proposito — ahi el slug llega por el
+      # marcador {{ORG}} del andamio, que es otra pieza con otro dueno.
+      #
+      # ROJO Y NO AVISO, con el mismo argumento que el check del CHANGELOG de mas
+      # abajo: este paso vive en el ci.yml de Projects y no viaja a ningun consumidor,
+      # asi que el unico afectado es quien acaba de escribir la linea. Y esta medido en
+      # verde: hoy las unicas dos ocurrencias del slug fuera de un comentario son los
+      # dos `uses:`.
+      - name: El marco no se auto-identifica por un slug literal
+        shell: bash
+        env:
+          PROPIETARIO: ${{ github.repository_owner }}
+          NOMBRE: ${{ github.event.repository.name }}
+        run: |
+          set -euo pipefail
+
+          # El slug se arma con lo que GitHub dice que es este repo, no con un literal:
+          # un check contra el auto-nombramiento no puede auto-nombrarse. El
+          # "Projects" del final es el fallback para un evento cuyo payload no traiga
+          # repository —y es el mismo nombre que marco-ci.yml deja literal, por el
+          # mismo motivo: no hay contexto que de solo el nombre del repo—.
+          SLUG="${PROPIETARIO}/${NOMBRE:-Projects}"
+          echo "el slug de este repo, segun el evento: ${SLUG}"
+
+          ARCHIVOS="$(git ls-files -- '.github/workflows/*.yml' '.github/workflows/*.yaml')"
+          if [ -z "${ARCHIVOS}" ]; then
+            echo "::error::git ls-files no devolvio ningun workflow. Este paso NO se declara verde por no haber podido medir: sin archivos no audito nada"
+            exit 1
+          fi
+
+          # -F: el slug es TEXTO, no un patron. El `|| true` no es un fail-open: grep
+          # sale 1 cuando no encontro nada, que es el caso sano de este paso, y el
+          # unico que hay que distinguir —"no pude mirar"— ya lo cerro la guarda de
+          # ARCHIVOS de arriba.
+          TODAS="$(echo "${ARCHIVOS}" | tr '\n' '\0' | xargs -0 grep -nHF -- "${SLUG}" || true)"
+          TOTAL=0
+          HALLAZGOS=0
+          while IFS= read -r L; do
+            [ -n "${L}" ] || continue
+            TOTAL=$((TOTAL + 1))
+            ARCHIVO="${L%%:*}"
+            RESTO="${L#*:}"
+            NUMERO="${RESTO%%:*}"
+            TEXTO="${RESTO#*:}"
+            # Comentario o `uses:`: las dos exenciones declaradas arriba, en un solo
+            # ancla. Un `if` y no un `&&` encadenado: con `set -e`, un `&&` que
+            # termina en falso como ultimo comando del cuerpo mata el bucle.
+            if printf '%s\n' "${TEXTO}" | grep -qE '^[[:space:]]*(#|(-[[:space:]]+)?uses:)'; then
+              continue
+            fi
+            HALLAZGOS=$((HALLAZGOS + 1))
+            echo "::error file=${ARCHIVO},line=${NUMERO}::esta linea escribe el slug de este repositorio (${SLUG}) fuera de un uses:. Un literal deja de coincidir en cuanto el arbol se copia a otra cuenta, y ahi el marco deja de reconocerse a si mismo: el job de la constitucion arranca en la copia y termina descargando la composite action de la cuenta ORIGINAL en cada PR de cada consumidor. Arreglo: derivalo del contexto github.repository_owner —en una expresion del workflow, o por env dentro del run, que es la convencion de este repo—. En un uses: no se puede, porque GitHub prohibe expresiones ahi, y por eso solo esas lineas estan exentas"
+          done <<EOF
+          ${TODAS}
+          EOF
+
+          if [ "${HALLAZGOS}" -gt 0 ]; then
+            echo "== ${HALLAZGOS} de ${TOTAL} ocurrencia(s) del slug estan fuera de un uses: =="
+            exit 1
+          fi
+
+          echo "ninguna de las ${TOTAL} ocurrencia(s) de ${SLUG} en .github/workflows esta fuera de un uses: o de un comentario"
+
   # EL CABLEADO DE LA CONSTITUCION, SOBRE EL PROPIO MARCO Y POR RUTA LOCAL.
   #
   # El carril del consumidor vive en marco-ci.yml y llama a la action por su ref
@@ -449,6 +566,7 @@ jobs:
   # condiciones. Si el scaffold deja de cablearla, este job es rojo.
   constitucion:
     name: constitucion
+    timeout-minutes: 10
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -502,6 +620,7 @@ jobs:
     name: changelog-en-el-pr
     # Solo en PRs: en un push a main el PR ya se mergeo y no hay diff que mirar.
     if: github.event_name == 'pull_request'
+    timeout-minutes: 10
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -565,6 +684,8 @@ jobs:
     name: ci-ok
     needs: [marco, pruebas_actions, pruebas_init, higiene, constitucion, changelog]
     if: always()
+    # 5 minutos: no hace checkout ni toca la red, solo lee los resultados de sus needs.
+    timeout-minutes: 5
     runs-on: ubuntu-latest
     steps:
       - name: Veredicto
@@ -586,11 +707,13 @@ jobs:
             echo "::error::el banco de la herramienta de init termino en '${{ needs.pruebas_init.result }}' en al menos uno de los tres sistemas operativos. Mira cual: la herramienta corre en la maquina de quien inicia un proyecto, no en un runner, asi que un rojo en windows o macos es un rojo real para un usuario real"
             exit 1
           }
-          # El paso de pines AVISA y no rompe (ver su comentario en el job
-          # higiene-del-marco), asi que este job solo se pone rojo si el paso no
-          # pudo medir. Que es lo correcto: "no pude auditar" nunca es verde.
+          # El job higiene-del-marco lleva DOS pasos con dos severidades distintas, y
+          # el mensaje las nombra porque el arreglo es distinto: el de pines AVISA y
+          # no rompe (los SHA se resuelven con red), asi que si el rojo viene de ahi es
+          # que no pudo medir; el del slug literal SI rompe por hallazgo, y ahi el
+          # arreglo es la linea que el propio paso anota.
           [ "${{ needs.higiene.result }}" = "success" ] || {
-            echo "::error::la higiene del marco (pines de actions de terceros) termino en '${{ needs.higiene.result }}'. Ese paso avisa y no rompe por hallazgos, asi que esto significa que no pudo medir"
+            echo "::error::la higiene del marco termino en '${{ needs.higiene.result }}'. Mira cual de sus dos pasos: el de pines de actions de terceros avisa y no rompe por hallazgos, asi que un rojo suyo significa que no pudo medir; el del slug literal si rompe por hallazgo y deja la linea anotada"
             exit 1
           }
           # Cualquier resultado que no sea success es un fallo, "skipped" incluido: un

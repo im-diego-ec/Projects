@@ -58,7 +58,8 @@ Si `openspec/specs/` no aparece modificado y el change sigue fuera de
 
 **Que se sabe de la causa.** El lock es sobre el rename del **directorio**, no
 sobre los archivos: `git mv` mueve los mismos archivos uno por uno sin problema.
-De ahi el procedimiento de abajo, que es exactamente el rodeo verificado en otro repo (PR #134).
+De ahi el procedimiento de abajo, que es exactamente el rodeo ya verificado en
+un PR real (#134).
 
 ---
 
@@ -298,8 +299,8 @@ intactos. No es un bug, es el formato.
 grep -rn "Purpose: TBD\|^TBD$" openspec/specs/
 ```
 
-Todo lo que aparezca se completa **en este mismo PR**. En otro repo una
-capability vivio una semana con el Purpose en TBD sin que nadie lo notara.
+Todo lo que aparezca se completa **en este mismo PR**. Ya paso: una capability
+vivio una semana con el Purpose en TBD sin que nadie lo notara.
 
 Revisa ademas que el `## Purpose` de las capabilities que tocaste siga siendo
 verdad despues del archive.

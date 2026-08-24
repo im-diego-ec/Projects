@@ -116,7 +116,7 @@ Toda verificación se hace **por código de salida**, nunca grepeando la salida.
       de node, así que el patrón no podía coincidir con ninguna ruta real.
 
       Alcance: `files: ["{{PAQUETE_WEB}}/src/**/*.{ts,tsx}"]` **propio**, no heredado del
-      `ignores` global (D4.2). El motivo medido: el un consumidor borró
+      `ignores` global (D4.2). El motivo medido: el consumidor medido borró
       `**/*.config.js` de su lista, así que apoyarse en ella habría dejado las reglas
       mordiendo la configuración de estilos, que es el único lugar legítimo donde los
       valores de marca se escriben.

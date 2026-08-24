@@ -12,12 +12,12 @@ estado: pendiente-de-revision
 El proposal establece el hueco: la regla «IaC = Terraform en `infra/` y `infra-prod/`» llega
 a cada sesión del agente y el andamio no crea ninguno de los dos directorios.
 
-Lo que la medición del 2026-08-23 sobre el un consumidor **cambió respecto de la
+Lo que la medición del 2026-08-23 sobre un consumidor real **cambió respecto de la
 intuición inicial** es el tamaño del problema. La suposición era «hay que repartir 2110
 líneas de Terraform». La realidad es que **el área comparte sus cimientos**, y por lo tanto
 la mayor parte de esas líneas no se decide: se **deriva**.
 
-| Cimiento | Cómo lo usa el un consumidor | Consecuencia |
+| Cimiento | Cómo lo usa el consumidor | Consecuencia |
 |---|---|---|
 | State | `backend "s3"` en un bucket **por cuenta, compartido** por los roots del área, con `key` por proyecto | Se deriva de la cuenta, el proyecto y la región |
 | Base de datos | `data "aws_rds_cluster" "shared"` — **no crea cluster**, referencia el del área | Se deriva; el nombre de la base sale del proyecto |
@@ -92,10 +92,10 @@ alarmas, que por D6 existe solo ahí—.
 El número importa igual: una lista larga de pendientes se lee como «esto está sin hacer» y
 se saltea; siete con criterio se resuelven.
 
-### D4 — Los huecos NO encodean las respuestas del un consumidor
+### D4 — Los huecos NO encodean las respuestas de un consumidor
 
-La tentación es copiar `infra/` de un-proyecto-anterior y sustituirle los valores. **No.** Y el
-mejor argumento está en su propio código: su `network.tf` documenta que el servicio corre en
+La tentación es copiar el `infra/` de un consumidor que ya corre y sustituirle los valores.
+**No.** Y el mejor argumento está en su propio código: su `network.tf` documenta que el servicio corre en
 subredes **públicas** aunque la VPC tenga NAT y subredes privadas, y lo justifica con una
 medición propia — *«con subnets privadas, `ingress_paths` queda vacío (probado)»*.
 
@@ -106,7 +106,7 @@ redibujado: algo que «se parece» y es otra cosa.
 
 **Entonces el hueco lleva el criterio, no la respuesta**: *«decidí en qué subredes corre el
 servicio; si necesitás un balanceador accesible desde internet, verificá qué exige antes de
-elegir privadas»*. Con el enlace al `network.tf` del un consumidor como
+elegir privadas»*. Con el enlace al `network.tf` de ese consumidor como
 **ejemplo**, nunca como plantilla.
 
 **Alternativa descartada: copiar y marcar con comentarios lo que hay que revisar.** Un
@@ -122,7 +122,7 @@ Lo que se exige es que **existan y estén cableadas al canal de alertas**. Cuál
 umbrales es del negocio de cada proyecto: un proyecto con tres alarmas bien elegidas cumple
 y uno con seis copiadas de otro negocio no.
 
-**Alternativa descartada: repartir el conjunto de alarmas del un consumidor
+**Alternativa descartada: repartir el conjunto de alarmas del consumidor medido
 (seis) como base.** Sería una cantidad esperada disfrazada de ayuda, y el marco ya tiene la
 regla escrita para las migraciones —invariantes de **propiedades**, jamás de cantidades—
 porque un invariante con número aborta trabajo sano por un falso fallo.
@@ -153,7 +153,7 @@ es que el andamio los sustituya como valor.
 
 **Alternativa descartada por ahora: agregarlos como valores 22 y 23.** Es la respuesta
 correcta y no se toma acá por dos razones. La primera es que el patrón de sus nombres se
-infirió de **dos** ejemplos —los del un consumidor—, y dos puntos alcanzan para ver
+infirió de **dos** ejemplos —los del consumidor medido—, y dos puntos alcanzan para ver
 una forma pero no para declarar una convención del área: eso lo sabe quien la definió. La
 segunda es que «los 21 valores» es un contrato documentado en tres lugares, y moverlo de
 pasada dentro de un change sobre infraestructura mete dos cambios en uno.

@@ -19,7 +19,7 @@ Toda verificación se acredita por **código de salida**, nunca grepeando la sal
 
 **`projects-starter` YA SE BORRÓ**, el 2026-08-23, y **antes** de la tarea 6.3 que
 lo gateaba. Esta nota decía «no se borra hasta que el ensayo del 4.1 esté verde,
-es el único lugar donde hoy vive el material de partida»; queda escrita así, tachada
+es el único lugar donde hoy vive el esqueleto»; queda escrita así, tachada
 y con lo que de verdad pasó, porque tildar la casilla como si el plan se hubiera
 seguido es peor que la desviación.
 
@@ -44,9 +44,9 @@ otro proyecto, y copiarlo al marco sería mover el problema, no resolverlo.
       (D5). Si la prueba resulta más frágil que valiosa, va exclusión con motivo.
       La decisión se toma con el número en la mano, no antes; lo que no puede
       quedar es al 0 % sin declaración.
-- [ ] 0.3 **Tomar el snapshot del material de partida**: los 32 archivos del
-      starter a un directorio de trabajo, con el `sha256` de cada uno y la fecha.
-      El otro repositorio se va a borrar; sin esta huella no se puede
+- [ ] 0.3 **Tomar el snapshot del esqueleto**: los 32 archivos del starter a un
+      directorio de trabajo, con el `sha256` de cada uno y la fecha.
+      El repositorio del starter se va a borrar; sin esta huella no se puede
       contestar después «¿esto lo cambiamos nosotros o venía así?».
 - [ ] 0.4 **Confirmar el conteo del `Why`.** El proposal afirma 49 archivos: 22
       del andamio más lo que dejan `openspec init` y el render de la
@@ -68,8 +68,8 @@ otro proyecto, y copiarlo al marco sería mover el problema, no resolverlo.
 
 ## 2. Los controles que hoy no existen (antes de absorber nada)
 
-Cada uno se escribe con el material de partida presente en un directorio de
-trabajo, para que el primer rojo sea el real.
+Cada uno se escribe con el esqueleto presente en un directorio de trabajo, para
+que el primer rojo sea el real.
 
 - [x] 2.1 **Enmascaramiento en los manifiestos del andamio.** Detecta `|| true`,
       `; exit 0`, `--passWithNoTests` y la familia. Evidencia: contra los
@@ -229,7 +229,7 @@ trabajo, para que el primer rojo sea el real.
       0.3 y el enlace al PR que lo absorbió.
       **Hecho el 2026-08-23, y ADELANTADO respecto de esta tarea:** Builder 1 lo borró
       apenas mergeó el PR #56, sin esperar el release ni el 5.3. La condición que
-      esta tarea protegía —tener el material de partida mientras el reemplazo no
+      esta tarea protegía —tener el esqueleto mientras el reemplazo no
       esté probado— ya se había cumplido por otra vía: el `pnpm verificar` del
       repo instanciado salía **exit 0** antes del merge, así que el reemplazo
       estaba probado. Lo que sí se perdió es el upstream para diferir, y eso queda

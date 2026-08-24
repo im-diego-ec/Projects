@@ -1,7 +1,7 @@
 # Auditoria de cierre de v1
 
-Corrida del 2026-08-20 sobre los cinco PRs abiertos de Projects (12, 14, 15, 16) y el PR 154 de
-un-proyecto-anterior, con el consumidor real como banco de pruebas. Veinte afirmaciones del
+Corrida del 2026-08-20 sobre los cinco PRs abiertos de Projects (12, 14, 15, 16) y el PR 154 del
+repo consumidor que sirvio de banco de pruebas. Veinte afirmaciones del
 cuerpo de esos PRs y de los comentarios del pipeline se pusieron a prueba con fixtures y
 codigo de salida: **trece quedaron refutadas y siete se sostienen**. Lo que sigue esta
 ordenado para leerse antes del review, no despues.
@@ -27,7 +27,7 @@ las lineas 237-239 promete lo contrario (falla si ademas esta por debajo del pis
 paquete). El cuerpo del PR se queda con la version fuerte. Medicion sobre el consumidor real:
 
 ```
-cd un-proyecto-anterior/web && node node_modules/vitest/vitest.mjs run --coverage
+cd <consumidor>/web && node node_modules/vitest/vitest.mjs run --coverage
 All files | 80.99 | 89.08 | 70.69 | 80.99
 EXIT = 0
 ```
@@ -100,7 +100,7 @@ los diffs de merge por defecto. Un secreto introducido en la RESOLUCION de un me
 la rama de trabajo, y borrado en el commit siguiente, sale **exit 0, 0 hallazgos, imprimiendo
 "(arbol + historia del cambio)"**, o sea afirmando una cobertura que no tuvo.
 `git log -p A..H | grep -c` da 0; con `-m` da 2. Traer main a la rama de trabajo es el flujo
-diario de este marco (la historia de un-proyecto-anterior ya tiene
+diario de este marco (la historia de un consumidor real ya tiene
 "Merge branch 'main' into feat/consumir-projects"). Arreglo: `--diff-merges=first-parent` en el
 `--log-opts`, o cruzar por plano con `esperados_arbol` y `esperados_historia` en vez de `max()`.
 
@@ -113,12 +113,12 @@ rojo por presencia se decide con `git ls-files`, y deberia decidirse con `test -
 
 ### B4. Mover `v1` pone rojo al consumidor real por dos checks sin modo aviso
 
-`Ejecutores de paquetes pinados` corrido tal cual contra un-proyecto-anterior:
+`Ejecutores de paquetes pinados` corrido tal cual contra el arbol de un consumidor real:
 **exit 1, 5 `::error::` en `.claude/settings.json:4-8`**. El detector de secretos declara 3
 hallazgos en ese mismo arbol (numero de los propios autores; no lo pude medir porque no baje el
 binario en ese carril, pero mi conteo independiente de 385 archivos rastreados corrobora que
 hablan de este arbol). Ninguno de los dos tiene modo aviso ni ventana: sus unicas salidas son
-exit 1 y `process.exit(1)`. otro repo llama al workflow por `@v1` (`ci.yml:55`), asi que lo
+exit 1 y `process.exit(1)`. Ese consumidor llama al workflow por `@v1` (`ci.yml:55`), asi que lo
 recibe sin tocar una linea. Eso viola la regla del propio `AGENTS.md:143-145` de Projects
 (endurecer se estrena en modo aviso). Agravante: la forma pinada correcta llega en
 `plantilla/.claude/settings.json`, que es PR 15 y solo alcanza repos nuevos; ningun paso migra
@@ -126,7 +126,7 @@ el allowlist de un consumidor existente.
 
 ### B5. La cadena de la constitucion no llega a ningun consumidor, y la propiedad se cae por el eslabon que nadie mira
 
-En `main` de un-proyecto-anterior el eslabon no existe: `git ls-files | grep -i projects` -> exit 1,
+En `main` de ese consumidor el eslabon no existe: `git ls-files | grep -i projects` -> exit 1,
 `test -f .projects/AGENTS-marco.md` -> exit 1, `grep -n projects AGENTS.md CLAUDE.md` -> exit 1. El
 archivo vive solo en `feat/constitucion-del-marco` (PR 154, bloqueado hasta que v1 mueva). O
 sea: el agente que trabaja hoy en el repo piloto corre sin la mitad de las reglas, que es
@@ -148,7 +148,7 @@ escritas en el mensaje (moverlo a ADDED o declarar el retitulado en RENAMED). El
 viaja por `@v1`: `git show main:actions/guardrail-deltas/check-openspec-deltas.mjs` contiene el
 bloque "HUECO DEL SCRIPT ORIGINAL, ARREGLADO ACA". Ese texto va en el artefacto que TODOS los
 consumidores cargan en CADA sesion, y ya esta vivo en el `.projects/AGENTS-marco.md` de
-un-proyecto-anterior. Cuesta doble: manda a revisar a mano algo que el CI caza, y ensena que las
+un consumidor. Cuesta doble: manda a revisar a mano algo que el CI caza, y ensena que las
 advertencias del canonico pueden estar viejas, que es el credito que este change existe para
 construir.
 
@@ -571,7 +571,7 @@ corre el riesgo de que el archive borre escenarios en silencio.
    verde en un check de seguridad; mergearlos asi entrega una garantia que no existe.
 3. **PR 15**, con el plan de la seccion 3 aplicado: cablear la action, arreglar `sustituir()`,
    borrar el paso inline.
-4. **Un PR en un-proyecto-anterior, mergeado y verde**, que pine las 5 entradas
+4. **Un PR en el repo consumidor, mergeado y verde**, que pine las 5 entradas
    `npx --yes openspec` del allowlist a `@fission-ai/openspec@1.9.0` (la forma que ya trae
    `plantilla/.claude/settings.json`), agregue `.projects/` y `.cursor/rules/00-marco.mdc` al
    `.prettierignore`, y limpie o declare los 3 hallazgos de secretos.
@@ -707,11 +707,11 @@ interaccion.
 20. La adopcion tiene el huevo antes que la gallina para un repo que ya existe. `constitucion.mjs`
     aborta con "falta `.projects-valores.json`" ANTES de ramificar por modo, asi que tambien falla en
     modo escribir, que es la pieza que deberia depositar el artefacto por primera vez. Medido
-    contra un espejo del arbol de otro repo: sin el archivo, exit 1; con el
+    contra un espejo del arbol de un consumidor existente: sin el archivo, exit 1; con el
     `.projects-valores.json` de la plantilla tal cual, exit 1 por placeholders. La plantilla solo
     resuelve el caso del repo nuevo.
 21. El artefacto generado queda DENTRO del formateador en el consumidor existente.
-    `grep -n projects .prettierignore` en otro repo da exit 1, y
+    `grep -n projects .prettierignore` en ese consumidor da exit 1, y
     `prettier --file-info .projects/AGENTS-marco.md` responde `{"ignored": false}` mientras su
     `ci.yml:107` corre `pnpm format:check`. El dia que el PR semanal deposite el artefacto,
     `format:check` se pone rojo; y si alguien corre `pnpm format` para apagarlo, prettier lo
@@ -766,7 +766,7 @@ Obligatorio y no dice "nada". Diez huecos, con el mas grande primero.
 7. **`intranet` es un punto ciego total.** Ver B9. Es el hallazgo mas grave con la evidencia mas
    debil, y hay que verificarlo contra el repo antes de actuar.
 8. **No revise cuanto DIVERGIO ya el scaffold en los consumidores reales.** Comparar `plantilla/`
-   contra el arbol de un-proyecto-anterior archivo por archivo es el item 1 de la revision
+   contra el arbol de un consumidor real archivo por archivo es el item 1 de la revision
    trimestral y es donde probablemente esten los huecos que este informe no nombra.
 9. **Cero verificacion de infraestructura y de AWS.** Las cinco capabilities sin enforcement las
    evalue solo por ausencia de check en el marco. No corri `terraform plan`, no consulte ninguna

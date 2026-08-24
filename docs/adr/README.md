@@ -92,7 +92,7 @@ se escribió, describiendo algo de hace un mes, miente sobre el historial.
 
 ### Procedencia
 
-Los tres se destilaron del proyecto piloto, donde estaban numerados
+Los tres nacieron en el proyecto piloto, donde estaban numerados
 `006`, `007` y `010` entre ADRs de producto (base de datos, auth, zona
 horaria) que **no** son del marco y se quedaron allá. La renumeración es
 deliberada: acá el `001` es el primer ADR *del marco*, no el sexto de un

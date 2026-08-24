@@ -839,7 +839,7 @@ export function nombreDelCheck(clave, job) {
  * mutaciones medidas pasaban por ahí:
  *   · clave `ci_ok` con `name: veredicto-final` -> el check se publica como
  *     «veredicto-final» y el ruleset sigue esperando `ci-ok`, una señal que no llega
- *     nunca (es el error que ya costó una semana de ruleset en otro repo);
+ *     nunca (es el error que ya costó una semana de ruleset en un repo real);
  *   · `name: ci-ok` con `strategy.matrix` -> se publican «ci-ok (a)» y «ci-ok (b)», y
  *     ningún check se llama `ci-ok`.
  * La clave normalizada se dejó de aceptar por lo mismo: un job `ci_ok` SIN `name`

@@ -58,7 +58,7 @@ SHA no representa lo que vas a probar.
 
 ## Paso 2 — Rama temporal en el consumidor
 
-En el repo consumidor (`un-proyecto-anterior`, `intranet`, el que sea):
+En el repo consumidor que estes validando:
 
 ```bash
 git checkout main && git pull --ff-only && git checkout -b chore/validar-projects-<sha-corto>

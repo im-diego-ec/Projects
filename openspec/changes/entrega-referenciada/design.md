@@ -29,9 +29,8 @@ del área: no es una reinterpretación del contrato, es un cambio de premisa —
 por eso arrastra un change de contrato propio, que este design flaguea y no
 cierra (ver «Lo que sigue sin resolver»).
 
-Los hechos del archivo real del consumidor, verificados sobre
-`un-proyecto-anterior/.github/workflows/deploy.yml` (685 líneas al abrir este
-change):
+Los hechos del archivo real del consumidor, verificados sobre su
+`.github/workflows/deploy.yml` (685 líneas al abrir este change):
 
 - El patrón de one-off en Fargate —`run-task` + `wait tasks-stopped` + check del
   exit code— aparece **cuatro veces**: `:121` (migraciones de dev), `:206`

@@ -557,6 +557,6 @@ escritos para que no se pierdan.
   la regla `auditar-permisos-de-job-nuevo` y lo que evita que un cambio del workflow los
   saque sin que nadie lo note.
 - **Las actions del `build_test` están una generación atrás** (`checkout@v4`, `setup-node@v4`,
-  `pnpm/action-setup@v4`) frente a las que ya usa un-proyecto-anterior (`@v7`, `@v7`, `@v6`). No
+  `pnpm/action-setup@v4`) frente a las que ya usa el consumidor viejo (`@v7`, `@v7`, `@v6`). No
   es de este change; el snippet del punto 2.8 usa `@v4` a propósito para no mezclar una
   actualización de dependencias con la migración de la constitución.

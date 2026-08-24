@@ -43,13 +43,13 @@ falsa desde antes de este change.
 Tres hechos que ordenan el diseño:
 
 **1. La base ya es el estado de hecho, 2 de 2, tipeada a mano dos veces.**
-`un-proyecto-anterior/AGENTS.md:28-37` e `intranet/AGENTS.md:18-28` (rama
+El `AGENTS.md:28-37` del consumidor viejo e `intranet/AGENTS.md:18-28` (rama
 `projects/adopcion-marco`) coinciden capa por capa: React + Vite + TypeScript, Node
 + Express, PostgreSQL vía Prisma, Clerk, Zod, AWS + Terraform, GitHub Actions,
 pnpm con workspaces, Vitest. Y coinciden en topología: `infra/ecs.tf` en los dos,
 base relacional administrada en los dos
-(`un-proyecto-anterior/infra-prod/database.tf`; en `intranet`, el cluster Aurora
-compartido). La deriva ya empezó y está en los detalles: uno pina «React 18», el
+(en el consumidor viejo, `infra-prod/database.tf`; en `intranet`, el cluster
+Aurora compartido). La deriva ya empezó y está en los detalles: uno pina «React 18», el
 otro no; uno dice «Aurora Serverless v2», el otro «Aurora PostgreSQL (una sola
 base)».
 
@@ -391,7 +391,7 @@ cerrar.
   estructural, no un check (D6), y por lo tanto se debilita el día que exista una
   segunda forma de desplegar dentro del carril del marco.
 - **La base fija la pieza, no su versión mayor.** «React» no dice React 18 o 19
-  —hoy `intranet` pina 18 y `un-proyecto-anterior` no—, y el check no va a cazar
+  —hoy `intranet` pina 18 y el otro consumidor no—, y el check no va a cazar
   esa divergencia. Las versiones las gobierna la política de dependencias; si
   algún día importa que dos repos corran la misma mayor, es otro change.
 - **Nada limita cuántos desvíos declara un proyecto.** Se hereda del canal de

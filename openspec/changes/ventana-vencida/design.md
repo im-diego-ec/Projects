@@ -26,7 +26,7 @@ las mismas 2.
 **Alternativa descartada: dejar el piso en 28 y solo sacar la fecha de la prosa.** Es
 cosmética. Medido: la fecha que un consumidor ve no sale de la versión que se publica sino
 de la **entrada pendiente más vieja**, así que sacarla del CHANGELOG no la saca del
-mensaje. El un consumidor seguiría viendo 2026-09-19, heredado de la 1.4.2.
+mensaje. El consumidor seguiría viendo 2026-09-19, heredado de la 1.4.2.
 
 ## D2. Las entradas históricas también pasan a exigible = publicada
 
@@ -89,7 +89,7 @@ anteriores.
 - **La ventana de la cobertura** (`calidad-codigo`, líneas 265-275, cierre 2026-09-30)
   tiene la misma premisa vencida y **no se toca**: otro mecanismo, otro radio, una fecha ya
   anunciada. Queda nombrada en el proposal.
-- **El artefacto del un consumidor no se regenera acá.** Este change hace que su
+- **El artefacto del consumidor no se regenera acá.** Este change hace que su
   próximo PR de bump llegue rojo; regenerarlo es trabajo de ese repo, en ese PR.
 - **La premisa vencida sigue escrita en el spec vivo de la cobertura.** Corregir esa
   justificación es parte de la decisión sobre esa otra ventana, no de esta.

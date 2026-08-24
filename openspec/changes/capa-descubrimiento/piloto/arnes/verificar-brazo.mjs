@@ -194,7 +194,7 @@ const raizEspacio = toplevel.codigo === 0 ? resolve(toplevel.texto.trim()) : nul
 // D5 dice «fuera de TODO repositorio», asi que la guarda se DERIVA de eso y no enumera
 // casos prohibidos. Enumeraba dos —que el espacio fuera Projects, o que tuviera plantilla/— y
 // eso dejaba pasar el mas probable: armar el laboratorio dentro de un repo CONSUMIDOR.
-// un-proyecto-anterior no es Projects y no tiene plantilla/, asi que la version anterior salia
+// Un repo consumidor no es Projects y no tiene plantilla/, asi que la version anterior salia
 // exit 0 sobre un espacio que D5 prohibe. Es el mismo defecto que este marco corrige en
 // todas sus otras superficies: una lista de lo prohibido siempre le falta un caso, y el que
 // le falta es el que alguien va a hacer.

@@ -66,8 +66,8 @@ Es el primer principio del marco (referenciar > copiar) aplicado mal. Referencia
 sirve cuando lo referenciado es un ARTEFACTO VIVO con dueño y versiones — la
 skill del design system, el workflow reusable —. Un esqueleto no es eso: se copia
 UNA vez, al nacer el proyecto, y después nadie vuelve. Referenciar algo que se
-consume una sola vez no ahorra deriva, la traslada al otro repositorio y le
-saca el review.
+consume una sola vez no ahorra deriva, la traslada al repositorio del esqueleto y
+le saca el review.
 
 **Alternativa descartada: publicar el esqueleto como paquete npm privado
 (`create-la organización-app`).** La respuesta ortodoxa. Cuesta un repositorio nuevo más
@@ -257,7 +257,7 @@ después y con un mensaje que no menciona workspaces. El contenido se muda al
 
 ## D7 — El paquete `e2e` existe porque su ausencia es roja
 
-**El hallazgo.** El material de partida tiene `api` y `web`. El `ci.yml` del
+**El hallazgo.** El esqueleto absorbido tiene `api` y `web`. El `ci.yml` del
 andamio declara `EXCEPCIONES: "{{PAQUETE_E2E}}:test {{PAQUETE_E2E}}:build"`, y su
 propio verificador considera **fallo** una excepción que no corresponde a ningún
 paquete del workspace («excepción muerta»). Sin paquete `e2e`, el repositorio
@@ -332,7 +332,7 @@ del esqueleto siga instalando» (Dependabot no ve el andamio). Queda como tarea
   comprobaciones del marco ya no dependen de ese código de salida, así que el pin
   no es urgente; subirlo es cambio de dependencia y se pregunta antes.
 - **Las versiones de todo lo demás.** React 18, Express 4, Prisma 7, vitest 2,
-  Vite 6: son las del material de partida y se absorben como están. Actualizarlas
+  Vite 6: son las que traía el esqueleto y se absorben como están. Actualizarlas
   es otro change, con su orden de riesgo.
 - **Que el esqueleto envejezca.** Nada avisa cuando el stack del andamio queda
   atrás. Declarado en el proposal y con la tarea 4.2 como camino.

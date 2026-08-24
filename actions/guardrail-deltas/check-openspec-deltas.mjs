@@ -3,11 +3,10 @@
 // requirement completo en el spec principal al archivar. Si el delta omite
 // un escenario que el spec vigente sí tiene, ese escenario se PIERDE.
 //
-// Origen: el 2026-07-31, en el repo donde nació este marco, el archive de un
-// change abortó por esto (la herramienta lo atrapó a tiempo, pero solo en el
-// último paso del change, con el trabajo ya hecho). Este script lo detecta en
-// CI, en cada PR — el error no vuelve a depender de que alguien se acuerde de
-// revisarlo.
+// Origen: el 2026-07-31 el archive de un change abortó por esto (la
+// herramienta lo atrapó a tiempo, pero solo en el último paso del change, con
+// el trabajo ya hecho). Este script lo detecta en CI, en cada PR — el error no
+// vuelve a depender de que alguien se acuerde de revisarlo.
 //
 // EL SEGUNDO PLANO, y hasta hoy el que no existía: EL ARCHIVE CONTRA EL SPEC
 // VIVO. Lo de arriba mira hacia adelante (qué se perdería al archivar) y no
@@ -235,7 +234,7 @@ for (const nombre of archivados) {
     // que el delta anterior describe un contrato que ya no rige. Sin esto, el delta
     // mas viejo de una capability que evoluciono pierde SIEMPRE contra el spec vivo,
     // y eso es el falso positivo que este archivo declara querer evitar.
-    // Medido en un-proyecto-anterior: la estrategia de ramas se agrego en
+    // Medido sobre un historial real: la estrategia de ramas se agrego en
     // 2026-07-23-add-git-branch-strategy y DOS changes posteriores la reescribieron
     // con MODIFIED; el ADDED original quedaba rojo para siempre y sin ninguna via de
     // declaracion, que es el peor tipo de rojo que este marco puede emitir.

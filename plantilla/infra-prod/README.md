@@ -29,6 +29,29 @@ garantía del marco queda sin cumplir.
 pendientes, y la compuerta llega con el change del despliegue. Hasta entonces se
 revisa a mano: `grep -rn PENDIENTE-INFRA infra infra-prod`.
 
+## Lo que el CI **sí** mira desde el primer PR
+
+El aviso de arriba es sobre los **pendientes**, no sobre el resto del archivo. El
+job `build-test` de `.github/workflows/ci.yml` corre en cada PR que toque código:
+
+```bash
+terraform fmt -check -recursive infra infra-prod
+# y, en cada raíz:
+terraform init -backend=false && terraform validate
+```
+
+Las dos son **inertes**: `fmt` sólo lee texto, y `-backend=false` es lo que evita
+tocar el bucket del state — que es justamente el pendiente 1. No hacen falta
+cuenta, credenciales ni que este repositorio se despliegue, y por eso son
+exigibles desde el día uno aunque la compuerta de los pendientes todavía espere al
+change del despliegue.
+
+Estrenan en **modo aviso hasta el 2026-09-30** y después se ponen rojas solas, sin
+que nadie toque el workflow: hasta hoy nada miraba estos archivos, así que la
+primera corrida es también la primera medición, y la ventana es el plazo para
+arreglar lo que reporte. Los mismos dos comandos corren en tu máquina sin
+credenciales.
+
 ## El pendiente de alarmas no se puede copiar de nadie, y por eso está acá
 
 El marco exige que las alarmas **existan y avisen** al canal `{{CANAL_ALERTAS}}`.

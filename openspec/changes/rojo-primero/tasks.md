@@ -41,7 +41,7 @@ el estreno que la constitución clasifica como breaking.
       **Evidencia**: un requirement de prueba sin declarar, y el rojo.
 - [ ] 3.3 Estreno: verificar que el repo del marco pasa los dos checks nuevos
       ANTES de hacerlos requeridos, y que el consumidor real también.
-      **Evidencia**: la corrida verde en el marco y en un-proyecto-anterior, por
+      **Evidencia**: la corrida verde en el marco y en el repo del consumidor, por
       código de salida.
 
 ## Bloque 4 — La propiedad de las afirmaciones
