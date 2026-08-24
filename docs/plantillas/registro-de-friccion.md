@@ -53,6 +53,7 @@ por 10× es un defecto de la guía, no del que la corrió.
 | 3.3 · Si el repo ya existía | — | | | |
 | 4 · El lockfile | 1 comando | | | |
 | 4.1 · Comprobarlo antes de pushear | — | | | |
+| 4.2 · lo que ya viene hecho | *no es trabajo: es inventario* | — | — | — |
 | 5 · Primer push a `main` | — | | | |
 | 5.1 · El primer CI sale rojo | — | | | |
 | 6.1 · Protección de `main` | — | | | |
@@ -60,6 +61,14 @@ por 10× es un defecto de la guía, no del que la corrió.
 | 6.3 · Dependabot | — | | | |
 | 6.4 · Los dos secrets | — | | | |
 | 7 · Primer change de OpenSpec | — | | | |
+| **7.1** · de los documentos a los specs | — | | | |
+| 7.1 · 1-2 · directorio aparte e instalar BMAD | — | | | |
+| 7.1 · 3 · documentos numerados | — | | | |
+| 7.1 · 4 · **la lista de cobertura** | — | | | |
+| 7.1 · 5 · **el PRD con `bmad-prd`** | 2-3 vueltas | | | |
+| 7.1 · 6 · pulir el PRD y contrastarlo | — | | | |
+| 7.1 · 7 · la sesión del repo: proposal y deltas | — | | | |
+| 7.1 · 8 · la tercera columna de la lista | — | | | |
 
 **Total real de punta a punta**: ____ · **de eso, esperando a otra persona**: ____
 
