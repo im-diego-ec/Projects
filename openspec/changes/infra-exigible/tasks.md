@@ -85,12 +85,17 @@ un PR por bloque con `Closes #<sub-issue>` desde su creación.
       incompleto.
       Sigue siendo obligatoria antes del archive del change.
 
-## Bloque 3 — Que el que llega mañana lo entienda
+## Bloque 3 — Que el que llega mañana lo entienda · **HECHO**
 
-- [ ] **3.1** Sumar los huecos a la fase 5.1 de `docs/arrancar-un-proyecto.md`, que ya
-      documenta el primer CI rojo como esperado y hoy cuenta tres huecos.
-      **Evidencia**: el conteo de la guía coincide con el conteo real del andamio, verificado
-      con el mismo `grep` de la tarea 1.2.
+- [x] **3.1** **REFORMULADA por la corrección de D8**, y el motivo importa: los pendientes
+      de infraestructura **ya no gatean**, así que sumarlos a la fase 5.1 —que explica por qué
+      el primer CI sale rojo— habría sido **falso**. La 5.1 sigue contando tres recuadros y eso
+      es correcto.
+      Lo que se hizo en su lugar: la fase 3.1 gana los dos directorios en su tabla y una
+      subsección propia que dice qué traen, que cada pendiente lleva su criterio, y **que no
+      van a poner el CI en rojo** — para que nadie los confunda con la causa del primer rojo.
+      **Evidencia, medida**: `projects init` escribe **75 archivos con 156 sustituciones** (eran 69
+      y 116), y el total del repo pasa de 87 a **93**. Los tres números están en la guía.
 
 - [x] **3.2** ~~Entrada en `CHANGELOG.md`~~ **CORREGIDA DE LUGAR al implementar el bloque 1.**
       Esta tarea estaba mal puesta acá: el check `changelog-en-el-pr` exige la entrada en el PR
@@ -101,10 +106,13 @@ un PR por bloque con `Closes #<sub-issue>` desde su creación.
       bloques dejaron, y agregarle lo que el bloque 2 haya cambiado.
       **Evidencia**: el check `changelog-en-el-pr` en verde en el PR del bloque 1.
 
-- [ ] **3.3** Anotar en `docs/reglas-no-escritas.md` la deuda que el design declara y que
-      ningún check puede cerrar: **que el hueco lleve un criterio útil** no es decidible con
-      un escaneo, y se revisa una vez acá en vez de una vez por proyecto.
-      **Evidencia**: la fila existe y dice por qué no se puede automatizar.
+- [x] **3.3** Dos filas en `docs/reglas-no-escritas.md`, no una — la corrección de D8 agregó
+      la segunda:
+      · **fila 22**, la compuerta que falta, con la medición que explica por qué no se puede
+        poner hoy (3 marcadores → 21, y `ci-ok` inalcanzable el día uno);
+      · **fila 23**, que un pendiente lleve un criterio **útil** no lo puede verificar ningún
+        check, y por qué la salida no es un check más sino que la revisión ocurra una vez.
+      **Evidencia**: las dos filas existen y las dos dicen por qué no se pueden cerrar hoy.
 
 ---
 

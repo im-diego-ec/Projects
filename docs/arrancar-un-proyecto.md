@@ -204,14 +204,15 @@ node <ruta-al-clon-de-projects>/herramientas/projects-init.mjs \
   --valores <ruta>/valores.json --destino .
 ```
 
-Eso es todo. **No hay una segunda pieza que traer**: `projects init` escribe **69 archivos
-con 116 sustituciones** — la mecánica **y** los tres paquetes con sus pruebas pasando.
+Eso es todo. **No hay una segunda pieza que traer**: `projects init` escribe **75 archivos
+con 156 sustituciones** — la mecánica, los tres paquetes con sus pruebas pasando, **y los
+dos directorios de infraestructura**.
 
 Si el repo que querés usar **ya existía**, el primer comando falla: eso es la 3.3.
 
 ### 3.1 Qué quedó en el repo
 
-**87 archivos.** El mensaje dice `escritos 69` y **está bien**: 69 son los del andamio, y
+**93 archivos.** El mensaje dice `escritos 75` y **está bien**: 75 son los del andamio, y
 los otros los escriben `openspec init` (que init ya corrió, con el pin del marco `1.9.0`)
 y el render de la constitución.
 
@@ -222,10 +223,36 @@ y el render de la constitución.
 | `e2e/` | Playwright, con una prueba de humo |
 | `.github/`, `eslint.config.mjs`, `AGENTS.md`, … | La mecánica del marco |
 | `.projects/`, `.cursor/rules/` | La porción de la constitución, renderizada al día |
+| `infra/`, `infra-prod/` | Terraform de dev y de producción — **con pendientes de decisión adentro**, ver abajo |
 
 **La tabla «Stack fijado» del `AGENTS.md` llega LLENA**, no con huecos, porque el andamio
 implementa ese stack. Lo que hay que hacer es **borrar la fila —y su paquete— de lo que
 este proyecto no vaya a tener**, no llenarla.
+
+#### Los dos directorios de infraestructura, y por qué NO te van a poner el CI en rojo
+
+`infra/` y `infra-prod/` llegan con **lo que se deriva de tus valores ya funcionando** —el
+backend del state, el proveedor, la referencia a la base compartida del área, los dominios—
+y con **los pendientes de decisión**: seis en dev y siete en producción. El séptimo es el de
+**alarmas**, y existe solo en producción a propósito.
+
+Cada pendiente dice tres cosas: qué falta, **con qué criterio se decide**, y qué garantía del
+marco queda sin cumplir si no se hace. Están ahí para que no haga falta haber diseñado la
+infraestructura del área para poder resolverlos.
+
+⚠️ **Y no gatean todavía**, así que no confundas: el primer CI rojo de la fase 5.1 **no**
+viene de acá. La compuerta llega con el trabajo de despliegue, porque hoy «este repositorio
+se despliega» no es verificable — el andamio no reparte pipeline de despliegue. Hasta
+entonces son disciplina, y se ven de un tirón:
+
+```bash
+grep -rn PENDIENTE-INFRA infra infra-prod
+```
+
+**Cero recursos de Terraform**, y es deliberado: el andamio no reparte infraestructura sin
+verificar, porque verificarla exige una cuenta real y un `apply` con OK humano — y repartir
+sin verificar haría que cada proyecto herede los errores del último que la escribió. Lo que
+hay son referencias a lo que **ya existe** y los pendientes que describen lo que falta crear.
 
 ### 3.2 Los equipos necesitan escritura sobre el repo, y nadie lo hace solo
 
