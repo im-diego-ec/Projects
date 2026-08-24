@@ -23,8 +23,11 @@ la red.
 
 **Sin resolver, en `pendientes.tf`**: siete. Uno más que dev, y es el de
 **alarmas**. Cada pendiente dice qué falta, **con qué criterio se decide** y qué
-garantía del marco queda sin cumplir. El pipeline se queda **rojo** mientras
-sobreviva uno.
+garantía del marco queda sin cumplir.
+
+⚠️ **Todavía no hay compuerta**: el pipeline **no** se pone rojo por estos
+pendientes, y la compuerta llega con el change del despliegue. Hasta entonces se
+revisa a mano: `grep -rn PENDIENTE-INFRA infra infra-prod`.
 
 ## El pendiente de alarmas no se puede copiar de nadie, y por eso está acá
 

@@ -23,7 +23,7 @@ terraform {
   # dev a propósito: el state de producción no se comparte cuenta con el de un
   # ambiente donde cualquiera prueba.
   #
-  # 🕳️ El nombre del bucket es un PENDIENTE — ver `pendientes.tf`, sección 1.
+  # PENDIENTE-INFRA: El nombre del bucket es un PENDIENTE — ver `pendientes.tf`, sección 1.
   backend "s3" {
     bucket       = "PENDIENTE-VER-pendientes-tf-SECCION-1"
     key          = "{{PROYECTO}}/infra-prod.tfstate"

@@ -1,10 +1,22 @@
 # PENDIENTES DE DECISIÓN — ambiente de DESARROLLO de {{PROYECTO}}
 #
 # Este archivo es solo comentarios: no declara nada y Terraform lo parsea sin
-# efecto. Existe porque el pipeline busca el marcador 🕳️ en todo el árbol y se
-# queda ROJO mientras sobreviva uno. Cuando resolvés un pendiente, borrás su
-# sección y escribís lo que decidiste en un archivo propio. Cuando no queda
+# efecto. Existe para que lo que falta decidir esté escrito donde se decide, y
+# para que el agente lo lea en cada sesión. Cuando resolvés un pendiente, borrás
+# su sección y escribís lo que decidiste en un archivo propio. Cuando no queda
 # ninguno, este archivo se borra entero.
+#
+# TODAVIA NO HAY COMPUERTA, y decirlo es parte del pendiente. El paso de
+# marcadores del pipeline NO ve este token: la compuerta llega con el change del
+# despliegue, que es cuando «este repositorio se despliega» se vuelve verificable.
+# Hasta entonces esto es disciplina declarada, y se revisa a mano:
+#
+#     grep -rn PENDIENTE-INFRA infra infra-prod
+#
+# El motivo de no gatearlo ya: el requirement de este change exige que la
+# verificacion sea INERTE para un repositorio que no se despliega, y un token que
+# cuenta desde el dia uno no cumple eso — pondria rojo a un repo recien nacido por
+# decisiones de infraestructura que todavia no puede tomar.
 #
 # Cada pendiente tiene la misma forma, y la del medio es la que importa:
 #
@@ -21,7 +33,7 @@
 # está citado como ejemplo.
 
 # ---------------------------------------------------------------------------
-# 🕳️ 1 · El bucket del state
+# PENDIENTE-INFRA: 1 · El bucket del state
 #
 # QUÉ FALTA
 #   El nombre del bucket de S3 donde vive el state de este root, en el
@@ -45,7 +57,7 @@
 # ---------------------------------------------------------------------------
 
 # ---------------------------------------------------------------------------
-# 🕳️ 2 · El identificador del cluster de base de datos
+# PENDIENTE-INFRA: 2 · El identificador del cluster de base de datos
 #
 # QUÉ FALTA
 #   El `cluster_identifier` del `data "aws_rds_cluster" "compartido"` de
@@ -68,7 +80,7 @@
 # ---------------------------------------------------------------------------
 
 # ---------------------------------------------------------------------------
-# 🕳️ 3 · En qué subredes corre el servicio
+# PENDIENTE-INFRA: 3 · En qué subredes corre el servicio
 #
 # QUÉ FALTA
 #   Decidir la topología de red del servicio y declararla: qué subredes usan las
@@ -94,7 +106,7 @@
 # ---------------------------------------------------------------------------
 
 # ---------------------------------------------------------------------------
-# 🕳️ 4 · El dimensionamiento del cómputo y los límites de autoescalado
+# PENDIENTE-INFRA: 4 · El dimensionamiento del cómputo y los límites de autoescalado
 #
 # QUÉ FALTA
 #   CPU y memoria de la tarea, cuántas corren en estado normal, y los límites
@@ -116,7 +128,7 @@
 # ---------------------------------------------------------------------------
 
 # ---------------------------------------------------------------------------
-# 🕳️ 5 · El certificado y la zona de DNS
+# PENDIENTE-INFRA: 5 · El certificado y la zona de DNS
 #
 # QUÉ FALTA
 #   El certificado de {{DOMINIO_DEV}} y el registro que lo apunta al servicio.
@@ -134,7 +146,7 @@
 # ---------------------------------------------------------------------------
 
 # ---------------------------------------------------------------------------
-# 🕳️ 6 · Si hace falta un programador de tareas
+# PENDIENTE-INFRA: 6 · Si hace falta un programador de tareas
 #
 # QUÉ FALTA
 #   Decidir si este proyecto tiene procesos periódicos, y si los tiene,
