@@ -581,6 +581,17 @@ test("(6) el allowlist que el propio scaffold reparte sigue satisfaciendo el pis
 
 const REPO_DEL_MARCO = "im-diego-ec/Projects";
 
+/** El apagado del carril del consumidor, en las DOS escrituras que valen: el repo del
+ *  marco nombrado literal, o derivado del owner con `format('{0}/Projects', ...)` para
+ *  que un fork o una copia bajo otra cuenta se apague igual. Lo que esta prueba mide es
+ *  la PROPIEDAD —que el job no corra en el repo que distribuye el marco—, no una
+ *  ortografia: si solo aceptara la literal, hacer el workflow portable daria rojo aca
+ *  sin que nada se hubiera roto. */
+const APAGADO_EN_EL_MARCO = new RegExp(
+  `github\\.repository\\s*!=\\s*(?:['"]${REPO_DEL_MARCO}['"]` +
+    `|format\\(\\s*['"]\\{0\\}/Projects['"]\\s*,\\s*github\\.repository_owner\\s*\\))`,
+);
+
 /**
  * Toda referencia a una action de ESTE repo hecha por ref remota, con el job donde vive
  * y si ese job PUEDE correr en este repo. Se parsea con el mismo lector del check —no se
@@ -602,9 +613,7 @@ function referenciasPropias() {
         // La particion del hallazgo 7: el carril del consumidor se apaga en el repo del
         // marco, y ese apagado es lo unico que hace legitima una ref que todavia no
         // tiene la action.
-        const apagadoAca = new RegExp(`github\\.repository\\s*!=\\s*['"]${REPO_DEL_MARCO}['"]`).test(
-          String(job?.if ?? ""),
-        );
+        const apagadoAca = APAGADO_EN_EL_MARCO.test(String(job?.if ?? ""));
         encontradas.push({ ruta, job: clave, camino: m[1], ref: m[2], corre: !apagadoAca });
       }
     }
@@ -692,7 +701,7 @@ test("(7) y el carril del consumidor sigue existiendo en el workflow reusable", 
   assert.match(marco, /im-diego-ec\/Projects\/actions\/constitucion@v1/);
   // El job del consumidor no puede correr en el propio marco: la action no esta en la
   // ref publicada todavia, y un job que no corre no descarga nada.
-  assert.match(marco, /github\.repository != 'im-diego-ec\/Projects'/);
+  assert.match(marco, APAGADO_EN_EL_MARCO);
   // Y el salteo no puede ser mudo: el veredicto agregado del reusable lo mira.
   assert.match(marco, /needs\.constitucion_cableada\.result/);
 });

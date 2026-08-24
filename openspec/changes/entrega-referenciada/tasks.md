@@ -129,8 +129,8 @@ un consumidor real. Y `AGENTS.md:255-256` es 🛑 en la otra dirección: **este
 trabajo no se hace desde una sesión de Projects** — el PR del consumidor se abre
 desde el repo del consumidor.
 
-- [ ] 3.1 En `un-proyecto-anterior`, reemplazar las **tres apariciones del tramo de
-      dev** (`deploy.yml:121`, `:206`, `:324`) por `uses: .../one-off-ecs@<SHA>`,
+- [ ] 3.1 En el repo de ese consumidor, reemplazar las **tres apariciones del
+      tramo de dev** (`deploy.yml:121`, `:206`, `:324`) por `uses: .../one-off-ecs@<SHA>`,
       pinado al SHA de este change (`AGENTS.md:177-179`). Evidencia: el diff del
       PR del consumidor y el run de dispatch verde sobre su rama.
 - [ ] 3.2 Recién con dev verde, la aparición de producción (`:480`). Es el orden

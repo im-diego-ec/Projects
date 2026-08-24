@@ -68,21 +68,41 @@ describe("app", () => {
     expect(consultar).toHaveBeenCalled();
   });
 
-  it("base caida: 503 con el detalle, y /api/health sigue en 200", async () => {
-    consultar.mockRejectedValue(new Error("connection refused"));
+  // /api/db/health es la unica ruta con logica SIN requireAuth: cualquiera que
+  // alcance el dominio la puede consultar. Estos dos casos fijan que la causa
+  // del fallo salga por el log y NO por el cuerpo. Hasta el 2026-08-24 fijaban
+  // lo contrario —`expect(res.body.detalle).toContain(...)`— asi que la fuga
+  // estaba protegida por sus propias aserciones: el mensaje de Prisma nombra
+  // host, puerto y usuario de la base (P1001, P1000).
+  it("base caida: 503 sin el mensaje del driver, con el detalle en el log", async () => {
+    const mensajeDelDriver = "Can't reach database server at `db.interna`:`5432`";
+    consultar.mockRejectedValue(new Error(mensajeDelDriver));
+    const emitidas = vi.spyOn(console, "error").mockImplementation(() => {});
     const app = createApp();
     const res = await request(app).get("/api/db/health");
     expect(res.status).toBe(503);
-    expect(res.body.detalle).toContain("connection refused");
+    // Se afirma sobre el cuerpo ENTERO y no sobre un campo: un `detalle` que
+    // vuelva con otro nombre tiene que morder igual.
+    expect(res.body).toEqual({ db: "no disponible", requestId: res.headers["x-request-id"] });
+    expect(JSON.stringify(res.body)).not.toContain("db.interna");
+    // El diagnostico no se pierde, cambia de canal — y viaja con el MISMO
+    // requestId que el cuerpo le devolvio al llamante, que es lo que deja
+    // correlacionar el curl del runbook con la linea del log.
+    const linea = String(emitidas.mock.calls.at(-1)?.[0]);
+    expect(linea).toContain(mensajeDelDriver);
+    expect(linea).toContain(res.body.requestId);
+    expect(JSON.parse(linea).nivel).toBe("error");
     // Lo que mira el balanceador no depende de la base: si dependiera, una base
     // lenta daria de baja tareas sanas y el incidente se multiplicaria.
     expect((await request(app).get("/api/health")).status).toBe(200);
   });
 
-  it("un rechazo que no es Error tambien sale como 503 legible", async () => {
+  it("un rechazo que no es Error tampoco filtra su texto al cuerpo", async () => {
     obtenerPrisma.mockRejectedValue("sin configuracion de base");
+    const emitidas = vi.spyOn(console, "error").mockImplementation(() => {});
     const res = await request(createApp()).get("/api/db/health");
     expect(res.status).toBe(503);
-    expect(res.body.detalle).toBe("sin configuracion de base");
+    expect(res.body).toEqual({ db: "no disponible", requestId: res.headers["x-request-id"] });
+    expect(String(emitidas.mock.calls.at(-1)?.[0])).toContain("sin configuracion de base");
   });
 });

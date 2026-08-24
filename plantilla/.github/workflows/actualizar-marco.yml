@@ -114,12 +114,19 @@ jobs:
       contents: write
       pull-requests: write
 
+    # EN EL ENV DEL JOB SOLO VIVE LO QUE NO ES UNA CREDENCIAL. El env de un job
+    # lo heredan TODOS sus pasos, y entre los pasos de aca abajo hay un `uses:`
+    # que trae codigo por referencia y se resuelve en cada corrida. Lo que se
+    # cuelga de este bloque queda expuesto a ese codigo, asi que el criterio es
+    # simple: un booleano si, el token no. El PAT vive en el env del UNICO paso
+    # que lo usa, mas abajo.
     env:
       RAMA: chore/marco-al-dia
       # El contexto secrets no se puede leer desde un if de paso, pero si
-      # desde env. De aca lo toma el primer paso.
+      # desde env. De aca lo toma el primer paso. Lo que viaja es el RESULTADO
+      # de la comparacion —"hay secret o no"—, no el secreto: un booleano no le
+      # sirve de nada a quien lo lea.
       TOKEN_PROPIO: ${{ secrets.TOKEN_ACTUALIZAR_MARCO != '' }}
-      GH_TOKEN: ${{ secrets.TOKEN_ACTUALIZAR_MARCO || secrets.GITHUB_TOKEN }}
 
     steps:
       # AVISO y no rojo, a proposito: sin el token propio el mecanismo
@@ -163,8 +170,20 @@ jobs:
         with:
           modo: escribir
 
+      # EL UNICO PASO QUE VE EL TOKEN, y es deliberado que sea el ultimo y el
+      # mas chico con logica propia. TOKEN_ACTUALIZAR_MARCO es un PAT con
+      # ESCRITURA sobre este repositorio: cuanto mas arriba se declare, mas
+      # codigo lo ve sin necesitarlo. Ningun otro paso de este job llama a la
+      # API de GitHub — el checkout trae su propia credencial, la action del
+      # marco solo escribe archivos en el arbol— asi que el alcance correcto es
+      # exactamente este bloque.
+      #
+      # Sin el secret propio cae al GITHUB_TOKEN del job: el mecanismo funciona
+      # igual y el primer paso ya aviso que el PR va a nacer sin checks.
       - name: Abrir o actualizar el PR
         shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.TOKEN_ACTUALIZAR_MARCO || secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
 

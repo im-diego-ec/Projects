@@ -25,7 +25,7 @@ El design lo dice y es la única forma en que este change puede hacer daño neto
 consumidores, el escritor lo borra.** Ningún bloque posterior arranca hasta que
 este cierre.
 
-- [ ] 0.1 Subir al canónico lo que `un-proyecto-anterior` aprendió y la plantilla
+- [ ] 0.1 Subir al canónico lo que el consumidor viejo aprendió y la plantilla
       diluyó o perdió: `claude.yml` como **ejecutor** de la política de modelo
       del bot (`--model sonnet --effort medium --max-turns 5`), la cifra real del
       costo por MTok que `plantilla:145-146` dejó en «varias veces el costo», el
@@ -49,7 +49,7 @@ este cierre.
       conviviendo con la nueva le da al agente dos reglas contradictorias.
       Evidencia: `grep` del texto viejo en el canónico → 0 ocurrencias.
 - [ ] 0.4 Subir al scaffold la exclusión del formateador para lo generado (la
-      doctrina que `un-proyecto-anterior/.prettierignore:17-24` ya documenta),
+      doctrina que un consumidor ya documenta en su `.prettierignore:17-24`),
       incluida la ruta del artefacto nuevo. Evidencia: el archivo del scaffold
       con la entrada, y el check de formato del consumidor en verde sobre un
       artefacto recién renderizado.
@@ -409,7 +409,7 @@ repositorio de un proyecto desde una sesión de Projects es 🛑. Y se prueban a
 a la **rama** de este change, con el pin revertido en el mismo PR — es la única
 corrida real que este código tiene antes de llegar a todos.
 
-- [ ] 6.1 `un-proyecto-anterior`: `.projects-valores.json` con sus placeholders,
+- [ ] 6.1 Consumidor viejo: `.projects-valores.json` con sus placeholders,
       correr el escritor, y reescribir `AGENTS.md` dejando solo lo genuinamente
       propio (la tabla de stack, el `spec/` archivado en `docs/legacy-spec/`, el
       enforcement duro que «se activa cuando Builder 2 esté operativo»), más la ruta
@@ -420,7 +420,7 @@ corrida real que este código tiene antes de llegar a todos.
       `ci-ok` (hoy con cero ocurrencias en el archivo), el porqué de los
       invariantes de propiedades y la regla de ejecutores pinados; y la palabra
       «Projects» pasa de 0 a presente.
-- [ ] 6.2 `un-proyecto-anterior`: alinear el allowlist del agente con el piso
+- [ ] 6.2 Consumidor viejo: alinear el allowlist del agente con el piso
       recomendado y con el check de ejecutores pinados —hoy autoriza `npx --yes
       openspec` sin scope ni versión, o sea el paquete ajeno con `--yes`—. No es
       tarea de este mecanismo: es el check vecino que ya existe. Evidencia: el

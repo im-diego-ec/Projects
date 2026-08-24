@@ -52,5 +52,5 @@ donde la política dice una cosa y el manifiesto otra.
 
 - La ventana de la **cobertura** (`calidad-codigo` 265-275, cierre 2026-09-30) no se toca:
   otro mecanismo, otra decisión (D6).
-- El artefacto del un consumidor **no se regenera acá**: eso pasa en su PR de
+- El artefacto del consumidor **no se regenera acá**: eso pasa en su PR de
   bump.

@@ -845,7 +845,13 @@ test("el canonico real trae las reglas que la copia lossy habia perdido", () => 
 
 test("el canonico real no filtra valores de ningun proyecto concreto", () => {
   const { cuerpo } = leerCanonico(CANONICO_REAL);
-  for (const prohibido of ["un-proyecto-anterior", "la organización-dev", "la organización-prod", "802589444524", "635352382411", "@builder-uno"]) {
+  // Los valores de abajo son los que el render inyecta desde `.projects-valores.json`:
+  // si alguno aparece en el canonico, el canonico dejo de ser del marco.
+  // La lista cubre UNA ranura de `.projects-valores.json` por clase de dato, y
+    // `{{PROYECTO}}` es la mas propensa a filtrarse porque aparece en prosa y no solo
+    // en configuracion: sin ella, el nombre de un proyecto concreto podria entrar al
+    // canonico sin que nadie lo viera.
+    for (const prohibido of ["un-proyecto-anterior", "la organización-dev", "la organización-prod", "802589444524", "635352382411", "@builder-uno"]) {
     assert.equal(cuerpo.includes(prohibido), false, `el canonico nombra ${prohibido}, que es de un proyecto`);
   }
 });

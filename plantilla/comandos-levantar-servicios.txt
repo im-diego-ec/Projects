@@ -7,6 +7,15 @@ recien creado no levanta y parece roto. Es una lista de comandos a proposito de
 que se pueda copiar y pegar, no documentacion de arquitectura (eso vive en
 AGENTS.md y en openspec/).
 
+LOS COMANDOS QUE CAMBIAN SEGUN EL SISTEMA VAN EN DOS BLOQUES ROTULADOS, y no es
+cosmetica. Una lista escrita para un solo sistema no falla al final: falla en el
+primer comando que en la otra plataforma no existe, y el mensaje que sale habla
+del comando que falta ("command not found"), nunca de la plataforma. El lector
+concluye que el repo esta roto, que es justo lo contrario de lo que este archivo
+existe para evitar. Los comandos identicos en las dos —que son la mayoria— van
+UNA sola vez y sin rotulo: duplicar lo que no difiere agrega mantenimiento y
+esconde lo que si.
+
 
 PRIMERA VEZ EN ESTA MAQUINA (una sola vez por clon)
 ------------------------------------------------------------
@@ -23,6 +32,11 @@ pnpm install
    de dev salen de la instancia dev de Clerk, que es SEPARADA y solo tiene
    usuarios de prueba.
 
+   [macOS / Linux / Git Bash]
+cp api/.env.example api/.env
+cp web/.env.example web/.env
+
+   [Windows PowerShell]
 Copy-Item api/.env.example api/.env
 Copy-Item web/.env.example web/.env
 
@@ -50,16 +64,23 @@ CADA DIA
 1. Si Docker Desktop no esta abierto, abrilo y espera a que el icono de la
    bandeja del sistema quede estable.
 
-2. Abre PowerShell y ejecuta, en orden:
+2. Abri una terminal y ejecuta, en orden. Solo la primera linea cambia segun el
+   sistema; las otras dos son las mismas:
 
+   [macOS / Linux / Git Bash]
+cd "<la ruta local de tu clon de {{PROYECTO}}>"
+
+   [Windows PowerShell]
 Set-Location "<la ruta local de tu clon de {{PROYECTO}}>"
+
 docker compose up -d
 pnpm dev
 
 Notas:
 - "docker compose up -d" levanta PostgreSQL (si ya esta corriendo, no hace nada).
 - "pnpm dev" levanta API (http://localhost:3000) y Web (http://localhost:5173).
-- Esa ventana de PowerShell debe quedar abierta mientras trabajas.
+- Esa terminal debe quedar abierta mientras trabajas: "pnpm dev" no vuelve al
+  prompt, se queda corriendo los dos servicios.
 - Para verificar que todo responde:
   curl http://localhost:3000/api/health
   curl http://localhost:5173
@@ -94,5 +115,13 @@ Lo que "pnpm verificar" NO cubre, y donde vive cada cosa:
 
 - La suite E2E, que corre con navegadores contra un ambiente ya desplegado y
   vive en el workflow de promocion (por eso ci.yml declara e2e:test y e2e:build
-  como excepciones). A mano, con el ambiente ya arriba:
-      E2E_BASE_URL=https://... pnpm e2e
+  como excepciones). A mano, con el ambiente ya arriba, la URL viaja como
+  variable de entorno y ahi la sintaxis SI cambia — un prefijo VAR=valor delante
+  del comando es sintaxis de shell POSIX y PowerShell lo rechaza como error de
+  parseo, no como comando desconocido:
+
+   [macOS / Linux / Git Bash]
+E2E_BASE_URL=https://... pnpm e2e
+
+   [Windows PowerShell]
+$env:E2E_BASE_URL='https://...'; pnpm e2e

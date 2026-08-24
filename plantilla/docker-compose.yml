@@ -11,11 +11,20 @@
 # Aurora Serverless v2 con IAM auth y se crean por Terraform (infra/ para dev,
 # infra-prod/ para produccion). Nada de este archivo se despliega.
 #
-# EL NOMBRE DE LA BASE ESTA ACOPLADO, y por eso es literal y no un marcador:
-# tiene que coincidir con el DATABASE_URL de api/.env.example. Son dos archivos
-# distintos y el marco no verifica que digan lo mismo, asi que cambiarlo aca
-# obliga a cambiarlo alla en el MISMO commit; si no, el primer `pnpm dev` del
-# repo nuevo falla al conectar y el error no dice por que.
+# EL NOMBRE DE LA BASE ESTA ACOPLADO al DATABASE_URL de api/.env.example, y por
+# eso los dos lados salen AHORA DEL MISMO MARCADOR: `{{PROYECTO}}` aca y
+# `.../{{PROYECTO}}` alla. Hasta el 2026-08-24 este lado era un literal heredado
+# del proyecto donde nacio el andamio y el comentario pedia acordarse de cambiar
+# los dos en el mismo commit — y el propio archivo ya incumplia lo que pedia,
+# porque ese literal no era el `{{PROYECTO}}` del otro lado: todo repo nuevo
+# nacia con el contenedor sirviendo una base que su DATABASE_URL no nombra.
+#
+# Con el marcador no queda nada que recordar: `projects init` sustituye los dos
+# a la vez o ninguno (una sustitucion incompleta es error, no aviso, en la
+# herramienta). El sintoma que evita: `prisma migrate dev` autocrea la base que
+# falte, asi que el desajuste no se ve — deja el contenedor con una base vacia
+# que nadie usa — pero psql o `prisma db pull` fallan con un error que no dice
+# por que.
 services:
   db:
     image: postgres:16
@@ -23,7 +32,12 @@ services:
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
-      POSTGRES_DB: la organización
+      # Las comillas NO son de estilo: en YAML una llave abre un mapa en flujo,
+      # asi que sin ellas este valor, mientras es un marcador, parsea como un
+      # MAPA anidado y no como texto (medido con un parser: la clave del mapa
+      # resulta ser otro mapa). El archivo no se rompe, se vuelve otra cosa —
+      # que es peor, porque no hay error que mirar.
+      POSTGRES_DB: "{{PROYECTO}}"
     ports:
       # El puerto estandar de Postgres. Si otro proyecto del area ya lo tiene
       # tomado en esta maquina, `docker compose up -d` falla con "port is

@@ -75,7 +75,8 @@ obligación, no el acceso.
 Tras editar CUALQUIER archivo de `openspec/`: `openspec validate --strict` +
 relectura de coherencia entre proposal/specs/design/tasks antes de commitear.
 
-**Herramientas verdes no bastan para specs que cambian contrato.** En otro repo, un change pasó `validate --strict` y el guardrail de deltas en verde
+**Herramientas verdes no bastan para specs que cambian contrato.** Ya hubo un
+change que pasó `validate --strict` y el guardrail de deltas en verde
 y aun así tenía dos bloqueantes que solo cazó una revisión adversarial con
 lentes independientes. Un delta `MODIFIED` debe reproducir **todos** los
 escenarios vigentes del requirement o el archive los borra en silencio; y el
@@ -237,7 +238,7 @@ sacar de acá y convertir en check automático, se saca.
   de escribirla, y dejar la justificación en el design.
 - Declarar `permissions` explícitos en cada workflow, con el mínimo necesario, y
   auditar **acción por acción** los permisos de un job nuevo antes del estreno
-  (lección repetida tres veces en otro repo).
+  (lección que ya se repitió tres veces).
 - Hacer ruidoso todo fail-open: si una detección falla y el pipeline sigue por
   el camino conservador, tiene que **decirlo** (`::warning::` como mínimo).
 - Parametrizar con la convención única (`{{PLACEHOLDER}}` en scaffold; `vars` y
@@ -291,8 +292,8 @@ sacar de acá y convertir en check automático, se saca.
 - **Idioma: español** en prosa, comentarios y documentación. Los keywords
   técnicos y de OpenSpec (`SHALL`, `WHEN`/`THEN`, `Scenario`, `Requirement`,
   ADDED/MODIFIED/REMOVED) van en inglés.
-- **Sin acentos en los comentarios de YAML de los workflows** (convención
-  heredada de otro repo). La prosa de Markdown sí lleva acentos.
+- **Sin acentos en los comentarios de YAML de los workflows.** La prosa de
+  Markdown sí lleva acentos.
 - **Sin em dashes en nombres ni descripciones de recursos AWS** (usar guiones).
   Aplica solo a valores que viajan a AWS.
 - **El `CHANGELOG.md` existe acá aunque el archive de OpenSpec sea el changelog

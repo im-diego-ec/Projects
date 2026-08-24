@@ -50,7 +50,7 @@ mañana trabaje en intranet lee una constitución que autoriza justo lo que ese
 incidente prohibió, y nada en el repo lo señala.
 
 **3. En el consumidor viejo la divergencia ya corre en las dos direcciones.**
-`un-proyecto-anterior/AGENTS.md:127` dice «(cola)» donde
+Su `AGENTS.md:127` dice «(cola)» donde
 `plantilla/AGENTS.md:196` dice «(cola, **nunca cancelación**)» — falta
 exactamente la mitad que es la lección del 2026-08-13 (`projects/README.md:43`).
 `:157` corta antes del porqué de los invariantes de propiedades
@@ -63,7 +63,7 @@ un repo que consume el marco no nombra al marco.
 Encima, tres reglas fijadas hoy —(a) escalar de modelo exige OK humano previo,
 (b) cambiar settings de un repo exige OK humano previo, (c) la infra base es
 primera opción y apartarse se pregunta ANTES— no llegaron a ningún archivo. La
-(a) además está **contradicha**: `un-proyecto-anterior/AGENTS.md:100-102` y
+(a) además está **contradicha**: el `AGENTS.md:100-102` de ese consumidor y
 `plantilla/AGENTS.md:139-141` dicen «Escala por sesión (`/model`, `/effort
 high`) cuando la tarea lo paga», sin compuerta. Un agente que lea la
 constitución vigente escala solo, y lo hace bien según lo escrito.
@@ -93,8 +93,9 @@ El render es literal (`{{PLACEHOLDER}}` → valor, la convención que el marco y
 tiene en `projects/README.md:179-197`) y es obligatorio, no cosmético: sin él el
 artefacto llevaría dobles llaves y pondría rojo el check «Sin marcadores del
 scaffold sin resolver» (`marco-ci.yml:473-489`) del propio consumidor. Como
-efecto lateral se cierra el defecto de los nombres pelados: `un-proyecto-anterior/AGENTS.md:9,37,164,205,238`
-dicen «Builder 1» donde `plantilla` dice `@{{BUILDER_1}}`; el día que la llave de
+efecto lateral se cierra el defecto de los nombres pelados: cinco líneas del
+`AGENTS.md` de ese consumidor (`:9,37,164,205,238`) dicen «Builder 1» donde
+`plantilla` dice `@{{BUILDER_1}}`; el día que la llave de
 producción cambie de persona, cambia un valor y se re-renderizan las cinco.
 
 El artefacto abre con una cabecera de una línea en comentario HTML
@@ -111,9 +112,9 @@ de lo cual el escritor pisa el bloque sin resistencia. Un guardrail cuyo bypass
 es una línea de `sha256sum` depende de que alguien decida no tomarla, y eso es
 lo que `projects/AGENTS.md:246-247` prohíbe. (ii) Obliga a reordenar las 264 líneas
 del consumidor en spans contiguos, con un diff de migración imposible de
-revisar. (iii) Acopla el sello al formateador: `AGENTS.md` **no** está en
-`un-proyecto-anterior/.prettierignore` y el único commit de contenido de ese
-archivo desde el fork es un pase de Prettier (`8eb873a`). Un path es una
+revisar. (iii) Acopla el sello al formateador: en el consumidor viejo,
+`AGENTS.md` **no** está en su `.prettierignore` y el único commit de contenido
+de ese archivo desde el fork es un pase de Prettier (`8eb873a`). Un path es una
 frontera que no se puede confundir; un rango de líneas dentro de un archivo
 editable, sí.
 
@@ -128,8 +129,8 @@ son dos, porque los tres `AGENTS.md` del área dicen en su primera línea «agen
 de IA (Claude Code, Cursor)»:
 
 - `.projects/AGENTS-marco.md`, cargado por la cadena `CLAUDE.md → @AGENTS.md →
-  @.projects/AGENTS-marco.md` (la primera mitad ya existe:
-  `un-proyecto-anterior/CLAUDE.md:11`);
+  @.projects/AGENTS-marco.md` (la primera mitad ya existe en el consumidor
+  viejo: `CLAUDE.md:11`);
 - `.cursor/rules/00-marco.mdc`, mismo cuerpo, para la superficie que lee
   `AGENTS.md` como markdown plano y no expande imports.
 
@@ -165,8 +166,8 @@ consumidor (`.projects-falsos-positivos.json`, `marco-ci.yml:126-135`):
 **Alternativa descartada: meterlos dentro de `.projects/`.** Se descartó por un
 accidente concreto: si las entradas viven dentro del directorio regenerable, un
 `rm -rf .projects && render` —lectura perfectamente natural de «este directorio lo
-escribe el marco», y la doctrina que `un-proyecto-anterior/.prettierignore:17-24`
-ya documenta para lo generado— borra un desvío del proyecto y el render sigue
+escribe el marco», y la doctrina que un consumidor ya documenta en su
+`.prettierignore:17-24` para lo generado— borra un desvío del proyecto y el render sigue
 siendo **autoconsistente**: hash correcto, versión correcta, check en verde. Una
 regla del proyecto desaparecida con todos los semáforos verdes es peor que la
 divergencia de hoy. Fuera del directorio, el invariante queda sin asterisco:
@@ -221,8 +222,9 @@ puede fallar cerrado en las dos direcciones, así que se separan:
   publica un **piso recomendado** (los comandos que las propias reglas del marco
   exigen correr antes del push). Si falta, `::warning::` con la lista. Un
   permiso faltante no rompe nada: produce un prompt.
-- **El ejecutor sin pin ya tiene dueño.** `un-proyecto-anterior/.claude/settings.json:4-8`
-  autoriza `npx --yes openspec ...` sin scope ni versión, contra
+- **El ejecutor sin pin ya tiene dueño.** En el consumidor viejo,
+  `.claude/settings.json:4-8` autoriza `npx --yes openspec ...` sin scope ni
+  versión, contra
   `plantilla/.claude/settings.json:4-8` que pina `@fission-ai/openspec@1.9.0`.
   Eso no lleva regla nueva: lo caza el check existente
   (`marco-ci.yml:942`, que mira archivos rastreados no-`.md`). Meterlo también
@@ -268,7 +270,7 @@ acuerde:
    ignoró cuatro PRs.
 
 La asimetría hay que decirla: **el check llega por el carril referenciado, a
-todos, gratis** (`un-proyecto-anterior/.github/workflows/ci.yml:55` e
+todos, gratis** (el `ci.yml:55` del consumidor viejo e
 `intranet/.github/workflows/ci.yml:17` ya hacen
 `uses: .../marco-ci.yml@v1`); **el escritor es scaffold**, o sea la forma que
 este change existe para arreglar. No es circular porque el check es lo que
@@ -404,7 +406,7 @@ corre antes de subir lo que hoy solo vive en los consumidores, el escritor lo
 borra.** Esa es la única forma en que este change puede hacer daño neto.
 
 **Bloque 0 — subir al canónico lo que los proyectos ya aprendieron (antes de
-tocar un solo consumidor).** De `un-proyecto-anterior`: `claude.yml` como
+tocar un solo consumidor).** Del consumidor viejo: `claude.yml` como
 **ejecutor** de la política de modelo (`AGENTS.md:105-106` +
 `.github/workflows/claude.yml:49`, `--model sonnet --effort medium
 --max-turns 5`), la cifra `$10/$50 vs $3/$15 por MTok` (`:107-108`, que
@@ -421,7 +423,7 @@ consumidor no lo carga: el hueco conocido del guardrail de deltas (`:78-84`) y
 de hoy, con la (a) entrando como **corrección** del texto vigente
 (`plantilla:139-141`), no como agregado.
 
-**Bloque 1 — `un-proyecto-anterior`.** Ya consume `@v1` (`ci.yml:55`), así que el
+**Bloque 1 — el consumidor viejo.** Ya consume `@v1` (`ci.yml:55`), así que el
 check le llega solo. El PR crea `.projects-valores.json`, corre el escritor y
 reescribe `AGENTS.md` dejando lo genuinamente propio (~13 líneas: la tabla de
 stack `:11-20`, el `spec/` archivado en `docs/legacy-spec/` `:29-30`, «se activa
@@ -476,7 +478,7 @@ PRs de migración estén mergeados y verificados, que es lo que exige
   del workflow reusable; borrar el artefacto es rojo, borrar el artefacto **y**
   el `uses:` no lo caza nada desde el CI del consumidor. Eso lo cierra el ruleset
   de `main` exigiendo `ci-ok` más review de code owner sobre `.github/workflows/`
-  — y en `un-proyecto-anterior` ese enforcement duro todavía no está activo
+  — y en el consumidor viejo ese enforcement duro todavía no está activo
   (`AGENTS.md:251-253`). Lo mismo con el pin a SHA, que `actions/README.md:28-31`
   permite: un consumidor pinado deja de recibir reglas y desde Projects eso no se ve.
 - **La dirección inversa sigue sin mecanismo.** Una mejora que un proyecto

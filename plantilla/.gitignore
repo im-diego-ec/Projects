@@ -5,10 +5,26 @@ build
 *.tsbuildinfo
 coverage
 
-# Entorno local y ruido del sistema
+# Entorno local y ruido del sistema.
+#
+# EL PATRON ES `.env.*`, NO UNA LISTA DE NOMBRES. Hasta el 2026-08-24 estas tres
+# lineas eran `.env`, `.env.local` y `.env.production`, y con eso `git
+# check-ignore` decia SE COMMITEA para `.env.development`, `.env.dev`,
+# `.env.test` y `.env.staging` — medido, los cuatro. Vite, Prisma y el resto del
+# ecosistema Node normalizan justo esos nombres, asi que quien separa las
+# credenciales de la instancia de dev en `api/.env.dev` lo ve limpio en `git
+# status` y lo commitea. Lo que hay adentro esta declarado en api/.env.example:
+# CLERK_SECRET_KEY y CLERK_JWT_KEY. Una clave del proveedor de identidad en la
+# historia de git ya no se saca borrando el archivo.
+#
+# La negacion va DESPUES, y es la que mantiene versionados los .env.example de
+# api/ y web/. Es exactamente el par que el .dockerignore de este mismo andamio
+# ya usaba, con su «un .env dentro de una imagen es un secreto publicado»: eran
+# dos archivos hermanos que discrepaban, y el debil era el que decide que entra
+# a la historia, que es lo irreversible.
 .env
-.env.local
-.env.production
+.env.*
+!.env.example
 *.log
 .DS_Store
 .idea

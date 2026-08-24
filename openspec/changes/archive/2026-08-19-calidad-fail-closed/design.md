@@ -241,7 +241,7 @@ archivos, un check del `marco-ci` las compara: dos números que tienen que
 coincidir y que nadie compara son un número que va a divergir.
 
 **El estreno lleva ventana, y la ventana se cierra sola.** Medido contra un
-espejo del consumidor real —`un-proyecto-anterior` en `main`, con sus dos reportes
+espejo del consumidor real —su `main`, con sus dos reportes
 `lcov` del 2026-08-20— el plano del total da **rojo**: `web` está en 70,70% de
 funciones, 9,30 puntos por debajo del mínimo, y no declara ni motivo ni fecha. El
 arreglo existe y está medido, pero vive en una rama sin mergear
@@ -431,8 +431,8 @@ El modo aviso queda para cuando haya consumidores que no controlamos.
 
 El 2026-08-19 un segundo proyecto —una intranet que **no nació del scaffold**—
 adoptó el marco y pasó sus cuatro checks en verde. Es la validación más fuerte
-que el marco tuvo hasta hoy: otro repositorio no podía darla, porque el
-marco se destiló de él y le calza por construcción.
+que el marco tuvo hasta hoy: el primer consumidor no podía darla, porque sus
+convenciones y las del marco son las mismas y le calza por construcción.
 
 Eso activó la condición que este mismo design declaraba: *«el modo aviso queda
 para endurecer contra consumidores que no controlamos, que hoy no aplica porque

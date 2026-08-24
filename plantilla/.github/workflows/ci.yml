@@ -42,6 +42,18 @@ jobs:
     # Entre comillas a proposito: sin ellas, el placeholder de doble llave hace
     # que YAML lea un mapa en flujo y el archivo no parsea antes de sustituirlo.
     uses: "{{ORG}}/Projects/.github/workflows/marco-ci.yml@v1.7.0"
+    # EL TECHO QUE SE LE CONCEDE AL REUSABLE, y por eso no es una repeticion
+    # decorativa del bloque de arriba: un workflow reusable no recibe NUNCA mas
+    # permisos que los que le da quien lo llama, asi que esta es la linea que de
+    # verdad decide con que corre la mecanica del marco. Escribirlo por job hace
+    # visible el techo en el mismo lugar donde se lee el uses:, en vez de tener
+    # que subir al encabezado para saberlo.
+    #
+    # pull-requests: read NO se puede recortar: sin el, el job que detecta el
+    # carril de docs no puede listar los archivos del PR y cae al fail-open.
+    permissions:
+      contents: read
+      pull-requests: read
 
   # ---------------------------------------------------------------------------
   # LA PORCION DEL MARCO DE LA CONSTITUCION: que las reglas que leen los agentes
@@ -106,6 +118,14 @@ jobs:
     needs: marco
     if: needs.marco.outputs.solo_docs == 'false'
     runs-on: ubuntu-latest
+    # EL MINIMO REAL Y DECLARADO POR JOB, no heredado del encabezado. Este es el
+    # unico job del repositorio que descarga y EJECUTA codigo que nadie leyo
+    # —`pnpm install` corre los scripts de instalacion de todo el arbol de
+    # dependencias—, asi que es justamente el que menos puede permitirse
+    # heredar de mas. El techo del workflow lleva pull-requests: read porque lo
+    # necesita el job de arriba; aca no se usa para nada y no se concede.
+    permissions:
+      contents: read
     steps:
       - uses: actions/checkout@v7
       # corepack en vez de una action de terceros: menos superficie que auditar
@@ -114,16 +134,29 @@ jobs:
       - uses: actions/setup-node@v7
         with:
           node-version: "22"
-          cache: pnpm
+      # SIN `cache: pnpm` EN EL SETUP-NODE DE ARRIBA, y es una decision escrita,
+      # no un olvido. El cache de GitHub Actions se ESCRIBE desde cualquier rama
+      # del repositorio y se restaura en las corridas de la rama por defecto, asi
+      # que un PR cualquiera puede sembrar el store que despues consume main; la
+      # restauracion por restore-keys ademas admite coincidencia parcial de
+      # clave. Es el unico canal de ESCRITURA que alguien de afuera tiene hacia
+      # este runner, y cae exactamente sobre el paso que instala y ejecuta codigo
+      # de terceros. Lo que se compra a cambio, en un repo de este porte, son
+      # segundos.
+      #
+      # SI EL INSTALL PASA A COSTAR MINUTOS la vuelta atras es legitima, y se
+      # escribe aca con la medicion al lado: cache con clave EXACTA (sin
+      # restore-keys) y el motivo. Lo que no vuelve es la linea suelta.
       - run: pnpm install --frozen-lockfile
 
       # El cliente de la capa de datos se genera ANTES del lint. El codigo de
       # acceso a datos esta tipado CONTRA ese cliente generado: sin el, las
       # reglas type-aware no tienen tipos que mirar y cada acceso a datos
       # vuelve a ser `any` silencioso — el lint pasa en verde sin haber
-      # verificado nada. Leccion aprendida en otro repo, no precaucion
-      # teorica. Vale para cualquier artefacto generado del que dependa el
-      # tipado, no solo para el cliente de datos.
+      # verificado nada. Y el modo de falla es el peor que hay: VERDE. Con el
+      # orden invertido nadie descubre el problema mirando la corrida, porque no
+      # hay nada que mirar. Vale para cualquier artefacto generado del que
+      # dependa el tipado, no solo para el cliente de datos.
       #
       # --fail-if-no-match no es decoracion: sin el, un --filter que no matchea
       # (paquete renombrado o movido) imprime "No projects matched the filters"
@@ -141,6 +174,106 @@ jobs:
       # posible: si la raiz no declara el script, `pnpm <script>` sale 1.
       - run: pnpm lint
       - run: pnpm format:check
+
+      # -------------------------------------------------------------------
+      # LA INFRAESTRUCTURA TAMBIEN SE VERIFICA
+      #
+      # Este repositorio reparte dos raices de Terraform (infra/ e infra-prod/)
+      # y un .github/dependabot.yml con dos entradas del ecosistema terraform:
+      # van a llegar PRs que suben el provider. Sin este paso, ese PR se puede
+      # mergear en verde sin que nadie haya corrido `terraform validate` una
+      # sola vez, y la unica compuerta seria que alguien se acuerde — que no
+      # cuenta como compuerta. Ni el linter ni el formateador ni el censo de
+      # fuentes alcanzan un .tf: lo que no esta aca, no lo mira nadie.
+      #
+      # POR QUE ES EXIGIBLE DESDE EL DIA UNO, que es lo que lo separa de los
+      # PENDIENTE-INFRA: las dos comprobaciones son INERTES. `fmt -check` solo
+      # lee texto. `init -backend=false` no toca el bucket del state —que hoy es
+      # el PENDIENTE-INFRA 1 y a proposito no resuelve— ni pide credenciales de
+      # ninguna cuenta. No hace falta que este repositorio se despliegue, ni que
+      # exista la infraestructura que el codigo referencia.
+      #
+      # VENTANA DE GRACIA HASTA EL 2026-09-30, y despues rojo sin que nadie
+      # toque nada. Hasta esa fecha un fallo AVISA en vez de detener. El motivo
+      # es que hasta hoy nada miro estos archivos, asi que la primera corrida es
+      # tambien la primera medicion: la ventana es el plazo para arreglar lo que
+      # reporte. La fecha esta comparada mas abajo contra el reloj, no anotada en
+      # un checklist, justamente para que el vencimiento no dependa de nadie.
+      #
+      # SI ESTE PROYECTO NO USA TERRAFORM, borra este paso junto con infra/,
+      # infra-prod/ y las dos entradas de terraform del dependabot.yml. Mientras
+      # los directorios no existan el paso no verifica nada y lo dice, en vez de
+      # pasar en un silencio indistinguible de haber verificado.
+      #
+      # LIMITE DECLARADO: el binario sale de la imagen del runner. Falta el
+      # `uses:` pinado por SHA que lo garantice, y por eso el paso avisa —no
+      # falla— cuando no lo encuentra: un rojo que el repositorio no puede
+      # arreglar solo entrena a ignorar el rojo. Para cerrarlo, agregar antes de
+      # este paso `uses: hashicorp/setup-terraform@<sha> # v<x.y.z>` con el SHA
+      # resuelto, nunca copiado de memoria:
+      #   curl -sS https://api.github.com/repos/hashicorp/setup-terraform/git/ref/tags/v3
+      #   curl -sS https://api.github.com/repos/hashicorp/setup-terraform/git/tags/<sha-del-objeto-tag>
+      # el object.sha del segundo llamado es el commit que va en el uses: y el
+      # campo message dice la version exacta que va en el comentario de al lado.
+      # -------------------------------------------------------------------
+      - name: Formato y validez de las raices de Terraform
+        shell: bash
+        env:
+          # Hasta este dia inclusive un fallo avisa; a partir del siguiente es
+          # rojo. Moverla es una decision que se escribe, no un default.
+          VENTANA_TERRAFORM: "2026-09-30"
+        run: |
+          set -euo pipefail
+
+          RAICES=""
+          for D in infra infra-prod; do
+            if [ -d "${D}" ]; then RAICES="${RAICES}${RAICES:+ }${D}"; fi
+          done
+
+          if [ -z "${RAICES}" ]; then
+            echo "::notice::no hay raices de Terraform en este repositorio (ni infra/ ni infra-prod/): no se verifico infraestructura porque no hay ninguna. Si el proyecto tampoco las va a tener, borra este paso y las entradas de terraform de .github/dependabot.yml"
+            exit 0
+          fi
+          echo "raices de Terraform encontradas: ${RAICES}"
+
+          if ! command -v terraform >/dev/null 2>&1; then
+            echo "::warning::hay raices de Terraform (${RAICES}) y este runner no trae el binario, asi que NO se verifico formato ni validez. Arreglo: agregar antes de este paso hashicorp/setup-terraform pinado por SHA — el encabezado de este paso trae los dos comandos que resuelven el SHA sin inventarlo"
+            exit 0
+          fi
+          terraform version
+
+          # La gravedad se DERIVA del reloj. Las dos fechas son ISO, asi que la
+          # comparacion de texto ordena igual que la de calendario.
+          HOY="$(date -u +%F)"
+          if [ "${HOY}" \> "${VENTANA_TERRAFORM}" ]; then
+            GRAVEDAD="error"
+          else
+            GRAVEDAD="warning"
+            echo "::notice::verificacion de Terraform en modo aviso hasta el ${VENTANA_TERRAFORM} (hoy es ${HOY}). Despues de esa fecha un fallo de fmt o de validate detiene el CI sin que nadie toque este archivo"
+          fi
+          HUBO_FALLO=0
+
+          # 1. FORMATO. Solo lee texto: ni providers, ni red, ni credenciales.
+          if ! terraform fmt -check -recursive -no-color ${RAICES}; then
+            echo "::${GRAVEDAD}::hay archivos de Terraform sin formatear (la lista esta arriba, un archivo por linea). Arreglo: corre 'terraform fmt -recursive ${RAICES}' y commitea el resultado"
+            HUBO_FALLO=1
+          fi
+
+          # 2. VALIDEZ, raiz por raiz. El -backend=false es lo que la vuelve
+          # inerte: init resuelve providers y modulos y NO inicializa el state
+          # remoto, asi que el marcador del bucket no estorba.
+          for D in ${RAICES}; do
+            echo "::group::${D}: terraform init -backend=false && terraform validate"
+            if ! ( cd "${D}" && terraform init -backend=false -input=false -no-color && terraform validate -no-color ); then
+              echo "::endgroup::"
+              echo "::${GRAVEDAD}::terraform validate fallo en '${D}'. Reproducilo local con: cd ${D} && terraform init -backend=false && terraform validate"
+              HUBO_FALLO=1
+              continue
+            fi
+            echo "::endgroup::"
+          done
+
+          if [ "${HUBO_FALLO}" -eq 1 ] && [ "${GRAVEDAD}" = "error" ]; then exit 1; fi
 
       # -------------------------------------------------------------------
       # POR QUE NO HAY `pnpm -r typecheck` / `-r test` / `-r build` ACA
@@ -375,14 +508,23 @@ jobs:
   # EL CHECK REQUERIDO POR EL RULESET DE main ES ESTE (nombre exacto: "ci-ok").
   #
   # No puede ser build-test: en el carril de docs queda "skipped" y un check
-  # omitido NO REPORTA NUNCA, asi que el ruleset esperaria para siempre una
-  # senal que no llega (paso de verdad, una semana entera, en el repo de
-  # origen). ci-ok reporta en AMBOS carriles gracias a if: always().
+  # omitido NO REPORTA NUNCA, asi que el ruleset se queda esperando para siempre
+  # una senal que no va a llegar. El sintoma es dificil de diagnosticar porque no
+  # se parece a un fallo: un PR de solo documentacion que no se puede mergear y
+  # ningun check en rojo que explique por que. ci-ok reporta en AMBOS carriles
+  # gracias a if: always().
   ci_ok:
     name: ci-ok
     needs: [marco, constitucion, build_test]
     if: always()
     runs-on: ubuntu-latest
+    # VACIO A PROPOSITO: este job no clona el arbol, no llama a ninguna API y no
+    # lee mas que los resultados de sus needs, que vienen del contexto y no del
+    # token. Su GITHUB_TOKEN no necesita ni contents: read. Es el caso extremo de
+    # la misma regla que cumplen los otros jobs, y por eso vale la pena que este
+    # escrito: un bloque vacio dice "se audito y da cero", que no es lo mismo que
+    # no haber mirado.
+    permissions: {}
     steps:
       - name: Veredicto
         shell: bash

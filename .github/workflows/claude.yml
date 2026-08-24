@@ -41,9 +41,35 @@ on:
   pull_request_review_comment:
     types: [created]
   issues:
-    types: [opened, assigned]
+    # SOLO `opened`, y `assigned` se fue a proposito. Un assign no es una pregunta
+    # nueva: es un evento sobre un issue cuyo CUERPO ya contiene "@claude", asi que el
+    # `if` de mas abajo lo dejaba pasar y cada assign/unassign volvia a levantar un
+    # runner, hacia checkout y cargaba el secret. En un repo con colaboradores
+    # externos, eso es un disparador que no depende de escribir nada.
+    types: [opened]
   pull_request_review:
     types: [submitted]
+
+# UN HILO, UNA CORRIDA. De los siete workflows del repo, tres declaraban concurrency
+# (aviso-version.yml y los dos del andamio, actualizar-marco.yml y plantilla/ci.yml) y
+# cuatro no. En tres de esos cuatro la ausencia no cuesta nada —los dispara un push o
+# un PR, o sea gente con escritura—; en este si, porque lo dispara cualquiera que pueda
+# comentar y cada mencion levantaba un runner propio, hacia checkout y cargaba el
+# secret, sin techo. El gate de identidad no ayuda aca porque no vive en el workflow
+# —el comentario del `if` lo dice: el control real de QUIEN puede invocarlo esta en la
+# action, que corta DESPUES del checkout—.
+#
+# cancel-in-progress: true, y es lo correcto para un bot que contesta: una mencion
+# nueva en el mismo hilo reemplaza a la anterior, no hace cola detras de ella. Es lo
+# contrario del criterio de aviso-version.yml, que pone false porque un aviso a medio
+# enviar no se cancela; aca la respuesta vieja ya no es la que se pidio.
+#
+# El `github.run_id` del final no es relleno: en un evento sin issue ni pull_request en
+# el payload el grupo quedaria en "claude-" y dos corridas ajenas se cancelarian entre
+# si. Con el run_id, ese caso degrada a "un grupo por corrida", que es no agrupar.
+concurrency:
+  group: claude-${{ github.event.issue.number || github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: true
 
 jobs:
   claude:

@@ -89,6 +89,11 @@ jobs:
   aviso:
     name: aviso
     runs-on: ubuntu-latest
+    # 10 minutos. Este job lee el CHANGELOG y hace UN POST con --max-time 20 y dos
+    # reintentos, o sea que su camino normal se mide en segundos; el default de GitHub
+    # son 360. Sin techo, un runner colgado mantiene su GITHUB_TOKEN vivo seis horas
+    # por un aviso que ya no le sirve a nadie: el release que anuncia ya se publico.
+    timeout-minutes: 10
     # Repetido a proposito. El bloque de arriba es el TECHO del workflow; este es
     # la declaracion explicita del job, que es lo que pide la regla 6 ("ningun
     # job hereda el default") y lo que un check de permisos por job va a leer.

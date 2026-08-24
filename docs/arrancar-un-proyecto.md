@@ -325,8 +325,8 @@ repo: van al Project del área, y los hijos —los sub-issues por bloque— no v
 Decidido el 2026-08-23; la regla es la de la constitución y no cambió.
 
 Hoy el único project del área es *«Roadmap del área»* (project 2). Si el proyecto
-nuevo entra ahí, se renombra, y eso toca a otro repo: por eso está en esta fase y no en
-la última.
+nuevo entra ahí, se renombra, y eso toca al repo que ya está en ese board: por eso está en
+esta fase y no en la última.
 
 ```bash
 gh project list --owner po
@@ -380,11 +380,11 @@ cómo **tu cliente local** nombra al servidor MCP de Slack. Se saca de un repo q
 funciona:
 
 ```bash
-grep -o 'mcp__[0-9a-f-]\{36\}' <ruta-a-un-proyecto-anterior>/.claude/settings.json | sort -u | head -1
+grep -o 'mcp__[0-9a-f-]\{36\}' <ruta-a-un-repo-que-ya-funciona>/.claude/settings.json | sort -u | head -1
 ```
 
 ```powershell
-Select-String -Path "<ruta-a-un-proyecto-anterior>\.claude\settings.json" -Pattern "mcp__[0-9a-f-]{36}" -AllMatches |
+Select-String -Path "<ruta-a-un-repo-que-ya-funciona>\.claude\settings.json" -Pattern "mcp__[0-9a-f-]{36}" -AllMatches |
   ForEach-Object { $_.Matches.Value } | Sort-Object -Unique | Select-Object -First 1
 ```
 
@@ -700,11 +700,11 @@ recibe bumps y **no aparece en el censo de consumidores** del marco.
 - `CLAUDE_CODE_OAUTH_TOKEN` — para que el bot conteste. `claude setup-token` y
   `gh secret set`. Si falta, `claude.yml` sale rojo y nada más se rompe. Puede
   esperar.
-- `TOKEN_ACTUALIZAR_MARCO` — **opcional**, y el un consumidor nunca lo
-  puso. Sin él el PR semanal de actualización nace sin checks; el propio workflow lo
+- `TOKEN_ACTUALIZAR_MARCO` — **opcional**, y el consumidor que ya está en marcha
+  nunca lo puso. Sin él el PR semanal de actualización nace sin checks; el propio workflow lo
   avisa y explica el rodeo.
 
-**Variables (`vars`): ninguna.** El un consumidor tiene cero.
+**Variables (`vars`): ninguna.** El consumidor que ya está en marcha tiene cero.
 
 ⚠️ **`actualizar-marco.yml` nunca corrió en ningún repo de la organización.** El repo
 nuevo va a ser el primer lugar donde se ejecute, y su cron cae el lunes siguiente al

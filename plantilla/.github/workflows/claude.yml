@@ -17,10 +17,12 @@ name: Claude Code
 # de una forma que le sirva a todos, eso sube al marco en la revision trimestral
 # de divergencia.
 #
-# Existe en el scaffold porque en otro repo el bot se configuro a mano y
-# nunca llego a los proyectos siguientes: la leccion se quedo en un solo repo.
-# Ahora un proyecto nuevo nace con el bot en vez de depender de que alguien se
-# acuerde de copiarlo.
+# POR QUE LLEGA PUESTO Y NO COMO UNA INSTRUCCION EN UNA GUIA. Un bot que hay que
+# configurar a mano despues de crear el repo termina existiendo solo donde
+# alguien se acordo, y el repo que no lo tiene no emite ninguna senal: nadie
+# extrana una respuesta que nunca se prometio. Llegando en el andamio, el
+# proyecto nace con el bot, y lo unico que queda a mano son los dos actos
+# humanos de abajo — que el primer paso del job reclama en rojo si faltan.
 #
 # DOS ACTOS HUMANOS ANTES DE QUE FUNCIONE (ninguno se puede automatizar desde
 # aca, y el primer paso del job falla en rojo con el mensaje exacto si faltan):
@@ -76,11 +78,13 @@ jobs:
     # leer.
     timeout-minutes: 15
 
-    # PERMISOS, auditados ACCION POR ACCION antes del estreno: es la regla del
-    # marco que otro repo aprendio TRES veces, siempre con la misma
-    # forma —falta un permiso, la API responde 403 y el 403 se disfraza de
-    # comportamiento normal—. Cada linea esta porque una llamada concreta la
-    # necesita; ninguna esta por las dudas:
+    # PERMISOS, auditados ACCION POR ACCION en vez de copiados de un ejemplo. El
+    # motivo esta en como falla un permiso que falta: la API responde 403, y aca
+    # un 403 no se ve como un error sino como comportamiento normal — el bot
+    # contesta igual, solo que sin haber podido leer lo que le faltaba. El fallo
+    # se disfraza de respuesta pobre y nadie lo diagnostica como configuracion.
+    # Cada linea esta porque una llamada concreta la necesita; ninguna esta por
+    # las dudas:
     #
     #   contents: read       actions/checkout clona el arbol, y sobre ese arbol
     #                        el bot lee AGENTS.md, los specs y el codigo por el

@@ -2,8 +2,8 @@ schema: spec-driven
 context: |
   Proyecto: Projects — marco de ingeniería de la organización.
   Qué es: el marco de trabajo (no una aplicación) que los proyectos del área
-  adoptan para nacer ya cumpliendo el estándar. Se destiló del estado maduro
-  del primer proyecto que lo ejercitó y evoluciona con vida propia.
+  adoptan para nacer ya cumpliendo el estándar. Condensa prácticas ya probadas
+  en producción, no teoría de escritorio, y evoluciona con vida propia.
   Qué contiene, según cómo evoluciona cada pieza:
     - Referenciado: workflows reusables y composite actions que los proyectos
       consumen con `uses: <org>/projects/...@v<major>`. Cambian una vez para todos.

@@ -23,7 +23,7 @@ semanal `actualizar-marco.yml` del andamio.
 `actualizar-marco.yml` corre la action de la versión que el repo **ya tiene
 pinada**, y el canónico viaja *dentro* de esa action. En modo escribir, por lo
 tanto, regenera el artefacto de la versión que ya estaba. Medido el 2026-08-22
-en un-proyecto-anterior con el pin en `1.4.1`: salida `version 1.3.0, sha
+en un repo consumidor con el pin en `1.4.1`: salida `version 1.3.0, sha
 22b7d8ee231f`, byte por byte idéntica al archivo del árbol, sin cambios y sin
 PR. Para su propio caso de uso —*el marco publicó, traeme la constitución al
 día*— **es un no-op**.

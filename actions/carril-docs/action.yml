@@ -18,11 +18,12 @@ author: la organización
 #     permissions:
 #       contents: read        # no hay llamadas a la API: es un git diff local
 #
-# POR QUE ESTA ESCRITO ACA: en otro repo esta deteccion nacio SIN
-# pull-requests:read. El token daba 403, el fail-open tapaba el error y el
-# carril rapido jamas actuo — en silencio, durante semanas. La leccion se
-# repitio en cada job nuevo (pull-requests:read primero, actions:read despues).
-# El marco la trae escrita para que no se vuelva a pagar.
+# POR QUE ESTA ESCRITO ACA: esta deteccion nacio SIN pull-requests:read. El
+# token daba 403, el fail-open tapaba el error y el carril rapido jamas actuo
+# — en silencio, durante semanas. Un permiso que falta no se manifiesta como
+# un rojo sino como un silencio, y por eso la leccion se vuelve a pagar en
+# cada job nuevo (pull-requests:read primero, actions:read despues). El marco
+# la trae escrita en el encabezado para que se lea antes, no despues.
 #
 # OJO: si el workflow declara un bloque `permissions:` (a nivel de workflow o
 # de job), ese bloque REEMPLAZA los permisos por defecto del token — hay que
@@ -43,7 +44,7 @@ inputs:
       NO alteran lo que se sirve en runtime. Las líneas en blanco y las que
       empiezan con "#" se ignoran; el resto se une con "|" en un solo patrón.
       Un cambio es solo_docs cuando TODOS sus archivos calzan con alguno.
-      El default replica el filtro que el marco trae de otro repo.
+      El default es el filtro que el marco trae de fábrica.
       Nota sobre ^\.github/ — incluirlo significa que un cambio de workflows no
       dispara build ni despliegue: es deliberado (el workflow nuevo se ejecuta
       solo, en su propio run), pero un proyecto que genere artefactos desde

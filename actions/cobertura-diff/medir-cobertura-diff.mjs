@@ -106,9 +106,9 @@ const EPSILON = 1e-9;
 // nadie la haya leido. Ya paso el 2026-08-19, al mover `v1` la primera vez.
 //
 // Medido, y es la razon por la que la ventana existe en vez de ser un parrafo:
-// contra un espejo del consumidor real (un-proyecto-anterior en main, con sus dos
-// reportes lcov del 2026-08-20) el plano del total da ROJO — `web` esta en
-// 70,70% de funciones, 9,30 puntos por debajo del minimo. Su arreglo existe y
+// contra un espejo de un consumidor real (su main, con sus dos reportes lcov
+// del 2026-08-20) el plano del total da ROJO — `web` esta en 70,70% de
+// funciones, 9,30 puntos por debajo del minimo. Su arreglo existe y
 // esta medido, pero vive en una rama sin mergear (`feat/cobertura-web-funciones-80`,
 // con umbrales de 93,6 en funciones), asi que el orden importa: si la compuerta
 // aterriza antes que esa rama, el consumidor amanece rojo por un cambio del
