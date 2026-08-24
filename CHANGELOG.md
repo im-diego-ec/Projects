@@ -41,6 +41,77 @@ mueve sobre un cambio incompatible.
 
 ## [No publicado]
 
+### Seguridad
+
+- **`projects init --version-openspec` sin valor era un éxito silencioso.** `argumentos()`
+  toma el valor con `argv[++i]`, que con la bandera al final del argv devuelve `undefined`,
+  y la validación estaba escrita `if (o.versionOpenspec !== undefined && !pinValido(...))`:
+  ese caso se colaba entero por las dos revisiones y `?? pinOpenspecDe(marcoCi)` lo
+  reemplazaba por el default del YAML. **El pin que la persona quiso fijar se descartaba
+  sin decirlo y la corrida declaraba éxito.** Ahora una bandera que lleva valor y llega sin
+  él muere por su nombre (`--version-openspec necesita un valor`, código 2) antes de
+  escribir nada, y la revisión pregunta por la existencia de la clave y no por el valor.
+  Lo mismo para `--valores` y `--destino`. Qué tiene que hacer un consumidor: nada.
+
+- **El marco no ejercitaba sobre sí mismo el Dependabot que reparte.** Su modelo de
+  distribución y su censo de consumidores dependen de que Dependabot funcione, y
+  `.github/dependabot.yml` no existía acá. Ahora existe, con el ecosistema de
+  github-actions y el motivo de cada exclusión escrito.
+
+- **Aviso de invocaciones a acciones ajenas sin pinar por SHA.** `AGENTS.md` declara en sus
+  fronteras que una acción de terceros «se pina por SHA, no por tag móvil ajeno», y medido
+  sobre el árbol solo una lo cumple. El job `higiene` ahora las detecta y las reporta con
+  `::warning::` —modo aviso y no rojo, porque estrenarle un rojo a un consumidor sin
+  anunciárselo es lo que este marco prohíbe— con el comando que cierra cada una y la
+  condición escrita para pasarlo a rojo. Qué tiene que hacer un consumidor: nada todavía.
+
+### Corregido
+
+- **En un Node anterior a 18.17 la herramienta escribía 16 de 75 archivos y salía diciendo
+  «cero marcadores sobrevivientes».** `readdirSync({recursive:true})` no existía antes de
+  esa versión y la opción se ignoraba en silencio; el control final releía el árbol con la
+  misma API rota, así que confirmaba limpio un árbol que nunca escaneó entero. El repo nuevo
+  nacía sin `ci.yml`, sin `CODEOWNERS` y sin `settings.json`, con un éxito en pantalla —el
+  fail-open exacto que el encabezado de la herramienta declaraba imposible. Ahora hay piso
+  de Node verificado antes de tocar nada, aviso en 20.12, y una defensa de fondo que compara
+  los archivos escritos contra el andamio medido **con la otra API**, la que no se rompe.
+
+- **`projects init` aceptaba nombres de paquete que no son las carpetas del andamio.** Salía
+  0 y dejaba el CI del repo nuevo en rojo por excepciones que no correspondían a ninguna
+  carpeta. Los nombres válidos ahora se derivan del andamio real, no de una lista escrita
+  aparte que puede divergir.
+
+- **Las cifras del andamio en el README eran de otra época.** Decía 22 archivos, 89
+  ocurrencias y 22 marcadores; medido con las propias funciones de la herramienta son **75
+  archivos, 157 ocurrencias de 21 marcadores en 37 archivos**. El encabezado de
+  `herramientas/projects-init.mjs` ahora trae el comando que las reproduce, para que la
+  próxima vez se recomprueben en vez de recordarse.
+
+- **La exclusión del README del andamio distinguía mayúsculas** sobre sistemas de archivos
+  que no las distinguen (macOS y Windows por defecto), y **el escaneo final recorría todo el
+  destino** en vez de lo que la corrida acababa de escribir: un `{{ALGO}}` preexistente en
+  un repo con contenido abortaba por un motivo ajeno.
+
+### Añadido
+
+- **`docs/para-el-po.md` y `docs/glosario.md`.** El rol con más poder de veto del marco —el
+  PO, dueño exclusivo de rutas en CODEOWNERS— no tenía ningún documento dirigido a él, y la
+  palabra «glosario» no aparecía en ningún archivo del repo. Con `pruebas/docs/` detrás, que
+  comprueba que cada ruta que CODEOWNERS le asigna al PO esté explicada y que la cifra del
+  glosario sea la cantidad real de filas: las dos reglas fallan solas si alguien toca
+  CODEOWNERS o agrega una fila.
+
+- **La guía de arranque deja de asumir un solo shell.** Tenía 25 bloques `bash`, cero de
+  PowerShell y una sola mención de Windows —y era un aviso de que un paso falla—. Ahora
+  declara la postura de sistema operativo arriba del todo, trae el gemelo en PowerShell de
+  cada bloque que no es portable, y suma los fallos silenciosos por sistema operativo a su
+  tabla. Los prerrequisitos incluyen `corepack enable` y la firma de commits por plataforma.
+
+- **Matriz de sistemas operativos para el banco de `projects init`.** Es la única pieza que
+  corre en la máquina de una persona y nunca se había ejecutado fuera de Linux. Ahora corre
+  en ubuntu, windows y macos.
+
+
 ### Corregido
 
 - **El canal de distribución del marco tenía un retraso de hasta nueve días, y nadie lo
