@@ -41,7 +41,47 @@ mueve sobre un cambio incompatible.
 
 ## [No publicado]
 
-Nada todavía.
+### Corregido
+
+- **El canal de distribución del marco tenía un retraso de hasta nueve días, y nadie lo
+  sabía.** El PR del bump es la única forma en que un consumidor se entera de que el marco se
+  movió. Medido el 2026-08-24 en el log de Dependabot del consumidor de referencia, con la
+  1.6.0 publicada desde el 22 y disponible:
+
+  ```
+  Available release version/ref is 1.6.0
+  Found acceptable version outside cooldown: 1.4.2
+  Latest version is 1.4.2
+  ```
+
+  **Propuso una versión vieja a propósito.** La causa es un `cooldown` de **tres días** que
+  GitHub aplica **por defecto** a las actualizaciones de versión cuando `cooldown` no está
+  declarado — no estaba en ningún archivo nuestro, y por eso nadie lo había visto. Sumado a la
+  agenda semanal del lunes, el retraso llegaba a **nueve días**: una versión publicada de
+  sábado a lunes no se proponía hasta el lunes siguiente.
+
+  El andamio ahora declara `cooldown.exclude` para el marco y pasa esa entrada a **diario**:
+
+  - **El cooldown se deja para las acciones de terceros**, que es donde sirve: cubre de una
+    release recién publicada y comprometida. El marco es propio y su premisa es que un arreglo
+    llegue a todos rápido, así que la protección de cadena de suministro no compra nada ahí y
+    cuesta días.
+  - **Diario es para toda la entrada, y no se puede acotar**: la agenda es por entrada de
+    `updates:` y GitHub no permite dos entradas del mismo ecosistema y directorio. Está
+    acotado por los grupos que ya existían: Dependabot no abre un segundo PR de un grupo
+    mientras el primero siga abierto, así que el techo son **dos PRs abiertos** y lo que cambia
+    a diario es la **corrida**, no la cantidad de PRs. Las otras cuatro entradas del archivo
+    siguen semanales.
+
+  El patrón `<org>/projects*` no es una apuesta: es el **mismo** que ya funciona en el grupo, y el
+  PR del bump salió con los cinco pines, así que matchea las dos formas con las que Dependabot
+  nombra al marco.
+
+  **Lo que queda sin explicar, y se dice en vez de rellenarse**: con una ventana uniforme de 72
+  horas, ni la 1.4.2 (45 h al correr) ni la 1.6.0 (27 h) deberían haber pasado el filtro, y
+  1.4.2 pasó. Verificado que las fechas de commit y de release de los tags coinciden, así que
+  no es eso. Algo más entra en el cálculo y no se pudo reconstruir del log. **No cambia el
+  arreglo**: `exclude` saca al marco del filtro cualquiera sea la aritmética.
 
 ---
 
