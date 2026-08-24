@@ -13,9 +13,9 @@ un PR por bloque con `Closes #<sub-issue>` desde su creación.
 
 ---
 
-## Bloque 1 — Los dos directorios, con lo derivado funcionando y los cinco huecos
+## Bloque 1 — Los dos directorios, con lo derivado funcionando y los huecos · **HECHO**
 
-- [ ] **1.1** Crear `plantilla/infra/` y `plantilla/infra-prod/` con lo que **se deriva**
+- [x] **1.1** Crear `plantilla/infra/` y `plantilla/infra-prod/` con lo que **se deriva**
       (D3): bloque de backend del state con el bucket por cuenta y la `key` por proyecto,
       referencia al cluster compartido, referencia a la VPC, proveedor y región, prefijo de
       recursos, identidad federada del pipeline, y los dominios. Todo con marcadores de valor
@@ -23,27 +23,36 @@ un PR por bloque con `Closes #<sub-issue>` desde su creación.
       **Evidencia**: `grep -rhoE '\{\{[A-Z0-9_]+\}\}' plantilla/infra plantilla/infra-prod |
       sort -u` y que cada marcador que salga esté en la lista que `projects init --ejemplo`
       imprime. Un marcador que no esté ahí viaja literal al repo nuevo.
+      **RESULTADO**: 12 marcadores usados, **los 12 entre los que `projects init` sustituye**.
+      Ninguno inventado. Y el design decía «siete valores»: son doce, corregido.
 
-- [ ] **1.2** Escribir los **cinco huecos de decisión** con la forma de tres partes —qué
+- [x] **1.2** Escribir los **huecos de decisión** con la forma de tres partes —qué
       falta, con qué criterio se decide, qué queda sin garantía—: dimensionamiento y
       autoescalado, certificado y zona DNS, programador de tareas, topología de subredes
       (D4), y alarmas (D5, **solo en `infra-prod/`** por D6).
       **Evidencia**: el paso de marcadores del pipeline corrido sobre un `projects init` de
-      prueba **falla**, y su salida nombra los cinco.
+      prueba **falla**, y su salida los nombra.
+      **RESULTADO**: **6 pendientes en dev y 7 en prod** —el séptimo es alarmas, solo ahí por
+      D6—. Son cinco decisiones del proyecto más los dos datos del área que encontró la
+      implementación (D7). Los marcadores del `main.tf` son punteros a la sección, para que el
+      fallo apunte a la línea exacta.
 
-- [ ] **1.3** Declarar la asimetría dev↔prod en el `README.md` de cada directorio (D6): dev
+- [x] **1.3** Declarar la asimetría dev↔prod en el `README.md` de cada directorio (D6): dev
       sin alarmas y sin programador **es decisión**, no hueco.
       **Evidencia**: los dos README existen y el de `infra/` dice por qué no tiene el hueco
       de alarmas.
 
-- [ ] **1.4** Sumar al `.gitignore` del andamio el `state` y los `.tfvars`, que en el
+- [x] **1.4** ~~Sumar al `.gitignore`~~ **YA ESTABA HECHO**: del andamio el `state` y los `.tfvars`, que en el
       un consumidor ya están ignorados y conviene que **nazcan** así.
-      **Evidencia**: `git check-ignore -v` sobre las rutas, en un `projects init` de prueba.
+      el `.gitignore` del andamio ya traía las siete reglas de Terraform —`.terraform`,
+      `*.tfstate*` y `*.tfvars` para los dos directorios— para directorios que no existían.
+      **Evidencia**: `grep -nE "tfstate|tfvars|terraform" plantilla/.gitignore`.
 
-- [ ] **1.5** Ningún archivo `.tf` con recursos reales en este bloque. Es la frontera del
+- [x] **1.5** Ningún archivo `.tf` con recursos reales en este bloque. Es la frontera del
       change y se verifica en vez de confiarse.
       **Evidencia**: `grep -rE '^resource ' plantilla/infra plantilla/infra-prod` sale
       **vacío**. Solo `data`, `terraform`, `provider`, `variable`, `locals` y `output`.
+      **RESULTADO**: vacío.
 
 ## Bloque 2 — Que la compuerta muerda, y que sea inerte donde debe
 
@@ -67,16 +76,19 @@ un PR por bloque con `Closes #<sub-issue>` desde su creación.
 
 ## Bloque 3 — Que el que llega mañana lo entienda
 
-- [ ] **3.1** Sumar los cinco huecos a la fase 5.1 de `docs/arrancar-un-proyecto.md`, que ya
+- [ ] **3.1** Sumar los huecos a la fase 5.1 de `docs/arrancar-un-proyecto.md`, que ya
       documenta el primer CI rojo como esperado y hoy cuenta tres huecos.
       **Evidencia**: el conteo de la guía coincide con el conteo real del andamio, verificado
       con el mismo `grep` de la tarea 1.2.
 
-- [ ] **3.2** Entrada en `CHANGELOG.md` con su sección **Para consumidores**: para un repo
-      que ya tiene infraestructura, **nada**; para un repo nuevo, cinco huecos más en el
-      primer rojo.
-      **Evidencia**: el check `changelog-en-el-pr` en verde — este bloque toca `plantilla/`,
-      así que aplica.
+- [x] **3.2** ~~Entrada en `CHANGELOG.md`~~ **CORREGIDA DE LUGAR al implementar el bloque 1.**
+      Esta tarea estaba mal puesta acá: el check `changelog-en-el-pr` exige la entrada en el PR
+      que **toca `plantilla/`**, o sea en el bloque 1, y la regla del marco dice lo mismo —«se
+      escribe en el PR que introduce el cambio, no al cortar la versión». Diferirla al bloque 3
+      habría puesto rojo al PR del bloque 1.
+      Queda, para el PR de este bloque: **revisar** que la entrada refleje lo que los tres
+      bloques dejaron, y agregarle lo que el bloque 2 haya cambiado.
+      **Evidencia**: el check `changelog-en-el-pr` en verde en el PR del bloque 1.
 
 - [ ] **3.3** Anotar en `docs/reglas-no-escritas.md` la deuda que el design declara y que
       ningún check puede cerrar: **que el hueco lleve un criterio útil** no es decidible con
