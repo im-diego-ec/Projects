@@ -26,7 +26,7 @@ name: Actualizar el marco
 # `constitucion-al-dia` que sube el job de marco del ci.yml y commitearlo sobre
 # el PR del bump.
 #
-# LA SALIDA ESTA DECIDIDA Y NO IMPLEMENTADA: **Projects ADR 004** — este mismo
+# LA SALIDA ESTA DECIDIDA Y NO IMPLEMENTADA: **Projects ADR 005** — este mismo
 # workflow mueve el pin Y regenera, y abre UN PR que nace verde. Se construye
 # cuando exista el segundo consumidor del marco. Hasta entonces este parrafo es
 # la advertencia, no la promesa.

@@ -335,7 +335,7 @@ es el mismo que el marco ya paga por `ci.yml` y por `CODEOWNERS`.
   **Este PR cambia prosa y cero comportamiento**: el diff del workflow es 100% comentarios.
   Lo que queda escrito es el límite con su medición, el arreglo mientras tanto —bajar el
   artifact `constitucion-al-dia` que sube el job de marco y commitearlo sobre el PR del
-  bump— y el destino, decidido en **[ADR 004](docs/adr/004-pin-y-constitucion-en-un-solo-pr.md)**:
+  bump— y el destino, decidido en **[ADR 005](docs/adr/005-pin-y-constitucion-en-un-solo-pr.md)**:
   que ese mismo workflow mueva el pin **y** regenere, y abra **un** PR que nazca verde. Se
   construye cuando exista el segundo consumidor del marco; con uno solo, sus defectos se
   descubrirían en el único consumidor que hay.
