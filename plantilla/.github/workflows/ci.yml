@@ -135,14 +135,19 @@ jobs:
         with:
           node-version: "22"
       # SIN `cache: pnpm` EN EL SETUP-NODE DE ARRIBA, y es una decision escrita,
-      # no un olvido. El cache de GitHub Actions se ESCRIBE desde cualquier rama
-      # del repositorio y se restaura en las corridas de la rama por defecto, asi
-      # que un PR cualquiera puede sembrar el store que despues consume main; la
-      # restauracion por restore-keys ademas admite coincidencia parcial de
-      # clave. Es el unico canal de ESCRITURA que alguien de afuera tiene hacia
-      # este runner, y cae exactamente sobre el paso que instala y ejecuta codigo
-      # de terceros. Lo que se compra a cambio, en un repo de este porte, son
-      # segundos.
+      # no un olvido. El cache de Actions es un canal de ESCRITURA que desemboca
+      # justo en el paso que instala y EJECUTA codigo que nadie leyo, y conviene
+      # decir su alcance REAL y no el que se supone: un cache se guarda en el
+      # scope de la rama que lo escribe, y una corrida solo restaura los de SU
+      # rama, los de su rama BASE si es un PR, y los de la rama por defecto.
+      # Las flechas van en esa direccion y no en la otra: NO viaja de un PR
+      # cualquiera a main —eso no pasa, y creerlo lleva a defender esta decision
+      # con un motivo falso—; viaja de una corrida a las siguientes de la misma
+      # rama, y desde main hacia TODAS las ramas, que es el caso que importa
+      # porque main corre este mismo install en cada push. La restauracion por
+      # restore-keys ademas admite coincidencia parcial de clave: la entrada que
+      # se acepta no es necesariamente la que se pidio. Lo que se compra a
+      # cambio, en un repo de este porte, son segundos.
       #
       # SI EL INSTALL PASA A COSTAR MINUTOS la vuelta atras es legitima, y se
       # escribe aca con la medicion al lado: cache con clave EXACTA (sin

@@ -61,8 +61,22 @@
 //    la regla `*  @<org>/builders`. Ver FORMATOS.
 //  · `openspec init` o el render de la constitucion que salen 0 sin escribir
 //    nada. Los dos se daban por buenos con "no lanzo excepcion", y este repo
-//    tiene MEDIDO que ese CLI miente en Windows. Ahora los dos releen el arbol,
-//    igual que se hace con los marcadores.
+//    tiene MEDIDO que ese CLI miente en Windows. Ahora cada uno se comprueba
+//    con lo que SI se puede afirmar de el, que no es lo mismo en los dos:
+//     · `openspec init` no declara nada, asi que se le fotografia openspec/
+//       antes y despues. Rojo si al final no hay openspec/ con contenido; y si
+//       el directorio YA tenia archivos y la corrida no agrego ninguno, la
+//       corrida no puede distinguir "el CLI mintio" de "el CLI no tenia nada
+//       que hacer sobre un openspec/ ya inicializado": eso es `::warning::`,
+//       porque un rojo que no sabe cual de los dos casos esta viendo rompe al
+//       reintento con `--forzar`, que es el camino de recuperacion que esta
+//       misma herramienta recomienda.
+//     · El render SI declara lo que escribio: `artefactos` es un output de
+//       actions/constitucion (action.yml). Se le da un GITHUB_OUTPUT propio, se
+//       leen esas rutas y se comprueban EN DISCO. Compararlas antes/despues no
+//       servia: el render es idempotente —reescribe siempre las mismas rutas—,
+//       asi que la segunda corrida sobre un destino ya instanciado no deja
+//       ninguna ruta nueva y el control salia rojo con todo bien.
 //
 // Y NO DEJA EL DESTINO A MEDIAS. Un fallo a mitad de escritura —EPERM por
 // antivirus, un archivo abierto, OneDrive sobre Documents— revierte lo que esta
@@ -84,6 +98,7 @@
 // ---------------------------------------------------------------------------
 
 import fs from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { execFileSync } from "node:child_process";
@@ -765,6 +780,34 @@ export function pinOpenspecDe(marcoCi) {
  *  sin shell falla con EINVAL. La defensa es acotar el argumento. */
 export function pinValido(pin) {
   return typeof pin === "string" && /^\d+\.\d+\.\d+$/.test(pin);
+}
+
+/** Las rutas que el render de la constitucion DICE haber escrito, leidas del
+ *  archivo de GITHUB_OUTPUT que esta herramienta le presta.
+ *
+ *  Por que no se comparan las rutas del destino antes y despues, que es lo
+ *  primero que uno escribe: el modo escribir de actions/constitucion es
+ *  IDEMPOTENTE —`escribirArchivo` reescribe siempre las mismas rutas, sin mirar
+ *  si el contenido cambio—, asi que una segunda corrida no deja ninguna ruta
+ *  nueva. Medido: `--forzar` sobre un destino ya instanciado salia 1 con "no
+ *  escribio un solo archivo nuevo" y mandaba a revisar las `superficies` de
+ *  .projects-valores.json, que no tenian nada que ver. Y el mtime tampoco
+ *  sirve: hay sistemas de archivos con resolucion de un segundo, y las dos
+ *  fotos se sacan con milisegundos de diferencia.
+ *
+ *  `artefactos` no es prosa que se parsea: es un output DECLARADO de la action
+ *  (actions/constitucion/action.yml, `outputs.artefactos`), o sea la misma
+ *  interfaz que consume el workflow. Quien la cambie cambia el contrato de la
+ *  action, no un detalle interno. Y las rutas que declara igual se comprueban
+ *  en disco: esto dice DONDE mirar, no reemplaza el mirar. */
+export function rutasDelRender(textoDeOutputs) {
+  const lineas = String(textoDeOutputs).split(/\r?\n/).filter((l) => l.startsWith("artefactos="));
+  if (lineas.length === 0) return [];
+  return lineas[lineas.length - 1]
+    .slice("artefactos=".length)
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean);
 }
 
 function main(argv) {

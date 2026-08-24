@@ -41,10 +41,10 @@ provider "aws" {
 
   default_tags {
     tags = {
-      Proyecto  = "{{PREFIJO_RECURSOS}}"
-      Ambiente  = "prod"
-      Gestion   = "terraform"
-      Repo      = "{{ORG}}/{{PROYECTO}}"
+      Proyecto = "{{PREFIJO_RECURSOS}}"
+      Ambiente = "prod"
+      Gestion  = "terraform"
+      Repo     = "{{ORG}}/{{PROYECTO}}"
     }
   }
 }
