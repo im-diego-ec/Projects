@@ -54,25 +54,36 @@ un PR por bloque con `Closes #<sub-issue>` desde su creación.
       **vacío**. Solo `data`, `terraform`, `provider`, `variable`, `locals` y `output`.
       **RESULTADO**: vacío.
 
-## Bloque 2 — Que la compuerta muerda, y que sea inerte donde debe
+## Bloque 2 — Que la compuerta muerda, y que sea inerte donde debe · **HECHO** (la 2.3 salió a issue propio)
 
-- [ ] **2.1** Prueba en `pruebas/andamio/` con el patrón que el banco ya usa: las
+- [x] **2.1** Prueba en `pruebas/andamio/` con el patrón que el banco ya usa: las
       comprobaciones se escriben una vez y se corren **contra el andamio real** (donde tienen
       que pasar salvo los huecos) y **contra copias mutadas** (donde tienen que morder).
       Mutaciones mínimas: hueco borrado sin resolver, hueco sin criterio, el directorio
       entero retirado, y el hueco de alarmas movido a `infra/`.
-      **Evidencia**: la prueba en verde, y cada mutación con su rojo y su mensaje.
+      **RESULTADO**: `pruebas/andamio/infra-pendientes.test.mjs`, **14 pruebas, 14 en verde**:
+      siete propiedades sobre el andamio real y siete mutaciones que muerden. Las siete
+      propiedades son estructura, cero recursos, marcadores válidos, las tres partes de cada
+      pendiente, alarmas solo en prod, punteros que resuelven, y numeración correlativa.
+      **Y la mordida cazó un defecto de la prueba misma**: la mutación de «CÓMO SE DECIDE»
+      golpeaba la primera ocurrencia del texto, que está en el encabezado explicativo y fuera
+      de toda sección, así que no degradaba ningún pendiente y no mordía. Corregida para mutar
+      el cuerpo de la sección, con el motivo escrito al lado.
 
-- [ ] **2.2** Verificar que la exigencia es **inerte** para un repositorio que no se
+- [x] **2.2** Verificar que la exigencia es **inerte** para un repositorio que no se
       despliega: Projects mismo no tiene los directorios y su CI no puede empezar a fallar.
-      **Evidencia**: el CI de este PR en verde es la evidencia, y se cita el run.
+      **RESULTADO**: el CI del PR del bloque 1 (#72) en verde. Y leído el log en vez de
+      suponerlo: el paso imprime «este repo distribuye un scaffold (plantilla/): los marcadores
+      son su materia prima… verificacion omitida». O sea que en Projects **el check no mira**, y
+      por eso ese verde acredita la inertness y NO que la compuerta muerda — eso lo acreditan
+      el banco de la 2.1 y la verificación contra el consumidor.
 
-- [ ] **2.3** Verificar contra el consumidor real, con el patrón que ya pagó dos veces: rama
-      temporal en un-proyecto-anterior apuntando al SHA de este change, PR **en borrador
-      titulado NO MERGEAR**, se recoge la evidencia y se cierra con `--delete-branch`.
-      Tiene que pasar **sin tocar una línea** de ese repo, porque ya tiene los dos
-      directorios con Terraform real y cero huecos.
-      **Evidencia**: enlace al run, y `ci-ok` en verde.
+- [ ] **2.3** **MOVIDA A ISSUE PROPIO (#73)**, y el motivo es que su compuerta no es técnica:
+      abre una rama temporal en un-proyecto-anterior y eso exige el OK de @builder-uno, aunque
+      el PR sea borrador y no se mergee. Un bloque no se cierra con una tarea pendiente de un
+      gate humano adentro, y dejarla acá habría hecho que el PR del bloque 2 cerrara un issue
+      incompleto.
+      Sigue siendo obligatoria antes del archive del change.
 
 ## Bloque 3 — Que el que llega mañana lo entienda
 
