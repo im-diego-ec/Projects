@@ -51,7 +51,7 @@ updates:
     # `exclude` acepta comodines y tiene precedencia sobre `include`. El patron es el
     # MISMO que ya funciona en el grupo de abajo —el PR del bump salio con los cinco
     # pines—, asi que matchea las dos formas con las que Dependabot nombra al marco:
-    # `<org>/projects` y `<org>/projects/.github/workflows/marco-ci.yml`.
+    # `<org>/Projects` y `<org>/Projects/.github/workflows/marco-ci.yml`.
     cooldown:
       exclude:
         - "{{ORG}}/Projects*"

@@ -13,6 +13,15 @@ name: CI
 # Se llama al workflow reusable por ruta LOCAL (./.github/workflows/marco-ci.yml)
 # a proposito: asi cada PR se valida contra la version del marco que ESE PR
 # propone, no contra la etiqueta @v1 ya publicada.
+#
+# DOS SUPERFICIES, DOS EXIGENCIAS DE SISTEMA OPERATIVO. Casi todo lo que el marco
+# hace ocurre en un runner, y ahi el marco elige el suyo: Linux x86-64, declarado
+# en el input `runner` de marco-ci.yml y comprobado por el primer paso de higiene.
+# Pero `herramientas/projects-init.mjs` NO corre en un runner: corre en la maquina
+# de quien inicia un proyecto, que puede ser Windows, macOS o Linux. Por eso el
+# unico job con matriz de sistemas operativos en este archivo es `pruebas-init`
+# (los tres), y por eso el resto sigue en ubuntu-latest: una matriz que no
+# corresponde a una superficie real se paga en minutos y no compra evidencia.
 on:
   push:
     branches: [main]
@@ -135,19 +144,289 @@ jobs:
           set -euo pipefail
           shopt -s globstar nullglob
 
-          PRUEBAS=(pruebas/**/*.test.mjs)
+          TODAS=(pruebas/**/*.test.mjs)
 
           # Misma disciplina que el paso de arriba: "no encontre pruebas" jamas
           # se reporta como exito.
-          if [ ${#PRUEBAS[@]} -eq 0 ]; then
+          if [ ${#TODAS[@]} -eq 0 ]; then
             echo "::error::no se encontro ningun archivo de pruebas en pruebas/**/*.test.mjs. Si moviste el banco de los pasos inline, actualiza este patron; si lo borraste, esos pasos volvieron a no tener ninguna asercion"
             exit 1
           fi
 
-          echo "== bancos de los pasos inline encontrados =="
+          # pruebas/init/ SE EXCLUYE ACA PORQUE CORRE EN OTRO LADO, no porque se
+          # haya apagado: es el unico banco del marco cuyo sujeto no vive en un
+          # runner sino en la maquina del desarrollador, asi que lo corre el job
+          # `pruebas-init` sobre los tres sistemas operativos. Ejecutarlo tambien
+          # aca solo repetiria la pasada de Linux.
+          #
+          # La exclusion no puede quedar apuntando al vacio: si alguien mueve o
+          # borra pruebas/init/, esta condicion se pone roja en vez de dejar de
+          # excluir en silencio. (El job `pruebas-init` tambien se pondria rojo;
+          # esto lo dice desde el lado que hace la exclusion, que es donde se lee
+          # el motivo.)
+          INIT=(pruebas/init/*.test.mjs)
+          if [ ${#INIT[@]} -eq 0 ]; then
+            echo "::error::este paso excluye pruebas/init/ porque el job 'pruebas-init' lo corre sobre ubuntu, windows y macos, pero pruebas/init/ no tiene ningun *.test.mjs. Si moviste ese banco, mueve tambien la exclusion y la matriz; si lo borraste, la herramienta de init se quedo sin la unica prueba que la ejercita fuera de Linux"
+            exit 1
+          fi
+
+          PRUEBAS=()
+          for P in "${TODAS[@]}"; do
+            case "${P}" in
+              pruebas/init/*) continue ;;
+            esac
+            PRUEBAS+=("${P}")
+          done
+
+          if [ ${#PRUEBAS[@]} -eq 0 ]; then
+            echo "::error::despues de excluir pruebas/init/ no quedo ningun banco que correr aca. O el resto de pruebas/ desaparecio, o todo se movio dentro de init/"
+            exit 1
+          fi
+
+          echo "== bancos de los pasos inline encontrados (sin pruebas/init/, que corre en la matriz) =="
           printf '%s\n' "${PRUEBAS[@]}"
 
           node --test "${PRUEBAS[@]}"
+
+  # LA HERRAMIENTA DE INIT, EN LOS TRES SISTEMAS OPERATIVOS.
+  #
+  # POR QUE ES UN JOB APARTE Y CON MATRIZ. `herramientas/projects-init.mjs` es la
+  # unica pieza del marco que NO se ejecuta en un runner: se ejecuta en la maquina
+  # de quien clona el marco para arrancar un proyecto, y esa maquina es Windows,
+  # macOS o Linux segun quien sea. Hasta hoy su banco solo se habia ejecutado en
+  # ubuntu-latest, dentro del job de arriba: o sea que el marco pedia que la
+  # herramienta sirviera en las tres y solo tenia evidencia de una.
+  #
+  # POR QUE LA MATRIZ NO VA EN TODO EL CI. Porque el resto del marco corre en un
+  # runner y ahi el marco ELIGE la plataforma —Linux x86-64, declarado en el input
+  # `runner` de marco-ci.yml—. Multiplicar por tres jobs cuya plataforma esta
+  # fijada por contrato cuesta minutos y no compra una sola asercion nueva.
+  #
+  # fail-fast: false a proposito: si init se rompe en Windows, querer saber ademas
+  # si se rompe en macOS es la mitad del diagnostico, y cancelar las otras dos
+  # patas lo esconde.
+  #
+  # QUE HACE FALTA PARA QUE ESTO SIRVA DE VERDAD, y esta cuidado: el paso corre
+  # con `shell: bash` (en windows-latest eso es el bash de Git, que viene en el
+  # runner), el patron es de UN solo nivel (`pruebas/init/*.test.mjs`) para no
+  # depender de `globstar`, que el bash 3.2 de macOS no tiene, y las rutas van con
+  # barra normal, que Git Bash entiende. El banco en si ya es portable: usa
+  # node:path, os.tmpdir() y process.execPath en vez de rutas cableadas, y la
+  # herramienta trae su rama de Windows: el `openspec init` que lanza npx le pasa
+  # `shell: process.platform === "win32"` a execFileSync, en
+  # herramientas/projects-init.mjs. VA SIN NUMERO DE LINEA A PROPOSITO: ese
+  # archivo se edita seguido y el puntero se pudre —esta misma nota ya cito una
+  # linea equivocada una vez—. El ancla es `grep -n win32
+  # herramientas/projects-init.mjs`, que devuelve la llamada y el parrafo del
+  # encabezado que explica por que esa rama existe.
+  # El .gitattributes del repo fija `* text=auto eol=lf`, asi que el checkout de
+  # Windows no rematerializa CRLF y las comparaciones byte a byte del banco
+  # siguen valiendo.
+  pruebas_init:
+    name: pruebas-init (${{ matrix.so }})
+    strategy:
+      fail-fast: false
+      matrix:
+        so: [ubuntu-latest, windows-latest, macos-latest]
+    runs-on: ${{ matrix.so }}
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with: { node-version: "22" }
+
+      - name: Banco de la herramienta de init
+        shell: bash
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+
+          PRUEBAS=(pruebas/init/*.test.mjs)
+
+          # Misma disciplina que los demas bancos: "no encontre pruebas" jamas se
+          # reporta como exito. Aca ademas la matriz lo multiplica — un patron
+          # que deja de matchear daria TRES verdes sin una sola asercion.
+          if [ ${#PRUEBAS[@]} -eq 0 ]; then
+            echo "::error::no se encontro ningun archivo en pruebas/init/*.test.mjs. Si moviste el banco de la herramienta de init, actualiza este patron y la exclusion del job pruebas-actions; si lo borraste, la herramienta que corre en la maquina de la gente se quedo sin banco en los tres sistemas operativos"
+            exit 1
+          fi
+
+          echo "== banco de init en $(uname -s) ($(uname -m)), node $(node --version) =="
+          printf '%s\n' "${PRUEBAS[@]}"
+
+          node --test "${PRUEBAS[@]}"
+
+  # PINES DE ACTIONS DE TERCEROS: LA FRONTERA QUE EL MARCO DECLARA Y NADIE MEDIA.
+  #
+  # Se llama `higiene` por el job del mismo nombre de marco-ci.yml, del que es
+  # hermano en intencion —lo que el marco AFIRMA y hasta hoy nadie verificaba—,
+  # pero vive aca y no alla por una razon concreta: cuando marco-ci.yml corre en
+  # un consumidor, el arbol checkouteado es el DEL CONSUMIDOR, asi que un check
+  # alojado ahi auditaria los pines ajenos... del consumidor, no los del marco.
+  # Los pines que este paso mira son los que el marco EJECUTA y los que REPARTE.
+  higiene:
+    name: higiene-del-marco
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v7
+
+      # AGENTS.md:257 declara la frontera textual: "Agregar una dependencia o una
+      # action de terceros al marco: entra al pipeline de todos los consumidores.
+      # Se pina por SHA, no por tag movil ajeno." Nada la verificaba.
+      #
+      # POR QUE IMPORTA MAS QUE UN PIN CUALQUIERA. Es la unica clase de cambio que
+      # llega a todos los consumidores a la vez sin que nadie mergee nada: mover un
+      # tag ajeno no abre un PR, no produce diff y no dispara aviso. La asimetria
+      # lo dice sola — la unica action de terceros que el repo trata como tal
+      # (anthropics/claude-code-action, .github/workflows/claude.yml:178) esta
+      # pinada por SHA con su comentario `# v1.0.196` al lado, y las de GitHub,
+      # que corren en cada job de cada repo, no.
+      #
+      # ESTADO MEDIDO EL 2026-08-24, ya contando los tres uses: que agrega este
+      # mismo cambio (26 de 28 uses ajenos van por tag movil):
+      #     15  actions/checkout@v7
+      #     10  actions/setup-node@v7
+      #      1  actions/upload-artifact@v5
+      # De esos 26, DIEZ viajan: 8 en plantilla/.github/workflows/ (que el andamio
+      # copia a cada proyecto nuevo) y 2 en los action.yml de cobertura-diff y
+      # guardrail-deltas (que ejecuta cada consumidor de @v1). Los otros 16 solo
+      # corren aca, en .github/workflows/.
+      #
+      # OJO CON EL 8, que no es el 14 del censo de `uses:` del andamio y por eso
+      # se explica en vez de dejarlo raro: plantilla/.github/workflows/ tiene 14
+      # `uses:`, pero 5 son marcadores sin resolver ({{ORG}}/Projects/...) que
+      # este paso saltea porque no son referencias, y 1 es el
+      # anthropics/claude-code-action que ya va por SHA. Quedan 8 pendientes.
+      # La cuenta sale del propio paso: sus 26 anotaciones ::warning agrupadas
+      # por archivo dan 16 / 8 / 2 (medido el 2026-08-24).
+      #
+      # Si, este paso se denuncia a si mismo: el checkout de arriba es uno de los
+      # 26. Eso es lo que tiene que hacer — un auditor que se exceptua deja de ser
+      # una medicion y pasa a ser una opinion.
+      #
+      # POR QUE ESTE PASO NO RESUELVE LOS SHA. Resolverlos exige red
+      # (`gh api .../commits/<tag>`), y un SHA inventado es peor que un tag: pina
+      # con confianza a un commit que no existe. Asi que el paso imprime el
+      # comando exacto por cada action distinta y deja que lo cierre quien pueda
+      # ejecutarlo.
+      #
+      # POR QUE AVISA Y NO ROMPE, y CUANDO PASA A ROJO. Estrenar esto en rojo
+      # pondria en rojo el CI del marco en su primera corrida y —via plantilla/—
+      # el de cualquier proyecto que se inicie despues, sin habersele anunciado a
+      # nadie; es exactamente el endurecimiento sin aviso que el marco prohibe.
+      # La condicion para invertirlo esta escrita y no depende de una fecha ni de
+      # que alguien se acuerde: en cuanto los 26 pines de la lista de arriba esten
+      # por SHA —o sea, en cuanto este paso imprima "los N uses: ... van pinados
+      # por SHA de 40 hex"— se cambia el ::warning:: final por ::error:: y exit 1,
+      # y se anota en el CHANGELOG bajo "Para consumidores". Antes no: un rojo que
+      # nadie puede cerrar sin red ensena a ignorar los rojos.
+      #
+      # Lo que NO mira, declarado: no juzga si el SHA apunta a un commit real ni
+      # si la version es la ultima. Eso es de Dependabot (.github/dependabot.yml),
+      # que es ademas lo que impide que un pin por SHA se congele para siempre.
+      - name: Pines de actions de terceros por SHA
+        shell: bash
+        env:
+          PROPIETARIO: ${{ github.repository_owner }}
+        run: |
+          set -euo pipefail
+
+          PROPIO="$(echo "${PROPIETARIO}" | tr '[:upper:]' '[:lower:]')"
+
+          # La lista de archivos sale de git ls-files y no de un find: lo que se
+          # audita es exactamente lo que el repo versiona, que es lo que se
+          # ejecuta y lo que se reparte. Nada de listas que alguien tenga que
+          # acordarse de ampliar cuando aparezca un workflow nuevo.
+          # El `|| true` no es un fail-open: es lo contrario. Sin el, un fallo de
+          # git (sin arbol, checkout parcial) mata el paso por `set -e` con el
+          # mensaje de git —"not a git repository"— y sin decir que era lo que se
+          # estaba auditando. Con el, el fallo cae en la condicion de abajo y sale
+          # rojo igual, pero con su motivo escrito.
+          ARCHIVOS="$(git ls-files -- '*.yml' '*.yaml' || true)"
+          if [ -z "${ARCHIVOS}" ]; then
+            echo "::error::git ls-files no devolvio ningun YAML. Este paso NO se declara verde por no haber podido medir: sin lista de archivos no audito nada. Revisa que el checkout de este job haya traido el arbol"
+            exit 1
+          fi
+
+          LINEAS="$(echo "${ARCHIVOS}" | tr '\n' '\0' | xargs -0 grep -nHE '^[[:space:]]*(-[[:space:]]+)?uses:' || true)"
+          if [ -z "${LINEAS}" ]; then
+            echo "::error::no encontre un solo 'uses:' en los YAML del repo, y este repo es un marco de CI: eso es un patron que dejo de matchear, no un repo sin actions"
+            exit 1
+          fi
+
+          TOTAL=0
+          PENDIENTES=0
+          ACCIONES=""
+          while IFS= read -r L; do
+            [ -n "${L}" ] || continue
+            ARCHIVO="${L%%:*}"
+            RESTO="${L#*:}"
+            NUMERO="${RESTO%%:*}"
+
+            # De la linea entera al ref: se quita todo hasta "uses:", las
+            # comillas (el andamio cita los suyos por los marcadores) y el
+            # comentario de version que va al lado de un SHA.
+            REF="$(printf '%s\n' "${L}" \
+              | sed -E 's/.*uses:[[:space:]]*//' \
+              | tr -d '"'"'"'' \
+              | sed -E 's/[[:space:]]+#.*$//; s/[[:space:]]+$//')"
+
+            # Una ruta local no tiene ref que pinar: es este mismo arbol.
+            case "${REF}" in
+              ./*) continue ;;
+            esac
+
+            # "Ajena" se decide contra el duenio REAL del repo, no contra un
+            # nombre cableado: asi un fork a otra cuenta sigue midiendo bien.
+            # {{ORG}} es el marcador del andamio, que apunta al propio marco.
+            DUENIO="$(echo "${REF%%/*}" | tr '[:upper:]' '[:lower:]')"
+            if [ "${DUENIO}" = "${PROPIO}" ] || [ "${DUENIO}" = "{{org}}" ]; then
+              continue
+            fi
+
+            TOTAL=$((TOTAL + 1))
+            REV="${REF##*@}"
+            ACCION="${REF%@*}"
+            # Un uses: sin @ref tampoco esta pinado: sigue el default del repo.
+            case "${REV}" in
+              "${REF}") ACCION="${REF}"; REV="(sin @ref)" ;;
+            esac
+
+            if printf '%s\n' "${REV}" | grep -qE '^[0-9a-f]{40}$'; then
+              continue
+            fi
+
+            PENDIENTES=$((PENDIENTES + 1))
+            # Se acumula con una barra vertical y no con saltos de linea porque
+            # el cuerpo de este paso ya vive dentro de un bloque YAML indentado:
+            # un salto de linea literal aca se lee mal y se rompe al reindentar.
+            ACCIONES="${ACCIONES}${ACCION}@${REV}|"
+            echo "::warning file=${ARCHIVO},line=${NUMERO}::${REF} es una action de una organizacion ajena pinada por tag movil. Quien controla ese tag puede moverlo a otro commit sin abrir un PR aca: el cambio entra a esta corrida y a la de todos los consumidores sin diff y sin aviso. Arreglo: gh api repos/${ACCION}/commits/${REV} --jq .sha , y pegar el resultado como ${ACCION}@<sha> # ${REV}"
+          done <<EOF
+          ${LINEAS}
+          EOF
+
+          if [ "${PENDIENTES}" -eq 0 ]; then
+            echo "los ${TOTAL} uses: a organizaciones ajenas van pinados por SHA de 40 hex"
+            echo "Este paso ya puede pasar a rojo: cambia el ::warning:: final por ::error:: y agrega exit 1 (ver el comentario del paso)"
+            exit 0
+          fi
+
+          echo "== pines ajenos por tag movil: ${PENDIENTES} de ${TOTAL} =="
+          printf '%s' "${ACCIONES}" | tr '|' '\n' | grep -v '^$' | sort | uniq -c | sort -rn
+          echo
+          echo "Comandos para cerrarlo, uno por action distinta (necesitan red y un gh autenticado):"
+          printf '%s' "${ACCIONES}" | tr '|' '\n' | grep -v '^$' | sort -u | while IFS= read -r A; do
+            echo "  gh api repos/${A%@*}/commits/${A##*@} --jq .sha"
+          done
+          echo
+
+          echo "::warning::${PENDIENTES} de ${TOTAL} uses: a organizaciones ajenas van por tag movil y no por SHA, contra la frontera que AGENTS.md declara. Este paso avisa y todavia no rompe, a proposito: los SHA se resuelven con red y estrenar el rojo dejaria al marco y al andamio en rojo sin poder cerrarlo. Los comandos exactos estan arriba; cuando no quede ninguno, este paso pasa a ::error:: y exit 1"
+
   # EL CABLEADO DE LA CONSTITUCION, SOBRE EL PROPIO MARCO Y POR RUTA LOCAL.
   #
   # El carril del consumidor vive en marco-ci.yml y llama a la action por su ref
@@ -284,7 +563,7 @@ jobs:
 
   ci_ok:
     name: ci-ok
-    needs: [marco, pruebas_actions, constitucion, changelog]
+    needs: [marco, pruebas_actions, pruebas_init, higiene, constitucion, changelog]
     if: always()
     runs-on: ubuntu-latest
     steps:
@@ -297,6 +576,21 @@ jobs:
           }
           [ "${{ needs.pruebas_actions.result }}" = "success" ] || {
             echo "::error::el banco de pruebas de las actions termino en '${{ needs.pruebas_actions.result }}'"
+            exit 1
+          }
+          # Un job con matriz reporta un solo resultado agregado: es "success"
+          # solo si las TRES patas lo son. Un rojo en windows-latest o en
+          # macos-latest llega aca igual que uno en ubuntu, que es justamente el
+          # punto de tener la matriz.
+          [ "${{ needs.pruebas_init.result }}" = "success" ] || {
+            echo "::error::el banco de la herramienta de init termino en '${{ needs.pruebas_init.result }}' en al menos uno de los tres sistemas operativos. Mira cual: la herramienta corre en la maquina de quien inicia un proyecto, no en un runner, asi que un rojo en windows o macos es un rojo real para un usuario real"
+            exit 1
+          }
+          # El paso de pines AVISA y no rompe (ver su comentario en el job
+          # higiene-del-marco), asi que este job solo se pone rojo si el paso no
+          # pudo medir. Que es lo correcto: "no pude auditar" nunca es verde.
+          [ "${{ needs.higiene.result }}" = "success" ] || {
+            echo "::error::la higiene del marco (pines de actions de terceros) termino en '${{ needs.higiene.result }}'. Ese paso avisa y no rompe por hallazgos, asi que esto significa que no pudo medir"
             exit 1
           }
           # Cualquier resultado que no sea success es un fallo, "skipped" incluido: un

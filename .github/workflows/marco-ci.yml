@@ -3,7 +3,7 @@ name: Marco CI (reusable)
 # ---------------------------------------------------------------------------
 # QUE ES ESTO
 #
-# Los jobs de CI que TODO proyecto la organización hereda del marco Projects:
+# Los jobs de CI que TODO proyecto de la organizacion hereda del marco Projects:
 #
 #   1. cambios   -> detecta si el PR/push toca solo documentacion (carril rapido)
 #   2. openspec  -> guardrail de deltas + validacion estricta de changes y specs
@@ -151,7 +151,37 @@ on:
           ^infra/
           ^infra-prod/
       runner:
-        description: Runner para todos los jobs de marco.
+        description: >-
+          Runner para todos los jobs de marco. TIENE que ser Linux x86-64, y el
+          motivo esta medido, no es preferencia: el job higiene descarga
+          actionlint y gitleaks pidiendo por nombre los assets linux_amd64 y
+          linux_x64 de cada release, ejecuta los binarios sin sufijo .exe, y
+          verifica el sha256 con `sha256sum --check --ignore-missing`, bandera
+          que el sha256sum de macOS no acepta. Sirven ubuntu-latest (el default)
+          y un self-hosted Linux x86-64; windows-latest, macos-latest y los
+          runners ARM (ubuntu-*-arm) NO.
+          QUIEN HACE CUMPLIR ESTO, con nombre y apellido: un solo guard, el
+          primer paso del job higiene, que resuelve la plataforma con `uname`
+          —no con el texto del input— y falla con este mismo motivo, para que el
+          rechazo no llegue como un 404 de curl a mitad del job. Los otros
+          cuatro jobs (cambios, openspec, constitucion-cableada, marco-ok) leen
+          el mismo input y NO lo comprueban por su cuenta: arrancan sobre lo que
+          se les pase. Aun asi el valor queda rechazado para la corrida entera,
+          y no por costumbre: el input es uno solo para los cinco jobs, higiene
+          no tiene `if:` (corre siempre) y marco-ok lo lleva en su `needs` y
+          exige que termine en success. Ahi se apoya la palabra TIENE, y en
+          ningun otro lado. Si algun dia higiene se saltea, se condiciona o sale
+          del `needs` de marco-ok, esta linea se queda sin respaldo: el arreglo
+          entonces es mover el guard a un job propio del que dependan los demas,
+          no aflojar la promesa de esta description.
+          Este input se acota en vez de honrarse porque un valor que el marco no
+          ejercita en ningun CI no es una promesa que pueda sostener: hoy nada
+          corre marco-ci fuera de Linux, y derivar el nombre del asset de `uname`
+          sin una corrida que lo pruebe seria cambiar un fallo conocido por uno
+          que aparece en el pipeline de un consumidor. Ampliar la promesa a los
+          tres sistemas operativos es un change —hay que derivar el asset de
+          uname y reemplazar la verificacion del sha256 por una portable—, no un
+          valor distinto en este input.
         type: string
         required: false
         default: ubuntu-latest
@@ -373,6 +403,46 @@ jobs:
     name: higiene
     runs-on: ${{ inputs.runner }}
     steps:
+      # LA PLATAFORMA SE COMPRUEBA ANTES QUE NADA, Y NO ES UN ROJO NUEVO.
+      #
+      # El input `runner` es opcional y con default, o sea que se lee como una
+      # invitacion a pasar otra cosa. Lo que recibia quien aceptaba la invitacion
+      # era un rojo a mitad de este job, en el paso de actionlint, con un 404 de
+      # curl que no menciona el sistema operativo por ningun lado — o sea el peor
+      # tipo de fallo que hay aca: un rojo DEL MARCO dentro del pipeline de un
+      # consumidor, sin causa legible.
+      #
+      # Este paso no vuelve rojo nada que hoy este verde: en Linux x86-64 pasa, y
+      # en cualquier otra plataforma el job ya moria mas abajo. Lo unico que
+      # cambia es CUANDO llega el fallo (primer paso, antes de gastar el clon
+      # completo del checkout) y QUE dice. Por eso es ::error:: y no ::warning::
+      # y no necesita el estreno en modo aviso que el marco exige para los
+      # endurecimientos: no hay ningun consumidor en verde al que esto ponga en
+      # rojo.
+      #
+      # Se comprueba con uname y no con el texto del input a proposito: el input
+      # puede decir "self-hosted" o una etiqueta cualquiera, y lo que importa no
+      # es como se llama el runner sino sobre que corre.
+      - name: El runner es Linux x86-64
+        shell: bash
+        env:
+          RUNNER_PEDIDO: ${{ inputs.runner }}
+        run: |
+          set -euo pipefail
+
+          SO="$(uname -s)"
+          ARQ="$(uname -m)"
+
+          case "${SO}/${ARQ}" in
+            Linux/x86_64)
+              echo "runner '${RUNNER_PEDIDO}' resuelve a ${SO}/${ARQ}: es lo que este job necesita"
+              ;;
+            *)
+              echo "::error::el input runner recibio '${RUNNER_PEDIDO}', que resuelve a ${SO}/${ARQ}, y el job higiene solo corre en Linux x86-64. No es preferencia: este job descarga actionlint (asset actionlint_<version>_linux_amd64.tar.gz) y gitleaks (asset gitleaks_<version>_linux_x64.tar.gz), ejecuta los binarios sin sufijo .exe y verifica el sha256 con 'sha256sum --check --ignore-missing', bandera que el sha256sum de macOS no acepta. Sin este paso el fallo llegaba igual, pero como un 404 de curl a mitad del job y sin nombrar el sistema operativo. Arreglo: pasa un runner Linux x86-64 (ubuntu-latest, que es el default, o un self-hosted x86-64). Si necesitas Windows, macOS o ARM en el CI del marco, eso es algo que el marco hoy NO promete —ver la description del input runner—: abre un change, porque hay que derivar el nombre del asset de uname y reemplazar la verificacion del sha256 por una portable"
+              exit 1
+              ;;
+          esac
+
       # fetch-depth 0 lo pide UN solo paso: el PLANO DE LA HISTORIA del
       # detector de secretos. Sin los objetos del rango del cambio ese plano no
       # puede correr, y entonces un secreto introducido y borrado en el commit
