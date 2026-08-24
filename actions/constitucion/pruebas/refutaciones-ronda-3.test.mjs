@@ -689,10 +689,10 @@ test("(7) el paso CORRE de verdad: el modo cableado sobre este repo sale al dia 
 
 test("(7) y el carril del consumidor sigue existiendo en el workflow reusable", () => {
   const marco = readFileSync(join(RAIZ_REPO, ".github/workflows/marco-ci.yml"), "utf8");
-  assert.match(marco, /im-diego-ec\/projects\/actions\/constitucion@v1/);
+  assert.match(marco, /im-diego-ec\/Projects\/actions\/constitucion@v1/);
   // El job del consumidor no puede correr en el propio marco: la action no esta en la
   // ref publicada todavia, y un job que no corre no descarga nada.
-  assert.match(marco, /github\.repository != 'im-diego-ec\/projects'/);
+  assert.match(marco, /github\.repository != 'im-diego-ec\/Projects'/);
   // Y el salteo no puede ser mudo: el veredicto agregado del reusable lo mira.
   assert.match(marco, /needs\.constitucion_cableada\.result/);
 });
