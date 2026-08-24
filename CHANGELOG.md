@@ -58,9 +58,22 @@ mueve sobre un cambio incompatible.
   Y llega **sin resolver lo que hay que decidir**: seis pendientes en dev y siete en prod. Cada
   uno con tres partes —qué falta, **con qué criterio se decide**, y qué garantía del marco
   queda sin cumplir—, porque un hueco que solo dice qué falta lo puede resolver únicamente
-  quien ya sabía la respuesta. Usan el marcador 🕳️ y **la compuerta que ya existía**: el paso
-  de marcadores del pipeline, que `calidad-codigo` ya exigía y cuyo texto ya cubría los «huecos
-  de decisión».
+  quien ya sabía la respuesta.
+
+  ⚠️ **Y todavía NO hay compuerta, a propósito.** Los pendientes usan un token propio
+  (`PENDIENTE-INFRA`) que el paso de marcadores **no** cuenta. La primera versión de esto usó
+  el marcador 🕳️ del andamio, que sí se cuenta, y eso llevaba a un repositorio recién nacido
+  de **3 marcadores a 21** — de los cuales 18 son decisiones de infraestructura que necesitan
+  cuentas, nombres de recursos y verificaciones que nadie puede hacer el primer día. Con la
+  compuerta puesta, **un repo nuevo no podía llegar a `ci-ok` verde**, y eso además violaba el
+  propio requirement de este change, que exige que la verificación sea **inerte para un
+  repositorio que no se despliega**.
+
+  Así que la compuerta llega con el change del despliegue, que es cuando «este repositorio se
+  despliega» se vuelve verificable. Hasta entonces los pendientes son **disciplina declarada**
+  —el agente los lee en cada sesión porque están en el árbol— y se revisan a mano con
+  `grep -rn PENDIENTE-INFRA infra infra-prod`. Está dicho en los dos `README.md` y en el
+  encabezado de los dos `pendientes.tf`, no solo acá.
 
   **Cero recursos de Terraform**, verificado y no confiado: `grep -rE '^resource '` sobre los
   dos directorios sale vacío. Repartir infraestructura sin verificar haría que cada proyecto
