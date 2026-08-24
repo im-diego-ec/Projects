@@ -108,6 +108,28 @@ un PR por bloque con `Closes #<sub-issue>` desde su creación.
 
 ---
 
+## Corrección posterior al bloque 1 · **la compuerta se difiere** (D8)
+
+- [x] Los pendientes pasan del marcador 🕳️ del andamio a un token propio
+      (`PENDIENTE-INFRA`) que el paso de marcadores **no** cuenta.
+      **Motivo, medido**: con 🕳️ un repositorio nuevo pasaba de **3 marcadores a 21**, y 18
+      de ellos son decisiones que nadie puede tomar el primer día. El paso es fallo duro,
+      así que arrastraba `ci-ok`: **un repo recién nacido no podía llegar a verde**. Y eso
+      violaba el propio requirement de este change, que exige inertness para un repositorio
+      que no se despliega.
+      **Evidencia**: `grep -rc 🕳️ plantilla/infra plantilla/infra-prod` sale vacío, y la
+      octava propiedad del banco lo verifica con su mutación.
+
+- [x] La prosa se corrige donde afirmaba lo que ya no es cierto: los dos `README.md`, los
+      encabezados de los dos `pendientes.tf` y el de `infra/main.tf` decían que el pipeline
+      se queda rojo. Ahora dicen que **todavía no hay compuerta**, con el motivo y el
+      comando de revisión a mano.
+      **Evidencia**: `grep -rniE "queda rojo|se queda .rojo" plantilla/infra*` sale vacío.
+
+- [ ] **La compuerta queda pendiente para el change del despliegue**, y este change NO se
+      archiva hasta que exista: su requirement pide compuerta y hoy hay disciplina
+      declarada. Está dicho en D8.
+
 ## Lo que NO es tarea de este change, y está declarado
 
 El Terraform con recursos reales, el `deploy.yml`, `verificar-prod` como pieza referenciada,

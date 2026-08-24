@@ -1,8 +1,20 @@
 # PENDIENTES DE DECISIÓN — ambiente de PRODUCCIÓN de {{PROYECTO}}
 #
-# Solo comentarios: no declara nada. El pipeline busca el marcador 🕳️ y se queda
-# ROJO mientras sobreviva uno. Resuelto un pendiente, se borra su sección y lo
+# Solo comentarios: no declara nada. Existe para que lo que falta decidir esté
+# escrito donde se decide. Resuelto un pendiente, se borra su sección y lo
 # decidido se escribe en un archivo propio. Sin pendientes, este archivo se borra.
+#
+# TODAVIA NO HAY COMPUERTA, y decirlo es parte del pendiente. El paso de
+# marcadores del pipeline NO ve este token: la compuerta llega con el change del
+# despliegue, que es cuando «este repositorio se despliega» se vuelve verificable.
+# Hasta entonces esto es disciplina declarada, y se revisa a mano:
+#
+#     grep -rn PENDIENTE-INFRA infra infra-prod
+#
+# El motivo de no gatearlo ya: el requirement de este change exige que la
+# verificacion sea INERTE para un repositorio que no se despliega, y un token que
+# cuenta desde el dia uno no cumple eso — pondria rojo a un repo recien nacido por
+# decisiones de infraestructura que todavia no puede tomar.
 #
 # Misma forma de tres partes que en dev, y la del medio es la que importa:
 # QUÉ FALTA · CÓMO SE DECIDE · SI NO SE HACE.
@@ -10,7 +22,7 @@
 # 🛑 Nada de acá se aplica sin el OK explícito de @{{BUILDER_1}} en la sesión.
 
 # ---------------------------------------------------------------------------
-# 🕳️ 1 · El bucket del state de producción
+# PENDIENTE-INFRA: 1 · El bucket del state de producción
 #
 # QUÉ FALTA   El nombre del bucket en el `backend "s3"` de `main.tf`.
 #
@@ -26,7 +38,7 @@
 # ---------------------------------------------------------------------------
 
 # ---------------------------------------------------------------------------
-# 🕳️ 2 · El identificador del cluster de base de datos
+# PENDIENTE-INFRA: 2 · El identificador del cluster de base de datos
 #
 # QUÉ FALTA   El `cluster_identifier` del `data` de `main.tf`.
 #
@@ -43,7 +55,7 @@
 # ---------------------------------------------------------------------------
 
 # ---------------------------------------------------------------------------
-# 🕳️ 3 · En qué subredes corre el servicio
+# PENDIENTE-INFRA: 3 · En qué subredes corre el servicio
 #
 # QUÉ FALTA   La topología de red del servicio, y si el balanceador mira a
 #   internet.
@@ -62,7 +74,7 @@
 # ---------------------------------------------------------------------------
 
 # ---------------------------------------------------------------------------
-# 🕳️ 4 · Dimensionamiento del cómputo y límites de autoescalado
+# PENDIENTE-INFRA: 4 · Dimensionamiento del cómputo y límites de autoescalado
 #
 # QUÉ FALTA   CPU y memoria de la tarea, cuántas en estado normal, y el mínimo y
 #   el máximo del autoescalado.
@@ -80,7 +92,7 @@
 # ---------------------------------------------------------------------------
 
 # ---------------------------------------------------------------------------
-# 🕳️ 5 · Certificado y zona de DNS
+# PENDIENTE-INFRA: 5 · Certificado y zona de DNS
 #
 # QUÉ FALTA   El certificado de {{DOMINIO_PROD}} y el registro que lo apunta.
 #
@@ -96,7 +108,7 @@
 # ---------------------------------------------------------------------------
 
 # ---------------------------------------------------------------------------
-# 🕳️ 6 · Si hace falta un programador de tareas
+# PENDIENTE-INFRA: 6 · Si hace falta un programador de tareas
 #
 # QUÉ FALTA   Decidir si hay procesos periódicos, y declararlos si los hay.
 #
@@ -112,7 +124,7 @@
 # ---------------------------------------------------------------------------
 
 # ---------------------------------------------------------------------------
-# 🕳️ 7 · LAS ALARMAS
+# PENDIENTE-INFRA: 7 · LAS ALARMAS
 #
 # QUÉ FALTA
 #   Las alarmas de este proyecto, cableadas al canal {{CANAL_ALERTAS}}.
