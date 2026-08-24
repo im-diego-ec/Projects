@@ -24,9 +24,91 @@ Marcas que vas a encontrar:
 
 ---
 
-## Antes de empezar: las cuatro cosas que la guía da por sentadas
+## Antes de empezar: las cinco cosas que la guía da por sentadas
 
-### 1. El clon del marco
+### 1. El sistema operativo y la shell, dicho de frente
+
+Esta guía toca **dos superficies distintas** y conviene no confundirlas: **tu máquina**,
+donde clonás el marco, corrés `projects init` y corrés `pnpm verificar`; y **el runner**,
+que es `ubuntu-latest` y no lo elegís vos. Todo lo de esta sección es sobre la primera.
+
+Qué está soportado, y qué significa «soportado»: cada bloque de comandos de la guía está
+marcado con su lenguaje, y **donde el comando no es el mismo en los dos lados, la guía trae
+el par**. Un bloque ` ```bash ` sin gemelo corre igual en las dos — es la mayoría, porque
+`git`, `node`, `pnpm`, `npx` y `gh` son el mismo programa en los tres sistemas.
+
+| Máquina | Shell | Cómo se ve acá |
+|---|---|---|
+| macOS, Linux, y **WSL** sobre Windows | `bash` o `zsh` | bloque ` ```bash ` |
+| Windows nativo | **PowerShell 7+** (`pwsh`) | bloque ` ```powershell ` |
+
+**En Windows la recomendación es WSL, y no es gusto.** El CI corre sobre `ubuntu-latest`:
+adentro de WSL tu verificación y la del pipeline corren sobre el mismo sistema de archivos
+—sensible a mayúsculas—, con los mismos fines de línea y sin el tope de 260 caracteres en
+las rutas. Las cuatro filas de sistema de archivos de la tabla de fallos silenciosos del final
+**desaparecen** en WSL; ninguna desaparece en PowerShell. Y hay una quinta, medida en este
+repo: `openspec archive` sobre Windows nativo imprime **`Specs updated successfully`** y no
+aplica nada ([upgrade-openspec.md, trampa 3](upgrade-openspec.md)).
+
+PowerShell nativo **sigue soportado** —hay quien no puede instalar WSL— y por eso los pares
+existen. Lo que **no** está soportado es `cmd.exe`, ni **Windows PowerShell 5.1**: la consola
+azul, `powershell.exe`, la que ya viene con el sistema. 5.1 rompe esta guía en dos lugares
+exactos: no entiende `&&` entre comandos (fases 4 y 5) —
+
+```
+The token '&&' is not a valid statement separator in this version.
+```
+
+— y su redirección `>` escribe **UTF-16**, que es cómo el `valores.json` de la fase 2 sale
+ilegible para Node sin que nada lo avise. `pwsh` es una instalación aparte y contesta:
+
+```powershell
+$PSVersionTable.PSVersion.Major    # 7 o más
+```
+
+⚠️ **Git Bash no es WSL.** Trae los coreutils, así que los bloques ` ```bash ` corren tal
+cual, pero abajo sigue habiendo NTFS: rutas largas, fines de línea y mayúsculas se comportan
+como en Windows. Sirve para no traducir comandos; no te saca de ninguna fila de esa tabla.
+
+#### Qué de esta promesa se comprueba con un comando, y qué no
+
+Los pares son una promesa, y una promesa que nadie mide se rompe sola. Hoy hay **una sola**
+cosa comprobable de un comando, y es que el inventario **no encoja**: el archivo tiene **9**
+gemelos y **28** bloques ` ```bash `, y eso lo dicen
+` grep -c '^```powershell' docs/arrancar-un-proyecto.md ` y ` grep -c '^```bash' ` sobre el
+mismo archivo. Está probado a la mala, que es la única forma de saber que un check sirve:
+borrando los nueve gemelos, uno por uno, sobre una copia. Los **nueve** bajan el conteo a 8 y
+ponen la comprobación en rojo — ninguno se escapa.
+
+Lo que ese conteo **no** ve, y conviene decirlo antes de que alguien se confíe: que un bloque
+` ```bash ` **nuevo** que no sea portable entre sin su gemelo. El lado bash sube a 29 y la
+comprobación se pone roja, sí, pero roja **porque el inventario cambió**, no porque falte un
+gemelo: quien la vea puede apagarla cambiando el 28 por 29 sin haberse preguntado si el
+bloque nuevo era portable. Distinguir un caso del otro a máquina pide adivinar qué comando
+corre igual en las dos shells, y adivinar es exactamente lo que un check no debe hacer; así
+que eso hoy lo ve una persona leyendo el diff, y por eso es otra fila del mismo
+[backlog de automatización](reglas-no-escritas.md#backlog-de-automatización) que la
+comprobación de prerrequisitos del punto 3. Ojo con esa ancla si la vas a buscar con `grep`:
+lleva tilde, y `grep -i` pliega mayúsculas pero **no** acentos, así que escrita sin tilde la
+búsqueda devuelve **cero** coincidencias y sale **1** — que se lee como que el enlace está
+roto, cuando no lo está. Lo que sí lo demuestra es buscar el encabezado del otro lado:
+` grep -n '^## Backlog de automatización' docs/reglas-no-escritas.md ` contesta con una sola
+línea, la 475.
+
+⚠️ **Ninguno de los nueve gemelos se ejecutó, y en CI no corre ninguno.** El
+pipeline corre sobre `ubuntu-latest`, donde no hay `pwsh`; en la máquina donde se midió esta
+guía, ` which pwsh powershell ` contesta *not found* y sale 1. Lo único que se les hizo fue
+leerlos contra la sintaxis de PowerShell. Validarlos de verdad son dos escalones bien
+distintos. El **barato** es parsearlos sin correrlos: un job en `windows-latest` que extraiga
+los bloques y se los pase a `[System.Management.Automation.Language.Parser]::ParseInput`, que
+devuelve los errores de sintaxis sin ejecutar nada — con una vuelta previa obligatoria,
+sustituir los `<marcadores>`, porque `<` no es un token válido de PowerShell (ni de bash,
+donde es redirección) y sin eso el parser los rechaza a todos por el motivo equivocado. El
+**caro** es ejecutarlos, y ese no va a existir: estos bloques crean claves SSH, escriben en
+`$HOME` y le hablan a la API de GitHub. Hasta que exista el barato, tratá cada bloque de
+PowerShell de esta guía por lo que es — **revisado por lectura, no medido**.
+
+### 2. El clon del marco
 
 Toda la guía dice `<ruta-al-clon-de-projects>`. Ese clon **no viene de ningún lado**: lo traés
 vos, una vez, y te sirve para todos los proyectos.
@@ -38,13 +120,15 @@ gh repo clone im-diego-ec/Projects
 Anotá la ruta donde quedó. Es la que vas a pegar cada vez que la guía diga
 `<ruta-al-clon-de-projects>`.
 
-### 2. Las herramientas
+### 3. Las herramientas
 
-Cuatro comandos. Si alguno no contesta lo que dice acá, resolvelo **antes** de la fase 0:
-todo lo que sigue lo usa.
+**Seis comprobaciones**, y dos cosas que hay que dejar armadas para que dos de ellas
+contesten lo que la guía espera. Si alguna no da lo que dice acá, resolvela **antes** de la
+fase 0: todo lo que sigue lo usa.
 
 ```bash
 node --version                      # 22 o más (el CI usa 22)
+git --version                       # 2.34 o más — lo pide la firma por SSH de abajo
 pnpm --version                      # 9.15.0 — lo fija el andamio con packageManager
 gh auth status                      # autenticado. Necesitás scope admin:org (fase 3.2) y
                                     # admin del repo (fase 6)
@@ -52,17 +136,117 @@ git config --get commit.gpgsign     # tiene que decir true: el marco exige commi
 uv --version                        # la herramienta de descubrimiento lo exige (fase 7.1)
 ```
 
+Los seis corren igual en `pwsh`, incluidos los comentarios: `#` también abre comentario ahí.
+Por eso este bloque no tiene gemelo.
+
+#### `corepack enable`, que es cómo se llega a ese `9.15.0`
+
+`pnpm --version` no contesta `9.15.0` por casualidad. El número lo fija el andamio en
+`package.json` —`"packageManager": "pnpm@9.15.0"`— y quien lo hace cumplir es **corepack**,
+que viene adentro de Node y se enciende **una vez por máquina**:
+
+```bash
+corepack enable
+```
+
+Está acá porque es literalmente lo que hace el CI: `corepack enable` es el **segundo** paso de
+`build-test` —el primero es `actions/checkout`—, y llega **antes** de `setup-node`; el
+comentario del workflow dice por qué: «corepack en vez de una action de terceros: menos
+superficie que auditar». La regla del área
+es que tu máquina y el pipeline corran lo mismo; esta línea es la que lo garantiza para el
+package manager.
+
+⚠️ **Fuera de un repo con `packageManager`, `pnpm --version` no prueba nada.** Contesta lo
+que corepack tenga por defecto, o lo que tengas instalado global, y podés pasar la
+comprobación con la versión equivocada. La medición que vale es **dentro del repo, después
+de la fase 3**. Antes de eso alcanza con que `corepack --version` conteste.
+
+#### La firma de commits, por sistema operativo
+
+`git config --get commit.gpgsign` tiene que decir `true`, y llegar ahí son **tres cosas, no
+una**: algo que firme, una clave, y esa clave cargada en GitHub. Si falta cualquiera de las
+tres, el síntoma es el mismo y no dice cuál falta:
+
+```
+error: gpg failed to sign the data
+fatal: failed to write commit object
+```
+
 ⚠️ Si `commit.gpgsign` no está en `true`, lo vas a descubrir en la fase 5, cuando el primer
 commit falle — o peor, cuando entre sin firma y el ruleset la exija más adelante.
 
-### 3. Los documentos del negocio, si ya existen
+**Hay dos formatos de firma y el marco no exige uno.** El switch se llama `commit.gpgsign`
+por historia, pero Git firma con GPG o con **SSH** según `gpg.format`, y GitHub verifica las
+dos. Para un equipo repartido en tres sistemas operativos **la recomendación es SSH**: es la
+misma clave con la que ya empujás, los comandos son idénticos en los tres, y no hay agente
+ni pinentry que configurar — que es justo la parte que se rompe distinto en cada sistema.
+Necesita Git 2.34 o más, y por eso `git --version` está en la lista de arriba.
+
+```bash
+ssh-keygen -t ed25519 -C "tu-correo"        # solo si todavía no tenés una
+git config --global gpg.format ssh
+git config --global user.signingkey ~/.ssh/id_ed25519.pub
+git config --global commit.gpgsign true
+gh ssh-key add ~/.ssh/id_ed25519.pub --type signing --title "firma"
+```
+
+```powershell
+ssh-keygen -t ed25519 -C "tu-correo"
+git config --global gpg.format ssh
+git config --global user.signingkey "$HOME\.ssh\id_ed25519.pub"
+git config --global commit.gpgsign true
+gh ssh-key add "$HOME\.ssh\id_ed25519.pub" --type signing --title "firma"
+```
+
+El par existe por **una** razón, y es la que muerde: PowerShell **no expande `~`** en los
+argumentos que le pasa a un programa externo. `gh` recibe una tilde literal y contesta que
+no encuentra el archivo; `git config` la guarda tal cual y el fallo aparece recién en el
+primer commit. `$HOME` sí se expande.
+
+⚠️ **`--type signing` no es opcional, y es el error caro.** El default de `gh ssh-key add` es
+`authentication` — que es como está cargada la clave que ya usás para empujar. Con esa sola,
+tus commits se firman perfectamente en tu máquina y GitHub los muestra **sin el badge
+Verified**: la misma clave tiene que estar cargada **dos veces, una por tipo**. Y cuando el
+ruleset de la fase 6.1 exija firma, el rechazo llega en el push, no acá.
+
+Si el área ya está parada en **GPG**, o ya tenés la clave, el camino es el de siempre y es lo
+único de esta guía que cambia de verdad según el sistema operativo:
+
+| Sistema | Cómo se instala | Lo que además hay que decirle a Git |
+|---|---|---|
+| **macOS** | `brew install gnupg pinentry-mac` | En `~/.gnupg/gpg-agent.conf`, `pinentry-program` apuntando a lo que conteste `which pinentry-mac` (la ruta cambia entre Apple Silicon e Intel). Sin eso la passphrase no se puede pedir y el commit falla con el `gpg failed to sign` de arriba, que no menciona pinentry por ningún lado |
+| **Linux** | El paquete `gnupg` de la distro | Nada, si el agente ya corre. Si el commit falla desde una terminal sin TTY declarada: `export GPG_TTY=$(tty)` en tu perfil |
+| **Windows nativo** | **Gpg4win** (trae GnuPG y Kleopatra) | `git config --global gpg.program "C:\Program Files (x86)\GnuPG\bin\gpg.exe"`. ⚠️ Git for Windows trae **su propio** `gpg`, y no es el que tiene tu clave: sin esta línea, `gpg --list-secret-keys` te muestra la clave y el commit igual falla |
+| **WSL** | Igual que Linux, **adentro** de WSL | Nada. La clave vive en WSL y no en Windows: son dos llaveros distintos, y una clave cargada en Gpg4win no existe del lado de WSL |
+
+Y en los cuatro casos el último paso es el mismo, y es el que se olvida — la clave
+**pública** cargada en GitHub, o el commit se firma y llega sin verificar:
+
+```bash
+gpg --list-secret-keys --keyid-format=long     # de acá sale el ID largo
+git config --global user.signingkey <ID>
+git config --global commit.gpgsign true
+gpg --armor --export <ID> | gh gpg-key add -
+```
+
+#### Y esto, hoy, depende de que te acuerdes
+
+⚠️ Toda esta sección es una regla que se cumple **porque alguien la leyó**, y la doctrina del
+marco dice que eso no cuenta. Lo que la convertiría en algo que falla solo es una
+**comprobación de prerrequisitos ejecutable**: un comando que corra las seis verificaciones
+de arriba, imprima cuál falló y salga distinto de 0. No se implementa acá — esta guía es la
+**especificación de qué tiene que comprobar**, no el lugar donde vive. Mientras no exista,
+el ítem es una fila del
+[backlog de automatización](reglas-no-escritas.md#backlog-de-automatización).
+
+### 4. Los documentos del negocio, si ya existen
 
 Si el PO ya hizo el trabajo de negocio —entrevistó gente, levantó los procesos, escribió
 los casos raros, hizo un prototipo—, esos archivos son tu punto de partida. **No van al
 repositorio**: pueden tener nombres de empleados, clientes y proveedores reales.
 Tenelos a mano antes de empezar. Cómo se convierten en specs está en la **fase 7.1**.
 
-### 4. El mapa
+### 5. El mapa
 
 Ocho fases, de la 0 a la 7. Las **[otro]** arrancan primero porque bloquean el final, no
 el arranque.
@@ -160,6 +344,17 @@ cd <ruta-al-clon-de-projects>
 node herramientas/projects-init.mjs --ejemplo > valores.json
 ```
 
+```powershell
+cd <ruta-al-clon-de-projects>
+node herramientas/projects-init.mjs --ejemplo | Set-Content -Encoding utf8 valores.json
+```
+
+El gemelo no usa `>` a propósito, y es el motivo por el que esta guía no soporta Windows
+PowerShell 5.1: ahí `>` escribe **UTF-16 con BOM**. El archivo se ve perfecto en el editor,
+y el `--valores` de la fase 3 lo rechaza con un error de sintaxis JSON sobre el primer
+carácter, que se lee como si lo hubieras llenado mal. `Set-Content -Encoding utf8` deja UTF-8
+sin BOM en `pwsh` 7, que es lo que Node espera.
+
 La tabla completa de qué es cada uno está en
 [`plantilla/README.md`](../plantilla/README.md), sección 2. Acá va sólo lo que
 necesitás para **juntar todo antes de sentarte**:
@@ -188,6 +383,11 @@ funciona:
 grep -o 'mcp__[0-9a-f-]\{36\}' <ruta-a-proyecto-origen>/.claude/settings.json | sort -u | head -1
 ```
 
+```powershell
+Select-String -Path "<ruta-a-proyecto-origen>\.claude\settings.json" -Pattern "mcp__[0-9a-f-]{36}" -AllMatches |
+  ForEach-Object { $_.Matches.Value } | Sort-Object -Unique | Select-Object -First 1
+```
+
 El valor va **sin** el prefijo `mcp__`. Con el valor mal, el andamio queda con cinco
 entradas de allowlist que no matchean ninguna herramienta y cada lectura de Slack te
 pide permiso a mano. **Ningún check lo detecta**: lo único que se verifica es que no
@@ -203,6 +403,16 @@ cd <proyecto>
 node <ruta-al-clon-de-projects>/herramientas/projects-init.mjs \
   --valores <ruta>/valores.json --destino .
 ```
+
+```powershell
+gh repo create im-diego-ec/<proyecto> --private --clone
+cd <proyecto>
+node <ruta-al-clon-de-projects>/herramientas/projects-init.mjs --valores <ruta>/valores.json --destino .
+```
+
+Lo único que cambia es la barra invertida del final de línea, que en PowerShell **no
+continúa el comando**: parte la invocación en dos y `node` arranca sin `--valores`. La barra
+de las rutas no hace falta cambiarla — Node y `gh` aceptan `/` en Windows.
 
 Eso es todo. **No hay una segunda pieza que traer**: `projects init` escribe **75 archivos
 con 156 sustituciones** — la mecánica, los tres paquetes con sus pruebas pasando, **y los
@@ -257,6 +467,10 @@ entonces son disciplina, y se ven de un tirón:
 
 ```bash
 grep -rn PENDIENTE-INFRA infra infra-prod
+```
+
+```powershell
+Get-ChildItem -Recurse -File infra, infra-prod | Select-String -Pattern "PENDIENTE-INFRA"
 ```
 
 **Cero recursos de Terraform**, y es deliberado: el andamio no reparte infraestructura sin
@@ -425,6 +639,17 @@ Antes del segundo push, comprobá que no quedó ninguno. Sin salida es lo que bu
 grep -rn "🕳" --include="*.md" .
 ```
 
+```powershell
+Get-ChildItem -Recurse -File -Filter *.md | Select-String -Pattern "🕳"
+```
+
+⚠️ **Este es el bloque donde el gemelo importa más, y también donde miente más fácil.**
+Los dos comandos recorren el árbol entero, así que después de `pnpm install` barren también
+`node_modules/` — tardan, y una coincidencia ahí abajo no es tuya. Y en la versión de
+PowerShell, si estás en la consola azul de 5.1 el emoji no sobrevive al parseo del archivo:
+**no encuentra nada y sale sin error**, que es exactamente lo que buscabas ver. Sin salida no
+prueba nada si la herramienta no sabe leer el carácter. En `pwsh` 7 sí lo lee.
+
 ---
 
 ## Fase 6 — Settings del repo · **[vos]**, y algunos exigen OK
@@ -460,6 +685,10 @@ gh label create "area:seguridad" --color B60205 --description "Area: seguridad"
 ```bash
 gh api repos/im-diego-ec/<proyecto> \
   --jq '.security_and_analysis.dependabot_security_updates.status'   # enabled
+```
+
+```powershell
+gh api repos/im-diego-ec/<proyecto> --jq ".security_and_analysis.dependabot_security_updates.status"
 ```
 
 Por qué importa: el andamio pina el marco por **versión exacta**, y el único
@@ -559,11 +788,14 @@ git init
 ⚠️ **Fuera del repo, y no es prolijidad: está medido que el CI se pone rojo.** Si instalás
 BMAD dentro del repo del proyecto, dos de sus archivos traen marcadores entre dobles llaves
 y el check «Sin marcadores del scaffold sin resolver» da **rojo** para siempre, sobre
-archivos que nadie escribió ni puede arreglar. Y en Windows `git add` falla con
-`Filename too long` en los `__pycache__` de la herramienta.
+archivos que nadie escribió ni puede arreglar. Y en Windows nativo `git add` falla con
+`Filename too long` en los `__pycache__` de la herramienta — ver la tabla de fallos por
+sistema operativo del final.
 
 El `git init` de acá **no** versiona nada del proyecto: es para poder volver atrás si BMAD
-sobrescribe algo (paso 6).
+sobrescribe algo (paso 6). En Windows nativo, dejale además un `.gitignore` con
+`__pycache__/` y `.venv/` **antes** del paso 6: son salida de la herramienta, y son lo que
+hace fallar ese `git add` justo cuando lo necesitás.
 
 #### 2 · Instalar BMAD ahí
 
@@ -886,6 +1118,15 @@ cp ~/descubrimiento-<proyecto>/lista-de-cobertura.md \
    openspec/changes/recepcion-de-mercaderia/cobertura.md
 ```
 
+```powershell
+Copy-Item "$HOME\descubrimiento-<proyecto>\lista-de-cobertura.md" `
+          "openspec\changes\recepcion-de-mercaderia\cobertura.md"
+```
+
+Dos diferencias, y las dos rompen callado: la continuación de línea en PowerShell es la
+**comilla invertida**, no la barra; y `~` en un argumento suelto llega literal, así que
+`Copy-Item` iría a buscar una carpeta llamada `~` dentro del repo. `$HOME` sí se expande.
+
 ##### 7.c El prompt
 
 Le pasás **tres cosas, no una**: el PRD, los documentos originales y la lista.
@@ -1036,6 +1277,22 @@ o apuntan al lugar equivocado.
 | **Usar `/opsx:propose` en vez de `/opsx:new`** | `propose` genera los cuatro artefactos en un solo paso, que es justo lo de la fila de arriba. `new` crea el change y para | Fase 7.1, paso 7.b |
 | **Nombrar el change como el proyecto** | Un change se propone, se aprueba y se archiva; si su nombre abarca todo el sistema no puede cerrarse nunca. El nombre es la rebanada | Fase 7.1, paso 7.a |
 | **Editar el prompt de una skill de BMAD** | Dejás de usar una herramienta y empezás a mantener un fork ajeno. Si no entiende los documentos, ESO es el resultado: se anota y se sigue a mano | Fase 7.1 |
+
+### Y los que dependen de tu sistema operativo
+
+Estos no salen del marco: salen de que **tu máquina no es el runner**. El CI corre sobre
+`ubuntu-latest`, y las cuatro primeras filas son diferencias del **sistema de archivos** —
+las cuatro desaparecen adentro de WSL, y ninguna desaparece en PowerShell nativo ni en Git
+Bash, que corren sobre NTFS igual. La postura completa está en «Antes de empezar», punto 1.
+
+| Qué | Síntoma real | Arreglo |
+|---|---|---|
+| **Rutas largas en Windows** | `git add` o `pnpm install` cortan con `Filename too long`, sobre un archivo que existe y que se puede abrir. El tope es de 260 caracteres y lo cuenta la ruta **completa**, así que aparece según dónde clonaste, no según qué archivo es: el mismo repo funciona en `C:\p\` y falla en `C:\Users\<vos>\Documents\Proyectos\…` | `git config --global core.longpaths true` arregla la mitad de git. La otra mitad —Node, pnpm— necesita la política **LongPathsEnabled** de Windows, que es cambio de sistema y pide administrador. Clonar cerca de la raíz lo esquiva sin permisos |
+| **Los `__pycache__` de la herramienta de descubrimiento** | Es la fila de arriba, con nombre y apellido: el `git add -A` del paso 6 —el commit antes de pedirle cambios a BMAD— muere con `Filename too long` adentro de `~/descubrimiento-<proyecto>`, y sin ese commit no hay deshacer | Ese directorio tiene su propio `git init` (paso 1) y ningún `.gitignore`. Escribile uno con `__pycache__/` y `.venv/`: son salida de la herramienta, no material del descubrimiento, y no hay razón para versionarlos |
+| **Fin de línea (CRLF)** | `pnpm verificar` sale rojo en el paso de formato sobre archivos que **nadie tocó**, y `git diff` no muestra nada: `[warn] Code style issues found in the above file(s). Run Prettier with --write to fix.` Está medido en este marco, el 2026-08-19: con `core.autocrlf=true` —el default de Git para Windows— los fixtures llegaban en CRLF, las pruebas los escribían en LF, y el diff veía el archivo entero reescrito: el caso «un cambio que solo **borra** líneas» pasaba a tener **2 líneas agregadas** y salía con **EXIT 1**. Quedaban 90 de 91 pruebas verdes, y la única roja lo era por el fin de línea del disco, no por el código | El andamio trae `.gitattributes` con `* text=auto eol=lf`, y por eso no es cosmético. Pero solo gobierna **desde** la fase 3: un checkout hecho antes ya está en CRLF en disco. `git config --global core.autocrlf false` y después `git add --renormalize .` |
+| **Mayúsculas del sistema de archivos** | Verde en tu máquina, rojo en el CI y solo ahí: `error TS2307: Cannot find module './Boton'`. macOS y Windows no distinguen `boton.tsx` de `Boton.tsx`; Linux sí. Su hermano peor es el renombre: `git mv boton.tsx Boton.tsx` en macOS o Windows **no hace nada y no dice nada**, así que el repo se queda con el nombre viejo y vos ves el nuevo | `git config core.ignorecase false` en el repo, y renombrar con `git mv -f`. El typecheck ya ayuda —`forceConsistentCasingInFileNames` está prendido en el `tsconfig.base.json` del andamio— pero solo sobre lo que pasa por el compilador: la ruta de una imagen, un nombre dentro de un glob o un archivo nombrado en el YAML del CI no los mira nadie hasta el runner |
+| **Windows PowerShell 5.1 en vez de `pwsh` 7** | Dos cortes exactos: `The token '&&' is not a valid statement separator in this version.` en las fases 4 y 5, y un `valores.json` en **UTF-16** que la fase 3 rechaza como JSON inválido en el primer carácter — lo que se lee como que llenaste mal el archivo | Instalar `pwsh` 7, que es un paquete aparte y convive con el 5.1. `$PSVersionTable.PSVersion.Major` tiene que decir 7 |
+| **`openspec archive` sobre Windows nativo** | Imprime **`Specs updated successfully`** y hace rollback de todo, specs incluidos. Verificado el 2026-08-14, reproducido dos veces | No mirar el mensaje: mirar `git status --short`. El procedimiento y los tres rodeos están en [upgrade-openspec.md, trampa 3](upgrade-openspec.md) |
 
 ---
 
