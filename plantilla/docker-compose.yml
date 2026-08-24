@@ -25,6 +25,11 @@
 # falte, asi que el desajuste no se ve — deja el contenedor con una base vacia
 # que nadie usa — pero psql o `prisma db pull` fallan con un error que no dice
 # por que.
+#
+# Y EL ACOPLE TIENE GUARDA. pruebas/andamio/acoples-del-andamio.test.mjs compara
+# el POSTGRES_DB de aca contra el ultimo segmento del DATABASE_URL de
+# api/.env.example y exige que sean el mismo texto; tambien exige las comillas
+# del parrafo de abajo. Antes coincidian porque alguien los escribio bien.
 services:
   db:
     image: postgres:16

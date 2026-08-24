@@ -22,6 +22,12 @@ coverage
 # ya usaba, con su «un .env dentro de una imagen es un secreto publicado»: eran
 # dos archivos hermanos que discrepaban, y el debil era el que decide que entra
 # a la historia, que es lo irreversible.
+#
+# ESTAS TRES LINEAS TIENEN GUARDA. pruebas/andamio/acoples-del-andamio.test.mjs
+# arma un repositorio vacio, le pone este mismo archivo y le PREGUNTA A GIT con
+# `git check-ignore` por trece nombres. Se pone rojo si vuelve la lista de
+# nombres literales, si alguien agrega un `!.env.dev` para desbloquear su
+# archivo, o si se pierde la negacion y los .env.example dejan de viajar.
 .env
 .env.*
 !.env.example

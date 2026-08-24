@@ -52,6 +52,15 @@ primera corrida es también la primera medición, y la ventana es el plazo para
 arreglar lo que reporte. Los mismos dos comandos corren en tu máquina sin
 credenciales.
 
+**Tres cosas se ponen rojas, no dos.** El binario de `terraform` sale hoy de la
+imagen del runner —al paso todavía le falta un `hashicorp/setup-terraform` pinado
+por SHA—, así que *no encontrarlo* es el tercer fallo y corre con **la misma
+ventana**: avisa hasta el 2026-09-30 y después detiene el CI. Es a propósito: si
+la ausencia del binario avisara para siempre, este paso pasaría en verde sin
+haber verificado nada el día que la imagen del runner dejara de traerlo, y «no
+pude verificar» se leería como «verifiqué y está bien». Mientras tanto, un
+`::warning::` en el resumen de la corrida dice cuál de los tres pasó.
+
 ## El pendiente de alarmas no se puede copiar de nadie, y por eso está acá
 
 El marco exige que las alarmas **existan y avisen** al canal `{{CANAL_ALERTAS}}`.

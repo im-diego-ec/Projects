@@ -27,9 +27,11 @@ import { coberturaDelMarco } from "../vitest.config.base.mjs";
 // que viaja dentro de vitest, y con vitest 2.x —que arrastra su propia copia de
 // vite como dependencia, no como peer— esa augmentation aterriza sobre el
 // UserConfig de la copia equivocada: TS2769 ("'test' does not exist in type
-// 'UserConfigExport'"), medido en el un consumidor del marco, que lo
-// tuvo que resolver con un remap de rutas. En tiempo de ejecucion las dos
-// funciones son la misma: normalizan y devuelven el objeto.
+// 'UserConfigExport'"). La otra salida —un remap de rutas en el tsconfig para
+// que las dos copias de vite resuelvan a una sola— arregla el sintoma pagando
+// con una linea de configuracion que nadie va a saber por que esta. En tiempo
+// de ejecucion las dos funciones son la misma: normalizan y devuelven el
+// objeto.
 const { coverage } = coberturaDelMarco();
 
 export default defineConfig({

@@ -8,6 +8,18 @@
 # La leccion ya estaba aprendida en otra parte esa misma manana, y al marco
 # no habia vuelto: es exactamente el patron que este repo existe para romper,
 # esta vez sobre si mismo.
+#
+# ESTE ARCHIVO Y plantilla/.gitattributes NO SON COPIA UNO DEL OTRO, y la
+# divergencia es deliberada en las dos direcciones. Aca queda la historia —la
+# fecha, el 'git reset --hard' que lo produjo, que fueron los bancos del marco
+# los que fallaron—, porque es historia de ESTE repositorio. Alla queda solo el
+# mecanismo, cierto en cualquier repositorio y sin fecha que envejezca: un
+# proyecto que nace del andamio no tiene por que conocer la historia interna del
+# marco, y hay un banco que lo exige:
+#   pruebas/andamio/lo-que-viaja-al-proyecto.test.mjs
+# Las REGLAS de abajo si son las mismas en los dos. Si algun dia se comparan los
+# dos archivos y los comentarios no coinciden, eso es lo esperado, no una copia
+# que quedo vieja.
 * text=auto eol=lf
 
 # Binarios: sin conversion ni diff de texto.

@@ -14,7 +14,9 @@ import { log } from "../lib/log.js";
  * clerkMiddleware de @clerk/express agrega ademas su propio "handshake"
  * pensado para sesiones por cookie del mismo dominio, y cuando no encuentra
  * token ese handshake lanza sin capturar — un 500 donde correspondia un 401.
- * Le paso en el un proyecto consumidor; el andamio no lo hereda.
+ * En un API puro no hay handshake que hacer: no hay cookie de sesion ni
+ * redireccion que negociar, asi que ese camino solo puede convertir una
+ * peticion sin credenciales en un error del servidor.
  */
 
 /** Se leen en cada llamada, no como const de import: los tests las alternan. */
@@ -24,11 +26,13 @@ export function clerkConfigurado(env: NodeJS.ProcessEnv = process.env): boolean 
 
 /**
  * El bypass de desarrollo exige el opt-in EXPLICITO ALLOW_DEV_AUTH=true.
- * Nunca se activa "porque falta CLERK_SECRET_KEY", y menos por NODE_ENV: ese
- * fue el bug critico del un proyecto consumidor — NODE_ENV no se seteaba en
- * produccion, el guard quedaba muerto y el API aceptaba identidades del
- * cliente. Una condicion de seguridad no depende de una variable que puede
- * faltar.
+ * Nunca se activa "porque falta CLERK_SECRET_KEY", y menos por NODE_ENV. Un
+ * guard escrito como `NODE_ENV !== "production"` falla ABIERTO: basta con que
+ * la variable no llegue al contenedor —y no llega sola: la pone quien escribe
+ * la definicion de tarea— para que el bypass quede activo en produccion y el
+ * API acepte la identidad que le mande el cliente. Una condicion de seguridad
+ * se apoya en una variable que hay que PONER para abrir, nunca en una que hay
+ * que poner para cerrar.
  */
 export function devAuthPermitido(env: NodeJS.ProcessEnv = process.env): boolean {
   return env.ALLOW_DEV_AUTH === "true";

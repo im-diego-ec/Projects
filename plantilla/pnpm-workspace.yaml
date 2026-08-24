@@ -32,8 +32,8 @@ packages:
 # starter traia un `allowBuilds` con @clerk/shared, @prisma/client,
 # @prisma/engines, esbuild y prisma dentro de api/pnpm-workspace.yaml. Con el
 # pnpm pinado en package.json (9.15.0) esa lista es INERTE: el bloqueo de
-# scripts de postinstall llego en la mayor 10, y el un consumidor del
-# marco corre esta misma pila (prisma + esbuild) en verde sin declarar ninguna.
+# scripts de postinstall llego en la mayor 10, y un consumidor del marco corre
+# esta misma pila (prisma + esbuild) en verde sin declarar ninguna.
 # Se deja escrita aca en prosa para que el dato no se pierda: al subir la mayor
 # de pnpm —sesion dedicada, como manda la politica de dependencias— hay que
 # declarar esos cinco paquetes con la clave que use esa version, o `prisma

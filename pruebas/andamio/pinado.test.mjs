@@ -62,8 +62,11 @@ const FUERA = /[\\/]pruebas[\\/]/;
 // `projects/<algo>@<ref>`, cortando el ref en el primer caracter que no puede ser
 // parte de un ref de git.
 // La `i` no es cosmetica: el repo se llama `Projects` con mayuscula y este regex
-// nacio en minuscula. Sin ella el escaneo encuentra 1 pin en vez de 15 y la
-// asercion de mas abajo se cae — que es exactamente para lo que esta puesta.
+// nacio en minuscula. MEDIDO instrumentando `pinesDeUses()` sobre estas mismas
+// superficies: con la `i` el escaneo encuentra 25 pines, sin ella encuentra 1.
+// El 15 que aparece mas abajo NO es una medicion: es el UMBRAL de la asercion
+// «un cero aca es el banco roto», y con 1 pin esa asercion se cae — que es
+// exactamente para lo que esta puesta.
 const PIN = /projects(\/[^\s"'`]*)?@([^\s"'`,)\]]+)/i;
 
 const VERSION_EXACTA = /^v\d+\.\d+\.\d+$/;
@@ -78,6 +81,16 @@ const MAYOR_MOVIL = /^v\d+$/;
 // Va por lista exacta a proposito: si manana aparece una segunda invocacion interna
 // con @v1, esto se pone ROJO en vez de dejarla heredar la excepcion. Es la
 // diferencia entre una excepcion declarada y un agujero.
+//
+// EL ARCHIVO CAMBIO PERO LA EXCEPCION NO. Desde que `actions/guardrail-deltas` se
+// mudo del job `openspec` a su propio job `deltas` —que se saltea en el repo que
+// distribuye el marco—, esa ref ya no se resuelve durante el CI de Projects, asi que
+// la circularidad que hacia IMPOSIBLE el pin exacto desaparecio. Lo que no
+// desaparecio es la otra mitad: retirar el ultimo `@v1` vivo del marco es una
+// decision de DISTRIBUCION (el paso del release que mueve el tag, y las cinco
+// superficies de prosa que dicen que v1 sigue vivo, incluida la asercion de mas
+// abajo), no un efecto colateral de mover un paso de job. Por eso la excepcion sigue
+// declarada y con el motivo actualizado en vez de borrarse de paso.
 const EXCEPCIONES = [
   { archivo: ".github/workflows/marco-ci.yml", ref: "v1", accion: "actions/guardrail-deltas" },
 ];
@@ -118,7 +131,10 @@ function archivosDe(dir) {
 }
 
 // Solo lineas con `uses:` — ver el alcance declarado arriba.
-function pinesDeUses() {
+// `patron` es parametro y no una constante capturada para que el caso de mas
+// abajo pueda correr el MISMO escaneo con el regex sensible a mayusculas y medir
+// la diferencia, en vez de dejarla escrita en un comentario que nadie recalcula.
+function pinesDeUses(patron = PIN) {
   const pines = [];
   for (const dir of SUPERFICIES) {
     for (const abs of archivosDe(dir)) {
@@ -130,7 +146,7 @@ function pinesDeUses() {
         // se usa `@v1` tiene que poder escribir `@v1`. Es el mismo limite que la
         // prosa, declarado arriba.
         if (/^\s*(#|\/\/|\*|\/\*)/.test(lineas[i])) continue;
-        const m = lineas[i].match(PIN);
+        const m = lineas[i].match(patron);
         if (!m) continue;
         // m[1] es la ruta dentro del repo del marco ("/actions/guardrail-deltas" o
         // "/.github/workflows/marco-ci.yml"), sin la barra inicial. La necesita la
@@ -157,6 +173,30 @@ test("el escaneo encuentra pines: un cero aca es el banco roto, no el arbol limp
       "El andamio referencia el marco en ci.yml (el reusable + tres actions) y en " +
       "actualizar-marco.yml, asi que menos de quince significa que este banco dejo de mirar " +
       "donde deberia: revisá SUPERFICIES y el regex PIN antes de creerle al verde",
+  );
+});
+
+test("la `i` del regex de pines no es cosmetica: sin ella este banco no ve casi nada", () => {
+  // El comentario de PIN afirmaba una cifra que nadie recalculaba, y llego a
+  // decir «1 en vez de 15» mezclando la medicion con el umbral de la asercion de
+  // arriba. Aca la diferencia se MIDE en cada corrida con el mismo escaneo: el
+  // repo se llama `Projects` con mayuscula, asi que un regex sensible a
+  // mayusculas deja de ver los `uses:` del marco y este banco entero pasa
+  // vacuamente sobre una lista de uno.
+  const conI = pinesDeUses(PIN).length;
+  const sinI = pinesDeUses(new RegExp(PIN.source)).length;
+  assert.ok(PIN.flags.includes("i"), "PIN perdio la `i`: el escaneo dejo de ver `Projects` con mayuscula");
+  assert.ok(
+    sinI < conI,
+    `sin la \`i\` el escaneo encuentra ${sinI} y con ella ${conI}: si los dos numeros son iguales, o el ` +
+      "repo dejo de escribirse `Projects` con mayuscula o este control dejo de medir lo que cree",
+  );
+  // Y la consecuencia concreta: sin la `i` la asercion del no-op de arriba se
+  // cae, que es lo que la vuelve la red y no un adorno.
+  assert.ok(
+    sinI < 15,
+    `sin la \`i\` el escaneo todavia encuentra ${sinI} pines, o sea que el umbral de 15 ya no seria la red ` +
+      "que caza un regex desfasado",
   );
 });
 

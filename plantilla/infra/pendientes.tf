@@ -89,8 +89,8 @@
 # CÓMO SE DECIDE
 #   Empezá por la respuesta conservadora —subredes privadas con salida por NAT—,
 #   y VERIFICÁ que funcione para tu caso antes de darla por buena. No la asumas
-#   en ninguna de las dos direcciones: el un consumidor del área
-#   terminó en subredes PÚBLICAS y lo dejó escrito con su medición
+#   en ninguna de las dos direcciones: un consumidor del área terminó en
+#   subredes PÚBLICAS y lo dejó escrito con su medición
 #   («con subnets privadas, `ingress_paths` queda vacío — probado»), porque su
 #   servicio necesita un balanceador accesible desde internet. Puede que a este
 #   proyecto le pase lo mismo y puede que no; lo que no se puede es heredar la
@@ -109,8 +109,29 @@
 # PENDIENTE-INFRA: 4 · El dimensionamiento del cómputo y los límites de autoescalado
 #
 # QUÉ FALTA
-#   CPU y memoria de la tarea, cuántas corren en estado normal, y los límites
-#   mínimo y máximo del autoescalado.
+#   CPU y memoria de la tarea, cuántas corren en estado normal, los límites
+#   mínimo y máximo del autoescalado, y la ARQUITECTURA del cómputo
+#   (`runtime_platform.cpu_architecture`: X86_64 o ARM64).
+#
+# LA ARQUITECTURA SE DECIDE EN DOS ARCHIVOS A LA VEZ
+#   ARQUITECTURA DE HOY: linux/amd64 (X86_64) — la fija api/Dockerfile.
+#
+#   Esa línea de arriba tiene forma fija porque se compara con máquina: es la
+#   única declaración del lado de infra que el banco puede leer, y la prosa que
+#   sigue nombra las DOS arquitecturas —tiene que hacerlo, porque explica cuándo
+#   se cambia—, así que «el archivo menciona ARM64» no distinguiría nada.
+#
+#   La imagen del API se construye con `FROM --platform=linux/amd64` fijo
+#   en api/Dockerfile, y esa línea existe justamente para que la
+#   imagen no herede la arquitectura de la máquina de quien construye. Si acá se
+#   declara ARM64 —es más barato por hora en Fargate, y es la razón por la que
+#   alguien va a querer cambiarlo— el `--platform` de api/Dockerfile pasa a
+#   linux/arm64 EN EL MISMO COMMIT. Los dos valores son uno solo escrito dos
+#   veces: si divergen, la tarea muere al arrancar con "exec format error", un
+#   mensaje que no nombra la arquitectura y que se termina buscando en el código
+#   de la aplicación. El acople lo vigila
+#   pruebas/andamio/acoples-del-andamio.test.mjs, que exige que este pendiente
+#   siga nombrando la arquitectura y que la nombre igual que el Dockerfile.
 #
 # CÓMO SE DECIDE
 #   Es decisión de NEGOCIO disfrazada de decisión técnica: la pregunta es cuánta
