@@ -750,10 +750,10 @@ test("la fecha de la ventana de estreno esta escrita en el spec vivo", () => {
 // EL DENOMINADOR, que es el dato que la regla LEE y que hasta hoy nadie
 // verificaba.
 //
-// LA MEDICION QUE ORIGINO ESTE BLOQUE, hecha sobre el reporte REAL del
-// consumidor (un-proyecto-anterior en main, web al 70,70% de funciones, el numero
-// del incidente). Tres transformaciones del lcov, las tres al alcance de la
-// configuracion del reporter, y las tres convertian ese ROJO en EXIT 0:
+// LA MEDICION QUE ORIGINO ESTE BLOQUE, hecha sobre el reporte REAL de un
+// consumidor (su main, web al 70,70% de funciones, el numero del incidente).
+// Tres transformaciones del lcov, las tres al alcance de la configuracion del
+// reporter, y las tres convertian ese ROJO en EXIT 0:
 //
 //   1. sacar FN/FNDA/FNF/FNH        -> "funciones n/a", EXIT 0, y MUDO
 //      (es lo que hace lcov_function_coverage=0, una opcion documentada)

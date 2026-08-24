@@ -70,7 +70,7 @@ sin darse cuenta.
 Si el ruleset exige un check que **solo reporta en un carril** —`build-test`,
 por ejemplo, que en un PR de solo docs queda `skipped`—, ese carril esta
 bloqueado desde antes de esta migracion. Un check `skipped` **no reporta nunca**.
-Ya paso: el ruleset de otro repo vivio una semana entera pidiendo el check
+Ya paso: el ruleset de un repo real vivio una semana entera pidiendo el check
 equivocado (2026-07-29 → 2026-08-05). Arreglarlo es parte de esta adopcion, y va
 al final (paso 7), cuando el check nuevo ya haya corrido al menos una vez.
 
@@ -169,10 +169,9 @@ desde su lado.
 
 **Que pasa exactamente si falta.** El job que detecta el carril de docs no puede
 listar los archivos del PR, la API devuelve **403**, la deteccion cae al
-**fail-open** y **todo PR corre el CI completo**. En otro repo eso duro
-**una semana entera sin que nadie se enterara** (2026-08-05): el carril rapido
-simplemente nunca actuo, y como el resultado era "correr de mas", nada se puso
-rojo.
+**fail-open** y **todo PR corre el CI completo**. Ya paso, y duro **una semana
+entera sin que nadie se enterara** (2026-08-05): el carril rapido simplemente
+nunca actuo, y como el resultado era "correr de mas", nada se puso rojo.
 
 **Sintoma exacto hoy:** en el log del job de deteccion aparece un `::warning::`
 nombrando el permiso faltante, y la salida `solo_docs` vale `false` **siempre**,
@@ -310,7 +309,7 @@ tipos—, asi que hoy no tienen lint ni tipos y sus errores llegan a produccion 
 poner nada en rojo. **La lista no es una falla de la adopcion: es el hallazgo que
 la justifica.**
 
-**El principio es CUBRIR antes que EXCLUIR.** En el consumidor de origen se
+**El principio es CUBRIR antes que EXCLUIR.** En un repo consumidor real se
 cerraron **23 archivos cubriendolos**, y de todo el repo quedo **una sola
 exclusion declarada** — la configuracion del propio linter, que ninguna suite
 puede importar para medirla — con su motivo escrito. Ese es el estandar, no una
@@ -409,7 +408,7 @@ resolver" del job `higiene` pone en rojo cualquier marcador que sobreviva.
 | Adoptar el marco sin cablear el censo | Rojo del check "Censo de fuentes cableado", con el paso listo para pegar | Cablear censo y cobertura en el mismo cambio |
 | Pinar el `uses:` a `@v1` | Dependabot **no propone ningun bump** (para el, `v1` ya es la mayor vigente), asi que el repo no recibe versiones nuevas por PR y **no aparece en el censo de consumidores**. No falla: se queda callado | Pinar la **version exacta** `vX.Y.Z` y dejar el marco en su propio grupo de `dependabot.yml` |
 | `fetch-depth` por defecto | La cobertura por diff falla porque el commit base no esta en el clon | `fetch-depth: 0` en el checkout |
-| La lista del censo asusta | Decenas de archivos fuera de alcance en la primera corrida | Es lo esperado. **Cubrir antes que excluir**: 23 archivos cerrados cubriendolos y UNA sola exclusion declarada en todo el repo, en el consumidor de origen |
+| La lista del censo asusta | Decenas de archivos fuera de alcance en la primera corrida | Es lo esperado. **Cubrir antes que excluir**: 23 archivos cerrados cubriendolos y UNA sola exclusion declarada en todo el repo, medido en un consumidor real |
 | Repo privado sin acceso de Actions | Error de repositorio no encontrado que parece un typo en la ruta del `uses:` | Habilitar el acceso en el repo del **marco** (requiere OK humano) |
 | Ejemplos con la marca de version dentro de `.claude/` | Rojo de "artefactos generados por una version distinta al pin" sobre un archivo que no genero ningun CLI | No escribir esa cadena con dos puntos en documentos que vivan bajo `.claude/` |
 

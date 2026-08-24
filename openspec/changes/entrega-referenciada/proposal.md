@@ -23,9 +23,9 @@ decreto** es exactamente el anti-patrón que Projects existe para matar
 (`AGENTS.md:169-175`: «en el momento en que existen dos copias, la divergencia es
 cuestión de tiempo y la corrección de un incidente deja de propagarse»).
 
-La evidencia está en el único consumidor con historia. Sobre
-`un-proyecto-anterior/.github/workflows/deploy.yml` (685 líneas al abrir este
-change), verificado hoy:
+La evidencia está en el único consumidor con historia. Sobre su
+`.github/workflows/deploy.yml` (685 líneas al abrir este change), verificado
+hoy:
 
 - El patrón de one-off en Fargate —`run-task` + `wait tasks-stopped` + check del
   exit code— aparece **cuatro veces**: `:121` (migraciones de dev), `:206`

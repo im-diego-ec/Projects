@@ -36,7 +36,8 @@ docs.
 
 Exigir un job que solo reporta en un carril —`build-test`, por ejemplo, que en
 un PR de solo documentación queda `skipped`— deja ese carril bloqueado para
-siempre esperando una señal que nunca llega. Ya pasó una semana entera en otro repo (2026-07-29 → 2026-08-05). Un check `skipped` **no reporta**.
+siempre esperando una señal que nunca llega. Ya pasó: un carril quedó bloqueado una
+semana entera (2026-07-29 → 2026-08-05). Un check `skipped` **no reporta**.
 
 ## Aplicarla desde cero
 

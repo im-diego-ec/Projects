@@ -4,7 +4,7 @@
 //
 // POR QUE EXISTE. Adoptar Projects eran ~30 actos manuales: copiar 75 archivos con
 // robocopy o cp (y acordarse del `/.` final, o los dotfiles no viajan), sustituir
-// 157 ocurrencias de 21 marcadores en 37 archivos, inicializar OpenSpec y
+// 167 ocurrencias de 21 marcadores en 37 archivos, inicializar OpenSpec y
 // renderizar la constitucion. Nada de eso es una decision: es transcripcion. Y la
 // transcripcion a mano falla de la peor manera —un marcador mal sustituido es
 // sintacticamente valido, asi que el check de marcadores lo deja pasar: "se
@@ -54,11 +54,29 @@
 // que lleva valor y llega SIN el (`--version-openspec` al final del argv daba
 // undefined, y undefined se colaba entero por las dos revisiones del pin).
 //
+// Y son ERROR desde este lote, cada uno con su medicion al lado:
+//  · Un valor con un caracter de control o con la forma equivocada. Miraba 2 de
+//    los 21; con EQUIPO_BUILDERS = "builders\n      - run: echo INYECTADO" la
+//    corrida salia 0 y la linea aterrizaba en `.github/CODEOWNERS:19`, debajo de
+//    la regla `*  @<org>/builders`. Ver FORMATOS.
+//  · `openspec init` o el render de la constitucion que salen 0 sin escribir
+//    nada. Los dos se daban por buenos con "no lanzo excepcion", y este repo
+//    tiene MEDIDO que ese CLI miente en Windows. Ahora los dos releen el arbol,
+//    igual que se hace con los marcadores.
+//
+// Y NO DEJA EL DESTINO A MEDIAS. Un fallo a mitad de escritura —EPERM por
+// antivirus, un archivo abierto, OneDrive sobre Documents— revierte lo que esta
+// corrida creo y dice que quedo. Antes salia como un volcado de `node:fs` con N
+// archivos escritos, y el reintento chocaba con el guard del destino ocupado:
+// el unico camino ofrecido era `--forzar`, la bandera que apaga la proteccion
+// contra pisar trabajo.
+//
 // USO:
 //   node herramientas/projects-init.mjs --valores <ruta.json> --destino <ruta>
 //                                    [--sin-herramientas] [--forzar]
 //                                    [--version-openspec <x.y.z>]
 //   node herramientas/projects-init.mjs --ejemplo > valores.json
+//   node herramientas/projects-init.mjs --help
 //
 // `--version-openspec` es el escape hatch para cuando el pin no se puede leer
 // del default de `version_openspec` en marco-ci.yml. Espera una version EXACTA
@@ -67,7 +85,24 @@
 
 import fs from "node:fs";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { execFileSync } from "node:child_process";
+
+/** ESTE archivo y su directorio, resueltos con `fileURLToPath(import.meta.url)`
+ *  y NO con `import.meta.dirname`.
+ *
+ *  No es estilo: `import.meta.dirname` e `import.meta.filename` llegaron en Node
+ *  20.11 (backport de 21.2), o sea DESPUES del piso que NODE_MINIMO declara
+ *  soportado. En 18.17 valen `undefined`, y lo que hacia con ellos este archivo
+ *  era `path.resolve(undefined, "..")`, que tira `TypeError [ERR_INVALID_ARG_TYPE]`
+ *  antes de leer una sola linea de la plantilla. O sea: el piso documentado y el
+ *  piso real no eran el mismo numero, y la unica forma de haberlo visto era
+ *  correr el banco en un Node de esa franja — que es exactamente la matriz de
+ *  VERSIONES que este banco todavia no tiene (la de SO ya esta en ci.yml).
+ *  `fileURLToPath` existe desde Node 10, asi que con esto el piso vuelve a ser
+ *  el que dice el numero. */
+const ESTE_ARCHIVO = fileURLToPath(import.meta.url);
+const ESTE_DIRECTORIO = path.dirname(ESTE_ARCHIVO);
 
 // ─────────────────────────── El piso de Node ───────────────────────────
 
@@ -199,6 +234,86 @@ export const CON_LIMPIEZA_MANUAL = {
   GENERAR_CLIENTE_DATOS: "si el proyecto no genera cliente de datos: borrar el paso \"Generar el cliente de la capa de datos\" de .github/workflows/ci.yml",
 };
 
+/** LA FORMA QUE CADA VALOR PUEDE TENER, uno por uno.
+ *
+ *  POR QUE ESTO EXISTE, y esta medido. Hasta este cambio la validacion miraba 2
+ *  de los 21: los doce digitos de las dos cuentas de AWS, mas el em dash de
+ *  PREFIJO_RECURSOS y PROYECTO. Los otros 19 pasaban por "no esta vacio, es
+ *  texto y no trae llaves" y despues se insertaban TAL CUAL. Corrido en vivo con
+ *  EQUIPO_BUILDERS = "builders\n      - run: echo INYECTADO": exit 0, y la linea
+ *  aterrizo en `.github/CODEOWNERS` justo debajo de la regla `*  @<org>/builders`.
+ *
+ *  El vector realista no es un atacante: es un archivo de valores armado
+ *  copiando de un chat, de la salida de un agente o de una celda de planilla que
+ *  arrastro un salto de linea. Y los destinos son los tres lugares donde un
+ *  caracter de mas no se ve: CODEOWNERS —que GitHub NO rechaza cuando esta
+ *  malformado, simplemente ignora la linea y no asigna a nadie—, el `run:` de
+ *  ci.yml, y la allowlist de .claude/settings.json, donde una entrada mal
+ *  cerrada amplia permisos sin ruido.
+ *
+ *  LA REGLA DE FONDO, que aplica a los 21 y no depende de esta tabla: ningun
+ *  valor puede traer caracteres de control (`\n`, `\r`, `\t`, y el resto del
+ *  rango C0 mas DEL). Eso solo cierra la inyeccion. Lo que agrega la tabla es el
+ *  diagnostico: decir CUAL valor y QUE forma se esperaba, en vez de dejar que el
+ *  repo nuevo nazca con un CODEOWNERS que no asigna a nadie.
+ *
+ *  `patron: null` NO es un olvido: GENERAR_CLIENTE_DATOS es una linea de comando
+ *  (`prisma generate`), o sea texto libre con espacios por definicion. Lo unico
+ *  que se le puede exigir es que sea UNA linea y que no venga con espacios al
+ *  borde, y eso se exige aparte. */
+export const FORMATOS = {
+  // Nombre de repo de GitHub, en la forma que documenta plantilla/README.md.
+  PROYECTO: { patron: /^[a-z0-9][a-z0-9._-]*$/, que: "un nombre de repo en kebab-case (minusculas, digitos, `.`, `_`, `-`)" },
+  // Handle de organizacion o de persona: la regla de GitHub (alfanumerico, guiones
+  // simples, ni al principio ni al final, hasta 39).
+  ORG: { patron: /^[A-Za-z0-9](?:-?[A-Za-z0-9]){0,38}$/, que: "un handle de organizacion de GitHub" },
+  BUILDER_1: { patron: /^[A-Za-z0-9](?:-?[A-Za-z0-9]){0,38}$/, que: "un handle de GitHub (sin la arroba: el andamio la pone donde va)" },
+  BUILDER_2: { patron: /^[A-Za-z0-9](?:-?[A-Za-z0-9]){0,38}$/, que: "un handle de GitHub (sin la arroba: el andamio la pone donde va)" },
+  PO: { patron: /^[A-Za-z0-9](?:-?[A-Za-z0-9]){0,38}$/, que: "un handle de GitHub (sin la arroba: el andamio la pone donde va)" },
+  // Slug de equipo: lo que GitHub genera para la URL del equipo, siempre en
+  // minusculas. Viaja a CODEOWNERS como `@{{ORG}}/{{EQUIPO_BUILDERS}}`.
+  EQUIPO_BUILDERS: { patron: /^[a-z0-9](?:[-_]?[a-z0-9]){0,38}$/, que: "el slug del equipo en GitHub, en minusculas (el de la URL del equipo, no su nombre para mostrar)" },
+  EQUIPO_PO: { patron: /^[a-z0-9](?:[-_]?[a-z0-9]){0,38}$/, que: "el slug del equipo en GitHub, en minusculas (el de la URL del equipo, no su nombre para mostrar)" },
+  // Los tres paquetes son NOMBRES DE CARPETA. problemasDePaquetes ademas los ata
+  // a las carpetas que el andamio reparte de verdad; esto es la forma.
+  PAQUETE_API: { patron: /^[a-z0-9][a-z0-9._-]*$/, que: "un nombre de carpeta (minusculas, sin barras ni espacios)" },
+  PAQUETE_WEB: { patron: /^[a-z0-9][a-z0-9._-]*$/, que: "un nombre de carpeta (minusculas, sin barras ni espacios)" },
+  PAQUETE_E2E: { patron: /^[a-z0-9][a-z0-9._-]*$/, que: "un nombre de carpeta (minusculas, sin barras ni espacios)" },
+  // Un comando. Ver el parrafo de arriba: aca no hay forma que exigir.
+  GENERAR_CLIENTE_DATOS: { patron: null, que: "un comando de UNA sola linea, tal como se invoca dentro del paquete de backend" },
+  CUENTA_DEV: { patron: /^\d{12}$/, que: "un id de cuenta AWS: 12 digitos" },
+  CUENTA_PROD: { patron: /^\d{12}$/, que: "un id de cuenta AWS: 12 digitos" },
+  REGION: { patron: /^[a-z]{2}(?:-[a-z]+)+-\d$/, que: "una region de AWS (us-east-1, eu-west-3, us-gov-west-1)" },
+  // El perfil de la CLI viaja a la allowlist de .claude/settings.json dentro de
+  // `Bash(AWS_PROFILE={{PERFIL_DEV}} terraform plan *)`. Un espacio ahi no rompe
+  // el JSON: rompe el patron, y una entrada de allowlist que no matchea nada es
+  // exactamente el fallo que nadie ve.
+  PERFIL_DEV: { patron: /^[A-Za-z0-9._-]+$/, que: "un nombre de perfil de la CLI de AWS, sin espacios (viaja dentro de un patron de la allowlist de .claude/settings.json)" },
+  PERFIL_PROD: { patron: /^[A-Za-z0-9._-]+$/, que: "un nombre de perfil de la CLI de AWS, sin espacios (viaja dentro de un patron de la allowlist de .claude/settings.json)" },
+  // Prefijo de recursos AWS y raiz de las rutas de SSM: /<prefijo>/<env>/<NOMBRE>.
+  PREFIJO_RECURSOS: { patron: /^[a-z0-9][a-z0-9-]*$/, que: "un prefijo de recursos AWS: minusculas, digitos y guiones (es tambien la raiz de las rutas de SSM)" },
+  DOMINIO_DEV: { patron: /^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]*[a-z0-9])?)+$/, que: "un host sin esquema ni barra final (agenda-dev.ejemplo.com, no https://agenda-dev.ejemplo.com/)" },
+  DOMINIO_PROD: { patron: /^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]*[a-z0-9])?)+$/, que: "un host sin esquema ni barra final (agenda.ejemplo.com, no https://agenda.ejemplo.com/)" },
+  CANAL_ALERTAS: { patron: /^#[a-z0-9][a-z0-9._-]*$/, que: "un canal con su almohadilla adelante, en minusculas (#alertas-prod)" },
+  // Viaja al MEDIO de los nombres de tool del MCP: `mcp__{{ID_MCP_SLACK}}__slack_read_channel`.
+  // Un guion bajo ahi corre el separador `__` y la entrada deja de matchear.
+  ID_MCP_SLACK: { patron: /^[A-Za-z0-9-]+$/, que: "el id del servidor MCP: alfanumerico y guiones, SIN guiones bajos (va entre los dos `__` del nombre de la tool)" },
+};
+
+/** Caracteres de control: el rango C0 completo mas DEL. Es la regla que aplica a
+ *  los 21 sin excepcion, incluido el valor de texto libre. */
+const CONTROL = /[\u0000-\u001f\u007f]/;
+
+/** Como se nombra un caracter de control en un mensaje de error. Imprimirlo
+ *  crudo seria escribir el salto de linea EN el diagnostico, que es justamente lo
+ *  que hace que el defecto sea invisible. */
+function nombrarControl(v) {
+  const i = v.search(CONTROL);
+  const c = v.charCodeAt(i);
+  const nombre = { 10: "\\n (salto de linea)", 13: "\\r (retorno de carro)", 9: "\\t (tabulacion)" }[c];
+  return `${nombre ?? `\\x${c.toString(16).padStart(2, "0")}`} en la posicion ${i}`;
+}
+
 export function validarValores(crudos) {
   const problemas = [];
   if (crudos === null || typeof crudos !== "object" || Array.isArray(crudos)) {
@@ -216,15 +331,34 @@ export function validarValores(crudos) {
     }
     // Un valor que todavia trae llaves es el ejemplo sin llenar. Pasa: el
     // archivo del andamio nace con cada clave apuntando a su propio marcador.
-    if (/\{\{|\}\}/.test(v)) problemas.push(`${k} sigue siendo un marcador sin llenar: ${v}`);
+    if (/\{\{|\}\}/.test(v)) {
+      problemas.push(`${k} sigue siendo un marcador sin llenar: ${v}`);
+      continue;
+    }
+    // Primero la regla de fondo. Se corta aca: un valor con un salto de linea
+    // adentro tambien va a fallar el patron, y dos problemas para el mismo valor
+    // hacen que el importante —el que explica que el archivo trae basura
+    // invisible— se lea como ruido.
+    if (CONTROL.test(v)) {
+      problemas.push(
+        `${k} trae un caracter de control: ${nombrarControl(v)}. Los valores viajan LITERALES a CODEOWNERS, ` +
+          `a ci.yml y a la allowlist de .claude/settings.json, y en los tres un salto de linea no es un typo: ` +
+          `es una linea nueva en un archivo que despues nadie relee`,
+      );
+      continue;
+    }
+    if (v !== v.trim()) {
+      problemas.push(`${k} = ${JSON.stringify(v)} empieza o termina con espacios. Sacaselos: en CODEOWNERS un handle con espacio al final no asigna a nadie y GitHub no lo reporta`);
+      continue;
+    }
+    const formato = FORMATOS[k];
+    if (formato?.patron && !formato.patron.test(v)) {
+      problemas.push(`${k} = ${JSON.stringify(v)} no tiene la forma que corresponde: se espera ${formato.que}`);
+    }
   }
-  if (typeof crudos.CUENTA_DEV === "string" && !/^\d{12}$/.test(crudos.CUENTA_DEV)) {
-    problemas.push("CUENTA_DEV no son 12 digitos (es un id de cuenta AWS)");
-  }
-  if (typeof crudos.CUENTA_PROD === "string" && !/^\d{12}$/.test(crudos.CUENTA_PROD)) {
-    problemas.push("CUENTA_PROD no son 12 digitos (es un id de cuenta AWS)");
-  }
-  // La regla del area: sin em dashes en nada que viaje a AWS.
+  // La regla del area: sin em dashes en nada que viaje a AWS. Sobrevive a los
+  // patrones de arriba —que ya rechazarian un em dash— porque el mensaje es lo
+  // que ensena la regla, y "no tiene la forma que corresponde" no la ensena.
   for (const k of ["PREFIJO_RECURSOS", "PROYECTO"]) {
     if (typeof crudos[k] === "string" && /—|–/.test(crudos[k])) {
       problemas.push(`${k} tiene un em dash o en dash: los nombres que viajan a AWS usan guiones normales`);
@@ -232,6 +366,15 @@ export function validarValores(crudos) {
   }
   if (problemas.length) return { problemas, valores: null };
   return { problemas: [], valores: derivar(crudos) };
+}
+
+/** Los 21 tienen una forma declarada. Sin esto, agregar una clave a REQUERIDOS y
+ *  olvidarse de su fila en FORMATOS la devuelve al regimen viejo —no-vacio y
+ *  nada mas— en silencio, que es exactamente el defecto que esta tabla cierra.
+ *  main() lo corre antes de leer el archivo de valores, asi que el desfase sale
+ *  en la primera corrida y no en el repo nuevo. */
+export function marcadoresSinFormato() {
+  return REQUERIDOS.filter((k) => !Object.hasOwn(FORMATOS, k));
 }
 
 /** Los archivos del andamio, relativos a plantilla/, sin el que no se copia. */
@@ -353,6 +496,18 @@ export function sustituir(texto, valores) {
   return { salida, cuenta, faltantes: [...faltantes] };
 }
 
+/** `mkdir -p` que ANOTA que directorios creo. `mkdirSync(recursive: true)` no lo
+ *  dice —devuelve solo el primero, y solo a veces—, y sin esa lista el rollback
+ *  de una copia a medias no puede distinguir un directorio que trajo esta
+ *  corrida de uno que ya estaba en el repo destino. */
+function crearDirectorios(dir, creados) {
+  if (fs.existsSync(dir)) return;
+  const padre = path.dirname(dir);
+  if (padre !== dir) crearDirectorios(padre, creados);
+  fs.mkdirSync(dir);
+  creados.push(dir);
+}
+
 export function instanciar({ raizAndamio, destino, valores }) {
   const rels = archivosDelAndamio(raizAndamio);
   if (rels.length === 0) throw new Error(`el andamio esta vacio: ${raizAndamio}`);
@@ -360,18 +515,71 @@ export function instanciar({ raizAndamio, destino, valores }) {
   let total = 0;
   const faltantes = new Set();
   const escritos = [];
+  // Lo que hace falta para poder DESHACER: los rels que esta corrida creo de
+  // cero, los que piso (que ya existian, y por eso no se borran), y los
+  // directorios que trajo. Se acumula sobre la marcha porque el caso que
+  // importa es el que interrumpe el bucle a la mitad.
+  const nuevos = [];
+  const sobreescritos = [];
+  const directoriosCreados = [];
+  const estado = () => ({ escritos, nuevos, sobreescritos, directoriosCreados });
   for (const rel of rels) {
     const origen = path.join(raizAndamio, rel);
-    const texto = fs.readFileSync(origen, "utf8");
-    const r = sustituir(texto, valores);
-    total += r.cuenta;
-    for (const f of r.faltantes) faltantes.add(f);
     const salida = path.join(destino, rel);
-    fs.mkdirSync(path.dirname(salida), { recursive: true });
-    fs.writeFileSync(salida, r.salida, "utf8");
-    escritos.push(rel);
+    try {
+      const texto = fs.readFileSync(origen, "utf8");
+      const r = sustituir(texto, valores);
+      total += r.cuenta;
+      for (const f of r.faltantes) faltantes.add(f);
+      crearDirectorios(path.dirname(salida), directoriosCreados);
+      const yaEstaba = fs.existsSync(salida);
+      fs.writeFileSync(salida, r.salida, "utf8");
+      (yaEstaba ? sobreescritos : nuevos).push(rel);
+      escritos.push(rel);
+    } catch (e) {
+      // El error se enriquece en vez de envolverse: quien lo atrape necesita el
+      // `code` de fs (EACCES, EPERM, ENOSPC) para explicar la causa, y ademas
+      // saber QUE quedo escrito. Envolverlo en un Error nuevo perdia lo primero.
+      e.relQueFallo = rel;
+      Object.assign(e, estado());
+      throw e;
+    }
   }
-  return { escritos, total, faltantes: [...faltantes].sort() };
+  return { total, faltantes: [...faltantes].sort(), ...estado() };
+}
+
+/** Deshace una copia que quedo a medias. Borra SOLO lo que esta corrida creo:
+ *  los archivos que no existian antes y los directorios que trajo, de mas hondo
+ *  a mas somero. Lo que ya estaba y se piso —solo posible con `--forzar`— NO se
+ *  restaura, porque esta herramienta nunca tuvo el contenido viejo en memoria;
+ *  se devuelve nombrado para que el mensaje lo diga en vez de insinuar que el
+ *  destino quedo como estaba.
+ *
+ *  Devuelve `{ borrados, sobreescritos, noSePudo }`. `noSePudo` no vuelve a
+ *  tirar: se esta atendiendo una falla, y hacer fallar el rollback dejaria a la
+ *  persona con dos problemas y ningun mensaje. */
+export function revertir(destino, { nuevos = [], sobreescritos = [], directoriosCreados = [] }) {
+  const borrados = [];
+  const noSePudo = [];
+  for (const rel of nuevos) {
+    const abs = path.join(destino, ...rel.split("/"));
+    try {
+      fs.rmSync(abs, { force: true });
+      borrados.push(rel);
+    } catch (e) {
+      noSePudo.push(`${rel}: ${e.message}`);
+    }
+  }
+  // De mas larga a mas corta: un directorio se borra despues que sus hijos.
+  for (const dir of [...directoriosCreados].sort((a, b) => b.length - a.length)) {
+    try {
+      fs.rmdirSync(dir);
+    } catch {
+      // Queda algo adentro que no es nuestro (o ya no esta). Se deja: borrar un
+      // directorio con contenido ajeno es peor que dejar uno vacio de mas.
+    }
+  }
+  return { borrados, sobreescritos, noSePudo };
 }
 
 /** Ningun `{{MARCADOR}}` puede sobrevivir. Es el mismo check que el CI del marco
@@ -404,6 +612,46 @@ export function marcadoresQueSobreviven(destino, rels) {
   return encontrados;
 }
 
+/** El nombre del archivo que le queda al proyecto como registro de sus valores.
+ *  Lo lee actions/constitucion para renderizar la porcion del marco. */
+export const REGISTRO_DE_VALORES = ".projects-valores.json";
+
+/** Que valores de REQUERIDOS NO quedan guardados en el registro del proyecto.
+ *
+ *  El andamio trae ese archivo con una clave por valor apuntando a su propio
+ *  marcador, asi que la instanciacion lo llena sola — pero SOLO las claves que
+ *  estan. Una clave que el andamio no declara no deja rastro en el repo nuevo:
+ *  el valor viajo a los archivos que lo usan y despues no hay donde preguntarle
+ *  "que equipo es el de builders en este repo".
+ *
+ *  Devuelve LINEAS de aviso, no tira ni decide: quien llama decide si son
+ *  `::warning::` o rojo. Hoy son aviso, y el porque esta donde se invoca. */
+export function avisosDelRegistroDeValores(destino) {
+  const abs = path.join(destino, REGISTRO_DE_VALORES);
+  if (!fs.existsSync(abs)) {
+    return [
+      `::warning::el destino no tiene ${REGISTRO_DE_VALORES}. Es el archivo del que actions/constitucion lee ` +
+        `los valores de este repo para renderizar la porcion del marco: sin el, ese render no tiene entrada.`,
+    ];
+  }
+  let guardados;
+  try {
+    guardados = JSON.parse(fs.readFileSync(abs, "utf8"));
+  } catch (e) {
+    return [`::warning::${REGISTRO_DE_VALORES} quedo escrito y no es JSON valido: ${e.message}`];
+  }
+  const faltan = REQUERIDOS.filter((k) => !Object.hasOwn(guardados, k));
+  if (faltan.length === 0) return [];
+  return [
+    `::warning::${REGISTRO_DE_VALORES} guarda ${REQUERIDOS.length - faltan.length} de los ${REQUERIDOS.length} ` +
+      `valores: no queda registro de ${faltan.join(", ")}. Los valores SI viajaron a los archivos que los usan, ` +
+      `asi que el repo nuevo funciona; lo que falta es la fuente unica que responda de donde salio cada uno ` +
+      `cuando haya que auditar el review cruzado o renombrar un equipo. Se arregla en el andamio, agregando ` +
+      `esas claves a plantilla/${REGISTRO_DE_VALORES} con la misma convencion que el resto del archivo ` +
+      `("${faltan[0]}": "{{${faltan[0]}}}").`,
+  ];
+}
+
 // ─────────────────────────── El programa ───────────────────────────
 
 const EJEMPLO = {
@@ -421,8 +669,13 @@ const EJEMPLO = {
   CUENTA_DEV: "111111111111",
   CUENTA_PROD: "222222222222",
   REGION: "us-east-1",
-  PERFIL_DEV: "la organización-dev",
-  PERFIL_PROD: "la organización-prod",
+  // Los perfiles del ejemplo llevaban un nombre con ESPACIO. Es exactamente el
+  // valor que FORMATOS.PERFIL_DEV rechaza, y por un motivo concreto: viaja dentro
+  // del patron `Bash(AWS_PROFILE={{PERFIL_DEV}} terraform plan *)` de la
+  // allowlist de .claude/settings.json, donde un espacio de mas no rompe el JSON,
+  // rompe el patron — y una entrada de allowlist que no matchea nada no avisa.
+  PERFIL_DEV: "ejemplo-dev",
+  PERFIL_PROD: "ejemplo-prod",
   PREFIJO_RECURSOS: "agenda",
   DOMINIO_DEV: "agenda-dev.ejemplo.com",
   DOMINIO_PROD: "agenda.ejemplo.com",
@@ -454,9 +707,34 @@ function argumentos(argv) {
     else if (argv[i] === "--forzar") o.forzar = true;
     else if (argv[i] === "--ejemplo") o.ejemplo = true;
     else if (argv[i] === "--version-openspec") o.versionOpenspec = valorDeBandera(argv, ++i, "--version-openspec");
+    // `--help` y `-h` son lo PRIMERO que tipea cualquiera frente a una
+    // herramienta que no conoce, y hasta este cambio caian en el `throw` de
+    // abajo: la respuesta a la pregunta mas basica era un error. Ahora imprimen
+    // el mismo texto que el uso y salen 0, porque pedir ayuda no es un fallo.
+    else if (argv[i] === "--help" || argv[i] === "-h") o.ayuda = true;
     else throw new Error(`argumento desconocido: ${argv[i]}`);
   }
   return o;
+}
+
+/** El uso, en UN solo lugar: lo imprime `--help` (por stdout, que es donde se lo
+ *  espera cuando se lo pide) y lo imprime el error de invocacion incompleta (por
+ *  stderr, que es donde va un diagnostico). Dos copias del texto divergen, y la
+ *  que se pudre es siempre la que nadie mira. */
+function lineasDeUso() {
+  return [
+    "uso: node herramientas/projects-init.mjs --valores <ruta.json> --destino <ruta>",
+    "     node herramientas/projects-init.mjs --ejemplo > valores.json",
+    "     node herramientas/projects-init.mjs --help",
+    "",
+    "  --valores <ruta.json>      los valores del proyecto. `--ejemplo` imprime el esqueleto",
+    "  --destino <ruta>           la raiz del repo nuevo, que tiene que existir",
+    "  --sin-herramientas         no corre `openspec init` ni el render de la constitucion",
+    "  --forzar                   sobreescribe un destino que ya tiene archivos del andamio",
+    "  --version-openspec <x.y.z> pin del CLI de OpenSpec cuando no se puede leer del default de",
+    "                             `version_openspec` en marco-ci.yml. Version EXACTA (0.9.4), no",
+    "                             un rango: el valor se concatena en la linea de comandos de npx",
+  ];
 }
 
 /** El pin del CLI de OpenSpec sale del `default` del input del reusable: UNA sola
@@ -508,17 +786,38 @@ function main(argv) {
     o = argumentos(argv);
   } catch (e) {
     console.error(`::error::${e.message}`);
+    // Y el uso a continuacion: el marco tiene escrito que cada error trae su
+    // arreglo, y el arreglo de "argumento desconocido" es la lista de los que si
+    // se aceptan. Antes esta rama ni siquiera llegaba a imprimirse para `--help`.
+    for (const linea of lineasDeUso()) console.error(linea);
     return 2;
+  }
+  if (o.ayuda) {
+    for (const linea of lineasDeUso()) process.stdout.write(`${linea}\n`);
+    return 0;
   }
   if (o.ejemplo) {
     process.stdout.write(JSON.stringify(EJEMPLO, null, 2) + "\n");
     return 0;
   }
   if (!o.valores || !o.destino) {
-    console.error("uso: node herramientas/projects-init.mjs --valores <ruta.json> --destino <ruta>");
-    console.error("     node herramientas/projects-init.mjs --ejemplo > valores.json");
-    console.error("     opcionales: --sin-herramientas | --forzar | --version-openspec <x.y.z>");
+    for (const linea of lineasDeUso()) console.error(linea);
     return 2;
+  }
+
+  // Los 21 valores tienen que tener una forma declarada, y se comprueba ANTES de
+  // leer el archivo de la persona: un desfase entre REQUERIDOS y FORMATOS es un
+  // defecto de esta herramienta, no de quien la corre, y el diagnostico tiene
+  // que decir eso.
+  const sinFormato = marcadoresSinFormato();
+  if (sinFormato.length) {
+    console.error(
+      `::error::${sinFormato.length} valor(es) de REQUERIDOS no tienen forma declarada en FORMATOS: ` +
+        `${sinFormato.join(", ")}. Sin su fila quedan validados solo por "no esta vacio", que es el regimen ` +
+        `con el que un salto de linea aterrizaba entero en CODEOWNERS. Agregales la fila (y la de ` +
+        `plantilla/README.md seccion 2) en el mismo cambio.`,
+    );
+    return 1;
   }
 
   // El pin de la bandera se revisa DOS veces con la misma regla: aca, antes de
@@ -541,7 +840,7 @@ function main(argv) {
     return 1;
   }
 
-  const raizMarco = path.resolve(import.meta.dirname, "..");
+  const raizMarco = path.resolve(ESTE_DIRECTORIO, "..");
   const raizAndamio = path.join(raizMarco, "plantilla");
   if (!fs.existsSync(raizAndamio)) {
     console.error(`::error::no encontre el andamio en ${raizAndamio}. Corre esto desde un clon del repo del marco`);
@@ -589,7 +888,60 @@ function main(argv) {
   }
 
   // ── Instanciar ──
-  const r = instanciar({ raizAndamio, destino: o.destino, valores });
+  //
+  // ESTA es la unica rama donde el destino puede quedar a medias, y hasta este
+  // cambio era tambien la unica que no lo decia: `instanciar` se llamaba sin
+  // try/catch y `main` tambien, asi que un EACCES en el archivo 40 de 75 salia
+  // como un volcado de `node:fs` con la traza del runtime, stdout vacio y N
+  // archivos escritos en un destino que el encabezado de este archivo promete
+  // intacto. En Windows no es la rama rara: EPERM por antivirus o por archivo
+  // abierto, y OneDrive sincronizando Documents. Y el reintento chocaba con el
+  // guard del destino ocupado, cuyo unico camino ofrecido es `--forzar`: la
+  // bandera que apaga la proteccion contra pisar trabajo.
+  //
+  // Ahora se revierte lo que ESTA corrida creo y se dice exactamente que quedo.
+  let r;
+  try {
+    r = instanciar({ raizAndamio, destino: o.destino, valores });
+  } catch (e) {
+    const vuelta = revertir(o.destino, e);
+    console.error(
+      e.relQueFallo
+        ? `::error::la copia se corto en ${e.relQueFallo}: ${e.code ? `${e.code} — ` : ""}${e.message}`
+        : `::error::la copia no llego a empezar: ${e.code ? `${e.code} — ` : ""}${e.message}`,
+    );
+    // El estado del destino se DICE, y se dice distinto segun lo que quedo: si
+    // sobrevive algo de esta corrida, prometer "reintenta sin --forzar" seria
+    // mandar a chocar de nuevo con el guard del destino ocupado.
+    const destinoLimpio = vuelta.sobreescritos.length === 0 && vuelta.noSePudo.length === 0;
+    console.error(
+      destinoLimpio
+        ? `Se revirtieron los ${vuelta.borrados.length} archivo(s) que esta corrida habia creado, asi que el ` +
+            `destino no queda a medias y NO hace falta --forzar para reintentar.`
+        : `Se revirtieron los ${vuelta.borrados.length} archivo(s) que esta corrida habia creado, pero el ` +
+            `destino NO queda como estaba: mira lo que sigue antes de reintentar.`,
+    );
+    if (vuelta.sobreescritos.length) {
+      console.error(
+        `Lo que NO se pudo deshacer, porque ya existia antes y esta corrida lo piso con --forzar ` +
+          `(su contenido viejo no lo tuvo nunca esta herramienta): ${vuelta.sobreescritos.length} archivo(s).`,
+      );
+      for (const rel of vuelta.sobreescritos.slice(0, 8)) console.error(`  - ${rel}`);
+      if (vuelta.sobreescritos.length > 8) console.error(`  ... y ${vuelta.sobreescritos.length - 8} mas`);
+      console.error("Esos los recuperas con `git checkout --` si el destino es un repo con esos archivos commiteados.");
+    }
+    if (vuelta.noSePudo.length) {
+      console.error(`Y esto no se pudo borrar; hay que sacarlo a mano antes de reintentar:`);
+      for (const linea of vuelta.noSePudo.slice(0, 8)) console.error(`  - ${linea}`);
+    }
+    if (e.code === "EPERM" || e.code === "EACCES" || e.code === "EBUSY") {
+      console.error(
+        "Causa habitual en Windows: el antivirus o un editor con el archivo abierto, o el destino dentro de " +
+          "una carpeta que OneDrive esta sincronizando. Cerra el editor, pausa la sincronizacion y reintenta.",
+      );
+    }
+    return 1;
+  }
   console.log(`escritos ${r.escritos.length} archivos, ${r.total} ocurrencias sustituidas`);
 
   // La copia esta COMPLETA, medida con la otra API. Es la defensa de fondo del
@@ -631,6 +983,19 @@ function main(argv) {
   }
   console.log("cero marcadores sobrevivientes");
 
+  // ── El registro de valores que le queda al proyecto ──
+  //
+  // Es AVISO y no rojo a proposito, y es la regla del marco, no una comodidad:
+  // el desfase esta HOY en el andamio y volverlo bloqueante seria estrenarle un
+  // rojo a la unica corrida que existe, la del repo que esta naciendo. Lo medido
+  // al escribir esto: `.projects-valores.json` guarda 15 de los 21, y los seis
+  // que faltan incluyen EQUIPO_BUILDERS y EQUIPO_PO — o sea justo los dos que
+  // CODEOWNERS sustituye. El proyecto queda con un CODEOWNERS que nombra un
+  // equipo y sin ninguna fuente que diga de donde salio ese nombre; y
+  // actions/constitucion, que renderiza desde ese mismo archivo, tampoco puede
+  // citarlos. Cuando el andamio los agregue, este aviso se apaga solo.
+  for (const linea of avisosDelRegistroDeValores(o.destino)) console.error(linea);
+
   // ── Las dos herramientas que el andamio no puede traer ──
   if (o.herramientas) {
     const marcoCi = fs.readFileSync(path.join(raizMarco, ".github/workflows/marco-ci.yml"), "utf8");
@@ -659,6 +1024,36 @@ function main(argv) {
       console.error(`::error::openspec init fallo: ${e.message}. El marco EXIGE openspec/ ([ -d openspec ] || exit 1), asi que el primer PR saldria rojo. Correlo a mano y volve`);
       return 1;
     }
+    // Y ahora se RELEE el arbol, que es lo que faltaba: hasta este cambio el
+    // paso se daba por bueno con "no lanzo excepcion", que es exactamente el
+    // fail-open que este mismo repo tiene MEDIDO para ese CLI en Windows —
+    // plantilla/.claude/skills/projects-archive-change/SKILL.md: "en Windows el
+    // CLI MIENTE", imprime exito y hace rollback—. El sintoma de no mirar es el
+    // peor posible: la herramienta imprime LISTO y las seis tareas humanas, el
+    // builder hace el push fundacional, y el primer CI muere en el paso que
+    // exige openspec/, con la herramienta ya cerrada y el diagnostico apuntando
+    // al pipeline en vez de al arranque. Se comprueba lo mismo que comprueba el
+    // marco (`[ -d openspec ]`), mas que no este vacio.
+    const dirOpenspec = path.join(o.destino, "openspec");
+    if (!fs.existsSync(dirOpenspec) || fs.readdirSync(dirOpenspec).length === 0) {
+      console.error(
+        `::error::openspec init salio 0 pero no dejo un openspec/ con contenido en ${o.destino}. Es el sintoma ` +
+          `medido de ese CLI en Windows: imprime exito y revierte lo que escribio (esta documentado en ` +
+          `plantilla/.claude/skills/projects-archive-change/SKILL.md). El marco EXIGE openspec/ ` +
+          `([ -d openspec ] || exit 1), asi que el primer PR saldria rojo. Corre a mano ` +
+          `\`npx --yes @fission-ai/openspec@${pin} init --tools claude\` dentro del destino y despues volve a ` +
+          `correr esto con --forzar --sin-herramientas.`,
+      );
+      return 1;
+    }
+
+    // El render de la constitucion no tiene un "[ -d ... ]" que copiar: las
+    // rutas que escribe dependen de las `superficies` que declare el proyecto, y
+    // repetirlas aca seria una segunda declaracion de algo que vive en
+    // actions/constitucion/constitucion.mjs. Lo que SI se puede afirmar sin
+    // duplicar nada es lo unico que importa: que haya escrito ALGO. Por eso se
+    // fotografia el destino antes y despues.
+    const antesDelRender = new Set(recorrer(o.destino, new Set([".git", "node_modules"])));
     console.log("render de la porcion del marco de la constitucion");
     try {
       execFileSync(process.execPath, [path.join(raizMarco, "actions/constitucion/constitucion.mjs")], {
@@ -668,6 +1063,21 @@ function main(argv) {
       console.error(`::error::el render de la constitucion fallo: ${e.message}`);
       return 1;
     }
+    const nuevosDelRender = recorrer(o.destino, new Set([".git", "node_modules"])).filter(
+      (rel) => !antesDelRender.has(rel),
+    );
+    if (nuevosDelRender.length === 0) {
+      console.error(
+        `::error::el render de la constitucion salio 0 y no escribio un solo archivo nuevo en ${o.destino}. ` +
+          `Sin la porcion del marco, los agentes de este repo trabajan sin las reglas del area y ningun check ` +
+          `del repo nuevo lo dice. Las rutas que le tocan salen de las \`superficies\` declaradas en ` +
+          `.projects-valores.json: revisa que ese archivo las declare y corre a mano ` +
+          `\`CONSTITUCION_MODO=escribir node <clon-del-marco>/actions/constitucion/constitucion.mjs\` dentro ` +
+          `del destino.`,
+      );
+      return 1;
+    }
+    console.log(`la constitucion dejo ${nuevosDelRender.length} archivo(s): ${nuevosDelRender.join(", ")}`);
   }
 
   // ── Lo que queda, y es humano ──
@@ -728,6 +1138,28 @@ function main(argv) {
   return 0;
 }
 
-if (path.resolve(process.argv[1] ?? "") === path.resolve(import.meta.filename)) {
+/** "Me invocaron a MI?", resuelto por realpath en los dos lados.
+ *
+ *  `import.meta.url` viene con los enlaces simbolicos ya resueltos y `argv[1]`
+ *  NO: son la misma ruta escrita distinto. En macOS eso pasa siempre que el
+ *  destino cuelga de `/tmp` —que es un enlace a `/private/tmp`—, y el resultado
+ *  era el peor de los posibles: la comparacion daba falso, `main` no corria, y
+ *  el proceso salia 0 SIN IMPRIMIR NADA. Un exito silencioso que no escribio un
+ *  archivo, en la herramienta cuyo encabezado declara que nunca omite en
+ *  silencio. Se caza asi: correr la herramienta por una ruta con un enlace
+ *  simbolico en el medio. Es el mismo patron que usa
+ *  actions/constitucion/constitucion.mjs, y por el mismo motivo.
+ *
+ *  El `try` es por el caso en que `argv[1]` no exista en disco (`node --eval`,
+ *  un REPL): ahi no nos invocaron a nosotros y no corre nada, que es lo correcto. */
+function meInvocaronAMi() {
+  try {
+    return fs.realpathSync(ESTE_ARCHIVO) === fs.realpathSync(process.argv[1] ?? "");
+  } catch {
+    return false;
+  }
+}
+
+if (meInvocaronAMi()) {
   process.exit(main(process.argv.slice(2)));
 }

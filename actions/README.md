@@ -111,8 +111,8 @@ decide qué se salta.
 **Fail-open ruidoso.** Ante cualquier duda o error, `solo_docs=false` (se corre
 todo) **y** queda un `::warning::` en el run. Omitir un build por un error de
 detección sería invisible y peligroso; correr de más cuesta minutos de runner.
-La mitad "ruidosa" no es adorno: en otro repo esta detección vivió
-semanas devolviendo 403 en silencio, y el carril rápido nunca actuó.
+La mitad "ruidosa" no es adorno: esta detección ya vivió semanas devolviendo
+403 en silencio en un repo real, y el carril rápido nunca actuó.
 
 ### Uso en pull request
 
@@ -868,10 +868,10 @@ CI de Projects— y la validación contra un consumidor real antes de mover `v1`
 
 ## Permisos mínimos
 
-Cada `action.yml` los trae escritos en su encabezado. En otro repo, cada
-job nuevo costó una o dos rondas de arreglos de permisos, siempre descubiertas
-en producción y siempre tapadas por un fail-open. El marco los trae escritos
-para no volver a pagarlo.
+Cada `action.yml` los trae escritos en su encabezado. Cada job nuevo cuesta una
+o dos rondas de arreglos de permisos, siempre descubiertas en producción y
+siempre tapadas por un fail-open. El marco los trae escritos para no volver a
+pagarlo.
 
 | Action | Modo | Permisos |
 | --- | --- | --- |

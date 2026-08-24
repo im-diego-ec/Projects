@@ -3,7 +3,8 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { execFileSync } from "node:child_process";
+import { fileURLToPath } from "node:url";
+import { execFileSync, spawnSync } from "node:child_process";
 
 import {
   REQUERIDOS,
@@ -25,8 +26,13 @@ import {
   pinValido,
   sustituir,
   instanciar,
+  revertir,
   marcadoresQueSobreviven,
   pinOpenspecDe,
+  FORMATOS,
+  marcadoresSinFormato,
+  REGISTRO_DE_VALORES,
+  avisosDelRegistroDeValores,
 } from "../../herramientas/projects-init.mjs";
 
 // ---------------------------------------------------------------------------
@@ -39,7 +45,11 @@ import {
 // si misma.
 // ---------------------------------------------------------------------------
 
-const RAIZ = path.resolve(import.meta.dirname, "..", "..");
+// `fileURLToPath(import.meta.url)` y no `import.meta.dirname`: el mismo motivo
+// que en la herramienta —esa propiedad no existe en toda la franja de Node que
+// NODE_MINIMO declara soportada—, y un banco que no puede ni arrancar en el piso
+// que verifica no verifica nada.
+const RAIZ = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 const ANDAMIO = path.join(RAIZ, "plantilla");
 
 const VALORES_OK = {
@@ -198,7 +208,10 @@ test("un valor que sigue siendo un marcador es error: el archivo del andamio nac
 
 test("una cuenta de AWS que no son 12 digitos es error", () => {
   const { problemas } = validarValores({ ...VALORES_OK, CUENTA_PROD: "22222" });
-  assert.ok(problemas.some((p) => p.includes("CUENTA_PROD no son 12 digitos")), problemas.join(" | "));
+  assert.ok(
+    problemas.some((p) => p.includes("CUENTA_PROD") && p.includes("12 digitos")),
+    problemas.join(" | "),
+  );
 });
 
 test("un em dash en un nombre que viaja a AWS es error (regla del area)", () => {
@@ -742,4 +755,563 @@ test("el ejemplo no nombra a ninguna persona: formas por rol, no handles reales"
     "00000000-0000-0000-0000-000000000000",
     "el id del MCP del ejemplo tiene que ser el UUID nulo, no el de un servidor real",
   );
+});
+
+// ══════════════════ LA FORMA DE LOS 21 VALORES ══════════════════
+//
+// Hasta este lote la validacion miraba 2 de los 21: los doce digitos de las dos
+// cuentas de AWS y el em dash de PREFIJO_RECURSOS y PROYECTO. Lo medido en vivo
+// antes de arreglarlo: con EQUIPO_BUILDERS = "builders\n      - run: echo
+// INYECTADO", la herramienta salia 0 y la linea aterrizaba en .github/CODEOWNERS
+// justo debajo de la regla `*  @<org>/<equipo>`. GitHub no rechaza un CODEOWNERS
+// malformado: ignora la linea y no asigna a nadie, que es el primero de los tres
+// modos de falla que la propia salida de la herramienta advierte en su punto 4.
+
+test("los 21 valores requeridos tienen una forma declarada", () => {
+  // Sin esto, agregar una clave a REQUERIDOS y olvidar su fila en FORMATOS la
+  // devuelve al regimen viejo —no-vacio y nada mas— sin que nada lo diga.
+  assert.deepEqual(marcadoresSinFormato(), []);
+  // Y al reves: una forma declarada para algo que ya nadie pide es una regla sin
+  // fuente, que es como empiezan las divergencias.
+  const sobrantes = Object.keys(FORMATOS).filter((k) => !REQUERIDOS.includes(k));
+  assert.deepEqual(sobrantes, []);
+});
+
+test("un salto de linea en CUALQUIERA de los 21 es error, y el mensaje dice cual", () => {
+  // Se recorren los 21 y no una muestra: el defecto era exactamente que la
+  // cobertura fuera parcial, asi que probarlo con dos claves lo repetiria.
+  const carga = "\n      - run: echo INYECTADO-EN-EL-WORKFLOW";
+  for (const k of REQUERIDOS) {
+    const { problemas, valores } = validarValores({ ...VALORES_OK, [k]: `${VALORES_OK[k]}${carga}` });
+    assert.equal(valores, null, `${k} con un salto de linea no tendria que validar`);
+    assert.ok(
+      problemas.some((p) => p.startsWith(`${k} trae un caracter de control`)),
+      `${k}: ${problemas.join(" | ")}`,
+    );
+    // Y el diagnostico no reimprime el salto: nombrarlo como texto es lo que lo
+    // hace visible en una terminal, que es donde se lee.
+    assert.equal(
+      problemas.some((p) => p.includes("\n")),
+      false,
+      "un mensaje que contiene el salto de linea esconde el defecto que denuncia",
+    );
+  }
+});
+
+test("los otros caracteres de control tampoco pasan", () => {
+  const casos = [
+    ["tabulacion", "\t"],
+    ["retorno de carro", "\r"],
+    ["nulo", String.fromCharCode(0)],
+    ["escape", String.fromCharCode(27)],
+  ];
+  for (const [nombre, c] of casos) {
+    const { problemas } = validarValores({ ...VALORES_OK, PROYECTO: `people${c}agenda` });
+    assert.ok(
+      problemas.some((p) => p.startsWith("PROYECTO trae un caracter de control")),
+      `${nombre}: ${problemas.join(" | ")}`,
+    );
+  }
+});
+
+test("cada familia rechaza lo que no es de su familia, con el nombre y la forma esperada", () => {
+  const malos = [
+    ["PROYECTO", "People Agenda", "un nombre de repo"],
+    ["ORG", "-arranca-con-guion", "un handle"],
+    ["BUILDER_1", "@con-arroba", "un handle"],
+    ["PO", "con espacio", "un handle"],
+    ["EQUIPO_BUILDERS", "Builders", "el slug del equipo"],
+    ["EQUIPO_PO", "po/sub", "el slug del equipo"],
+    ["PAQUETE_API", "src/api", "un nombre de carpeta"],
+    ["CUENTA_DEV", "1234", "un id de cuenta AWS"],
+    ["REGION", "useast1", "una region de AWS"],
+    ["PERFIL_DEV", "perfil con espacios", "un nombre de perfil"],
+    ["PERFIL_PROD", "perfil|raro", "un nombre de perfil"],
+    ["PREFIJO_RECURSOS", "Agenda_Prod", "un prefijo de recursos AWS"],
+    ["DOMINIO_DEV", "https://agenda-dev.ejemplo.com/", "un host sin esquema"],
+    ["DOMINIO_PROD", "agenda.ejemplo.com:443", "un host sin esquema"],
+    ["CANAL_ALERTAS", "alertas-prod", "un canal con su almohadilla"],
+    ["ID_MCP_SLACK", "id_con_guion_bajo", "el id del servidor MCP"],
+  ];
+  for (const [k, valor, fragmento] of malos) {
+    const { problemas, valores } = validarValores({ ...VALORES_OK, [k]: valor });
+    assert.equal(valores, null, `${k} = ${JSON.stringify(valor)} no tendria que validar`);
+    const mio = problemas.filter((p) => p.startsWith(`${k} = `));
+    assert.equal(mio.length, 1, `${k}: ${problemas.join(" | ")}`);
+    assert.ok(mio[0].includes(fragmento), `${k}: el mensaje no ensena que se espera — ${mio[0]}`);
+    assert.ok(mio[0].includes(JSON.stringify(valor)), `${k}: el mensaje no cita el valor — ${mio[0]}`);
+  }
+});
+
+test("y acepta lo que SI es de su familia: el guard no es un rojo permanente", () => {
+  // La otra mitad, y la que evita que este banco premie a un validador que
+  // rechaza todo. Cada caso es una forma legitima que se vio o se puede ver.
+  const buenos = [
+    ["PROYECTO", "people-agenda"],
+    ["PROYECTO", "api.v2"],
+    ["ORG", "po"],
+    ["ORG", "Ejemplo-Org"],
+    ["BUILDER_1", "a"],
+    ["EQUIPO_BUILDERS", "builders-core"],
+    ["REGION", "us-east-1"],
+    ["REGION", "ap-southeast-2"],
+    ["REGION", "us-gov-west-1"],
+    ["PERFIL_DEV", "ejemplo-dev"],
+    ["PERFIL_PROD", "ejemplo.prod_2"],
+    ["PREFIJO_RECURSOS", "agenda-prod"],
+    ["DOMINIO_DEV", "a.co"],
+    ["DOMINIO_PROD", "agenda.sub.ejemplo.com"],
+    ["CANAL_ALERTAS", "#alertas_prod-2"],
+    ["ID_MCP_SLACK", "00000000-0000-0000-0000-000000000000"],
+    // Texto libre a proposito: es un COMANDO, y un comando lleva espacios y
+    // banderas. Declararle un patron seria inventarle una forma que no tiene.
+    ["GENERAR_CLIENTE_DATOS", "prisma generate --schema ./db/schema.prisma"],
+    ["GENERAR_CLIENTE_DATOS", "pnpm run db:generate"],
+  ];
+  for (const [k, valor] of buenos) {
+    const { problemas } = validarValores({ ...VALORES_OK, [k]: valor });
+    assert.deepEqual(problemas, [], `${k} = ${JSON.stringify(valor)} tendria que valer`);
+  }
+});
+
+test("un valor con espacios al borde es error: en CODEOWNERS eso no asigna a nadie", () => {
+  const { problemas } = validarValores({ ...VALORES_OK, PO: " el-po" });
+  assert.ok(problemas.some((p) => p.startsWith("PO = ") && p.includes("espacios")), problemas.join(" | "));
+});
+
+test("la inyeccion por salto de linea NO llega al CODEOWNERS del repo nuevo", () => {
+  // El caso de punta a punta, con la carga exacta que se midio aterrizando en
+  // `.github/CODEOWNERS:19` antes de este arreglo.
+  const destino = tmp("inyeccion-codeowners");
+  const vals = valoresEn(destino, {
+    ...VALORES_OK,
+    EQUIPO_BUILDERS: "builders\n      - run: echo INYECTADO-EN-EL-WORKFLOW",
+  });
+  const { codigo, salida } = correr("--valores", vals, "--destino", destino, "--sin-herramientas");
+  assert.notEqual(codigo, 0, "tenia que abortar");
+  assert.match(salida, /EQUIPO_BUILDERS trae un caracter de control/);
+  assert.match(salida, /No se escribio nada/i);
+  assert.deepEqual(fs.readdirSync(destino), [], "el destino tenia que quedar intacto");
+});
+
+// ══════════════════ LO QUE LLEGA A UN PROCESO HIJO ══════════════════
+
+const FUENTE = fs.readFileSync(HERRAMIENTA, "utf8");
+
+/** Las lineas de CODIGO del archivo: sin las de comentario. El encabezado y los
+ *  docblocks CITAN la invocacion de npx para explicarla, y un control que
+ *  contara esas citas estaria midiendo la prosa en vez del programa. */
+const LINEAS_DE_CODIGO = FUENTE.split("\n").filter((l) => {
+  const t = l.trim();
+  return t !== "" && !t.startsWith("//") && !t.startsWith("*") && !t.startsWith("/*");
+});
+
+test("la unica entrada que puede llegar a un shell es el pin, y esta acotada", () => {
+  // Este control existe porque la defensa no es una funcion sino una PROPIEDAD
+  // del archivo: `pinValido` acota el unico argumento variable de la unica
+  // invocacion que en Windows pasa por cmd.exe. Agregar manana un segundo
+  // argumento interpolado ahi no romperia ninguna prueba de comportamiento, y el
+  // repo tiene medido que ese es el modo de falla que solo ve quien no lo puede
+  // depurar: el escapado es asimetrico por sistema operativo.
+  const conShell = LINEAS_DE_CODIGO.filter((l) => l.includes("shell:"));
+  assert.equal(conShell.length, 1, `hay ${conShell.length} invocaciones con shell: ${conShell.join(" || ")}`);
+  assert.match(conShell[0].trim(), /shell: process\.platform === "win32"/);
+
+  // Y ninguna forma de lanzar un proceso que reciba la linea de comandos entera
+  // como un solo string, que es donde el escapado deja de existir.
+  const codigo = LINEAS_DE_CODIGO.join("\n");
+  for (const [nombre, patron] of [
+    ["execSync", /\bexecSync\(/],
+    ["exec", /(?<![.\w])exec\(/],
+    ["spawn", /(?<![.\w])spawn\(/],
+    ["spawnSync", /\bspawnSync\(/],
+  ]) {
+    assert.equal(
+      patron.test(codigo),
+      false,
+      `${nombre}() recibe una linea de comandos entera: no entra en esta herramienta`,
+    );
+  }
+
+  // El vector de argumentos de npx interpola UNA sola expresion, y es `pin`.
+  const invocaciones = [...FUENTE.matchAll(/execFileSync\("npx", (\[[^\]]*\])/g)];
+  assert.ok(
+    invocaciones.length >= 1,
+    "no encontre la invocacion de npx: si cambio de forma, este control dejo de mirar lo que cree que mira",
+  );
+  for (const inv of invocaciones) {
+    const interpoladas = [...inv[1].matchAll(/\$\{([^}]*)\}/g)].map((m) => m[1]);
+    assert.deepEqual(interpoladas, ["pin"], `en Windows esos argumentos van concatenados sin escapar: ${inv[1]}`);
+  }
+});
+
+// ══════════════════ LOS DOS ULTIMOS PASOS, RELEIDOS DEL ARBOL ══════════════════
+//
+// El bloque `if (o.herramientas)` —los dos procesos hijos— NO se ejecutaba en
+// ninguna prueba: las dos invocaciones de la CLI que pasaban --destino usaban
+// --sin-herramientas. Lo que sigue lo ejerce entero, y lo hace con un MARCO
+// FALSO: una copia del andamio, del marco-ci.yml del que sale el pin, de esta
+// herramienta, y un `constitucion.mjs` de mentira cuyo comportamiento decide
+// cada caso. Sin eso no hay forma de ver ROJO un "salio 0 y no escribio nada",
+// que es exactamente el modo de falla que este repo tiene MEDIDO para el CLI de
+// OpenSpec en Windows (plantilla/.claude/skills/projects-archive-change/SKILL.md:
+// "en Windows el CLI MIENTE ... imprime `Specs updated successfully` y hace
+// rollback").
+
+/** Un clon minimo del marco, para que la herramienta copiada resuelva su propia
+ *  raiz ahi adentro y los dos procesos hijos sean los que este banco decida. */
+function marcoFalso(nombre, constitucion) {
+  const raiz = tmp(nombre);
+  fs.mkdirSync(path.join(raiz, "herramientas"));
+  fs.copyFileSync(HERRAMIENTA, path.join(raiz, "herramientas", "projects-init.mjs"));
+  fs.cpSync(ANDAMIO, path.join(raiz, "plantilla"), { recursive: true });
+  fs.mkdirSync(path.join(raiz, ".github", "workflows"), { recursive: true });
+  fs.copyFileSync(
+    path.join(RAIZ, ".github/workflows/marco-ci.yml"),
+    path.join(raiz, ".github", "workflows", "marco-ci.yml"),
+  );
+  fs.mkdirSync(path.join(raiz, "actions", "constitucion"), { recursive: true });
+  fs.writeFileSync(path.join(raiz, "actions", "constitucion", "constitucion.mjs"), constitucion, "utf8");
+  return raiz;
+}
+
+/** Un ejecutor de paquetes de mentira delante del PATH. Se escriben las dos formas porque este
+ *  banco corre en los tres sistemas operativos: en Windows la herramienta lanza
+ *  la invocacion por cmd.exe, que resuelve `npx.cmd`. */
+// El nombre del ejecutor vive en una constante y no suelto en cada llamada, y no es
+// estilo: el guardrail de ejecutores del propio marco lee este archivo y una linea como
+// `path.join(bin, "npx"), sh` la interpreta como una invocacion de npx al paquete `sh`,
+// sin version exacta, y pone el arbol en ROJO. Con la constante, el literal aparece una
+// sola vez y sin nada que parezca un paquete detras.
+const EJECUTOR = "npx";
+
+function npxFalso(nombre, sh, cmd) {
+  const bin = tmp(nombre);
+  fs.writeFileSync(path.join(bin, EJECUTOR), sh, "utf8");
+  fs.chmodSync(path.join(bin, EJECUTOR), 0o755);
+  fs.writeFileSync(path.join(bin, `${EJECUTOR}.cmd`), cmd, "utf8");
+  return bin;
+}
+
+const NPX_QUE_MIENTE = ["#!/bin/sh\nexit 0\n", "@echo off\r\nexit /b 0\r\n"];
+const NPX_QUE_ESCRIBE = [
+  "#!/bin/sh\nmkdir -p openspec && printf 'x\\n' > openspec/project.md\nexit 0\n",
+  "@echo off\r\nmkdir openspec\r\necho x> openspec\\project.md\r\nexit /b 0\r\n",
+];
+
+/** Corre la CLI del marco falso con ese PATH por delante. */
+function correrEnMarco(marco, bin, ...args) {
+  try {
+    const salida = execFileSync(process.execPath, [path.join(marco, "herramientas", "projects-init.mjs"), ...args], {
+      encoding: "utf8",
+      stdio: "pipe",
+      env: { ...process.env, PATH: `${bin}${path.delimiter}${process.env.PATH}` },
+    });
+    return { codigo: 0, salida };
+  } catch (e) {
+    return { codigo: e.status ?? -1, salida: `${e.stdout ?? ""}${e.stderr ?? ""}` };
+  }
+}
+
+test("openspec init que sale 0 sin crear openspec/ es ROJO, no LISTO", () => {
+  // El sintoma que se evita: la herramienta imprime LISTO y las seis tareas
+  // humanas, el builder hace el push fundacional, y el primer CI muere en el
+  // paso que exige openspec/ — con la herramienta ya cerrada y el diagnostico
+  // apuntando al pipeline en vez de al arranque.
+  const marco = marcoFalso("openspec-miente", "process.exit(0);\n");
+  const bin = npxFalso("bin-miente", ...NPX_QUE_MIENTE);
+  const destino = tmp("openspec-miente-destino");
+  const vals = valoresEn(destino);
+
+  const { codigo, salida } = correrEnMarco(marco, bin, "--valores", vals, "--destino", destino);
+  assert.notEqual(codigo, 0, `tenia que ser rojo; salida: ${salida}`);
+  assert.match(salida, /openspec init salio 0 pero no dejo un openspec\/ con contenido/);
+  // Y el mensaje trae el arreglo, que es la regla del marco para cada error.
+  assert.match(
+    salida,
+    new RegExp(`${EJECUTOR} --yes @fission-ai/openspec@\\d+\\.\\d+\\.\\d+ init --tools claude`),
+  );
+  assert.equal(/LISTO\./.test(salida), false, "no se declara LISTO sobre un arranque a medias");
+});
+
+test("un render de la constitucion que sale 0 sin escribir nada es ROJO", () => {
+  const marco = marcoFalso("constitucion-muda", "process.exit(0);\n");
+  const bin = npxFalso("bin-escribe", ...NPX_QUE_ESCRIBE);
+  const destino = tmp("constitucion-muda-destino");
+  const vals = valoresEn(destino);
+
+  const { codigo, salida } = correrEnMarco(marco, bin, "--valores", vals, "--destino", destino);
+  assert.notEqual(codigo, 0, `tenia que ser rojo; salida: ${salida}`);
+  assert.match(salida, /el render de la constitucion salio 0 y no escribio un solo archivo nuevo/);
+  assert.equal(/LISTO\./.test(salida), false);
+});
+
+test("con los dos pasos escribiendo de verdad, la corrida sale 0 y los nombra", () => {
+  // ANTI-VACUIDAD de los dos casos de arriba: si el bloque de herramientas
+  // fuera rojo por cualquier motivo, los dos pasarian igual. Y es ademas la
+  // primera vez que este banco ejecuta ese bloque en el camino feliz.
+  const constitucion = [
+    "import fs from 'node:fs';",
+    "fs.mkdirSync('.projects', { recursive: true });",
+    "fs.writeFileSync('.projects/AGENTS-marco.md', 'porcion del marco\\n');",
+  ].join("\n");
+  const marco = marcoFalso("herramientas-ok", constitucion);
+  const bin = npxFalso("bin-ok", ...NPX_QUE_ESCRIBE);
+  const destino = tmp("herramientas-ok-destino");
+  const vals = valoresEn(destino);
+
+  const { codigo, salida } = correrEnMarco(marco, bin, "--valores", vals, "--destino", destino);
+  assert.equal(codigo, 0, salida);
+  assert.match(salida, /openspec init con el pin del marco \(\d+\.\d+\.\d+\)/);
+  assert.match(salida, /la constitucion dejo \d+ archivo\(s\)/);
+  assert.match(salida, /LISTO\./);
+  assert.ok(fs.existsSync(path.join(destino, "openspec", "project.md")));
+  assert.ok(fs.existsSync(path.join(destino, ".projects", "AGENTS-marco.md")));
+});
+
+// ══════════════════ UNA COPIA QUE SE CORTA A LA MITAD ══════════════════
+
+test("revertir borra lo que la corrida creo y NO lo que ya estaba", () => {
+  const destino = tmp("revertir");
+  fs.mkdirSync(path.join(destino, "propio"));
+  fs.writeFileSync(path.join(destino, "propio", "mio.md"), "trabajo previo\n", "utf8");
+  fs.writeFileSync(path.join(destino, "nuevo.md"), "de esta corrida\n", "utf8");
+  fs.mkdirSync(path.join(destino, "traido"));
+  fs.writeFileSync(path.join(destino, "traido", "otro.md"), "de esta corrida\n", "utf8");
+
+  const r = revertir(destino, {
+    nuevos: ["nuevo.md", "traido/otro.md"],
+    sobreescritos: ["propio/mio.md"],
+    directoriosCreados: [path.join(destino, "traido")],
+  });
+  assert.deepEqual(r.borrados.sort(), ["nuevo.md", "traido/otro.md"]);
+  assert.deepEqual(r.sobreescritos, ["propio/mio.md"]);
+  assert.deepEqual(r.noSePudo, []);
+  assert.equal(fs.existsSync(path.join(destino, "traido")), false, "el directorio que trajo la corrida se va con ella");
+  // Lo que ya estaba sigue ahi Y con su contenido: revertir no restaura un
+  // archivo pisado, pero tampoco lo borra.
+  assert.equal(fs.readFileSync(path.join(destino, "propio", "mio.md"), "utf8"), "trabajo previo\n");
+  assert.deepEqual(fs.readdirSync(destino), ["propio"]);
+});
+
+test("una copia que se corta a la mitad revierte lo escrito y lo DICE, sin traza de Node", () => {
+  // Como se fuerza la falla sin depender de permisos —que en Windows no se
+  // pueden simular igual—: se pone un ARCHIVO donde el andamio necesita un
+  // directorio. `api/` existe como archivo, asi que escribir `api/package.json`
+  // tira ENOTDIR a mitad de la lista, con decenas de archivos ya escritos.
+  // El guard del destino ocupado no se dispara: mira `api/package.json`, no `api`.
+  const destino = tmp("corte-a-la-mitad");
+  fs.writeFileSync(path.join(destino, "api"), "esto no es un directorio\n", "utf8");
+  const vals = valoresEn(destino);
+
+  const { codigo, salida } = correr("--valores", vals, "--destino", destino, "--sin-herramientas");
+  assert.notEqual(codigo, 0, `tenia que abortar; salida: ${salida}`);
+  // El nombre exacto del primer archivo bajo api/ sale del andamio y cambia con
+  // el: lo que se fija es que el mensaje NOMBRE el archivo que fallo.
+  assert.match(salida, /^::error::la copia se corto en api\/[^\s:]+: [A-Z]+ —/m);
+  assert.match(salida, /Se revirtieron los \d+ archivo\(s\) que esta corrida habia creado/);
+  assert.match(salida, /NO hace falta --forzar para reintentar/);
+  // Nada de volcado del runtime: el mensaje es para quien arranca un repo, no
+  // para quien depura node:fs.
+  assert.equal(/node:fs/.test(salida), false, salida);
+  assert.equal(/\n\s+at /.test(salida), false, `quedo una traza de Node en la salida: ${salida}`);
+  // Y el destino queda como estaba: solo el archivo que la persona puso.
+  assert.deepEqual(fs.readdirSync(destino), ["api"]);
+});
+
+test("el reintento despues de un corte NO necesita --forzar", () => {
+  // La otra mitad de la promesa: si el rollback dejara un solo archivo del
+  // andamio, el guard del destino ocupado empujaria a --forzar, que es la
+  // bandera que apaga la proteccion contra pisar trabajo.
+  const destino = tmp("reintento");
+  fs.writeFileSync(path.join(destino, "api"), "esto no es un directorio\n", "utf8");
+  const vals = valoresEn(destino);
+  assert.notEqual(correr("--valores", vals, "--destino", destino, "--sin-herramientas").codigo, 0);
+
+  fs.rmSync(path.join(destino, "api"));
+  const segunda = correr("--valores", vals, "--destino", destino, "--sin-herramientas");
+  assert.equal(segunda.codigo, 0, segunda.salida);
+  assert.equal(/--forzar/.test(segunda.salida), false, "el reintento limpio no tendria que hablar de --forzar");
+});
+
+// ══════════════════ --forzar, QUE NUNCA SE HABIA EJECUTADO ══════════════════
+
+test("--forzar sobreescribe un destino ocupado y sale 0", () => {
+  // `--forzar` aparecia en el banco una sola vez y era en el TITULO de otro
+  // caso: el camino de recuperacion que la propia herramienta recomienda jamas
+  // se habia corrido.
+  const destino = tmp("forzar");
+  fs.mkdirSync(path.join(destino, ".github", "workflows"), { recursive: true });
+  fs.writeFileSync(path.join(destino, ".github", "workflows", "ci.yml"), "mi ci viejo\n", "utf8");
+  const vals = valoresEn(destino);
+
+  const sinForzar = correr("--valores", vals, "--destino", destino, "--sin-herramientas");
+  assert.notEqual(sinForzar.codigo, 0);
+
+  const conForzar = correr("--valores", vals, "--destino", destino, "--sin-herramientas", "--forzar");
+  assert.equal(conForzar.codigo, 0, conForzar.salida);
+  const ci = fs.readFileSync(path.join(destino, ".github", "workflows", "ci.yml"), "utf8");
+  assert.notEqual(ci, "mi ci viejo\n", "--forzar tenia que pisar el archivo");
+  // `{{` a secas no sirve como control: ci.yml esta lleno de expresiones
+  // `${{ ... }}` de GitHub Actions, que no son marcadores del andamio. El patron
+  // es el de la herramienta: llaves con MAYUSCULAS adentro.
+  assert.equal(/\{\{[A-Z0-9_]+\}\}/.test(ci), false, "el ci.yml escrito no puede traer marcadores del andamio");
+});
+
+test("un corte durante --forzar NO promete un destino limpio: nombra lo que piso", () => {
+  // La otra mitad del rollback, y la que no se puede deshacer: con --forzar la
+  // corrida pisa archivos que ya existian, y su contenido viejo esta herramienta
+  // no lo tuvo nunca. Decir "reintenta sin --forzar" ahi seria mandar a chocar
+  // otra vez con el guard del destino ocupado.
+  const destino = tmp("forzar-cortado");
+  const vals = valoresEn(destino);
+  assert.equal(correr("--valores", vals, "--destino", destino, "--sin-herramientas").codigo, 0);
+
+  // Se vuelve a poner la trampa: api/ deja de ser un directorio y pasa a ser un
+  // archivo, asi que la segunda corrida se corta al llegar ahi.
+  fs.rmSync(path.join(destino, "api"), { recursive: true, force: true });
+  fs.writeFileSync(path.join(destino, "api"), "esto no es un directorio\n", "utf8");
+
+  const { codigo, salida } = correr("--valores", vals, "--destino", destino, "--sin-herramientas", "--forzar");
+  assert.notEqual(codigo, 0, salida);
+  assert.match(salida, /^::error::la copia se corto en api\//m);
+  assert.match(salida, /el destino NO queda como estaba/);
+  assert.match(salida, /ya existia antes y esta corrida lo piso con --forzar/);
+  assert.match(salida, /git checkout --/);
+  assert.equal(/NO hace falta --forzar para reintentar/.test(salida), false, "esa promesa no vale cuando quedaron archivos pisados");
+  assert.equal(/\n\s+at /.test(salida), false, `quedo una traza: ${salida}`);
+  // Lo pisado sigue ahi —no se restaura, y por eso se nombra— y lo que la
+  // corrida cortada habia traido de nuevo no quedo suelto.
+  assert.ok(fs.existsSync(path.join(destino, ".github", "workflows", "ci.yml")));
+});
+
+// ══════════════════ EL REGISTRO DE VALORES DEL PROYECTO ══════════════════
+
+test("el registro de valores se compara contra REQUERIDOS, y el desfase se nombra", () => {
+  // Se prueba el MECANISMO sobre un registro sintetico y no sobre el del
+  // andamio: atar este caso al estado de hoy lo volveria rojo el dia que el
+  // andamio se arregle, que es justo el dia en que tiene que quedar verde.
+  const completo = tmp("registro-completo");
+  const todos = Object.fromEntries(REQUERIDOS.map((k) => [k, VALORES_OK[k]]));
+  fs.writeFileSync(path.join(completo, REGISTRO_DE_VALORES), JSON.stringify({ superficies: [], ...todos }), "utf8");
+  assert.deepEqual(avisosDelRegistroDeValores(completo), [], "un registro completo no avisa nada");
+
+  const incompleto = tmp("registro-incompleto");
+  const { EQUIPO_BUILDERS, EQUIPO_PO, ...resto } = todos;
+  fs.writeFileSync(path.join(incompleto, REGISTRO_DE_VALORES), JSON.stringify(resto), "utf8");
+  const avisos = avisosDelRegistroDeValores(incompleto);
+  assert.equal(avisos.length, 1, avisos.join(" | "));
+  // AVISO y no rojo: el desfase esta en el andamio, y estrenarle un rojo a la
+  // corrida que crea el repo es romper a quien no lo puede arreglar.
+  assert.match(avisos[0], /^::warning::/);
+  assert.match(avisos[0], /EQUIPO_BUILDERS, EQUIPO_PO/);
+  assert.match(avisos[0], /plantilla\/\.projects-valores\.json/);
+
+  // Y el archivo que no esta tampoco pasa en silencio.
+  assert.match(avisosDelRegistroDeValores(tmp("registro-ausente"))[0], /^::warning::el destino no tiene/);
+});
+
+test("la corrida completa avisa por stderr y sigue saliendo 0", () => {
+  // El aviso no puede convertirse en un rojo por la ventana de atras, y tampoco
+  // puede ensuciar stdout: `--ejemplo` escribe JSON ahi y una linea de aviso en
+  // el medio lo corrompe. `spawnSync` y no el `correr` de arriba porque hace
+  // falta ver los DOS flujos por separado, y execFileSync solo devuelve stdout.
+  const destino = tmp("aviso-registro");
+  const vals = valoresEn(destino);
+  const r = spawnSync(process.execPath, [HERRAMIENTA, "--valores", vals, "--destino", destino, "--sin-herramientas"], {
+    encoding: "utf8",
+  });
+  assert.equal(r.status, 0, r.stderr);
+
+  // El aviso tiene que decir la verdad sobre el andamio de HOY, en las dos
+  // direcciones: si manana el andamio guarda los 21, este caso exige silencio.
+  const registro = JSON.parse(fs.readFileSync(path.join(destino, REGISTRO_DE_VALORES), "utf8"));
+  const faltan = REQUERIDOS.filter((k) => !Object.hasOwn(registro, k));
+  assert.equal(
+    /::warning::.*guarda \d+ de los \d+ valores/.test(r.stderr),
+    faltan.length > 0,
+    `el aviso y el estado del andamio no coinciden: faltan ${faltan.join(", ") || "(ninguno)"}`,
+  );
+  for (const k of faltan) assert.ok(r.stderr.includes(k), `el aviso no nombra ${k}`);
+  assert.equal(/::warning::/.test(r.stdout), false, "los avisos van por stderr: stdout es para el JSON de --ejemplo");
+  assert.match(r.stdout, /cero marcadores sobrevivientes/);
+});
+
+// ══════════════════ LA TABLA DE plantilla/README.md ══════════════════
+
+test("la tabla de marcadores del andamio y REQUERIDOS son el MISMO conjunto", () => {
+  // El banco ya cubria una direccion —REQUERIDOS cubre lo que el andamio usa—,
+  // pero nada leia la tabla. Agregar un marcador a REQUERIDOS y a un archivo del
+  // andamio sin agregar su fila pasaba todo en verde, y el resultado es un valor
+  // que un humano tiene que inventar sin que ningun documento le diga que poner.
+  // La regla existe escrita en el mensaje de error de la herramienta ("Agregalos
+  // a REQUERIDOS ... y a la tabla de plantilla/README.md, en el mismo cambio") y
+  // hasta aca dependia de que alguien se acordara.
+  const readme = fs.readFileSync(path.join(ANDAMIO, "README.md"), "utf8");
+  const enLaTabla = new Set([...readme.matchAll(/^\| *`?\{\{([A-Z0-9_]+)\}\}/gm)].map((m) => m[1]));
+  // PAQUETES se DERIVA y no se pide, pero si se documenta: es un valor que
+  // aparece en los archivos y alguien va a querer saber de donde sale.
+  const esperados = new Set([...REQUERIDOS, "PAQUETES"]);
+
+  const sinFila = [...esperados].filter((k) => !enLaTabla.has(k)).sort();
+  assert.deepEqual(sinFila, [], "estos valores se piden y la tabla no dice que poner en ellos");
+  const sinPedir = [...enLaTabla].filter((k) => !esperados.has(k)).sort();
+  assert.deepEqual(sinPedir, [], "la tabla documenta marcadores que ya nadie pide: una regla sin fuente");
+  // Anti-vacuidad: si el regex dejara de matchear, los dos conjuntos vacios
+  // darian verde.
+  assert.equal(enLaTabla.size, esperados.size);
+  assert.ok(enLaTabla.size >= 20, `solo ${enLaTabla.size} filas leidas de la tabla`);
+});
+
+// ══════════════════ LA PRIMERA PREGUNTA QUE HACE CUALQUIERA ══════════════════
+
+test("--help y -h salen 0 con el uso, y sin traza de Node", () => {
+  // Antes caian en el `throw` de argumento desconocido, y como main() se
+  // invocaba sin try/catch la respuesta a la pregunta mas basica era un volcado
+  // del runtime con exit 1.
+  for (const bandera of ["--help", "-h"]) {
+    const { codigo, salida } = correr(bandera);
+    assert.equal(codigo, 0, `${bandera}: ${salida}`);
+    assert.match(salida, /^uso: node herramientas\/projects-init\.mjs/m);
+    assert.equal(/node:internal/.test(salida), false, salida);
+    assert.equal(/\n\s+at /.test(salida), false, `${bandera} devolvio una traza: ${salida}`);
+  }
+});
+
+test("la ayuda documenta las cinco banderas, --version-openspec incluida", () => {
+  // Esa bandera vivia documentada UNICAMENTE dentro del texto de un mensaje de
+  // error: un escape hatch que solo descubre quien ya se topo con la falla.
+  const { salida } = correr("--help");
+  for (const bandera of ["--valores", "--destino", "--sin-herramientas", "--forzar", "--version-openspec"]) {
+    assert.ok(salida.includes(bandera), `--help no nombra ${bandera}`);
+  }
+  assert.match(salida, /version EXACTA \(0\.9\.4\)|Version EXACTA \(0\.9\.4\)/);
+});
+
+test("un argumento desconocido sale 2 con el uso y sin traza", () => {
+  const { codigo, salida } = correr("--no-existe-esta-bandera");
+  assert.equal(codigo, 2, salida);
+  assert.match(salida, /^::error::argumento desconocido: --no-existe-esta-bandera$/m);
+  assert.match(salida, /^uso: node herramientas\/projects-init\.mjs/m);
+  assert.equal(/\n\s+at /.test(salida), false, `quedo una traza: ${salida}`);
+});
+
+test("la herramienta corre igual invocada por una ruta con un enlace simbolico", () => {
+  // El guard "me invocaron a mi?" comparaba `import.meta` (que viene con los
+  // enlaces resueltos) contra `argv[1]` (que no). En macOS eso pasa siempre que
+  // la ruta cuelga de /tmp, que es un enlace a /private/tmp, y el resultado era
+  // el peor posible: exit 0 sin imprimir NADA y sin escribir un archivo. Un
+  // exito silencioso, en la herramienta cuyo encabezado promete lo contrario.
+  const real = tmp("enlace-real");
+  const enlace = path.join(tmp("enlace-padre"), "por-el-enlace");
+  try {
+    fs.symlinkSync(real, enlace, "dir");
+  } catch {
+    return; // Windows sin privilegios para crear enlaces: el caso no aplica.
+  }
+  fs.mkdirSync(path.join(real, "herramientas"));
+  const copia = path.join(enlace, "herramientas", "projects-init.mjs");
+  fs.copyFileSync(HERRAMIENTA, copia);
+  const salida = execFileSync(process.execPath, [copia, "--help"], { encoding: "utf8" });
+  assert.match(salida, /^uso: node herramientas\/projects-init\.mjs/m, "salio sin imprimir nada: el guard no reconocio su propia invocacion");
 });

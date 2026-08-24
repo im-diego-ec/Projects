@@ -96,7 +96,16 @@ on:
         required: false
         default: "1.9.0"
       version_node:
-        description: Version de Node para el guardrail y el CLI de OpenSpec.
+        description: >-
+          Version de Node para TODOS los jobs del marco que la necesitan: el
+          guardrail y el CLI de OpenSpec, los cuatro lectores de manifiestos del
+          job higiene y el lector de cableado de constitucion-cableada. Hasta el
+          cambio que introdujo esta linea, decia "para el guardrail y el CLI de
+          OpenSpec", y era
+          exacto por un motivo que no era bueno: higiene no instalaba node y sus
+          lectores corrian con el que trajera la imagen del runner, mientras
+          constitucion-cableada tenia el 22 cableado a mano. Ahora los tres jobs
+          leen este numero, asi que subirlo mueve el marco entero de una vez.
         type: string
         required: false
         default: "22"
@@ -208,8 +217,58 @@ jobs:
   # o error de deteccion, solo_docs=false y corre el CI completo — nunca se
   # omite la validacion de codigo en silencio. Y el fail-open es RUIDOSO
   # (::warning): el 2026-08-05 este fallo fue mudo durante una semana.
+  #
+  # ---------------------------------------------------------------------------
+  # PULL_REQUEST_TARGET: QUE HACE EL MARCO Y POR QUE HASTA HOY MENTIA
+  #
+  # Este archivo ramifica sobre `pull_request_target` en tres lugares (aca, en el
+  # detector del carril y en el plano de la historia del detector de secretos), o sea
+  # que lo trata como evento soportado. Pero ninguno de los cuatro checkouts fijaba
+  # `ref:`, y bajo `pull_request_target` el default de actions/checkout NO es el head
+  # del PR: es la rama BASE. Resultado medido por lectura: los nueve pasos de higiene,
+  # la validacion --strict, el guardrail de deltas y el detector de secretos corrian
+  # sobre el codigo que ya estaba en main, y marco-ok los sumaba en success. Un
+  # consumidor que usara `pull_request_target` —el motivo tipico es darle permisos a
+  # los PRs de forks— recibia TODOS los checks del marco en verde sobre codigo que
+  # jamas se leyo.
+  #
+  # SE ELIGIO SOPORTARLO, no prohibirlo. Los tres checkouts que quedan —openspec,
+  # higiene y constitucion-cableada— fijan
+  #   ref: ${{ github.event_name == 'pull_request_target' && github.event.pull_request.head.sha || '' }}
+  # El job `cambios` no entra: ya hacia lo correcto, no hace checkout y lista por API.
+  #
+  # EL `ref` SE OVERRIDEA SOLO BAJO ESE EVENTO, y la angostura es el punto. Un `ref`
+  # vacio es el default de actions/checkout, asi que bajo `pull_request` el marco sigue
+  # leyendo el commit de merge —el resultado integrado, que es lo que corresponde
+  # verificar— y ningun consumidor ve cambiar un solo check por esto. La forma ancha
+  # que se descarto era `github.event.pull_request.head.sha || github.sha`: cierra el
+  # mismo agujero, pero de paso mueve TODO PR de la rama de merge al head, o sea que le
+  # estrena un rojo posible a cada consumidor por un evento que ninguno de ellos usa.
+  #
+  # CONSECUENCIA ASUMIDA Y DECLARADA: bajo `pull_request_target` lo que se verifica es
+  # el HEAD del PR y no el merge. Es la diferencia entre verificar el cambio y no
+  # verificar nada, que es lo que habia; verificar el merge ahi exigiria checkoutear
+  # `refs/pull/<n>/merge`, o sea el codigo del fork YA MEZCLADO con la rama protegida,
+  # que es justo lo que ese evento vuelve peligroso.
+  #
+  # EL COSTO, dicho entero y avisado en la corrida (ver el ::warning:: del paso de
+  # abajo): a partir de ahora, bajo `pull_request_target`, el marco LEE el codigo del
+  # head del PR, que en un PR de fork es codigo de un tercero. Ninguno de estos jobs lo
+  # EJECUTA —actionlint, gitleaks y los `node -e` leen texto, y no hay install del
+  # manifiesto del consumidor— y el techo de permisos de este workflow sigue siendo
+  # `contents: read`. Lo que si cambia para un consumidor es que checks que estaban
+  # verdes pueden ponerse rojos: no es un rojo nuevo del marco, es el rojo que ya se
+  # debia y que el default del checkout estaba tapando. Por eso el aviso lo dice con
+  # todas las letras en vez de dejar que aparezca como una regresion.
+  # ---------------------------------------------------------------------------
   cambios:
     name: cambios
+    # 10 minutos: este job lista archivos por API y corre un grep. El default de
+    # GitHub son 360 minutos, y en un workflow REUSABLE ese default no lo paga el
+    # marco sino el consumidor: con el cancel-in-progress del scaffold, un job colgado
+    # bloquea la cola de ese PR, y un job vivo mantiene su GITHUB_TOKEN valido las seis
+    # horas. Los cinco jobs de este archivo llevan techo por eso.
+    timeout-minutes: 10
     runs-on: ${{ inputs.runner }}
     outputs:
       solo_docs: ${{ steps.detectar.outputs.solo_docs }}
@@ -232,6 +291,16 @@ jobs:
         run: |
           SOLO_DOCS=false
           CONFIABLE=true
+
+          # EL AVISO DEL CAMBIO DE COMPORTAMIENTO, y va aca porque este es el primer
+          # job del marco y el unico que corre siempre antes que los demas. Ver el
+          # bloque "PULL_REQUEST_TARGET" del encabezado de este job: hasta el cambio que
+          # introduce este aviso, los checkouts del marco caian en la rama BASE bajo este evento y todo el
+          # veredicto era verde sobre un cambio que nunca se miro. No se calla porque
+          # el consumidor tiene que poder atribuir un rojo nuevo a esto y no a su PR.
+          if [ "${GITHUB_EVENT_NAME}" = "pull_request_target" ]; then
+            echo "::warning::este repo dispara el marco con pull_request_target. Desde esta version del marco los checkouts apuntan al HEAD DEL PR y no a la rama base: antes los checks de higiene, la validacion de OpenSpec y el detector de secretos leian el codigo que ya estaba en la rama base y salian verdes sobre un cambio que nunca miraron. Si aparece un rojo que ayer no estaba, es un hallazgo real del PR que el default anterior tapaba, no una regresion del marco. Y el otro lado de la moneda, que decide TU repo y no el marco: bajo pull_request_target el head de un PR de fork es codigo de un tercero — el marco lo LEE (actionlint, gitleaks y los lectores de manifiestos no ejecutan codigo del repo) pero cualquier job PROPIO tuyo que corra en esa misma corrida si lo ejecuta, y ahi los secrets del repo estan a mano"
+          fi
 
           if [ "${GITHUB_EVENT_NAME}" = "pull_request" ] || [ "${GITHUB_EVENT_NAME}" = "pull_request_target" ]; then
             if ! gh api "repos/${GITHUB_REPOSITORY}/pulls/${NUMERO_PR}/files" \
@@ -301,10 +370,22 @@ jobs:
   # validacion estricta de todos los changes y specs.
   openspec:
     name: openspec
+    # 10 minutos. Este job hace checkout, instala node y corre dos lectores de specs;
+    # el default de GitHub son 360 y este workflow es reusable, asi que la cola colgada
+    # la paga el consumidor. Ver el comentario del timeout de higiene.
+    timeout-minutes: 10
     runs-on: ${{ inputs.runner }}
     steps:
       - name: Checkout del repo consumidor
         uses: actions/checkout@v7
+        with:
+          # Bajo pull_request_target el default de actions/checkout es la rama BASE:
+          # el guardrail de deltas y la validacion --strict corrian sobre lo que ya
+          # estaba en main y salian verdes sobre un cambio que nunca miraron. En
+          # cualquier otro evento esto queda en la cadena vacia, que ES el default de
+          # la action: nada cambia. El bloque entero esta en el encabezado del job
+          # cambios.
+          ref: ${{ github.event_name == 'pull_request_target' && github.event.pull_request.head.sha || '' }}
 
       - uses: actions/setup-node@v7
         with: { node-version: "${{ inputs.version_node }}" }
@@ -401,6 +482,12 @@ jobs:
   # marco, cuando otros repos ya lo consumen.
   higiene:
     name: higiene
+    # 20 y no 10: es el job largo del marco —dos binarios descargados y verificados por
+    # sha256, nueve lectores y un barrido de la historia del cambio— y el unico que
+    # toca la red. El default de GitHub son 360 minutos, y este workflow es reusable:
+    # el minuto colgado lo paga el consumidor. Los cuatro curl de mas abajo llevan
+    # ademas su propio --max-time, que es el techo del paso; este es el del job.
+    timeout-minutes: 20
     runs-on: ${{ inputs.runner }}
     steps:
       # LA PLATAFORMA SE COMPRUEBA ANTES QUE NADA, Y NO ES UN ROJO NUEVO.
@@ -452,8 +539,33 @@ jobs:
       # es despreciable (el mayor son 2,6 MiB de pack, 421 commits) y en un repo
       # con historia pesada se nota. Si algun dia pesa mas que lo que compra, la
       # salida es acotar el fetch al rango, no apagar el plano.
+      #
+      # Y EL `ref` NO ES DECORACION: ver el bloque "PULL_REQUEST_TARGET" del
+      # encabezado del job cambios. Sin el, bajo ese evento los nueve checks de
+      # este job leian la rama BASE y reportaban verde sobre un cambio que nunca
+      # miraron — el detector de secretos incluido.
       - uses: actions/checkout@v7
-        with: { fetch-depth: 0 }
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event_name == 'pull_request_target' && github.event.pull_request.head.sha || '' }}
+
+      # NODE, PARA ESTE JOB Y CON LA VERSION QUE EL CONSUMIDOR PIDIO.
+      #
+      # Cuatro pasos de este job leen manifiestos con `node`, y hasta hoy este job no
+      # instalaba ninguno: corrian con el que trajera la imagen del runner —o con
+      # ninguno, en un runner propio—. Los cuatro guards decian "agrega
+      # 'uses: actions/setup-node@v7' a ESTE job", y "este job" es higiene, que vive en
+      # marco-ci.yml: el consumidor lo consume por `uses:` y no puede editarlo. O sea
+      # que el mensaje de arreglo mas repetido del archivo le pedia al lector algo que
+      # el lector no podia hacer, y quien lo intentaba editaba SU ci.yml, no cambiaba
+      # nada y volvia a ver el mismo rojo.
+      #
+      # Con este paso los cuatro casos dejan de existir por construccion, y de paso la
+      # version deja de ser la que sopla la imagen: `inputs.version_node`, el mismo
+      # numero que el job de openspec. La description de ese input decia "para el
+      # guardrail y el CLI de OpenSpec" justamente porque higiene no lo honraba.
+      - uses: actions/setup-node@v7
+        with: { node-version: "${{ inputs.version_node }}" }
 
       # HUECO 1 — "regenerado" era la unica forma de distribucion del marco que
       # se apoyaba solo en que alguien se acordara de ejecutarla. El marco pina
@@ -491,10 +603,28 @@ jobs:
           # sus skills se llaman openspec-* y sus comandos viven bajo opsx/. Un
           # archivo escrito a mano no cae ahi salvo que alguien lo bautice
           # exactamente como el generador, y eso ya seria pisarle el espacio.
-          ARTEFACTOS=$(git ls-files --             '.claude/skills/openspec-*/SKILL.md'             '.claude/commands/opsx/*'             '.agents/skills/openspec-*/SKILL.md'             '.agents/skills/source-command-opsx-*/SKILL.md' || true)
+          #
+          # EL `|| true` QUE ESTABA ACA ERA UN VERDE AFIRMATIVO SOBRE CERO ARCHIVOS, y
+          # no un fail-open ruidoso: `git ls-files` fuera de un arbol git sale 128 y
+          # deja la variable VACIA, que es indistinguible de "este repo no tiene
+          # artefactos". El paso salia exit 0 diciendo "nada que verificar" sin haber
+          # leido un solo archivo. El disparo no es teorico: un checkout parcial, un
+          # submodulo o un runner propio con el workspace fuera del arbol dan ese 128.
+          # Se parte la asignacion del codigo de salida con la MISMA forma que este
+          # paso ya usa doce lineas mas abajo para grep, y por la misma regla que ahi
+          # esta escrita: lo no verificable es rojo, nunca exito mudo.
+          set +e
+          ARTEFACTOS=$(git ls-files --             '.claude/skills/openspec-*/SKILL.md'             '.claude/commands/opsx/*'             '.agents/skills/openspec-*/SKILL.md'             '.agents/skills/source-command-opsx-*/SKILL.md')
+          RC=$?
+          set -e
+          if [ "${RC}" -ne 0 ]; then
+            echo "::error::no se pudieron listar los archivos rastreados (git ls-files rc=${RC}), asi que este paso no leyo NADA: sin poder mirar no se declara que los artefactos esten al dia. Arreglo: revisa que el checkout de este job haya traido el arbol git (un checkout parcial o un workspace fuera del arbol dan rc=128)"
+            exit 1
+          fi
 
           if [ -z "${ARTEFACTOS}" ]; then
-            echo "este repo no tiene artefactos generados por el CLI: nada que verificar"
+            # Ahora este verde SI dice lo que dice: git listo, y no hay artefactos.
+            echo "::notice::este repo no tiene artefactos generados por el CLI: nada que verificar"
             exit 0
           fi
 
@@ -600,8 +730,12 @@ jobs:
           TMP=$(mktemp -d)
           BASE="https://github.com/rhysd/actionlint/releases/download/v${VERSION_ACTIONLINT}"
           TAR="actionlint_${VERSION_ACTIONLINT}_linux_amd64.tar.gz"
-          curl -fsSL -o "${TMP}/${TAR}" "${BASE}/${TAR}"
-          curl -fsSL -o "${TMP}/checksums.txt" "${BASE}/actionlint_${VERSION_ACTIONLINT}_checksums.txt"
+          # --max-time y --retry no son adorno: sin techo, una descarga que se queda
+          # esperando se come el timeout del job entero, y en un workflow reusable esa
+          # espera la paga el consumidor. Los flags son los mismos que ya usa
+          # .github/workflows/aviso-version.yml en su unico curl.
+          curl -fsSL --max-time 60 --retry 2 --retry-all-errors -o "${TMP}/${TAR}" "${BASE}/${TAR}"
+          curl -fsSL --max-time 60 --retry 2 --retry-all-errors -o "${TMP}/checksums.txt" "${BASE}/actionlint_${VERSION_ACTIONLINT}_checksums.txt"
           # Verifica el asset contra los checksums del MISMO release: cubre
           # descarga corrupta o asset cambiado, no un release comprometido de
           # raiz. Se declara el alcance en vez de dar por sentado que "hay
@@ -656,13 +790,36 @@ jobs:
           ERRORES="${RUNNER_TEMP}/marcadores-errores.txt"
           : > "${ERRORES}"
 
-          git ls-files -z | xargs -0 grep -nIE '(^|[^$])\{\{[A-Z0-9_]+\}\}' > pendientes.txt 2>> "${ERRORES}" || true
+          # EL PIPE TENIA UN AGUJERO QUE EL COMENTARIO DE ARRIBA NO CUBRIA: el `2>>`
+          # captura el stderr de GREP, no el de `git ls-files`, y el `|| true` del
+          # final desactiva el pipefail del `set -euo` de este mismo paso. Con
+          # `git ls-files` fallando (128 fuera de un arbol git, un checkout parcial, un
+          # workspace ajeno) xargs no recibia ni un byte, pendientes.txt y ERRORES
+          # quedaban vacios y el paso imprimia "sin marcadores del scaffold pendientes":
+          # un verde AFIRMATIVO sobre cero archivos leidos, que es lo que este paso
+          # existe para no ser. Se materializa la lista en un archivo, con su propia
+          # guarda de codigo de salida, y xargs se alimenta de ahi.
+          LISTA="${RUNNER_TEMP}/marcadores-rastreados.bin"
+          set +e
+          git ls-files -z > "${LISTA}"
+          RC=$?
+          set -e
+          if [ "${RC}" -ne 0 ]; then
+            echo "::error::no se pudieron listar los archivos rastreados (git ls-files rc=${RC}), asi que este paso no inspecciono NADA y la AUSENCIA de marcadores del scaffold no se puede afirmar. Arreglo: revisa que el checkout de este job haya traido el arbol git (un checkout parcial o un workspace fuera del arbol dan rc=128)"
+            exit 1
+          fi
+          if [ ! -s "${LISTA}" ]; then
+            echo "::error::git ls-files salio bien y no devolvio un solo archivo rastreado. Un repo sin nada rastreado no existe, asi que esto es una lista que no se pudo leer, no un arbol vacio: sin archivos que mirar no se declara que no queden marcadores"
+            exit 1
+          fi
+
+          xargs -0 grep -nIE '(^|[^$])\{\{[A-Z0-9_]+\}\}' < "${LISTA}" > pendientes.txt 2>> "${ERRORES}" || true
 
           # El hueco de decision del scaffold. Se arma por codepoint (U+1F573)
           # en vez de pegar el emoji: asi matchea lo mismo lleve o no el
           # selector de variacion, y no depende del locale del runner.
           HUECO=$(printf '\xf0\x9f\x95\xb3')
-          git ls-files -z | xargs -0 grep -nIF "${HUECO}" >> pendientes.txt 2>> "${ERRORES}" || true
+          xargs -0 grep -nIF "${HUECO}" < "${LISTA}" >> pendientes.txt 2>> "${ERRORES}" || true
 
           if [ -s pendientes.txt ]; then
             echo "::error::quedaron marcadores del scaffold sin resolver — el bootstrap del repo esta a medias y hay promesas del marco que no se estan cumpliendo (revisa sobre todo el archivo de propietarios de codigo)"
@@ -726,7 +883,7 @@ jobs:
           # no esta, no se puede verificar — y lo que no se puede verificar es
           # rojo, nunca un exito mudo.
           if ! command -v node > /dev/null 2>&1; then
-            echo "::error::no hay 'node' en el PATH y sin el no se pueden leer los manifiestos. Arreglo: agrega 'uses: actions/setup-node@v7' a este job, antes de este paso"
+            echo "::error::no hay 'node' en el PATH y sin el no se pueden leer los manifiestos. Esto es un fallo DEL MARCO, no de tu repo: el job higiene de marco-ci.yml instala node con actions/setup-node y la version que declara el input version_node, asi que si falta es que ese paso no corrio. No lo podes arreglar desde tu ci.yml —este job no es tuyo, lo consumis por uses:—. Arreglo: abri un issue en el repo del marco; si ademas usas un runner propio, garantiza node en el PATH (actions/README.md, Requisitos del runner)"
             exit 1
           fi
 
@@ -971,6 +1128,11 @@ jobs:
       - name: Censo de fuentes cableado
         if: '!cancelled()'
         shell: bash
+        env:
+          # Por env y no interpolado en el run: es la convencion de este archivo (ver
+          # el paso "Exigir OpenSpec en el repo"). Alimenta el snippet que el paso
+          # IMPRIME cuando el censo no esta cableado.
+          PROPIETARIO: ${{ github.repository_owner }}
         run: |
           set -euo pipefail
 
@@ -1038,7 +1200,15 @@ jobs:
             echo "::error::este repo no invoca el censo de fuentes en ningun flujo: sin ese paso, un archivo que ninguna herramienta mira no produce rojo en ningun lado y la verificacion de alcance queda declarada pero apagada. Arreglo: pega el paso de abajo en el job que ya corre lint y typecheck, DESPUES de instalar dependencias (el censo interroga al toolchain ya instalado)"
             echo "== paso a agregar =="
             echo "      - name: Ningun archivo fuera del alcance de la verificacion"
-            echo "        uses: im-diego-ec/Projects/actions/censo-fuentes@v1.7.0"
+            # LA CUENTA SALE DEL PROPIETARIO DE ESTE REPOSITORIO, no de un literal. Este
+            # snippet es lo que el consumidor PEGA en su workflow, o sea el unico lugar
+            # del archivo donde un slug equivocado no lo paga el marco sino quien lee el
+            # error: con la cuenta escrita literal, un marco copiado a otra cuenta le
+            # ensenaba a cada uno de sus consumidores a apuntar a la cuenta original.
+            # El marco y sus consumidores viven en la misma cuenta —es la premisa del
+            # encabezado, "TODO proyecto de la organizacion"— asi que derivarla del
+            # propietario da el mismo texto en el original y el correcto en la copia.
+            echo "        uses: ${PROPIETARIO}/Projects/actions/censo-fuentes@v1.7.0"
             exit 1
           fi
 
@@ -1210,7 +1380,7 @@ jobs:
           set -euo pipefail
 
           if ! command -v node > /dev/null 2>&1; then
-            echo "::error::no hay 'node' en el PATH y sin el no se pueden leer las invocaciones. Arreglo: agrega 'uses: actions/setup-node@v7' a este job, antes de este paso"
+            echo "::error::no hay 'node' en el PATH y sin el no se pueden leer las invocaciones. Esto es un fallo DEL MARCO, no de tu repo: el job higiene de marco-ci.yml instala node con actions/setup-node y la version que declara el input version_node, asi que si falta es que ese paso no corrio. No lo podes arreglar desde tu ci.yml —este job no es tuyo, lo consumis por uses:—. Arreglo: abri un issue en el repo del marco; si ademas usas un runner propio, garantiza node en el PATH (actions/README.md, Requisitos del runner)"
             exit 1
           fi
 
@@ -1847,7 +2017,7 @@ jobs:
           set -euo pipefail
 
           if ! command -v node > /dev/null 2>&1; then
-            echo "::error::no hay 'node' en el PATH y sin el no se puede clasificar el reporte del detector. Arreglo: agrega 'uses: actions/setup-node@v7' a este job, antes de este paso"
+            echo "::error::no hay 'node' en el PATH y sin el no se puede clasificar el reporte del detector. Esto es un fallo DEL MARCO, no de tu repo: el job higiene de marco-ci.yml instala node con actions/setup-node y la version que declara el input version_node, asi que si falta es que ese paso no corrio. No lo podes arreglar desde tu ci.yml —este job no es tuyo, lo consumis por uses:—. Arreglo: abri un issue en el repo del marco; si ademas usas un runner propio, garantiza node en el PATH (actions/README.md, Requisitos del runner)"
             exit 1
           fi
 
@@ -1917,8 +2087,11 @@ jobs:
           URL="https://github.com/gitleaks/gitleaks/releases/download/v${VERSION_GITLEAKS}"
           TAR="gitleaks_${VERSION_GITLEAKS}_linux_x64.tar.gz"
 
-          if ! curl -fsSL -o "${TMP}/${TAR}" "${URL}/${TAR}" \
-             || ! curl -fsSL -o "${TMP}/checksums.txt" "${URL}/gitleaks_${VERSION_GITLEAKS}_checksums.txt"; then
+          # Mismos flags que el curl de actionlint y por el mismo motivo: un techo de
+          # tiempo por descarga, para que una conexion que no responde no se lleve el
+          # timeout del job.
+          if ! curl -fsSL --max-time 60 --retry 2 --retry-all-errors -o "${TMP}/${TAR}" "${URL}/${TAR}" \
+             || ! curl -fsSL --max-time 60 --retry 2 --retry-all-errors -o "${TMP}/checksums.txt" "${URL}/gitleaks_${VERSION_GITLEAKS}_checksums.txt"; then
             echo "::error::no se pudo descargar el detector de secretos ${VERSION_GITLEAKS} del release oficial. Sin detector NO se declara que el repo este limpio: este paso es rojo a proposito, no uno que se saltee. Arreglo: reintenta la corrida; si persiste, verifica que la version pineada siga publicada"
             exit 1
           fi
@@ -2379,6 +2552,15 @@ jobs:
       #     area, asi que queda fuera del universo. Es la misma evasion limpia
       #     que ya declara el censo de fuentes.
       #   - Reconoce verbos que escriben; no prueba que el resto no pueda.
+      #   - Del frontmatter de skills y agentes se leen SOLO las claves
+      #     `allowed-tools:` y `tools:`, y solo en sus dos formas reales: lista en
+      #     una linea (con o sin corchetes) o lista en bloque con guiones. No hay
+      #     parser de YAML aca —el marco no se permite dependencias— asi que un
+      #     frontmatter mas raro que eso no se lee. El paso imprime cuantas
+      #     entradas leyo POR ARCHIVO justamente para que "no supe leerlo" se vea
+      #     como un 0 y no se confunda con "no tiene permisos".
+      #   - Las skills y los agentes que un repo NO rastrea quedan fuera, igual
+      #     que el archivo de ajustes: lo no versionado no se puede mirar.
       - name: Permisos del agente sin escritura
         if: '!cancelled()'
         shell: bash
@@ -2395,7 +2577,43 @@ jobs:
           # puede comer, y hoy se lo come diciendo la verdad incomoda — su .claude
           # no esta rastreado, asi que sale el aviso de abajo en su propio repo.
           if ! command -v node > /dev/null 2>&1; then
-            echo "::error::no hay 'node' en el PATH y sin el no se puede leer el allowlist del agente. Arreglo: agrega 'uses: actions/setup-node@v7' a este job, antes de este paso"
+            echo "::error::no hay 'node' en el PATH y sin el no se puede leer el allowlist del agente. Esto es un fallo DEL MARCO, no de tu repo: el job higiene de marco-ci.yml instala node con actions/setup-node y la version que declara el input version_node, asi que si falta es que ese paso no corrio. No lo podes arreglar desde tu ci.yml —este job no es tuyo, lo consumis por uses:—. Arreglo: abri un issue en el repo del marco; si ademas usas un runner propio, garantiza node en el PATH (actions/README.md, Requisitos del runner)"
+            exit 1
+          fi
+
+          # EL UNIVERSO SON TRES SUPERFICIES Y HASTA HOY ERA UNA.
+          #
+          # Este paso fijaba su universo en ${RUTA_ALLOWLIST} y en ningun otro lado,
+          # mientras el `allowed-tools:` del frontmatter de una skill y el `tools:` de
+          # un agente son ALLOWLISTS DE AGENTE con la misma semantica y el mismo poder:
+          # `Bash(gh:*)` autoriza `gh pr merge`, `gh release create` y `gh api -X
+          # DELETE`; `Bash(git:*)` autoriza `git push --force`; y un `tools: Bash`
+          # pelado autoriza cualquier comando de shell. Ninguna de las dos compuertas
+          # del marco los miraba: el paso vecino de ejecutores pinados excluye los .md
+          # por pathspec (son prosa) y este solo abria un archivo. La unica barrera era
+          # un parrafo dentro del cuerpo de la skill diciendo que se detiene a pedir OK
+          # humano, o sea justo lo que el marco declara que NO cuenta como enforcement.
+          #
+          # El LECTOR de entradas no cambia —las formas de arriba ya caen en sus dos
+          # reglas, comodin en la posicion del subcomando y herramienta sin acotar—;
+          # lo que cambia es de donde se alimenta.
+          #
+          # LAS DOS SUPERFICIES NUEVAS ENTRAN EN MODO AVISO, y no es timidez: es la
+          # regla del marco sobre endurecimientos. Este workflow es reusable, asi que
+          # un rojo nuevo aparece en el pipeline de cada consumidor sin que nadie se lo
+          # haya anunciado, y hoy los SKILL.md del propio marco tienen `Bash(git:*)`.
+          # Lo que ya era rojo sigue rojo: las entradas de ${RUTA_ALLOWLIST}. Para
+          # invertirlo no hace falta que nadie se acuerde de nada — la condicion esta
+          # escrita: cuando el paso deje de imprimir avisos de frontmatter en el marco
+          # y en el consumidor real, se cambia la severidad de esa clase a ::error:: y
+          # se anota en el CHANGELOG bajo "Para consumidores".
+          FUENTES="${RUNNER_TEMP}/permisos-frontmatter.txt"
+          set +e
+          git ls-files -- '.claude/skills/*/SKILL.md' '.claude/agents/*.md' > "${FUENTES}"
+          RC=$?
+          set -e
+          if [ "${RC}" -ne 0 ]; then
+            echo "::error::no se pudieron listar los archivos rastreados (git ls-files rc=${RC}), asi que este paso no sabe que skills ni que agentes tiene el repo: sin poder mirar no se declara que ningun allowlist autorice una escritura. Arreglo: revisa que el checkout de este job haya traido el arbol git (un checkout parcial o un workspace fuera del arbol dan rc=128)"
             exit 1
           fi
 
@@ -2404,7 +2622,14 @@ jobs:
           # repo con .claude entero fuera del control de versiones esconde de
           # los dos checks justo el archivo donde aparecio el problema.
           if ! git ls-files --error-unmatch "${RUTA_ALLOWLIST}" > /dev/null 2>&1; then
-            echo "::warning file=${RUTA_ALLOWLIST}::este repo no rastrea ${RUTA_ALLOWLIST}: el allowlist de su agente no esta versionado, no pasa por la revision cruzada y este check no tiene nada que mirar. Es AVISO y no fallo porque el marco no puede exigir el archivo de una herramienta que el proyecto quizas no use; lo que no hace es callarse y declararlo sano. Arreglo: versiona el allowlist del agente — si en cambio los permisos se acumulan en settings.local.json, ese archivo esta en el .gitignore y queda fuera de la revision de todos"
+            echo "::warning file=${RUTA_ALLOWLIST}::este repo no rastrea ${RUTA_ALLOWLIST}: el allowlist de su agente no esta versionado, no pasa por la revision cruzada y este check no tiene ese archivo que mirar. Es AVISO y no fallo porque el marco no puede exigir el archivo de una herramienta que el proyecto quizas no use; lo que no hace es callarse y declararlo sano. Arreglo: versiona el allowlist del agente — si en cambio los permisos se acumulan en settings.local.json, ese archivo esta en el .gitignore y queda fuera de la revision de todos"
+            # Vaciarla y NO salir: el frontmatter de las skills y de los agentes es un
+            # allowlist igual de real y puede estar rastreado aunque este no lo este.
+            RUTA_ALLOWLIST=""
+          fi
+
+          if [ -z "${RUTA_ALLOWLIST}" ] && [ ! -s "${FUENTES}" ]; then
+            echo "::notice::este repo no rastrea ningun allowlist de agente (ni el archivo de ajustes, ni skills en .claude/skills/*/SKILL.md, ni agentes en .claude/agents/*.md): no hay permisos que leer"
             exit 0
           fi
 
@@ -2413,10 +2638,12 @@ jobs:
           # simple literal (va por String.fromCharCode) y los $ de sus
           # expresiones regulares son del lenguaje, no del shell.
           # shellcheck disable=SC2016
+          RUTA_FUENTES="${FUENTES}" \
           node -e '
             const { readFileSync, existsSync } = require("node:fs");
 
             const RUTA = process.env.RUTA_ALLOWLIST;
+            const RUTA_FUENTES = process.env.RUTA_FUENTES;
             const RUTA_VALORES = process.env.RUTA_VALORES;
             const RUTA_DESVIOS = process.env.RUTA_DESVIOS;
 
@@ -2445,17 +2672,100 @@ jobs:
             // estan aca a proposito.
             const VERBOS_MCP = /^(send|create|update|delete|trash|write|post|share|schedule|invite|remove|add|set|archive|move|upload|copy|respond|react|draft|publish|resolve|assign|snooze|label|pin)$/;
 
-            let ajustes;
-            try {
-              ajustes = JSON.parse(readFileSync(RUTA, "utf8"));
-            } catch (error) {
-              morir(RUTA + " esta rastreado y no se pudo leer o no parsea (" + error.message + "), asi que no se puede afirmar que el allowlist del agente no autorice una escritura. Lo no verificable es rojo, nunca exito mudo. Arreglo: corregi el JSON");
+            // LAS FUENTES DE PERMISOS DEL REPO. Cada una trae sus entradas y su
+            // severidad: el archivo de ajustes es COMPUERTA (rojo) y el frontmatter de
+            // skills y agentes entra en MODO AVISO, por la regla del marco sobre
+            // endurecimientos. Ver el bloque del paso, arriba.
+            const fuentes = [];
+
+            if (RUTA) {
+              let ajustes;
+              try {
+                ajustes = JSON.parse(readFileSync(RUTA, "utf8"));
+              } catch (error) {
+                morir(RUTA + " esta rastreado y no se pudo leer o no parsea (" + error.message + "), asi que no se puede afirmar que el allowlist del agente no autorice una escritura. Lo no verificable es rojo, nunca exito mudo. Arreglo: corregi el JSON");
+              }
+              const permisos = ajustes && typeof ajustes === "object" ? ajustes.permissions : null;
+              const allow = permisos && Array.isArray(permisos.allow)
+                ? permisos.allow.filter((x) => typeof x === "string").map((x) => x.trim()).filter(Boolean)
+                : [];
+              fuentes.push({ ruta: RUTA, entradas: allow, compuerta: true });
             }
 
-            const permisos = ajustes && typeof ajustes === "object" ? ajustes.permissions : null;
-            const allow = permisos && Array.isArray(permisos.allow)
-              ? permisos.allow.filter((x) => typeof x === "string").map((x) => x.trim()).filter(Boolean)
+            // Separa una lista escrita en una linea respetando parentesis y comillas:
+            // "Bash(git diff:*), Read" son dos entradas, y la coma de
+            // Bash(npm --prefix \"a,b\" exec x) no parte nada. La comilla simple va por
+            // su escape hexadecimal, como en los pasos hermanos: una literal cerraria
+            // el programa a la mitad.
+            function partirEntradas(texto) {
+              const salida = [];
+              let actual = "";
+              let profundidad = 0;
+              let comilla = null;
+              for (const c of texto) {
+                if (comilla !== null) { actual += c; if (c === comilla) comilla = null; continue; }
+                if (c === "\"" || c === "\x27") { comilla = c; actual += c; continue; }
+                if (c === "(" || c === "[") { profundidad += 1; actual += c; continue; }
+                if (c === ")" || c === "]") { profundidad -= 1; actual += c; continue; }
+                if (c === "," && profundidad === 0) { salida.push(actual); actual = ""; continue; }
+                actual += c;
+              }
+              salida.push(actual);
+              return salida
+                .map((x) => x.trim().replace(/^["\x27]/, "").replace(/["\x27]$/, "").trim())
+                .filter(Boolean);
+            }
+
+            // El frontmatter, leido a mano y sin dependencias como todo el marco.
+            // LIMITES DECLARADOS: solo el bloque delimitado por --- al principio del
+            // archivo, solo las claves allowed-tools: y tools:, y solo sus dos formas
+            // reales —lista en una linea (con o sin corchetes) o lista en bloque con
+            // guiones—. Un YAML mas raro que eso no se lee, y por eso el paso dice
+            // cuantas entradas leyo de cada archivo en vez de dar por sentado que
+            // las leyo todas.
+            function entradasDeFrontmatter(texto) {
+              const lineas = texto.split(/\r?\n/);
+              if (lineas.length === 0 || lineas[0].trim() !== "---") return [];
+              let fin = -1;
+              for (let i = 1; i < lineas.length; i += 1) {
+                if (lineas[i].trim() === "---") { fin = i; break; }
+              }
+              if (fin === -1) return [];
+              const entradas = [];
+              for (let i = 1; i < fin; i += 1) {
+                const clave = lineas[i].match(/^(allowed-tools|tools):[ \t]*(.*)$/);
+                if (!clave) continue;
+                const enLinea = clave[2].trim();
+                if (enLinea !== "" && enLinea !== "|" && enLinea !== ">") {
+                  for (const e of partirEntradas(enLinea.replace(/^\[/, "").replace(/\]$/, ""))) entradas.push(e);
+                  continue;
+                }
+                for (let j = i + 1; j < fin; j += 1) {
+                  const item = lineas[j].match(/^[ \t]*-[ \t]+(.*)$/);
+                  if (!item) break;
+                  for (const e of partirEntradas(item[1])) entradas.push(e);
+                }
+              }
+              return entradas;
+            }
+
+            const rutasFrontmatter = RUTA_FUENTES && existsSync(RUTA_FUENTES)
+              ? readFileSync(RUTA_FUENTES, "utf8").split(/\r?\n/).filter(Boolean)
               : [];
+
+            for (const ruta of rutasFrontmatter) {
+              let texto;
+              try {
+                texto = readFileSync(ruta, "utf8");
+              } catch (error) {
+                // Rastreado y no legible: es E/S, y sin poder mirar no se declara que
+                // no autorice nada. Rojo, igual que el archivo de ajustes ilegible.
+                morir(ruta + " esta rastreado y no se pudo leer (" + error.message + "), asi que no se puede afirmar que su allowlist de agente no autorice una escritura");
+              }
+              fuentes.push({ ruta: ruta, entradas: entradasDeFrontmatter(texto), compuerta: false });
+            }
+
+            const todasLasEntradas = fuentes.flatMap((f) => f.entradas);
 
             // El perfil de produccion es un valor DEL PROYECTO: sale de su
             // archivo de valores y nunca esta escrito en el marco (los handles
@@ -2528,14 +2838,17 @@ jobs:
             const absorbidos = [];
             const aLaVista = [];
 
-            function marcar(entrada, porque, conPerfilProd) {
+            function marcar(fuente, entrada, porque, conPerfilProd) {
               const d = declarados.get(entrada);
               if (d) {
                 d.usado = true;
-                absorbidos.push({ entrada: entrada, porque: porque, motivo: d.motivo, quien: d.quien });
+                absorbidos.push({ entrada: entrada, porque: porque, motivo: d.motivo, quien: d.quien, ruta: fuente.ruta });
                 return;
               }
-              hallazgos.push({ entrada: entrada, porque: porque, prod: conPerfilProd === true });
+              // La severidad la decide la FUENTE, no la entrada: la misma forma
+              // (`Bash(gh:*)`) es rojo en el archivo de ajustes y aviso en el
+              // frontmatter de una skill, porque el segundo es el estreno.
+              hallazgos.push({ entrada: entrada, porque: porque, prod: conPerfilProd === true, ruta: fuente.ruta, compuerta: fuente.compuerta });
             }
 
             // El allowlist admite "cmd args *" y "cmd args:*": las dos formas
@@ -2555,7 +2868,8 @@ jobs:
               return { entorno: entorno, palabras: brutos.slice(i) };
             }
 
-            for (const entrada of allow) {
+            for (const fuente of fuentes) {
+            for (const entrada of fuente.entradas) {
               const bash = entrada.match(/^Bash(\((.*)\))?$/);
               if (bash) {
                 const interno = bash[2] === undefined ? "*" : bash[2];
@@ -2564,7 +2878,7 @@ jobs:
                 const prod = PERFIL_PROD !== "" && partido.entorno.some((e) => e.slice(e.indexOf("=") + 1) === PERFIL_PROD);
 
                 if (palabras.length === 0 || palabras[0].indexOf("*") >= 0) {
-                  marcar(entrada, "autoriza cualquier comando de shell sin acotar la herramienta, y cualquiera incluye los que escriben", prod);
+                  marcar(fuente, entrada, "autoriza cualquier comando de shell sin acotar la herramienta, y cualquiera incluye los que escriben", prod);
                   continue;
                 }
                 const herramienta = palabras[0];
@@ -2580,7 +2894,7 @@ jobs:
                   break;
                 }
                 if (posicion !== null && posicion.indexOf("*") >= 0) {
-                  marcar(entrada, "deja el subcomando de \"" + herramienta + "\" en comodin, asi que autoriza TODOS sus subcomandos y entre ellos los que escriben", prod);
+                  marcar(fuente, entrada, "deja el subcomando de \"" + herramienta + "\" en comodin, asi que autoriza TODOS sus subcomandos y entre ellos los que escriben", prod);
                   continue;
                 }
 
@@ -2600,11 +2914,11 @@ jobs:
                   }
                 }
                 if (verbo !== null) {
-                  marcar(entrada, "autoriza \"" + herramienta + " ... " + verbo + "\" sin preguntar, y ese verbo ESCRIBE", prod);
+                  marcar(fuente, entrada, "autoriza \"" + herramienta + " ... " + verbo + "\" sin preguntar, y ese verbo ESCRIBE", prod);
                   continue;
                 }
                 if (prod) {
-                  aLaVista.push(entrada);
+                  aLaVista.push({ entrada: entrada, ruta: fuente.ruta });
                 }
                 continue;
               }
@@ -2617,36 +2931,43 @@ jobs:
                   if (segmento !== "" && VERBOS_MCP.test(segmento) && verbo === null) verbo = segmento;
                 }
                 if (verbo !== null) {
-                  marcar(entrada, "autoriza la tool \"" + tool + "\" de un servidor MCP y su verbo (\"" + verbo + "\") escribe fuera del repo: actuar sobre un sistema de terceros o contactar a una persona real es una frontera del marco, no un detalle de configuracion", false);
+                  marcar(fuente, entrada, "autoriza la tool \"" + tool + "\" de un servidor MCP y su verbo (\"" + verbo + "\") escribe fuera del repo: actuar sobre un sistema de terceros o contactar a una persona real es una frontera del marco, no un detalle de configuracion", false);
                 }
                 continue;
               }
               // El resto de las tools (lectura y edicion del arbol de trabajo)
               // queda fuera del alcance declarado arriba.
             }
+            }
 
             let salida = 0;
 
+            // EL ESTRENO EN MODO AVISO, dicho en cada hallazgo que lo lleva. Sin esta
+            // coda el aviso seria indistinguible de un rojo que alguien apago.
+            const ESTRENO = " ESTO ES AVISO Y NO ROJO, a proposito: el frontmatter de skills y agentes entro al universo de este check despues que el archivo de ajustes, y marco-ci.yml es un workflow reusable — estrenarlo en rojo pondria en rojo el pipeline de consumidores que nadie aviso, que es el endurecimiento sin aviso que el marco prohibe. La entrada autoriza lo mismo que autorizaria en el archivo de ajustes; lo unico distinto es el color de hoy. Cuando esta clase deje de imprimir avisos en el marco y en el consumidor real, pasa a ::error:: y se anota en el CHANGELOG bajo \"Para consumidores\".";
+
             for (const h of hallazgos) {
-              salida = 1;
               const cola = h.prod
                 ? " Ademas corre con el perfil de PRODUCCION: escribir en produccion exige el OK explicito de una persona en esa sesion, y un permiso pre-aprobado es exactamente lo contrario de pedirlo."
                 : "";
-              console.log(
-                "::error file=" + escapar(RUTA) + ",title=Permiso de escritura sin desvio declarado::" +
-                escapar(
-                  "la entrada \"" + h.entrada + "\" del allowlist " + h.porque + ", asi que el agente puede hacerlo sin que nadie confirme." + cola +
-                  " Arreglo, una de dos: ACOTALA a las operaciones de lectura que el trabajo necesita de verdad (un allowlist es una lista blanca: siempre se puede escribir el subcomando exacto en vez del comodin), o si esa autorizacion es deliberada declarala como desvio en " + RUTA_DESVIOS +
-                  " con su motivo escrito: { \"permiso\": \"" + h.entrada + "\", \"motivo\": \"por que este proyecto la necesita\", \"aprobado_por\": \"<quien>\", \"fecha\": \"AAAA-MM-DD\" }. Taparla con una entrada de \"deny\" no cuenta: deja el permiso ancho y la excepcion sin motivo escrito"
-                )
+              const cuerpo = escapar(
+                "la entrada \"" + h.entrada + "\" del allowlist " + h.porque + ", asi que el agente puede hacerlo sin que nadie confirme." + cola +
+                " Arreglo, una de dos: ACOTALA a las operaciones de lectura que el trabajo necesita de verdad (un allowlist es una lista blanca: siempre se puede escribir el subcomando exacto en vez del comodin), o si esa autorizacion es deliberada declarala como desvio en " + RUTA_DESVIOS +
+                " con su motivo escrito: { \"permiso\": \"" + h.entrada + "\", \"motivo\": \"por que este proyecto la necesita\", \"aprobado_por\": \"<quien>\", \"fecha\": \"AAAA-MM-DD\" }. Taparla con una entrada de \"deny\" no cuenta: deja el permiso ancho y la excepcion sin motivo escrito"
               );
+              if (h.compuerta) {
+                salida = 1;
+                console.log("::error file=" + escapar(h.ruta) + ",title=Permiso de escritura sin desvio declarado::" + cuerpo);
+              } else {
+                console.log("::warning file=" + escapar(h.ruta) + ",title=Permiso de escritura declarado en el frontmatter::" + cuerpo + escapar(ESTRENO));
+              }
             }
 
             for (const a of absorbidos) {
               // El desvio vivo se reimprime en CADA corrida: una excepcion que
               // nadie vuelve a ver es una excepcion que nadie vuelve a
               // discutir.
-              console.log("::notice title=Permiso de escritura con desvio declarado::" + escapar(a.motivo + " (permiso \"" + a.entrada + "\"" + (a.quien ? ", aprobado por " + a.quien : "") + ")"));
+              console.log("::notice title=Permiso de escritura con desvio declarado::" + escapar(a.motivo + " (permiso \"" + a.entrada + "\" en " + a.ruta + (a.quien ? ", aprobado por " + a.quien : "") + ")"));
             }
 
             // Un desvio de permiso que ya no absorbe nada esta repartiendo
@@ -2656,17 +2977,21 @@ jobs:
             for (const [permiso, d] of declarados) {
               if (d.usado) continue;
               salida = 1;
-              const detalle = allow.indexOf(permiso) >= 0
-                ? "esa entrada sigue en el allowlist pero ya no autoriza ninguna escritura, asi que el desvio no hace falta"
-                : "esa entrada ya no esta en el allowlist";
+              // Se busca en TODAS las fuentes y no solo en el archivo de ajustes: un
+              // desvio puede estar absorbiendo una entrada del frontmatter de una
+              // skill, y decir "ya no esta en el allowlist" sobre una entrada que si
+              // esta —en otro archivo— manda a quien lo lea a buscar donde no es.
+              const detalle = todasLasEntradas.indexOf(permiso) >= 0
+                ? "esa entrada sigue declarada en algun allowlist del repo pero ya no autoriza ninguna escritura, asi que el desvio no hace falta"
+                : "esa entrada ya no esta en ningun allowlist del repo";
               console.log(
                 "::error file=" + escapar(RUTA_DESVIOS) + ",title=Desvio de permiso muerto::" +
                 escapar("el desvio del permiso \"" + permiso + "\" no absorbe ningun hallazgo: " + detalle + ". Arreglo: borra esa entrada de " + RUTA_DESVIOS + " (motivo que tenia escrito: " + d.motivo + ")")
               );
             }
 
-            for (const entrada of aLaVista) {
-              console.log("::notice title=Permiso con el perfil de produccion::" + escapar("la entrada \"" + entrada + "\" corre con el perfil de produccion. El marco autoriza LEER produccion por CLI, asi que no es un hallazgo — se imprime en cada corrida para que quede a la vista y no se descubra el dia que importa"));
+            for (const item of aLaVista) {
+              console.log("::notice file=" + escapar(item.ruta) + ",title=Permiso con el perfil de produccion::" + escapar("la entrada \"" + item.entrada + "\" de " + item.ruta + " corre con el perfil de produccion. El marco autoriza LEER produccion por CLI, asi que no es un hallazgo — se imprime en cada corrida para que quede a la vista y no se descubra el dia que importa"));
             }
 
             // EL PISO RECOMENDADO NO SE MIDE ACA. Lo declara el manifiesto del
@@ -2675,10 +3000,21 @@ jobs:
             // este paso: cuando se declaraba en un lado y se verificaba con un
             // literal en el otro, las dos copias divergieron.
 
-            // La verdad de lo que se probo, ni una palabra mas.
+            // La verdad de lo que se probo, ni una palabra mas. El detalle POR ARCHIVO
+            // no es adorno: el lector del frontmatter tiene limites declarados (solo
+            // allowed-tools:/tools:, solo dos formas de lista), asi que un archivo que
+            // aparece con 0 entradas leidas es la senal de que ahi hay un YAML que
+            // este paso no supo leer — y sin la cuenta por archivo esa senal no
+            // existe, queda un total que se ve igual de sano.
+            for (const f of fuentes) {
+              console.log("   " + f.ruta + ": " + f.entradas.length + " entrada(s) leidas" + (f.compuerta ? " (COMPUERTA: sus hallazgos son rojos)" : " (modo aviso)"));
+            }
+            const enCompuerta = hallazgos.filter((h) => h.compuerta).length;
             console.log(
-              "== permisos del agente == " + allow.length + " entrada(s) del allowlist leidas: " +
-              hallazgos.length + " autoriza(n) una escritura sin desvio declarado, " + absorbidos.length + " con desvio y motivo escrito, " +
+              "== permisos del agente == " + todasLasEntradas.length + " entrada(s) leidas en " + fuentes.length + " archivo(s): " +
+              enCompuerta + " autoriza(n) una escritura sin desvio declarado y ponen ROJO este job, " +
+              (hallazgos.length - enCompuerta) + " autoriza(n) una escritura desde el frontmatter de una skill o un agente (AVISO, estreno), " +
+              absorbidos.length + " con desvio y motivo escrito, " +
               aLaVista.length + " corre(n) con el perfil de produccion" +
               (PERFIL_PROD === "" ? " (deteccion APAGADA: ver el aviso de arriba, ese 0 no significa que no haya ninguna)" : "") + ". " +
               "Es lectura de la FORMA de las entradas y no ejecucion: reconoce verbos que escriben y comodines en la posicion del subcomando, NO prueba que el resto de las entradas no pueda escribir. El piso recomendado de permisos lo mide actions/constitucion, que es donde vive su unica declaracion"
@@ -2788,25 +3124,63 @@ jobs:
   # paso mataba el job de higiene entero en el CI de Projects — o sea que la compuerta
   # jamas se ejercito como compuerta, que es el hallazgo 7 de la ronda 3.
   #
-  # POR QUE EL `if` NOMBRA AL REPO DEL MARCO, y por que no es una perilla. `uses:` no
-  # admite expresiones (la referencia lo prohibe) y una ruta local dentro de un workflow
-  # reusable se resuelve contra el repo de QUIEN LLAMA, no contra el del reusable. Las
-  # dos formas son entonces incompatibles en un mismo paso: el consumidor necesita la
-  # ref publicada y el marco necesita su arbol. La particion es TOTAL —el que no corre
-  # aca corre en el ci.yml del marco por ruta local, `./actions/constitucion`— y el
-  # veredicto de abajo lo COBRA: si este job se saltea sin ser el marco, es rojo.
-  # Cuando el tag movil traiga la action, este `if` se borra y queda un solo camino.
+  # POR QUE EL `if` PREGUNTA POR EL REPO DEL MARCO, y por que no es una perilla. `uses:`
+  # no admite expresiones (la referencia lo prohibe) y una ruta local dentro de un
+  # workflow reusable se resuelve contra el repo de QUIEN LLAMA, no contra el del
+  # reusable. Las dos formas son entonces incompatibles en un mismo paso: el consumidor
+  # necesita la ref publicada y el marco necesita su arbol. La particion es TOTAL —el
+  # que no corre aca corre en el ci.yml del marco por ruta local,
+  # `./actions/constitucion`— y el veredicto de abajo lo COBRA: si este job se saltea
+  # sin ser el marco, es rojo. Cuando el tag movil traiga la action, este `if` se borra
+  # y queda un solo camino.
+  #
+  # LA CUENTA SE DERIVA, NO SE REPITE, y el motivo es el escenario de la copia. Hasta
+  # hoy este `if` y el del veredicto comparaban contra el slug completo escrito literal.
+  # Un literal se vuelve mentira en cuanto el arbol cambia de cuenta —ya paso una vez,
+  # en el renombrado— y el modo de falla no es un error de arranque sino algo peor: en
+  # una copia a OtraCuenta/Projects el literal deja de coincidir, este job ARRANCA, y
+  # "Set up job" descarga y ejecuta `actions/constitucion` de la cuenta ORIGINAL en cada
+  # PR de cada repo que consuma esa copia. Con `github.repository_owner` la comparacion
+  # se resuelve dentro de la cuenta que corre: la copia se reconoce a si misma como el
+  # marco y toma el skip, igual que el original.
+  #
+  # LO QUE QUEDA LITERAL, dicho entero: el NOMBRE del repositorio ("Projects"). No hay
+  # ningun contexto que diga en que repositorio VIVE un workflow reusable —el contexto
+  # `github` de aca adentro es siempre el de quien llama— asi que la unica forma de
+  # derivarlo del todo seria un input, y un input es exactamente la perilla que este
+  # bloque no quiere: con `es_el_repo_del_marco: true` cualquier consumidor apagaria la
+  # compuerta y el veredicto de abajo se lo tragaria. El nombre no viaja entre cuentas,
+  # la cuenta si, y por eso se deriva la mitad que rota.
+  #
+  # Y LO QUE SIGUE SIN PODER DERIVARSE, con el comando exacto para una copia: los dos
+  # `uses:` de este archivo que nombran la cuenta original —el de mas abajo y el de
+  # `actions/guardrail-deltas` en el job de openspec— no admiten expresiones. Quien
+  # copie el marco a otra cuenta los cambia a mano, y son dos lineas, las que devuelve
+  #   grep -n 'uses: im-diego-ec/Projects' .github/workflows/marco-ci.yml
+  # El skip derivado de arriba hace que en la copia este job ni siquiera corra, asi que
+  # el unico `uses:` ajeno que queda VIVO en una copia es el de guardrail-deltas.
   # ---------------------------------------------------------------------------
   constitucion_cableada:
     name: constitucion-cableada
-    if: ${{ !cancelled() && github.repository != 'im-diego-ec/Projects' }}
+    # 10 minutos: este job hace un checkout, instala node y corre un lector de YAML sin
+    # dependencias. El default de GitHub son 360, y este workflow es reusable: el minuto
+    # colgado lo paga el consumidor.
+    timeout-minutes: 10
+    if: ${{ !cancelled() && github.repository != format('{0}/Projects', github.repository_owner) }}
     runs-on: ${{ inputs.runner }}
     permissions:
       contents: read
     steps:
       - uses: actions/checkout@v7
+        with:
+          # Bajo pull_request_target el default de actions/checkout es la rama BASE:
+          # ver el bloque del checkout del job higiene, que explica entero por que ese
+          # default convertia a todo el marco en un verde sobre codigo que nunca miro.
+          ref: ${{ github.event_name == 'pull_request_target' && github.event.pull_request.head.sha || '' }}
       - uses: actions/setup-node@v7
-        with: { node-version: "22" }
+        # La version que el consumidor pidio, no la que traiga la imagen del runner:
+        # este job leia manifiestos con un node que nadie eligio.
+        with: { node-version: "${{ inputs.version_node }}" }
       # Version exacta, no @v1: ver el motivo largo en el paso de deltas de OpenSpec.
       - name: Constitucion del marco cableada
         uses: im-diego-ec/Projects/actions/constitucion@v1.7.0
@@ -2826,6 +3200,9 @@ jobs:
     name: marco-ok
     needs: [cambios, openspec, higiene, constitucion_cableada]
     if: always()
+    # 5 minutos: este job no hace checkout ni toca la red, solo lee los resultados de
+    # sus needs. Si tarda mas que esto es que se colgo el runner, no el veredicto.
+    timeout-minutes: 5
     runs-on: ${{ inputs.runner }}
     steps:
       - name: Veredicto
@@ -2839,11 +3216,17 @@ jobs:
           # cableado por ruta local en su propio ci.yml. Cualquier otro salteo es un
           # fail-open, y un fail-open silencioso es indistinguible de que la compuerta
           # no exista.
+          # La cuenta se DERIVA, no se repite: es la otra punta de la comparacion del
+          # `if` de constitucion-cableada y tiene que decir exactamente lo mismo. Ver
+          # el bloque largo de ese job — con el slug escrito literal, una copia del
+          # marco a otra cuenta dejaba de reconocerse y terminaba ejecutando las
+          # composite actions de la cuenta original.
+          EL_REPO_DEL_MARCO="${{ github.repository_owner }}/Projects"
           if [ "${{ needs.constitucion_cableada.result }}" != "success" ]; then
-            if [ "${{ needs.constitucion_cableada.result }}" = "skipped" ] && [ "${{ github.repository }}" = "im-diego-ec/Projects" ]; then
-              echo "constitucion-cableada: salteado a proposito en el repo del marco, que lo corre por ruta local en su ci.yml"
+            if [ "${{ needs.constitucion_cableada.result }}" = "skipped" ] && [ "${{ github.repository }}" = "${EL_REPO_DEL_MARCO}" ]; then
+              echo "constitucion-cableada: salteado a proposito en el repo del marco (${EL_REPO_DEL_MARCO}), que lo corre por ruta local en su ci.yml"
             else
-              echo "::error::la comprobacion del cableado de la constitucion termino en '${{ needs.constitucion_cableada.result }}' en ${{ github.repository }}: un salteo solo es valido en el repo que distribuye el marco"
+              echo "::error::la comprobacion del cableado de la constitucion termino en '${{ needs.constitucion_cableada.result }}' en ${{ github.repository }}: un salteo solo es valido en el repo que distribuye el marco (${EL_REPO_DEL_MARCO})"
               exit 1
             fi
           fi

@@ -23,14 +23,14 @@ razonar: no dice qué está fijado, no dice quién lo cambia y no da ninguna sal
 al proyecto que necesita otra cosa.
 
 **Los dos proyectos del área llegaron por su cuenta a la misma base, y cada uno
-la volvió a tipear.** `un-proyecto-anterior/AGENTS.md:28-37` e
+la volvió a tipear.** El `AGENTS.md:28-37` del consumidor viejo e
 `intranet/AGENTS.md:18-28` (rama `projects/adopcion-marco`) coinciden capa por
 capa: React + Vite + TypeScript, Node + Express, PostgreSQL vía Prisma, Clerk,
 Zod, AWS + Terraform, GitHub Actions, pnpm con workspaces, Vitest. Y coinciden
 en la topología: los dos tienen `infra/ecs.tf`, los dos corren el backend como
 contenedor de Express sobre ECS y los datos en una base relacional administrada
-(`un-proyecto-anterior/infra-prod/database.tf`; en `intranet`, el cluster Aurora
-compartido). La base no es una aspiración de escritorio: es el estado de hecho
+(en el consumidor viejo, `infra-prod/database.tf`; en `intranet`, el cluster
+Aurora compartido). La base no es una aspiración de escritorio: es el estado de hecho
 **2 de 2**, escrito a mano dos veces, con la deriva previsible en los detalles
 —uno pina «React 18» y el otro no, uno dice «Aurora Serverless v2» y el otro
 «Aurora PostgreSQL (una sola base)»—.

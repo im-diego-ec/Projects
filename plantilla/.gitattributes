@@ -1,13 +1,19 @@
-# Normalizacion de fin de linea. Sin esto, con core.autocrlf=true git
-# rematerializa los archivos con CRLF en cada checkout, y los BANCOS DE PRUEBAS
-# del marco comparan contenido byte a byte: un fixture que en el repo es LF pero
-# en disco es CRLF hace fallar una prueba de borrado puro —el diff ve las lineas
-# como modificadas en vez de eliminadas— sin que nada haya cambiado en el codigo.
-# Paso el 2026-08-19, despues de un simple 'git reset --hard'.
+# Normalizacion de fin de linea, y no es cosmetica. Con core.autocrlf=true —el
+# default de git en Windows— cada checkout REMATERIALIZA los archivos con CRLF
+# aunque en el repositorio esten guardados con LF. A partir de ahi, todo lo que
+# compare contenido byte a byte miente: un arbol recien clonado aparece SUCIO
+# sin que nadie haya tocado nada, un diff lee como "modificadas" lineas que solo
+# se borraron, y una prueba que compara un archivo generado contra el esperado
+# falla por el fin de linea y no por lo que estaba probando.
 #
-# La leccion venia de un-proyecto-anterior, que recibio su .gitattributes esa
-# misma manana. Al marco no volvio: es el patron que este repo existe para
-# romper, esta vez sobre si mismo.
+# Lo caro no es el fallo sino que el sintoma no se parece a su causa: se busca el
+# bug en el codigo, y el codigo esta bien. Un 'git reset --hard' basta para
+# producirlo y no deja rastro de por que.
+#
+# `text=auto eol=lf` fija el fin de linea del arbol de trabajo en TODOS los
+# sistemas, asi que la configuracion de cada maquina deja de ser una variable del
+# resultado. Es la unica forma de que dos personas con sistemas distintos midan
+# lo mismo sobre el mismo commit.
 * text=auto eol=lf
 
 # Binarios: sin conversion ni diff de texto.

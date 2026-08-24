@@ -117,13 +117,13 @@ recuerde.
 ## Impact
 
 **Distribución.** *Scaffold*: los dos directorios nuevos y sus huecos, más su entrada en
-`.gitignore` para el `state` y los `.tfvars` —que en el un consumidor ya están
+`.gitignore` para el `state` y los `.tfvars` —que en el consumidor medido ya están
 ignorados y conviene que nazcan así—. *Canónico*: nada; la regla ya está escrita y no
 cambia. *Referenciado*: nada; el paso que caza los huecos ya existe y ya viaja.
 
-**Impacto en los consumidores actuales: ninguno, y es verificable.** un-proyecto-anterior
-ya tiene `infra/` y `infra-prod/` con Terraform real y **cero** huecos de decisión, así
-que pasa sin tocar una línea. Es MINOR y no breaking: ningún repositorio que hoy pasa,
+**Impacto en los consumidores actuales: ninguno, y es verificable.** El consumidor que ya
+está andando tiene `infra/` e `infra-prod/` con Terraform real y **cero** huecos de decisión,
+así que pasa sin tocar una línea. Es MINOR y no breaking: ningún repositorio que hoy pasa,
 mañana falla.
 
 **Impacto en un repositorio nuevo.** Su primer CI sale **rojo** en los huecos de

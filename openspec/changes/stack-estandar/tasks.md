@@ -149,7 +149,7 @@ no escrita, que es exactamente el estado que hoy declara en
 
 ## 4. Los dos consumidores
 
-- [ ] 4.1 `un-proyecto-anterior`: agregar el bloque de base a su archivo de
+- [ ] 4.1 Consumidor viejo: agregar el bloque de base a su archivo de
       valores. Verificado al abrir este change: su tabla
       (`AGENTS.md:28-37`) coincide capa por capa con la base, y su topología
       también (`infra/ecs.tf`, `infra-prod/database.tf`), así que el PR es el
