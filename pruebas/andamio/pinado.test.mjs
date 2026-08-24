@@ -61,7 +61,10 @@ const FUERA = /[\\/]pruebas[\\/]/;
 
 // `projects/<algo>@<ref>`, cortando el ref en el primer caracter que no puede ser
 // parte de un ref de git.
-const PIN = /projects(\/[^\s"'`]*)?@([^\s"'`,)\]]+)/;
+// La `i` no es cosmetica: el repo se llama `Projects` con mayuscula y este regex
+// nacio en minuscula. Sin ella el escaneo encuentra 1 pin en vez de 15 y la
+// asercion de mas abajo se cae — que es exactamente para lo que esta puesta.
+const PIN = /projects(\/[^\s"'`]*)?@([^\s"'`,)\]]+)/i;
 
 const VERSION_EXACTA = /^v\d+\.\d+\.\d+$/;
 const MAYOR_MOVIL = /^v\d+$/;
