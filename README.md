@@ -1,5 +1,35 @@
 # Projects — el marco de ingeniería de Transformación Digital y Data
 
+**Qué es, sin jerga.** Projects es el conjunto de reglas de trabajo del área
+convertidas en verificaciones que corren solas: cada vez que alguien propone un
+cambio, el sistema comprueba que cumpla lo que el equipo ya prometió, y si no lo
+cumple no lo deja entrar. No decide **qué** software se construye —eso es del
+negocio—; decide **cómo** se construye, cómo se revisa y cómo se entrega. Las
+palabras propias de acá (andamio, carril, compuerta, delta, fail-open, pin,
+capability) están definidas en una línea cada una en el
+[glosario](docs/glosario.md).
+
+| Qué te da | Qué te exige |
+|---|---|
+| El pipeline de CI/CD ya escrito y probado: lo llamás, no lo copiás, y sus arreglos te llegan como pull request | Que **no lo edites desde tu repo**: si te falta algo, o es un parámetro del workflow o es una propuesta de cambio acá |
+| Un repositorio nuevo completo en un comando: gobernanza, constitución, plantillas y CI ya conectado | Que **decidas los valores** del proyecto (cuentas, dominios, equipos) y toques GitHub a mano — eso no es transcripción |
+| Guardrails que atrapan errores que ya costaron caro una vez, cada uno con su incidente y su fecha | Que el comportamiento se escriba como **contrato** (`openspec/`) antes de implementarlo, y que lo apruebe quien es dueño del qué |
+| Una versión exacta y estable: nada cambia bajo tus pies | Que te mantengas **pineado a una versión** (`@vX.Y.Z`) y aceptes los bumps que llegan por pull request |
+
+**Por dónde sigo, según quién soy:**
+
+| Si sos… | Empezá por | Qué vas a encontrar |
+|---|---|---|
+| **El PO** — dueño del qué y el por qué | [`docs/para-el-po.md`](docs/para-el-po.md) | Una página sin código: qué rutas aprobás, cómo se lee un spec real línea por línea, y las cuatro preguntas con las que se devuelve una propuesta |
+| **Un builder nuevo en el equipo** | [`docs/reglas-no-escritas.md`](docs/reglas-no-escritas.md), y después [`AGENTS.md`](AGENTS.md) | Cómo se trabaja acá, qué regla está automatizada y cuál todavía depende de una persona — declarado, no supuesto |
+| **Un builder arrancando un proyecto** | [`docs/arrancar-un-proyecto.md`](docs/arrancar-un-proyecto.md) | De no tener repositorio a `ci-ok` en verde, con los fallos silenciosos del día 1 |
+| **Alguien con un incidente en curso** | El runbook del proyecto, en **su** repo | Acá no hay recursos concretos; lo que vive acá es la plantilla con la que ese runbook se escribió ([`docs/plantillas/runbook.md`](docs/plantillas/runbook.md)) |
+
+El resto de esta página es el detalle: por qué existe cada pieza, cómo se
+distribuye y cómo se consume.
+
+---
+
 Projects es el marco con el que nacen y se operan los proyectos del área: el
 flujo de especificación (OpenSpec), los guardrails de CI/CD, la gobernanza
 del repositorio (CODEOWNERS, protección de `main`, plantilla de PR), la
@@ -98,8 +128,8 @@ node /tmp/projects/herramientas/projects-init.mjs --ejemplo > valores.json
 node /tmp/projects/herramientas/projects-init.mjs --valores valores.json --destino .
 ```
 
-Eso copia los 22 archivos del andamio —dotfiles incluidos, que es donde falla el
-copiado a mano— sustituye las 89 ocurrencias de los 22 marcadores, corre
+Eso copia los 75 archivos del andamio —dotfiles incluidos, que es donde falla el
+copiado a mano— sustituye las 157 ocurrencias de los 21 marcadores, corre
 `openspec init` con el pin del marco y renderiza la porción del marco de la
 constitución. **Falla cerrado**: un valor que falta, un marcador que sobrevive o un
 destino que ya tiene andamio abortan sin escribir nada, con el nombre de lo que
@@ -127,7 +157,7 @@ Lo que **no** hace, porque no es transcripción:
    proponerlos. En los dos casos el repo simplemente **no recibe versiones nuevas
    y no aparece en el censo de consumidores**, sin avisar.
 
-> **La tabla de los 22 valores**, con qué poner, ejemplo y caso borde de cada uno,
+> **La tabla de los 21 valores**, con qué poner, ejemplo y caso borde de cada uno,
 > vive en **[`plantilla/README.md`](plantilla/README.md)** sección 2. Ese archivo es
 > la fuente de verdad de los valores y manda sobre este resumen; también documenta
 > el camino **manual**, que sigue siendo válido y es el fallback si `projects init`
@@ -275,7 +305,7 @@ diff.
 │                          #   con su propio README como guía del bootstrap y un
 │                          #   .github/workflows/ci.yml que ya llama al marco por versión exacta
 ├── herramientas/          # projects-init.mjs: instancia el andamio en un repo nuevo en un comando
-│                          #   (copia + 22 marcadores + openspec init + render de la constitucion)
+│                          #   (copia + 21 marcadores + openspec init + render de la constitucion)
 ├── pruebas/                # el banco de los pasos INLINE de marco-ci.yml y del pinado del andamio:
 │                          #   ese código no puede salir de su bloque `run:` (cuando un consumidor
 │                          #   llama al reusable, el árbol checkouteado es el DEL CONSUMIDOR), así
