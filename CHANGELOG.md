@@ -43,6 +43,65 @@ mueve sobre un cambio incompatible.
 
 ### Seguridad
 
+- **Un consumidor llamado `<su-cuenta>/Projects` se salteaba la compuerta de la
+  constitución, y el veredicto agregado le aceptaba el salteo en silencio.** El `if` de
+  `constitucion-cableada` y su gemelo en `marco-ok` comparaban contra
+  `format('{0}/Projects', github.repository_owner)`. Las dos puntas derivaban lo mismo,
+  así que el fail-open no se notaba: un repositorio que se llamara así recibía «salteado
+  a propósito» en vez de la compuerta. Un nombre de repositorio no es una identidad.
+  Ahora la pregunta la contesta una **sonda por archivos rastreados de la rama base**
+  (`cambios.outputs.es_distribuidor`): reparte `plantilla/.github/workflows/ci.yml`,
+  contiene `actions/constitucion/action.yml` y no versiona `.projects-valores.json`.
+  Fail-closed en todas sus salidas — no poder medir responde `false`, y `false` es el
+  caso en el que las compuertas **corren**. Banco:
+  `pruebas/marco-ci/distribuidor.test.mjs`.
+- **`actions/guardrail-deltas` se mudó a un job propio, `deltas-openspec`, que se saltea
+  en el repo que distribuye el marco.** Vivía como paso del job `openspec`, que corre en
+  todas partes: una copia del árbol a otra cuenta seguía descargando y ejecutando la
+  composite action de la cuenta **original** en cada PR de cada consumidor de esa copia.
+  Un `if` de paso no lo arregla — GitHub resuelve y descarga las actions de un job en
+  «Set up job», antes de evaluar el `if` de cualquier paso.
+- **Bajo `pull_request_target`, el job `openspec` sí ejecutaba código del PR.** Corre
+  `npx --yes "@fission-ai/openspec@<pin>"` con el cwd dentro del árbol recién
+  *checkouteado*, y npm lee el `.npmrc` del directorio de trabajo antes que el del
+  usuario: un `.npmrc` del head de un fork redirigía el `registry=` y npx bajaba y
+  ejecutaba otro paquete con ese nombre. El pin dice **qué** bajar, no **de dónde**. Se
+  agrega el paso «El arbol del PR no redirige el registry de npm» (rojo si el árbol trae
+  un `.npmrc`) y el `npx` corre con `npm_config_userconfig` apuntando a un archivo
+  vacío. Banco: `pruebas/marco-ci/registry-npm.test.mjs`.
+- **Los cinco checkouts de `marco-ci.yml` declaran `persist-credentials: false`.** Con
+  el default, bajo `pull_request_target` el checkout dejaba el token del repo
+  **llamador** escrito como `extraheader` en el `.git/config` de un árbol que es código
+  de un tercero. Banco: `pruebas/marco-ci/checkouts.test.mjs`.
+- **El `allowed-tools:` del frontmatter de skills y agentes pasa a ser COMPUERTA en el
+  repo que distribuye el marco.** Seguía en modo aviso en todas partes: medido sobre
+  este árbol, 30 entradas que autorizan una escritura (`Bash(gh:*)` habilita `gh pr
+  merge`, `gh release create` y `gh api -X DELETE`; `Bash(git:*)` habilita `git push
+  --force`) y el job terminaba **verde**. La regla del marco sobre endurecimientos
+  protege a los consumidores de un rojo que nadie les anunció; no protege al repo que
+  escribe la línea. Banco: `pruebas/marco-ci/permisos-compuerta.test.mjs`.
+
+### Para consumidores
+
+- **Un job nuevo en el CI heredado: `deltas-openspec`.** Es el guardrail de deltas de
+  OpenSpec, que antes era un paso del job `openspec`. No cambia lo que se verifica ni
+  cuándo falla; cambia dónde aparece en la lista de checks. Cuesta un checkout y un
+  `setup-node` más por corrida.
+- **`marco-ok` ahora cobra también el salteo de `deltas-openspec`**, con el mismo
+  criterio que ya usaba para `constitucion-cableada`: un skip solo es válido en el repo
+  que distribuye el marco.
+- Nada que hacer del lado del consumidor. El `allowed-tools:` del frontmatter **sigue en
+  modo aviso** en tu repo: el endurecimiento de esa clase se anunciará antes en esta
+  misma sección.
+
+### Guardas que quedaron sin banco y ahora lo tienen
+
+- Las dos guardas de «no pude mirar» del job `higiene` —«Artefactos regenerados al dia»
+  y «Sin marcadores del scaffold sin resolver»— cerraban un verde afirmativo sobre cero
+  archivos leídos (`git ls-files` sale 128 fuera de un árbol git) y se habían escrito
+  **sin una sola aserción**. Banco con mutación:
+  `pruebas/marco-ci/higiene-sin-arbol.test.mjs`.
+
 - **`projects init --version-openspec` sin valor era un éxito silencioso.** `argumentos()`
   toma el valor con `argv[++i]`, que con la bandera al final del argv devuelve `undefined`,
   y la validación estaba escrita `if (o.versionOpenspec !== undefined && !pinValido(...))`:

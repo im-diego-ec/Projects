@@ -63,8 +63,8 @@
 # CÓMO SE DECIDE
 #   Empezá por subredes privadas con salida por NAT y VERIFICÁ que funcione para
 #   tu caso. No heredes la conclusión de otro proyecto en ninguna de las dos
-#   direcciones: el un consumidor terminó en subredes PÚBLICAS y lo
-#   dejó escrito con su medición («con subnets privadas, `ingress_paths` queda
+#   direcciones: un consumidor terminó en subredes PÚBLICAS y lo dejó
+#   escrito con su medición («con subnets privadas, `ingress_paths` queda
 #   vacío — probado»), porque su servicio necesita un balanceador accesible desde
 #   internet. Su `network.tf` es un buen EJEMPLO de cómo documentar una decisión
 #   así, y no es una plantilla.

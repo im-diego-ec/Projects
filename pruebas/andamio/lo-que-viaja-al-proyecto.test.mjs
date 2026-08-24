@@ -1,7 +1,7 @@
 // LO QUE EL ANDAMIO LE ENTREGA A UN REPOSITORIO NUEVO TIENE QUE SER CIERTO Y
 // USABLE *EN ESE* REPOSITORIO.
 //
-// POR QUE ESTAN LAS TRES JUNTAS. Son la misma clase de defecto, que solo se ve
+// POR QUE ESTAN LAS CINCO JUNTAS. Son la misma clase de defecto, que solo se ve
 // cuando uno se para en el repo que RECIBE el andamio y no en el que lo escribe:
 //
 //   1. Un documento de arranque escrito para un solo sistema operativo. No falla
@@ -17,8 +17,15 @@
 //      unica linea `cache:` de todo el arbol estaba en el andamio y no en el CI
 //      del marco, y caia sobre el unico job que instala y ejecuta codigo de
 //      terceros.
+//   4. El nombre del repositorio del marco escrito en minuscula. GitHub resuelve
+//      el `uses:` igual, asi que no hay rojo; lo que se rompe son los escaneos
+//      del marco que buscan esas referencias por texto para comprobar que esten
+//      pinadas, y una guarda que no encuentra la linea que audita sale verde.
+//   5. El residuo de una pasada de reemplazo: «el un consumidor», donde el
+//      articulo viejo quedo pegado al nombre nuevo. Ningun linter mira un
+//      comentario, asi que viaja intacto a cada repo que nazca del andamio.
 //
-// Las tres MUERDEN: cada comprobacion se corre tambien sobre una copia mutada en
+// Las cinco MUERDEN: cada comprobacion se corre tambien sobre una copia mutada en
 // un directorio temporal —nunca sobre el arbol del repo— y se exige que reporte
 // el problema. Una comprobacion que no se vio fallar no es una comprobacion.
 import test from "node:test";
@@ -258,11 +265,31 @@ test("andamio · la comprobacion del cache MUERDE", () => {
 // mismo motivo: decidir si una frase atribuye o explica no se resuelve con un
 // escaneo de texto.
 //
-// Queda FUERA a proposito «consumidor de referencia». Ahi el andamio no dice
-// donde aprendio una regla: cita la decision de otro proyecto COMO EJEMPLO, con
+// «consumidor de referencia» SIGUE EN LA LISTA, y el UNICO archivo del andamio
+// que hoy la usa —infra/pendientes.tf— esta en EXCEPCIONES con su motivo. La
+// diferencia con sacarla de la lista no es de estilo: ahi el andamio no dice
+// donde aprendio una regla, cita la decision de otro proyecto COMO EJEMPLO, con
 // su medicion al lado y con la advertencia de no copiarla sin repetir la prueba
-// (el encabezado de infra/pendientes.tf lo explica). Prohibirlo obligaria a
-// borrar el ejemplo, que es lo unico que vuelve decidible el pendiente.
+// (el encabezado de ese mismo archivo lo explica). Prohibirlo obligaria a borrar
+// el ejemplo, que es lo unico que vuelve decidible el pendiente. Pero el permiso
+// es de ESE ARCHIVO, no de la frase: en cualquier otro se sigue reportando —el
+// segundo uso que habia, en eslint.config.mjs, contaba DONDE habia pasado algo y
+// se reescribio en vez de eximirlo— y cuando ese encabezado se reescriba la
+// excepcion queda muerta y este banco pide que se borre. Hasta el 2026-08-24
+// esto estaba escrito como si la frase estuviera fuera de la lista, y no lo
+// estaba: el arbol pasaba por el fail-open de abajo, no por ninguna excepcion.
+//
+// ── EL FAIL-OPEN QUE ESTA GUARDA TENIA, y por que la busqueda normaliza ─────
+// La comparacion era `texto.includes(frase)` sobre el archivo CRUDO. Un
+// comentario largo se parte en varias lineas, asi que «consumidor de referencia»
+// escrito en eslint.config.mjs quedaba como "consumidor de\n        // referencia"
+// y la guarda no lo veia: la frase estaba en su propia lista, en el arbol, y el
+// banco daba verde. Es el patron que este marco persigue —una compuerta que no
+// tapa su propio caso— dentro de la compuerta misma. Por eso ahora se busca
+// sobre el texto NORMALIZADO: los saltos de linea y el prefijo de comentario que
+// abre la linea siguiente colapsan a un solo espacio, asi que una frase partida
+// por el wrap se lee igual que una frase entera. Envolver un comentario deja de
+// ser una forma de esconder una procedencia.
 // ---------------------------------------------------------------------------
 
 // Lo que se vigila son FRASES DE PROCEDENCIA, no nombres propios. La diferencia
@@ -280,6 +307,13 @@ const PROCEDENCIAS = [
   "consumidor de referencia",
   "material de origen",
   "el marco existe para",
+  // Las dos formas que se escaparon de la lista mientras la busqueda no
+  // normalizaba: el andamio las tenia escritas y esta guarda no las nombraba.
+  // «el piloto» estaba en un ejemplo de config de cobertura ("heredado del
+  // piloto") y «un proyecto consumidor» en dos comentarios del API. Los dos
+  // archivos ya estan limpios; las frases quedan aca para que no vuelvan.
+  "el piloto",
+  "un proyecto consumidor",
 ];
 
 // EXCEPCIONES VIGENTES, con su motivo y su condicion de muerte. Cada una tiene
@@ -288,9 +322,22 @@ const PROCEDENCIAS = [
 // lo que la justificaba, que es como una excepcion se convierte en un agujero.
 // Las dos excepciones que vivian aca murieron cuando los archivos se limpiaron, y
 // el banco lo dijo solo: ese es el mecanismo. Una excepcion sin su archivo detras es
-// un agujero esperando a que alguien vuelva a caer por el, asi que la lista se queda
-// vacia hasta que haya un caso real que justificar.
-const EXCEPCIONES = [];
+// un agujero esperando a que alguien vuelva a caer por el, asi que la lista solo
+// lleva casos reales, y cada uno tiene que SEGUIR matcheando.
+const EXCEPCIONES = [
+  {
+    archivo: "infra/pendientes.tf",
+    frases: ["consumidor de referencia"],
+    motivo:
+      "Es el unico lugar del andamio donde la frase no explica DONDE se aprendio una regla: " +
+      "el encabezado de los pendientes dice que aca NO estan las respuestas de otro proyecto, " +
+      "y nombra al consumidor de referencia para advertir que sus respuestas estan razonadas " +
+      "contra mediciones suyas y que copiarlas sin su razon las convierte en decisiones que " +
+      "nadie tomo. Borrar la frase borraria la advertencia, que es lo que vuelve decidible el " +
+      "pendiente. Condicion de muerte: si el encabezado se reescribe sin nombrarlo, esta " +
+      "entrada queda muerta y el banco pide borrarla.",
+  },
+];
 
 /** Todos los archivos de texto del andamio, con su ruta relativa a plantilla/. */
 function archivosDelAndamio(dir = ANDAMIO, acumulado = []) {
@@ -307,6 +354,28 @@ function archivosDelAndamio(dir = ANDAMIO, acumulado = []) {
   return acumulado;
 }
 
+/**
+ * El texto de un archivo aplanado para buscar frases en el.
+ *
+ * QUE COLAPSA Y POR QUE. Un salto de linea seguido de la sangria y del prefijo
+ * que abre el comentario siguiente (`//`, `#`, `*` de un bloque JSDoc, `--`, `;`)
+ * pasa a ser UN espacio, y las corridas de espacios y tabs pasan a ser uno. Con
+ * eso, «consumidor de\n        // referencia» y «consumidor de referencia» son el
+ * mismo texto para la busqueda. Sin eso, envolver un comentario alcanzaba para
+ * esconder una frase de la lista: era el fail-open de esta guarda.
+ *
+ * Colapsar de mas es la direccion SEGURA del error: puede juntar el final de una
+ * linea con el principio de la siguiente y reportar una frase que nadie escribio
+ * de corrido, y eso se resuelve leyendo el archivo. Colapsar de menos deja pasar
+ * la frase, y eso no se resuelve nunca porque nadie se entera.
+ */
+function normalizado(texto) {
+  return texto
+    .toLowerCase()
+    .replace(/[\r\n]+[ \t]*(?:\/\/+|#+|\*+|--+|;+)?[ \t]*/g, " ")
+    .replace(/[ \t]+/g, " ");
+}
+
 /** Los problemas de procedencia de un arbol de andamio. */
 function problemasDeProcedencia(raizAndamio, excepciones = EXCEPCIONES) {
   const problemas = [];
@@ -315,7 +384,7 @@ function problemasDeProcedencia(raizAndamio, excepciones = EXCEPCIONES) {
 
   for (const abs of archivosDelAndamio(raizAndamio)) {
     const rel = path.relative(raizAndamio, abs).split(path.sep).join("/");
-    const texto = fs.readFileSync(abs, "utf8").toLowerCase();
+    const texto = normalizado(fs.readFileSync(abs, "utf8"));
     for (const frase of PROCEDENCIAS) {
       if (!texto.includes(frase)) continue;
       if (exentos.has(rel) && excepciones.find((e) => e.archivo === rel).frases.includes(frase)) {
@@ -368,5 +437,177 @@ test("andamio · la comprobacion de procedencia MUERDE", () => {
   const muertas = problemasDeProcedencia(copia, inventada).filter((p) => p.startsWith("excepcion muerta:"));
   assert.equal(muertas.length, 1, "una excepcion cuyo archivo ya no tiene la frase tiene que pedirse borrar");
 
+  // (c) EL FAIL-OPEN DEL WRAP, que es por lo que esta guarda existia sin morder.
+  // La MISMA frase escrita partida por el salto de linea de un comentario tiene
+  // que reportarse igual que escrita de corrido. Se prueba con las tres
+  // ortografias de comentario que el andamio usa —`//`, `#` y el `*` de un
+  // bloque JSDoc— porque el prefijo de la linea siguiente es justamente lo que
+  // se colaba entre las dos mitades de la frase.
+  const partidas = [
+    ["wrap-doble-barra.mjs", "// una regla que venia del repo de\n// origen y nadie volvio a mirar\n"],
+    ["wrap-numeral.yml", "# una regla que venia del repositorio de\n#   origen y nadie volvio a mirar\n"],
+    ["wrap-jsdoc.ts", "/**\n * una regla que venia del material de\n * origen y nadie volvio a mirar\n */\n"],
+  ];
+  for (const [nombre, contenido] of partidas) {
+    const suelto = path.join(copia, nombre);
+    fs.writeFileSync(suelto, contenido);
+    const problemas = problemasDeProcedencia(copia);
+    assert.equal(
+      problemas.length,
+      1,
+      `la procedencia de ${nombre} esta partida por el wrap del comentario y no se detecto: ${JSON.stringify(problemas)}`,
+    );
+    assert.match(problemas[0], new RegExp(`^${nombre}: nombra la procedencia`));
+    fs.rmSync(suelto);
+  }
+  assert.deepEqual(problemasDeProcedencia(copia), [], "la copia no volvio limpia despues de los casos partidos");
+
+  fs.rmSync(tmp, { recursive: true, force: true });
+});
+
+// ---------------------------------------------------------------------------
+// 4 · EL NOMBRE DEL REPOSITORIO DEL MARCO SE ESCRIBE `Projects`, CON MAYUSCULA
+//
+// POR QUE ES UNA GUARDA Y NO UNA PREFERENCIA DE ESTILO. GitHub resuelve el slug
+// de un `uses:` sin distinguir mayusculas, asi que un `<org>/projects/...` FUNCIONA
+// y no hay ningun rojo que lo denuncie. Lo que no funciona son las cosas que el
+// marco construye ALREDEDOR de ese slug: los escaneos que buscan las referencias
+// al marco para comprobar que esten pinadas van por texto, y ya se rompieron dos
+// veces contra una ortografia en minuscula — una guarda que no encuentra la linea
+// que viene a auditar sale verde por construccion, que es el fail-open mas barato
+// que hay. El costo de escribirlo bien es cero; el de escribirlo mal no se ve.
+//
+// LA REGLA, DECIDIBLE: detras de un prefijo de CUENTA —el marcador que sustituye
+// el andamio, el `<org>` de la prosa o la cuenta literal— el segmento siguiente
+// es el nombre del repositorio, y tiene que ser exactamente `Projects`. Una ruta
+// del sistema de archivos (`/tmp/projects`) no lleva prefijo de cuenta y por eso
+// queda fuera sin necesidad de una excepcion.
+// ---------------------------------------------------------------------------
+const CUENTA = String.raw`(?:\{\{ORG\}\}|<org>|im-diego-ec)`;
+const SLUG = new RegExp(`${CUENTA}/([A-Za-z][A-Za-z0-9_.-]*)(?=[/@\`'"\\s)])`, "g");
+
+/** Las referencias al repositorio del marco mal escritas, con su ubicacion. */
+function slugsMalEscritos(raizAndamio) {
+  const problemas = [];
+  for (const abs of archivosDelAndamio(raizAndamio)) {
+    const rel = path.relative(raizAndamio, abs).split(path.sep).join("/");
+    const lineas = fs.readFileSync(abs, "utf8").split(/\r?\n/);
+    lineas.forEach((linea, i) => {
+      for (const m of linea.matchAll(SLUG)) {
+        if (m[1] === "Projects") continue;
+        problemas.push(
+          `${rel}:${i + 1}: el repositorio del marco se llama "Projects" con mayuscula y aca dice "${m[0]}". Arreglo: escribilo Projects; los escaneos de pinado del marco buscan por texto y no lo encuentran asi`,
+        );
+      }
+    });
+  }
+  return problemas;
+}
+
+test("andamio · toda referencia al repositorio del marco lo escribe `Projects`", () => {
+  // Cero referencias encontradas seria la guarda mirando al vacio: el andamio
+  // consume el marco por `uses:` en varios archivos y tiene que verlas.
+  let vistas = 0;
+  for (const abs of archivosDelAndamio()) {
+    vistas += [...fs.readFileSync(abs, "utf8").matchAll(SLUG)].length;
+  }
+  assert.ok(vistas >= 6, `solo ${vistas} referencias al marco encontradas: el patron dejo de matchear`);
+  assert.deepEqual(slugsMalEscritos(ANDAMIO), []);
+});
+
+test("andamio · la comprobacion del nombre del repositorio MUERDE", () => {
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "projects-slug-"));
+  const copia = path.join(tmp, "plantilla");
+  fs.cpSync(ANDAMIO, copia, { recursive: true });
+  assert.deepEqual(slugsMalEscritos(copia), [], "la copia no arranco limpia");
+
+  // Las tres ortografias de cuenta, cada una con el repo en minuscula. Y una
+  // ruta del sistema de archivos al lado, que NO se reporta: si se reportara, la
+  // guarda tendria que llevar una excepcion y una excepcion es un agujero.
+  const suelto = path.join(copia, "slug-de-prueba.md");
+  fs.writeFileSync(
+    suelto,
+    ["uses: {{ORG}}/projects/actions/x@v1", "ver <org>/projects/.github", "uses: im-diego-ec/projects@v1", "cp -r /tmp/projects/plantilla/. .", ""].join("\n"),
+  );
+  const problemas = slugsMalEscritos(copia);
+  assert.equal(problemas.length, 3, `las tres ortografias tenian que reportarse y la ruta local no: ${JSON.stringify(problemas)}`);
+  assert.ok(problemas.every((p) => p.startsWith("slug-de-prueba.md:")));
+  assert.deepEqual(
+    problemas.map((p) => p.split(":")[1]),
+    ["1", "2", "3"],
+    "la linea que reporta cada problema no es la del hallazgo",
+  );
+
+  fs.rmSync(suelto);
+  assert.deepEqual(slugsMalEscritos(copia), [], "la copia no volvio limpia");
+  fs.rmSync(tmp, { recursive: true, force: true });
+});
+
+// ---------------------------------------------------------------------------
+// 5 · NINGUNA PASADA DE REEMPLAZO DEJA EL ARTICULO VIEJO PEGADO AL NUEVO
+//
+// POR QUE ES UNA GUARDA Y NO UNA CORRECCION DE ESTILO. Los reemplazos masivos de
+// nombres son la forma en que este arbol se anonimiza y se renombra, y siempre
+// sustituyen el SUSTANTIVO sin mirar el determinante que lo precedia: «el
+// <nombre>» se convierte en «el un consumidor», «del <nombre>» en «del un
+// consumidor». El texto sigue leyendose casi bien, ningun linter lo mira —son
+// comentarios y prosa— y viaja a cada repositorio que nazca del andamio, incluido
+// el comentario del middleware de autenticacion que un ingeniero SI abre. Cuando
+// esta guarda se escribio el 2026-08-24 el andamio traia casos vivos en cuatro
+// archivos, todos de la misma pasada; el numero exacto no se anota aca porque lo
+// mide la comprobacion de abajo cada vez que corre.
+//
+// LA REGLA, DECIDIBLE: en castellano un articulo determinado no precede a uno
+// indeterminado. «el un», «del un» y «al un» seguidos de palabra son siempre el
+// residuo de un reemplazo, nunca una frase que alguien escribio a proposito.
+// ---------------------------------------------------------------------------
+const ARTICULO_PEGADO = /\b(?:el|del|al)\s+un\s+[a-záéíóúñ]/i;
+
+/** Los residuos de reemplazo del andamio, con archivo y linea. */
+function articulosPegados(raizAndamio) {
+  const problemas = [];
+  for (const abs of archivosDelAndamio(raizAndamio)) {
+    const rel = path.relative(raizAndamio, abs).split(path.sep).join("/");
+    fs.readFileSync(abs, "utf8")
+      .split(/\r?\n/)
+      .forEach((linea, i) => {
+        const m = linea.match(ARTICULO_PEGADO);
+        if (!m) return;
+        problemas.push(
+          `${rel}:${i + 1}: "${m[0].trim()}" — un articulo determinado delante de uno indeterminado es el residuo de una pasada de reemplazo que sustituyo el nombre y dejo el determinante viejo. Arreglo: borra el determinante que sobra`,
+        );
+      });
+  }
+  return problemas;
+}
+
+test("andamio · ninguna linea arrastra el articulo viejo de un reemplazo", () => {
+  assert.deepEqual(articulosPegados(ANDAMIO), []);
+});
+
+test("andamio · la comprobacion del articulo pegado MUERDE", () => {
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "projects-articulo-"));
+  const copia = path.join(tmp, "plantilla");
+  fs.cpSync(ANDAMIO, copia, { recursive: true });
+  assert.deepEqual(articulosPegados(copia), [], "la copia no arranco limpia");
+
+  // Las tres formas, y debajo dos que NO se reportan: «el unico» (una palabra
+  // sola que empieza igual) y «un consumidor» ya sano. Sin esos dos controles la
+  // guarda podria estar mordiendo por el prefijo y no por la construccion.
+  const suelto = path.join(copia, "residuo-de-prueba.md");
+  fs.writeFileSync(
+    suelto,
+    ["Le paso en el un proyecto vecino.", "fue el bug del un servicio.", "medido al un consumidor.", "es el unico lugar legitimo.", "lo midio un consumidor.", ""].join("\n"),
+  );
+  const problemas = articulosPegados(copia);
+  assert.equal(problemas.length, 3, `las tres formas tenian que reportarse y las dos sanas no: ${JSON.stringify(problemas)}`);
+  assert.deepEqual(
+    problemas.map((p) => p.split(":")[1]),
+    ["1", "2", "3"],
+    "la linea que reporta cada residuo no es la del hallazgo",
+  );
+
+  fs.rmSync(suelto);
+  assert.deepEqual(articulosPegados(copia), [], "la copia no volvio limpia");
   fs.rmSync(tmp, { recursive: true, force: true });
 });

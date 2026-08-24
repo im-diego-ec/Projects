@@ -78,11 +78,16 @@ COPY . .
 RUN pnpm install --frozen-lockfile --prod=false --filter {{PAQUETE_API}}...
 
 WORKDIR /app/api
-# DATABASE_URL de relleno: prisma.config.ts exige la variable para resolver la
-# config, pero "generate" no se conecta a ninguna base. La URL real la inyecta
-# la definicion de tarea en tiempo de ejecucion.
-RUN DATABASE_URL="postgresql://relleno:relleno@localhost:5432/relleno" \
-  pnpm exec prisma generate
+# SIN DATABASE_URL, y no es un olvido. `generate` es codegen puro: no se conecta
+# a ninguna base. Y prisma.config.ts declara la datasource CONDICIONAL —lee
+# `process.env.DATABASE_URL` y solo la incluye si esta— justamente para que la
+# variable no haga falta aca; su propio comentario lleva la medicion al lado
+# ("sin DATABASE_URL, `prisma generate` -> EXIT 0"). Este paso llevaba una URL
+# de relleno con el motivo "prisma.config.ts exige la variable", que era falso
+# contra el archivo hermano: una URL inventada en el build solo sirve para que
+# el dia que `generate` SI necesite conectarse el error apunte a un host que no
+# existe. La URL real la inyecta la definicion de tarea en tiempo de ejecucion.
+RUN pnpm exec prisma generate
 
 # NO ROOT. La imagen base trae el usuario `node` (uid 1000) sin usar, y hasta
 # aca todo corrio como uid 0: sin estas dos lineas el proceso que atiende HTTP
@@ -124,9 +129,19 @@ USER node
 EXPOSE 3000
 CMD ["pnpm", "start"]
 
-# COMO SE COMPRUEBA, Y POR QUE NO ESTA COMPROBADO TODAVIA. El cambio que escribio
-# el --platform, el COREPACK_HOME y el USER de este archivo no tenia docker ni
-# salida a red en la maquina: NINGUNO DE LOS TRES SE VIO CORRER. Queda el
+# LO QUE SI ESTA COMPROBADO, Y DONDE. pruebas/andamio/acoples-del-andamio.test.mjs
+# lee este archivo y pone en rojo lo que antes salia verde: que falte `USER node`,
+# que suba arriba del install o del generate, que se borre el `chown -R`, que
+# COREPACK_HOME vuelva al $HOME de root, que falte el `mkdir -p /opt/corepack`
+# del que depende ese chown, que el CMD quede arriba del USER, y que el
+# --platform desaparezca o deje de coincidir con la arquitectura declarada en
+# infra/pendientes.tf. Cada una de esas comprobaciones se vio fallar contra una
+# copia mutada; ninguna construye la imagen.
+#
+# COMO SE COMPRUEBA LO QUE UN ESCANEO DE TEXTO NO PUEDE VER. Que el proceso corra
+# de verdad como `node`, que pnpm se resuelva sin salir al registry y que la
+# imagen salga con la arquitectura declarada solo se miden construyendo: la
+# maquina donde se escribio esto no tiene docker ni salida a red. Queda el
 # comando exacto que los cierra, desde la RAIZ del repo, con lo que cada uno
 # tiene que contestar:
 #
