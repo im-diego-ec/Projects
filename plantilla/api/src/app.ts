@@ -38,12 +38,15 @@ export function createApp() {
   // Chequeo de la base, SEPARADO de /api/health: si se mezclaran, una base
   // lenta haria que el balanceador diera de baja tareas que estan sanas.
   //
-  // ES LA UNICA RUTA CON LOGICA QUE NO LLEVA requireAuth, y eso es a proposito:
-  // el runbook la consulta con curl contra el dominio de produccion y solo mira
-  // el codigo HTTP. Por eso la CAUSA no viaja en el cuerpo. El mensaje del
-  // driver nombra internals de la infraestructura: P1001 de Prisma es "Can't
-  // reach database server at `<host>`:`<puerto>`" y P1000 nombra el usuario de
-  // la base. Devolverlo es regalarle a cualquiera que haga curl el mapa interno.
+  // NO LLEVA requireAuth —tampoco /api/health, aca arriba— pero es la unica de
+  // las dos que TOCA LA BASE, asi que es la unica cuyo camino de error puede
+  // disparar cualquiera que alcance el dominio. Es a proposito: el runbook la
+  // consulta con curl contra produccion y solo mira el codigo HTTP.
+  //
+  // Por eso la CAUSA no viaja en el cuerpo. El mensaje del driver nombra
+  // internals de la infraestructura: P1001 de Prisma es "Can't reach database
+  // server at `<host>`:`<puerto>`" y P1000 nombra el usuario de la base.
+  // Devolverlo es regalarle a cualquiera que haga curl el mapa interno.
   //
   // El canal se parte en dos, igual que en errorHandler.ts: al cliente lo
   // minimo mas el requestId, al log el error entero (log.ts serializa el Error

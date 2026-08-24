@@ -68,12 +68,13 @@ describe("app", () => {
     expect(consultar).toHaveBeenCalled();
   });
 
-  // /api/db/health es la unica ruta con logica SIN requireAuth: cualquiera que
-  // alcance el dominio la puede consultar. Estos dos casos fijan que la causa
-  // del fallo salga por el log y NO por el cuerpo. Hasta el 2026-08-24 fijaban
-  // lo contrario —`expect(res.body.detalle).toContain(...)`— asi que la fuga
-  // estaba protegida por sus propias aserciones: el mensaje de Prisma nombra
-  // host, puerto y usuario de la base (P1001, P1000).
+  // /api/db/health no lleva requireAuth —tampoco /api/health— pero es la unica
+  // de las dos que toca la base, o sea la unica cuyo camino de error puede
+  // disparar cualquiera que alcance el dominio. Estos dos casos fijan que la
+  // causa del fallo salga por el log y NO por el cuerpo. Hasta el 2026-08-24
+  // fijaban lo contrario —`expect(res.body.detalle).toContain(...)`— asi que la
+  // fuga estaba protegida por sus propias aserciones: el mensaje de Prisma
+  // nombra host, puerto y usuario de la base (P1001, P1000).
   it("base caida: 503 sin el mensaje del driver, con el detalle en el log", async () => {
     const mensajeDelDriver = "Can't reach database server at `db.interna`:`5432`";
     consultar.mockRejectedValue(new Error(mensajeDelDriver));

@@ -19,6 +19,17 @@
 # ESTE VALOR Y EL DE LA DEFINICION DE TAREA SON UNO SOLO: si el dimensionamiento
 # del computo (PENDIENTE-INFRA 4, en infra/pendientes.tf) declara un
 # runtime_platform ARM64, esta linea pasa a linux/arm64 EN EL MISMO COMMIT.
+#
+# DOS COSAS QUE QUIEN CONSTRUYA VA A VER, y ninguna es sintoma de algo roto.
+# (1) Un aviso en cada build: el frontend por defecto de BuildKit desaconseja el
+# --platform con valor CONSTANTE y pide `docker build --platform linux/amd64` o
+# un ARG. La forma que pide mueve la decision a la linea de comandos, o sea a
+# que alguien se acuerde de escribirla, que es exactamente lo que este archivo
+# no quiere; el aviso se acepta a cambio. (2) En un Mac con Apple Silicon —el
+# caso que motiva todo el parrafo de arriba— el build entero corre emulado: el
+# `pnpm install` y el `prisma generate` de mas abajo pasan por qemu y tardan
+# bastante mas que sin --platform. Es el precio de que la imagen salga igual
+# desde cualquier maquina.
 FROM --platform=linux/amd64 node:22-slim
 WORKDIR /app
 
@@ -42,8 +53,14 @@ ENV NODE_ENV=production
 # veria y corepack intentaria bajar pnpm otra vez, desde una tarea que no tiene
 # salida al registry. Un directorio comun, chowneado junto con /app, deja el
 # pnpm ya resuelto para el usuario que arranca.
+#
+# El `mkdir -p` no es decorativo: lo crea ACA en vez de confiar en que lo
+# materialicen `corepack enable` o el install de mas abajo. Si /opt/corepack no
+# existiera al llegar al `chown -R` del final, ese chown falla con "cannot
+# access" y el build entero muere — una precondicion que ningun paso comprueba
+# y que se pagaria en el primer build, no aca.
 ENV COREPACK_HOME=/opt/corepack
-RUN corepack enable
+RUN mkdir -p /opt/corepack && corepack enable
 
 # Se copia el arbol entero y despues se instala SOLO este paquete. La version
 # "copiar manifiestos primero para cachear dependencias" es mas rapida, pero
@@ -79,6 +96,25 @@ RUN DATABASE_URL="postgresql://relleno:relleno@localhost:5432/relleno" \
 # /app como root; /opt/corepack entra por lo explicado arriba. El puerto es
 # 3000, arriba de 1024, asi que no hace falta ningun privilegio para escucharlo.
 #
+# Y NO ES GRATIS: se paga en el tamano de la imagen. En overlayfs cambiarle el
+# dueno a un archivo obliga a copiarlo ENTERO a la capa nueva, asi que esta sola
+# instruccion deja una segunda copia de todo /app — el arbol del `COPY . .` mas
+# los node_modules del install, virtual store .pnpm incluido, cuyos hardlinks
+# tambien caen adentro por vivir bajo /app. En la practica, duplicar la imagen.
+# NO MEDIDO EN BYTES: la maquina donde se escribio esto no tiene docker (ver el
+# bloque del final); el mecanismo es de manual, el numero no.
+#
+# Las dos alternativas, y por que no estan aca. `COPY --chown=node:node . .`
+# arregla la mitad chica: las fuentes llegan con el dueno correcto, pero el
+# install y el generate siguen corriendo como root y lo que ellos escriben —que
+# es el bulto— necesita el chown igual. La que SI lo elimina es instalar ya como
+# `node`: mkdir y chown de /app y /opt/corepack VACIOS (capa minima), USER node
+# antes del install, y el apt-get de arriba queda como unico paso de root. Eso
+# reordena el archivo entero y toca el camino por el que se resuelve pnpm, y aca
+# no se puede ver correr — la misma razon por la que el bloque del final sigue
+# sin comprobar. Cuando alguien tenga docker delante: se construyen las dos
+# variantes con el comando de ese bloque y se comparan los tamanos.
+#
 # Sacar el toolchain de la imagen es otro cambio y mas caro —exige que el API
 # compile de verdad; hoy `build` es "{{GENERAR_CLIENTE_DATOS}} && tsc --noEmit"—
 # y no bloquea a este.
@@ -98,6 +134,15 @@ CMD ["pnpm", "start"]
 #   docker run --rm {{PROYECTO}}-api id -un                        # node
 #   docker run --rm {{PROYECTO}}-api pnpm --version                # 9.15.0
 #   docker image inspect {{PROYECTO}}-api | grep '"Architecture"'  # amd64
+#
+# Y los dos que cierran lo que este archivo AFIRMA pero no midio:
+#
+#   docker build --check -f api/Dockerfile .      # el unico aviso esperado es
+#                                                 # el del --platform constante
+#
+# ...y el mismo `docker image inspect` de arriba, pero mirando '"Size"', contra
+# un build identico sin el `chown -R`: esa diferencia es lo que cuesta el
+# copy-up de /app, la cifra que al bloque del chown le falta.
 #
 # Si el segundo tarda o falla por red, el que quedo mal es COREPACK_HOME: el
 # pnpm que cacheo el build quedo en un $HOME que el usuario `node` no lee.
