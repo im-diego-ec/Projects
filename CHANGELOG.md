@@ -43,6 +43,45 @@ mueve sobre un cambio incompatible.
 
 ### Añadido
 
+- **El andamio reparte `infra/` y `infra-prod/`, que la constitución nombraba desde siempre y
+  no existían.** El canónico dice «IaC = Terraform, sin excepción: `infra/` (dev),
+  `infra-prod/` (prod)» y eso se renderiza en el artefacto que **el agente carga en cada
+  sesión**, con las cuentas ya sustituidas. Los directorios no existían: el agente leía una
+  regla que apunta a un lugar vacío, que es peor que una regla ausente porque invita a
+  improvisar justo donde no se quiere improvisación.
+
+  Llega **resuelto todo lo que se deriva** de los valores del proyecto: la `key` del state, la
+  región, el proveedor con sus etiquetas, la referencia a la VPC, el prefijo de recursos, la
+  identidad del repositorio y los dominios. Doce marcadores, **los doce entre los que
+  `projects init` ya sustituye** — verificado con un script, ninguno inventado.
+
+  Y llega **sin resolver lo que hay que decidir**: seis pendientes en dev y siete en prod. Cada
+  uno con tres partes —qué falta, **con qué criterio se decide**, y qué garantía del marco
+  queda sin cumplir—, porque un hueco que solo dice qué falta lo puede resolver únicamente
+  quien ya sabía la respuesta. Usan el marcador 🕳️ y **la compuerta que ya existía**: el paso
+  de marcadores del pipeline, que `calidad-codigo` ya exigía y cuyo texto ya cubría los «huecos
+  de decisión».
+
+  **Cero recursos de Terraform**, verificado y no confiado: `grep -rE '^resource '` sobre los
+  dos directorios sale vacío. Repartir infraestructura sin verificar haría que cada proyecto
+  nuevo herede los errores de la última vez que alguien la escribió, y verificarla exige una
+  cuenta real y un `apply` con OK humano.
+
+  Dos decisiones de forma que vale conocer: los pendientes van **juntos** en un
+  `pendientes.tf` y no repartidos en ocho archivos como en el consumidor de referencia —copiar
+  su división de archivos sería copiar su respuesta—; y el marcador del bucket del state va
+  **dentro del valor**, así `terraform init` falla en vez de crear un state en el lugar
+  equivocado. En producción eso además evita el modo de falla peligroso: escribir el state de
+  prod en el bucket de dev.
+
+  **Las alarmas se exigen como propiedad y jamás como lista**: que existan y avisen al canal.
+  Cuáles y con qué umbrales es del negocio de cada proyecto —tres bien elegidas cumplen, seis
+  copiadas de otro negocio no—. Y **dev no lleva pendiente de alarmas**, declarado como
+  decisión: una alarma que suena por un deploy de prueba entrena a ignorarla.
+
+  Lo que este cambio **no** trae, y está escrito: el Terraform con recursos reales, el
+  `deploy.yml` y `verificar-prod`. Bloque 1 de 3 del change `infra-exigible`.
+
 - **El CHANGELOG dejó de ser una regla sin check.** «Se escribe en el PR que introduce el
   cambio» estaba enunciado en `AGENTS.md` y en el encabezado de este archivo, y **ya había
   fallado, medido**: el 2026-08-22 se mergeó `projects init` —348 líneas— con la sección
