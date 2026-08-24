@@ -581,15 +581,27 @@ test("(6) el allowlist que el propio scaffold reparte sigue satisfaciendo el pis
 
 const REPO_DEL_MARCO = "im-diego-ec/Projects";
 
-/** El apagado del carril del consumidor, en las DOS escrituras que valen: el repo del
- *  marco nombrado literal, o derivado del owner con `format('{0}/Projects', ...)` para
- *  que un fork o una copia bajo otra cuenta se apague igual. Lo que esta prueba mide es
- *  la PROPIEDAD —que el job no corra en el repo que distribuye el marco—, no una
- *  ortografia: si solo aceptara la literal, hacer el workflow portable daria rojo aca
- *  sin que nada se hubiera roto. */
+/** El apagado del carril del consumidor, en las TRES escrituras que ha tenido. Lo que
+ *  esta prueba mide es la PROPIEDAD —que el job no corra en el repo que distribuye el
+ *  marco—, no una ortografia: si solo aceptara una forma, hacer el workflow portable
+ *  daria rojo aca sin que nada se hubiera roto.
+ *
+ *  Las tres, en orden y con su modo de falla, porque la historia es el argumento:
+ *    1. el slug literal — una copia a otra cuenta dejaba de reconocerse, el job
+ *       arrancaba y descargaba la action de la cuenta ORIGINAL;
+ *    2. `format('{0}/Projects', github.repository_owner)` — arreglaba eso y abria uno
+ *       mas ancho, porque coincide con CUALQUIER consumidor llamado <cuenta>/Projects;
+ *    3. `needs.cambios.outputs.es_distribuidor != 'true'` — una sonda por archivos
+ *       rastreados, que es la unica de las tres que no se satisface con un nombre.
+ *
+ *  Las tres se siguen aceptando porque lo que esta prueba vigila es OTRA cosa (que la
+ *  ref remota no se resuelva en el repo que la contiene), y estrecharla a la forma de
+ *  hoy la convertiria en un check de ortografia. Su banco propio esta en
+ *  pruebas/marco-ci/distribuidor.test.mjs, que si mide cual de las tres actua. */
 const APAGADO_EN_EL_MARCO = new RegExp(
   `github\\.repository\\s*!=\\s*(?:['"]${REPO_DEL_MARCO}['"]` +
-    `|format\\(\\s*['"]\\{0\\}/Projects['"]\\s*,\\s*github\\.repository_owner\\s*\\))`,
+    `|format\\(\\s*['"]\\{0\\}/Projects['"]\\s*,\\s*github\\.repository_owner\\s*\\))` +
+    `|needs\\.cambios\\.outputs\\.es_distribuidor\\s*!=\\s*['"]true['"]`,
 );
 
 /**
@@ -638,8 +650,25 @@ test("(7) una action propia nombrada por ref remota en un job que SI corre aca e
   // que no tiene la action. GitHub resuelve y DESCARGA las actions de un job en
   // «Set up job», antes de correr un solo paso y sin mirar el if de ningun paso: eso no
   // da un paso rojo, da el job entero muerto y los otros catorce checks con el.
-  const candidatas = referenciasPropias().filter((r) => r.corre);
-  assert.ok(candidatas.length > 0, "no quedo ninguna referencia remota que vigilar: se borro lo que esta prueba mide");
+  const todas = referenciasPropias();
+  // EL CONTROL DE NO-VACUIDAD VA SOBRE EL TOTAL, no sobre las que corren, y el motivo es
+  // un cambio real: desde que `actions/guardrail-deltas` se mudo del job `openspec` a
+  // su propio job —salteado en el repo que distribuye el marco, igual que
+  // `actions/constitucion`—, NINGUNA referencia remota corre aca. Eso no es "se borro
+  // lo que esta prueba mide": es la propiedad mas fuerte que esta prueba persigue, y
+  // era el dano abierto que la motivaba (una copia del arbol a otra cuenta seguia
+  // descargando y ejecutando la action de la cuenta ORIGINAL). Lo que si seria el banco
+  // roto es que no quedara NINGUNA referencia remota que clasificar.
+  assert.ok(todas.length > 0, "no quedo ninguna referencia remota que vigilar: se borro lo que esta prueba mide");
+  const candidatas = todas.filter((r) => r.corre);
+  if (candidatas.length === 0) {
+    console.log(
+      "::notice::las " + todas.length + " referencia(s) remota(s) a actions de este repo viven en jobs " +
+        "que se saltean en el repo que distribuye el marco, asi que ninguna se resuelve aca: " +
+        "no hay nada que pueda morir en Set up job. La otra mitad —que existan en el arbol " +
+        "del PR— la mide la prueba siguiente",
+    );
+  }
 
   // EL FAIL-OPEN, DECLARADO Y RUIDOSO, como el marco exige: lo que no se puede medir se
   // dice, no se calla ni se convierte en rojo. Con los tags presentes (local, o un CI con

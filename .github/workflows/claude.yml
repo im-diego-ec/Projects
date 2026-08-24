@@ -50,11 +50,31 @@ on:
   pull_request_review:
     types: [submitted]
 
-# UN HILO, UNA CORRIDA. De los siete workflows del repo, tres declaraban concurrency
+# UN HILO, UNA CORRIDA. De los siete workflows del repo —los que devuelve
+# `ls .github/workflows plantilla/.github/workflows`— tres declaraban concurrency
 # (aviso-version.yml y los dos del andamio, actualizar-marco.yml y plantilla/ci.yml) y
-# cuatro no. En tres de esos cuatro la ausencia no cuesta nada —los dispara un push o
-# un PR, o sea gente con escritura—; en este si, porque lo dispara cualquiera que pueda
-# comentar y cada mencion levantaba un runner propio, hacia checkout y cargaba el
+# cuatro no: ci.yml, marco-ci.yml, este archivo y plantilla/.github/workflows/claude.yml.
+#
+# LOS CUATRO NO SON EL MISMO CASO, y la version anterior de este parrafo los metia en
+# la misma bolsa con una frase falsa ("en tres de esos cuatro la ausencia no cuesta
+# nada, los dispara un push o un PR"). Cierto para DOS: ci.yml y marco-ci.yml se
+# disparan por push o por pull_request, o sea gente con escritura. El cuarto,
+# plantilla/.github/workflows/claude.yml, es la COPIA de este archivo y declara los
+# mismos disparadores de comentario (`issue_comment`, `issues`,
+# `pull_request_review_comment`): le cuesta exactamente lo mismo que a este, y ademas
+# se lo cuesta a cada proyecto nuevo, porque el andamio lo reparte. Que ese archivo
+# siga sin concurrency es un pendiente ABIERTO del andamio, no una ausencia inofensiva,
+# y se dice aca en vez de dejar que la frase anterior lo tape.
+#
+# ESTADO DE HOY, remedido despues de este cambio y con el comando al lado:
+#   `ls .github/workflows plantilla/.github/workflows` -> siete workflows
+#   `grep -rn '^concurrency:' .github/workflows plantilla/.github/workflows` -> cuatro
+#     (aviso-version.yml, este archivo, plantilla/actualizar-marco.yml, plantilla/ci.yml)
+# Quedan tres sin concurrency: ci.yml y marco-ci.yml, que se disparan por push o PR, y
+# plantilla/.github/workflows/claude.yml, que es el pendiente descrito arriba.
+#
+# En este archivo la ausencia si costaba: lo dispara cualquiera que pueda comentar y
+# cada mencion levantaba un runner propio, hacia checkout y cargaba el
 # secret, sin techo. El gate de identidad no ayuda aca porque no vive en el workflow
 # —el comentario del `if` lo dice: el control real de QUIEN puede invocarlo esta en la
 # action, que corta DESPUES del checkout—.

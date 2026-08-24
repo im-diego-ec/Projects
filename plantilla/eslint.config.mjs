@@ -201,7 +201,7 @@ export default tseslint.config(
   //
   // EL ALCANCE ES PROPIO, NO HEREDADO. Se acota con `files` al fuente de la
   // interfaz y NO se apoya en la lista global de `ignores` de arriba: un repo
-  // puede haberla recortado (el un consumidor borro "**/*.config.js")
+  // puede haberla recortado (un consumidor borro "**/*.config.js")
   // y entonces estas reglas morderian la configuracion de estilos, que es el
   // UNICO lugar legitimo donde los valores de marca se escriben. Que esos
   // valores COINCIDAN con los del sistema no lo puede ver un linter: eso lo
@@ -295,10 +295,11 @@ export default tseslint.config(
             "El rotulo tiene que decir que va a pasar (Guardar, Crear cuenta), no Aceptar ni Click aqui.",
         },
         // (10) EL LOGO NO SE REDIBUJA. Un SVG a mano "que se parece" es otra
-        // marca con el mismo nombre: paso tres veces en el consumidor de
-        // referencia, con una estrella de lineas rectas donde la oficial tiene
-        // curvas. La salida existe y es mejor practica igual: una ilustracion
-        // propia vive en un archivo .svg que se importa, no en el JSX.
+        // marca con el mismo nombre, y es un error que se repite: una estrella
+        // de lineas rectas donde la oficial tiene curvas pasa la revision
+        // porque de lejos se parece. La salida existe y es mejor practica
+        // igual: una ilustracion propia vive en un archivo .svg que se
+        // importa, no en el JSX.
         {
           selector: String.raw`JSXOpeningElement[name.name="svg"]`,
           message:

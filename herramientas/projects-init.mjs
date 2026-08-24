@@ -4,7 +4,7 @@
 //
 // POR QUE EXISTE. Adoptar Projects eran ~30 actos manuales: copiar 75 archivos con
 // robocopy o cp (y acordarse del `/.` final, o los dotfiles no viajan), sustituir
-// 167 ocurrencias de 21 marcadores en 37 archivos, inicializar OpenSpec y
+// 169 ocurrencias de 21 marcadores en 38 archivos, inicializar OpenSpec y
 // renderizar la constitucion. Nada de eso es una decision: es transcripcion. Y la
 // transcripcion a mano falla de la peor manera —un marcador mal sustituido es
 // sintacticamente valido, asi que el check de marcadores lo deja pasar: "se
@@ -671,7 +671,13 @@ export function avisosDelRegistroDeValores(destino) {
 
 const EJEMPLO = {
   PROYECTO: "people-agenda",
-  ORG: "po",
+  // ORG es la ORG de GitHub, no un equipo dentro de ella: se interpola en
+  // `uses: {{ORG}}/Projects/...`, o sea en la coordenada con la que GitHub
+  // resuelve el marco. Una pasada automatica de anonimizado dejo aca el slug del
+  // equipo del PO —el mismo que `gh api orgs/<org>/teams/<slug>/members` usa—, y
+  // con eso el ejemplo apuntaba a un repo que no existe. EQUIPO_PO de mas abajo
+  // es el que SI es un slug de equipo, y por eso son dos valores distintos.
+  ORG: "Ejemplo-Org",
   PAQUETE_API: "api",
   PAQUETE_WEB: "web",
   PAQUETE_E2E: "e2e",
@@ -890,6 +896,31 @@ function main(argv) {
     return 1;
   }
 
+  // EL OTRO archivo del marco del que esta corrida depende, comprobado ACA y no
+  // donde se usa. Solo se comprobaba `plantilla/`; `marco-ci.yml` —de donde sale
+  // el pin de OpenSpec— se leia recien despues de escribir los 75 archivos del
+  // andamio, y sin try/catch: en un clon parcial (sparse checkout, un fork sin
+  // .github/workflows/, esta herramienta copiada fuera de su arbol) el destino
+  // quedaba ESCRITO ENTERO y el proceso moria con un volcado de node:fs. O sea
+  // los dos modos de falla que el encabezado de este archivo declara cerrados
+  // —traza del runtime, y destino a medias sin decirlo— reintroducidos por una
+  // lectura sin guard. Medido asi: un clon con herramientas/ + plantilla/ +
+  // actions/ y SIN .github/workflows/marco-ci.yml.
+  //
+  // La condicion es la de la necesidad real: el archivo solo hace falta si se
+  // van a correr las herramientas Y el pin no vino por bandera.
+  const rutaMarcoCi = path.join(raizMarco, ".github/workflows/marco-ci.yml");
+  if (o.herramientas && !o.versionOpenspec && !fs.existsSync(rutaMarcoCi)) {
+    console.error(
+      `::error::no encontre ${rutaMarcoCi}. De ahi sale el pin del CLI de OpenSpec (el \`default\` del input ` +
+        `\`version_openspec\`), y sin el este arranque no puede correr \`openspec init\`. NO se escribio nada. ` +
+        `Dos salidas: pasa el pin a mano con --version-openspec <x.y.z>, o corre esto desde un clon COMPLETO ` +
+        `del repo del marco (un clon parcial o un fork sin .github/workflows/ no trae ese archivo). Si el ` +
+        `arranque no necesita las dos herramientas, --sin-herramientas tampoco lo pide.`,
+    );
+    return 1;
+  }
+
   // ── Valores ──
   let crudos;
   try {
@@ -1041,8 +1072,26 @@ function main(argv) {
 
   // ── Las dos herramientas que el andamio no puede traer ──
   if (o.herramientas) {
-    const marcoCi = fs.readFileSync(path.join(raizMarco, ".github/workflows/marco-ci.yml"), "utf8");
-    const pin = o.versionOpenspec ?? pinOpenspecDe(marcoCi);
+    // El guard de mas arriba ya exigio que el archivo EXISTA antes de escribir
+    // nada; esto cubre lo que existsSync no cubre —permisos, un directorio con
+    // ese nombre, un enlace roto— para que la lectura no vuelva a ser el unico
+    // punto de este bloque que sale por volcado del runtime. Y no se lee cuando
+    // el pin vino por bandera: ahi el archivo no hace falta.
+    let pin = o.versionOpenspec;
+    if (!pin) {
+      let marcoCi;
+      try {
+        marcoCi = fs.readFileSync(rutaMarcoCi, "utf8");
+      } catch (e) {
+        console.error(
+          `::error::no pude leer ${rutaMarcoCi}, de donde sale el pin de OpenSpec: ` +
+            `${e.code ? `${e.code} — ` : ""}${e.message}. El andamio YA quedo escrito en ${o.destino}; ` +
+            `volve a correr con --forzar y --version-openspec <x.y.z>.`,
+        );
+        return 1;
+      }
+      pin = pinOpenspecDe(marcoCi);
+    }
     if (!pin) {
       console.error("::error::no pude leer el pin de OpenSpec del default de `version_openspec` en marco-ci.yml. Pasalo con --version-openspec <x.y.z>");
       return 1;
@@ -1257,6 +1306,39 @@ function meInvocaronAMi() {
   }
 }
 
+/** LA RED DE ULTIMA INSTANCIA, y por que la llamada no puede ir pelada.
+ *
+ *  `main()` se invocaba sin try/catch. La envoltura que este archivo ya tenia
+ *  cubre `argumentos()` —un uso mal escrito— y la copia —un EPERM a mitad de
+ *  escritura—, pero NO el resto de main(): cualquier excepcion fuera de esas dos
+ *  ramas salia como volcado del runtime, con `at ModuleJob.run (node:internal/
+ *  modules/esm/module_job:...)` en pantalla, un codigo de salida que no elige
+ *  esta herramienta y ni una linea sobre que quedo en el destino. Habia al menos
+ *  una alcanzable y medida: un `plantilla` que existe pero no es un directorio
+ *  hace que el primer recorrido tire ENOTDIR.
+ *
+ *  Esto no adivina la causa —si supiera cual es, seria un control con su propio
+ *  mensaje mas arriba— pero si hace tres cosas que el volcado no hacia: lo marca
+ *  como `::error::` igual que el resto, dice que el destino puede haber quedado
+ *  a medias, y fija el codigo en 1. La traza va DEBAJO y anunciada, porque para
+ *  reportar el defecto hace falta; lo que no puede pasar es que sea la respuesta
+ *  entera. */
 if (meInvocaronAMi()) {
-  process.exit(main(process.argv.slice(2)));
+  let codigo;
+  try {
+    codigo = main(process.argv.slice(2));
+  } catch (e) {
+    console.error(
+      `::error::la corrida murio con una excepcion que ningun control de esta herramienta atrapo: ` +
+        `${e?.code ? `${e.code} — ` : ""}${e?.message ?? e}`,
+    );
+    console.error(
+      "Eso es un defecto de esta herramienta, no de como la corriste. El destino PUEDE haber quedado a medias: " +
+        "revisalo antes de reintentar y, si tiene archivos del andamio, borralos o reintenta con --forzar. " +
+        "Lo que sigue es la traza, para reportarlo:",
+    );
+    console.error(e?.stack ?? String(e));
+    codigo = 1;
+  }
+  process.exit(codigo);
 }

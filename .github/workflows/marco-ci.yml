@@ -5,8 +5,11 @@ name: Marco CI (reusable)
 #
 # Los jobs de CI que TODO proyecto de la organizacion hereda del marco Projects:
 #
-#   1. cambios   -> detecta si el PR/push toca solo documentacion (carril rapido)
-#   2. openspec  -> guardrail de deltas + validacion estricta de changes y specs
+#   1. cambios   -> detecta si el PR/push toca solo documentacion (carril rapido),
+#                   y contesta si este repo es el que DISTRIBUYE el marco (la sonda
+#                   de la que cuelga el salteo de los dos jobs que invocan composite
+#                   actions del marco por su ref publicada)
+#   2. openspec  -> validacion estricta de changes y specs
 #   3. higiene   -> lo que el marco AFIRMA y hasta hoy nadie verificaba:
 #                   artefactos regenerados al dia, definiciones de pipeline
 #                   validas, cero marcadores del scaffold sin resolver,
@@ -16,7 +19,16 @@ name: Marco CI (reusable)
 #                   ningun ejecutor de paquetes corriendo algo sin version
 #                   exacta (el nombre pelado de un paquete lo puede tener
 #                   otro)
-#   4. marco-ok  -> veredicto agregado de los tres jobs anteriores
+#   2b. deltas-openspec -> el guardrail de deltas. Job aparte y no un paso de
+#                   openspec, porque invoca una composite action del marco por su ref
+#                   publicada y eso NO puede correr en el repo que la contiene: GitHub
+#                   descarga las actions de un job en "Set up job", antes de evaluar el
+#                   `if` de cualquier paso. Se saltea en el distribuidor, que lo corre
+#                   por ruta local en su propio ci.yml
+#   4. constitucion-cableada -> misma particion, para actions/constitucion
+#   5. marco-ok  -> veredicto agregado de los cinco jobs anteriores. Cobra tambien los
+#                   SALTEOS: un skip de los dos jobs de arriba solo vale si la sonda
+#                   del job cambios dijo que este repo distribuye el marco
 #
 # El proyecto consumidor NO copia estos jobs: los referencia. Un arreglo aca
 # arregla el CI de todos los repos a la vez.
@@ -92,19 +104,26 @@ on:
           en este repo y en todos los consumidores. Dependabot NO ve este pin
           porque mira manifests, no una invocacion inline: se sube a mano aca
           y todos los repos del marco lo heredan.
+          LIMITE DECLARADO: este pin fija UNA version de UN paquete, no el
+          arbol transitivo que esa version arrastra ni el contenido de sus
+          dependencias, que se resuelven frescas en cada corrida y no tienen
+          lockfile. Lo que acota ese resto es la bandera --ignore-scripts de la
+          invocacion, que impide que los scripts de instalacion de ese arbol
+          corran; el codigo del CLI si se ejecuta, porque es lo que se invoco.
         type: string
         required: false
         default: "1.9.0"
       version_node:
         description: >-
           Version de Node para TODOS los jobs del marco que la necesitan: el
-          guardrail y el CLI de OpenSpec, los cuatro lectores de manifiestos del
-          job higiene y el lector de cableado de constitucion-cableada. Hasta el
+          guardrail de deltas y el CLI de OpenSpec, los cuatro lectores de manifiestos
+          del job higiene y el lector de cableado de constitucion-cableada. Hasta el
           cambio que introdujo esta linea, decia "para el guardrail y el CLI de
           OpenSpec", y era
           exacto por un motivo que no era bueno: higiene no instalaba node y sus
           lectores corrian con el que trajera la imagen del runner, mientras
-          constitucion-cableada tenia el 22 cableado a mano. Ahora los tres jobs
+          constitucion-cableada tenia el 22 cableado a mano. Ahora los cuatro jobs que
+          instalan node —openspec, deltas-openspec, higiene y constitucion-cableada—
           leen este numero, asi que subirlo mueve el marco entero de una vez.
         type: string
         required: false
@@ -173,10 +192,11 @@ on:
           primer paso del job higiene, que resuelve la plataforma con `uname`
           —no con el texto del input— y falla con este mismo motivo, para que el
           rechazo no llegue como un 404 de curl a mitad del job. Los otros
-          cuatro jobs (cambios, openspec, constitucion-cableada, marco-ok) leen
+          cinco jobs (cambios, openspec, deltas-openspec, constitucion-cableada
+          y marco-ok) leen
           el mismo input y NO lo comprueban por su cuenta: arrancan sobre lo que
           se les pase. Aun asi el valor queda rechazado para la corrida entera,
-          y no por costumbre: el input es uno solo para los cinco jobs, higiene
+          y no por costumbre: el input es uno solo para los seis jobs, higiene
           no tiene `if:` (corre siempre) y marco-ok lo lleva en su `needs` y
           exige que termine en success. Ahi se apoya la palabra TIENE, y en
           ningun otro lado. Si algun dia higiene se saltea, se condiciona o sale
@@ -223,19 +243,25 @@ jobs:
   #
   # Este archivo ramifica sobre `pull_request_target` en tres lugares (aca, en el
   # detector del carril y en el plano de la historia del detector de secretos), o sea
-  # que lo trata como evento soportado. Pero ninguno de los cuatro checkouts fijaba
+  # que lo trata como evento soportado. Pero NINGUNO de los checkouts fijaba
   # `ref:`, y bajo `pull_request_target` el default de actions/checkout NO es el head
-  # del PR: es la rama BASE. Resultado medido por lectura: los nueve pasos de higiene,
+  # del PR: es la rama BASE. Resultado medido por lectura: los diez pasos de higiene,
   # la validacion --strict, el guardrail de deltas y el detector de secretos corrian
   # sobre el codigo que ya estaba en main, y marco-ok los sumaba en success. Un
   # consumidor que usara `pull_request_target` —el motivo tipico es darle permisos a
   # los PRs de forks— recibia TODOS los checks del marco en verde sobre codigo que
   # jamas se leyo.
   #
-  # SE ELIGIO SOPORTARLO, no prohibirlo. Los tres checkouts que quedan —openspec,
-  # higiene y constitucion-cableada— fijan
+  # SE ELIGIO SOPORTARLO, no prohibirlo. Los checkouts que leen el CAMBIO —openspec,
+  # deltas-openspec, higiene y constitucion-cableada— fijan
   #   ref: ${{ github.event_name == 'pull_request_target' && github.event.pull_request.head.sha || '' }}
-  # El job `cambios` no entra: ya hacia lo correcto, no hace checkout y lista por API.
+  # El job `cambios` es la excepcion Y VA AL REVES A PROPOSITO: su checkout apunta a la
+  # rama BASE bajo los dos eventos de PR. Ese job no verifica el cambio —lista archivos
+  # por API—; lo que hace con el arbol es la SONDA DEL DISTRIBUIDOR, que decide si la
+  # compuerta de la constitucion se saltea. Si esa sonda mirara el head, un PR de fork
+  # se declararia distribuidor agregando dos archivos y se apagaria la compuerta desde
+  # el propio PR. La regla, entonces, no es "siempre el head": es "el head para lo que
+  # juzga el cambio, la base para lo que decide que compuertas corren".
   #
   # EL `ref` SE OVERRIDEA SOLO BAJO ESE EVENTO, y la angostura es el punto. Un `ref`
   # vacio es el default de actions/checkout, asi que bajo `pull_request` el marco sigue
@@ -253,10 +279,27 @@ jobs:
   #
   # EL COSTO, dicho entero y avisado en la corrida (ver el ::warning:: del paso de
   # abajo): a partir de ahora, bajo `pull_request_target`, el marco LEE el codigo del
-  # head del PR, que en un PR de fork es codigo de un tercero. Ninguno de estos jobs lo
-  # EJECUTA —actionlint, gitleaks y los `node -e` leen texto, y no hay install del
-  # manifiesto del consumidor— y el techo de permisos de este workflow sigue siendo
-  # `contents: read`. Lo que si cambia para un consumidor es que checks que estaban
+  # head del PR, que en un PR de fork es codigo de un tercero.
+  #
+  # NINGUN JOB EJECUTA CODIGO DEL PR, Y HAY UN CASO QUE HUBO QUE CERRAR PARA PODER
+  # DECIRLO. La primera version de este parrafo afirmaba "ninguno de estos jobs lo
+  # EJECUTA —actionlint, gitleaks y los `node -e` leen texto—" y era falsa en el unico
+  # job que baja un paquete: `openspec` corre
+  # `npx --yes "@fission-ai/openspec@${VERSION_OPENSPEC}" validate --all --strict` con
+  # el cwd DENTRO del arbol ya checkouteado, y npm resuelve su configuracion leyendo el
+  # `.npmrc` del directorio de trabajo. Un PR de fork que agregue un `.npmrc` con otro
+  # `registry=` hace que npx descargue y ejecute otro paquete bajo ese nombre, con los
+  # permisos que el llamador le concedio a la corrida de pull_request_target. Por eso
+  # ese job lleva ahora, ANTES del npx, el paso "El arbol del PR no redirige el registry
+  # de npm", que es rojo si el arbol trae un `.npmrc`, y el npx corre ademas con
+  # `npm_config_userconfig` apuntando a un archivo vacio del RUNNER_TEMP. Sin ese paso
+  # la frase de arriba no se podia escribir; con el, se puede.
+  #
+  # El techo de permisos de este workflow sigue siendo `contents: read`, y los cinco
+  # checkouts del archivo llevan `persist-credentials: false`: sin eso, bajo pull_request_target el
+  # checkout del head de un fork dejaba el token del LLAMADOR escrito en el
+  # .git/config de un arbol que es codigo de un tercero. Lo que si cambia para un
+  # consumidor es que checks que estaban
   # verdes pueden ponerse rojos: no es un rojo nuevo del marco, es el rojo que ya se
   # debia y que el default del checkout estaba tapando. Por eso el aviso lo dice con
   # todas las letras en vez de dejar que aparezca como una regresion.
@@ -267,19 +310,134 @@ jobs:
     # GitHub son 360 minutos, y en un workflow REUSABLE ese default no lo paga el
     # marco sino el consumidor: con el cancel-in-progress del scaffold, un job colgado
     # bloquea la cola de ese PR, y un job vivo mantiene su GITHUB_TOKEN valido las seis
-    # horas. Los cinco jobs de este archivo llevan techo por eso.
+    # horas. Los seis jobs de este archivo llevan techo por eso.
     timeout-minutes: 10
     runs-on: ${{ inputs.runner }}
+    # EL UNICO JOB DE ESTE ARCHIVO QUE PIDE MAS QUE contents: read, y lo pide por
+    # job y no heredado del encabezado. pull-requests: read es lo que le permite
+    # LISTAR los archivos del PR por API; sin el la deteccion cae al fail-open y
+    # el carril rapido no actua nunca (incidente del 2026-08-05). contents: read
+    # es para el checkout del carril de push.
+    #
+    # En un workflow REUSABLE este bloque es un techo de segunda instancia: lo que
+    # llega no puede superar lo que concede el job que hace el `uses:` en el
+    # consumidor. Declararlo igual sirve para lo contrario de lo obvio — que un
+    # consumidor generoso (permissions: write-all) no le regale a este job nada
+    # que no pida.
+    permissions:
+      contents: read
+      pull-requests: read
     outputs:
       solo_docs: ${{ steps.detectar.outputs.solo_docs }}
       confiable: ${{ steps.detectar.outputs.confiable }}
+      # La sonda del distribuidor. La consumen el `if` de los dos jobs que invocan
+      # composite actions del marco por su ref publicada y el veredicto de marco-ok.
+      es_distribuidor: ${{ steps.distribuidor.outputs.es_distribuidor }}
     steps:
-      # Solo el carril de push necesita el arbol git (para el diff del rango).
-      # En PR se lista por API, que es lo correcto para merge, squash y rebase.
-      - name: Checkout (solo para el diff de push)
-        if: github.event_name != 'pull_request' && github.event_name != 'pull_request_target'
+      # EL CHECKOUT DEJO DE SER "SOLO PARA EL DIFF DE PUSH" y ahora corre siempre,
+      # porque este job gano una segunda razon para tener el arbol: la sonda del
+      # distribuidor de mas abajo, que se decide por ARCHIVOS y no por el nombre del
+      # repositorio. Cuesta un clon de profundidad 1 en el job mas corto del marco.
+      #
+      # EL `ref` VA A LA RAMA BASE BAJO LOS DOS EVENTOS DE PR, al reves que los demas
+      # checkouts de este archivo y a proposito: ver el bloque "PULL_REQUEST_TARGET" de
+      # aca arriba. Lo que este arbol alimenta no es un veredicto sobre el cambio —los
+      # archivos del PR se listan por API, que es lo correcto para merge, squash y
+      # rebase— sino la decision de QUE COMPUERTAS CORREN. Un PR que pudiera moverla se
+      # apagaria la compuerta de la constitucion desde el propio PR.
+      #
+      # fetch-depth: el carril de push necesita la historia para el diff del rango; en
+      # PR la sonda solo mira `git ls-files`, asi que alcanza con profundidad 1.
+      - name: Checkout (diff del carril de push y sonda del distribuidor)
         uses: actions/checkout@v7
-        with: { fetch-depth: 0 }
+        with:
+          persist-credentials: false
+          ref: ${{ (github.event_name == 'pull_request' || github.event_name == 'pull_request_target') && github.base_ref || '' }}
+          fetch-depth: ${{ (github.event_name == 'pull_request' || github.event_name == 'pull_request_target') && 1 || 0 }}
+
+      # ESTE REPO, ES EL QUE DISTRIBUYE EL MARCO? SE DECIDE POR ARCHIVOS.
+      #
+      # QUE CIERRA, y por que la respuesta anterior era peor que la de antes. El marco
+      # necesita saberlo para UNA cosa: los dos jobs que invocan composite actions
+      # suyas por la ref publicada (`actions/constitucion` y `actions/guardrail-deltas`)
+      # no pueden correr en el repo que las contiene —`uses:` no admite expresiones y
+      # una ruta local dentro de un workflow reusable se resuelve contra el arbol de
+      # QUIEN LLAMA—, asi que ahi se saltean y el ci.yml del marco los corre por ruta
+      # local. La pregunta se contesto primero con el slug escrito literal, y una copia
+      # del arbol a otra cuenta dejaba de reconocerse: el job arrancaba y "Set up job"
+      # descargaba y ejecutaba la action de la cuenta ORIGINAL en cada PR de cada
+      # consumidor de esa copia. Se cambio por la cuenta derivada,
+      # `github.repository != format('{0}/Projects', github.repository_owner)`, y eso
+      # abrio uno MAS ANCHO: cualquier consumidor cuyo repositorio se llame
+      # <su-cuenta>/Projects coincidia, se salteaba la compuerta, y marco-ok le
+      # aceptaba el salteo en silencio porque usaba la misma derivacion. Un nombre de
+      # repositorio no es una identidad, y por eso desde este cambio el nombre NO
+      # participa de la decision: ni la cuenta ni el repo aparecen en la comparacion.
+      #
+      # LA PROPIEDAD POSITIVA, con los mismos tres candados que ya usa el check del
+      # cableado de la constitucion, y ninguno de los tres es un nombre:
+      #   1. RASTREA plantilla/.github/workflows/ci.yml — reparte el scaffold.
+      #   2. RASTREA actions/constitucion/action.yml — contiene las composite actions
+      #      que los otros dos jobs invocarian por ref publicada, que es exactamente
+      #      la razon por la que se saltean.
+      #   3. NO rastrea .projects-valores.json — un repo ADOPTADO si lo tiene, y un
+      #      adoptado no se apaga la compuerta agregando archivos.
+      # Un consumidor llamado <su-cuenta>/Projects falla 1 y 2: la compuerta le corre.
+      #
+      # FAIL-CLOSED EN TODAS SUS SALIDAS. Cualquier cosa que impida medir —no hay arbol
+      # git, checkout parcial, `git ls-files` con rc distinto de 0— deja la respuesta en
+      # "false", y "false" es el caso en el que las compuertas CORREN. El error posible
+      # es correr un job de mas, nunca saltearlo. Por eso este paso no lleva ninguna
+      # guarda que lo ponga rojo: no hay estado "no pude medir" que necesite color
+      # propio, porque no poder medir ya es la respuesta segura.
+      - name: Este repo es el que distribuye el marco
+        id: distribuidor
+        shell: bash
+        run: |
+          set -uo pipefail
+
+          rastrea() {
+            git ls-files --error-unmatch -- "$1" > /dev/null 2>&1
+          }
+
+          ES=false
+          PORQUE=""
+
+          if ! git rev-parse --is-inside-work-tree > /dev/null 2>&1; then
+            PORQUE="no hay un arbol git en el workspace, asi que no se pudo mirar un solo archivo"
+            echo "::warning::${PORQUE} — la sonda del distribuidor responde 'false' (fail-closed): las compuertas que dependen de ella VAN A CORRER. Si este es el repo que distribuye el marco, revisa el checkout de este job"
+          else
+            REPARTE=1
+            TRAE=1
+            ADOPTADO=1
+            rastrea "plantilla/.github/workflows/ci.yml" && REPARTE=0
+            rastrea "actions/constitucion/action.yml" && TRAE=0
+            rastrea ".projects-valores.json" && ADOPTADO=0
+
+            if [ "${REPARTE}" -eq 0 ] && [ "${TRAE}" -eq 0 ] && [ "${ADOPTADO}" -ne 0 ]; then
+              ES=true
+              PORQUE="rastrea plantilla/.github/workflows/ci.yml y actions/constitucion/action.yml, y no rastrea .projects-valores.json"
+            else
+              FALTA=""
+              [ "${REPARTE}" -eq 0 ] || FALTA="${FALTA} no rastrea plantilla/.github/workflows/ci.yml (no reparte el scaffold);"
+              [ "${TRAE}" -eq 0 ] || FALTA="${FALTA} no rastrea actions/constitucion/action.yml (no contiene las composite actions del marco);"
+              [ "${ADOPTADO}" -ne 0 ] || FALTA="${FALTA} rastrea .projects-valores.json (es un repo adoptado, no el distribuidor);"
+              PORQUE="${FALTA# }"
+            fi
+          fi
+
+          if [ "${ES}" = "true" ]; then
+            echo "::notice::este repo ES el que distribuye el marco (${PORQUE}): los jobs que invocan composite actions del marco por su ref publicada se saltean aca y corren por ruta local en su propio ci.yml"
+          else
+            echo "este repo NO es el distribuidor del marco (${PORQUE}): las compuertas que invocan sus composite actions corren"
+          fi
+
+          # El nombre del repositorio NO participa de la decision y se imprime igual,
+          # porque el caso que rompio antes es justamente un consumidor llamado
+          # <cuenta>/Projects: verlo al lado del veredicto es lo que permite auditar
+          # que el nombre ya no manda.
+          echo "   (repositorio: ${GITHUB_REPOSITORY:-<sin GITHUB_REPOSITORY>} — el nombre no interviene en esta decision)"
+          echo "es_distribuidor=${ES}" >> "${GITHUB_OUTPUT}"
 
       - id: detectar
         shell: bash
@@ -370,11 +528,17 @@ jobs:
   # validacion estricta de todos los changes y specs.
   openspec:
     name: openspec
-    # 10 minutos. Este job hace checkout, instala node y corre dos lectores de specs;
+    # 10 minutos. Este job hace checkout, instala node, comprueba que el arbol no
+    # redirija el registry de npm y corre la validacion estricta del CLI de OpenSpec;
     # el default de GitHub son 360 y este workflow es reusable, asi que la cola colgada
     # la paga el consumidor. Ver el comentario del timeout de higiene.
     timeout-minutes: 10
     runs-on: ${{ inputs.runner }}
+    # Minimo real por job: clona el arbol del consumidor y corre dos lectores de
+    # specs. No consulta ninguna API de GitHub, asi que no recibe el
+    # pull-requests: read que si necesita el job "cambios".
+    permissions:
+      contents: read
     steps:
       - name: Checkout del repo consumidor
         uses: actions/checkout@v7
@@ -386,6 +550,12 @@ jobs:
           # la action: nada cambia. El bloque entero esta en el encabezado del job
           # cambios.
           ref: ${{ github.event_name == 'pull_request_target' && github.event.pull_request.head.sha || '' }}
+          # Bajo pull_request_target el arbol que se acaba de traer es codigo de un
+          # tercero Y el token es el del repo LLAMADOR. Con el default (true) el
+          # checkout escribe ese token como extraheader en el .git/config de ese
+          # arbol, o sea que queda a mano de cualquier cosa que corra despues con ese
+          # cwd. Ningun paso de este job hace fetch ni push, asi que no cuesta nada.
+          persist-credentials: false
 
       - uses: actions/setup-node@v7
         with: { node-version: "${{ inputs.version_node }}" }
@@ -404,72 +574,165 @@ jobs:
             exit 1
           }
 
-      # Un bloque "## MODIFIED Requirements" REEMPLAZA al requirement completo
-      # en el spec vigente al archivar: si el delta omite un escenario que el
-      # spec ya tenia, ese escenario se BORRA. Paso el 2026-07-31 y lo atrapo
-      # la herramienta recien en el ultimo paso del change; aca se detecta en
-      # cada PR, sin depender de que alguien se acuerde de mirarlo.
+      # EL ARBOL DEL PR NO PUEDE DECIDIR DE DONDE BAJA EL PAQUETE QUE ESTE JOB CORRE.
       #
-      # El guardrail viaja como composite action del marco: GitHub la descarga
-      # igual que a este workflow, resolviendola por la configuracion de Actions
-      # de la organizacion. NO se hace checkout del repo del marco — el
-      # GITHUB_TOKEN del consumidor no tiene lectura sobre otro repo y daria 404
-      # (comprobado el 2026-08-14 en la validacion de Fase 2). El script viaja
-      # DENTRO de la action, asi que ningun proyecto vendora una copia que se
-      # pueda quedar vieja.
+      # QUE CIERRA, y por que hubo que cerrarlo para poder escribir el parrafo del
+      # encabezado del job cambios. Ese parrafo afirmaba que bajo pull_request_target
+      # "ninguno de estos jobs EJECUTA" el codigo del head del PR. Era falso justo
+      # aca: el paso de abajo corre `npx --yes "@fission-ai/openspec@<pin>"` con el cwd
+      # DENTRO del arbol recien checkouteado, y npm arma su configuracion leyendo el
+      # `.npmrc` del directorio de trabajo antes que el del usuario. Un PR de fork que
+      # agregue un `.npmrc` con `registry=` apuntando a otro lado hace que npx
+      # descargue y ejecute OTRO paquete con ese nombre y ese numero de version — el
+      # pin no protege de eso, porque el pin dice que bajar y no de donde—, dentro de
+      # una corrida que tiene los permisos del repo llamador.
       #
-      # ESTA LINEA ES LA UNICA DEL MARCO QUE SIGUE USANDO @v1, Y NO ES UN OLVIDO.
+      # DOS CANDADOS, y hacen falta los dos:
+      #   · Este paso: si el arbol trae un `.npmrc` en cualquier nivel, es ROJO. Se
+      #     mira el arbol de TRABAJO y no `git ls-files` a proposito: bajo
+      #     pull_request_target lo que importa es el archivo que va a estar en disco
+      #     cuando corra npm, este rastreado o no.
+      #   · El `npm_config_userconfig` del paso siguiente, que apunta a un archivo
+      #     vacio del RUNNER_TEMP: sin el, un `~/.npmrc` del runner seguiria mandando.
+      #     Es cinturon y tirantes, y el barato es este.
       #
-      # GitHub no admite expresiones en `uses:`, asi que un workflow reusable NO
-      # PUEDE referenciar su propio ref. Y una ruta local dentro de un reusable se
-      # resuelve contra el arbol de QUIEN LLAMA, no contra el del reusable (esta
-      # documentado dos veces en este repo, con el 404 medido el 2026-08-14).
-      #
-      # Se intento pinar la version exacta el 2026-08-22 y CI lo refuto en el acto:
-      # "Unable to resolve action im-diego-ec/Projects@v1.4.2, unable to find
-      # version v1.4.2". El tag se crea DESPUES de mergear el PR de release, asi que
-      # una linea que pina la version que se esta cortando pone en rojo al propio PR
-      # que la corta. Es circular por construccion, no por orden de los pasos.
-      #
-      # Por que aca y no en la otra invocacion interna (actions/constitucion, mas
-      # abajo): ese job se SALTEA en el repo del marco y corre por ruta local en su
-      # ci.yml, asi que su ref nunca se resuelve durante el CI de projects. Este paso
-      # vive en el job de OpenSpec, que si corre aca.
-      #
-      # EL RESIDUO, dicho entero: un consumidor pinado a marco-ci.yml@vX.Y.Z recibe
-      # ESTE workflow en X.Y.Z y esta action en la ultima 1.x. Es un skew real y es
-      # la razon por la que v1 no se pudo retirar del todo. Esta acotado a UNA action
-      # —un verificador de deltas, no logica de producto— y el banco del pinado lo
-      # exceptua por lista, con nombre y archivo, para que una tercera invocacion
-      # interna no herede la excepcion en silencio.
-      #
-      # La version derivada: aplicar la misma particion que usa la constitucion —
-      # saltear el paso cuando el repo es el del marco y correr la action por ruta
-      # local en el ci.yml de projects—. Eso elimina el skew y deja morir a v1. No se
-      # hizo en la 1.4.2 porque toca la logica del veredicto agregado que heredan
-      # todos los consumidores, a dos dias del piloto. Fila en reglas-no-escritas.
-      #
-      # Apuntaba a @v1 para que la action y este workflow avanzaran juntos sin
-      # tocar la linea en cada release. Eso dejo de ser cierto en la 1.4.0, cuando
-      # la distribucion paso a version exacta: un consumidor pinado a
-      # marco-ci.yml@v1.4.1 recibia ESTE workflow de la 1.4.1 y esta action de lo
-      # que `v1` apuntara EN ESE MOMENTO. O sea que el pin exacto que el consumidor
-      # creia tener era una media verdad, y llegaba comportamiento nuevo sin que
-      # nadie lo revisara — exactamente lo que la 1.4.0 venia a eliminar.
-      #
-      # El costo de la version exacta es que el release tiene que mover esta linea.
-      # No depende de que alguien se acuerde: pruebas/andamio/pinado.test.mjs exige
-      # que todo `uses:` del marco sea igual a la version mas alta del CHANGELOG.
-      - name: Deltas de OpenSpec sin perdida de escenarios
-        uses: im-diego-ec/Projects/actions/guardrail-deltas@v1
-        with:
-          instalar-node: "false"
+      # ROJO EN TODOS LOS EVENTOS Y NO SOLO EN pull_request_target: un `.npmrc` en el
+      # repo de un consumidor tambien redirige este npx, y "es tu repo" no lo vuelve
+      # deliberado. El mensaje trae la salida, que existe: quien de verdad necesita un
+      # registry propio instala el CLI el mismo antes de llamar al marco.
+      - name: El arbol del PR no redirige el registry de npm
+        shell: bash
+        run: |
+          set -euo pipefail
 
+          ENCONTRADOS="$(find . -name .npmrc -not -path './.git/*' 2>/dev/null | sort)"
+          if [ -n "${ENCONTRADOS}" ]; then
+            echo "::error::este arbol trae uno o mas .npmrc y el paso siguiente corre el CLI de OpenSpec con un ejecutor de paquetes y el cwd adentro de este arbol: npm lee esa configuracion antes que la del usuario, asi que un 'registry=' de ahi decide de donde baja el paquete que este job ejecuta. Bajo pull_request_target ese archivo puede venir del head de un PR de fork, o sea de un tercero, y el pin de version no protege —el pin dice QUE bajar, no DE DONDE—. Arreglo: saca el .npmrc del arbol; si tu proyecto necesita un registry propio, instala el CLI de OpenSpec vos mismo antes de llamar a este workflow"
+            echo "== .npmrc encontrados =="
+            printf '%s\n' "${ENCONTRADOS}"
+            exit 1
+          fi
+
+          echo "no hay ningun .npmrc en el arbol: la configuracion de npm de este job no la escribe el repo"
+
+      # --ignore-scripts NO es decorativo y no lo cubre el pin. El pin decide QUE
+      # se descarga; --ignore-scripts decide que de lo descargado se EJECUTA
+      # antes de que nadie lo invoque. Sin el, `npx` corre los preinstall/install/
+      # postinstall del paquete Y DE TODO SU ARBOL TRANSITIVO — que este pin no
+      # fija, porque un pin exacto fija una version y no el cierre de sus
+      # dependencias— dentro del job que tiene el GITHUB_TOKEN del consumidor.
+      # Con la bandera, el CLI se descarga igual y se ejecuta igual: lo unico que
+      # deja de correr son los scripts del ciclo de instalacion, que un validador
+      # de specs no necesita.
+      #
+      # npm_config_userconfig apunta a un archivo VACIO del RUNNER_TEMP: es el otro
+      # candado del paso de arriba. Se crea en el mismo `run:` para que no dependa de
+      # que exista, y una variable de entorno gana sobre cualquier .npmrc segun el
+      # orden de precedencia de npm (linea de comandos, entorno, archivos).
       - name: Validacion estricta de changes y specs
         shell: bash
         env:
           VERSION_OPENSPEC: ${{ inputs.version_openspec }}
-        run: npx --yes "@fission-ai/openspec@${VERSION_OPENSPEC}" validate --all --strict
+        run: |
+          set -euo pipefail
+          NPMRC_VACIO="${RUNNER_TEMP}/npmrc-vacio"
+          : > "${NPMRC_VACIO}"
+          npm_config_userconfig="${NPMRC_VACIO}" \
+            npx --yes --ignore-scripts "@fission-ai/openspec@${VERSION_OPENSPEC}" validate --all --strict
+
+  # ---------------------------------------------------------------------------
+  # EL GUARDRAIL DE DELTAS, EN SU PROPIO JOB Y CON LA MISMA PARTICION QUE LA
+  # CONSTITUCION.
+  #
+  # QUE HACE. Un bloque "## MODIFIED Requirements" REEMPLAZA al requirement completo
+  # en el spec vigente al archivar: si el delta omite un escenario que el spec ya
+  # tenia, ese escenario se BORRA. Paso el 2026-07-31 y lo atrapo la herramienta
+  # recien en el ultimo paso del change; aca se detecta en cada PR, sin depender de
+  # que alguien se acuerde de mirarlo.
+  #
+  # POR QUE ES UN JOB Y YA NO UN PASO DEL JOB openspec. Este era el ultimo `uses:` del
+  # marco que nombraba la cuenta original y CORRIA EN TODAS PARTES, el repo del marco
+  # incluido. Ese es el dano concreto que quedaba abierto: una copia del arbol a
+  # OtraCuenta/Projects seguia descargando y ejecutando
+  # `<la cuenta original>/Projects/actions/guardrail-deltas` en cada PR de cada repo
+  # que consumiera la copia, porque GitHub resuelve y descarga las actions de un job en
+  # "Set up job", ANTES de evaluar el `if` de cualquier paso. Un `if` de paso no lo
+  # arregla: hay que saltear el JOB. Es exactamente la particion que ya usaba
+  # constitucion-cableada, y ahora las dos invocaciones internas del marco se deciden
+  # con la misma sonda —`cambios.outputs.es_distribuidor`, que mira ARCHIVOS y no
+  # nombres— y la otra mitad de las dos vive en el ci.yml del marco, por ruta local.
+  #
+  # EL @v1 DE ABAJO SIGUE SIENDO @v1, Y AHORA SE SABE POR QUE. El comentario viejo lo
+  # defendia con un motivo cierto MIENTRAS el paso corriera en el repo del marco: pinar
+  # la version que se esta cortando pone en rojo al propio PR que la corta, porque el
+  # tag se crea despues del merge (medido el 2026-08-22: "Unable to resolve action
+  # ...@v1.4.2"). Con el job salteado en el distribuidor esa ref ya no se resuelve
+  # nunca durante el CI del marco, asi que ESA imposibilidad desaparecio: el pin exacto
+  # ya es tecnicamente posible, igual que en actions/constitucion.
+  #
+  # No se hace aca porque lo que queda no es un problema de este archivo: este es el
+  # ULTIMO `@v1` vivo del marco, y retirarlo es una decision de DISTRIBUCION —el paso
+  # del release que mueve el tag, los consumidores que todavia pinan @v1, y las
+  # superficies de prosa que afirman que v1 sigue vivo, entre ellas la asercion
+  # "v1 sigue vivo donde el marco dice que vive" de pruebas/andamio/pinado.test.mjs,
+  # que se pone ROJA si esta linea se pina—. Mover un paso de job no autoriza a retirar
+  # un canal de distribucion de paso.
+  #
+  # EL RESIDUO QUE SIGUE VIVO, dicho entero: un consumidor pinado a marco-ci.yml@vX.Y.Z
+  # recibe ESTE workflow en X.Y.Z y esta action en la ultima 1.x. Esta acotado a UNA
+  # action —un verificador de deltas, no logica de producto— y el banco del pinado lo
+  # exceptua por lista, con nombre y archivo, para que una segunda invocacion interna
+  # no herede la excepcion en silencio.
+  #
+  # EL COSTO, declarado: un job mas por corrida en cada consumidor (un checkout, un
+  # setup-node y un lector de specs; el techo son 10 minutos). Se paga a cambio de que
+  # el `uses:` a una cuenta ajena deje de ejecutarse en un arbol que no es de esa
+  # cuenta.
+  #
+  # NO SE HACE CHECKOUT DEL REPO DEL MARCO para traer la action: el GITHUB_TOKEN del
+  # consumidor no tiene lectura sobre otro repo y daria 404 (comprobado el 2026-08-14).
+  # El script viaja DENTRO de la action, asi que ningun proyecto vendora una copia que
+  # se pueda quedar vieja.
+  #
+  # Y EL RESTO DE LOS `uses:` DEL MARCO NO DEPENDEN DE QUE ALGUIEN SE ACUERDE:
+  # pruebas/andamio/pinado.test.mjs exige que todo `uses:` del marco sea igual a la
+  # version mas alta del CHANGELOG, y la unica excepcion es esta linea, declarada por
+  # lista con archivo y action — una segunda invocacion interna con @v1 pone rojo ese
+  # banco en vez de heredar la excepcion.
+  # ---------------------------------------------------------------------------
+  deltas:
+    name: deltas-openspec
+    needs: [cambios]
+    # !cancelled() y no always(): si alguien cancela la corrida, se para. Y si la sonda
+    # no pudo decidir, su salida es "false" y este job CORRE: el skip exige una
+    # afirmacion positiva, nunca la ausencia de una.
+    if: ${{ !cancelled() && needs.cambios.outputs.es_distribuidor != 'true' }}
+    # 10 minutos: checkout, node y un lector de specs. El default de GitHub son 360, y
+    # este workflow es reusable: el minuto colgado lo paga el consumidor.
+    timeout-minutes: 10
+    runs-on: ${{ inputs.runner }}
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout del repo consumidor para el guardrail de deltas
+        uses: actions/checkout@v7
+        with:
+          # Ver el bloque "PULL_REQUEST_TARGET" del encabezado del job cambios: sin
+          # esto, bajo ese evento el guardrail leia la rama BASE y salia verde sobre un
+          # cambio que nunca miro.
+          ref: ${{ github.event_name == 'pull_request_target' && github.event.pull_request.head.sha || '' }}
+          # El arbol que se trae puede ser codigo de un tercero y el token es el del
+          # repo llamador: no se le escribe en el .git/config.
+          persist-credentials: false
+
+      - uses: actions/setup-node@v7
+        # La version que el consumidor pidio, no la que traiga la imagen del runner.
+        with: { node-version: "${{ inputs.version_node }}" }
+
+      - name: Deltas de OpenSpec sin perdida de escenarios
+        uses: im-diego-ec/Projects/actions/guardrail-deltas@v1
+        with:
+          instalar-node: "false"
 
   # Los checks que hacen que el marco se cumpla SOLO. Cada uno cierra un hueco
   # donde el marco AFIRMABA algo (en un README, en una guia de bootstrap, en un
@@ -483,9 +746,9 @@ jobs:
   higiene:
     name: higiene
     # 20 y no 10: es el job largo del marco —dos binarios descargados y verificados por
-    # sha256, nueve lectores y un barrido de la historia del cambio— y el que mas red
+    # sha256, diez lectores y un barrido de la historia del cambio— y el que mas red
     # usa, que no es lo mismo que el unico: el job openspec baja un paquete de npm en
-    # cada corrida (`npx --yes "@fission-ai/openspec@..."`), y los cuatro jobs con
+    # cada corrida (`npx --yes "@fission-ai/openspec@..."`), y los cinco jobs con
     # `uses:` —este incluido— bajan ademas cada action que invocan. El default de
     # GitHub son 360 minutos, y este workflow es reusable: el minuto colgado lo paga
     # el consumidor. Los cuatro curl de mas abajo llevan ademas su propio --max-time,
@@ -494,6 +757,13 @@ jobs:
     # el timeout-minutes de 10 de ese job y nada mas.
     timeout-minutes: 20
     runs-on: ${{ inputs.runner }}
+    # Minimo real por job: es el job que mas HACE y el que menos NECESITA. Clona
+    # el arbol del consumidor, descarga dos binarios por HTTPS y corre lectores
+    # sobre archivos; ni un solo paso consulta la API de GitHub con el token
+    # (medido: no hay `gh api` ni GITHUB_TOKEN en ninguno de sus pasos). Que sea
+    # el job largo y con mas red es exactamente el motivo para no dejarlo heredar.
+    permissions:
+      contents: read
     steps:
       # LA PLATAFORMA SE COMPRUEBA ANTES QUE NADA, Y NO ES UN ROJO NUEVO.
       #
@@ -553,6 +823,12 @@ jobs:
         with:
           fetch-depth: 0
           ref: ${{ github.event_name == 'pull_request_target' && github.event.pull_request.head.sha || '' }}
+          # Bajo pull_request_target este arbol es codigo de un tercero y el token es
+          # el del repo LLAMADOR: con el default (true) el checkout lo deja escrito
+          # como extraheader en el .git/config de ese mismo arbol. Ningun paso de este
+          # job hace fetch ni push —solo ls-files, grep, log y archive—, asi que
+          # apagarlo no cuesta nada.
+          persist-credentials: false
 
       # NODE, PARA ESTE JOB Y CON LA VERSION QUE EL CONSUMIDOR PIDIO.
       #
@@ -784,7 +1060,7 @@ jobs:
 
           # {{MAYUSCULAS}} es la forma exacta que emite el scaffold. El [^$]
           # inicial descarta las expresiones que el proveedor de CI resuelve en
-          # cada corrida (needs.build_test.result y companía), que ademas llevan
+          # cada corrida (needs.build_test.result y compania), que ademas llevan
           # puntos y minusculas.
           # xargs colapsa "grep no encontro nada" (rc=1) y "grep no pudo leer"
           # (rc=2) en el mismo rc=123, asi que el codigo de salida no alcanza
@@ -888,7 +1164,7 @@ jobs:
           # no esta, no se puede verificar — y lo que no se puede verificar es
           # rojo, nunca un exito mudo.
           if ! command -v node > /dev/null 2>&1; then
-            echo "::error::no hay 'node' en el PATH y sin el no se pueden leer los manifiestos. Esto es un fallo DEL MARCO, no de tu repo: el job higiene de marco-ci.yml instala node con actions/setup-node y la version que declara el input version_node, asi que si falta es que ese paso no corrio. No lo podes arreglar desde tu ci.yml —este job no es tuyo, lo consumis por uses:—. Arreglo: abri un issue en el repo del marco; si ademas usas un runner propio, garantiza node en el PATH (actions/README.md, Requisitos del runner)"
+            echo "::error::no hay 'node' en el PATH y sin el no se pueden leer los manifiestos. Esto es un fallo DEL MARCO, no de tu repo: el job higiene de marco-ci.yml instala node con actions/setup-node y la version que declara el input version_node, asi que si falta es que ese paso no corrio. No lo podes arreglar desde tu ci.yml —este job no es tuyo, lo consumis por uses:—. Arreglo: abri un issue en el repo del marco; si ademas usas un runner propio, garantiza 'node' en el PATH ANTES de llamar a este workflow: el paso que lo instala es actions/setup-node, que necesita encontrar la version del input version_node en la tool cache del runner o poder descargarla, y en un runner propio ninguna de las dos cosas esta dada. Esta condicion se escribe aca entera a proposito —antes el mensaje mandaba a leer 'Requisitos del runner' de actions/README.md, que enumera bash, git y gh y NO menciona node, o sea que el lector que seguia la referencia no encontraba lo que se le mando a buscar—"
             exit 1
           fi
 
@@ -1385,7 +1661,7 @@ jobs:
           set -euo pipefail
 
           if ! command -v node > /dev/null 2>&1; then
-            echo "::error::no hay 'node' en el PATH y sin el no se pueden leer las invocaciones. Esto es un fallo DEL MARCO, no de tu repo: el job higiene de marco-ci.yml instala node con actions/setup-node y la version que declara el input version_node, asi que si falta es que ese paso no corrio. No lo podes arreglar desde tu ci.yml —este job no es tuyo, lo consumis por uses:—. Arreglo: abri un issue en el repo del marco; si ademas usas un runner propio, garantiza node en el PATH (actions/README.md, Requisitos del runner)"
+            echo "::error::no hay 'node' en el PATH y sin el no se pueden leer las invocaciones. Esto es un fallo DEL MARCO, no de tu repo: el job higiene de marco-ci.yml instala node con actions/setup-node y la version que declara el input version_node, asi que si falta es que ese paso no corrio. No lo podes arreglar desde tu ci.yml —este job no es tuyo, lo consumis por uses:—. Arreglo: abri un issue en el repo del marco; si ademas usas un runner propio, garantiza 'node' en el PATH ANTES de llamar a este workflow: el paso que lo instala es actions/setup-node, que necesita encontrar la version del input version_node en la tool cache del runner o poder descargarla, y en un runner propio ninguna de las dos cosas esta dada. Esta condicion se escribe aca entera a proposito —antes el mensaje mandaba a leer 'Requisitos del runner' de actions/README.md, que enumera bash, git y gh y NO menciona node, o sea que el lector que seguia la referencia no encontraba lo que se le mando a buscar—"
             exit 1
           fi
 
@@ -1657,7 +1933,7 @@ jobs:
             // es ::warning:: y exit 0 fuera de un allowlist: un falso verde sobre
             // una invocacion real y sin pinar. Ahora el valor ilegible se saltea
             // y la busqueda sigue; solo si NINGUN token tiene forma de paquete se
-            // reporta el primero ilegible como indeterminado. Cambio de dueño el
+            // reporta el primero ilegible como indeterminado. Cambio de dueno el
             // lado conservador: antes lo dudoso tapaba el hallazgo, ahora el
             // hallazgo gana.
             function paqueteDe(tokens, desde) {
@@ -2022,7 +2298,7 @@ jobs:
           set -euo pipefail
 
           if ! command -v node > /dev/null 2>&1; then
-            echo "::error::no hay 'node' en el PATH y sin el no se puede clasificar el reporte del detector. Esto es un fallo DEL MARCO, no de tu repo: el job higiene de marco-ci.yml instala node con actions/setup-node y la version que declara el input version_node, asi que si falta es que ese paso no corrio. No lo podes arreglar desde tu ci.yml —este job no es tuyo, lo consumis por uses:—. Arreglo: abri un issue en el repo del marco; si ademas usas un runner propio, garantiza node en el PATH (actions/README.md, Requisitos del runner)"
+            echo "::error::no hay 'node' en el PATH y sin el no se puede clasificar el reporte del detector. Esto es un fallo DEL MARCO, no de tu repo: el job higiene de marco-ci.yml instala node con actions/setup-node y la version que declara el input version_node, asi que si falta es que ese paso no corrio. No lo podes arreglar desde tu ci.yml —este job no es tuyo, lo consumis por uses:—. Arreglo: abri un issue en el repo del marco; si ademas usas un runner propio, garantiza 'node' en el PATH ANTES de llamar a este workflow: el paso que lo instala es actions/setup-node, que necesita encontrar la version del input version_node en la tool cache del runner o poder descargarla, y en un runner propio ninguna de las dos cosas esta dada. Esta condicion se escribe aca entera a proposito —antes el mensaje mandaba a leer 'Requisitos del runner' de actions/README.md, que enumera bash, git y gh y NO menciona node, o sea que el lector que seguia la referencia no encontraba lo que se le mando a buscar—"
             exit 1
           fi
 
@@ -2587,7 +2863,7 @@ jobs:
           # puede comer, y hoy se lo come diciendo la verdad incomoda — su .claude
           # no esta rastreado, asi que sale el aviso de abajo en su propio repo.
           if ! command -v node > /dev/null 2>&1; then
-            echo "::error::no hay 'node' en el PATH y sin el no se puede leer el allowlist del agente. Esto es un fallo DEL MARCO, no de tu repo: el job higiene de marco-ci.yml instala node con actions/setup-node y la version que declara el input version_node, asi que si falta es que ese paso no corrio. No lo podes arreglar desde tu ci.yml —este job no es tuyo, lo consumis por uses:—. Arreglo: abri un issue en el repo del marco; si ademas usas un runner propio, garantiza node en el PATH (actions/README.md, Requisitos del runner)"
+            echo "::error::no hay 'node' en el PATH y sin el no se puede leer el allowlist del agente. Esto es un fallo DEL MARCO, no de tu repo: el job higiene de marco-ci.yml instala node con actions/setup-node y la version que declara el input version_node, asi que si falta es que ese paso no corrio. No lo podes arreglar desde tu ci.yml —este job no es tuyo, lo consumis por uses:—. Arreglo: abri un issue en el repo del marco; si ademas usas un runner propio, garantiza 'node' en el PATH ANTES de llamar a este workflow: el paso que lo instala es actions/setup-node, que necesita encontrar la version del input version_node en la tool cache del runner o poder descargarla, y en un runner propio ninguna de las dos cosas esta dada. Esta condicion se escribe aca entera a proposito —antes el mensaje mandaba a leer 'Requisitos del runner' de actions/README.md, que enumera bash, git y gh y NO menciona node, o sea que el lector que seguia la referencia no encontraba lo que se le mando a buscar—"
             exit 1
           fi
 
@@ -2608,15 +2884,42 @@ jobs:
           # reglas, comodin en la posicion del subcomando y herramienta sin acotar—;
           # lo que cambia es de donde se alimenta.
           #
-          # LAS DOS SUPERFICIES NUEVAS ENTRAN EN MODO AVISO, y no es timidez: es la
-          # regla del marco sobre endurecimientos. Este workflow es reusable, asi que
-          # un rojo nuevo aparece en el pipeline de cada consumidor sin que nadie se lo
-          # haya anunciado, y hoy los SKILL.md del propio marco tienen `Bash(git:*)`.
-          # Lo que ya era rojo sigue rojo: las entradas de ${RUTA_ALLOWLIST}. Para
-          # invertirlo no hace falta que nadie se acuerde de nada — la condicion esta
-          # escrita: cuando el paso deje de imprimir avisos de frontmatter en el marco
-          # y en el consumidor real, se cambia la severidad de esa clase a ::error:: y
-          # se anota en el CHANGELOG bajo "Para consumidores".
+          # EL FRONTMATTER YA NO ES AVISO EN TODAS PARTES: ES COMPUERTA EN EL
+          # DISTRIBUIDOR Y AVISO EN EL CONSUMIDOR. La version anterior lo dejaba en
+          # aviso EN TODOS LADOS y escribia la condicion para invertirlo asi: «cuando
+          # el paso deje de imprimir avisos de frontmatter en el marco y en el
+          # consumidor real, se cambia la severidad». Esa condicion era incumplible por
+          # construccion — dependia de que alguien acotara los allowed-tools, o sea de
+          # la mitad del arreglo que no se estaba haciendo—, y mientras tanto lo unico
+          # medible era que `Bash(gh:*)` (gh pr merge, gh release create, gh api -X
+          # DELETE) y `Bash(git:*)` (git push --force) salian en amarillo y el job
+          # terminaba VERDE. Un allowlist que se mira y no detiene no es una compuerta.
+          #
+          # LA PARTICION, y por que no es un termino medio. La regla del marco sobre
+          # endurecimientos protege a los CONSUMIDORES de un rojo que nadie les
+          # anuncio: este workflow es reusable y un ::error:: nuevo aparece en su
+          # pipeline sin PR de por medio. Esa regla NO protege al repo que distribuye
+          # el marco: ahi el unico afectado es quien escribe la linea, que es
+          # exactamente el mismo argumento con el que el check del CHANGELOG y el del
+          # slug literal salieron en rojo desde el primer dia. Asi que:
+          #   · en el DISTRIBUIDOR el frontmatter es compuerta (rojo), hoy;
+          #   · en un CONSUMIDOR sigue siendo aviso, hasta que se anuncie.
+          # Y la condicion para invertir el lado del consumidor deja de depender de un
+          # archivo ajeno: se anuncia en el CHANGELOG bajo "Para consumidores" y se
+          # cambia. El lado que el marco controla ya no espera a nadie.
+          #
+          # LA SONDA ES LA MISMA DEL JOB `cambios`, repetida aca y no recibida por
+          # `needs`: este job no depende de aquel a proposito (los checks de higiene
+          # corren en paralelo con la deteccion del carril), y la respuesta se calcula
+          # sobre el arbol que ESTE job ya tiene. La direccion del error es segura:
+          # mentir diciendo "soy el distribuidor" solo consigue un rojo MAS estricto.
+          ES_DISTRIBUIDOR=false
+          if git ls-files --error-unmatch -- plantilla/.github/workflows/ci.yml > /dev/null 2>&1 \
+            && git ls-files --error-unmatch -- actions/constitucion/action.yml > /dev/null 2>&1 \
+            && ! git ls-files --error-unmatch -- .projects-valores.json > /dev/null 2>&1; then
+            ES_DISTRIBUIDOR=true
+          fi
+
           FUENTES="${RUNNER_TEMP}/permisos-frontmatter.txt"
           set +e
           git ls-files -- '.claude/skills/*/SKILL.md' '.claude/agents/*.md' > "${FUENTES}"
@@ -2649,6 +2952,7 @@ jobs:
           # expresiones regulares son del lenguaje, no del shell.
           # shellcheck disable=SC2016
           RUTA_FUENTES="${FUENTES}" \
+          ES_DISTRIBUIDOR="${ES_DISTRIBUIDOR}" \
           node -e '
             const { readFileSync, existsSync } = require("node:fs");
 
@@ -2785,6 +3089,11 @@ jobs:
               return entradas;
             }
 
+            // "true" y solo "true": cualquier otra cosa —vacio, no definido, un valor
+            // raro— deja el frontmatter en modo aviso, que es el lado que no estrena
+            // rojos en el pipeline de nadie.
+            const FRONTMATTER_ES_COMPUERTA = process.env.ES_DISTRIBUIDOR === "true";
+
             const rutasFrontmatter = RUTA_FUENTES && existsSync(RUTA_FUENTES)
               ? readFileSync(RUTA_FUENTES, "utf8").split(/\r?\n/).filter(Boolean)
               : [];
@@ -2798,7 +3107,11 @@ jobs:
                 // no autorice nada. Rojo, igual que el archivo de ajustes ilegible.
                 morir(ruta + " esta rastreado y no se pudo leer (" + error.message + "), asi que no se puede afirmar que su allowlist de agente no autorice una escritura");
               }
-              fuentes.push({ ruta: ruta, entradas: entradasDeFrontmatter(texto), compuerta: false });
+              // COMPUERTA EN EL DISTRIBUIDOR, AVISO EN EL CONSUMIDOR: ver el bloque
+              // largo del paso. La severidad la sigue decidiendo la FUENTE y no la
+              // entrada; lo que cambio es que una de las fuentes ya no es aviso en
+              // todas partes.
+              fuentes.push({ ruta: ruta, entradas: entradasDeFrontmatter(texto), compuerta: FRONTMATTER_ES_COMPUERTA });
             }
 
             const todasLasEntradas = fuentes.flatMap((f) => f.entradas);
@@ -2820,8 +3133,11 @@ jobs:
             // PERFIL_PROD, la variable quedaba en "" y la deteccion se apagaba en
             // silencio. Medido, mismo allowlist y mismo dia: sin el archivo, el
             // paso informaba "0 corre(n) con el perfil de produccion" sobre un
-            // allowlist que contenia a la vista Bash(AWS_PROFILE=la organización-prod
-            // terraform plan *); con el archivo, "1 corre(n)". Un conteo falso
+            // allowlist que contenia a la vista una entrada de la forma
+            // Bash(AWS_PROFILE=<el PERFIL_PROD del proyecto> terraform plan *) — el
+            // valor real es del consumidor y no se escribe aca, que es justamente por
+            // lo que el paso lo lee de .projects-valores.json en vez de cablearlo;
+            // con el archivo, "1 corre(n)". Un conteo falso
             // reportado como hecho es peor que no reportarlo, y es exactamente el
             // fail-open silencioso del incidente del 2026-08-05.
             let PERFIL_PROD = "";
@@ -2979,8 +3295,10 @@ jobs:
             let salida = 0;
 
             // EL ESTRENO EN MODO AVISO, dicho en cada hallazgo que lo lleva. Sin esta
-            // coda el aviso seria indistinguible de un rojo que alguien apago.
-            const ESTRENO = " ESTO ES AVISO Y NO ROJO, a proposito: el frontmatter de skills y agentes entro al universo de este check despues que el archivo de ajustes, y marco-ci.yml es un workflow reusable — estrenarlo en rojo pondria en rojo el pipeline de consumidores que nadie aviso, que es el endurecimiento sin aviso que el marco prohibe. La entrada autoriza lo mismo que autorizaria en el archivo de ajustes; lo unico distinto es el color de hoy. Cuando esta clase deje de imprimir avisos en el marco y en el consumidor real, pasa a ::error:: y se anota en el CHANGELOG bajo \"Para consumidores\".";
+            // coda el aviso seria indistinguible de un rojo que alguien apago. Y la
+            // coda solo sale en un CONSUMIDOR: en el repo que distribuye el marco esta
+            // misma clase ya es ::error:: y no pasa por aca.
+            const ESTRENO = " ESTO ES AVISO Y NO ROJO EN TU REPO, a proposito: el frontmatter de skills y agentes entro al universo de este check despues que el archivo de ajustes, y marco-ci.yml es un workflow reusable — estrenarlo en rojo pondria en rojo el pipeline de consumidores que nadie aviso, que es el endurecimiento sin aviso que el marco prohibe. La entrada autoriza lo mismo que autorizaria en el archivo de ajustes; lo unico distinto es el color de hoy, y solo de tu lado: en el repo que distribuye el marco esta clase YA es rojo desde este cambio, para que la severidad del consumidor no quede esperando a que alguien acote un archivo del marco. El dia que se invierta de tu lado se anuncia antes en el CHANGELOG bajo \"Para consumidores\".";
 
             for (const h of hallazgos) {
               const cola = h.prod
@@ -3045,11 +3363,12 @@ jobs:
             for (const f of fuentes) {
               console.log("   " + f.ruta + ": " + f.entradas.length + " entrada(s) leidas" + (f.compuerta ? " (COMPUERTA: sus hallazgos son rojos)" : " (modo aviso)"));
             }
+            console.log("   (este repo " + (FRONTMATTER_ES_COMPUERTA ? "ES" : "NO es") + " el que distribuye el marco, asi que el frontmatter de skills y agentes es " + (FRONTMATTER_ES_COMPUERTA ? "COMPUERTA: sus hallazgos son rojos" : "modo aviso") + " en esta corrida)");
             const enCompuerta = hallazgos.filter((h) => h.compuerta).length;
             console.log(
               "== permisos del agente == " + todasLasEntradas.length + " entrada(s) leidas en " + fuentes.length + " archivo(s): " +
               enCompuerta + " autoriza(n) una escritura sin desvio declarado y ponen ROJO este job, " +
-              (hallazgos.length - enCompuerta) + " autoriza(n) una escritura desde el frontmatter de una skill o un agente (AVISO, estreno), " +
+              (hallazgos.length - enCompuerta) + " autoriza(n) una escritura y salen en AVISO (frontmatter de una skill o un agente en un repo consumidor; en el repo que distribuye el marco esa misma clase es ROJA), " +
               absorbidos.length + " con desvio y motivo escrito, " +
               aLaVista.length + " corre(n) con el perfil de produccion" +
               (PERFIL_PROD === "" ? " (deteccion APAGADA: ver el aviso de arriba, ese 0 no significa que no haya ninguna)" : "") + ". " +
@@ -3160,43 +3479,53 @@ jobs:
   # paso mataba el job de higiene entero en el CI de Projects — o sea que la compuerta
   # jamas se ejercito como compuerta, que es el hallazgo 7 de la ronda 3.
   #
-  # POR QUE EL `if` PREGUNTA POR EL REPO DEL MARCO, y por que no es una perilla. `uses:`
+  # POR QUE EL `if` PREGUNTA SI ESTE REPO ES EL DISTRIBUIDOR. `uses:`
   # no admite expresiones (la referencia lo prohibe) y una ruta local dentro de un
   # workflow reusable se resuelve contra el repo de QUIEN LLAMA, no contra el del
   # reusable. Las dos formas son entonces incompatibles en un mismo paso: el consumidor
   # necesita la ref publicada y el marco necesita su arbol. La particion es TOTAL —el
   # que no corre aca corre en el ci.yml del marco por ruta local,
   # `./actions/constitucion`— y el veredicto de abajo lo COBRA: si este job se saltea
-  # sin ser el marco, es rojo. Cuando el tag movil traiga la action, este `if` se borra
-  # y queda un solo camino.
+  # sin que la sonda haya dicho que si, es rojo.
   #
-  # LA CUENTA SE DERIVA, NO SE REPITE, y el motivo es el escenario de la copia. Hasta
-  # hoy este `if` y el del veredicto comparaban contra el slug completo escrito literal.
-  # Un literal se vuelve mentira en cuanto el arbol cambia de cuenta —ya paso una vez,
-  # en el renombrado— y el modo de falla no es un error de arranque sino algo peor: en
-  # una copia a OtraCuenta/Projects el literal deja de coincidir, este job ARRANCA, y
-  # "Set up job" descarga y ejecuta `actions/constitucion` de la cuenta ORIGINAL en cada
-  # PR de cada repo que consuma esa copia. Con `github.repository_owner` la comparacion
-  # se resuelve dentro de la cuenta que corre: la copia se reconoce a si misma como el
-  # marco y toma el skip, igual que el original.
+  # NI EL NOMBRE NI LA CUENTA DECIDEN QUIEN ES EL MARCO, Y ESTA ES LA TERCERA
+  # RESPUESTA A ESA PREGUNTA. Vale escribir las tres, porque la segunda fue PEOR que la
+  # primera y esa es la leccion:
+  #   1. `github.repository != '<cuenta>/Projects'`, el slug escrito literal. Modo de
+  #      falla: en una copia del arbol a OtraCuenta/Projects el literal deja de
+  #      coincidir, este job ARRANCA, y "Set up job" descarga y ejecuta
+  #      `actions/constitucion` de la cuenta ORIGINAL en cada PR de cada repo que
+  #      consuma esa copia.
+  #   2. `github.repository != format('{0}/Projects', github.repository_owner)`, la
+  #      cuenta derivada. Arreglaba la copia y abria uno MAS ANCHO: coincide con
+  #      CUALQUIER consumidor cuyo repositorio se llame <su-cuenta>/Projects. Ese
+  #      consumidor se salteaba la compuerta de la constitucion, y el veredicto de
+  #      abajo le aceptaba el salteo EN SILENCIO porque usaba la misma derivacion —las
+  #      dos puntas mentian igual, que es la unica forma de que un fail-open no se
+  #      note—. Antes coincidia un slug; despues, una familia entera.
+  #   3. La de hoy: `needs.cambios.outputs.es_distribuidor`, una sonda que se decide
+  #      por ARCHIVOS RASTREADOS de la rama base (reparte el scaffold, contiene las
+  #      composite actions, no es un repo adoptado). Un nombre no es una identidad; lo
+  #      que tiene el marco y no tiene un consumidor son los archivos que el marco
+  #      distribuye. El bloque largo de esa sonda esta en el job `cambios`.
   #
-  # LO QUE QUEDA LITERAL, dicho entero: el NOMBRE del repositorio ("Projects"). No hay
-  # ningun contexto que diga en que repositorio VIVE un workflow reusable —el contexto
-  # `github` de aca adentro es siempre el de quien llama— asi que la unica forma de
-  # derivarlo del todo seria un input, y un input es exactamente la perilla que este
-  # bloque no quiere: con `es_el_repo_del_marco: true` cualquier consumidor apagaria la
-  # compuerta y el veredicto de abajo se lo tragaria. El nombre no viaja entre cuentas,
-  # la cuenta si, y por eso se deriva la mitad que rota.
+  # POR QUE UNA SONDA Y NO UN INPUT. Un input es una perilla: con
+  # `es_el_repo_del_marco: true` cualquier consumidor apagaria la compuerta y el
+  # veredicto se lo tragaria. La sonda no se declara, se comprueba, y falla del lado en
+  # que el error es correr un job de mas.
   #
-  # Y LO QUE SIGUE SIN PODER DERIVARSE, con el comando exacto para una copia: los dos
-  # `uses:` de este archivo que nombran la cuenta original —el de mas abajo y el de
-  # `actions/guardrail-deltas` en el job de openspec— no admiten expresiones. Quien
-  # copie el marco a otra cuenta los cambia a mano, y son dos lineas, las que devuelve
+  # LO QUE SIGUE SIN PODER DERIVARSE, con el comando exacto para una copia: los `uses:`
+  # de este archivo que nombran la cuenta original no admiten expresiones. Quien copie
+  # el marco a otra cuenta los cambia a mano, y son las lineas que devuelve
   #   grep -nE '^[[:space:]]*uses: im-diego-ec/Projects' .github/workflows/marco-ci.yml
   # El ancla del principio de linea no es adorno: sin ella el patron se encuentra a si
-  # mismo en este comentario y devuelve tres hits, uno de los cuales no hay que tocar.
-  # El skip derivado de arriba hace que en la copia este job ni siquiera corra, asi que
-  # el unico `uses:` ajeno que queda VIVO en una copia es el de guardrail-deltas.
+  # mismo en los comentarios de este archivo y devuelve hits que no hay que tocar.
+  # DESDE ESTE CAMBIO NINGUNO DE ESOS `uses:` QUEDA VIVO EN UNA COPIA: los dos viven en
+  # jobs que la sonda saltea en el distribuidor —este y `deltas`—, asi que una copia a
+  # OtraCuenta/Projects no descarga ni ejecuta nada de la cuenta original. Cambiarlos a
+  # mano sigue siendo necesario para que los CONSUMIDORES de la copia reciban las
+  # actions de la copia, pero ya no es lo que separa a la copia de ejecutar codigo
+  # ajeno.
   # ---------------------------------------------------------------------------
   constitucion_cableada:
     name: constitucion-cableada
@@ -3204,7 +3533,11 @@ jobs:
     # dependencias. El default de GitHub son 360, y este workflow es reusable: el minuto
     # colgado lo paga el consumidor.
     timeout-minutes: 10
-    if: ${{ !cancelled() && github.repository != format('{0}/Projects', github.repository_owner) }}
+    needs: [cambios]
+    # !cancelled() y no always(): si alguien cancela la corrida, se para. Y el skip
+    # exige una afirmacion POSITIVA de la sonda: si no pudo medir, su salida es "false"
+    # y este job corre.
+    if: ${{ !cancelled() && needs.cambios.outputs.es_distribuidor != 'true' }}
     runs-on: ${{ inputs.runner }}
     permissions:
       contents: read
@@ -3215,6 +3548,9 @@ jobs:
           # ver el bloque del checkout del job higiene, que explica entero por que ese
           # default convertia a todo el marco en un verde sobre codigo que nunca miro.
           ref: ${{ github.event_name == 'pull_request_target' && github.event.pull_request.head.sha || '' }}
+          # Mismo motivo que los otros tres checkouts de este archivo: no se le deja
+          # el token del llamador en el .git/config a un arbol de un tercero.
+          persist-credentials: false
       - uses: actions/setup-node@v7
         # La version que el consumidor pidio, no la que traiga la imagen del runner:
         # este job leia manifiestos con un node que nadie eligio.
@@ -3236,12 +3572,17 @@ jobs:
   # el check requerido por el ruleset.
   marco_ok:
     name: marco-ok
-    needs: [cambios, openspec, higiene, constitucion_cableada]
+    needs: [cambios, openspec, deltas, higiene, constitucion_cableada]
     if: always()
     # 5 minutos: este job no hace checkout ni toca la red, solo lee los resultados de
     # sus needs. Si tarda mas que esto es que se colgo el runner, no el veredicto.
     timeout-minutes: 5
     runs-on: ${{ inputs.runner }}
+    # VACIO A PROPOSITO: no clona el arbol, no llama a ninguna API y no lee mas
+    # que los resultados de sus needs, que vienen del contexto y no del token. Su
+    # GITHUB_TOKEN no necesita ni contents: read. Un bloque vacio dice "se audito
+    # y da cero", que no es lo mismo que no haber mirado.
+    permissions: {}
     steps:
       - name: Veredicto
         shell: bash
@@ -3249,25 +3590,40 @@ jobs:
           [ "${{ needs.cambios.result }}" = "success" ] || { echo "::error::la deteccion de cambios fallo"; exit 1; }
           [ "${{ needs.openspec.result }}" = "success" ] || { echo "::error::la validacion de OpenSpec fallo"; exit 1; }
           [ "${{ needs.higiene.result }}" = "success" ] || { echo "::error::los checks de higiene del marco fallaron"; exit 1; }
-          # El salteo del carril del consumidor tiene UNA sola excusa valida, y se
-          # comprueba aca en vez de confiarse: el repo del marco, que verifica su
-          # cableado por ruta local en su propio ci.yml. Cualquier otro salteo es un
-          # fail-open, y un fail-open silencioso es indistinguible de que la compuerta
-          # no exista.
-          # La cuenta se DERIVA, no se repite: es la otra punta de la comparacion del
-          # `if` de constitucion-cableada y tiene que decir exactamente lo mismo. Ver
-          # el bloque largo de ese job — con el slug escrito literal, una copia del
-          # marco a otra cuenta dejaba de reconocerse y terminaba ejecutando las
-          # composite actions de la cuenta original.
-          EL_REPO_DEL_MARCO="${{ github.repository_owner }}/Projects"
-          if [ "${{ needs.constitucion_cableada.result }}" != "success" ]; then
-            if [ "${{ needs.constitucion_cableada.result }}" = "skipped" ] && [ "${{ github.repository }}" = "${EL_REPO_DEL_MARCO}" ]; then
-              echo "constitucion-cableada: salteado a proposito en el repo del marco (${EL_REPO_DEL_MARCO}), que lo corre por ruta local en su ci.yml"
-            else
-              echo "::error::la comprobacion del cableado de la constitucion termino en '${{ needs.constitucion_cableada.result }}' en ${{ github.repository }}: un salteo solo es valido en el repo que distribuye el marco (${EL_REPO_DEL_MARCO})"
-              exit 1
+
+          # LOS DOS JOBS QUE INVOCAN COMPOSITE ACTIONS DEL MARCO SE COBRAN IGUAL, y con
+          # la MISMA sonda que decide su `if`. El salteo tiene UNA sola excusa valida
+          # —el repo que DISTRIBUYE el marco, que corre las dos por ruta local en su
+          # propio ci.yml— y se comprueba aca en vez de confiarse: cualquier otro
+          # salteo es un fail-open, y un fail-open silencioso es indistinguible de que
+          # la compuerta no exista.
+          #
+          # POR QUE LA EXCUSA ES UNA SONDA Y NO UN NOMBRE. Las dos puntas —el `if` de
+          # aquellos jobs y esta comprobacion— tienen que decir exactamente lo mismo, y
+          # cuando las dos decian `<cuenta>/Projects` cualquier consumidor con un repo
+          # llamado asi se salteaba la compuerta y este veredicto le imprimia "salteado
+          # a proposito". Que las dos puntas compartan la derivacion es lo que hace que
+          # el agujero no se vea. Ahora comparten una MEDICION (archivos rastreados de
+          # la rama base), que un consumidor no puede satisfacer por llamarse de una
+          # manera.
+          ES_DISTRIBUIDOR="${{ needs.cambios.outputs.es_distribuidor }}"
+          for PAR in "constitucion-cableada:${{ needs.constitucion_cableada.result }}" "deltas-openspec:${{ needs.deltas.result }}"; do
+            NOMBRE="${PAR%%:*}"
+            RESULTADO="${PAR#*:}"
+            # Un `if` y no un `&&` encadenado: con el `-e` que el runner le pone a
+            # `shell: bash`, un `&&` que termina en falso como ultimo comando del
+            # cuerpo mata el bucle. Es el mismo escarmiento que ya lleva escrito el
+            # paso del slug literal en el ci.yml del marco.
+            if [ "${RESULTADO}" = "success" ]; then
+              continue
             fi
-          fi
+            if [ "${RESULTADO}" = "skipped" ] && [ "${ES_DISTRIBUIDOR}" = "true" ]; then
+              echo "${NOMBRE}: salteado a proposito en el repo que distribuye el marco, que lo corre por ruta local en su ci.yml"
+              continue
+            fi
+            echo "::error::${NOMBRE} termino en '${RESULTADO}' en ${{ github.repository }}: un salteo solo es valido cuando la sonda del job cambios dice que este repo distribuye el marco, y en esta corrida dijo '${ES_DISTRIBUIDOR:-<vacio>}'. Si esperabas que corriera, mira la salida del paso 'Este repo es el que distribuye el marco'"
+            exit 1
+          done
           if [ "${{ needs.cambios.outputs.solo_docs }}" = "true" ]; then
             echo "carril de docs: el consumidor puede omitir su build/test"
           else

@@ -27,7 +27,8 @@
 //
 //   "projects": { "cobertura": {
 //       "piso":  { "lineas": 71.2, "funciones": 70.6, "ramas": 68.0 },
-//       "deuda": { "motivo": "heredado del piloto; el plan esta en el issue N",
+//       "deuda": { "motivo": "deuda heredada al absorber el paquete; el plan
+//                              esta en el issue N",
 //                  "fecha": "AAAA-MM-DD" } } }
 //
 // OJO CON EL PISO: solo se declaran las metricas que el reporte de este paquete

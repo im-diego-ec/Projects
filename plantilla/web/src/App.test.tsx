@@ -16,8 +16,15 @@ vi.mock("@clerk/clerk-react", () => ({
   UserButton: () => <div>menu de usuario</div>,
 }));
 
-const SALUD_OK = { status: "ok", service: "api", time: "2026-01-01T00:00:00.000Z" };
-const HOLA_OK = { message: "Hola desde el API", userId: "dev-user" };
+// LOS DOBLES COPIAN LA FORMA QUE DEVUELVE api/src/app.ts, no una inventada.
+// Antes decian `status`/`service`/`time` y `message`: campos que el API de este
+// mismo andamio no emite. Con eso los seis casos de abajo pasaban en verde
+// contra un API que no existe, y el front —que validaba con esos mismos nombres
+// inventados— no podia leer al backend real sin que nada mordiera. El acople
+// entre estos dobles, los esquemas de App.tsx y los `res.json` de app.ts lo
+// vigila pruebas/andamio/acoples-del-andamio.test.mjs.
+const SALUD_OK = { estado: "ok", servicio: "{{PROYECTO}}-api", ts: "2026-01-01T00:00:00.000Z" };
+const HOLA_OK = { mensaje: "Hola desde el API", userId: "dev-user" };
 
 /** Una respuesta de fetch con lo unico que el codigo bajo prueba le pide. */
 function respuesta(cuerpo: unknown, ok = true) {
@@ -82,10 +89,17 @@ describe("App", () => {
   });
 
   it("distingue una respuesta con otra forma de una caida del API", async () => {
-    // El caso real: un API viejo todavia desplegado, o un proxy que devuelve
-    // otra cosa. La validacion con Zod tiene que atajarlo ANTES de la interfaz,
-    // y el mensaje tiene que mandar a mirar otro lado que "sin conexion".
-    cablearFetch(() => respuesta({ estado: "ok" }));
+    // El caso real: una version anterior del API todavia desplegada, o un proxy
+    // que devuelve otra cosa. La validacion con Zod tiene que atajarlo ANTES de
+    // la interfaz, y el mensaje tiene que mandar a mirar otro lado que "sin
+    // conexion".
+    //
+    // El ejemplo de forma AJENA es `{ status: "ok" }` a proposito: es la forma
+    // que este banco doblaba como si fuera la del andamio. Tiene que ser una
+    // forma que el API de api/src/app.ts NO emita — si aca se pusiera la que si
+    // emite, el caso estaria exigiendo que la respuesta buena y real se muestre
+    // como basura, que es exactamente lo que pasaba.
+    cablearFetch(() => respuesta({ status: "ok" }));
 
     render(<App clerkHabilitado={false} />);
 

@@ -210,16 +210,29 @@ jobs:
       # los directorios no existan el paso no verifica nada y lo dice, en vez de
       # pasar en un silencio indistinguible de haber verificado.
       #
-      # LIMITE DECLARADO: el binario sale de la imagen del runner. Falta el
-      # `uses:` pinado por SHA que lo garantice, y por eso el paso avisa —no
-      # falla— cuando no lo encuentra: un rojo que el repositorio no puede
-      # arreglar solo entrena a ignorar el rojo. Para cerrarlo, agregar antes de
-      # este paso `uses: hashicorp/setup-terraform@<sha> # v<x.y.z>` con el SHA
+      # EL BINARIO AUSENTE ES UN CASO DE FALLO, NO UN CASO NEUTRO, y sigue la
+      # MISMA ventana que los otros dos. El binario sale hoy de la imagen del
+      # runner: falta el `uses:` pinado por SHA que lo garantice. Mientras la
+      # ventana corre, no encontrarlo AVISA; vencida la ventana, no encontrarlo
+      # es ROJO. El motivo es que la alternativa —avisar para siempre— convierte
+      # este paso en un aviso perpetuo que se lee como compuerta: bastaria con
+      # que la imagen del runner dejara de traer terraform para que el paso
+      # pasara en verde sin haber verificado nada, indefinidamente y sin que
+      # nadie se entere. "No pude verificar" no es "verifique y esta bien".
+      # Para cerrar el limite de raiz, agregar antes de este paso
+      # `uses: hashicorp/setup-terraform@<sha> # v<x.y.z>` con el SHA
       # resuelto, nunca copiado de memoria:
       #   curl -sS https://api.github.com/repos/hashicorp/setup-terraform/git/ref/tags/v3
       #   curl -sS https://api.github.com/repos/hashicorp/setup-terraform/git/tags/<sha-del-objeto-tag>
       # el object.sha del segundo llamado es el commit que va en el uses: y el
       # campo message dice la version exacta que va en el comentario de al lado.
+      #
+      # ESTE PASO SE EJECUTA EN UN BANCO, no solo se lee: el marco extrae este
+      # mismo bloque `run:` del YAML y lo corre contra arboles fabricados con un
+      # `terraform` falso, en los cinco caminos que tiene (sin raices; sin
+      # binario dentro y fuera de la ventana; fmt y validate en rojo dentro y
+      # fuera). Vive en pruebas/andamio/terraform-en-ci.test.mjs del repo del
+      # marco, y si este paso se borra o se renombra, ese banco se pone rojo.
       # -------------------------------------------------------------------
       - name: Formato y validez de las raices de Terraform
         shell: bash
@@ -241,21 +254,25 @@ jobs:
           fi
           echo "raices de Terraform encontradas: ${RAICES}"
 
-          if ! command -v terraform >/dev/null 2>&1; then
-            echo "::warning::hay raices de Terraform (${RAICES}) y este runner no trae el binario, asi que NO se verifico formato ni validez. Arreglo: agregar antes de este paso hashicorp/setup-terraform pinado por SHA — el encabezado de este paso trae los dos comandos que resuelven el SHA sin inventarlo"
-            exit 0
-          fi
-          terraform version
-
-          # La gravedad se DERIVA del reloj. Las dos fechas son ISO, asi que la
+          # La gravedad se DERIVA del reloj, y se deriva ANTES de mirar si hay
+          # binario: el binario ausente comparte la ventana con los otros dos
+          # fallos, no queda fuera de ella.  Las dos fechas son ISO, asi que la
           # comparacion de texto ordena igual que la de calendario.
           HOY="$(date -u +%F)"
           if [ "${HOY}" \> "${VENTANA_TERRAFORM}" ]; then
             GRAVEDAD="error"
           else
             GRAVEDAD="warning"
-            echo "::notice::verificacion de Terraform en modo aviso hasta el ${VENTANA_TERRAFORM} (hoy es ${HOY}). Despues de esa fecha un fallo de fmt o de validate detiene el CI sin que nadie toque este archivo"
+            echo "::notice::verificacion de Terraform en modo aviso hasta el ${VENTANA_TERRAFORM} (hoy es ${HOY}). Despues de esa fecha un fallo de fmt, de validate o la ausencia del binario detienen el CI sin que nadie toque este archivo"
           fi
+
+          if ! command -v terraform >/dev/null 2>&1; then
+            echo "::${GRAVEDAD}::hay raices de Terraform (${RAICES}) y este runner no trae el binario, asi que NO se verifico formato ni validez. Arreglo: agregar antes de este paso hashicorp/setup-terraform pinado por SHA — el encabezado de este paso trae los dos comandos que resuelven el SHA sin inventarlo"
+            if [ "${GRAVEDAD}" = "error" ]; then exit 1; fi
+            exit 0
+          fi
+          terraform version
+
           HUBO_FALLO=0
 
           # 1. FORMATO. Solo lee texto: ni providers, ni red, ni credenciales.

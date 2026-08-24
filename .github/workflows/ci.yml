@@ -40,9 +40,24 @@ jobs:
     # SIN timeout-minutes, y no es un olvido: un job que llama a un workflow reusable
     # solo admite name, uses, with, secrets, needs, if, permissions, strategy y
     # concurrency — la referencia de GitHub no lista `timeout-minutes` entre ellas. El
-    # techo de esta llamada lo ponen los cinco jobs de marco-ci.yml, que desde este
-    # cambio lo llevan todos.
+    # techo de esta llamada lo ponen los jobs de marco-ci.yml, que lo llevan TODOS.
+    # Sin numero a proposito: la cuenta cambia cada vez que ese archivo gana un job
+    # y una cifra escrita aca envejeceria sin que nada la mida.
     uses: ./.github/workflows/marco-ci.yml
+    # EL TECHO QUE SE LE CONCEDE AL REUSABLE, y por eso no repite decorativamente
+    # el bloque del encabezado: un workflow reusable no recibe NUNCA mas permisos
+    # que los que le da quien lo llama, asi que esta es la linea que de verdad
+    # decide con que corre la mecanica del marco. Escrito por job, se lee en el
+    # mismo lugar que el uses:, sin subir al encabezado para saberlo. Es el gemelo
+    # exacto del bloque que lleva este mismo job en el scaffold
+    # (plantilla/.github/workflows/ci.yml).
+    #
+    # pull-requests: read NO se puede recortar: sin el, el job "cambios" de
+    # marco-ci.yml no puede listar los archivos del PR, cae al fail-open y el
+    # carril rapido no actua nunca (incidente del 2026-08-05).
+    permissions:
+      contents: read
+      pull-requests: read
     # Sin "with": el CI del marco corre con los defaults que exporta, que es
     # justamente lo que hay que probar. Si un default no sirve para Projects,
     # tampoco sirve para los proyectos — se arregla el default, no este bloque.
@@ -70,6 +85,12 @@ jobs:
     # doble largo de lo que el job tarda cuando anda bien, no un numero redondo—.
     timeout-minutes: 15
     runs-on: ubuntu-latest
+    # MINIMO REAL Y DECLARADO POR JOB, no heredado del encabezado: este job clona
+    # el arbol y corre `node --test` sobre el codigo de las actions y de los pasos
+    # inline. No llama a ninguna API de GitHub, asi que el pull-requests: read del
+    # encabezado no se le concede.
+    permissions:
+      contents: read
     steps:
       - uses: actions/checkout@v7
 
@@ -305,15 +326,14 @@ jobs:
       # pinada por SHA con su comentario `# v1.0.196` al lado, y las de GitHub,
       # que corren en cada job de cada repo, no.
       #
-      # ESTADO MEDIDO EL 2026-08-24, contando el `uses: actions/setup-node@v7` que este
-      # mismo cambio agrega al job higiene de marco-ci.yml (27 de 29 uses ajenos van
-      # por tag movil):
-      #     15  actions/checkout@v7
-      #     11  actions/setup-node@v7
+      # ESTADO MEDIDO DESPUES DEL ULTIMO CAMBIO DE ESTE ARCHIVO: 31 de 33 `uses:` ajenos
+      # van por tag movil y no por SHA. El desglose por action:
+      #     17  actions/checkout@v7
+      #     13  actions/setup-node@v7
       #      1  actions/upload-artifact@v5
-      # De esos 27, DIEZ viajan: 8 en plantilla/.github/workflows/ (que el andamio
+      # De esos 31, DIEZ viajan: 8 en plantilla/.github/workflows/ (que el andamio
       # copia a cada proyecto nuevo) y 2 en los action.yml de cobertura-diff y
-      # guardrail-deltas (que ejecuta cada consumidor). Los otros 17 solo corren aca,
+      # guardrail-deltas (que ejecuta cada consumidor). Los otros 21 solo corren aca,
       # en .github/workflows/.
       #
       # OJO CON EL 8, que no es el 14 del censo de `uses:` del andamio y por eso
@@ -322,13 +342,17 @@ jobs:
       # este paso saltea porque no son referencias, y 1 es el
       # anthropics/claude-code-action que ya va por SHA. Quedan 8 pendientes.
       #
-      # LOS NUMEROS NO SE MANTIENEN A MANO: los mide este mismo paso, y sus anotaciones
-      # ::warning agrupadas por archivo dan 17 / 8 / 2 (medido el 2026-08-24). Si un
-      # cambio agrega un `uses:` ajeno, la corrida imprime el total nuevo y este parrafo
-      # queda viejo a la vista, que es preferible a un total que nadie puede reproducir.
+      # LOS NUMEROS NO SE MANTIENEN A MANO, Y YA SE PUDRIERON UNA VEZ: este parrafo
+      # decia 27 de 29, con 15/11/1 y 17/8/2, y dejo de cerrar en cuanto un cambio
+      # agrego jobs con checkout y setup-node sin que nadie los volviera a contar. Los
+      # mide ESTE MISMO PASO, y sus anotaciones ::warning agrupadas por archivo dan
+      # 21 / 8 / 2. Si un cambio agrega un `uses:` ajeno, la corrida imprime el total
+      # nuevo y este parrafo queda viejo a la vista, que es preferible a un total que
+      # nadie puede reproducir — pero "a la vista" solo sirve si alguien mira: la regla
+      # es que el PR que agrega un `uses:` ajeno remide estas cifras.
       #
       # Si, este paso se denuncia a si mismo: el checkout de arriba es uno de los
-      # 27. Eso es lo que tiene que hacer — un auditor que se exceptua deja de ser
+      # 31. Eso es lo que tiene que hacer — un auditor que se exceptua deja de ser
       # una medicion y pasa a ser una opinion.
       #
       # POR QUE ESTE PASO NO RESUELVE LOS SHA. Resolverlos exige red
@@ -497,9 +521,11 @@ jobs:
       # ROJO Y NO AVISO, con el mismo argumento que el check del CHANGELOG de mas
       # abajo: este paso vive en el ci.yml de Projects y no viaja a ningun consumidor,
       # asi que el unico afectado es quien acaba de escribir la linea. Y esta medido en
-      # verde: hoy la cuenta aparece cuatro veces en .github/workflows y las cuatro
-      # estan exentas —los dos `uses:` de marco-ci.yml y dos comentarios de ese mismo
-      # archivo que hablan de ellos—.
+      # verde: hoy la cuenta aparece TRES veces en .github/workflows y las tres estan
+      # exentas —los dos `uses:` de marco-ci.yml y un comentario de ese mismo archivo
+      # que trae el grep para encontrarlos—. El comando que lo remide:
+      #   git ls-files -- '.github/workflows/*.yml' | tr '\n' '\0' \
+      #     | xargs -0 grep -cHF -- '<la cuenta>'
       - name: El marco no se auto-identifica por un literal de su cuenta
         shell: bash
         env:
@@ -593,6 +619,35 @@ jobs:
         with:
           modo: cableado
           rama_por_defecto: ${{ github.event.repository.default_branch }}
+
+  # EL GUARDRAIL DE DELTAS, SOBRE EL PROPIO MARCO Y POR RUTA LOCAL.
+  #
+  # Es la segunda mitad de la MISMA particion que el job de arriba, y aparece porque
+  # `actions/guardrail-deltas` dejo de invocarse desde el job openspec de marco-ci.yml
+  # y paso a su propio job `deltas-openspec`, que se saltea en el repo que distribuye
+  # el marco. Sin este job, el marco dejaria de ejercitar su propio guardrail de
+  # deltas: los changes de openspec/ de este repo pasarian sin que nadie compruebe que
+  # un bloque "## MODIFIED Requirements" no borra escenarios.
+  #
+  # Igual que con la constitucion, la ruta local no es comodidad: cada PR valida contra
+  # la version de la action que ESE PR propone, no contra la etiqueta ya publicada.
+  # `uses:` no admite expresiones y una ruta local dentro de un workflow reusable se
+  # resuelve contra el arbol de quien llama, asi que las dos formas no caben en el
+  # mismo paso.
+  deltas:
+    name: deltas-openspec
+    timeout-minutes: 10
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with: { node-version: "22" }
+      - name: Deltas de OpenSpec sin perdida de escenarios
+        uses: ./actions/guardrail-deltas
+        with:
+          instalar-node: "false"
 
   # Check REQUERIDO por el ruleset main-protegida (nombre exacto: "ci-ok").
   #
@@ -696,11 +751,17 @@ jobs:
 
   ci_ok:
     name: ci-ok
-    needs: [marco, pruebas_actions, pruebas_init, higiene, constitucion, changelog]
+    needs: [marco, pruebas_actions, pruebas_init, higiene, constitucion, deltas, changelog]
     if: always()
     # 5 minutos: no hace checkout ni toca la red, solo lee los resultados de sus needs.
     timeout-minutes: 5
     runs-on: ubuntu-latest
+    # VACIO A PROPOSITO, igual que su gemelo del scaffold: este job no clona el
+    # arbol, no llama a ninguna API y no lee mas que los resultados de sus needs,
+    # que vienen del contexto y no del token. Su GITHUB_TOKEN no necesita ni
+    # contents: read. Un bloque vacio dice "se audito y da cero", que no es lo
+    # mismo que no haber mirado.
+    permissions: {}
     steps:
       - name: Veredicto
         shell: bash
@@ -736,6 +797,13 @@ jobs:
           # que esta linea es la que convierte el salteo en rojo.
           [ "${{ needs.constitucion.result }}" = "success" ] || {
             echo "::error::el cableado de la constitucion (modo cableado, por ruta local) termino en '${{ needs.constitucion.result }}'"
+            exit 1
+          }
+          # La otra mitad de la misma particion. Mismo criterio: un "skipped" aca es
+          # apagar el unico lugar donde el marco ejercita su propio guardrail de
+          # deltas, porque en marco-ci.yml ese job se saltea justamente en este repo.
+          [ "${{ needs.deltas.result }}" = "success" ] || {
+            echo "::error::el guardrail de deltas de OpenSpec (por ruta local) termino en '${{ needs.deltas.result }}'"
             exit 1
           }
           # El job del CHANGELOG se saltea a proposito en un push a main: ahi el PR ya

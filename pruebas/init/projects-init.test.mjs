@@ -232,8 +232,34 @@ test("cero sustituciones es ERROR y no un arbol limpio", () => {
   const destino = tmp("sin-marcadores-destino");
   const r = instanciar({ raizAndamio: falso, destino, valores: derivar(VALORES_OK) });
   assert.equal(r.total, 0, "el fixture no deberia tener marcadores");
-  // La decision de que 0 es error vive en main(); acá se fija el hecho del que
-  // depende, para que un refactor que lo cambie tenga que pasar por esta linea.
+  // Y la DECISION de que 0 es rojo, que vive en main(), se ejerce abajo por la
+  // CLI: hasta este cambio esta linea era el limite del caso —declarado en su
+  // propio comentario— y `if (r.total === 0)` se podia cambiar por `if (false)`
+  // con el banco entero en verde.
+});
+
+test("cero sustituciones sale ROJO por la CLI, no LISTO sobre un arbol lleno de llaves", () => {
+  // El guard que el encabezado de la herramienta llama «la ultima importa mas de
+  // lo que parece» era el unico control de main() que ninguna prueba podia ver
+  // actuar. Se estrena con el mismo montaje que los casos del marco falso: un
+  // clon minimo cuyo `plantilla/` no tiene un solo marcador, que es lo que
+  // pasaria el dia que el patron dejara de matchear.
+  const marco = marcoConAndamio("total-cero", {
+    "a.md": "un andamio sin un solo marcador\n",
+    "sub/b.txt": "tampoco aca\n",
+  });
+  const destino = tmp("total-cero-destino");
+  const vals = valoresEn(destino);
+
+  const { codigo, salida } = correrEnMarcoPelado(marco, "--valores", vals, "--destino", destino, "--sin-herramientas");
+  assert.notEqual(codigo, 0, `tenia que ser rojo; salida: ${salida}`);
+  assert.match(salida, /^::error::cero sustituciones sobre un andamio que tiene marcadores/m);
+  assert.equal(/LISTO\./.test(salida), false, "no se declara LISTO sobre un repo que nace lleno de marcadores");
+  // ANTI-VACUIDAD: el rojo es POR el conteo, no porque la copia fallara. Los dos
+  // archivos estan escritos en el destino.
+  assert.ok(fs.existsSync(path.join(destino, "a.md")));
+  assert.ok(fs.existsSync(path.join(destino, "sub", "b.txt")));
+  assert.match(salida, /escritos 2 archivos, 0 ocurrencias sustituidas/);
 });
 
 test("un marcador del andamio que REQUERIDOS no declara sale por nombre", () => {
@@ -757,6 +783,36 @@ test("el ejemplo no nombra a ninguna persona: formas por rol, no handles reales"
   );
 });
 
+test("el ORG del ejemplo es una ORG de GitHub, no el slug de un equipo de adentro", () => {
+  // Una pasada automatica de anonimizado convirtio ORG en el slug del equipo del
+  // PO, y el ejemplo quedo apuntando a un repo que no existe: {{ORG}} se
+  // interpola en la coordenada con la que GitHub resuelve el marco
+  // (`uses: {{ORG}}/Projects/...`), mientras que los slugs de equipo viven detras
+  // de `orgs/<org>/teams/<slug>`. Nada del banco miraba ORG, asi que paso verde.
+  const v = JSON.parse(correr("--ejemplo").salida);
+
+  // ANTI-VACUIDAD, y la razon de que la distincion importe: el andamio usa
+  // {{ORG}} DENTRO de lineas `uses:`, o sea como duenio del repo del marco.
+  const enUses = archivosDelAndamio(ANDAMIO)
+    .flatMap((rel) => fs.readFileSync(path.join(ANDAMIO, ...rel.split("/")), "utf8").split("\n").map((l) => [rel, l]))
+    .filter(([, l]) => /uses:\s*"?\{\{ORG\}\}\//.test(l));
+  assert.ok(
+    enUses.length >= 1,
+    "ningun archivo del andamio usa {{ORG}} dentro de un `uses:`: si eso cambio, este control dejo de mirar lo que cree",
+  );
+
+  assert.match(v.ORG, FORMATOS.ORG.patron, `ORG = ${JSON.stringify(v.ORG)} no tiene la forma de un handle de org`);
+  for (const equipo of ["EQUIPO_BUILDERS", "EQUIPO_PO"]) {
+    assert.notEqual(
+      v.ORG,
+      v[equipo],
+      `ORG y ${equipo} valen lo mismo (${JSON.stringify(v.ORG)}). ORG es el duenio del repo del marco y ` +
+        `${equipo} es un slug de equipo DENTRO de esa org: si coinciden, el \`uses:\` del ejemplo apunta a un ` +
+        `repo que no existe. Es el residuo tipico de una pasada automatica sobre los nombres.`,
+    );
+  }
+});
+
 // ══════════════════ LA FORMA DE LOS 21 VALORES ══════════════════
 //
 // Hasta este lote la validacion miraba 2 de los 21: los doce digitos de las dos
@@ -849,7 +905,11 @@ test("y acepta lo que SI es de su familia: el guard no es un rojo permanente", (
   const buenos = [
     ["PROYECTO", "people-agenda"],
     ["PROYECTO", "api.v2"],
-    ["ORG", "po"],
+    // Un handle de org de DOS letras es legitimo y el patron tiene que aceptarlo.
+    // El valor de antes aca era `po`, que es el slug de un EQUIPO y es tambien el
+    // residuo que la pasada de anonimizado dejo en el ejemplo: tenerlo en la lista
+    // de «formas legitimas de ORG» invitaba a devolverlo ahi.
+    ["ORG", "ab"],
     ["ORG", "Ejemplo-Org"],
     ["BUILDER_1", "a"],
     ["EQUIPO_BUILDERS", "builders-core"],
@@ -990,6 +1050,34 @@ function marcoFalso(nombre, constitucion) {
   fs.mkdirSync(path.join(raiz, "actions", "constitucion"), { recursive: true });
   fs.writeFileSync(path.join(raiz, "actions", "constitucion", "constitucion.mjs"), constitucion, "utf8");
   return raiz;
+}
+
+/** Un clon minimo del marco con un andamio DE MENTIRA. `marcoFalso` copia el
+ *  andamio real, que es lo que quieren los casos de los dos procesos hijos; este
+ *  sirve para los casos donde lo que se decide es una propiedad DEL ANDAMIO —por
+ *  ejemplo que no tenga ningun marcador—, que sobre `plantilla/` no se puede
+ *  montar sin romperlo. No trae marco-ci.yml ni actions/: los casos que lo usan
+ *  corren con --sin-herramientas. */
+function marcoConAndamio(nombre, archivos) {
+  const raiz = tmp(nombre);
+  fs.mkdirSync(path.join(raiz, "herramientas"));
+  fs.copyFileSync(HERRAMIENTA, path.join(raiz, "herramientas", "projects-init.mjs"));
+  for (const [rel, contenido] of Object.entries(archivos)) {
+    const abs = path.join(raiz, "plantilla", ...rel.split("/"));
+    fs.mkdirSync(path.dirname(abs), { recursive: true });
+    fs.writeFileSync(abs, contenido, "utf8");
+  }
+  return raiz;
+}
+
+/** La CLI del marco falso SIN tocar el PATH: para los casos que no llegan a
+ *  lanzar ningun proceso hijo. `spawnSync` por el mismo motivo que
+ *  `correrEnMarco`: hacen falta los dos flujos. */
+function correrEnMarcoPelado(marco, ...args) {
+  const r = spawnSync(process.execPath, [path.join(marco, "herramientas", "projects-init.mjs"), ...args], {
+    encoding: "utf8",
+  });
+  return { codigo: r.status ?? -1, salida: `${r.stdout ?? ""}${r.stderr ?? ""}` };
 }
 
 /** Un ejecutor de paquetes de mentira delante del PATH. Se escriben las dos formas porque este
@@ -1164,6 +1252,81 @@ test("la segunda corrida con --forzar sobre un destino ya instanciado sigue sali
   // El openspec/ de la segunda corrida SI cae en el caso ambiguo —el ejecutor de
   // mentira reescribe el mismo archivo y no agrega ninguno—, y eso es aviso.
   assert.match(segunda.salida, /::warning::openspec init salio 0 y openspec\//);
+});
+
+// ══════════════════ UN CLON DEL MARCO AL QUE LE FALTA UNA PIEZA ══════════════════
+
+test("sin marco-ci.yml la corrida muere ANTES de escribir, no despues del andamio entero", () => {
+  // La herramienta comprobaba que existiera `plantilla/` y NUNCA que existiera
+  // marco-ci.yml, que es de donde sale el pin de OpenSpec. Esa lectura vivia
+  // despues de la copia y sin try/catch, asi que un clon parcial —sparse
+  // checkout, un fork sin .github/workflows/, la herramienta copiada fuera de su
+  // arbol— dejaba los archivos del andamio ESCRITOS en el destino y mataba el
+  // proceso con un volcado de node:fs. Los dos modos de falla que el resto de
+  // este archivo cierra, reintroducidos en la linea de al lado.
+  const marco = marcoFalso("sin-marco-ci", CONSTITUCION_QUE_ESCRIBE);
+  fs.rmSync(path.join(marco, ".github", "workflows", "marco-ci.yml"));
+  const destino = tmp("sin-marco-ci-destino");
+  const vals = valoresEn(destino);
+
+  const { codigo, salida } = correrEnMarcoPelado(marco, "--valores", vals, "--destino", destino);
+  assert.notEqual(codigo, 0, `tenia que ser rojo; salida: ${salida}`);
+  assert.match(salida, /^::error::no encontre .*marco-ci\.yml/m);
+  assert.match(salida, /NO se escribio nada/);
+  // Y el arreglo, que es la regla del marco para cada error: las dos salidas.
+  assert.match(salida, /--version-openspec <x\.y\.z>/);
+  assert.match(salida, /--sin-herramientas/);
+  // Nada de volcado del runtime.
+  assert.equal(/node:fs/.test(salida), false, salida);
+  assert.equal(/\n\s+at /.test(salida), false, `quedo una traza de Node en la salida: ${salida}`);
+  // LO QUE IMPORTA: el destino esta INTACTO. Antes quedaban los 75 archivos del
+  // andamio y ninguna linea decia que estaban ahi.
+  assert.deepEqual(fs.readdirSync(destino), [], "el destino tenia que quedar sin tocar");
+});
+
+test("y el guard no es un rojo permanente: con --version-openspec el mismo clon arranca", () => {
+  // ANTI-VACUIDAD del caso de arriba. El archivo solo hace falta para LEER el
+  // pin: si el pin viene por bandera, un clon sin marco-ci.yml tiene que poder
+  // instanciar igual. Sin esta linea, el guard podia estar escrito como "exigir
+  // el archivo siempre" y el caso de arriba pasaria lo mismo.
+  const marco = marcoFalso("sin-marco-ci-con-pin", CONSTITUCION_QUE_ESCRIBE);
+  fs.rmSync(path.join(marco, ".github", "workflows", "marco-ci.yml"));
+  const bin = npxFalso("bin-sin-marco-ci", ...NPX_QUE_ESCRIBE);
+  const destino = tmp("sin-marco-ci-con-pin-destino");
+  const vals = valoresEn(destino);
+
+  const { codigo, salida } = correrEnMarco(
+    marco, bin, "--valores", vals, "--destino", destino, "--version-openspec", "0.9.4",
+  );
+  assert.equal(codigo, 0, salida);
+  assert.match(salida, /openspec init con el pin del marco \(0\.9\.4\)/);
+  assert.match(salida, /LISTO\./);
+});
+
+test("una excepcion que ningun control atrapa sale como ::error:: y exit 1, no como volcado", () => {
+  // LA RED DE ULTIMA INSTANCIA. La envoltura que este archivo tenia cubria
+  // `argumentos()` y la copia, pero main() se invocaba PELADO: cualquier
+  // excepcion de las otras ramas salia con la traza del runtime, un codigo que
+  // no elegia la herramienta y ni una linea sobre el destino. Se dispara con un
+  // `plantilla` que EXISTE y no es un directorio: `fs.existsSync` lo da por
+  // bueno y el primer recorrido tira ENOTDIR.
+  const marco = tmp("excepcion-suelta");
+  fs.mkdirSync(path.join(marco, "herramientas"));
+  fs.copyFileSync(HERRAMIENTA, path.join(marco, "herramientas", "projects-init.mjs"));
+  fs.writeFileSync(path.join(marco, "plantilla"), "esto no es un directorio\n", "utf8");
+  const destino = tmp("excepcion-suelta-destino");
+  const vals = valoresEn(destino);
+
+  const { codigo, salida } = correrEnMarcoPelado(marco, "--valores", vals, "--destino", destino, "--sin-herramientas");
+  assert.equal(codigo, 1, `el codigo lo elige la herramienta, no el runtime; salida: ${salida}`);
+  // La PRIMERA linea es el ::error::, no la traza: quien arranca un repo lee eso.
+  assert.match(salida.split("\n")[0], /^::error::la corrida murio con una excepcion que ningun control/);
+  assert.match(salida, /ENOTDIR/);
+  assert.match(salida, /El destino PUEDE haber quedado a medias/);
+  // La traza sigue estando, y anunciada: sin ella el defecto no se puede
+  // reportar. Lo que no puede pasar es que sea la respuesta entera.
+  assert.match(salida, /Lo que sigue es la traza, para reportarlo:/);
+  assert.deepEqual(fs.readdirSync(destino), [], "esta falla ocurre antes de escribir: el destino queda intacto");
 });
 
 // ══════════════════ UNA COPIA QUE SE CORTA A LA MITAD ══════════════════

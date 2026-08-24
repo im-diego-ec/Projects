@@ -27,7 +27,10 @@
 #               Los package.json del andamio ni siquiera tienen nombre resoluble
 #               (plantilla/package.json declara `"name": "{{PROYECTO}}"`).
 #   docker      FUERA, y el motivo NO es que no haya Dockerfile: HAY uno
-#               versionado, plantilla/api/Dockerfile:11 (`FROM node:22-slim`).
+#               versionado, el de plantilla/api/ (`FROM --platform=linux/amd64
+#               node:22-slim`, la unica linea que devuelve `grep -n FROM
+#               plantilla/api/Dockerfile`; va por comando y no por numero de
+#               linea, que se pudre en cuanto alguien edita mas arriba).
 #               Queda fuera porque en este repo no se construye ni se podria: su
 #               install es `pnpm install --frozen-lockfile ... --filter
 #               {{PAQUETE_API}}...` —marcador sin resolver— y el propio archivo
@@ -66,11 +69,20 @@
 # (.github/workflows/aviso-version.yml, que se dispara al publicar el release).
 #
 # LIMITE MEDIDO Y DECLARADO, no supuesto: el marco SI se referencia a si mismo
-# en dos lineas —.github/workflows/marco-ci.yml:383 (@v1) y :2812 (@v1.7.0);
-# remedidas el 2026-08-24 con `grep -nE '^\s*(-\s+)?uses:\s*po/'`, que
-# es como hay que volver a medirlas, porque son numeros de linea de un archivo de
-# 2857 lineas que se edita seguido—,
-# asi que Dependabot va a proponer esos bumps y van a caer en el grupo general
+# dentro de .github/workflows/marco-ci.yml, en las lineas que devuelve
+#
+#     grep -nE '^[[:space:]]*uses: im-diego-ec/Projects' .github/workflows/marco-ci.yml
+#
+# VA POR COMANDO Y SIN NUMEROS DE LINEA, a proposito y escarmentado: la version
+# anterior de este parrafo citaba dos numeros que a los pocos commits ya
+# apuntaban a otra cosa —marco-ci.yml pasa de las tres mil lineas y se edita en
+# casi todos los PRs—, y ademas escribia el dueno como `po`, residuo de una
+# pasada de anonimizacion, con lo cual el grep que ofrecia no devolvia NADA. Un
+# limite que se presenta como medido y no se puede reproducir es peor que no
+# declararlo. El ancla `^[[:space:]]*uses:` no es adorno: sin ella el patron se
+# encuentra a si mismo en este comentario y en los de marco-ci.yml.
+#
+# Dependabot va a proponer esos bumps y van a caer en el grupo general
 # de abajo. Eso es lo correcto hoy: ahi un bump propio no es una entrega, es un
 # indicador de que el pin quedo atras de la version publicada. Si algun dia ese
 # PR se queda trabado detras de otro, el arreglo es partir el grupo igual que en
@@ -80,12 +92,22 @@ updates:
   - package-ecosystem: "github-actions"
     # TRES SUPERFICIES, y ninguna es opcional. Con `directory: "/"` —lo unico
     # que declara el andamio— Dependabot mira `.github/workflows/` y nada mas.
-    # Medido el 2026-08-24 sobre los 38 `uses:` que este repo versiona: 22 estan
+    # Sobre los 44 `uses:` que este repo versiona: 28 estan
     # ahi y 16 quedan fuera —14 en `plantilla/.github/workflows/` y 2 en los
     # `action.yml` de las composite actions—, y esos 16 son justamente los que
     # VIAJAN: el andamio los copia a cada proyecto nuevo y las composite actions
     # las ejecuta cada consumidor de @v1. Dejarlos fuera es vigilar lo que solo
     # corre aca e ignorar lo que corre en todas partes.
+    #
+    # LAS TRES CIFRAS SE REMIDEN, NO SE CREEN, y este parrafo ya las tuvo mal: decia
+    # 38 / 22 / 16 con un total que dejo de cerrar en cuanto un cambio agrego pasos con
+    # `uses:` y nadie las volvio a contar. El comando que las produce, entero:
+    #
+    #     git ls-files -- '*.yml' '*.yaml' | tr '\n' '\0' \
+    #       | xargs -0 grep -hE '^[[:space:]]*(-[[:space:]]+)?uses:' | wc -l
+    #
+    # y el mismo, acotado a cada superficie, para el desglose. Quien las lea y no las
+    # corra que las trate como una foto vieja, no como un hecho.
     #
     # EFECTO DECLARADO DE `/plantilla`, que se acepta a sabiendas y no se
     # descubre despues: de los 14 `uses:` del andamio, 5 NO son referencias
