@@ -159,7 +159,7 @@ jobs:
           node-version: "22"
 
       - name: Regenerar la porcion del marco
-        uses: "{{ORG}}/Projects/actions/constitucion@v1.6.0"
+        uses: "{{ORG}}/Projects/actions/constitucion@v1.7.0"
         with:
           modo: escribir
 

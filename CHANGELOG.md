@@ -41,6 +41,37 @@ mueve sobre un cambio incompatible.
 
 ## [No publicado]
 
+Nada todavía.
+
+---
+
+## [1.7.0] — 2026-08-23
+
+### Para consumidores
+
+**No hay nada que hacer.** Un repositorio que ya consume el marco y no vuelve a correr
+`projects init` no ve **nada** de esta versión: todo lo nuevo viaja por el carril *scaffold*,
+que se copia una vez al crear el repositorio y no vuelve. Y el canónico de la constitución
+**no cambió**, así que el artefacto que ya tenés sigue siendo el correcto y el check no se
+mueve.
+
+Verificado contra el consumidor de referencia antes de publicar: corrida
+[32681956360](https://github.com/im-diego-ec/proyecto-origen/actions/runs/32681956360),
+**8/8 verde sin tocar una línea de código** de ese repositorio. Y esa corrida vale más que el
+verde del CI de Projects para el caso de los marcadores: en Projects el paso se exime a sí mismo
+por ser el repositorio que distribuye el andamio, así que allá no mira. En el consumidor
+miró de verdad y pasó.
+
+**Lo que sí cambia, y sólo para un repositorio NUEVO**: `projects init` pasa de escribir 69
+archivos con 116 sustituciones a **75 con 156**. Lo nuevo son los dos directorios de
+infraestructura, con lo derivable ya funcionando y con sus pendientes de decisión — que
+**no** ponen el CI en rojo, a propósito.
+
+**Si querés lo nuevo en un repositorio que ya existe**, el carril scaffold no lo trae solo:
+hay que copiarlo a mano o correr la skill de adopción. Es el costo conocido de ese carril y
+es el mismo que el marco ya paga por `ci.yml` y por `CODEOWNERS`.
+
+
 ### Añadido
 
 - **El andamio reparte `infra/` y `infra-prod/`, que la constitución nombraba desde siempre y
