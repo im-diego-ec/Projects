@@ -1,4 +1,4 @@
-# ADR 004 — El bump del pin y la constitución regenerada viajan en un solo PR, abierto por el repo del proyecto
+# ADR 005 — El bump del pin y la constitución regenerada viajan en un solo PR, abierto por el repo del proyecto
 
 - **Fecha**: 2026-08-23
 - **Estado**: aceptada (implementación diferida — ver *trigger* al final)
