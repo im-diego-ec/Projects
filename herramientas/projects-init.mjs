@@ -1059,6 +1059,15 @@ function main(argv) {
       return 1;
     }
     console.log(`openspec init con el pin del marco (${pin})`);
+    // La foto de openspec/ ANTES, que es lo que faltaba: preguntar despues "hay
+    // algo en openspec/?" falla ABIERTO justo donde importa. El destino no
+    // siempre nace vacio —un reintento con --forzar, o la skill de adopcion
+    // apuntada a un repo que ya usaba OpenSpec— y ahi el CLI que miente pasaba
+    // sin ruido, porque el contenido que la pregunta encontraba ya estaba antes
+    // de correrlo. `null` significa "no habia directorio", que no es lo mismo
+    // que "habia uno vacio" para lo que se decide mas abajo.
+    const dirOpenspec = path.join(o.destino, "openspec");
+    const openspecAntes = fs.existsSync(dirOpenspec) ? new Set(recorrer(dirOpenspec)) : null;
     try {
       execFileSync("npx", ["--yes", `@fission-ai/openspec@${pin}`, "init", "--tools", "claude"], {
         cwd: o.destino, stdio: "inherit", shell: process.platform === "win32",
@@ -1077,8 +1086,8 @@ function main(argv) {
     // exige openspec/, con la herramienta ya cerrada y el diagnostico apuntando
     // al pipeline en vez de al arranque. Se comprueba lo mismo que comprueba el
     // marco (`[ -d openspec ]`), mas que no este vacio.
-    const dirOpenspec = path.join(o.destino, "openspec");
-    if (!fs.existsSync(dirOpenspec) || fs.readdirSync(dirOpenspec).length === 0) {
+    const openspecAhora = fs.existsSync(dirOpenspec) ? recorrer(dirOpenspec) : [];
+    if (openspecAhora.length === 0) {
       console.error(
         `::error::openspec init salio 0 pero no dejo un openspec/ con contenido en ${o.destino}. Es el sintoma ` +
           `medido de ese CLI en Windows: imprime exito y revierte lo que escribio (esta documentado en ` +
@@ -1089,29 +1098,57 @@ function main(argv) {
       );
       return 1;
     }
+    // Hay contenido, pero NINGUNO lo trajo esta corrida y el directorio ya
+    // estaba poblado antes de invocar el CLI. Las dos lecturas son igual de
+    // plausibles —el CLI mintio, o no tenia nada que hacer sobre un openspec/ ya
+    // inicializado— y esta herramienta no puede distinguirlas sin repetir aca lo
+    // que ese CLI considera "inicializado". Por eso AVISA en vez de romper: el
+    // escenario en que aparece es el reintento con `--forzar`, o sea el camino
+    // de recuperacion que la propia herramienta recomienda, y estrenarle un rojo
+    // seria mandar a esa persona a un callejon. Lo que el rojo de arriba SI
+    // cubre es el caso del repo nuevo, donde openspec/ no existia.
+    const nuevosDeOpenspec = openspecAntes ? openspecAhora.filter((rel) => !openspecAntes.has(rel)) : openspecAhora;
+    if (nuevosDeOpenspec.length === 0) {
+      console.error(
+        `::warning::openspec init salio 0 y openspec/ quedo con los mismos ${openspecAhora.length} archivo(s) que ` +
+          `ya tenia antes de correrlo. Puede ser que el CLI no tuviera nada que hacer sobre un openspec/ ya ` +
+          `inicializado, o el sintoma medido de ese CLI en Windows: imprime exito y revierte lo que escribio ` +
+          `(plantilla/.claude/skills/projects-archive-change/SKILL.md). Abri openspec/ y confirma que es el de ` +
+          `este proyecto antes del push fundacional.`,
+      );
+    }
 
     // El render de la constitucion no tiene un "[ -d ... ]" que copiar: las
     // rutas que escribe dependen de las `superficies` que declare el proyecto, y
     // repetirlas aca seria una segunda declaracion de algo que vive en
-    // actions/constitucion/constitucion.mjs. Lo que SI se puede afirmar sin
-    // duplicar nada es lo unico que importa: que haya escrito ALGO. Por eso se
-    // fotografia el destino antes y despues.
-    const antesDelRender = new Set(recorrer(o.destino, new Set([".git", "node_modules"])));
-    console.log("render de la porcion del marco de la constitucion");
+    // actions/constitucion/constitucion.mjs. Pero no hace falta adivinarlas: la
+    // action DECLARA lo que escribio en su output `artefactos` (action.yml), asi
+    // que se le presta un GITHUB_OUTPUT propio, se leen esas rutas y se
+    // comprueban en disco. Ver rutasDelRender para por que la foto antes/despues
+    // que habia aca daba rojo sobre un destino ya instanciado.
+    const bandeja = fs.mkdtempSync(path.join(os.tmpdir(), "projects-init-render-"));
+    const salidaDelRender = path.join(bandeja, "outputs.txt");
+    fs.writeFileSync(salidaDelRender, "", "utf8");
+    let artefactos;
     try {
-      execFileSync(process.execPath, [path.join(raizMarco, "actions/constitucion/constitucion.mjs")], {
-        cwd: o.destino, stdio: "inherit", env: { ...process.env, CONSTITUCION_MODO: "escribir" },
-      });
-    } catch (e) {
-      console.error(`::error::el render de la constitucion fallo: ${e.message}`);
-      return 1;
+      console.log("render de la porcion del marco de la constitucion");
+      try {
+        execFileSync(process.execPath, [path.join(raizMarco, "actions/constitucion/constitucion.mjs")], {
+          cwd: o.destino,
+          stdio: "inherit",
+          env: { ...process.env, CONSTITUCION_MODO: "escribir", GITHUB_OUTPUT: salidaDelRender },
+        });
+      } catch (e) {
+        console.error(`::error::el render de la constitucion fallo: ${e.message}`);
+        return 1;
+      }
+      artefactos = rutasDelRender(fs.readFileSync(salidaDelRender, "utf8"));
+    } finally {
+      fs.rmSync(bandeja, { recursive: true, force: true });
     }
-    const nuevosDelRender = recorrer(o.destino, new Set([".git", "node_modules"])).filter(
-      (rel) => !antesDelRender.has(rel),
-    );
-    if (nuevosDelRender.length === 0) {
+    if (artefactos.length === 0) {
       console.error(
-        `::error::el render de la constitucion salio 0 y no escribio un solo archivo nuevo en ${o.destino}. ` +
+        `::error::el render de la constitucion salio 0 y no declaro un solo artefacto escrito en ${o.destino}. ` +
           `Sin la porcion del marco, los agentes de este repo trabajan sin las reglas del area y ningun check ` +
           `del repo nuevo lo dice. Las rutas que le tocan salen de las \`superficies\` declaradas en ` +
           `.projects-valores.json: revisa que ese archivo las declare y corre a mano ` +
@@ -1120,7 +1157,24 @@ function main(argv) {
       );
       return 1;
     }
-    console.log(`la constitucion dejo ${nuevosDelRender.length} archivo(s): ${nuevosDelRender.join(", ")}`);
+    // Lo que declaro, comprobado en el disco: el output dice DONDE mirar, no
+    // reemplaza el mirar. Es el mismo principio que el escaneo de marcadores,
+    // que tampoco le cree a lo que sustituir() dice de si misma.
+    const noEstan = artefactos.filter((rel) => {
+      const abs = path.join(o.destino, ...rel.split("/"));
+      return !fs.existsSync(abs) || fs.statSync(abs).size === 0;
+    });
+    if (noEstan.length) {
+      console.error(
+        `::error::el render de la constitucion declaro ${artefactos.length} artefacto(s) y ${noEstan.length} no ` +
+          `quedaron escritos en ${o.destino}: ${noEstan.join(", ")}. Salio 0 y no dejo el archivo, que es el ` +
+          `modo de falla que este repo tiene medido para los CLI en Windows: exito impreso y rollback. Corre a ` +
+          `mano \`CONSTITUCION_MODO=escribir node <clon-del-marco>/actions/constitucion/constitucion.mjs\` ` +
+          `dentro del destino y mira que dice.`,
+      );
+      return 1;
+    }
+    console.log(`la constitucion dejo ${artefactos.length} archivo(s): ${artefactos.join(", ")}`);
   }
 
   // ── Lo que queda, y es humano ──
