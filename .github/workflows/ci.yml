@@ -328,7 +328,7 @@ jobs:
       # queda viejo a la vista, que es preferible a un total que nadie puede reproducir.
       #
       # Si, este paso se denuncia a si mismo: el checkout de arriba es uno de los
-      # 26. Eso es lo que tiene que hacer — un auditor que se exceptua deja de ser
+      # 27. Eso es lo que tiene que hacer — un auditor que se exceptua deja de ser
       # una medicion y pasa a ser una opinion.
       #
       # POR QUE ESTE PASO NO RESUELVE LOS SHA. Resolverlos exige red
@@ -342,7 +342,7 @@ jobs:
       # el de cualquier proyecto que se inicie despues, sin habersele anunciado a
       # nadie; es exactamente el endurecimiento sin aviso que el marco prohibe.
       # La condicion para invertirlo esta escrita y no depende de una fecha ni de
-      # que alguien se acuerde: en cuanto los 26 pines de la lista de arriba esten
+      # que alguien se acuerde: en cuanto los 27 pines de la lista de arriba esten
       # por SHA —o sea, en cuanto este paso imprima "los N uses: ... van pinados
       # por SHA de 40 hex"— se cambia el ::warning:: final por ::error:: y exit 1,
       # y se anota en el CHANGELOG bajo "Para consumidores". Antes no: un rojo que
@@ -450,7 +450,7 @@ jobs:
 
           echo "::warning::${PENDIENTES} de ${TOTAL} uses: a organizaciones ajenas van por tag movil y no por SHA, contra la frontera que AGENTS.md declara. Este paso avisa y todavia no rompe, a proposito: los SHA se resuelven con red y estrenar el rojo dejaria al marco y al andamio en rojo sin poder cerrarlo. Los comandos exactos estan arriba; cuando no quede ninguno, este paso pasa a ::error:: y exit 1"
 
-      # EL MARCO NO SE AUTO-IDENTIFICA POR UN SLUG LITERAL.
+      # EL MARCO NO SE AUTO-IDENTIFICA POR UN LITERAL DE SU CUENTA.
       #
       # QUE CIERRA. marco-ci.yml decidia dos cosas comparando `github.repository`
       # contra el slug del repo escrito literal: si el job constitucion-cableada corre,
@@ -462,6 +462,16 @@ jobs:
       # Nada lo miraba: `grep -rn 'github.repository' pruebas/ actions/*/pruebas/` da
       # cero lineas, hoy tambien.
       #
+      # LO QUE SE BUSCA ES LA CUENTA, NO EL SLUG DE DOS SEGMENTOS, y la diferencia no
+      # es cosmetica: la primera version de este paso buscaba "<cuenta>/Projects" y por
+      # lo tanto dejaba pasar en VERDE la misma falla escrita con la cuenta sola
+      # —`github.repository_owner != '<la cuenta>'` en el `if` del job de la
+      # constitucion, con la cuenta escrita literal—, que rompe exactamente igual al
+      # copiar el arbol. Fijar una forma sintactica no es fijar la propiedad. La parte
+      # que rota entre copias es la CUENTA (el nombre del repo no viaja), asi que el
+      # literal a perseguir es la cuenta — y perseguirla cubre tambien al slug, que la
+      # contiene.
+      #
       # POR QUE VIVE ACA Y NO EN pruebas/. El banco de marco-ci.yml extrae el bloque
       # `run:` de un PASO y lo corre contra fixtures; las dos comparaciones del slug no
       # estan en un `run:` sino en el `if` de un job y en una expresion, que ese
@@ -469,41 +479,45 @@ jobs:
       # proxima, que puede aparecer en cualquiera de los cuatro workflows.
       #
       # LA PROPIEDAD QUE SE VERIFICA, y por que se puede: fuera de un `uses:`, el marco
-      # NO escribe su propio slug. Las comparaciones se derivan de
+      # NO escribe el nombre de su cuenta. Las comparaciones se derivan de
       # `github.repository_owner`. Los `uses:` quedan exentos POR LA REFERENCIA, no por
       # comodidad: GitHub prohibe expresiones ahi, asi que ese literal es la unica
       # forma que existe — y por eso el comentario de esas lineas trae el comando que
       # una copia corre para cambiarlas.
       #
       # Las lineas de COMENTARIO tambien quedan fuera: un comentario que explica por
-      # que el slug no puede ir en el codigo tiene que poder escribirlo, y sin esta
+      # que la cuenta no puede ir en el codigo tiene que poder escribirla, y sin esta
       # regla este mismo bloque pondria rojo el paso. Es el mismo limite que ya declara
       # el paso de ejecutores pinados de marco-ci.yml.
       #
       # ALCANCE DECLARADO: solo .github/workflows/, que es donde viven las
-      # comparaciones. plantilla/ queda fuera a proposito — ahi el slug llega por el
+      # comparaciones. plantilla/ queda fuera a proposito — ahi la cuenta llega por el
       # marcador {{ORG}} del andamio, que es otra pieza con otro dueno.
       #
       # ROJO Y NO AVISO, con el mismo argumento que el check del CHANGELOG de mas
       # abajo: este paso vive en el ci.yml de Projects y no viaja a ningun consumidor,
       # asi que el unico afectado es quien acaba de escribir la linea. Y esta medido en
-      # verde: hoy las unicas dos ocurrencias del slug fuera de un comentario son los
-      # dos `uses:`.
-      - name: El marco no se auto-identifica por un slug literal
+      # verde: hoy la cuenta aparece cuatro veces en .github/workflows y las cuatro
+      # estan exentas —los dos `uses:` de marco-ci.yml y dos comentarios de ese mismo
+      # archivo que hablan de ellos—.
+      - name: El marco no se auto-identifica por un literal de su cuenta
         shell: bash
         env:
           PROPIETARIO: ${{ github.repository_owner }}
-          NOMBRE: ${{ github.event.repository.name }}
         run: |
           set -euo pipefail
 
-          # El slug se arma con lo que GitHub dice que es este repo, no con un literal:
-          # un check contra el auto-nombramiento no puede auto-nombrarse. El
-          # "Projects" del final es el fallback para un evento cuyo payload no traiga
-          # repository —y es el mismo nombre que marco-ci.yml deja literal, por el
-          # mismo motivo: no hay contexto que de solo el nombre del repo—.
-          SLUG="${PROPIETARIO}/${NOMBRE:-Projects}"
-          echo "el slug de este repo, segun el evento: ${SLUG}"
+          # La cuenta sale de lo que GitHub dice que es este repo, no de un literal: un
+          # check contra el auto-nombramiento no puede auto-nombrarse. Y si llegara
+          # vacia no hay caso sano que reportar: `grep -F ""` matchea TODAS las lineas
+          # de todos los workflows, o sea que el paso se volveria ruido en vez de
+          # medicion. Vacio es rojo, no verde mudo.
+          CUENTA="${PROPIETARIO}"
+          if [ -z "${CUENTA}" ]; then
+            echo "::error::github.repository_owner llego vacio, asi que no hay contra que comparar. Este paso NO se declara verde por no haber podido medir"
+            exit 1
+          fi
+          echo "la cuenta de este repo, segun el evento: ${CUENTA}"
 
           ARCHIVOS="$(git ls-files -- '.github/workflows/*.yml' '.github/workflows/*.yaml')"
           if [ -z "${ARCHIVOS}" ]; then
@@ -511,11 +525,11 @@ jobs:
             exit 1
           fi
 
-          # -F: el slug es TEXTO, no un patron. El `|| true` no es un fail-open: grep
+          # -F: la cuenta es TEXTO, no un patron. El `|| true` no es un fail-open: grep
           # sale 1 cuando no encontro nada, que es el caso sano de este paso, y el
           # unico que hay que distinguir —"no pude mirar"— ya lo cerro la guarda de
           # ARCHIVOS de arriba.
-          TODAS="$(echo "${ARCHIVOS}" | tr '\n' '\0' | xargs -0 grep -nHF -- "${SLUG}" || true)"
+          TODAS="$(echo "${ARCHIVOS}" | tr '\n' '\0' | xargs -0 grep -nHF -- "${CUENTA}" || true)"
           TOTAL=0
           HALLAZGOS=0
           while IFS= read -r L; do
@@ -532,17 +546,17 @@ jobs:
               continue
             fi
             HALLAZGOS=$((HALLAZGOS + 1))
-            echo "::error file=${ARCHIVO},line=${NUMERO}::esta linea escribe el slug de este repositorio (${SLUG}) fuera de un uses:. Un literal deja de coincidir en cuanto el arbol se copia a otra cuenta, y ahi el marco deja de reconocerse a si mismo: el job de la constitucion arranca en la copia y termina descargando la composite action de la cuenta ORIGINAL en cada PR de cada consumidor. Arreglo: derivalo del contexto github.repository_owner —en una expresion del workflow, o por env dentro del run, que es la convencion de este repo—. En un uses: no se puede, porque GitHub prohibe expresiones ahi, y por eso solo esas lineas estan exentas"
+            echo "::error file=${ARCHIVO},line=${NUMERO}::esta linea escribe el nombre de la cuenta de este repositorio (${CUENTA}) fuera de un uses:, sola o dentro del slug. Un literal deja de coincidir en cuanto el arbol se copia a otra cuenta, y ahi el marco deja de reconocerse a si mismo: el job de la constitucion arranca en la copia y termina descargando la composite action de la cuenta ORIGINAL en cada PR de cada consumidor. Arreglo: derivala del contexto github.repository_owner —en una expresion del workflow, o por env dentro del run, que es la convencion de este repo—. En un uses: no se puede, porque GitHub prohibe expresiones ahi, y por eso solo esas lineas estan exentas"
           done <<EOF
           ${TODAS}
           EOF
 
           if [ "${HALLAZGOS}" -gt 0 ]; then
-            echo "== ${HALLAZGOS} de ${TOTAL} ocurrencia(s) del slug estan fuera de un uses: =="
+            echo "== ${HALLAZGOS} de ${TOTAL} ocurrencia(s) de la cuenta estan fuera de un uses: =="
             exit 1
           fi
 
-          echo "ninguna de las ${TOTAL} ocurrencia(s) de ${SLUG} en .github/workflows esta fuera de un uses: o de un comentario"
+          echo "ninguna de las ${TOTAL} ocurrencia(s) de ${CUENTA} en .github/workflows esta fuera de un uses: o de un comentario"
 
   # EL CABLEADO DE LA CONSTITUCION, SOBRE EL PROPIO MARCO Y POR RUTA LOCAL.
   #

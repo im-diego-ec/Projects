@@ -933,15 +933,32 @@ test("la unica entrada que puede llegar a un shell es el pin, y esta acotada", (
     );
   }
 
-  // El vector de argumentos de npx interpola UNA sola expresion, y es `pin`.
-  const invocaciones = [...FUENTE.matchAll(/execFileSync\("npx", (\[[^\]]*\])/g)];
+  // El vector de argumentos de npx: TODO literal menos uno, y ese uno es el pin.
+  //
+  // Mirar solo `${...}` no alcanzaba, y la mitad que se escapaba es la que
+  // cualquiera escribiria primero: un argumento variable puesto como
+  // identificador pelado (`"--tools", o.destino`) no trae interpolacion de
+  // plantilla y pasaba invisible — con el banco entero en verde y ese valor
+  // viajando concatenado por cmd.exe sin escapar. Por eso el control es al
+  // reves: se borran los literales de cadena y lo que sobra tiene que ser
+  // EXACTAMENTE el template del pin. Cualquier otra forma de argumento variable
+  // —identificador, propiedad, llamada, otra interpolacion— queda en el resto.
+  // Sobre `codigo` y no sobre FUENTE: el docblock de pinValido CITA esta misma
+  // invocacion con un `...` en el medio para explicarla, y una prosa no es un
+  // argumento que viaje a cmd.exe.
+  const invocaciones = [...codigo.matchAll(/execFileSync\("npx", \[([^\]]*)\]/g)];
   assert.ok(
     invocaciones.length >= 1,
     "no encontre la invocacion de npx: si cambio de forma, este control dejo de mirar lo que cree que mira",
   );
   for (const inv of invocaciones) {
-    const interpoladas = [...inv[1].matchAll(/\$\{([^}]*)\}/g)].map((m) => m[1]);
-    assert.deepEqual(interpoladas, ["pin"], `en Windows esos argumentos van concatenados sin escapar: ${inv[1]}`);
+    const sinLiterales = inv[1].replace(/"(?:[^"\\]|\\.)*"/g, "").replace(/[\s,]/g, "");
+    assert.equal(
+      sinLiterales,
+      "`@fission-ai/openspec@${pin}`",
+      `en Windows esos argumentos van concatenados sin escapar, asi que el unico variable tiene que ser el ` +
+        `pin (que pinValido acota). Sobro esto: ${sinLiterales || "(nada)"} — en [${inv[1]}]`,
+    );
   }
 });
 
@@ -993,24 +1010,37 @@ function npxFalso(nombre, sh, cmd) {
   return bin;
 }
 
+/** El `constitucion.mjs` de mentira del camino feliz. Hace las DOS cosas que
+ *  hace el modo escribir de la action real: escribe la porcion del marco y la
+ *  DECLARA en su output `artefactos` (actions/constitucion/action.yml). Ese
+ *  output es lo que la herramienta lee para saber que rutas comprobar en disco.
+ *  Y es IDEMPOTENTE —reescribe siempre la misma ruta, como el real—, que es la
+ *  propiedad que el caso de la segunda corrida necesita. */
+const CONSTITUCION_QUE_ESCRIBE = [
+  "import fs from 'node:fs';",
+  "fs.mkdirSync('.projects', { recursive: true });",
+  "fs.writeFileSync('.projects/AGENTS-marco.md', 'porcion del marco\\n');",
+  "fs.appendFileSync(process.env.GITHUB_OUTPUT, 'artefactos=.projects/AGENTS-marco.md\\n');",
+].join("\n");
+
 const NPX_QUE_MIENTE = ["#!/bin/sh\nexit 0\n", "@echo off\r\nexit /b 0\r\n"];
 const NPX_QUE_ESCRIBE = [
   "#!/bin/sh\nmkdir -p openspec && printf 'x\\n' > openspec/project.md\nexit 0\n",
   "@echo off\r\nmkdir openspec\r\necho x> openspec\\project.md\r\nexit /b 0\r\n",
 ];
 
-/** Corre la CLI del marco falso con ese PATH por delante. */
+/** Corre la CLI del marco falso con ese PATH por delante.
+ *
+ *  `spawnSync` y no `execFileSync`: los `::warning::` salen por stderr, y
+ *  execFileSync en una corrida que sale 0 devuelve SOLO stdout. Con el, un aviso
+ *  emitido en el camino feliz —que es justo donde vive el de openspec/— era
+ *  invisible para este banco. */
 function correrEnMarco(marco, bin, ...args) {
-  try {
-    const salida = execFileSync(process.execPath, [path.join(marco, "herramientas", "projects-init.mjs"), ...args], {
-      encoding: "utf8",
-      stdio: "pipe",
-      env: { ...process.env, PATH: `${bin}${path.delimiter}${process.env.PATH}` },
-    });
-    return { codigo: 0, salida };
-  } catch (e) {
-    return { codigo: e.status ?? -1, salida: `${e.stdout ?? ""}${e.stderr ?? ""}` };
-  }
+  const r = spawnSync(process.execPath, [path.join(marco, "herramientas", "projects-init.mjs"), ...args], {
+    encoding: "utf8",
+    env: { ...process.env, PATH: `${bin}${path.delimiter}${process.env.PATH}` },
+  });
+  return { codigo: r.status ?? -1, salida: `${r.stdout ?? ""}${r.stderr ?? ""}` };
 }
 
 test("openspec init que sale 0 sin crear openspec/ es ROJO, no LISTO", () => {
@@ -1034,6 +1064,31 @@ test("openspec init que sale 0 sin crear openspec/ es ROJO, no LISTO", () => {
   assert.equal(/LISTO\./.test(salida), false, "no se declara LISTO sobre un arranque a medias");
 });
 
+test("openspec/ que YA tenia contenido y un CLI que miente: la corrida avisa, no pasa en silencio", () => {
+  // El fail-open que faltaba cerrar. El control preguntaba "hay algo en
+  // openspec/?" sin haber fotografiado antes, asi que en el unico escenario en
+  // que el destino NO nace vacio —un reintento con --forzar, o la skill de
+  // adopcion apuntada a un repo que ya usaba OpenSpec— el contenido que la
+  // pregunta encontraba ya estaba ahi antes de correr el CLI, y el CLI que
+  // miente en Windows pasaba entero sin ruido.
+  const marco = marcoFalso("openspec-preexistente", CONSTITUCION_QUE_ESCRIBE);
+  const bin = npxFalso("bin-preexistente", ...NPX_QUE_MIENTE);
+  const destino = tmp("openspec-preexistente-destino");
+  fs.mkdirSync(path.join(destino, "openspec"));
+  fs.writeFileSync(path.join(destino, "openspec", "viejo.md"), "de otro proyecto\n", "utf8");
+  const vals = valoresEn(destino);
+
+  const { codigo, salida } = correrEnMarco(marco, bin, "--valores", vals, "--destino", destino);
+  // AVISO y no rojo, y la razon esta en la herramienta: desde aca no se
+  // distingue "el CLI mintio" de "el CLI no tenia nada que hacer sobre un
+  // openspec/ ya inicializado", y romper el reintento con --forzar es romper el
+  // camino de recuperacion que esta misma herramienta recomienda. Lo que no
+  // puede seguir siendo es silencio.
+  assert.equal(codigo, 0, salida);
+  assert.match(salida, /::warning::openspec init salio 0 y openspec\/ quedo con los mismos 1 archivo\(s\)/);
+  assert.deepEqual(fs.readdirSync(path.join(destino, "openspec")), ["viejo.md"], "el CLI de mentira no escribio nada");
+});
+
 test("un render de la constitucion que sale 0 sin escribir nada es ROJO", () => {
   const marco = marcoFalso("constitucion-muda", "process.exit(0);\n");
   const bin = npxFalso("bin-escribe", ...NPX_QUE_ESCRIBE);
@@ -1042,20 +1097,35 @@ test("un render de la constitucion que sale 0 sin escribir nada es ROJO", () => 
 
   const { codigo, salida } = correrEnMarco(marco, bin, "--valores", vals, "--destino", destino);
   assert.notEqual(codigo, 0, `tenia que ser rojo; salida: ${salida}`);
-  assert.match(salida, /el render de la constitucion salio 0 y no escribio un solo archivo nuevo/);
+  assert.match(salida, /el render de la constitucion salio 0 y no declaro un solo artefacto escrito/);
+  assert.equal(/LISTO\./.test(salida), false);
+});
+
+test("un render que DECLARA un artefacto y no lo deja escrito es ROJO", () => {
+  // La otra mitad del control: el output `artefactos` dice DONDE mirar, no
+  // reemplaza el mirar. Un render que imprime exito y revierte lo que escribio
+  // —el modo de falla que este repo tiene medido para los CLI en Windows—
+  // declara la ruta igual, y sin releer el disco eso pasaba por camino feliz.
+  const marco = marcoFalso(
+    "constitucion-mentirosa",
+    "import fs from 'node:fs';\n" +
+      "fs.appendFileSync(process.env.GITHUB_OUTPUT, 'artefactos=.projects/AGENTS-marco.md\\n');\n",
+  );
+  const bin = npxFalso("bin-escribe-2", ...NPX_QUE_ESCRIBE);
+  const destino = tmp("constitucion-mentirosa-destino");
+  const vals = valoresEn(destino);
+
+  const { codigo, salida } = correrEnMarco(marco, bin, "--valores", vals, "--destino", destino);
+  assert.notEqual(codigo, 0, `tenia que ser rojo; salida: ${salida}`);
+  assert.match(salida, /declaro 1 artefacto\(s\) y 1 no quedaron escritos.*\.projects\/AGENTS-marco\.md/);
   assert.equal(/LISTO\./.test(salida), false);
 });
 
 test("con los dos pasos escribiendo de verdad, la corrida sale 0 y los nombra", () => {
-  // ANTI-VACUIDAD de los dos casos de arriba: si el bloque de herramientas
-  // fuera rojo por cualquier motivo, los dos pasarian igual. Y es ademas la
-  // primera vez que este banco ejecuta ese bloque en el camino feliz.
-  const constitucion = [
-    "import fs from 'node:fs';",
-    "fs.mkdirSync('.projects', { recursive: true });",
-    "fs.writeFileSync('.projects/AGENTS-marco.md', 'porcion del marco\\n');",
-  ].join("\n");
-  const marco = marcoFalso("herramientas-ok", constitucion);
+  // ANTI-VACUIDAD de los casos de arriba: si el bloque de herramientas fuera
+  // rojo por cualquier motivo, todos pasarian igual. Y es ademas la primera vez
+  // que este banco ejecuta ese bloque en el camino feliz.
+  const marco = marcoFalso("herramientas-ok", CONSTITUCION_QUE_ESCRIBE);
   const bin = npxFalso("bin-ok", ...NPX_QUE_ESCRIBE);
   const destino = tmp("herramientas-ok-destino");
   const vals = valoresEn(destino);
@@ -1067,6 +1137,33 @@ test("con los dos pasos escribiendo de verdad, la corrida sale 0 y los nombra", 
   assert.match(salida, /LISTO\./);
   assert.ok(fs.existsSync(path.join(destino, "openspec", "project.md")));
   assert.ok(fs.existsSync(path.join(destino, ".projects", "AGENTS-marco.md")));
+});
+
+test("la segunda corrida con --forzar sobre un destino ya instanciado sigue saliendo 0", () => {
+  // EL ROJO FALSO que este lote introdujo y que el banco no veia, porque su
+  // unico caso de --forzar corria con --sin-herramientas. El modo escribir de
+  // actions/constitucion es idempotente: reescribe SIEMPRE las mismas rutas.
+  // Comparando las rutas del destino antes y despues del render, una segunda
+  // corrida no deja ninguna ruta nueva, asi que `--forzar` sobre un destino ya
+  // instanciado salia 1 con "no escribio un solo archivo nuevo" y mandaba a
+  // revisar las `superficies` de .projects-valores.json, que no tenian nada que
+  // ver. Y --forzar es el camino de recuperacion que la herramienta recomienda
+  // en sus propios mensajes de error.
+  const marco = marcoFalso("forzar-idempotente", CONSTITUCION_QUE_ESCRIBE);
+  const bin = npxFalso("bin-forzar-idempotente", ...NPX_QUE_ESCRIBE);
+  const destino = tmp("forzar-idempotente-destino");
+  const vals = valoresEn(destino);
+
+  const primera = correrEnMarco(marco, bin, "--valores", vals, "--destino", destino);
+  assert.equal(primera.codigo, 0, primera.salida);
+
+  const segunda = correrEnMarco(marco, bin, "--valores", vals, "--destino", destino, "--forzar");
+  assert.equal(segunda.codigo, 0, segunda.salida);
+  assert.match(segunda.salida, /la constitucion dejo 1 archivo\(s\): \.projects\/AGENTS-marco\.md/);
+  assert.match(segunda.salida, /LISTO\./);
+  // El openspec/ de la segunda corrida SI cae en el caso ambiguo —el ejecutor de
+  // mentira reescribe el mismo archivo y no agrega ninguno—, y eso es aviso.
+  assert.match(segunda.salida, /::warning::openspec init salio 0 y openspec\//);
 });
 
 // ══════════════════ UNA COPIA QUE SE CORTA A LA MITAD ══════════════════
@@ -1281,7 +1378,12 @@ test("--help y -h salen 0 con el uso, y sin traza de Node", () => {
 test("la ayuda documenta las cinco banderas, --version-openspec incluida", () => {
   // Esa bandera vivia documentada UNICAMENTE dentro del texto de un mensaje de
   // error: un escape hatch que solo descubre quien ya se topo con la falla.
-  const { salida } = correr("--help");
+  const { codigo, salida } = correr("--help");
+  // El codigo de salida NO es decorado en este caso: `correr()` junta stdout con
+  // stderr, y el camino de ERROR imprime el mismo texto de uso. Sin esta linea,
+  // borrar la rama de `--help` de argumentos() dejaba este caso en verde —el
+  // uso aparecia igual, por stderr y con exit 2— y solo caian los otros dos.
+  assert.equal(codigo, 0, salida);
   for (const bandera of ["--valores", "--destino", "--sin-herramientas", "--forzar", "--version-openspec"]) {
     assert.ok(salida.includes(bandera), `--help no nombra ${bandera}`);
   }

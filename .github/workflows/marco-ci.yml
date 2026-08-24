@@ -483,10 +483,15 @@ jobs:
   higiene:
     name: higiene
     # 20 y no 10: es el job largo del marco —dos binarios descargados y verificados por
-    # sha256, nueve lectores y un barrido de la historia del cambio— y el unico que
-    # toca la red. El default de GitHub son 360 minutos, y este workflow es reusable:
-    # el minuto colgado lo paga el consumidor. Los cuatro curl de mas abajo llevan
-    # ademas su propio --max-time, que es el techo del paso; este es el del job.
+    # sha256, nueve lectores y un barrido de la historia del cambio— y el que mas red
+    # usa, que no es lo mismo que el unico: el job openspec baja un paquete de npm en
+    # cada corrida (`npx --yes "@fission-ai/openspec@..."`), y los cuatro jobs con
+    # `uses:` —este incluido— bajan ademas cada action que invocan. El default de
+    # GitHub son 360 minutos, y este workflow es reusable: el minuto colgado lo paga
+    # el consumidor. Los cuatro curl de mas abajo llevan ademas su propio --max-time,
+    # que es el techo del paso; este es el del job. De las descargas que este archivo
+    # hace desde un `run:`, el npx de openspec es la unica sin techo propio: la corta
+    # el timeout-minutes de 10 de ese job y nada mas.
     timeout-minutes: 20
     runs-on: ${{ inputs.runner }}
     steps:
@@ -2553,12 +2558,17 @@ jobs:
       #     que ya declara el censo de fuentes.
       #   - Reconoce verbos que escriben; no prueba que el resto no pueda.
       #   - Del frontmatter de skills y agentes se leen SOLO las claves
-      #     `allowed-tools:` y `tools:`, y solo en sus dos formas reales: lista en
-      #     una linea (con o sin corchetes) o lista en bloque con guiones. No hay
-      #     parser de YAML aca —el marco no se permite dependencias— asi que un
-      #     frontmatter mas raro que eso no se lee. El paso imprime cuantas
-      #     entradas leyo POR ARCHIVO justamente para que "no supe leerlo" se vea
-      #     como un 0 y no se confunda con "no tiene permisos".
+      #     `allowed-tools:` y `tools:`, y solo en sus formas reales: lista en una
+      #     linea (con o sin corchetes, y con o sin la lista ENTERA entre comillas)
+      #     o lista en bloque con guiones. No hay parser de YAML aca —el marco no
+      #     se permite dependencias— asi que un frontmatter mas raro que eso no se
+      #     lee. El paso imprime cuantas entradas leyo POR ARCHIVO justamente para
+      #     que "no supe leerlo" se vea como un 0 y no se confunda con "no tiene
+      #     permisos". OJO CON EL LIMITE DE ESA MITIGACION, que es por lo que la
+      #     forma entre comillas se arreglo en vez de declararse: cuando lo que
+      #     falla no es leer el bloque sino PARTIRLO, el archivo no sale como un 0
+      #     sino como un 1 limpio, y un permiso ancho reportado como leido es peor
+      #     que uno reportado como ilegible.
       #   - Las skills y los agentes que un repo NO rastrea quedan fuera, igual
       #     que el archivo de ajustes: lo no versionado no se puede mirar.
       - name: Permisos del agente sin escritura
@@ -2697,6 +2707,27 @@ jobs:
             // Bash(npm --prefix \"a,b\" exec x) no parte nada. La comilla simple va por
             // su escape hexadecimal, como en los pasos hermanos: una literal cerraria
             // el programa a la mitad.
+            //
+            // LA LISTA ENTERA ENTRE COMILLAS SE DESNUDA ANTES DE PARTIR. `allowed-tools:
+            // "Bash(git:*), Read"` es YAML valido, y hasta el 2026-08-24 salia como UNA
+            // entrada: el partidor entraba en modo comilla en el primer caracter y la
+            // coma quedaba adentro, asi que el comodin de git no se marcaba y el archivo
+            // se reportaba como "1 entrada(s) leidas" y sin avisos. Medido en un repo de
+            // juguete con esa sola linea: cero avisos antes, uno ahora.
+            //
+            // El par se saca SOLO si encierra el valor entero —la comilla de apertura
+            // cierra al final y no antes—, que es lo que distingue `"a, b"` (una lista
+            // entre comillas) de `"a", "b"` (dos entradas citadas una por una, que el
+            // partidor de abajo ya separaba bien y que desnudar romperia).
+            function desnudar(texto) {
+              const limpio = texto.trim();
+              const primero = limpio.charAt(0);
+              if (limpio.length < 2) return limpio;
+              if (primero !== "\"" && primero !== "\x27") return limpio;
+              if (limpio.indexOf(primero, 1) !== limpio.length - 1) return limpio;
+              return limpio.slice(1, -1).trim();
+            }
+
             function partirEntradas(texto) {
               const salida = [];
               let actual = "";
@@ -2718,11 +2749,11 @@ jobs:
 
             // El frontmatter, leido a mano y sin dependencias como todo el marco.
             // LIMITES DECLARADOS: solo el bloque delimitado por --- al principio del
-            // archivo, solo las claves allowed-tools: y tools:, y solo sus dos formas
-            // reales —lista en una linea (con o sin corchetes) o lista en bloque con
-            // guiones—. Un YAML mas raro que eso no se lee, y por eso el paso dice
-            // cuantas entradas leyo de cada archivo en vez de dar por sentado que
-            // las leyo todas.
+            // archivo, solo las claves allowed-tools: y tools:, y solo sus formas
+            // reales —lista en una linea (con o sin corchetes, y con o sin la lista
+            // entera entre comillas) o lista en bloque con guiones—. Un YAML mas
+            // raro que eso no se lee, y por eso el paso dice cuantas entradas leyo
+            // de cada archivo en vez de dar por sentado que las leyo todas.
             function entradasDeFrontmatter(texto) {
               const lineas = texto.split(/\r?\n/);
               if (lineas.length === 0 || lineas[0].trim() !== "---") return [];
@@ -2737,13 +2768,18 @@ jobs:
                 if (!clave) continue;
                 const enLinea = clave[2].trim();
                 if (enLinea !== "" && enLinea !== "|" && enLinea !== ">") {
-                  for (const e of partirEntradas(enLinea.replace(/^\[/, "").replace(/\]$/, ""))) entradas.push(e);
+                  // Desnudar dos veces, por las dos formas que anidan: la lista citada
+                  // entera ("[a, b]") y la lista con corchetes cuyo contenido viene
+                  // citado ([\"a, b\"]). Sin corchetes ni comillas, las dos pasadas son
+                  // la identidad.
+                  const cuerpo = desnudar(desnudar(enLinea).replace(/^\[/, "").replace(/\]$/, ""));
+                  for (const e of partirEntradas(cuerpo)) entradas.push(e);
                   continue;
                 }
                 for (let j = i + 1; j < fin; j += 1) {
                   const item = lineas[j].match(/^[ \t]*-[ \t]+(.*)$/);
                   if (!item) break;
-                  for (const e of partirEntradas(item[1])) entradas.push(e);
+                  for (const e of partirEntradas(desnudar(item[1]))) entradas.push(e);
                 }
               }
               return entradas;
@@ -3156,7 +3192,9 @@ jobs:
   # `uses:` de este archivo que nombran la cuenta original —el de mas abajo y el de
   # `actions/guardrail-deltas` en el job de openspec— no admiten expresiones. Quien
   # copie el marco a otra cuenta los cambia a mano, y son dos lineas, las que devuelve
-  #   grep -n 'uses: im-diego-ec/Projects' .github/workflows/marco-ci.yml
+  #   grep -nE '^[[:space:]]*uses: im-diego-ec/Projects' .github/workflows/marco-ci.yml
+  # El ancla del principio de linea no es adorno: sin ella el patron se encuentra a si
+  # mismo en este comentario y devuelve tres hits, uno de los cuales no hay que tocar.
   # El skip derivado de arriba hace que en la copia este job ni siquiera corra, asi que
   # el unico `uses:` ajeno que queda VIVO en una copia es el de guardrail-deltas.
   # ---------------------------------------------------------------------------
