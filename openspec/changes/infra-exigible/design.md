@@ -25,11 +25,13 @@ la mayor parte de esas líneas no se decide: se **deriva**.
 | Identidad del pipeline | `github_repo` con la forma `org/repo` | Se deriva |
 | Región, prefijo de recursos, dominios | ya son valores del andamio | Se derivan |
 
-De los 21 valores que `projects init` ya sustituye, **siete alimentan directamente** la
-infraestructura: proyecto, organización, cuentas de dev y prod, región, prefijo de recursos
-y los dos dominios. Eso invierte la forma esperada de este change: no es «repartir mucho y
-dejar poco», es **entregar funcionando todo lo que se deriva y dejar pocos huecos, con
-criterio**.
+De los 21 valores que `projects init` ya sustituye, **doce alimentan directamente** la
+infraestructura —medido sobre la implementación del bloque 1: proyecto, organización, las
+dos cuentas, región, los dos perfiles, prefijo de recursos, los dos dominios, el canal de
+alertas y el handle del builder que aprueba producción.
+
+Eso invierte la forma esperada de este change: no es «repartir mucho y dejar poco», es
+**entregar funcionando todo lo que se deriva y dejar pocos huecos, con criterio**.
 
 ## Decisions
 
@@ -66,9 +68,11 @@ ya paga por `ci.yml` y por `CODEOWNERS`.
 Es la decisión que hace útil al change, y sale de la tabla del Context. Un hueco por algo
 derivable es trabajo que el marco le pasa al proyecto sin motivo.
 
-**Se entrega funcionando** (sin huecos): el bloque de backend del state, la referencia al
-cluster compartido, la referencia a la VPC, el proveedor y la región, el prefijo de
-recursos, la identidad federada del pipeline, y los dominios.
+**Se entrega funcionando** (sin huecos): la `key` del state derivada del proyecto, la
+referencia a la VPC, el proveedor con su región y sus etiquetas por defecto, el prefijo de
+recursos, la identidad del repositorio y los dominios. La **forma** del backend y del `data`
+del cluster también llega escrita; lo único que les falta es un nombre, y por eso son los dos
+huecos de D7 y no piezas por escribir.
 
 **Queda como hueco, porque no es derivable de ningún valor**:
 
@@ -80,8 +84,13 @@ recursos, la identidad federada del pipeline, y los dominios.
 | **Las alarmas** | Ver D5 |
 | La topología de subredes del servicio | Ver D4 |
 
-Cinco huecos, no veinte. El número importa: una lista larga de pendientes se lee como
-«esto está sin hacer» y se saltea; cinco con criterio se resuelven.
+Cinco decisiones del proyecto. **La implementación encontró dos más, y son de otra
+naturaleza** (ver D7): el nombre del bucket del state y el identificador del cluster
+compartido. Total: **seis huecos en dev y siete en producción** —el séptimo es el de
+alarmas, que por D6 existe solo ahí—.
+
+El número importa igual: una lista larga de pendientes se lee como «esto está sin hacer» y
+se saltea; siete con criterio se resuelven.
 
 ### D4 — Los huecos NO encodean las respuestas del un consumidor
 
@@ -130,6 +139,28 @@ ignorarla.
 
 Queda escrito en el andamio para que no se lea como un hueco que alguien olvidó. El hueco de
 alarmas existe **solo en `infra-prod/`**.
+
+### D7 — Dos de los huecos son datos del área, no decisiones del proyecto, y quedan anotados como tal
+
+La implementación del bloque 1 encontró que **el andamio no tiene ningún valor que describa
+la infraestructura compartida del área**. Los 21 valores describen el proyecto —su nombre, sus
+cuentas, sus dominios— y ninguno nombra el bucket del state ni el cluster de base de datos,
+que son por cuenta y compartidos entre las aplicaciones.
+
+Los dos entran como hueco, y **los dos dicen en su propio texto que probablemente no deberían
+serlo**: quien los resuelva a mano tiene la instrucción de anotarlo, porque el arreglo de fondo
+es que el andamio los sustituya como valor.
+
+**Alternativa descartada por ahora: agregarlos como valores 22 y 23.** Es la respuesta
+correcta y no se toma acá por dos razones. La primera es que el patrón de sus nombres se
+infirió de **dos** ejemplos —los del un consumidor—, y dos puntos alcanzan para ver
+una forma pero no para declarar una convención del área: eso lo sabe quien la definió. La
+segunda es que «los 21 valores» es un contrato documentado en tres lugares, y moverlo de
+pasada dentro de un change sobre infraestructura mete dos cambios en uno.
+
+**Consecuencia asumida y declarada**: en el primer proyecto que use esto, dos de los siete
+huecos van a resolverse copiando un dato de otro repositorio. Es fricción real, está anotada, y
+su arreglo es un change de dos líneas cuando alguien confirme la convención.
 
 ## La propiedad, enunciada
 
