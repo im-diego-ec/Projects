@@ -34,7 +34,7 @@ node <clon-del-marco>/herramientas/projects-init.mjs --ejemplo > valores.json
 node <clon-del-marco>/herramientas/projects-init.mjs --valores valores.json --destino .
 ```
 
-Hace el copiado (sección 1), la sustitución de los 22 marcadores (sección 2), el
+Hace el copiado (sección 1), la sustitución de los 21 marcadores (sección 2), el
 `openspec init` con el pin del marco (sección 4) y el render de la constitución
 (sección 2.5). Falla cerrado y verifica releyendo el árbol.
 
@@ -476,7 +476,7 @@ vez**; después ninguno pide que alguien se acuerde de nada.
       motivo en `EXCEPCIONES` del `ci.yml`). No hace falta acordarse: el CI lo exige y falla
       nombrando el `package.json` incompleto
 - [ ] `.github/workflows/ci.yml`: el job `build_test` refleja el stack real y el job `marco`
-      apunta a `<org>/projects/.github/workflows/marco-ci.yml@<versión exacta>` (nunca
+      apunta a `<org>/Projects/.github/workflows/marco-ci.yml@<versión exacta>` (nunca
         `@v1`: un tag móvil no produce PR de Dependabot, y sin ese PR este repo no
         aparece en el censo de consumidores del marco)
 - [ ] Los tres handles de `.github/CODEOWNERS` existen en la org y tienen acceso de escritura
