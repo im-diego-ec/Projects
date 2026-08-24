@@ -14,6 +14,13 @@
 # sistemas, asi que la configuracion de cada maquina deja de ser una variable del
 # resultado. Es la unica forma de que dos personas con sistemas distintos midan
 # lo mismo sobre el mismo commit.
+#
+# ESTE TEXTO NO ES COPIA DEL QUE EL MARCO TIENE EN SU PROPIA RAIZ, y la
+# divergencia es deliberada: alla el mismo remedio se cuenta con la fecha del
+# incidente que lo motivo, que es historia de aquel repositorio y no de este.
+# Aca queda solo el mecanismo, cierto en cualquier repositorio y sin fecha que
+# envejezca. Si algun dia se comparan los dos archivos y no coinciden, eso es lo
+# esperado, no una copia que quedo vieja.
 * text=auto eol=lf
 
 # Binarios: sin conversion ni diff de texto.
