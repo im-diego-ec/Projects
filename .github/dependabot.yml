@@ -1,0 +1,145 @@
+# Dependabot DEL MARCO — el que le faltaba al que reparte Dependabot.
+#
+# POR QUE ESTE ARCHIVO NO EXISTIA Y POR QUE ES UN AGUJERO Y NO UN OLVIDO. El
+# marco reparte plantilla/.github/dependabot.yml a cada proyecto que se inicia,
+# y su modelo de distribucion entero DESCANSA en que Dependabot funcione: el PR
+# del bump es el canal por el que un consumidor se entera de que el marco se
+# movio, y la lista de esos PRs ES el censo de quien lo consume. O sea que el
+# marco depende de una pieza que hasta hoy no ejercitaba sobre si mismo. Medido
+# el 2026-08-24: `ls .github/dependabot.yml` -> No such file or directory.
+#
+# Lo que se hereda del andamio y lo que se quita. El corte es UNO SOLO y conviene
+# decirlo antes de la lista, porque los tres motivos de exclusion son el mismo:
+# este repo no tiene ningun manifiesto PROPIO de npm, docker o terraform. Los que
+# si versiona —medido el 2026-08-24: cuatro package.json bajo plantilla/,
+# plantilla/api/Dockerfile, plantilla/infra/main.tf y plantilla/infra-prod/main.tf—
+# son ANDAMIO: se copian al proyecto durante el init, llevan marcadores sin
+# resolver ({{PROYECTO}}, {{PAQUETE_API}}) y ningun job del marco los instala, los
+# construye ni los aplica. Donde de verdad se ejecutan —el repo del consumidor— ya
+# los vigila el dependabot que ese repo hereda: plantilla/.github/dependabot.yml
+# declara npm, docker y los dos terraform. Con el motivo puntual al lado:
+#
+#   npm         FUERA. No hay package.json en la raiz (`ls package.json` -> No
+#               such file or directory) y no hay UN SOLO lockfile versionado en
+#               todo el repo (`find . -name pnpm-lock.yaml -o -name
+#               package-lock.json` -> vacio, sin contar .git): el codigo del
+#               marco son .mjs con node --test, cero dependencias a proposito.
+#               Los package.json del andamio ni siquiera tienen nombre resoluble
+#               (plantilla/package.json declara `"name": "{{PROYECTO}}"`).
+#   docker      FUERA, y el motivo NO es que no haya Dockerfile: HAY uno
+#               versionado, plantilla/api/Dockerfile:11 (`FROM node:22-slim`).
+#               Queda fuera porque en este repo no se construye ni se podria: su
+#               install es `pnpm install --frozen-lockfile ... --filter
+#               {{PAQUETE_API}}...` —marcador sin resolver— y el propio archivo
+#               dice que la imagen se arma desde la raiz del monorepo DEL
+#               PROYECTO, raiz que aca no existe (no hay package.json ni
+#               lockfile que copiar). Donde si se arma ya esta cubierto: el
+#               andamio se lleva su propia entrada docker
+#               (plantilla/.github/dependabot.yml, `directory: /{{PAQUETE_API}}`)
+#               con la politica de saltear las majors impares de node. Y ponerla
+#               tambien aca seria peor que no tenerla: el 22 del andamio vive en
+#               cuatro lugares acoplados —el `FROM` de ese Dockerfile y los tres
+#               `node-version: "22"` de plantilla/.github/workflows/ (dos en
+#               ci.yml, uno en actualizar-marco.yml)— y un PR de docker moveria
+#               uno solo, sin ningun job que construya la imagen para notar la
+#               incoherencia. La condicion para revisar esta decision esta
+#               escrita: que aparezca un Dockerfile que ESTE repo construya.
+#   terraform   FUERA. No hay infra/ ni infra-prod/ en la raiz del marco. Los .tf
+#               que el repo versiona son los del andamio (plantilla/infra/main.tf
+#               y plantilla/infra-prod/main.tf, con siete y ocho marcadores sin
+#               resolver), y ningun job del marco corre `terraform`.
+#   github-acs  DENTRO, y es la unica que aplica: TODO lo que este repo ejecuta y
+#               todo lo que reparte son definiciones de pipeline. Y como el
+#               andamio SI entra por esta puerta —ver `/plantilla` mas abajo—,
+#               queda dicha la asimetria con las otras tres: un bump de
+#               `actions/checkout@v7` dentro de plantilla/ es un cambio de una
+#               linea, sin nada acoplado, y el CI del marco lo valida (actionlint
+#               y el paso de pines de ci.yml, que ya lee plantilla/). Subir la
+#               major de node arrastra los cuatro lugares de arriba y una
+#               politica de LTS que ya vive en el dependabot del andamio.
+#
+# Y EL GRUPO PROPIO DEL ANDAMIO TAMPOCO VIENE. En un consumidor, el marco es la
+# dependencia cuyo aviso importa y por eso alla va en su grupo aparte, para que
+# no quede rehen del PR mas trabado. Aca no compra eso: un bump del marco en el
+# repo del marco no es un evento de distribucion —no hay nadie aguas abajo
+# esperandolo— y el aviso a los consumidores ya sale por otra puerta
+# (.github/workflows/aviso-version.yml, que se dispara al publicar el release).
+#
+# LIMITE MEDIDO Y DECLARADO, no supuesto: el marco SI se referencia a si mismo
+# en dos lineas —.github/workflows/marco-ci.yml:383 (@v1) y :2812 (@v1.7.0);
+# remedidas el 2026-08-24 con `grep -nE '^\s*(-\s+)?uses:\s*po/'`, que
+# es como hay que volver a medirlas, porque son numeros de linea de un archivo de
+# 2857 lineas que se edita seguido—,
+# asi que Dependabot va a proponer esos bumps y van a caer en el grupo general
+# de abajo. Eso es lo correcto hoy: ahi un bump propio no es una entrega, es un
+# indicador de que el pin quedo atras de la version publicada. Si algun dia ese
+# PR se queda trabado detras de otro, el arreglo es partir el grupo igual que en
+# el andamio, no bajarle la agenda al resto.
+version: 2
+updates:
+  - package-ecosystem: "github-actions"
+    # TRES SUPERFICIES, y ninguna es opcional. Con `directory: "/"` —lo unico
+    # que declara el andamio— Dependabot mira `.github/workflows/` y nada mas.
+    # Medido el 2026-08-24 sobre los 38 `uses:` que este repo versiona: 22 estan
+    # ahi y 16 quedan fuera —14 en `plantilla/.github/workflows/` y 2 en los
+    # `action.yml` de las composite actions—, y esos 16 son justamente los que
+    # VIAJAN: el andamio los copia a cada proyecto nuevo y las composite actions
+    # las ejecuta cada consumidor de @v1. Dejarlos fuera es vigilar lo que solo
+    # corre aca e ignorar lo que corre en todas partes.
+    #
+    # EFECTO DECLARADO DE `/plantilla`, que se acepta a sabiendas y no se
+    # descubre despues: de los 14 `uses:` del andamio, 5 NO son referencias
+    # resolubles sino marcadores del scaffolding —`uses: "{{ORG}}/Projects/..."`,
+    # cuatro en plantilla/.github/workflows/ci.yml y uno en actualizar-marco.yml—.
+    # Dependabot va a intentar resolver `{{ORG}}/Projects` como un repositorio de
+    # GitHub y no va a poder; lo esperable es una linea de error por cada uno en
+    # el log del job de Dependabot. Esto NO esta comprobado —exige red y una
+    # corrida real, y por eso se escribe como expectativa y no como hecho—, pero
+    # tampoco se calla: el archivo se presenta como cada decision con su limite
+    # escrito, y este es el limite. Se acepta porque el ruido cae en un log que se
+    # mira cuando algo falla, y lo que se compra a cambio son los 9 `uses:`
+    # restantes, que si son reales, ajenos y viajan a cada proyecto nuevo. Lo que
+    # habria que revisar es lo otro: si ese error resultara FATAL para la entrada
+    # —o sea que por los 5 marcadores tampoco se propongan los 9—, sacar
+    # `/plantilla` no arregla nada, deja esos 9 sin vigilancia otra vez; el
+    # arreglo estaria en el andamio, en que el `uses:` del marco se escriba con un
+    # owner resoluble y el init reescriba solo la version.
+    #
+    # `/actions/*` es un patron y no una lista de las dos carpetas que hoy
+    # tienen `uses:`: una lista habria que acordarse de actualizarla al agregar
+    # una action, y en este repo lo que depende de que alguien se acuerde no
+    # cuenta. Si Dependabot reporta que alguna de esas carpetas no tiene
+    # manifiesto, el arreglo esta en esta entrada, no en el arbol.
+    directories:
+      - "/"
+      - "/plantilla"
+      - "/actions/*"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    open-pull-requests-limit: 5
+    # SEMANAL ACA, DIARIO EN EL ANDAMIO, y la diferencia no es descuido. La
+    # agenda diaria del andamio existe por UNA razon escrita ahi: que el bump
+    # del marco le llegue rapido al consumidor, porque ese PR es el canal de
+    # distribucion. En el repo del marco esa razon no existe — los unicos
+    # habitantes de esta entrada son actions de terceros, cuyo bump no es
+    # urgente y a las que ademas les conviene esperar (ver el cooldown de aca
+    # abajo). Diario aca seria correr todos los dias para llegar al mismo lugar.
+    #
+    # EL COOLDOWN NO SE DECLARA A PROPOSITO. Sin la clave, GitHub aplica su
+    # default de tres dias a las actualizaciones de version. En el andamio eso
+    # costo una semana de retraso invisible y por eso alla el marco se excluye
+    # con `cooldown.exclude`; aca es exactamente lo que se quiere, porque los
+    # tres dias son la ventana en la que se detecta y se retira una release de
+    # un tercero recien comprometida. Es el unico lugar del marco donde esperar
+    # es la decision segura.
+    groups:
+      acciones:
+        patterns: ["*"]
+    # POR QUE ESTA ENTRADA ES LA OTRA MITAD DEL CHECK DE PINES DE ci.yml. El
+    # paso "Pines de actions de terceros por SHA" audita que todo `uses:` ajeno
+    # vaya por SHA de 40 hex; un SHA, a diferencia de un tag, NO se mueve, asi
+    # que sin Dependabot esos pines se congelan y quedan peor que los tags —una
+    # vulnerabilidad parcheada aguas arriba no llega nunca—. Dependabot es lo
+    # que los descongela: reescribe el SHA y el comentario `# vX.Y` que lleva al
+    # lado. Las dos piezas se necesitan; ninguna de las dos sola sirve.
