@@ -212,9 +212,19 @@ Si el repo que querés usar **ya existía**, el primer comando falla: eso es la 
 
 ### 3.1 Qué quedó en el repo
 
-**93 archivos.** El mensaje dice `escritos 75` y **está bien**: 75 son los del andamio, y
-los otros los escriben `openspec init` (que init ya corrió, con el pin del marco `1.9.0`)
-y el render de la constitución.
+**102 archivos**, y el mensaje dice `escritos 75`. Las dos cosas están bien, y el desglose
+medido es este:
+
+| De dónde | Cuántos |
+|---|---|
+| El andamio — lo que `projects init` copia y sustituye | **75** |
+| `openspec init`, que `projects init` corre en su último paso (12 comandos `/opsx:*`, 12 skills `openspec-*`, y el árbol de `openspec/`) | **25** |
+| El render de la constitución (`.projects/` y `.cursor/rules/`) | **2** |
+
+⚠️ **El artefacto de la constitución va a declarar `version=1.6.0` y no 1.7.0, y está bien.**
+Versiona el **canónico**, no el release: como el texto del canónico no cambió en la 1.7.0, el
+artefacto sigue siendo el correcto. Verificado — el check da exit 0 y dice «la porción del
+marco está al día en 2 superficies».
 
 | Directorio | Qué hay |
 |---|---|
