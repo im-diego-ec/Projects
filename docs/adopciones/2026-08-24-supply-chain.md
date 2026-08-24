@@ -69,6 +69,7 @@ fase 7, cuando el primer change de OpenSpec necesita al PO.
 | 3.3 · Si el repo ya existía | *no aplica: se crea repo nuevo* | — | — | — |
 | 4 · El lockfile | 1 comando | | | |
 | 4.1 · Comprobarlo antes de pushear | — | | | |
+| 4.2 · lo que ya viene hecho | *no es trabajo: es inventario* | — | — | — |
 | 5 · Primer push a `main` | — | | | |
 | 5.1 · El primer CI sale rojo | — | | | |
 | 6.1 · Protección de `main` | — | | | |
@@ -76,6 +77,17 @@ fase 7, cuando el primer change de OpenSpec necesita al PO.
 | 6.3 · Dependabot | — | | | |
 | 6.4 · Los dos secrets | — | | | |
 | 7 · Primer change de OpenSpec | — | | | |
+| **7.1** · de los documentos a los specs | — | | | |
+| 7.1 · 1-2 · directorio aparte e instalar BMAD | — | | | |
+| 7.1 · 3 · documentos numerados | — | | | |
+| 7.1 · 4 · **la lista de cobertura** | — | | | |
+| 7.1 · 5 · **el PRD con `bmad-prd`** | 2-3 vueltas | | | |
+| 7.1 · 6 · pulir el PRD y contrastarlo | — | | | |
+| 7.1 · 7 · la sesión del repo: proposal y deltas | — | | | |
+| 7.1 · 8 · la tercera columna de la lista | — | | | |
+
+**Los tres pasos que nadie corrió nunca son el 4, el 5 y el 6.** Ahí es donde el reloj
+importa de verdad: si el 5 se come la tarde, eso es el resultado del día.
 
 **Total real punta a punta**: ____ · **de eso, esperando a otra persona**: ____
 
