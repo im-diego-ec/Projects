@@ -24,16 +24,18 @@
 // design lo declara como deuda: se revisa una vez, en el PR del change, en vez de
 // una vez por proyecto. Esta prueba cierra la mitad automatizable.
 //
-// LO QUE VERIFICA. Siete propiedades, todas LEIDAS del arbol:
+// LO QUE VERIFICA. Ocho propiedades, todas LEIDAS del arbol:
 //   1. los dos directorios existen con sus tres archivos;
 //   2. cero recursos de Terraform — la frontera del change;
 //   3. todo marcador usado esta entre los que `projects init` sustituye;
 //   4. cada pendiente numerado trae sus tres partes;
 //   5. el pendiente de alarmas existe SOLO en produccion;
 //   6. cada puntero del main.tf resuelve a una seccion que existe;
-//   7. la numeracion de los pendientes es correlativa, sin saltos.
+//   7. la numeracion de los pendientes es correlativa, sin saltos;
+//   8. y ninguno usa el hueco GATEADO del andamio — la que evita que un repo recien
+//      nacido amanezca rojo por infraestructura que todavia no puede decidir.
 //
-// Mas una octava que hace que las siete signifiquen algo: cada una MUERDE. Se
+// Mas una novena que hace que las ocho signifiquen algo: cada una MUERDE. Se
 // mutan copias en un directorio temporal —nunca el arbol del repo— y se exige que
 // la comprobacion que le toca reporte el problema.
 import test from "node:test";
@@ -50,11 +52,17 @@ const ANDAMIO = path.join(RAIZ, "plantilla");
 const DIRS = ["infra", "infra-prod"];
 const ARCHIVOS = ["main.tf", "pendientes.tf", "README.md"];
 
-// El marcador de hueco de decision, por codepoint y sin el selector de variacion:
-// depender del par exacto de bytes hace que la prueba falle por el locale del
-// editor y no por el arbol. Es la misma razon por la que el paso del pipeline lo
-// busca asi.
-const HUECO = "\u{1F573}";
+// El marcador de los pendientes de infraestructura. NO es el hueco del andamio, y esa
+// distincion es el nucleo de este archivo: ver HUECO_GATEADO abajo.
+const MARCA = "PENDIENTE-INFRA";
+
+// Y el marcador que los pendientes de infra NO pueden usar. El hueco del andamio SI
+// lo cuenta el paso del pipeline, asi que ponerlo aca pondria rojo a todo repo recien
+// nacido por decisiones de infraestructura que todavia no puede tomar — y el propio
+// requirement de este change exige que la verificacion sea INERTE para un repositorio
+// que no se despliega. Por eso el change queda declarado como PARCIALMENTE
+// implementado: la compuerta llega con el change del despliegue.
+const HUECO_GATEADO = "\u{1F573}";
 
 // Los valores que `projects init` sustituye salen de la herramienta, no de una lista
 // repetida aca: una segunda declaracion puede divergir de la primera, y entonces
@@ -75,7 +83,7 @@ function seccionesDe(texto) {
   const lineas = texto.split("\n");
   let actual = null;
   for (const linea of lineas) {
-    const enc = linea.match(new RegExp(`${HUECO}\\uFE0F? (\\d+) ·`, "u"));
+    const enc = linea.match(new RegExp(`${MARCA}:? (\\d+) ·`, "u"));
     if (enc) {
       if (actual) secciones.push(actual);
       actual = { numero: Number(enc[1]), cuerpo: [linea] };
@@ -209,6 +217,26 @@ const COMPROBACIONES = {
     return [...new Set(hallazgos)];
   },
 
+  sinElHuecoGateado(raiz) {
+    // Si alguien pone el hueco del andamio en estos archivos, TODO repo nuevo amanece
+    // rojo en el paso de marcadores por decisiones de infraestructura que todavia no
+    // puede tomar. Es el defecto que este archivo existe para que no vuelva.
+    const hallazgos = [];
+    for (const d of DIRS) {
+      const dd = path.join(raiz, d);
+      if (!fs.existsSync(dd)) continue;
+      for (const f of fs.readdirSync(dd)) {
+        const texto = fs.readFileSync(path.join(dd, f), "utf8");
+        if (texto.includes(HUECO_GATEADO)) {
+          hallazgos.push(
+            `${d}/${f} usa el hueco del andamio, que el pipeline SI cuenta: pondria rojo a todo repo nuevo por infraestructura que todavia no puede decidir`
+          );
+        }
+      }
+    }
+    return hallazgos;
+  },
+
   numeracionCorrelativa(raiz) {
     const hallazgos = [];
     for (const d of DIRS) {
@@ -307,12 +335,18 @@ const MUTACIONES = [
     },
   },
   {
+    nombre: "alguien pone el hueco gateado del andamio en un pendiente de infra",
+    comprobacion: "sinElHuecoGateado",
+    mutar: (t) =>
+      fs.appendFileSync(path.join(t, "infra", "pendientes.tf"), `\n# ${HUECO_GATEADO} algo pendiente\n`),
+  },
+  {
     nombre: "la numeracion de los pendientes salta",
     comprobacion: "numeracionCorrelativa",
     mutar: (t) => {
       const p = path.join(t, "infra", "pendientes.tf");
       const texto = fs.readFileSync(p, "utf8");
-      fs.writeFileSync(p, texto.replace(`${HUECO}️ 2 ·`, `${HUECO}️ 9 ·`), "utf8");
+      fs.writeFileSync(p, texto.replace(`${MARCA}: 2 ·`, `${MARCA}: 9 ·`), "utf8");
     },
   },
 ];

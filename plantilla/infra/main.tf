@@ -2,8 +2,9 @@
 #
 # Lo que hay acá es lo que se DERIVA de los valores del proyecto y no requiere
 # ninguna decisión: el backend del state, el proveedor, y la referencia a la base
-# compartida del área. Lo que sí requiere decidir vive en `pendientes.tf`, y el
-# pipeline se queda ROJO mientras quede uno sin resolver.
+# compartida del área. Lo que sí requiere decidir vive en `pendientes.tf`, con su
+# criterio y todavía SIN compuerta del pipeline — el motivo está en el encabezado
+# de ese archivo.
 #
 # Cero recursos a propósito. Este archivo referencia infraestructura que ya
 # existe; crear recursos es el trabajo que los pendientes describen.
@@ -24,7 +25,7 @@ terraform {
   # `use_lockfile` usa el lock nativo de S3 (Terraform >= 1.10) y por eso NO hace
   # falta una tabla de DynamoDB.
   #
-  # 🕳️ El nombre del bucket es un PENDIENTE — ver `pendientes.tf`, sección 1.
+  # PENDIENTE-INFRA: El nombre del bucket es un PENDIENTE — ver `pendientes.tf`, sección 1.
   # Está acá abajo con el marcador para que `terraform init` falle con un mensaje
   # claro en vez de crear un state en un lugar equivocado.
   backend "s3" {
@@ -57,7 +58,7 @@ provider "aws" {
 # cada aplicación vive como una base dentro de él. Esto es una referencia de
 # lectura: si el cluster no existe, `plan` falla diciéndolo, que es lo correcto.
 #
-# 🕳️ El identificador del cluster es un PENDIENTE — ver `pendientes.tf`, sección 2.
+# PENDIENTE-INFRA: El identificador del cluster es un PENDIENTE — ver `pendientes.tf`, sección 2.
 data "aws_rds_cluster" "compartido" {
   cluster_identifier = "PENDIENTE-VER-pendientes-tf-SECCION-2"
 }
