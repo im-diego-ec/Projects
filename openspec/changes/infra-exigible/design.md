@@ -162,6 +162,47 @@ pasada dentro de un change sobre infraestructura mete dos cambios en uno.
 huecos van a resolverse copiando un dato de otro repositorio. Es fricción real, está anotada, y
 su arreglo es un change de dos líneas cuando alguien confirme la convención.
 
+### D8 — La compuerta se difiere, y el change queda declarado como parcialmente implementado
+
+**Esto es una corrección de la implementación contra su propio requirement, no un cambio de
+alcance.** El delta de este change dice que la verificación «SHALL ser inerte para un
+repositorio que no se despliega: la exigencia nace del despliegue, no de la existencia del
+repositorio». El bloque 1 no cumplió eso: puso los pendientes con el marcador 🕳️ del
+andamio, que el paso del pipeline **sí** cuenta desde el primer día.
+
+Medido: un repositorio nuevo pasaba de **3 marcadores a 21**. Los 3 originales se resuelven
+en minutos —editar dos documentos y aplicar el ruleset—; de los 18 nuevos, todos necesitan
+el nombre de un bucket, el identificador de un cluster, verificar subredes, dimensionar
+cómputo o elegir alarmas. Y el paso es fallo duro (`::error::` más `exit 1`), así que
+arrastra `marco / higiene` → `marco_ok` → **`ci-ok`**.
+
+Consecuencia que lo vuelve inaceptable: **un repositorio recién nacido no podía llegar a
+verde**, y la guía de arranque promete en su primera línea llevar a «`ci-ok` verde y el
+primer change en marcha». Un andamio que entrega un repo imposible de poner en verde no es
+una compuerta: es una trampa.
+
+**Decisión**: los pendientes usan un token propio, `PENDIENTE-INFRA`, que el paso de
+marcadores no cuenta. Siguen en el árbol —así que el agente los lee en cada sesión, que es
+el nivel donde el criterio técnico se transfiere sin que nadie lo recuerde— y se revisan a
+mano hasta que exista la compuerta.
+
+**La compuerta llega con el change del despliegue**, y no es una postergación cómoda: es
+cuando «este repositorio se despliega» se vuelve verificable de verdad. Hoy no lo es —el
+andamio no reparte pipeline de despliegue—, así que cualquier disparador que se inventara
+ahora sería una aproximación.
+
+**Por lo tanto este change queda PARCIALMENTE implementado, y se dice en vez de disimularse**:
+el requirement pide compuerta y hoy hay disciplina declarada. El archive espera esa mitad.
+
+**Alternativa descartada: sacar los directorios del andamio hasta que exista la compuerta.**
+Deja al agente leyendo una regla que apunta a un directorio vacío, que es el defecto que este
+change existe para cerrar. Peor el remedio.
+
+**Alternativa descartada: inventar el disparador ahora** (por ejemplo, «cuenta los pendientes
+si existe un workflow de despliegue»). Es adivinar la forma que va a tener una pieza que
+todavía no se diseñó, y el marco ya tiene escrito lo que cuesta un disparador elegido antes
+de conocer la pieza: un ruleset vivió una semana pidiendo el check equivocado.
+
 ## La propiedad, enunciada
 
 > Un repositorio que se despliega no puede llegar a verde con su infraestructura sin
