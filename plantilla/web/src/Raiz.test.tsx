@@ -1,31 +1,28 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
-import type { ReactNode } from "react";
 import { Raiz } from "./Raiz";
+import type { Autenticacion } from "./auth";
 
-// El provider de Clerk entra reemplazado por un marcador que expone la clave
-// que recibio: lo que hay que verificar es la DECISION del arranque (envolver o
-// no, y con que clave), no el SDK del tercero. El mock cubre tambien lo que
-// importa App, que se monta debajo.
-vi.mock("@clerk/clerk-react", () => ({
-  ClerkProvider: ({
-    children,
-    publishableKey,
-  }: {
-    children?: ReactNode;
-    publishableKey: string;
-  }) => (
-    <div data-testid="provider-de-clerk" data-clave={publishableKey}>
-      {children}
-    </div>
-  ),
-  SignedOut: ({ children }: { children?: ReactNode }) => <div>{children}</div>,
-  SignedIn: () => null,
-  SignInButton: ({ children }: { children?: ReactNode }) => <div>{children}</div>,
-  UserButton: () => <div>menu de usuario</div>,
-}));
+// Se dobla el ARMADO del proveedor, no el SDK: lo que hay que verificar aca es
+// la DECISION del arranque —con las variables puestas la app corre con auth, sin
+// ellas corre sin auth y lo dice—, no como se construye el cliente (eso es
+// auth.test.ts).
+const { crear } = vi.hoisted(() => ({ crear: vi.fn() }));
+vi.mock("./auth", () => ({ crearAutenticacion: crear }));
+
+/** Un proveedor que no hace nada: alcanza para ver la rama "con auth". */
+function proveedorInerte(): Autenticacion {
+  return {
+    sesionActual: vi.fn(() => Promise.resolve(null)),
+    token: vi.fn(() => Promise.resolve(null)),
+    alCambiar: vi.fn(() => vi.fn()),
+    ingresar: vi.fn(() => Promise.resolve()),
+    salir: vi.fn(() => Promise.resolve()),
+  };
+}
 
 beforeEach(() => {
+  vi.clearAllMocks();
   // App consulta el healthcheck al montarse; sin esto la prueba dependeria de
   // que haya un API escuchando, que es la definicion de prueba intermitente.
   //
@@ -51,29 +48,38 @@ afterEach(() => {
 });
 
 describe("Raiz", () => {
-  it("sin clave publicable corre sin auth, y la interfaz lo dice", async () => {
-    vi.stubEnv("VITE_CLERK_PUBLISHABLE_KEY", "");
+  it("sin las variables del proveedor corre sin auth, y la interfaz lo dice", async () => {
+    crear.mockReturnValue(null);
 
     render(<Raiz />);
 
     expect(await screen.findByText("ok")).toBeTruthy();
-    expect(screen.queryByTestId("provider-de-clerk")).toBeNull();
     // Que la app corra sin auth no puede ser silencioso: en dev es comodo y en
-    // un ambiente desplegado es un aviso de que falta la variable.
-    expect(screen.getByText(/Clerk no configurado/)).toBeTruthy();
+    // un ambiente desplegado es un aviso de que faltan las variables.
+    expect(screen.getByText(/Supabase no configurado/)).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Enviar enlace de acceso" })).toBeNull();
   });
 
-  it("con clave publicable envuelve la app en el provider y le pasa esa clave", async () => {
-    vi.stubEnv("VITE_CLERK_PUBLISHABLE_KEY", "pk_test_del_andamio");
+  it("con el proveedor armado la app corre con auth y ofrece ingresar", async () => {
+    crear.mockReturnValue(proveedorInerte());
 
     render(<Raiz />);
 
     expect(await screen.findByText("ok")).toBeTruthy();
-    const provider = screen.getByTestId("provider-de-clerk");
-    // La clave se COMPRUEBA, no se da por sentada: un provider montado sin
-    // clave deja la app sin sesion y sin decir por que.
-    expect(provider.getAttribute("data-clave")).toBe("pk_test_del_andamio");
-    expect(screen.getByRole("button", { name: "Iniciar sesión" })).toBeTruthy();
-    expect(screen.queryByText(/Clerk no configurado/)).toBeNull();
+    expect(screen.getByRole("button", { name: "Enviar enlace de acceso" })).toBeTruthy();
+    expect(screen.queryByText(/Supabase no configurado/)).toBeNull();
+  });
+
+  it("el proveedor se arma UNA vez, no en cada render", async () => {
+    // Sin el useMemo, cada re-render abre una conexion nueva con el proveedor y
+    // reinicia la suscripcion a los cambios de sesion — un fallo que no se ve
+    // mirando la pantalla.
+    crear.mockReturnValue(proveedorInerte());
+
+    const { rerender } = render(<Raiz />);
+    await screen.findByText("ok");
+    rerender(<Raiz />);
+
+    expect(crear).toHaveBeenCalledOnce();
   });
 });

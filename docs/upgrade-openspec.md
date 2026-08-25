@@ -7,6 +7,17 @@ trampas conocidas: nadie te va a avisar de que hay versión nueva, las
 skills que quedan viejas no lo dicen en voz alta, y en Windows el `archive`
 puede mentir. Este documento es el procedimiento y las tres trampas.
 
+**Para quién es esta página.** Para quien mantiene el marco y va a subir la
+versión fijada de una herramienta. **Es un procedimiento técnico**, corto y con
+comandos: si no estás subiendo esa versión, no es tuya.
+
+**Palabras del marco que vas a ver acá**, cada una definida en una línea:
+[ADR](glosario.md), [archive](glosario.md), [canónico](glosario.md),
+[change](glosario.md), [constitución](glosario.md), [delta](glosario.md),
+[guardrail](glosario.md), [pin](glosario.md), [referenciado](glosario.md),
+[regenerado](glosario.md), [requirement](glosario.md), [reusable](glosario.md),
+[scaffold](glosario.md), [spec](glosario.md).
+
 ## Por qué está pineada
 
 1. **Mismo veredicto en CI y en tu máquina.** `validate --strict` es un
