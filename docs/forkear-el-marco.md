@@ -11,6 +11,17 @@ Lo que **no** hay es un incidente registrado —ni entrada de CHANGELOG, ni fila
 a alguien. La página se sostiene por lo que se puede contar con `grep`, no por una
 anécdota.
 
+**Para quién es esta página.** Para quien va a **copiar el marco entero a otra
+cuenta de GitHub** y tiene que dejarlo apuntando a la cuenta nueva. **Es una
+página técnica y muy acotada**: si no estás haciendo eso, no es tuya.
+
+**Palabras del marco que vas a ver acá**, cada una definida en una línea:
+[andamio](glosario.md), [builder](glosario.md), [bump](glosario.md),
+[censo](glosario.md), [change](glosario.md), [CODEOWNERS](glosario.md),
+[delta](glosario.md), [guardrail](glosario.md), [marcador](glosario.md),
+[PO](glosario.md), [pin](glosario.md), [reusable](glosario.md),
+[scaffold](glosario.md).
+
 ⚠️ **Y forkear el marco no es una salida para un proyecto.** [`AGENTS.md`](../AGENTS.md)
 lo lista entre lo que no se hace nunca («Hacer fork de Projects para un proyecto»),
 por el mismo motivo por el que un proyecto no copia el marco: desde el momento en que

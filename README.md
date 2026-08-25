@@ -4,10 +4,30 @@
 convertidas en verificaciones que corren solas: cada vez que alguien propone un
 cambio, el sistema comprueba que cumpla lo que el equipo ya prometió, y si no lo
 cumple no lo deja entrar. No decide **qué** software se construye —eso es del
-negocio—; decide **cómo** se construye, cómo se revisa y cómo se entrega. Las
-palabras propias de acá (andamio, carril, compuerta, delta, fail-open, pin,
-capability) están definidas en una línea cada una en el
-[glosario](docs/glosario.md).
+negocio—; decide **cómo** se construye, cómo se revisa y cómo se entrega. **Para quién es esta página.** Para el equipo entero, y sobre todo para quien
+llega al repositorio y no sabe qué es: la tabla de más abajo reparte el camino
+según quién sos. **Es una página técnica de punta a punta.** Si no sos técnico,
+entrá por [`docs/empezar-sin-ser-tecnico.md`](docs/empezar-sin-ser-tecnico.md)
+—qué es esto y por qué— o por
+[`docs/paso-a-paso-sin-ser-tecnico.md`](docs/paso-a-paso-sin-ser-tecnico.md) —qué
+comando copiar y qué vas a ver en pantalla—.
+
+**Palabras propias de acá**, cada una definida en una línea en el
+[glosario](docs/glosario.md): [ADR](docs/glosario.md),
+[andamio](docs/glosario.md), [archive](docs/glosario.md),
+[builder](docs/glosario.md), [bump](docs/glosario.md),
+[canónico](docs/glosario.md), [capability](docs/glosario.md),
+[carril](docs/glosario.md), [censo](docs/glosario.md),
+[change](docs/glosario.md), [ci-ok](docs/glosario.md),
+[CODEOWNERS](docs/glosario.md), [compuerta](docs/glosario.md),
+[constitución](docs/glosario.md), [delta](docs/glosario.md),
+[estreno](docs/glosario.md), [fail-open](docs/glosario.md),
+[guardrail](docs/glosario.md), [marcador](docs/glosario.md),
+[monorepo](docs/glosario.md), [PO](docs/glosario.md), [pin](docs/glosario.md),
+[referenciado](docs/glosario.md), [regenerado](docs/glosario.md),
+[reusable](docs/glosario.md), [ruleset](docs/glosario.md),
+[scaffold](docs/glosario.md), [spec](docs/glosario.md),
+[veredicto agregado](docs/glosario.md).
 
 | Qué te da | Qué te exige |
 |---|---|
@@ -21,6 +41,7 @@ capability) están definidas en una línea cada una en el
 | Si sos… | Empezá por | Qué vas a encontrar |
 |---|---|---|
 | **Alguien que no es técnico** — un BA, un PO que recién llega, quien tenga que decidir si esto se adopta | [`docs/empezar-sin-ser-tecnico.md`](docs/empezar-sin-ser-tecnico.md) | Qué es esto en castellano llano, qué te da y qué te exige, cuánto cuesta, qué decisiones te va a pedir a vos y qué pasa si el equipo es una sola persona |
+| **Alguien que no es técnico y tiene que arrancarlo igual** | [`docs/paso-a-paso-sin-ser-tecnico.md`](docs/paso-a-paso-sin-ser-tecnico.md) | El «hacelo conmigo»: qué comando copiar, **qué vas a ver en pantalla**, cómo saber que salió bien, cuánto tarda cada paso, las cuentas que hay que abrir con sus límites gratuitos medidos, y los rojos que son esperados |
 | **El PO** — dueño del qué y el por qué | [`docs/para-el-po.md`](docs/para-el-po.md) | Una página sin código: qué rutas aprobás, cómo se lee un spec real línea por línea, y las cuatro preguntas con las que se devuelve una propuesta |
 | **Un builder nuevo en el equipo** | [`docs/reglas-no-escritas.md`](docs/reglas-no-escritas.md), y después [`AGENTS.md`](AGENTS.md) | Cómo se trabaja acá, qué regla está automatizada y cuál todavía depende de una persona — declarado, no supuesto |
 | **Un builder arrancando un proyecto** | [`docs/arrancar-un-proyecto.md`](docs/arrancar-un-proyecto.md) | De no tener repositorio a `ci-ok` en verde, con los fallos silenciosos del día 1 |
@@ -444,8 +465,9 @@ describen su dominio, y estas describen el carril por el que ese dominio viaja.
   **Lo que el andamio congela**, en la tabla de `plantilla/AGENTS.md` —el
   archivo que el proyecto hereda—: **pnpm con workspaces** como gestor del
   monorepo, **Zod** para validar todo input externo, y el resto de esa tabla
-  (React, Express, Prisma, Clerk, Vitest). Apartarse de una de esas filas se
-  pregunta **antes** de implementar y queda escrito con su motivo.
+  (React, Express, Prisma, Vitest y el proveedor de identidad). Apartarse de
+  una de esas filas se pregunta **antes** de implementar y queda escrito con su
+  motivo.
   **Lo que el proyecto elige**: la plataforma donde despliega —la única fila de
   esa tabla que es suya— y su dominio entero.
   La tabla capa por capa —qué fija el marco, qué trae el andamio, qué elige el

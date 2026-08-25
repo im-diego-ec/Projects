@@ -7,6 +7,24 @@ que meterle el marco, eso es otra cosa y vive en la skill `projects-adoptar`.
 **Todo lo que dice acá está medido**, corriendo los comandos, no deducido de leer
 los archivos. Donde algo falla, lo dice y dice el mensaje exacto que vas a ver.
 
+**Para quién es esta página.** Para quien va a **ejecutar** el arranque y sabe
+moverse en una consola: es un runbook técnico, denso a propósito, y no evita el
+vocabulario del oficio. Si no sos técnico y tenés que arrancarlo igual, la
+versión acompañada —paso por paso, con lo que vas a ver en pantalla— es
+[paso-a-paso-sin-ser-tecnico.md](paso-a-paso-sin-ser-tecnico.md); esta página
+sigue siendo la que manda cuando las dos se contradigan.
+
+**Palabras del marco que vas a ver acá**, cada una definida en una línea:
+[ADR](glosario.md), [andamio](glosario.md), [archive](glosario.md),
+[builder](glosario.md), [bump](glosario.md), [canónico](glosario.md),
+[capability](glosario.md), [carril](glosario.md), [censo](glosario.md),
+[change](glosario.md), [ci-ok](glosario.md), [CODEOWNERS](glosario.md),
+[compuerta](glosario.md), [constitución](glosario.md), [delta](glosario.md),
+[guardrail](glosario.md), [marcador](glosario.md), [PO](glosario.md),
+[PRD](glosario.md), [pin](glosario.md), [proposal](glosario.md),
+[requirement](glosario.md), [ruleset](glosario.md), [scaffold](glosario.md),
+[spec](glosario.md).
+
 Marcas que vas a encontrar:
 
 | Marca | Significa |
@@ -510,8 +528,8 @@ marco está al día en 2 superficies».
 
 | Directorio | Qué hay |
 |---|---|
-| `api/` | Express + TS + Prisma + Clerk, con `lib/log.ts`, `middleware/errorHandler.ts`, `requestId.ts`, `asyncHandler.ts` — y **46 pruebas** |
-| `web/` | React + Vite + Tailwind + Clerk, con **8 pruebas** |
+| `api/` | Express + TS + Prisma + **Supabase Auth** (el token se verifica en el propio API, sin llamada de red por request), con `lib/log.ts`, `middleware/auth.ts`, `middleware/errorHandler.ts`, `requestId.ts`, `asyncHandler.ts` — y **48 pruebas** |
+| `web/` | React + Vite + Tailwind + **Supabase Auth** (`src/auth.ts` es el único archivo que importa el SDK del proveedor), con **25 pruebas** |
 | `e2e/` | Playwright, con una prueba de humo |
 | `.github/`, `eslint.config.mjs`, `AGENTS.md`, … | La mecánica del marco |
 | `.projects/`, `.cursor/rules/` | La porción de la constitución, renderizada al día |
@@ -985,8 +1003,8 @@ proceso y que él decida si conviene un portal o un chatbot?* La respuesta corta
 las dos**, y por tres motivos distintos.
 
 **1. La forma no se decide acá, y no la decide una herramienta.** El stack está fijado por el
-marco: app web —React con Vite adelante, Express de API, Postgres por Prisma, Clerk para
-identidad— sobre ECS y RDS. Apartarse de eso es una frontera ⚠️ que **se pregunta antes de
+marco: app web —React con Vite adelante, Express de API, Postgres por Prisma, Supabase Auth
+para identidad— sobre ECS y RDS. Apartarse de eso es una frontera ⚠️ que **se pregunta antes de
 implementar**, y la contesta una persona. Así que no le preguntes «¿portal o chatbot?»: no es
 su decisión. Y si al leer los documentos tu conclusión honesta es que esto no debería ser una
 app web, eso **para el trabajo y se pregunta** — no se resuelve dentro de un PRD.
@@ -997,7 +1015,7 @@ pendiente. Después de la fase 3 ya tenés corriendo, con sus pruebas pasando:
 | Ya existe | Qué es |
 |---|---|
 | Una página con el nombre del proyecto | Y el estado del API leído en vivo |
-| **Botón de ingreso y menú de usuario** | `ClerkProvider` cableado; `SignedOut` muestra *Sign in*, `SignedIn` muestra el usuario |
+| **Ingreso por correo y menú de usuario** | El componente `Identidad` de `web/src/App.tsx`, cableado contra `web/src/auth.ts`: sin sesión pide el correo y manda el enlace de acceso; con sesión muestra el correo y el botón *Cerrar sesión* |
 | `GET /api/health` | Abierto, es lo que verifica el pipeline |
 | `GET /api/hello` | **Detrás de `requireAuth`**: la cadena de identidad ya funciona de punta a punta |
 | `requestId`, `errorHandler`, logging | La mecánica de observabilidad que el marco exige |
