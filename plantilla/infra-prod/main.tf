@@ -1,5 +1,8 @@
 # Raíz de Terraform del ambiente de PRODUCCIÓN de {{PROYECTO}}.
 #
+# ES EL ADAPTADOR `aws`: el marco fija cuatro capacidades, no una nube. Las cinco
+# plataformas admitidas están en `../infra/adaptadores.md`.
+#
 # Mismo reparto que en `../infra/`: acá está lo que se DERIVA de los valores del
 # proyecto, y lo que hay que decidir vive en `pendientes.tf`.
 #

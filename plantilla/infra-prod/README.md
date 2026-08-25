@@ -1,5 +1,13 @@
 # `infra-prod/` — ambiente de producción de {{PROYECTO}}
 
+> ## Antes de leer esto: ¿este proyecto usa AWS?
+>
+> Igual que `../infra/`, este directorio es el **adaptador `aws`** y no la única forma de
+> desplegar que el marco acepta. Las cinco plataformas admitidas, con lo que cubre cada una
+> de las cuatro capacidades y con su plan gratuito medido, están en
+> [`../infra/adaptadores.md`](../infra/adaptadores.md). Si la plataforma no es `aws` —o
+> todavía es `ninguna`—, este directorio se borra entero y el CI no exige nada a cambio.
+
 Terraform del ambiente **producción**, cuenta `{{CUENTA_PROD}}`, región `{{REGION}}`.
 
 > 🛑 **Todo `apply` en esta raíz exige el OK explícito de @{{BUILDER_1}} en la
@@ -54,7 +62,7 @@ credenciales.
 
 **Tres cosas se ponen rojas, no dos.** El binario de `terraform` sale hoy de la
 imagen del runner —al paso todavía le falta un `hashicorp/setup-terraform` pinado
-por SHA—, así que *no encontrarlo* es el tercer fallo y corre con **la misma
+por SHA—, así que _no encontrarlo_ es el tercer fallo y corre con **la misma
 ventana**: avisa hasta el 2026-09-30 y después detiene el CI. Es a propósito: si
 la ausencia del binario avisara para siempre, este paso pasaría en verde sin
 haber verificado nada el día que la imagen del runner dejara de traerlo, y «no

@@ -28,13 +28,36 @@ packages:
   # el glob "{{PAQUETE_E2E}}/**/*.mjs" del entorno Node de eslint.config.mjs.
   - "e2e"
 
-# NO HAY LISTA DE APROBACION DE SCRIPTS DE INSTALACION, y es una decision. El
-# starter traia un `allowBuilds` con @clerk/shared, @prisma/client,
-# @prisma/engines, esbuild y prisma dentro de api/pnpm-workspace.yaml. Con el
-# pnpm pinado en package.json (9.15.0) esa lista es INERTE: el bloqueo de
-# scripts de postinstall llego en la mayor 10, y un consumidor del marco corre
-# esta misma pila (prisma + esbuild) en verde sin declarar ninguna.
-# Se deja escrita aca en prosa para que el dato no se pierda: al subir la mayor
-# de pnpm —sesion dedicada, como manda la politica de dependencias— hay que
-# declarar esos cinco paquetes con la clave que use esa version, o `prisma
-# generate` y el build del front se quedan sin binarios.
+# LA LISTA DE APROBACION DE SCRIPTS DE INSTALACION, Y POR QUE VIVE ACA. Desde su
+# mayor 10, pnpm NO ejecuta los scripts de instalacion de las dependencias salvo
+# que esten aprobados; desde la 11 la clave se llama `allowBuilds` y SOLO se lee
+# de este archivo — el campo `pnpm` del package.json de la raiz ya no se mira.
+# Medido con el pnpm que fija package.json (11.23.0) sobre un proyecto de una
+# sola dependencia con script de instalacion: declarandolo en
+# `pnpm.onlyBuiltDependencies` del package.json el install sale 1 y avisa «The
+# "pnpm" field in package.json is no longer read by pnpm»; declarandolo como el
+# bloque de abajo, sale 0.
+#
+# SIN ESTE BLOQUE EL REPO NUEVO NO ARRANCA, y ademas se ensucia solo: el primer
+# `pnpm install` sale 1 con ERR_PNPM_IGNORED_BUILDS y de paso ESCRIBE en este
+# archivo un `allowBuilds` de relleno donde cada paquete vale el texto «set this
+# to true or false» —que no es un booleano—, asi que el segundo install vuelve a
+# salir 1 sobre un archivo que ya nadie escribio a proposito.
+#
+# SON LOS CUATRO QUE PNPM NOMBRA, NI UNO MAS. @prisma/client se parece a un
+# quinto y no lo es: su package.json publicado no trae preinstall ni postinstall
+# (el cliente lo genera `pnpm datos`, que es un script del proyecto, no de la
+# dependencia), asi que aprobarlo seria una linea que nadie puede ver fallar. Si
+# al subir dependencias apareciera un quinto de verdad, el propio
+# ERR_PNPM_IGNORED_BUILDS lo nombra con su version.
+#
+# QUE SE ROMPE SI SE SACA ALGUNO — los cuatro traen un script real, leido en su
+# package.json publicado: `preinstall` en prisma, `postinstall` en
+# @prisma/engines, esbuild y @clerk/shared. Sin los dos de prisma, `pnpm datos`
+# se queda sin motores de consulta; sin el de esbuild, el build del front se
+# queda sin su binario nativo.
+allowBuilds:
+  "@clerk/shared": true
+  "@prisma/engines": true
+  esbuild: true
+  prisma: true

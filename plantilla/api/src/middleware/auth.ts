@@ -1,6 +1,5 @@
 import type { Request, RequestHandler } from "express";
 import { verifyToken } from "@clerk/backend";
-import { asyncHandler } from "../lib/asyncHandler.js";
 import { log } from "../lib/log.js";
 
 /**
@@ -62,16 +61,22 @@ function tokenBearer(req: Request): string | null {
   return header.slice("Bearer ".length);
 }
 
-/** Exige un usuario autenticado. Sin claim valido: 401, sin excepciones. */
-export const requireAuth: RequestHandler = asyncHandler(async (req, res, next) => {
+/** Exige un usuario autenticado. Sin claim valido: 401, sin excepciones.
+ *
+ *  Va `async` y SIN envoltorio: Express 5 reenvia al manejador de errores la
+ *  promesa rechazada que devuelve un handler, asi que el `asyncHandler` que el
+ *  andamio traia para Express 4 dejo de tener motivo y ya no existe. Lo que el
+ *  try/catch de abajo atrapa NO es eso: es el rechazo de verifyToken, que aca
+ *  no es una falla del sistema sino un 401. */
+export const requireAuth: RequestHandler = async (req, res, next) => {
   if (clerkConfigurado()) {
     const token = tokenBearer(req);
     if (token) {
       try {
         // verifyToken LANZA ante cualquier token invalido (no devuelve un
-        // resultado que se pueda ignorar). El try/catch no es opcional: este
-        // handler es async y un rechazo suelto en Express 4 no llega a ningun
-        // lado.
+        // resultado que se pueda ignorar). El try/catch no es opcional, y no
+        // por el transporte: sin el, Express 5 mandaria el token vencido al
+        // manejador de errores y el cliente veria un 500 donde corresponde 401.
         const payload = await verifyToken(token, { jwtKey: clavePublica() });
         // Los claims custom no estan en el tipo de verifyToken: vista
         // estructural en vez de `any`, y el typeof sigue siendo el guard real.
@@ -107,4 +112,4 @@ export const requireAuth: RequestHandler = asyncHandler(async (req, res, next) =
 
   log.warn("peticion rechazada: el API corre sin Clerk y sin ALLOW_DEV_AUTH");
   res.status(401).json({ error: "No autenticado" });
-});
+};

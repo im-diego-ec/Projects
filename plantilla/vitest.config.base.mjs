@@ -37,7 +37,7 @@
 // EMITE. Un piso sobre una metrica que llega sin un solo dato es ROJO, y a
 // proposito: el piso es un ratchet y un ratchet que no tiene contra que comparar
 // dejo de proteger la ganancia acumulada. Antes de esa regla, apagar el ratchet
-// de un paquete costaba lo mismo que cambiar el reporter o apagar `all: true`, y
+// de un paquete costaba lo mismo que cambiar el reporter o recortar el `include`, y
 // la corrida seguia en verde imprimiendo "n/a". Un paquete sin ramas no declara
 // "ramas".
 //
@@ -79,24 +79,28 @@ export function coberturaDelMarco(minimo = MINIMO_DEL_MARCO) {
     coverage: {
       provider: "v8",
 
-      // SIN ESTO EL TOTAL MIENTE. Con all:false el reporte solo trae los
-      // archivos que alguna prueba importo, asi que el modulo que nadie prueba
-      // no baja el promedio: simplemente no existe. El plano del total del
-      // marco lo detecta como archivo sin dato de cobertura, pero el umbral de
-      // aca no, y el paquete quedaria verde contra si mismo.
+      // QUE ENTRA AL CALCULO, Y POR QUE ES LA MITAD DE LA COMPUERTA. El reporte
+      // tiene que traer TAMBIEN los archivos que ninguna prueba importo: si
+      // solo trajera los importados, el modulo que nadie prueba no baja el
+      // promedio —simplemente no existe— y el paquete queda verde contra si
+      // mismo. El plano del total del marco lo detectaria como archivo sin dato
+      // de cobertura, pero el umbral de aca abajo no.
       //
-      // INCERTIDUMBRE DECLARADA: esto esta escrito para la mayor de vitest que
-      // el stack tiene pinada hoy (2.x), donde `all` es una opcion propia. En
-      // majors posteriores la misma propiedad se expresa solo con `include`, asi
-      // que al subir la mayor de vitest hay que releer este bloque en vez de
-      // asumir que sigue diciendo lo mismo. No se pudo confirmar contra la
-      // documentacion en esta sesion, y por eso se declara en vez de afirmarse.
-      all: true,
-
-      // Que entra al calculo. src y nada mas: la config, los scripts y los
-      // generados no son codigo que a este paquete le corresponda probar. Lo
-      // que se saca a proposito se declara en projects.cobertura.excluidos del
-      // package.json, con su motivo escrito, y ahi lo ve el marco tambien.
+      // ESO YA NO SE PIDE CON `all: true`. La incertidumbre que este bloque
+      // declaraba mientras el stack estaba en vitest 2.x quedo resuelta al subir
+      // la mayor, y la respuesta es que la opcion DESAPARECIO: hoy el alcance lo
+      // fija `include` y nada mas. MEDIDO en vitest 4.1.11, sobre un andamio
+      // recien instanciado y agregandole un `web/src/huerfano.ts` que ninguna
+      // prueba importa: con `all: true` y sin `all: true` el reporte lo trae
+      // igual, en 0%, y baja el total del paquete de 100% a 91,66%. O sea la
+      // opcion habria quedado INERTE, y una opcion inerte con un comentario que
+      // la declara load-bearing es peor que no tenerla: el proximo que la lea va
+      // a creer que la compuerta la sostiene ella.
+      //
+      // src y nada mas: la config, los scripts y los generados no son codigo que
+      // a este paquete le corresponda probar. Lo que se saca a proposito se
+      // declara en projects.cobertura.excluidos del package.json, con su motivo
+      // escrito, y ahi lo ve el marco tambien.
       include: ["src/**/*.{ts,tsx,mts,cts,js,jsx,mjs,cjs}"],
       exclude: ["src/**/*.test.{ts,tsx}", "src/**/*.d.ts"],
 

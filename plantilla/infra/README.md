@@ -1,5 +1,23 @@
 # `infra/` — ambiente de desarrollo de {{PROYECTO}}
 
+> ## Antes de leer esto: ¿este proyecto usa AWS?
+>
+> **El marco ya no fija la nube.** Este directorio es el **adaptador `aws`** y llega
+> desarrollado porque es el que estaba escrito, no porque sea la primera opción. Lo que el
+> marco exige son cuatro capacidades —dónde corre la API, dónde vive la base, cómo se
+> resuelven los secretos en el arranque de cada tarea, y cómo se despliega y se verifica lo
+> desplegado—; con qué plataforma se cumplen lo decide el proyecto en
+> [`adaptadores.md`](adaptadores.md), que trae las cinco opciones admitidas con su plan
+> gratuito medido.
+>
+> **Si la plataforma de este proyecto no es `aws` —o todavía es `ninguna`—, este directorio
+> y `../infra-prod/` se borran enteros.** No hay nada que desactivar: el job de Terraform
+> del CI mira si las raíces existen y, cuando no, lo dice con un `::notice::` y sale verde.
+> Lo único de este directorio que sobrevive es `adaptadores.md`, que se mueve a la raíz.
+>
+> Y si el objetivo es **coste cero**, leé el adaptador antes de quedarte con éste: el plan
+> gratuito de AWS es una promoción con fecha de vencimiento, no un escalón permanente.
+
 Terraform del ambiente **dev**, cuenta `{{CUENTA_DEV}}`, región `{{REGION}}`.
 
 ```bash
@@ -57,7 +75,7 @@ credenciales.
 
 **Tres cosas se ponen rojas, no dos.** El binario de `terraform` sale hoy de la
 imagen del runner —al paso todavía le falta un `hashicorp/setup-terraform` pinado
-por SHA—, así que *no encontrarlo* es el tercer fallo y corre con **la misma
+por SHA—, así que _no encontrarlo_ es el tercer fallo y corre con **la misma
 ventana**: avisa hasta el 2026-09-30 y después detiene el CI. Es a propósito: si
 la ausencia del binario avisara para siempre, este paso pasaría en verde sin
 haber verificado nada el día que la imagen del runner dejara de traerlo, y «no

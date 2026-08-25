@@ -1,6 +1,5 @@
 import express from "express";
 import cors from "cors";
-import { asyncHandler } from "./lib/asyncHandler.js";
 import { log } from "./lib/log.js";
 import { getPrisma } from "./lib/prisma.js";
 import { requireAuth } from "./middleware/auth.js";
@@ -53,19 +52,24 @@ export function createApp() {
   // con su stack y le pega el mismo requestId via AsyncLocalStorage). Quien
   // esta de guardia lleva el requestId de la respuesta a CloudWatch y ve la
   // causa completa; el diagnostico no se pierde, cambia de canal.
-  app.get(
-    "/api/db/health",
-    asyncHandler(async (req, res) => {
-      try {
-        const prisma = await getPrisma();
-        await prisma.$queryRaw`SELECT 1`;
-        res.json({ db: "ok" });
-      } catch (err) {
-        log.error("db health fallo", { error: err });
-        res.status(503).json({ db: "no disponible", requestId: req.requestId });
-      }
-    })
-  );
+  //
+  // EL HANDLER ES `async` Y VA SUELTO, sin envoltorio. Express 5 reenvia al
+  // manejador de errores la promesa RECHAZADA que devuelve un handler; en
+  // Express 4 no lo hacia, y por eso este andamio traia un `asyncHandler` que
+  // envolvia cada uno. Ese archivo ya no existe: mantener un envoltorio cuyo
+  // motivo dejo de ser cierto es peor que no tenerlo, porque el proximo que lo
+  // lea va a creerle. Lo comprueba middleware/errorHandler.test.ts, que registra
+  // un handler async que rechaza SIN envoltorio y exige el 500 con requestId.
+  app.get("/api/db/health", async (req, res) => {
+    try {
+      const prisma = await getPrisma();
+      await prisma.$queryRaw`SELECT 1`;
+      res.json({ db: "ok" });
+    } catch (err) {
+      log.error("db health fallo", { error: err });
+      res.status(503).json({ db: "no disponible", requestId: req.requestId });
+    }
+  });
 
   app.use(errorHandler);
 

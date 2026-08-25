@@ -7,9 +7,18 @@
 # ambiente compartido: dev es staging de todo el equipo, no el banco de pruebas
 # de una rama.
 #
-# ESTO ES SOLO PARA LA MAQUINA DE QUIEN DESARROLLA. Los ambientes reales corren
-# Aurora Serverless v2 con IAM auth y se crean por Terraform (infra/ para dev,
-# infra-prod/ para produccion). Nada de este archivo se despliega.
+# ESTO ES SOLO PARA LA MAQUINA DE QUIEN DESARROLLA. Nada de este archivo se
+# despliega, y este archivo NO decide donde vive la base en los ambientes reales:
+# eso es la capacidad (b) del contrato de plataforma, y quien la cubre lo dice el
+# adaptador que el proyecto haya elegido en infra/adaptadores.md — Postgres
+# administrado de la plataforma, base del proveedor de nube, o ninguno todavia.
+#
+# MIENTRAS NO HAYA NADA DESPLEGADO —y un repositorio recien nacido no lo tiene,
+# declare la plataforma que declare— ESTE CONTENEDOR ES LA BASE DEL PROYECTO, y
+# eso esta bien: no hace falta una base en la nube para ensayar las migraciones.
+# Lo que no cambia con la plataforma es la regla de los secretos: la contrasena de
+# aca es de juguete y vale SOLO en local; ningun secreto real entra a este archivo
+# ni al build.
 #
 # EL NOMBRE DE LA BASE ESTA ACOPLADO al DATABASE_URL de api/.env.example, y por
 # eso los dos lados salen AHORA DEL MISMO MARCADOR: `{{PROYECTO}}` aca y

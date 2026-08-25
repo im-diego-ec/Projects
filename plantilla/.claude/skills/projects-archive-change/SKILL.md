@@ -422,7 +422,7 @@ contenido nuevo — es la pregunta que sale en review todas las veces.
 | Script de archive que no aplica nada | "deltas aplicados" con cero operaciones y exit 0                                                                        | El script de esta skill sale 1 en ese caso. Si ves un verde con 0 operaciones, el script esta roto |
 | MODIFIED que omite escenarios        | `validate --strict` en **verde** y aun asi el spec vivo pierde escenarios al archivar                                   | Comparar titulo por titulo antes de aplicar + conteo de escenarios antes/despues                   |
 | Retitulado sin declarar              | El guardrail **no avisa** cuando el titulo del delta no existe en el spec vivo                                          | Declarar el par FROM/TO en `## RENAMED Requirements`                                               |
-| Capability nueva                     | Nace con `Purpose: TBD` y nadie lo nota                                                                                 | `git grep -n "Purpose: TBD" -- openspec/specs/` y completarlo en el mismo PR                             |
+| Capability nueva                     | Nace con `Purpose: TBD` y nadie lo nota                                                                                 | `git grep -n "Purpose: TBD" -- openspec/specs/` y completarlo en el mismo PR                       |
 
 ## Estado de verificacion del script
 

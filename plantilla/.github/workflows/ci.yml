@@ -110,7 +110,7 @@ jobs:
       # texto, no interroga al toolchain del proyecto.
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
         with:
-          node-version: "22"
+          node-version: "24"
       - id: marco_constitucion
         uses: "{{ORG}}/Projects/actions/constitucion@v1.7.0"
         with:
@@ -151,7 +151,7 @@ jobs:
       - run: corepack enable
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
         with:
-          node-version: "22"
+          node-version: "24"
       # SIN `cache: pnpm` EN EL SETUP-NODE DE ARRIBA, y es una decision escrita,
       # no un olvido. El cache de Actions es un canal de ESCRITURA que desemboca
       # justo en el paso que instala y EJECUTA codigo que nadie leyo, y conviene
@@ -540,9 +540,11 @@ jobs:
       # Ver el requirement de cobertura del spec calidad-codigo.
       #
       # Para que el plano del total vea el codigo que ninguna prueba importa,
-      # la cobertura de cada paquete tiene que emitirse con `all: true` y con el
-      # projectRoot del reporter lcov en la raiz del monorepo. Las dos cosas
-      # vienen armadas en `vitest.config.base.mjs` de la raiz.
+      # la cobertura de cada paquete tiene que abarcar TODO el fuente del paquete
+      # (no solo lo que alguna prueba importo) y emitirse con el projectRoot del
+      # reporter lcov en la raiz del monorepo. Las dos cosas vienen armadas en
+      # `vitest.config.base.mjs` de la raiz: lo primero es su `include` — la
+      # opcion `all` que lo pedia en vitest 2.x ya no existe.
       - uses: "{{ORG}}/Projects/actions/cobertura-diff@v1.7.0"
 
   # EL CHECK REQUERIDO POR EL RULESET DE main ES ESTE (nombre exacto: "ci-ok").

@@ -38,7 +38,7 @@ const SECCIONES = [
   { archivo: "30-git-despliegue.md", de_que: "git, la promoción por ambientes y qué es «done»" },
   { archivo: "40-fronteras.md", de_que: "las fronteras de tres niveles" },
   { archivo: "50-seguridad-observabilidad.md", de_que: "auth, authz, logs y alertas" },
-  { archivo: "60-infra-aws-secretos.md", de_que: "AWS, Terraform y dónde viven los secretos" },
+  { archivo: "60-infra-plataforma-secretos.md", de_que: "las cuatro capacidades de plataforma, la IaC y dónde viven los secretos" },
   { archivo: "70-agentes-modelos.md", de_que: "uso de modelos y effort" },
   { archivo: "80-github.md", de_que: "branches, issues, PRs y labels" },
   { archivo: "90-marca.md", de_que: "las 7 reglas de identidad visual del área" },

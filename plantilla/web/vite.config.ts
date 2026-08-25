@@ -20,22 +20,28 @@
 // su motivo escrito.
 import { defineConfig } from "vitest/config";
 import react from "@vitejs/plugin-react";
+import tailwindcss from "@tailwindcss/vite";
 import { coberturaDelMarco } from "../vitest.config.base.mjs";
 
 // `defineConfig` se importa de "vitest/config" y no de "vite": es el unico de
 // los dos que tipa la clave `test`. Con el de vite hace falta la augmentation
-// que viaja dentro de vitest, y con vitest 2.x —que arrastra su propia copia de
-// vite como dependencia, no como peer— esa augmentation aterriza sobre el
-// UserConfig de la copia equivocada: TS2769 ("'test' does not exist in type
-// 'UserConfigExport'"). La otra salida —un remap de rutas en el tsconfig para
-// que las dos copias de vite resuelvan a una sola— arregla el sintoma pagando
-// con una linea de configuracion que nadie va a saber por que esta. En tiempo
-// de ejecucion las dos funciones son la misma: normalizan y devuelven el
-// objeto.
+// que viaja dentro de vitest, y esa augmentation tiene que aterrizar sobre la
+// MISMA copia de vite que resuelve este paquete; cuando no coincide, el sintoma
+// es TS2769 ("'test' does not exist in type 'UserConfigExport'"). La otra salida
+// —un remap de rutas en el tsconfig para que las dos copias de vite resuelvan a
+// una sola— arregla el sintoma pagando con una linea de configuracion que nadie
+// va a saber por que esta. En tiempo de ejecucion las dos funciones son la
+// misma: normalizan y devuelven el objeto.
 const { coverage } = coberturaDelMarco();
 
 export default defineConfig({
-  plugins: [react()],
+  // TAILWIND ENTRA COMO PLUGIN DE VITE, NO POR POSTCSS. Desde Tailwind 4 la
+  // configuracion vive en la hoja de estilos (src/index.css) y el cableado es
+  // este plugin: por eso este paquete ya no trae tailwind.config.js,
+  // postcss.config.js ni autoprefixer. La via de postcss sigue existiendo
+  // (@tailwindcss/postcss) y es la que corresponde a un proyecto que NO use
+  // vite; aca la de vite es mas rapida y una pieza menos que mantener.
+  plugins: [react(), tailwindcss()],
   server: { port: 5173 },
   test: {
     // Los componentes de React necesitan un DOM. jsdom lo simula; solo lo
@@ -55,8 +61,9 @@ export default defineConfig({
     // fallos que dependen del orden.
     globals: true,
 
-    // La cobertura la reparte el marco desde la raiz (umbral del area, all:true
-    // y el projectRoot del reporter lcov en la raiz del monorepo, que es lo que
+    // La cobertura la reparte el marco desde la raiz (umbral del area, el
+    // `include` que hace que la medicion abarque todo el fuente del paquete, y
+    // el projectRoot del reporter lcov en la raiz del monorepo, que es lo que
     // hace comparables las rutas SF: entre paquetes). Va AL FINAL a proposito:
     // asi nadie la pisa mas abajo sin que el diff lo muestre.
     coverage: {

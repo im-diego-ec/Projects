@@ -20,6 +20,7 @@ capability) están definidas en una línea cada una en el
 
 | Si sos… | Empezá por | Qué vas a encontrar |
 |---|---|---|
+| **Alguien que no es técnico** — un BA, un PO que recién llega, quien tenga que decidir si esto se adopta | [`docs/empezar-sin-ser-tecnico.md`](docs/empezar-sin-ser-tecnico.md) | Qué es esto en castellano llano, qué te da y qué te exige, cuánto cuesta, qué decisiones te va a pedir a vos y qué pasa si el equipo es una sola persona |
 | **El PO** — dueño del qué y el por qué | [`docs/para-el-po.md`](docs/para-el-po.md) | Una página sin código: qué rutas aprobás, cómo se lee un spec real línea por línea, y las cuatro preguntas con las que se devuelve una propuesta |
 | **Un builder nuevo en el equipo** | [`docs/reglas-no-escritas.md`](docs/reglas-no-escritas.md), y después [`AGENTS.md`](AGENTS.md) | Cómo se trabaja acá, qué regla está automatizada y cuál todavía depende de una persona — declarado, no supuesto |
 | **Un builder arrancando un proyecto** | [`docs/arrancar-un-proyecto.md`](docs/arrancar-un-proyecto.md) | De no tener repositorio a `ci-ok` en verde, con los fallos silenciosos del día 1 |
@@ -242,7 +243,10 @@ Sin big bang: se adopta por partes, empezando por lo referenciado.
        # La version exacta, no el tag mayor: un tag movil no produce PR de
        # Dependabot (para el ya es la mayor vigente), asi que el repo no
        # recibiria versiones nuevas ni apareceria en el censo.
-       uses: im-diego-ec/Projects/.github/workflows/marco-ci.yml@v1.4.1
+       # vX.Y.Z es un marcador a proposito: la version vigente la pina el
+       # andamio en plantilla/.github/workflows/ci.yml, y un numero escrito
+       # aca envejeceria sin que nada lo mida.
+       uses: im-diego-ec/Projects/.github/workflows/marco-ci.yml@vX.Y.Z
 
      build_test:          # lo del producto: lint, typecheck, test, build
        name: build-test
@@ -395,9 +399,10 @@ diff.
 │   ├── config.yaml        #   contexto y reglas de OpenSpec para este repo
 │   ├── specs/             #   los specs vivos del marco (una carpeta por capability)
 │   └── changes/           #   los changes en vuelo (`openspec list`) y su historia en changes/archive/
-└── docs/                  # el porqué: ADRs, reglas no escritas, upgrade del CLI, cómo forkear
-                           #   el marco a otra cuenta, y plantillas de documentos de proceso
-                           #   (post-mortem, runbook). El índice completo: docs/README.md
+└── docs/                  # el porqué: ADRs, reglas no escritas, el stack declarado capa por capa
+                           #   (stack.md), la puerta de entrada para quien no es técnico, upgrade
+                           #   del CLI, cómo forkear el marco a otra cuenta, y plantillas de
+                           #   documentos de proceso. El índice completo: docs/README.md
 ```
 
 El mapa de arriba nombra las carpetas; **[`docs/README.md`](docs/README.md) es el
@@ -422,19 +427,31 @@ describen su dominio, y estas describen el carril por el que ese dominio viaja.
   API, ni utilidades compartidas. Projects gobierna **cómo se construye y se
   entrega** el software, no qué hace el software. Un paquete compartido de
   código sería otro repo, con otro ciclo de vida.
-- **No impone el stack de aplicación — pero sí fija el de plataforma.** La
-  distinción importa y este README la tenía mal hasta el 2026-08-21, cuando Builder 1
-  lo señaló. **Lo que el marco FIJA** y no es elección del proyecto: **Terraform**
-  como IaC, **GitHub Actions** como pipeline, **pnpm con workspaces** como gestor,
-  **Zod** para validar todo input externo, y **ECS Express + RDS** como primera
-  opción de infraestructura. Está en `plantilla/AGENTS.md`, que es el archivo que
-  el proyecto hereda, y apartarse se pregunta **antes** de implementar.
-  **Lo que el proyecto elige**: el framework de frontend, el ORM, el runtime del
-  backend más allá de Node, y su dominio entero. El andamio trae React,
-  Express y Prisma; nada obliga a repetirlo.
-  Un proyecto con otro stack de aplicación sigue obteniendo lo mismo: el flujo de
-  specs, la gobernanza, los guardrails, el veredicto único de CI, la promoción por
-  ambientes.
+- **No fija dónde corre tu proyecto — fija el carril por el que viaja.** La
+  distinción importa y este README la tenía mal hasta el 2026-08-21, cuando
+  Builder 1 lo señaló; la corrección de ese día enumeró lo fijado y, de paso,
+  metió una topología concreta de infraestructura como «primera opción». Eso
+  último se retiró: **dónde se despliega es la decisión con más impacto en el
+  costo, y es del proyecto**.
+  **Lo que el marco FIJA**, y no es elección de nadie: el **flujo de
+  especificación** (el contrato se escribe y se aprueba antes que el código), el
+  **pipeline** (workflows reusables con un veredicto agregado único), la
+  **gobernanza del repositorio** (propiedad por rutas, protección de `main`,
+  plantilla de PR, CHANGELOG obligatorio) y los **guardrails**, cada uno con su
+  incidente detrás. Todo eso son **propiedades**: se cumplen desplegando en
+  cualquier proveedor, y por eso los specs de `openspec/specs/` no nombran
+  ninguno.
+  **Lo que el andamio congela**, en la tabla de `plantilla/AGENTS.md` —el
+  archivo que el proyecto hereda—: **pnpm con workspaces** como gestor del
+  monorepo, **Zod** para validar todo input externo, y el resto de esa tabla
+  (React, Express, Prisma, Clerk, Vitest). Apartarse de una de esas filas se
+  pregunta **antes** de implementar y queda escrito con su motivo.
+  **Lo que el proyecto elige**: la plataforma donde despliega —la única fila de
+  esa tabla que es suya— y su dominio entero.
+  La tabla capa por capa —qué fija el marco, qué trae el andamio, qué elige el
+  proyecto, y en qué archivo vive la versión de cada pieza— está en
+  [`docs/stack.md`](docs/stack.md), que no escribe un solo número: los deriva de
+  los manifiestos y tiene un banco de pruebas detrás.
 - **No es un sustituto del criterio del equipo.** Los guardrails atrapan lo que
   ya nos pasó. Lo que no nos pasó todavía lo caza una revisión adversarial: ya
   hubo un change que pasó `validate --strict` **y** el guardrail de deltas en

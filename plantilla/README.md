@@ -322,8 +322,9 @@ Un buscar-y-reemplazar no los resuelve: son decisiones.
   generado es ruido permanente.
 - **`.prettierignore` → mismos generados** (dos líneas comentadas, misma razón).
 - **`vitest.config.base.mjs` → conectarlo desde cada paquete**. El archivo llega con el
-  umbral del total del marco (80 en las cuatro métricas), `all: true` y el `projectRoot` del
-  reporter lcov en la raíz del monorepo. Lo que falta es la línea que lo importa desde la
+  umbral del total del marco (80 en las cuatro métricas), el `include` que mete al cálculo
+  **todo** el `src/` del paquete —también lo que ninguna prueba importó— y el `projectRoot`
+  del reporter lcov en la raíz del monorepo. Lo que falta es la línea que lo importa desde la
   config de cada paquete (`import { coberturaDelMarco } from "../vitest.config.base.mjs"`).
   El umbral **no se baja**: si un paquete todavía no llega, se declara la deuda en SU
   `package.json` con `projects.cobertura.deuda = { motivo, fecha }` y el marco la reporta en

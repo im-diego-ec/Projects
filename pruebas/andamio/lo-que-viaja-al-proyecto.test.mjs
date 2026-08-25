@@ -239,9 +239,15 @@ test("andamio · ningun workflow que instale dependencias declara un cache", () 
 
 test("andamio · la comprobacion del cache MUERDE", () => {
   const archivos = workflowsDelAndamio();
+  // EL ANCLA ES `node-version` CON CUALQUIER MAYOR, no una en particular, y esa
+  // generalidad se pago: escrita como `"22"` fija, el dia que el andamio subio a
+  // la LTS 24 la mutacion dejo de aplicar en ci.yml y cayo en el unico workflow
+  // que no instala nada, asi que esta prueba se puso roja anunciando "el ancla se
+  // movio" cuando lo unico que habia cambiado era el numero. La compuerta que
+  // demuestra no depende de que mayor de Node use el andamio.
   const mutados = archivos.map((a) => ({
     nombre: a.nombre,
-    texto: a.texto.replace(/(^\s*)node-version: "22"/m, '$1node-version: "22"\n$1cache: pnpm'),
+    texto: a.texto.replace(/(^\s*)(node-version: "\d+")/m, "$1$2\n$1cache: pnpm"),
   }));
   assert.notDeepEqual(
     mutados.map((m) => m.texto),

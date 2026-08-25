@@ -31,14 +31,14 @@ Lo que se decide de verdad no vive en este archivo: las propuestas y los contrat
 
 ## Estructura
 
-| Directorio | Qué hay |
-|---|---|
-| `{{PAQUETE_API}}/` | Backend. Expone la API y es la autoridad de autorización: la identidad sale siempre de los claims firmados, nunca del cuerpo de la petición. |
-| `{{PAQUETE_WEB}}/` | Frontend. Consume la API del backend; no habla con la base de datos ni con la nube. |
-| `{{PAQUETE_E2E}}/` | Suite end-to-end, que ejercita el sistema entero contra un ambiente levantado. |
+| Directorio              | Qué hay                                                                                                                                          |
+| ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `{{PAQUETE_API}}/`      | Backend. Expone la API y es la autoridad de autorización: la identidad sale siempre de los claims firmados, nunca del cuerpo de la petición.     |
+| `{{PAQUETE_WEB}}/`      | Frontend. Consume la API del backend; no habla con la base de datos ni con la nube.                                                              |
+| `{{PAQUETE_E2E}}/`      | Suite end-to-end, que ejercita el sistema entero contra un ambiente levantado.                                                                   |
 | `infra/`, `infra-prod/` | Infraestructura como código, un root por ambiente. Los pendientes de decisión que quedan abiertos están escritos en `pendientes.tf` de cada uno. |
-| `openspec/` | Propuestas y contratos: lo que se va a construir y qué garantiza. |
-| `.github/workflows/` | El pipeline. Lo común llega por referencia al marco; lo del proyecto vive acá. |
+| `openspec/`             | Propuestas y contratos: lo que se va a construir y qué garantiza.                                                                                |
+| `.github/workflows/`    | El pipeline. Lo común llega por referencia al marco; lo del proyecto vive acá.                                                                   |
 
 ## Levantarlo en tu máquina
 
@@ -59,10 +59,10 @@ pipeline, y el diagnóstico local es varios minutos más barato.
 
 ## Ambientes
 
-| Ambiente | Frontend | Cuándo se despliega |
-|---|---|---|
-| Desarrollo | `{{DOMINIO_DEV}}` | **RELLENAR** — qué lo dispara (¿cada merge a `main`?, ¿a mano?) |
-| Producción | `{{DOMINIO_PROD}}` | **RELLENAR** — qué lo dispara y quién lo autoriza |
+| Ambiente   | Frontend           | Cuándo se despliega                                             |
+| ---------- | ------------------ | --------------------------------------------------------------- |
+| Desarrollo | `{{DOMINIO_DEV}}`  | **RELLENAR** — qué lo dispara (¿cada merge a `main`?, ¿a mano?) |
+| Producción | `{{DOMINIO_PROD}}` | **RELLENAR** — qué lo dispara y quién lo autoriza               |
 
 Los recursos de nube de este proyecto llevan el prefijo `{{PREFIJO_RECURSOS}}` y viven en
 la región `{{REGION}}`. La configuración por ambiente **no** se escribe en el repositorio:

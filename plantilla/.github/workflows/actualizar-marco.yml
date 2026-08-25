@@ -161,9 +161,14 @@ jobs:
           fi
           echo "arbol limpio: lo que aparezca de aca en adelante lo escribio la action del marco"
 
+      # LA MISMA MAYOR QUE EL RESTO DEL ANDAMIO (hoy la LTS 24): el `node-version`
+      # de los dos jobs de ci.yml y el FROM de api/Dockerfile. Son cuatro
+      # declaraciones de UNA sola decision y se mueven en el MISMO commit —
+      # dejarlas divergentes hace que un workflow corra en una mayor que ningun
+      # otro ejercita, y ahi el rojo aparece donde nadie lo estaba mirando.
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
         with:
-          node-version: "22"
+          node-version: "24"
 
       - name: Regenerar la porcion del marco
         uses: "{{ORG}}/Projects/actions/constitucion@v1.7.0"

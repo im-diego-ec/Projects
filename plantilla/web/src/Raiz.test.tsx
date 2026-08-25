@@ -28,10 +28,19 @@ vi.mock("@clerk/clerk-react", () => ({
 beforeEach(() => {
   // App consulta el healthcheck al montarse; sin esto la prueba dependeria de
   // que haya un API escuchando, que es la definicion de prueba intermitente.
+  //
+  // EL DOBLE COPIA LA FORMA QUE DEVUELVE api/src/app.ts (`{ estado }`), no una
+  // inventada. Decia `{ status: "ok" }` —el nombre que el API de este andamio no
+  // emite— y las dos pruebas de abajo estaban ROJAS por eso: el esquema Zod de
+  // App.tsx rechazaba el cuerpo, la portada mostraba "el API respondio algo que
+  // no entiendo" y el `findByText("ok")` no encontraba nada. Medido: el mismo
+  // safeParse falla igual con zod 3 y con zod 4, o sea el rojo no lo estreno la
+  // subida de mayor, estaba ahi desde que se corrigieron los dobles de
+  // App.test.tsx y este quedo sin corregir.
   vi.stubGlobal(
     "fetch",
     vi.fn(() =>
-      Promise.resolve({ ok: true, status: 200, json: () => Promise.resolve({ status: "ok" }) })
+      Promise.resolve({ ok: true, status: 200, json: () => Promise.resolve({ estado: "ok" }) })
     )
   );
 });
