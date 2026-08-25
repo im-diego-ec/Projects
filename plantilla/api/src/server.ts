@@ -101,13 +101,13 @@ export interface OpcionesDeArranque {
 export function iniciar(opciones: OpcionesDeArranque = {}): Server | undefined {
   const salir = opciones.salir ?? ((codigo: number) => process.exit(codigo));
 
-  // Fail-closed: sin Clerk y sin el opt-in de dev, el API NO arranca. La
-  // alternativa -arrancar y aceptar identidades del cliente- es peor que estar
-  // caido, porque nadie se entera.
+  // Fail-closed: sin proveedor de identidad y sin el opt-in de dev, el API NO
+  // arranca. La alternativa -arrancar y aceptar identidades del cliente- es peor
+  // que estar caido, porque nadie se entera.
   if (authConfigInsegura()) {
     log.fatal(
-      "CLERK_SECRET_KEY no configurado y ALLOW_DEV_AUTH!=true: el API no arranca " +
-        "en modo inseguro. Configura Clerk, o ALLOW_DEV_AUTH=true solo en desarrollo."
+      "SUPABASE_URL no configurado y ALLOW_DEV_AUTH!=true: el API no arranca " +
+        "en modo inseguro. Configura Supabase, o ALLOW_DEV_AUTH=true solo en desarrollo."
     );
     salir(1);
     return undefined;

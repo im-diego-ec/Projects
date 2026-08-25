@@ -54,8 +54,8 @@ describe("esEntrypoint", () => {
 });
 
 describe("iniciar", () => {
-  it("se niega a arrancar sin Clerk y sin el opt-in de dev", () => {
-    vi.stubEnv("CLERK_SECRET_KEY", "");
+  it("se niega a arrancar sin proveedor de identidad y sin el opt-in de dev", () => {
+    vi.stubEnv("SUPABASE_URL", "");
     vi.stubEnv("ALLOW_DEV_AUTH", "");
     const salir = vi.fn();
 

@@ -13,8 +13,10 @@
 interface ImportMetaEnv {
   /** Base del API. Sin ella, el front asume el API local. */
   readonly VITE_API_URL?: string;
-  /** Clave publicable de Clerk. Sin ella la app corre sin auth (solo dev). */
-  readonly VITE_CLERK_PUBLISHABLE_KEY?: string;
+  /** URL del proyecto de Supabase. Sin ella la app corre sin auth (solo dev). */
+  readonly VITE_SUPABASE_URL?: string;
+  /** Clave ANONIMA de Supabase: publica a proposito, viaja en el bundle. */
+  readonly VITE_SUPABASE_ANON_KEY?: string;
 }
 
 interface ImportMeta {

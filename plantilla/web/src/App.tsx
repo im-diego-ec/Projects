@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { z } from "zod";
-import { SignedIn, SignedOut, SignInButton, UserButton } from "@clerk/clerk-react";
+import type { Autenticacion, Sesion } from "./auth";
 
 const API_URL = import.meta.env.VITE_API_URL ?? "http://localhost:3000";
 
@@ -40,8 +40,22 @@ const RespuestaHola = z.object({ mensaje: z.string(), userId: z.string() });
 const SIN_CONEXION = "sin conexion con el API";
 const RESPUESTA_INESPERADA = "el API respondio algo que no entiendo";
 
-async function pedirJson(ruta: string): Promise<unknown> {
-  const respuesta = await fetch(`${API_URL}${ruta}`);
+/**
+ * Las cabeceras con las que sale una peticion al API.
+ *
+ * Con token viaja el `Authorization: Bearer <token>` que exige requireAuth
+ * (api/src/middleware/auth.ts); sin token sale limpia, que es el unico modo en
+ * el que un endpoint protegido puede responder algo util: el bypass de
+ * desarrollo del API (ALLOW_DEV_AUTH=true). LA CABECERA NO ES OPCIONAL en un
+ * ambiente real — sin ella /api/hello responde 401 aunque la persona tenga
+ * sesion, que es exactamente lo que hacia esta portada antes.
+ */
+function cabecerasDeAuth(token: string | null): Record<string, string> {
+  return token === null ? {} : { Authorization: `Bearer ${token}` };
+}
+
+async function pedirJson(ruta: string, cabeceras: Record<string, string> = {}): Promise<unknown> {
+  const respuesta = await fetch(`${API_URL}${ruta}`, { headers: cabeceras });
   // Un 401 o un 500 tambien son respuestas: sin este chequeo, `.json()` de un
   // cuerpo de error se cuela como si fuera el dato bueno.
   if (!respuesta.ok) throw new Error(`el API respondio ${respuesta.status}`);
@@ -66,11 +80,22 @@ async function leerSalud(): Promise<string> {
   return leido.success ? leido.data.estado : RESPUESTA_INESPERADA;
 }
 
-/** El texto a mostrar de /api/hello (endpoint protegido). Nunca lanza. */
-async function leerHola(): Promise<string> {
+/**
+ * El texto a mostrar de /api/hello (endpoint protegido). Nunca lanza.
+ *
+ * El token se pide JUSTO ANTES de llamar y no se guarda en el estado: vence, y
+ * el proveedor lo renueva por su cuenta. `auth` puede ser null (proyecto sin
+ * proveedor configurado) y entonces la peticion sale sin cabecera: la respuesta
+ * util en ese caso la da el bypass de desarrollo del API, y si no esta puesto,
+ * el 401 se muestra con el mensaje de abajo en vez de una pantalla en blanco.
+ */
+async function leerHola(auth: Autenticacion | null): Promise<string> {
   let cuerpo: unknown;
   try {
-    cuerpo = await pedirJson("/api/hello");
+    // Dentro del try junto con la peticion: un rechazo del proveedor al pedir
+    // el token es otra forma de "no se pudo llamar", y esta funcion no lanza.
+    const token = (await auth?.token()) ?? null;
+    cuerpo = await pedirJson("/api/hello", cabecerasDeAuth(token));
   } catch {
     return "no se pudo llamar /api/hello (revisa la sesion y que el API este arriba)";
   }
@@ -79,9 +104,86 @@ async function leerHola(): Promise<string> {
   return `${leido.data.mensaje} (userId: ${leido.data.userId})`;
 }
 
-export default function App({ clerkHabilitado }: { clerkHabilitado: boolean }) {
+const ENLACE_ENVIADO = "Revisa tu correo: te enviamos un enlace de acceso.";
+const ENLACE_FALLIDO = "No se pudo enviar el enlace de acceso.";
+
+/**
+ * El bloque de identidad de la portada. Sale a un componente propio porque
+ * tiene los TRES estados que hay que poder ver por separado (sin proveedor, con
+ * proveedor y sin sesion, con sesion) y porque asi App queda con una sola
+ * responsabilidad de datos.
+ */
+function Identidad({ auth, sesion }: { auth: Autenticacion | null; sesion: Sesion | null }) {
+  const [email, setEmail] = useState("");
+  const [aviso, setAviso] = useState("");
+
+  if (!auth) {
+    return (
+      <p className="text-xs text-neutral-500">
+        Supabase no configurado (dev). Agrega VITE_SUPABASE_URL y VITE_SUPABASE_ANON_KEY para
+        activar auth.
+      </p>
+    );
+  }
+
+  // Copia en un `const` y no uso directo de la prop: TypeScript no conserva el
+  // estrechamiento de un parametro DENTRO de una funcion anidada (el onClick, el
+  // handler), asi que sin esto cada uso pediria un `!` o un `?.` — un `!` es una
+  // afirmacion que el compilador no verifica, y justo aca no hace falta.
+  const proveedor = auth;
+
+  if (sesion) {
+    return (
+      <div className="flex items-center justify-between gap-3">
+        <span className="text-sm text-neutral-700">{sesion.email ?? sesion.userId}</span>
+        <button
+          onClick={() => void proveedor.salir()}
+          className="px-4 py-2 rounded-lg bg-neutral-900 text-white text-sm"
+        >
+          Cerrar sesión
+        </button>
+      </div>
+    );
+  }
+
+  async function enviarEnlace() {
+    // El handler atrapa SIEMPRE: una promesa rechazada en un onClick no la ve
+    // nadie, y el usuario se queda mirando un formulario que no dijo nada.
+    try {
+      await proveedor.ingresar(email);
+      setAviso(ENLACE_ENVIADO);
+    } catch {
+      setAviso(ENLACE_FALLIDO);
+    }
+  }
+
+  return (
+    <div className="space-y-2">
+      <label htmlFor="email-de-ingreso" className="block text-sm text-neutral-500">
+        Correo
+      </label>
+      <input
+        id="email-de-ingreso"
+        type="email"
+        value={email}
+        onChange={(e) => setEmail(e.target.value)}
+        className="w-full px-3 py-2 rounded-lg border border-neutral-300 text-sm"
+      />
+      <button
+        onClick={enviarEnlace}
+        className="w-full px-4 py-2 rounded-lg bg-neutral-900 text-white text-sm"
+      >
+        Enviar enlace de acceso
+      </button>
+      {aviso && <p className="text-sm text-neutral-700">{aviso}</p>}
+    </div>
+  );
+}
+
+export default function App({ auth }: { auth: Autenticacion | null }) {
   const [salud, setSalud] = useState("...");
   const [hola, setHola] = useState("");
+  const [sesion, setSesion] = useState<Sesion | null>(null);
 
   useEffect(() => {
     // `void` explicito: es un fire-and-forget intencional y leerSalud() no
@@ -90,8 +192,18 @@ export default function App({ clerkHabilitado }: { clerkHabilitado: boolean }) {
     void leerSalud().then(setSalud);
   }, []);
 
+  useEffect(() => {
+    if (!auth) return;
+    // Las DOS cosas hacen falta: la sesion que YA existe (el navegador vuelve
+    // con ella desde el almacenamiento) y las que vengan despues (el usuario
+    // entra por el enlace del correo, o cierra sesion en otra pestana). Con
+    // solo la primera, la portada se queda diciendo "sin sesion" para siempre.
+    void auth.sesionActual().then(setSesion);
+    return auth.alCambiar(setSesion);
+  }, [auth]);
+
   async function llamarHola() {
-    setHola(await leerHola());
+    setHola(await leerHola(auth));
   }
 
   return (
@@ -100,7 +212,7 @@ export default function App({ clerkHabilitado }: { clerkHabilitado: boolean }) {
         <header className="space-y-1">
           <p className="text-sm font-medium text-orange-600">{ORG_DEL_PROYECTO}</p>
           <h1 className="text-2xl font-semibold">{NOMBRE_DEL_PROYECTO}</h1>
-          <p className="text-sm text-neutral-500">React + Node + RDS + Clerk · hello world</p>
+          <p className="text-sm text-neutral-500">React + Node + Prisma + Supabase · hello world</p>
         </header>
 
         <div className="text-sm">
@@ -108,24 +220,7 @@ export default function App({ clerkHabilitado }: { clerkHabilitado: boolean }) {
           <span className="font-mono">{salud}</span>
         </div>
 
-        {clerkHabilitado ? (
-          <div className="flex items-center gap-3">
-            <SignedOut>
-              <SignInButton mode="modal">
-                <button className="px-4 py-2 rounded-lg bg-neutral-900 text-white text-sm">
-                  Iniciar sesión
-                </button>
-              </SignInButton>
-            </SignedOut>
-            <SignedIn>
-              <UserButton />
-            </SignedIn>
-          </div>
-        ) : (
-          <p className="text-xs text-neutral-500">
-            Clerk no configurado (dev). Agrega VITE_CLERK_PUBLISHABLE_KEY para activar auth.
-          </p>
-        )}
+        <Identidad auth={auth} sesion={sesion} />
 
         <div className="space-y-2">
           {/* Texto OSCURO sobre el naranja de marca, no blanco: blanco sobre
