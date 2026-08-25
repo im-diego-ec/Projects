@@ -56,7 +56,8 @@ propósito: son dos listas distintas y el grep de una no debe traer la otra.
 
     grep -rn PENDIENTE-PLATAFORMA .
 
-Como los de infraestructura, **hoy no tienen compuerta**: el pipeline no se pone rojo por
+Como los de infraestructura, **hoy no tienen compuerta** —ninguna comprobación bloquea el
+merge por esto—: el pipeline no se pone rojo por
 ellos. Es disciplina declarada y se revisa a mano.
 
 ### PENDIENTE-PLATAFORMA · el marco · la clave todavía no la lee nadie

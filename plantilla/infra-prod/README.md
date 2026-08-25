@@ -33,8 +33,9 @@ la red.
 **alarmas**. Cada pendiente dice qué falta, **con qué criterio se decide** y qué
 garantía del marco queda sin cumplir.
 
-⚠️ **Todavía no hay compuerta**: el pipeline **no** se pone rojo por estos
-pendientes, y la compuerta llega con el change del despliegue. Hasta entonces se
+⚠️ **Todavía no hay compuerta** —una comprobación que bloquea el merge—: el pipeline
+**no** se pone rojo por estos pendientes, y esa comprobación llega con el change —la
+propuesta escrita— del despliegue. Hasta entonces se
 revisa a mano: `grep -rn PENDIENTE-INFRA infra infra-prod`.
 
 ## Lo que el CI **sí** mira desde el primer PR
