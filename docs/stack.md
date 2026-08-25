@@ -12,6 +12,21 @@ ahí.
 Cuando una palabra del marco suene rara, está definida en una línea en el
 [glosario](glosario.md).
 
+**Para quién es esta página.** Para quien tiene que decidir, revisar o discutir
+una pieza de tecnología: un builder, un arquitecto, y también quien evalúa si
+esto obliga a pagar algo. **Es una página técnica**, y no evita el vocabulario:
+lo que hace es dejarlo enlazado. Si lo que buscás es qué es el marco y qué te
+va a pedir, empezá por
+[empezar-sin-ser-tecnico.md](empezar-sin-ser-tecnico.md).
+
+**Palabras del marco que vas a ver acá**, cada una definida en una línea:
+[ADR](glosario.md), [builder](glosario.md), [carril](glosario.md),
+[compuerta](glosario.md),
+[constitución](glosario.md), [delta](glosario.md), [guardrail](glosario.md),
+[marcador](glosario.md), [monorepo](glosario.md), [pin](glosario.md),
+[referenciado](glosario.md), [reusable](glosario.md), [scaffold](glosario.md),
+[spec](glosario.md), [veredicto agregado](glosario.md).
+
 ---
 
 ## Por qué esta página no escribe versiones
@@ -87,7 +102,7 @@ piezas, capa por capa:
 | Frontend | React con TypeScript, Vite, Tailwind y shadcn/ui | Es la base que el área ya usaba, escrita a mano en cada proyecto hasta que empezó a divergir en los detalles |
 | Backend | Node con TypeScript y Express | Lo mismo, y comparte intérprete con la mecánica del marco: una sola versión de Node que gobernar |
 | Datos | PostgreSQL a través de Prisma | El esquema y las migraciones quedan versionados en el repositorio, que es lo que permite exigir que una migración pase por revisión |
-| Identidad | Clerk | Componentes en el frontend y verificación del token en el backend, sin llamada de red por request |
+| Identidad | Supabase Auth (la fila que `plantilla/AGENTS.md` todavía escribe como **Clerk**) | Verificación del token en el backend sin llamada de red por request, y un solo archivo del frontend —`web/src/auth.ts`— tocando el SDK del proveedor. **Fila en transición, y se dice de frente**: lo que el andamio INSTALA hoy es Supabase —`@supabase/supabase-js` en el frontend, `jose` en el API, y ninguna dependencia `@clerk/*` en ningún manifiesto—, mientras [`plantilla/AGENTS.md`](../plantilla/AGENTS.md) sigue congelando **Clerk** en su tabla. Mientras difieran manda **lo que declaran los manifiestos del andamio**, que es lo que el proyecto instala y ejecuta; la fila que hay que corregir es la de `plantilla/AGENTS.md`, y ese arreglo no es de esta página |
 | Validación de input externo | Zod | Todo lo que entra de afuera se valida contra un esquema declarado, en vez de confiar en el tipo estático |
 | Pruebas | Vitest para unidad e integración, Playwright para extremo a extremo | La cobertura del diff que el marco exige se mide sobre el reporte que Vitest emite |
 | Empaquetado | Imagen de contenedor construida desde la raíz del monorepo | La arquitectura se declara en el `Dockerfile` en vez de heredarse de la máquina que construye |
@@ -163,8 +178,8 @@ que declara dónde vive cada forma.
 | Express | `plantilla/api/package.json` → `express` | Scaffold |
 | Prisma | `plantilla/api/package.json` → `@prisma/client` | Scaffold |
 | Driver de PostgreSQL | `plantilla/api/package.json` → `pg` | Scaffold |
-| Clerk — backend | `plantilla/api/package.json` → `@clerk/backend` | Scaffold |
-| Clerk — frontend | `plantilla/web/package.json` → `@clerk/clerk-react` | Scaffold |
+| Identidad — verificación del token en el API | `plantilla/api/package.json` → `jose` | Scaffold |
+| Identidad — frontend | `plantilla/web/package.json` → `@supabase/supabase-js` | Scaffold |
 | Zod | `plantilla/api/package.json` → `zod` | Scaffold |
 | Vitest | `plantilla/api/package.json` → `vitest` | Scaffold |
 | Playwright | `plantilla/e2e/package.json` → `@playwright/test` | Scaffold |

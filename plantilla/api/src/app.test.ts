@@ -22,9 +22,10 @@ describe("app", () => {
     obtenerPrisma.mockResolvedValue({ $queryRaw: consultar });
     consultar.mockResolvedValue([{ uno: 1 }]);
     // El bypass de dev es la unica forma de ejercitar una ruta protegida sin
-    // Clerk, y exige el opt-in explicito: exactamente lo que hace produccion.
+    // proveedor de identidad, y exige el opt-in explicito: exactamente lo que
+    // hace produccion.
     vi.stubEnv("ALLOW_DEV_AUTH", "true");
-    vi.stubEnv("CLERK_SECRET_KEY", "");
+    vi.stubEnv("SUPABASE_URL", "");
   });
 
   afterEach(() => {

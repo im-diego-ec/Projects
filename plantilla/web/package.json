@@ -11,7 +11,7 @@
     "lint": "eslint . --max-warnings=0"
   },
   "dependencies": {
-    "@clerk/clerk-react": "^5.61.3",
+    "@supabase/supabase-js": "^2.112.4",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
     "zod": "^4.4.3"
@@ -25,7 +25,7 @@
     "@vitest/coverage-v8": "^4.1.11",
     "jsdom": "^30.0.1",
     "tailwindcss": "^4.3.3",
-    "typescript": "^6.0.3",
+    "typescript": "^7.0.2",
     "vite": "^8.2.2",
     "vitest": "^4.1.11"
   },
@@ -38,7 +38,7 @@
         },
         {
           "patron": "src/main.tsx",
-          "motivo": "Entrypoint del navegador: monta el arbol en #root y NADA MAS. Se puede excluir con la conciencia tranquila porque no decide nada: la unica decision del arranque (con clave publicable de Clerk se envuelve en su provider, sin ella la app corre sin auth) se mudo a src/Raiz.tsx, que si tiene prueba. Si alguna vez vuelve logica a este archivo, la exclusion deja de ser honesta y hay que sacarla."
+          "motivo": "Entrypoint del navegador: monta el arbol en #root y NADA MAS. Se puede excluir con la conciencia tranquila porque no decide nada: la unica decision del arranque (con las variables de Supabase se arma el proveedor de identidad, sin ellas la app corre sin auth) se mudo a src/Raiz.tsx, que si tiene prueba. Si alguna vez vuelve logica a este archivo, la exclusion deja de ser honesta y hay que sacarla."
         }
       ]
     }

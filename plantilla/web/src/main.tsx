@@ -4,9 +4,9 @@ import { Raiz } from "./Raiz";
 import "./index.css";
 
 // ENTRYPOINT DEL NAVEGADOR: monta el arbol y nada mas. No decide nada a
-// proposito — la unica decision del arranque (envolver o no en el provider de
-// auth) vive en Raiz.tsx, que es un componente y por lo tanto se puede renderizar
-// en una prueba. Un entrypoint no se puede probar sin montar el navegador
+// proposito — la unica decision del arranque (armar o no el proveedor de
+// identidad) vive en Raiz.tsx, que es un componente y por lo tanto se puede
+// renderizar en una prueba. Un entrypoint no se puede probar sin montar el navegador
 // entero, asi que la forma de que su falta de pruebas no esconda nada es que no
 // tenga nada que esconder. Por eso —y solo por eso— este archivo esta declarado
 // en projects.cobertura.excluidos de package.json.
