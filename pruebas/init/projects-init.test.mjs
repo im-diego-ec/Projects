@@ -33,6 +33,8 @@ import {
   marcadoresSinFormato,
   REGISTRO_DE_VALORES,
   avisosDelRegistroDeValores,
+  RENOMBRES,
+  destinoDe,
 } from "../../herramientas/projects-init.mjs";
 
 // ---------------------------------------------------------------------------
@@ -134,12 +136,32 @@ test("instancia el andamio y NINGUN marcador sobrevive (escaneo independiente)",
   );
 });
 
-test("el README del andamio NO se copia: es la guia del bootstrap, no el README del proyecto", () => {
+test("el README del andamio NO se copia, y el del PROYECTO llega en su lugar", () => {
+  // Los dos hechos son UNO: en la raiz del andamio conviven dos documentos que en
+  // el repo nuevo se llamarian igual —la guia del bootstrap y el README del
+  // proyecto—, asi que la guia no viaja y el otro viaja RENOMBRADO. Medir solo
+  // "el destino no tiene README.md" era cierto mientras el segundo no existia, y
+  // hoy seria exigir que el repo nuevo nazca sin portada.
   const destino = tmp("readme");
   instanciar({ raizAndamio: ANDAMIO, destino, valores: derivar(VALORES_OK) });
-  assert.equal(fs.existsSync(path.join(destino, "README.md")), false);
-  // Y es el unico excluido: si manana se excluye otro sin pensarlo, esto lo dice.
+
+  const enDestino = fs.readFileSync(path.join(destino, "README.md"), "utf8");
+  const guia = fs.readFileSync(path.join(ANDAMIO, "README.md"), "utf8");
+  assert.notEqual(enDestino, guia, "lo que aterrizo como README.md es la guia del bootstrap, no el del proyecto");
+  assert.ok(
+    enDestino.includes("RELLENAR"),
+    "el README que llego no es el del proyecto: el del proyecto trae los huecos RELLENAR que hay que llenar antes del primer push",
+  );
+  // Y no queda el archivo con su nombre del andamio: si quedara, el repo nuevo
+  // tendria los dos y nadie sabria cual es el bueno.
+  assert.equal(fs.existsSync(path.join(destino, "README-del-proyecto.md")), false);
+
+  // Los dos mecanismos, cada uno con su unica declaracion: si manana se excluye
+  // o se renombra otro archivo sin pensarlo, esto lo dice.
   assert.deepEqual([...NO_SE_COPIA], ["README.md"]);
+  assert.deepEqual([...RENOMBRES], [["README-del-proyecto.md", "README.md"]]);
+  assert.equal(destinoDe("README-del-proyecto.md"), "README.md");
+  assert.equal(destinoDe("api/package.json"), "api/package.json", "un archivo que no se renombra tiene que pasar tal cual");
 });
 
 test("viajan los dotfiles, que es donde falla el copiado a mano", () => {

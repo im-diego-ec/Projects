@@ -111,4 +111,17 @@ runs:
         AVISO_LIMITE: ${{ inputs.limite }}
         AVISO_CAMPO: ${{ inputs.campo }}
         AVISO_SALIDA: ${{ inputs.salida }}
-      run: node "${GITHUB_ACTION_PATH}/aviso-version.mjs"
+      # ESTA ACTION NO INSTALA NODE: corre en un workflow de release, donde el
+      # unico paso previo es el checkout y agregar un setup-node seria pagarlo
+      # para leer un archivo de texto. Lo que no puede hacer es morir con
+      # "node: command not found" —un mensaje del shell, que no dice que
+      # instalar— en un runner propio o en cualquier imagen sin node.
+      run: |
+        set -euo pipefail
+
+        if ! command -v node > /dev/null 2>&1; then
+          echo "::error::no hay 'node' en el PATH y sin el no se puede armar el mensaje desde el CHANGELOG. Arreglo: agrega 'uses: actions/setup-node@v7' a este job, antes de este paso"
+          exit 1
+        fi
+
+        node "${GITHUB_ACTION_PATH}/aviso-version.mjs"

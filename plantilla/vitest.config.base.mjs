@@ -8,9 +8,11 @@
 //
 // POR QUE ESTO LO REPARTE EL MARCO Y NO LO ESCRIBE CADA PAQUETE. El umbral del
 // total no es una preferencia del paquete: es el minimo del area. Cuando cada
-// paquete lo escribia solo, el numero terminaba siendo el que la medicion daba
-// ese dia: el consumidor tenia functions: 70.6 fijado en el numero medido, o sea
-// un umbral que no exigia nada porque ya estaba cumplido por construccion.
+// paquete lo escribia solo, el numero terminaba siendo el que su propia medicion
+// daba ese dia. La firma de ese modo de fijarlo es visible: un umbral con
+// decimales (functions: 70.6 y parecidos) no es una vara que alguien eligio, es
+// la medicion copiada, y no exige nada porque ya esta cumplida por construccion
+// en el instante en que se escribe — solo puede bajar despues, nunca subir.
 // Repartirlo desde aca hace que un paquete nuevo NAZCA con el piso del marco.
 //
 // LA OTRA MITAD DE LA COMPUERTA NO ESTA ACA, Y ES A PROPOSITO. Estos umbrales
@@ -43,11 +45,11 @@
 // compara los items que llegan contra el denominador que el propio reporte
 // declara por registro (LF:, FNF:, BRF:), asi que "FNF:0" —el reporter diciendo
 // que midio funciones y no habia ninguna— pasa como n/a, y un reporte sin FNF: y
-// sin un solo FN: no pasa: eso es no medir. La medicion que lo obliga: sobre el
-// reporte real del consumidor, con su paquete a 70,70% de funciones, sacarle los
-// registros de funciones convertia el rojo en EXIT 0 sin un solo aviso, y
-// borrarle los registros sin cubrir dejando FNF: intacto publicaba 95,83% con la
-// fila en OK. Un denominador corto no baja la cobertura: la infla.
+// sin un solo FN: no pasa: eso es no medir. Las dos formas de romperlo, medidas
+// sobre un reporte real de un paquete que estaba a 70,70% de funciones: sacarle
+// los registros de funciones convertia el rojo en EXIT 0 sin un solo aviso, y
+// borrarle solo los registros sin cubrir, dejando FNF: intacto, publicaba 95,83%
+// con la fila en OK. Un denominador corto no baja la cobertura: la infla.
 //
 // POR QUE .mjs Y NO .ts, que seria lo esperable en este stack: un .ts en la
 // raiz del monorepo no cae bajo el tsconfig de ningun paquete, asi que el censo

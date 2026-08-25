@@ -426,3 +426,76 @@ con su motivo escrito, del mismo modo que las exclusiones del alcance.
 #### Scenario: Código excluido del cálculo con su motivo declarado
 - **WHEN** un paquete declara, con su justificación escrita, que cierto código no le corresponde probar
 - **THEN** ese código no cuenta en el cálculo y la exclusión queda registrada en el resumen de la corrida
+
+### Requirement: Las reglas de identidad visual del área viajan como reglas de lint verificadas
+
+La configuración de lint que el andamio entrega SHALL contener las reglas de
+identidad visual del área con **alcance propio** y severidad de error, de modo
+que apartarse de la identidad detenga la integración en vez de quedar como una
+recomendación que cada proyecto interpreta.
+
+Cada regla embebida en un selector SHALL compilar —una expresión rota hace caer
+al linter en cada corrida de cada proyecto que la consume—, SHALL aceptar su
+caso violatorio y SHALL rechazar los casos legítimos: una regla que muerde
+trabajo honesto se apaga al tercer PR y deja de proteger nada.
+
+Toda regla de identidad visual que la constitución del marco enuncie SHALL tener
+decidido su estado frente al linter: verificada, o declarada como no
+verificable con su motivo. Ninguna SHALL quedar sin decidir.
+
+**El límite se declara acá, no se descubre después:** la verificación comprueba
+la FORMA de las reglas —que existan, que compilen, que discriminen— y no las
+ejecuta contra un árbol real, porque el repositorio del marco no tiene
+dependencias instaladas y esa propiedad es deliberada. La otra mitad de cada
+selector la ejerce el lint del proyecto que las consume.
+
+#### Scenario: El bloque de reglas de identidad pierde su alcance
+- **WHEN** el bloque de reglas de identidad visual del andamio se queda sin su alcance propio y hereda el de otro bloque
+- **THEN** la verificación falla, porque un alcance heredado aplica las reglas donde no corresponden y las omite donde sí
+
+#### Scenario: Una regla que deja de detectar su propia violación
+- **WHEN** una regla de identidad visual se edita y deja de reconocer el caso que existe para prohibir
+- **THEN** la verificación falla, porque una regla que ya no muerde su caso es indistinguible de no tenerla
+
+#### Scenario: Una regla que se ensancha y muerde trabajo honesto
+- **WHEN** una regla de identidad visual pasa a marcar código legítimo que nunca fue una violación
+- **THEN** la verificación falla, porque el falso positivo termina en que alguien apague la regla entera
+
+#### Scenario: Una regla de la constitución sin estado decidido
+- **WHEN** la constitución del marco enuncia una regla de identidad visual y nadie decidió si el linter la verifica o no
+- **THEN** la verificación falla pidiendo la decisión escrita, en vez de dejarla como un hueco silencioso
+
+### Requirement: El esqueleto que entrega el andamio encaja consigo mismo
+
+Las piezas que el andamio entrega —definición de servicios locales, aplicación
+de servidor, aplicación de cliente, suite de extremo a extremo e imagen del
+servicio— SHALL ser coherentes entre sí, y la verificación SHALL fallar cuando
+un acople se rompa. Un esqueleto cuyas piezas no encajan no es un punto de
+partida: es una tarde de depuración el primer día del proyecto.
+
+Los acoples que SHALL sostenerse son propiedades, no archivos concretos: el
+nombre de la base que declara la definición de servicios locales y el que usa la
+aplicación de servidor SHALL ser el mismo; el contrato que la aplicación de
+cliente consume, el que la de servidor expone y el que su banco de pruebas
+afirma SHALL ser el mismo; la imagen del servicio NO SHALL atender peticiones
+como superusuario; la arquitectura de cómputo SHALL estar declarada en la
+imagen y en el hueco de infraestructura que la fija; ninguna variante del
+archivo de variables de entorno SHALL poder entrar a la historia del
+repositorio, y el archivo de ejemplo SHALL poder entrar; y el esqueleto NO SHALL
+traer el nombre de ninguna organización escrito a mano.
+
+#### Scenario: El nombre de la base deja de coincidir
+- **WHEN** la definición de servicios locales y la aplicación de servidor nombran bases distintas
+- **THEN** la verificación falla, porque el repositorio arranca con una conexión que apunta a una base que no existe
+
+#### Scenario: La imagen del servicio atiende como superusuario
+- **WHEN** la imagen que el andamio entrega no baja de privilegios antes de atender peticiones
+- **THEN** la verificación falla, y lo hace en el andamio, una vez, en vez de en cada proyecto que lo herede
+
+#### Scenario: Una variante del archivo de variables de entorno queda rastreable
+- **WHEN** una variante del archivo de variables de entorno deja de estar excluida del control de versiones
+- **THEN** la verificación falla, porque el modo de falla es que un secreto entre a la historia sin que nadie lo note
+
+#### Scenario: El esqueleto nombra una organización a mano
+- **WHEN** una pieza del esqueleto trae el nombre de una organización escrito literalmente en vez de la sustitución que el andamio resuelve
+- **THEN** la verificación falla, porque ese literal viaja a todos los proyectos y ninguno lo corrige

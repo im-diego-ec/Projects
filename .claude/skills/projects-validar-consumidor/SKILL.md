@@ -1,7 +1,15 @@
 ---
 name: projects-validar-consumidor
 description: Probar un cambio del marco Projects contra un repo consumidor real ANTES de publicar la version — rama temporal con el uses pineado al SHA, PR en borrador NO MERGEAR, evidencia de los jobs y cierre con --delete-branch. Usar antes de cualquier release del marco o cuando haya que verificar que un workflow o action nueva funciona en un repo de verdad.
-allowed-tools: Bash(git:*), Bash(gh:*), Bash(grep:*), Bash(sed:*), Read, Edit
+# ALLOWLIST ACOTADO. `allowed-tools` es un allowlist de agente con el mismo poder
+# que el archivo de ajustes: `Bash(git:*)` autoriza `git push --force` y `Bash(gh:*)`
+# autoriza `gh pr merge`, `gh release create` y `gh api -X DELETE`. Un comodin en la
+# posicion del subcomando autoriza mas de lo que nadie reviso, asi que aca solo entran
+# LECTURAS acotadas.
+# Lo que ESCRIBE fuera del arbol —git checkout, git pull, git add, git commit, git push, el `sed -i` que reescribe los `uses:` del consumidor, gh pr create, gh pr close y gh workflow run— queda deliberadamente afuera: no es que la
+# skill no lo haga, es que cada una de esas corridas se PIDE en la sesion. Buscar en el
+# arbol va por las tools `Grep` y `Glob` en vez de por `Bash(grep:*)`.
+allowed-tools: Bash(git status:*), Bash(git diff:*), Bash(git log:*), Bash(git rev-parse:*), Bash(git ls-files:*), Bash(git ls-remote:*), Bash(git grep:*), Bash(gh pr view:*), Bash(gh pr checks:*), Bash(gh run list:*), Bash(gh run view:*), Read, Grep, Glob, Edit
 metadata:
   author: Transformación Digital y Data
   version: "1.0"

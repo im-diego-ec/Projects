@@ -893,9 +893,68 @@ degradar en silencio.
 
 ## Requisitos del runner
 
-`bash`, `git` y `gh` — los tres vienen en los runners hospedados por GitHub. En
-un runner propio hay que garantizarlos. `gh` lo usa solo `carril-docs`, que es
-la única que habla con la API.
+`bash`, `git`, `gh` y **`node`** — los cuatro vienen en los runners hospedados
+por GitHub. En un runner propio hay que garantizarlos. `gh` lo usa solo
+`carril-docs`, que es la única que habla con la API.
+
+`node` merece su propia tabla porque cada action lo resuelve distinto, y quien
+lea un `node: command not found` necesita saber a quién le toca arreglarlo:
+
+| Action | Node | Qué hace si no está |
+| --- | --- | --- |
+| `guardrail-deltas` | **Lo instala** con `actions/setup-node` cuando `instalar-node` es `"true"` (su default) **y además lo exige** | Con `instalar-node: false` y sin Node en el job: `::error::` con las dos salidas (prender el input o agregar el paso) |
+| `cobertura-diff` | **Lo exige**, y lo instala solo si se lo piden: `instalar-node` tiene default `false`, porque para llegar acá el job ya corrió las pruebas | Con el default y sin Node en el job: `::error::` con las dos salidas (prender el input o agregar el paso) |
+| `constitucion` | **Lo exige** | `::error::` que nombra el paso a agregar |
+| `censo-fuentes` | **Lo exige** (no puede instalarlo: va *después* del install del repo, así que el job ya tiene su `setup-node`) | `::error::` que nombra el paso a agregar |
+| `aviso-version` | **Lo exige** (corre en un workflow de release, donde el único paso previo es el checkout) | `::error::` que nombra el paso a agregar |
+| `carril-docs` | **No lo usa**: su lógica es bash y `gh` | — |
+
+La invariante es que ninguna muere con el error del shell: o instala Node, o
+comprueba que esté y falla con el arreglo escrito. La verifica un banco derivado
+del árbol (`pruebas/ci-del-marco/node-en-las-actions.test.mjs`), así que una
+action nueva que invoque `node` a secas se pone roja sin que nadie actualice
+esta tabla.
+
+**Un `setup-node` con `if:` no cuenta como instalación.** Las dos actions que lo
+traen lo tienen gateado por el input `instalar-node`, así que la instalación
+depende de quien las invoque y no garantiza nada: para el banco esas dos siguen
+necesitando el guard, y sin él se ponen rojas. La versión anterior de esta tabla
+decía que `cobertura-diff` emitía un `::error::` que no tenía —clasificada como
+«lo instala» por la sola presencia de la línea `uses:`, el banco salía verde
+sobre la action que, en su configuración por defecto, moría con
+`node: command not found`—.
+
+**Residuo declarado, porque esta sección lo creó.** Antes de que existiera la
+lista de arriba, esta sección no nombraba `node`, y los cuatro `::error::` de
+node del workflow reusable lo dicen dentro de su explicación: *«antes el mensaje
+mandaba a leer 'Requisitos del runner' de actions/README.md, que enumera bash,
+git y gh y NO menciona node»*. Con `node` ya listado, esa frase quedó en presente
+sobre un hecho que dejó de ser cierto: son cuatro mensajes del marco afirmando
+algo verificablemente falso sobre un archivo del marco. Viven en
+`.github/workflows/marco-ci.yml`, fuera de este directorio —se ubican con el
+primer comando de acá abajo, no por número de línea: ese archivo se edita seguido
+y una línea citada envejece en el PR siguiente—, y el arreglo es pasar la frase a
+pasado, que es lo que describe:
+
+```bash
+grep -n 'que enumera bash, git y gh y NO menciona node' .github/workflows/marco-ci.yml   # da 4
+perl -pi -e 's/que enumera bash, git y gh y NO menciona node/que entonces enumeraba bash, git y gh y NO mencionaba node/g' .github/workflows/marco-ci.yml
+grep -c 'que entonces enumeraba bash, git y gh' .github/workflows/marco-ci.yml           # tiene que dar 4
+```
+
+### De quién es el job que hay que editar
+
+Los `::error::` de arriba dicen «agregá `uses: actions/setup-node@v7` a **este
+job**», y eso es correcto **para las actions**: una action se invoca con `uses:`
+desde un job del repo consumidor, así que el job es suyo y el paso se agrega ahí.
+
+**No vale lo mismo para el workflow reusable del marco.** Sus guardrails corren
+en jobs que viven en el archivo del marco, no en el `ci.yml` del consumidor: ahí
+«este job» no es editable desde el repo que lo consume, y por eso esos mensajes
+dicen otra cosa —que el fallo es del marco, y qué hacer si el runner es propio—.
+La distinción no es cosmética: cuatro mensajes daban la instrucción de las
+actions dentro del workflow reusable, y quien la siguiera editaba su `ci.yml`,
+no cambiaba nada y volvía a ver el mismo rojo.
 
 ## Banco de pruebas
 
@@ -920,3 +979,24 @@ Para correr el banco entero en local, desde la raíz de Projects:
 ```bash
 node --test actions/*/pruebas/*.test.mjs
 ```
+
+### Qué significa `export` en estos scripts
+
+**«Un banco lo importa».** Nada más. No hay un paquete publicado ni un consumidor
+que haga `import` de estos archivos: lo que se consume es la action entera por
+`uses:`, y lo que corre es su `main()`. Así que la única razón legítima para
+exportar un identificador es que otro `.mjs` del árbol lo nombre.
+
+No es una convención decorativa. Se buscó código muerto y **no hay** —cada
+identificador se usa dentro de su archivo—, pero sí había 35 exportaciones que
+ningún otro archivo importaba, catorce de ellas en `constitucion/cableado.mjs`.
+Eso le decía al lector que existía una superficie probada que no existía, y le
+cobraba el costo de averiguar cuál de las cuarenta era de verdad. La salida no
+fue borrar código: fue quitarles el `export` y dejarlas como `const` y `function`
+del módulo. Lo verifica `pruebas/ci-del-marco/superficie-exportada.test.mjs`,
+derivado del árbol, con una lista declarada para la excepción que haga falta.
+
+### La otra invariante derivada
+
+`pruebas/ci-del-marco/node-en-las-actions.test.mjs` exige que ninguna action
+publicada muera con `node: command not found` — ver *Requisitos del runner*.

@@ -50,7 +50,13 @@
 #   terraform   FUERA. No hay infra/ ni infra-prod/ en la raiz del marco. Los .tf
 #               que el repo versiona son los del andamio (plantilla/infra/main.tf
 #               y plantilla/infra-prod/main.tf, con siete y ocho marcadores sin
-#               resolver), y ningun job del marco corre `terraform`.
+#               resolver).
+#               OJO CON EL MATIZ, que cambio y no invierte la decision: el marco SI
+#               tiene un job `terraform` en marco-ci.yml, pero ese job verifica las
+#               raices del repo que lo consume, no las de este. En este repo no
+#               encuentra ninguna y sale diciendolo, asi que sigue sin haber aca un
+#               provider que Dependabot pueda subir. La condicion para revisar esta
+#               decision es la de siempre: que aparezca un .tf en la raiz del marco.
 #   github-acs  DENTRO, y es la unica que aplica: TODO lo que este repo ejecuta y
 #               todo lo que reparte son definiciones de pipeline. Y como el
 #               andamio SI entra por esta puerta —ver `/plantilla` mas abajo—,
@@ -92,16 +98,17 @@ updates:
   - package-ecosystem: "github-actions"
     # TRES SUPERFICIES, y ninguna es opcional. Con `directory: "/"` —lo unico
     # que declara el andamio— Dependabot mira `.github/workflows/` y nada mas.
-    # Sobre los 44 `uses:` que este repo versiona: 28 estan
-    # ahi y 16 quedan fuera —14 en `plantilla/.github/workflows/` y 2 en los
-    # `action.yml` de las composite actions—, y esos 16 son justamente los que
-    # VIAJAN: el andamio los copia a cada proyecto nuevo y las composite actions
-    # las ejecuta cada consumidor de @v1. Dejarlos fuera es vigilar lo que solo
-    # corre aca e ignorar lo que corre en todas partes.
+    # Sobre los 45 `uses:` que este repo versiona: 29 estan ahi y 16 quedan fuera
+    # —14 en `plantilla/.github/workflows/` y 2 en los `action.yml` de las
+    # composite actions—, y esos 16 son justamente los que VIAJAN: el andamio los
+    # copia a cada proyecto nuevo y las composite actions las ejecuta cada consumidor
+    # de @v1. Dejarlos fuera es vigilar lo que solo corre aca e ignorar lo que corre
+    # en todas partes.
     #
-    # LAS TRES CIFRAS SE REMIDEN, NO SE CREEN, y este parrafo ya las tuvo mal: decia
-    # 38 / 22 / 16 con un total que dejo de cerrar en cuanto un cambio agrego pasos con
-    # `uses:` y nadie las volvio a contar. El comando que las produce, entero:
+    # LAS TRES CIFRAS SE REMIDEN, NO SE CREEN, y este parrafo ya las tuvo mal DOS
+    # veces: decia 38 / 22 / 16, y despues 44 / 28 / 16 —esta ultima dejo de cerrar
+    # en cuanto el job `terraform` de marco-ci.yml sumo su checkout y nadie las
+    # volvio a contar—. El comando que las produce, entero:
     #
     #     git ls-files -- '*.yml' '*.yaml' | tr '\n' '\0' \
     #       | xargs -0 grep -hE '^[[:space:]]*(-[[:space:]]+)?uses:' | wc -l
@@ -158,10 +165,17 @@ updates:
     groups:
       acciones:
         patterns: ["*"]
-    # POR QUE ESTA ENTRADA ES LA OTRA MITAD DEL CHECK DE PINES DE ci.yml. El
-    # paso "Pines de actions de terceros por SHA" audita que todo `uses:` ajeno
-    # vaya por SHA de 40 hex; un SHA, a diferencia de un tag, NO se mueve, asi
-    # que sin Dependabot esos pines se congelan y quedan peor que los tags —una
-    # vulnerabilidad parcheada aguas arriba no llega nunca—. Dependabot es lo
-    # que los descongela: reescribe el SHA y el comentario `# vX.Y` que lleva al
-    # lado. Las dos piezas se necesitan; ninguna de las dos sola sirve.
+    # POR QUE ESTA ENTRADA ES LA OTRA MITAD DEL CHECK DE PINES DE ci.yml, y desde
+    # este cambio deja de ser una hipotesis. El paso "Pines de actions de terceros
+    # por SHA" audita que todo `uses:` ajeno vaya por SHA de 40 hex; un SHA, a
+    # diferencia de un tag, NO se mueve, asi que sin Dependabot esos pines se
+    # congelan y quedan peor que los tags —una vulnerabilidad parcheada aguas
+    # arriba no llega nunca—. Dependabot es lo que los descongela: reescribe el
+    # SHA y el comentario `# vX` que lleva al lado. Las dos piezas se necesitan;
+    # ninguna de las dos sola sirve. Lo que cambio es la escala: hasta hoy habia
+    # DOS pines por SHA en todo el repo y ahora hay 24 —los 22 `uses:` de
+    # .github/workflows/ mas las dos lineas de anthropics/claude-code-action—, o
+    # sea que esta entrada pasa de cubrir un caso aislado a ser lo unico que
+    # mantiene fresco casi todo lo que el marco ejecuta. Si esta entrada se
+    # rompiera o se sacara, el efecto ya no seria un pin viejo: seria que el marco
+    # entero se queda clavado en el dia en que se pino.

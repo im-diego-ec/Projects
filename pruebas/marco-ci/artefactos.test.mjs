@@ -1,5 +1,13 @@
 // Banco del paso "Artefactos regenerados al dia" de marco-ci.yml.
 //
+// QUE CAPABILITY ENFORZA. `pipeline-entrega`, requirement "Los artefactos
+// regenerados no divergen de la version pinada": el paso es el unico check del
+// marco que lo vuelve exigible, y este banco es lo unico que ejercita el paso.
+// El nombre de la capability se escribe aca a proposito — el censo de "que
+// requirement tiene un check que falla solo" se hace buscando el nombre en los
+// archivos ejecutables, y una capability que ningun ejecutable nombra figura
+// como no enforzada aunque lo este.
+//
 // La auditoria del 2026-08-20 midio que la rama del aviso de este paso era CODIGO
 // MUERTO: el paso no podia salir amarillo nunca. `xargs` COLAPSA los codigos de
 // salida —sale 123 si cualquier hijo salio entre 1 y 125— asi que "grep no

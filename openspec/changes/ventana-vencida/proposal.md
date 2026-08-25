@@ -1,9 +1,15 @@
 ---
 artefacto: proposal
 dri: Builder 1
-aprueba: Builder 1 (builder) # maquinaria del marco; el gate del PO en este repo está
-                        # acotado a `gobierno-contribucion` (.github/CODEOWNERS,
-                        # últimas dos líneas)
+aprueba: Builder 2 (builder par) # NO el `dri`: hasta el 2026-08-24 este campo decía
+                              # `Builder 1`, o sea el propio autor, y un autor que se
+                              # aprueba a sí mismo no es un review. Con
+                              # `required_approving_review_count` en `0` y
+                              # `require_code_owner_review` en `false`, nada más lo
+                              # detiene. Sigue sin ser el PO: su gate en este repo está
+                              # acotado a la capability de gobernanza
+                              # (.github/CODEOWNERS, últimas líneas) y este delta es
+                              # técnico
 informado: PO / Builder 2
 estado: aprobado-en-sesion
 ---

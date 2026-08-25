@@ -442,6 +442,39 @@ verde. Adelantarlo compra costo hundido y el costo hundido decide veredictos.
       descubrimiento, con el link al veredicto o al ADR. Evidencia: el issue
       actualizado.
 
+## 8. Romper el acople del arnés ANTES de archivar o descartar (BLOQUEANTE)
+
+`openspec/changes/` es una carpeta transitoria: archivar este change lo mueve a
+`openspec/changes/archive/<fecha>-capa-descubrimiento/` y descartarlo lo borra. Hoy
+el banco **requerido** del marco depende de una ruta de adentro, así que cualquiera
+de las dos operaciones deja el CI en rojo por algo que no tiene nada que ver con
+specs. La dirección del acople está al revés y se arregla acá, no el día del
+archive.
+
+Medido el 2026-08-24, con el comando que lo mide:
+
+```bash
+git grep -n -F "openspec/changes/capa-descubrimiento" -- ':!openspec/changes/capa-descubrimiento'
+# -> pruebas/piloto/arnes-d5.test.mjs:31
+```
+
+- [ ] 8.1 Mover el arnés fuera de la carpeta transitoria y actualizar a quien lo
+      nombra, en el mismo commit:
+      `git mv openspec/changes/capa-descubrimiento/piloto/arnes/verificar-brazo.mjs herramientas/verificar-brazo.mjs`
+      y en `pruebas/piloto/arnes-d5.test.mjs` cambiar la constante `ARNES` a
+      `path.join(RAIZ, "herramientas/verificar-brazo.mjs")`.
+      Evidencia: `node --test pruebas/piloto/arnes-d5.test.mjs` en verde y el
+      `git grep` de arriba sin salida.
+- [ ] 8.2 Decidir qué pasa con `openspec/changes/capa-descubrimiento/piloto/arnes/config-espacio-de-trabajo.yaml`,
+      que viaja con el arnés: o se mueve junto, o el arnés deja de leerlo de una
+      ruta relativa al change. Evidencia: el arnés corre desde su ruta nueva.
+- [ ] 8.3 Comprobar que la guarda del archivado ya no se dispara:
+      `node .claude/skills/projects-archive-change/aplicar-deltas.mjs capa-descubrimiento --simulacro`
+      tiene que dejar de imprimir «ruta transitoria». Evidencia: la salida del
+      comando. **Esa guarda ya está puesta y hoy sale roja sobre este change**:
+      es la que impide archivarlo con el acople encima, así que 8.1 no se puede
+      olvidar.
+
 ## Fuera de alcance, declarado
 
 No son tareas de este change; se anotan para que no se lean como olvido.

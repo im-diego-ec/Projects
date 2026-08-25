@@ -1,3 +1,17 @@
+---
+artefacto: proposal
+dri: Builder 1
+aprueba: Builder 2 (builder par)  # change técnico de `calidad-codigo`; el gate del PO
+                              # en este repo está acotado a la capability de
+                              # gobernanza (.github/CODEOWNERS, últimas líneas).
+                              # NO puede ser el propio `dri`: un autor que se
+                              # aprueba a sí mismo no es un review, y con
+                              # `required_approving_review_count` en `0` nada
+                              # más lo detiene
+informado: PO / Builder 2
+estado: pendiente-de-revision
+---
+
 # Rojo primero, y no solo en el código
 
 ## Por qué

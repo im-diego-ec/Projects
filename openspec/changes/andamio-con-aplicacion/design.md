@@ -1,7 +1,9 @@
 ---
 artefacto: design
 dri: Builder 1
-aprueba: Builder 1 (builder) # gate de `calidad-codigo`, no del PO
+aprueba: Builder 2 (builder par) # gate de `calidad-codigo`, no del PO — y NO el `dri`:
+                                # hasta el 2026-08-24 decía `Builder 1`, o sea el
+                                # propio autor, que no es un review
 informado: PO / Builder 2
 estado: pendiente-de-revision
 ---

@@ -2,9 +2,10 @@
 // ---------------------------------------------------------------------------
 // projects init — instancia el andamio en un repo nuevo.
 //
-// POR QUE EXISTE. Adoptar Projects eran ~30 actos manuales: copiar 75 archivos con
-// robocopy o cp (y acordarse del `/.` final, o los dotfiles no viajan), sustituir
-// 169 ocurrencias de 21 marcadores en 38 archivos, inicializar OpenSpec y
+// POR QUE EXISTE. Adoptar Projects eran ~30 actos manuales: copiar 76 archivos con
+// robocopy o cp (y acordarse del `/.` final, o los dotfiles no viajan; y de
+// renombrar el README del proyecto, que viaja con otro nombre), sustituir
+// 192 ocurrencias de 21 marcadores en 39 archivos, inicializar OpenSpec y
 // renderizar la constitucion. Nada de eso es una decision: es transcripcion. Y la
 // transcripcion a mano falla de la peor manera —un marcador mal sustituido es
 // sintacticamente valido, asi que el check de marcadores lo deja pasar: "se
@@ -12,8 +13,8 @@
 // reemplazaron" (marco-ci.yml)—.
 //
 // ESOS CUATRO NUMEROS SE MIDEN, no se recuerdan: crecen con cada archivo que
-// entra a plantilla/ y la version anterior de este parrafo decia 23/122/22/15,
-// que fue cierto alguna vez. Desde la raiz del clon del marco:
+// entra a plantilla/ y las versiones anteriores de este parrafo decian 23/122/22/15
+// y 75/169/21/38, que fueron ciertas alguna vez. Desde la raiz del clon del marco:
 //
 //   node --input-type=module -e '
 //   import { archivosDelAndamio, MARCADOR } from "./herramientas/projects-init.mjs";
@@ -217,6 +218,33 @@ export function seExcluyeDelCopiado(rel) {
   const bajo = rel.toLowerCase();
   for (const n of NO_SE_COPIA) if (n.toLowerCase() === bajo) return true;
   return false;
+}
+
+/** Los archivos que viajan CON OTRO NOMBRE: clave = como se llama en el andamio,
+ *  valor = como se llama en el repo nuevo.
+ *
+ *  POR QUE HACE FALTA UN RENOMBRE Y NO ALCANZA CON COPIAR TAL CUAL. En la raiz
+ *  del andamio conviven dos documentos que en el repo nuevo se llamarian igual:
+ *  la guia del bootstrap (README.md, que NO viaja) y el README del PROYECTO. Dos
+ *  archivos no pueden tener el mismo nombre en el mismo directorio, asi que el
+ *  segundo vive como README-del-proyecto.md y se renombra al aterrizar.
+ *
+ *  Y por que el repo nuevo NECESITA un README: es el unico archivo que GitHub
+ *  renderiza en la portada del repositorio, o sea lo primero —y muchas veces lo
+ *  unico— que lee alguien que llega. Sin el, un repo recien nacido se presenta
+ *  con una lista de directorios: nadie puede decir que hace el proyecto, como se
+ *  levanta ni a quien preguntarle, y nada se pone rojo por eso. La ausencia no
+ *  emite ninguna senal, que es exactamente la clase de hueco que este arranque
+ *  existe para cerrar.
+ *
+ *  El renombre es de la RUTA, no del contenido: la sustitucion de marcadores
+ *  corre igual sobre el archivo, y el escaneo de marcadores sobrevivientes lo
+ *  relee por su nombre de DESTINO. */
+export const RENOMBRES = new Map([["README-del-proyecto.md", "README.md"]]);
+
+/** Como se llama `rel` en el repo nuevo. Identidad para casi todo. */
+export function destinoDe(rel) {
+  return RENOMBRES.get(rel) ?? rel;
 }
 
 /** Los 21 valores que un humano tiene que decidir —hoy, uno por cada marcador
@@ -537,10 +565,16 @@ export function instanciar({ raizAndamio, destino, valores }) {
   const nuevos = [];
   const sobreescritos = [];
   const directoriosCreados = [];
-  const estado = () => ({ escritos, nuevos, sobreescritos, directoriosCreados });
+  // `escritos` habla en nombres del ANDAMIO —es lo que se compara contra la
+  // segunda medicion del arbol de origen— y `escritosEnDestino` en nombres del
+  // REPO NUEVO, que es por donde hay que releer los archivos. Para todo lo que
+  // no se renombra son la misma lista; la diferencia existe por RENOMBRES.
+  const escritosEnDestino = [];
+  const estado = () => ({ escritos, escritosEnDestino, nuevos, sobreescritos, directoriosCreados });
   for (const rel of rels) {
+    const relDestino = destinoDe(rel);
     const origen = path.join(raizAndamio, rel);
-    const salida = path.join(destino, rel);
+    const salida = path.join(destino, ...relDestino.split("/"));
     try {
       const texto = fs.readFileSync(origen, "utf8");
       const r = sustituir(texto, valores);
@@ -549,8 +583,11 @@ export function instanciar({ raizAndamio, destino, valores }) {
       crearDirectorios(path.dirname(salida), directoriosCreados);
       const yaEstaba = fs.existsSync(salida);
       fs.writeFileSync(salida, r.salida, "utf8");
-      (yaEstaba ? sobreescritos : nuevos).push(rel);
+      // El rollback y los mensajes de "esto se piso" hablan del DESTINO: borrar
+      // por el nombre del andamio dejaria el archivo renombrado en el repo.
+      (yaEstaba ? sobreescritos : nuevos).push(relDestino);
       escritos.push(rel);
+      escritosEnDestino.push(relDestino);
     } catch (e) {
       // El error se enriquece en vez de envolverse: quien lo atrape necesita el
       // `code` de fs (EACCES, EPERM, ENOSPC) para explicar la causa, y ademas
@@ -630,6 +667,37 @@ export function marcadoresQueSobreviven(destino, rels) {
 /** El nombre del archivo que le queda al proyecto como registro de sus valores.
  *  Lo lee actions/constitucion para renderizar la porcion del marco. */
 export const REGISTRO_DE_VALORES = ".projects-valores.json";
+
+/** Que valores de REQUERIDOS el ANDAMIO no declara en su propio registro.
+ *
+ *  QUE ES EL DESFASE. plantilla/.projects-valores.json llega al repo nuevo con
+ *  una clave por valor apuntando a su propio marcador, asi que la instanciacion
+ *  lo llena sola — pero SOLO las claves que estan escritas. Una clave ausente no
+ *  deja rastro: el valor viaja a los archivos que lo usan y despues no hay donde
+ *  preguntarle "que equipo es el de builders en este repo", ni de donde lo lea
+ *  actions/constitucion para renderizar la porcion del marco.
+ *
+ *  QUIEN LA CORRE, y no es main(). Es un invariante del ANDAMIO —de un archivo
+ *  del marco, no de nada que traiga quien corre la herramienta— asi que lo
+ *  comprueba el banco del marco (pruebas/andamio/tabla-de-valores.test.mjs), que
+ *  es donde el desfase se arregla. En main() seria peor que inutil: un andamio
+ *  MINIMO, con dos archivos y sin registro, es un caso legitimo —los bancos de
+ *  esta herramienta arman varios— y romperle la corrida cambiaria un desfase del
+ *  marco por un rojo sobre alguien que no hizo nada mal.
+ *
+ *  Lo que SI mira main() es el otro lado: avisosDelRegistroDeValores relee el
+ *  archivo del DESTINO ya escrito, y ahi avisa en vez de romper porque el defecto
+ *  puede ser de un archivo que esta herramienta no controla. */
+export function clavesQueElRegistroNoDeclara(raizAndamio) {
+  const abs = path.join(raizAndamio, REGISTRO_DE_VALORES);
+  let guardados;
+  try {
+    guardados = JSON.parse(fs.readFileSync(abs, "utf8"));
+  } catch (e) {
+    return { error: `no pude leer ${REGISTRO_DE_VALORES} del andamio: ${e.message}`, faltan: [] };
+  }
+  return { error: null, faltan: REQUERIDOS.filter((k) => !Object.hasOwn(guardados, k)) };
+}
 
 /** Que valores de REQUERIDOS NO quedan guardados en el registro del proyecto.
  *
@@ -870,8 +938,8 @@ function main(argv) {
   }
 
   // El pin de la bandera se revisa DOS veces con la misma regla: aca, antes de
-  // leer un solo archivo, para que un valor mal formado no cueste 75 archivos
-  // escritos y un destino a medias; y otra vez donde se resuelve, que es lo que
+  // leer un solo archivo, para que un valor mal formado no cueste el andamio
+  // entero escrito y un destino a medias; y otra vez donde se resuelve, que es lo que
   // cubre tambien la rama que lo lee del YAML.
   // La condicion pregunta si la CLAVE existe, no si su valor no es `undefined`.
   // Escrita como `o.versionOpenspec !== undefined` este guard fallaba ABIERTO
@@ -898,8 +966,8 @@ function main(argv) {
 
   // EL OTRO archivo del marco del que esta corrida depende, comprobado ACA y no
   // donde se usa. Solo se comprobaba `plantilla/`; `marco-ci.yml` —de donde sale
-  // el pin de OpenSpec— se leia recien despues de escribir los 75 archivos del
-  // andamio, y sin try/catch: en un clon parcial (sparse checkout, un fork sin
+  // el pin de OpenSpec— se leia recien despues de escribir el andamio entero,
+  // y sin try/catch: en un clon parcial (sparse checkout, un fork sin
   // .github/workflows/, esta herramienta copiada fuera de su arbol) el destino
   // quedaba ESCRITO ENTERO y el proceso moria con un volcado de node:fs. O sea
   // los dos modos de falla que el encabezado de este archivo declara cerrados
@@ -952,7 +1020,14 @@ function main(argv) {
     console.error(`::error::el destino no existe: ${o.destino}. Crea el repo primero y corre esto en su raiz`);
     return 1;
   }
-  const yaTiene = archivosDelAndamio(raizAndamio).filter((r) => fs.existsSync(path.join(o.destino, r)));
+  // La pregunta se hace por el nombre de DESTINO: lo que decide si se pisa
+  // trabajo ajeno es como se va a llamar el archivo en el repo nuevo, no como
+  // se llama en el andamio. Escrita con el nombre de origen, el README del
+  // proyecto —que aterriza como README.md— no aparecia en este censo y se
+  // pisaba sin --forzar el README que ese repo ya tuviera.
+  const yaTiene = archivosDelAndamio(raizAndamio)
+    .map(destinoDe)
+    .filter((r) => fs.existsSync(path.join(o.destino, ...r.split("/"))));
   if (yaTiene.length && !o.forzar) {
     console.error(`::error::el destino ya tiene ${yaTiene.length} archivo(s) del andamio. Se aborta para no sobreescribir trabajo:`);
     for (const r of yaTiene.slice(0, 8)) console.error(`  - ${r}`);
@@ -965,7 +1040,7 @@ function main(argv) {
   //
   // ESTA es la unica rama donde el destino puede quedar a medias, y hasta este
   // cambio era tambien la unica que no lo decia: `instanciar` se llamaba sin
-  // try/catch y `main` tambien, asi que un EACCES en el archivo 40 de 75 salia
+  // try/catch y `main` tambien, asi que un EACCES a mitad de la copia salia
   // como un volcado de `node:fs` con la traza del runtime, stdout vacio y N
   // archivos escritos en un destino que el encabezado de este archivo promete
   // intacto. En Windows no es la rama rara: EPERM por antivirus o por archivo
@@ -1049,7 +1124,7 @@ function main(argv) {
   }
 
   // ── El control que hace verificable el paso ──
-  const sobreviven = marcadoresQueSobreviven(o.destino, r.escritos);
+  const sobreviven = marcadoresQueSobreviven(o.destino, r.escritosEnDestino);
   if (sobreviven.length) {
     console.error(`::error::quedaron ${sobreviven.length} marcador(es) sin sustituir:`);
     for (const s of sobreviven.slice(0, 10)) console.error(`  - ${s.archivo}:${s.linea} ${s.marcador}`);
@@ -1059,15 +1134,21 @@ function main(argv) {
 
   // ── El registro de valores que le queda al proyecto ──
   //
-  // Es AVISO y no rojo a proposito, y es la regla del marco, no una comodidad:
-  // el desfase esta HOY en el andamio y volverlo bloqueante seria estrenarle un
-  // rojo a la unica corrida que existe, la del repo que esta naciendo. Lo medido
-  // al escribir esto: `.projects-valores.json` guarda 15 de los 21, y los seis
-  // que faltan incluyen EQUIPO_BUILDERS y EQUIPO_PO — o sea justo los dos que
-  // CODEOWNERS sustituye. El proyecto queda con un CODEOWNERS que nombra un
-  // equipo y sin ninguna fuente que diga de donde salio ese nombre; y
-  // actions/constitucion, que renderiza desde ese mismo archivo, tampoco puede
-  // citarlos. Cuando el andamio los agregue, este aviso se apaga solo.
+  // El desfase que este aviso nacio para reportar —el ANDAMIO sin declarar una
+  // de las claves— hoy no esta: plantilla/.projects-valores.json declara las de
+  // REQUERIDOS. Pero eso NO lo sostiene main(): ningun camino de esta funcion
+  // lee el registro del andamio. Lo sostiene el banco del marco
+  // (pruebas/andamio/tabla-de-valores.test.mjs, via clavesQueElRegistroNoDeclara),
+  // y el porque esta en el JSDoc de esa funcion: un andamio minimo sin registro
+  // es un caso legitimo y romperle la corrida a quien no hizo nada mal seria
+  // peor que el desfase.
+  // Lo que si mira main() es el otro lado, que aquel banco no puede ver: el
+  // archivo del DESTINO, releido del disco. Ahi el defecto puede no ser del
+  // andamio —un destino preexistente con su propio archivo, una escritura a
+  // medias, un JSON que otro dejo roto— y por eso es AVISO: el repo nuevo
+  // funciona igual (los valores SI viajaron a los archivos que los usan) y
+  // romper una corrida ya escrita por algo que esta herramienta no controla
+  // mandaria a la persona a un callejon.
   for (const linea of avisosDelRegistroDeValores(o.destino)) console.error(linea);
 
   // ── Las dos herramientas que el andamio no puede traer ──
@@ -1130,7 +1211,7 @@ function main(argv) {
     // fail-open que este mismo repo tiene MEDIDO para ese CLI en Windows —
     // plantilla/.claude/skills/projects-archive-change/SKILL.md: "en Windows el
     // CLI MIENTE", imprime exito y hace rollback—. El sintoma de no mirar es el
-    // peor posible: la herramienta imprime LISTO y las seis tareas humanas, el
+    // peor posible: la herramienta imprime LISTO y las tareas humanas, el
     // builder hace el push fundacional, y el primer CI muere en el paso que
     // exige openspec/, con la herramienta ya cerrada y el diagnostico apuntando
     // al pipeline en vez de al arranque. Se comprueba lo mismo que comprueba el
@@ -1238,7 +1319,7 @@ function main(argv) {
   console.log("  haya corrido una vez. Push -> CI verde -> recien ahi el ruleset -> y desde");
   console.log("  ese momento todo por PR.");
   console.log("");
-  console.log("  1. ANTES DEL PRIMER PUSH — `pnpm install`, y es el unico paso que falta:");
+  console.log("  1. ANTES DEL PRIMER PUSH — `pnpm install`:");
   console.log("     El andamio trae los manifiestos con sus rangos, pero NO el lockfile: un");
   console.log("     lockfile no convive con marcadores. El CI corre con --frozen-lockfile, asi");
   console.log("     que sin ese install el primer push muere en el cuarto paso. Corriendolo,");
@@ -1247,9 +1328,20 @@ function main(argv) {
   console.log("     cobertura del andamio, el cableado de vitest.config.base.mjs en cada");
   console.log("     paquete, el proveedor de cobertura, y los scripts que el CI invoca.");
   console.log("");
-  console.log("  2. Proteccion de main: las 4 reglas probadas, no las 8 (.github/proteccion-main.md)");
+  console.log("  2. ANTES DEL PRIMER PUSH — llenar `README.md`:");
+  console.log("     El andamio deja un README con la estructura puesta y los valores ya");
+  console.log("     sustituidos, y con huecos marcados RELLENAR donde van las respuestas");
+  console.log("     que ninguna herramienta puede inventar: que hace el proyecto, su");
+  console.log("     alcance, que dispara cada despliegue, y el runbook de sus alarmas.");
+  console.log("     Es lo unico que GitHub renderiza en la portada del repo, o sea lo");
+  console.log("     primero que lee quien llega — y un README que quedo con los rotulos");
+  console.log("     del andamio no pone nada en rojo: se lee como si el proyecto no");
+  console.log("     tuviera la respuesta. Cuantos quedan lo dice el grep, no esta lista:");
+  console.log("          grep -n RELLENAR README.md");
   console.log("");
-  console.log("  3. Dependabot, y son DOS cosas en DOS lugares distintos:");
+  console.log("  3. Proteccion de main: las 4 reglas probadas, no las 8 (.github/proteccion-main.md)");
+  console.log("");
+  console.log("  4. Dependabot, y son DOS cosas en DOS lugares distintos:");
   console.log("     a) En ESTE repo: Settings -> Advanced Security -> Dependency graph y");
   console.log("        Dependabot security updates. NO se encienden solos en un repo nuevo.");
   console.log("        Sin eso el repo no recibe versiones nuevas del marco NI aparece en su censo.");
@@ -1258,14 +1350,14 @@ function main(argv) {
   console.log("        access), no del repo del marco. Verificar antes de tocar nada:");
   console.log("          gh api orgs/<ORG>/dependabot/repository-access");
   console.log("");
-  console.log("  4. Los handles de CODEOWNERS existen en la org, ESTAN EN SU EQUIPO y tienen escritura");
+  console.log("  5. Los handles de CODEOWNERS existen en la org, ESTAN EN SU EQUIPO y tienen escritura");
   console.log("     Tres formas de que el review cruzado no exista y ningun check lo diga:");
   console.log("     un handle mal escrito, un equipo VACIO, y un equipo sin permiso de escritura");
   console.log("     (GitHub simplemente no asigna a nadie, sin aviso). Y el permiso se le");
   console.log("     pregunta al REPO, no a la org: el endpoint de la org informa el default.");
   console.log("          gh api repos/<ORG>/<REPO>/teams --jq '.[] | \"\\(.slug): \\(.permission)\"'");
   console.log("");
-  console.log("  5. El issue macro en el Project del area, y las SEIS labels `area:*`, que no");
+  console.log("  6. El issue macro en el Project del area, y las SEIS labels `area:*`, que no");
   console.log("     se heredan de ningun molde — un repo nuevo nace sin ninguna:");
   console.log('          gh label create "area:backend"   --color 0052CC --description "Area: backend"');
   console.log('          gh label create "area:ci-cd"     --color 006B75 --description "Area: ci-cd"');
@@ -1274,7 +1366,7 @@ function main(argv) {
   console.log('          gh label create "area:infra"     --color 5319E7 --description "Area: infra"');
   console.log('          gh label create "area:seguridad" --color B60205 --description "Area: seguridad"');
   console.log("");
-  console.log("  6. Los secrets, que son DOS y ninguno gatea el pipeline:");
+  console.log("  7. Los secrets, que son DOS y ninguno gatea el pipeline:");
   console.log("     CLAUDE_CODE_OAUTH_TOKEN (para que el bot conteste; `claude setup-token`)");
   console.log("     TOKEN_ACTUALIZAR_MARCO   (OPCIONAL: sin el, el PR semanal del marco nace");
   console.log("                               sin checks y el propio workflow lo avisa)");
