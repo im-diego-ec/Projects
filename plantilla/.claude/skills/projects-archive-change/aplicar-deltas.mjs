@@ -53,7 +53,6 @@ const args = process.argv.slice(2);
 const SIMULACRO = args.includes("--simulacro");
 const CHANGE = args.find((a) => !a.startsWith("--"));
 
-
 // ---------------------------------------------------------------------------
 // LOS TRES MODOS PORTABLES, y por que existen.
 //
@@ -192,10 +191,16 @@ if (args.includes("--pin-openspec")) {
   let dentro = false;
   let pin = null;
   for (const linea of lineas) {
-    if (/^\s*version_openspec:\s*$/.test(linea)) { dentro = true; continue; }
+    if (/^\s*version_openspec:\s*$/.test(linea)) {
+      dentro = true;
+      continue;
+    }
     if (!dentro) continue;
     const m = linea.match(/^\s*default:\s*"?([0-9]+\.[0-9]+\.[0-9]+)"?\s*$/);
-    if (m) { pin = m[1]; break; }
+    if (m) {
+      pin = m[1];
+      break;
+    }
     // Otro input empezo: el default que buscabamos no estaba.
     if (/^\s{6}[a-z_]+:\s*$/.test(linea)) break;
   }
@@ -278,11 +283,15 @@ if (args.includes("--mover")) {
   const i = args.indexOf("--mover");
   const DESTINO = args[i + 1];
   if (!DESTINO || DESTINO.startsWith("--")) {
-    console.error("uso: node aplicar-deltas.mjs <nombre-del-change> --mover <destino> [--simulacro]");
+    console.error(
+      "uso: node aplicar-deltas.mjs <nombre-del-change> --mover <destino> [--simulacro]"
+    );
     process.exit(2);
   }
   if (!CHANGE) {
-    console.error("uso: node aplicar-deltas.mjs <nombre-del-change> --mover <destino> [--simulacro]");
+    console.error(
+      "uso: node aplicar-deltas.mjs <nombre-del-change> --mover <destino> [--simulacro]"
+    );
     process.exit(2);
   }
   // Este es el paso que de verdad mueve la carpeta: la guarda va ANTES del
@@ -292,7 +301,9 @@ if (args.includes("--mover")) {
   const origen = `${CHANGES.replace(/\\/g, "/").replace(/\/+$/, "")}/${CHANGE}`;
   const { rc, salida } = git("ls-files", "--", origen);
   if (rc !== 0) {
-    console.error(`::error::git ls-files salio ${rc} sobre "${origen}": no se pudo listar que archivos mover.`);
+    console.error(
+      `::error::git ls-files salio ${rc} sobre "${origen}": no se pudo listar que archivos mover.`
+    );
     process.exit(1);
   }
   const archivos = salida.split(/\r?\n/).filter(Boolean);

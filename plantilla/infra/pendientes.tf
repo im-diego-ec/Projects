@@ -1,5 +1,17 @@
 # PENDIENTES DE DECISIÓN — ambiente de DESARROLLO de {{PROYECTO}}
 #
+# ANTES QUE TODO: ESTOS SEIS PENDIENTES SON DEL ADAPTADOR `aws`. El marco ya no
+# fija la nube — fija cuatro capacidades (dónde corre la API, dónde vive la base,
+# cómo se resuelven los secretos en el arranque de cada tarea, y cómo se despliega
+# y se verifica lo desplegado) y deja que el proyecto elija quién se las da. Las
+# cinco plataformas admitidas, con su plan gratuito medido, están en
+# `adaptadores.md`, al lado de este archivo.
+#
+# Si la plataforma de este proyecto NO es `aws`, no se resuelve ninguno de estos
+# seis: se borra este directorio entero junto con `../infra-prod/`, y lo que hay
+# que contestar son los pendientes del adaptador elegido. El CI no exige raíces de
+# Terraform que no existan.
+#
 # Este archivo es solo comentarios: no declara nada y Terraform lo parsea sin
 # efecto. Existe para que lo que falta decidir esté escrito donde se decide, y
 # para que el agente lo lea en cada sesión. Cuando resolvés un pendiente, borrás

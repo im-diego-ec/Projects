@@ -1,5 +1,9 @@
 # Raíz de Terraform del ambiente de DESARROLLO de {{PROYECTO}}.
 #
+# ES EL ADAPTADOR `aws`, no «la infraestructura del marco». El marco fija cuatro
+# capacidades y el proyecto elige quién se las da: ver `adaptadores.md`. Si la
+# plataforma no es `aws`, este archivo se borra con el resto del directorio.
+#
 # Lo que hay acá es lo que se DERIVA de los valores del proyecto y no requiere
 # ninguna decisión: el backend del state, el proveedor, y la referencia a la base
 # compartida del área. Lo que sí requiere decidir vive en `pendientes.tf`, con su

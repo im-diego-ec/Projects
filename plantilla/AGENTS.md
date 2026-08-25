@@ -83,14 +83,44 @@ más al conteo.)
 | Datos                       | **PostgreSQL** vía **Prisma**                                         |
 | Auth                        | **Clerk** (componentes en el front; JWT verificado offline en el API) |
 | Validación de input externo | **Zod**                                                               |
-| Infra                       | **AWS** + **Terraform** (IaC; `infra/` dev, `infra-prod/` producción) |
+| Plataforma                  | **La elige el proyecto**; nace en `aws` — ver `infra/adaptadores.md`  |
 | CI/CD                       | **GitHub Actions** (promoción por ambientes, workflows del marco)     |
 | Package manager             | **pnpm** con workspaces (monorepo: web, api, e2e)                     |
 | Tests                       | **Vitest** (unit/integración) + **Playwright** (E2E contra dev)       |
 
-Ninguna de estas filas es elección del proyecto: las fija el área y el andamio las entrega
-implementadas. Lo que el proyecto decide es lo que viene ENCIMA — sus modelos, sus
-endpoints, sus pantallas.
+Salvo la fila **Plataforma**, ninguna de estas filas es elección del proyecto: las fija el
+área y el andamio las entrega implementadas. Lo que el proyecto decide es lo que viene
+ENCIMA — sus modelos, sus endpoints, sus pantallas.
+
+**La plataforma SÍ la elige el proyecto, y es la decisión de más impacto en el costo.** El
+marco fija cuatro capacidades —dónde corre la API, dónde vive la base, cómo se resuelven
+los secretos en el arranque de cada tarea, y cómo se despliega y se verifica lo desplegado—
+y no fija el producto que las da. Los valores admitidos son `supabase`, `cloudflare`,
+`gcp`, `aws` y `ninguna`; qué cubre cada uno, qué cuesta y qué límite tiene su plan
+gratuito está en `infra/adaptadores.md`.
+
+**Este repositorio nace declarando `aws`**, y eso es una descripción y no un consejo: es la
+única plataforma que el andamio reparte ya escrita, en `infra/` e `infra-prod/`. Su plan
+gratuito es una promoción con fecha de vencimiento, así que si el objetivo es coste cero,
+el adaptador se lee **antes** de quedarse con ésta.
+
+**`ninguna` es una respuesta legítima**, no un hueco: un proyecto que todavía no despliega
+no elige una nube para llenar la fila. Pero elegirla **es trabajo, no omisión**: hoy
+ninguna herramienta reparte el andamio según esta clave, así que las dos raíces de
+Terraform llegan igual y hay que sacarlas a mano. Son cuatro pasos, en este orden:
+
+1. borrar `infra/` e `infra-prod/` enteros, después de mover `infra/adaptadores.md` a la
+   raíz del repositorio — es lo único de ahí que sigue valiendo sin Terraform;
+2. borrar del `.github/dependabot.yml` las dos entradas del ecosistema `terraform`, que si
+   no van a abrir PRs para actualizar un provider que ya nadie usa;
+3. borrar el paso «Formato y validez de las raíces de Terraform» de
+   `.github/workflows/ci.yml` (opcional: sin las raíces ese paso ya sale verde solo, y
+   dejarlo puesto es lo que hace barato volver a Terraform el día que haga falta);
+4. poner `"plataforma": "ninguna"` en `.projects-valores.json`.
+
+Hasta que el paso 1 esté hecho, **el job de Terraform del CI sigue exigiendo el binario**:
+decide mirando si los directorios existen, no la clave. Una vez borrados lo dice con un
+`::notice::` y sale verde, y ya no hay ninguna ventana de gracia que pueda vencer.
 
 Los nombres de la fila **Package manager** son DIRECTORIOS y están escritos literales a
 propósito: `projects init` copia las rutas tal cual y solo sustituye el contenido de los

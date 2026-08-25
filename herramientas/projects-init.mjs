@@ -123,9 +123,20 @@ const ESTE_DIRECTORIO = path.dirname(ESTE_ARCHIVO);
 // ─────────────────────────── El piso de Node ───────────────────────────
 
 /** ESTA es la unica pieza del marco que corre en la maquina de una persona y no
- *  en un runner. El runner esta pinado en Node 22; la laptop de quien adopta el
- *  marco no la pina nadie, y en Windows lo habitual es un Node instalado hace
- *  tiempo con el MSI. Por eso el piso se verifica en vez de suponerse.
+ *  en un runner. El runner esta pinado en la LTS vigente (hoy Node 24, la misma
+ *  que fija el `node-version` del ci.yml del andamio y el FROM de su
+ *  api/Dockerfile); la laptop de quien adopta el marco no la pina nadie, y en
+ *  Windows lo habitual es un Node instalado hace tiempo con el MSI. Por eso el
+ *  piso se verifica en vez de suponerse.
+ *
+ *  Y SON DOS PISOS DISTINTOS, que conviene no confundir. El de aca es el que
+ *  necesita ESTA herramienta para copiar el andamio sin perder archivos, y por
+ *  eso es bajo a proposito. El que necesita el REPO QUE SALE de la copia es mas
+ *  alto y no lo decide este archivo: lo declaran las dependencias del andamio
+ *  (hoy la mas exigente es jsdom, que pide `^22.22.2 || ^24.15.0 || >=26.0.0`),
+ *  y quien se quede corto se entera en su `pnpm install`, no aca. Copiar
+ *  archivos y poder instalarlos son dos cosas distintas: mezclarlas haria que
+ *  esta herramienta se niegue a escribir en maquinas donde escribir funciona.
  *
  *  POR QUE 18.17.0 ES EL PISO DURO. Las dos funciones que recorren arboles usan
  *  `readdirSync(..., { recursive: true })`, y esa opcion llego en 18.17. En un
@@ -1319,11 +1330,16 @@ function main(argv) {
   console.log("  haya corrido una vez. Push -> CI verde -> recien ahi el ruleset -> y desde");
   console.log("  ese momento todo por PR.");
   console.log("");
-  console.log("  1. ANTES DEL PRIMER PUSH — `pnpm install`:");
+  console.log("  1. ANTES DEL PRIMER PUSH — `pnpm install && pnpm format`:");
   console.log("     El andamio trae los manifiestos con sus rangos, pero NO el lockfile: un");
   console.log("     lockfile no convive con marcadores. El CI corre con --frozen-lockfile, asi");
   console.log("     que sin ese install el primer push muere en el cuarto paso. Corriendolo,");
   console.log("     el lockfile entra al commit fundacional y queda versionado.");
+  console.log("     El `format` va pegado y no es cosmetico: al sustituir los marcadores");
+  console.log("     cambian los anchos del texto, y el formateador alinea las tablas de");
+  console.log("     markdown por ancho — asi que el README nace desalineado y `pnpm");
+  console.log("     verificar` sale rojo en el primer intento por una razon que no es tuya.");
+  console.log("     Una pasada lo deja en verde y no vuelve a pasar.");
   console.log("     Lo que YA viene hecho y antes habia que pegar a mano: los excluidos de");
   console.log("     cobertura del andamio, el cableado de vitest.config.base.mjs en cada");
   console.log("     paquete, el proveedor de cobertura, y los scripts que el CI invoca.");

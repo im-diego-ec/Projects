@@ -37,3 +37,15 @@ openspec/changes/archive
 # projects-archive-change/) y esos SI se formatean y SI se revisan.
 .claude/commands/opsx
 .claude/skills/openspec-*
+
+# LO REESCRIBE pnpm, NO ESTE REPO. `pnpm install` con pnpm 11 anota aqui los
+# paquetes con script de instalacion aprobado y las versiones demasiado nuevas
+# para su ventana de espera, y lo hace en SU estilo de comillas. Medido en un
+# repo recien nacido: el archivo pasa de 63 a 81 lineas y `pnpm format:check`
+# queda rojo antes de que nadie haya escrito una linea de codigo.
+#
+# Formatearlo no arregla nada: el siguiente `pnpm install` devuelve el diff.
+# Es el mismo criterio que `.projects/` y que el andamio de OpenSpec — un
+# archivo que otra herramienta posee y reescribe no lo policia el formateador
+# de este repo.
+pnpm-workspace.yaml

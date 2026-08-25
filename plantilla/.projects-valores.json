@@ -1,5 +1,6 @@
 {
   "superficies": ["claude-code", "cursor"],
+  "plataforma": "aws",
   "PROYECTO": "{{PROYECTO}}",
   "ORG": "{{ORG}}",
   "PAQUETE_API": "{{PAQUETE_API}}",

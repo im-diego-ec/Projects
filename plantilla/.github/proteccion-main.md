@@ -70,7 +70,7 @@ caro y más silencioso de la configuración inicial.
 5. **Reglas que NO se marcan todavía**, y son exactamente las de la segunda
    tabla: `Require signed commits`, `Required approvals: 1`,
    `Require review from Code Owners` y `Require branches to be up to date before
-   merging`. Marcarlas ahora es el auto-encierro que advierte la nota ⚠️ de más
+merging`. Marcarlas ahora es el auto-encierro que advierte la nota ⚠️ de más
    arriba — no es una omisión de esta lista, es su punto.
 6. **Bypass list: vacía.**
 7. Actualizar la tabla de estado real en el mismo PR.

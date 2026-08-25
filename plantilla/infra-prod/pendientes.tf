@@ -1,5 +1,11 @@
 # PENDIENTES DE DECISIÓN — ambiente de PRODUCCIÓN de {{PROYECTO}}
 #
+# ANTES QUE TODO: ESTOS SIETE PENDIENTES SON DEL ADAPTADOR `aws`. El marco fija
+# cuatro capacidades y no una nube; las cinco plataformas admitidas, con su plan
+# gratuito medido, están en `../infra/adaptadores.md`. Si la plataforma de este
+# proyecto no es `aws`, este directorio se borra entero y lo que hay que contestar
+# son los pendientes del adaptador elegido.
+#
 # Solo comentarios: no declara nada. Existe para que lo que falta decidir esté
 # escrito donde se decide. Resuelto un pendiente, se borra su sección y lo
 # decidido se escribe en un archivo propio. Sin pendientes, este archivo se borra.

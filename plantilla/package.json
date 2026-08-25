@@ -1,7 +1,7 @@
 {
   "name": "{{PROYECTO}}",
   "private": true,
-  "packageManager": "pnpm@9.15.0",
+  "packageManager": "pnpm@11.23.0",
   "scripts": {
     "dev": "pnpm --parallel -r dev",
     "lint": "eslint . --max-warnings=0",
@@ -15,17 +15,33 @@
     "e2e": "pnpm -C e2e run test"
   },
   "devDependencies": {
-    "@eslint/js": "^9.17.0",
-    "@tanstack/eslint-plugin-query": "^5.62.1",
-    "eslint": "^9.17.0",
-    "eslint-config-prettier": "^9.1.0",
-    "eslint-plugin-react-hooks": "^5.1.0",
-    "eslint-plugin-react-refresh": "^0.5.3",
-    "globals": "^15.14.0",
-    "prettier": "^3.4.2",
-    "typescript-eslint": "^8.19.0"
+    "@eslint/js": "^10.0.1",
+    "@tanstack/eslint-plugin-query": "^5.102.3",
+    "eslint": "^10.9.1",
+    "eslint-config-prettier": "^10.1.8",
+    "eslint-plugin-react-hooks": "^7.1.1",
+    "eslint-plugin-react-refresh": "^0.5.4",
+    "globals": "^17.11.0",
+    "prettier": "^3.9.6",
+    "typescript-eslint": "^8.68.0"
   },
   "projects": {
+    "stack": {
+      "desvios": [
+        {
+          "paquete": "typescript",
+          "fijado_en": "^6.0.3",
+          "ultima_estable_al_fijarlo": "7.0.2",
+          "motivo": "TypeScript 7 es el compilador nativo en Go y DEJA DE EXPONER la API de compilador en JavaScript, que es de lo que viven las reglas type-checked (politica 1 de eslint.config.mjs). Medido contra el paquete publicado: en 7.0.2 el mapa de exports ya no tiene lib/typescript.js, `import(\"typescript\")` devuelve solo { version, versionMajorMinor } —no hay createProgram— e importar @typescript-eslint/typescript-estree con ese typescript instalado revienta con \"Cannot read properties of undefined (reading 'Cjs')\". typescript-eslint 8.68.0 lo declara ademas en su peer: typescript >=4.8.4 <6.1.0. Apagar las reglas type-checked para poder subir el numero seria cambiar una compuerta real por una version nueva. 6.0.3 SI es un salto de mayor (venia de 5.7.3), es estable y es la ultima que typescript-eslint soporta hoy. Se vuelve a mirar cuando typescript-eslint publique soporte de TypeScript 7."
+        }
+      ],
+      "notas": [
+        {
+          "tema": "pnpm 11 y los scripts de instalacion",
+          "detalle": "Desde la mayor 10 pnpm BLOQUEA por defecto los scripts de instalacion de las dependencias, y desde la 11 la lista de permitidos se llama `allowBuilds` y SOLO se lee de pnpm-workspace.yaml: el campo `pnpm` de ESTE archivo ya no se mira. Medido con pnpm 11.23.0: declarar el permiso en `pnpm.onlyBuiltDependencies` de package.json deja el install en 1 y avisa \"The 'pnpm' field in package.json is no longer read by pnpm\"; declararlo en `allowBuilds` de pnpm-workspace.yaml lo deja en 0. Por eso la lista vive alla y no aca: son los cuatro paquetes que ERR_PNPM_IGNORED_BUILDS nombra (@clerk/shared, @prisma/engines, esbuild y prisma), con su motivo escrito al lado en ese archivo. Esta nota queda en package.json porque la trampa es de package.json: quien vaya a agregar el permiso lo va a buscar primero aca."
+        }
+      ]
+    },
     "cobertura": {
       "excluidos": [
         {

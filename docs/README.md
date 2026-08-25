@@ -18,6 +18,8 @@
 
 | Documento | Qué es | Cómo evoluciona |
 |---|---|---|
+| [empezar-sin-ser-tecnico.md](empezar-sin-ser-tecnico.md) | La puerta de entrada de **quien no es técnico** —un BA, un PO que recién llega, quien tenga que decidir si esto se adopta—: qué es el marco y por qué existe, qué te da y qué te exige, cuánto cuesta, qué decisiones te va a pedir y qué pasa si el equipo es una sola persona | **Canónico** — se actualiza cuando cambia lo que el marco fija o lo que le pide a una persona. Un banco exige dos cosas: que cada palabra del [glosario](glosario.md) que use esté enlazada ahí mismo, y que no aparezca jerga de oficio que el glosario no define —«pipeline», «check», «deploy»—, que es por donde se colaba antes |
+| [stack.md](stack.md) | **El stack en un solo sitio**: qué fija el marco y por qué, qué trae el andamio implementado, qué elige el proyecto, y en qué archivo vive la versión de cada pieza. No escribe un solo número: los deriva de los manifiestos con `node pruebas/docs/versiones.mjs` | **Canónico** — la prosa se actualiza cuando cambia una decisión, no cuando cambia una versión. `pruebas/docs/stack.test.mjs` se pone rojo si una fila apunta a un archivo o a una clave que ya nadie declara, si alguien escribe un número a mano en la página, o si la página y la constitución del andamio (`plantilla/AGENTS.md`, que es la que viaja) dejan de decir lo mismo sobre el stack |
 | [para-el-po.md](para-el-po.md) | La puerta del **PO**: qué es el marco sin jerga, qué rutas aprueba —con las de `CODEOWNERS` textuales—, cómo se lee un spec real línea por línea, qué significa «bloqueado» y las cuatro preguntas con las que se devuelve un change | **Canónico** — se actualiza cuando `CODEOWNERS` cambia lo que el PO aprueba, o cuando la protección de `main` enciende una de sus reglas diferidas |
 | [glosario.md](glosario.md) | Las palabras propias del marco —andamio, carril, compuerta, delta, fail-open, censo, pin, capability, veredicto agregado— en una línea cada una, con el archivo que manda sobre cada una | **Canónico** — se agrega una fila cuando una palabra del marco empieza a usarse sin definirse; si una fila y el archivo de su tercera columna difieren, manda el archivo y la fila se corrige |
 | [adr/](adr/) | Decisiones estructurales del marco: cómo se especifica, cómo se promueve a producción, cómo se verifica un deploy | **Canónico** — viven solo acá; los proyectos las referencian, no las copian |
@@ -35,6 +37,10 @@
 
 ## Por dónde empezar
 
+- **No sos técnico y querés entender qué es esto**:
+  [empezar-sin-ser-tecnico.md](empezar-sin-ser-tecnico.md). Es la página de
+  antes de todas las demás: no supone nada, contesta cuánto cuesta y qué te va a
+  pedir, y de ahí salen los dos caminos —el del PO y el de arrancar un proyecto—.
 - **Sos el PO**: [para-el-po.md](para-el-po.md), y nada más. Es una página, no
   supone que escribas código, y trae las rutas que aprobás y las preguntas con
   las que se rechaza un change. El resto de esta carpeta es de ingeniería.
@@ -45,6 +51,9 @@
   de punta a punta. Los [ADRs](adr/) explican por qué el sistema es así; esa
   página te deja el repo verde. (Decía «los ADRs y de ahí a las plantillas, que
   se copian» — consejo de antes de que existiera `projects init`.)
+- **Queriendo saber con qué corre esto**: [stack.md](stack.md) — qué pieza usa
+  cada capa, quién la decide y dónde vive su versión. Es también la página que
+  contesta «¿esto me obliga a pagar algo?».
 - **Con un incidente en curso**: no es acá. Los runbooks del proyecto viven
   en su propio repo, porque hablan de recursos concretos; acá está la
   plantilla con la que se escribieron.

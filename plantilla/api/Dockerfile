@@ -30,7 +30,22 @@
 # `pnpm install` y el `prisma generate` de mas abajo pasan por qemu y tardan
 # bastante mas que sin --platform. Es el precio de que la imagen salga igual
 # desde cualquier maquina.
-FROM --platform=linux/amd64 node:22-slim
+#
+# LA MAYOR DE NODE ES LA LTS VIGENTE, y el andamio la declara en CUATRO lugares
+# que son UNA SOLA decision: esta linea y los tres `node-version` de
+# .github/workflows/ (dos en ci.yml, uno en actualizar-marco.yml). Hoy la LTS es
+# la 24 (Krypton). Cuando entre la siguiente, los cuatro se mueven en el MISMO
+# commit — una imagen que corre en otra mayor que el CI convierte un rojo del PR
+# en una sorpresa del despliegue, y un workflow que se queda atras corre en una
+# mayor que ningun otro ejercita.
+#
+# EL PISO DE herramientas/projects-init.mjs NO ES EL QUINTO, y confundirlo sale
+# caro en las dos direcciones. Ese numero es el minimo que necesita la
+# herramienta que COPIA el andamio para no perder archivos, corriendo en la
+# laptop de quien adopta el marco: es bajo a proposito y no sube con la LTS.
+# Subirlo con estos cuatro haria que la copia se niegue a correr en maquinas
+# donde copiar funciona perfectamente.
+FROM --platform=linux/amd64 node:24-slim
 WORKDIR /app
 
 # openssl: el motor de consultas de Prisma lo usa para detectar libssl; sin el
@@ -147,7 +162,7 @@ CMD ["pnpm", "start"]
 #
 #   docker build -f api/Dockerfile -t {{PROYECTO}}-api .
 #   docker run --rm {{PROYECTO}}-api id -un                        # node
-#   docker run --rm {{PROYECTO}}-api pnpm --version                # 9.15.0
+#   docker run --rm {{PROYECTO}}-api pnpm --version                # 11.23.0
 #   docker image inspect {{PROYECTO}}-api | grep '"Architecture"'  # amd64
 #
 # Y los dos que cierran lo que este archivo AFIRMA pero no midio:

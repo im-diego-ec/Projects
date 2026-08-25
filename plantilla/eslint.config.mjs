@@ -30,6 +30,14 @@ export default tseslint.config(
     ignores: [
       "**/dist/**",
       "**/node_modules/**",
+      // El reporte HTML de cobertura que escribe el propio `pnpm test`
+      // (reportsDirectory: "coverage" en vitest.config.base.mjs). Sin esta
+      // linea, `pnpm verificar` corrido DOS VECES en la misma maquina no lintea
+      // lo mismo: la primera pasada mide el fuente del proyecto y la segunda le
+      // suma seis archivos JS que genero la pasada anterior
+      // (coverage/lcov-report/{block-navigation,prettify,sorter}.js por
+      // paquete). Ya esta en .gitignore; el linter tambien tiene que saberlo.
+      "**/coverage/**",
       "**/*.config.js",
       "**/*.config.mjs",
       "**/*.config.ts",
@@ -201,11 +209,16 @@ export default tseslint.config(
   //
   // EL ALCANCE ES PROPIO, NO HEREDADO. Se acota con `files` al fuente de la
   // interfaz y NO se apoya en la lista global de `ignores` de arriba: un repo
-  // puede haberla recortado (un consumidor borro "**/*.config.js")
-  // y entonces estas reglas morderian la configuracion de estilos, que es el
-  // UNICO lugar legitimo donde los valores de marca se escriben. Que esos
-  // valores COINCIDAN con los del sistema no lo puede ver un linter: eso lo
-  // verifica la revision de artefactos.
+  // puede haberla recortado (un consumidor borro "**/*.config.js") y estas
+  // reglas no tienen por que depender de eso para no morder donde no deben.
+  //
+  // Y DESDE TAILWIND 4 EL LUGAR DONDE LOS VALORES DE MARCA SE ESCRIBEN NO ES UN
+  // ARCHIVO DE CONFIGURACION SINO LA HOJA DE ESTILOS: el bloque `@theme` de
+  // {{PAQUETE_WEB}}/src/index.css. Eso saca ese archivo del alcance de este
+  // linter por construccion —ESLint no analiza CSS— en vez de por una linea de
+  // `ignores` que alguien puede borrar. Que esos valores COINCIDAN con los del
+  // sistema sigue sin poder verlo un linter: eso lo verifica la revision de
+  // artefactos.
   //
   // LIMITES DECLARADOS, y conviene leerlos antes de confiar:
   //   - El nombre de la clase del acento lo elige el proyecto. Aca se reconocen
@@ -242,7 +255,7 @@ export default tseslint.config(
         {
           selector: String.raw`Literal[value=/#(?:[0-9a-fA-F]{3,4}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})\b/]`,
           message:
-            "Color escrito a mano. Los colores vienen de los tokens del sistema (clase o variable). El unico lugar donde se escribe un hex es la configuracion de estilos.",
+            "Color escrito a mano. Los colores vienen de los tokens del sistema (clase o variable). El unico lugar donde se escribe un hex es el bloque @theme de src/index.css.",
         },
         {
           selector: String.raw`TemplateElement[value.raw=/#(?:[0-9a-fA-F]{3,4}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})\b/]`,
