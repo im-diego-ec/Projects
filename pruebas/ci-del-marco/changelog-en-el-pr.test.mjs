@@ -107,13 +107,32 @@ test("un PR que cambia el marco y SI toca el CHANGELOG es verde", () => {
 test("las cuatro superficies que viajan al consumidor disparan la exigencia", () => {
   for (const rel of [
     "actions/x/action.yml",
-    ".github/workflows/x.yml",
+    ".github/workflows/marco-ci.yml",
     "plantilla/x.json",
     "herramientas/x.mjs",
   ]) {
     conRepo([rel], {}, (repo) => {
       const { exit, salida } = correr(repo);
       assert.equal(exit, 1, `${rel} tenia que exigir CHANGELOG:\n${salida}`);
+    });
+  }
+});
+
+// De `.github/workflows/` viaja UNO solo. Los otros tres son el CI del marco sobre
+// si mismo, su bot y su aviso de release: nadie los hereda, asi que exigirles
+// CHANGELOG ponia en rojo permanente cada bump de Dependabot sobre ellos — y
+// Dependabot no escribe entradas de changelog nunca. Este caso es el que separa
+// las dos cosas; sin el, alguien "simplifica" la superficie de vuelta al
+// directorio entero y el rojo permanente vuelve sin que nada lo diga.
+test("los workflows del marco que NADIE hereda no exigen CHANGELOG", () => {
+  for (const rel of [
+    ".github/workflows/ci.yml",
+    ".github/workflows/claude.yml",
+    ".github/workflows/aviso-version.yml",
+  ]) {
+    conRepo([rel], {}, (repo) => {
+      const { exit, salida } = correr(repo);
+      assert.equal(exit, 0, `${rel} no viaja a ningun consumidor y no tenia que exigir CHANGELOG:\n${salida}`);
     });
   }
 });

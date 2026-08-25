@@ -845,7 +845,17 @@ jobs:
           # quedan fuera a proposito: no viajan por el carril referenciado, asi que un
           # PR que solo toca documentacion o especificacion no le mueve el piso a
           # nadie. `pruebas/` tambien: es el banco del marco, no lo que se distribuye.
-          SUPERFICIES="actions .github/workflows plantilla herramientas"
+          #
+          # DE `.github/workflows/` VIAJA UNO SOLO, y la distincion no es un matiz:
+          # marco-ci.yml es el reusable que los consumidores invocan con `uses:`. Los
+          # otros tres son el CI del marco sobre si mismo (ci.yml), su bot (claude.yml)
+          # y su aviso de release (aviso-version.yml): nadie los hereda. Con el
+          # directorio entero en la lista, CADA bump de Dependabot sobre esos tres
+          # nacia en ROJO PERMANENTE por un CHANGELOG que Dependabot no escribe nunca,
+          # y una regla que garantiza rojo en una clase entera de PRs ensena a ignorar
+          # el rojo — justo lo que el comentario de arriba dice que hay que evitar. El
+          # andamio no necesita excepcion: sus workflows viajan y los cubre `plantilla`.
+          SUPERFICIES="actions .github/workflows/marco-ci.yml plantilla herramientas"
 
           if ! git cat-file -e "${BASE}^{commit}" 2>/dev/null; then
             echo "::error::no pude resolver el commit base del PR (${BASE}). Sin el no hay diff que mirar, y este check NO se declara verde por no haber podido medir. Arreglo: el checkout de este job necesita fetch-depth: 0"
@@ -863,7 +873,9 @@ jobs:
 
           TOCA_MARCO=""
           for s in ${SUPERFICIES}; do
-            if echo "${CAMBIADOS}" | grep -qE "^${s}/"; then
+            # El ancla acepta las dos formas: un directorio (`actions/...`) y un
+            # archivo suelto (`.github/workflows/marco-ci.yml`).
+            if echo "${CAMBIADOS}" | grep -qE "^${s}(/|\$)"; then
               TOCA_MARCO="${TOCA_MARCO} ${s}"
             fi
           done
