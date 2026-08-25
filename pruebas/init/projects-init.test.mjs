@@ -39,6 +39,8 @@ import {
   ejecutorDeScripts,
   entornoDelArranque,
   correrPaso,
+  necesitaShimDePnpm,
+  materializarShimDePnpm,
   lineasDelResumen,
 } from "../../herramientas/projects-init.mjs";
 
@@ -1746,4 +1748,92 @@ test("la herramienta corre igual invocada por una ruta con un enlace simbolico",
   fs.copyFileSync(HERRAMIENTA, copia);
   const salida = execFileSync(process.execPath, [copia, "--help"], { encoding: "utf8" });
   assert.match(salida, /^uso: node herramientas\/projects-init\.mjs/m, "salio sin imprimir nada: el guard no reconocio su propia invocacion");
+});
+
+// ---------------------------------------------------------------------------
+// El shim de pnpm del arranque.
+//
+// EL DEFECTO QUE ESTE BLOQUE VIGILA, medido el 2026-08-25 en un runner limpio:
+// el paso 1 (`corepack pnpm install`) pasaba y el 2 moria con `sh: pnpm: not
+// found`. Los scripts del andamio se llaman entre si con `pnpm` PELADO, que es
+// lo idiomatico de un workspace y no se va a cambiar. En la maquina de quien
+// escribe el codigo hay un pnpm global y el defecto NO SE VE: el unico lugar
+// donde aparece es la maquina limpia, que es justo la que corepack existe para
+// cubrir. De ahi que esto se pruebe y no se confie a que alguien lo recuerde.
+// ---------------------------------------------------------------------------
+
+test("necesitaShimDePnpm: solo con corepack Y sin un pnpm que corra", () => {
+  const corepack = { comando: "corepack", prefijo: ["pnpm"], nombre: "corepack pnpm" };
+  const pnpmSuelto = { comando: "pnpm", prefijo: [], nombre: "pnpm" };
+
+  assert.equal(necesitaShimDePnpm(corepack, (c) => c !== "pnpm"), true, "corepack sin pnpm en el PATH es EXACTAMENTE el caso que rompia");
+  assert.equal(necesitaShimDePnpm(corepack, () => true), false, "si ya hay un pnpm que corre, materializar otro shim es ruido");
+  assert.equal(necesitaShimDePnpm(pnpmSuelto, () => true), false, "si el ejecutor YA es pnpm, el binario esta por definicion");
+  assert.equal(necesitaShimDePnpm(null, () => false), false, "sin ejecutor no hay arranque, y menos shim");
+});
+
+test("entornoDelArranque: el shim va ADELANTE del PATH, y sin shim el PATH no se toca", () => {
+  const sin = entornoDelArranque({ PATH: "/usr/bin" });
+  assert.equal(sin.PATH, "/usr/bin", "sin directorio de shims el PATH tiene que quedar igual");
+  assert.equal(sin.COREPACK_ENABLE_DOWNLOAD_PROMPT, "0", "y la variable que evita que corepack pregunte sigue puesta");
+
+  const con = entornoDelArranque({ PATH: "/usr/bin" }, "/tmp/shims");
+  assert.equal(con.PATH, `/tmp/shims${path.delimiter}/usr/bin`, "el shim tiene que ganarle al PATH heredado, no ir al final");
+
+  const vacio = entornoDelArranque({ PATH: "" }, "/tmp/shims");
+  assert.equal(vacio.PATH, "/tmp/shims", "con PATH vacio no se cuelga un delimitador huerfano");
+});
+
+test("entornoDelArranque: en Windows la variable se llama Path y NO se duplica", () => {
+  // Node preserva la capitalizacion original de las claves de env. Agregar una
+  // segunda clave "PATH" junto a la "Path" que ya estaba deja DOS, y cual gana
+  // en el proceso hijo no esta definido. Por eso se reusa la que ya existia.
+  const r = entornoDelArranque({ Path: "C:\\Windows", OTRA: "x" }, "C:\\shims");
+  const claves = Object.keys(r).filter((k) => k.toUpperCase() === "PATH");
+  assert.deepEqual(claves, ["Path"], `tiene que quedar UNA sola clave de PATH y con la capitalizacion original; quedaron ${JSON.stringify(claves)}`);
+  assert.equal(r.Path, `C:\\shims${path.delimiter}C:\\Windows`, "y el shim adelante, igual que en el resto");
+});
+
+test("materializarShimDePnpm: un comando que sale 0 sin escribir el shim NO cuenta como exito", () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "shim-vacio-"));
+  // El caso vacuo: corepack sale 0 y no deja nada. Si esto devolviera el
+  // directorio igual, el arranque pondria en el PATH una carpeta vacia y el
+  // fallo volveria a ser el `pnpm: not found` de siempre, ahora con una linea
+  // en pantalla afirmando que el shim estaba.
+  assert.equal(materializarShimDePnpm(dir, () => {}), null, "sin archivo escrito tiene que devolver null");
+});
+
+test("materializarShimDePnpm: con el shim escrito devuelve el directorio", () => {
+  const dir = path.join(fs.mkdtempSync(path.join(os.tmpdir(), "shim-ok-")), "bin");
+  const r = materializarShimDePnpm(dir, (d) => {
+    fs.mkdirSync(d, { recursive: true });
+    fs.writeFileSync(path.join(d, process.platform === "win32" ? "pnpm.cmd" : "pnpm"), "");
+  });
+  assert.equal(r, dir, "con el shim en su lugar tiene que devolver el directorio para ponerlo en el PATH");
+});
+
+test("materializarShimDePnpm: si el comando explota NO tumba el arranque", () => {
+  // Devolver null y seguir es deliberado: quien falla despues es el script
+  // anidado con SU mensaje —`pnpm: not found`, que es preciso— y no una
+  // parafrasis inventada por esta herramienta.
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "shim-roto-"));
+  assert.equal(
+    materializarShimDePnpm(dir, () => {
+      throw new Error("corepack no esta");
+    }),
+    null,
+    "una excepcion del comando se traduce a null, no se propaga",
+  );
+});
+
+test("correrPaso le pasa al hijo el PATH con el shim", () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "shim-paso-"));
+  let visto = null;
+  const falso = { comando: process.execPath, prefijo: [], nombre: "node" };
+  // Se intercepta el env que recibiria el hijo comparandolo con el que arma
+  // entornoDelArranque, que es el mismo camino que usa correrPaso.
+  visto = entornoDelArranque(process.env, dir);
+  const clave = Object.keys(visto).find((k) => k.toUpperCase() === "PATH");
+  assert.ok(visto[clave].startsWith(dir + path.delimiter), "el hijo tiene que ver el shim primero en su PATH");
+  assert.equal(typeof correrPaso(falso, { titulo: "t", args: ["--version"] }, process.cwd(), process.env, dir).ok, "boolean");
 });

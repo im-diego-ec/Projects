@@ -70,6 +70,20 @@ mueve sobre un cambio incompatible.
 
 ### Corregido
 
+- **El arranque automático moría en una máquina limpia — la única que corepack existe
+  para cubrir.** Medido en un runner de CI sin `pnpm` global: el paso 1
+  (`corepack pnpm install`) pasaba y el 2 se cortaba con `sh: pnpm: not found`. La causa
+  es que los scripts del andamio se llaman entre sí con `pnpm` **pelado**
+  (`pnpm -C api run typecheck`, `pnpm datos && pnpm lint && …`), que es la forma
+  idiomática de un workspace y no se va a cambiar: escribir `corepack pnpm` dentro de
+  cada script del proyecto del consumidor sería filtrarle a su `package.json` un detalle
+  de cómo lo arrancamos nosotros. **Por qué no se veía:** en la máquina de quien escribe
+  el código hay un `pnpm` global y los scripts anidados lo encuentran. Ahora, cuando el
+  ejecutor es corepack y no hay un `pnpm` que corra, el arranque materializa los shims
+  con `corepack enable --install-directory` y los pone **adelante** del `PATH` de sus
+  procesos hijos — directorio temporal, nada global, nada que tocar en la máquina.
+  Comprobado con un `PATH` reducido a Node y `/usr/bin`: los cuatro pasos en verde.
+  Banco: `pruebas/init/projects-init.test.mjs`.
 - **Todo proyecto nacido del andamio arrancaba ROJO en su primer CI.**
   `plantilla/.github/workflows/ci.yml` expandía `${RAICES}` sin comillas (SC2086). El
   arreglo ya existía en el workflow del marco y faltaba portarlo a la copia que viaja.
