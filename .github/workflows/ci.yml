@@ -424,18 +424,18 @@ jobs:
       # cada job de cada repo— iban por tag. Hoy las de este arbol tambien van por
       # SHA; lo que queda pendiente es lo que el marco REPARTE.
       #
-      # ESTADO MEDIDO DESPUES DEL ULTIMO CAMBIO DE ESTE ARCHIVO: 10 de 34 `uses:` ajenos
-      # van por tag movil y no por SHA. El desglose por action de esos 10:
-      #      5  actions/setup-node@v7
-      #      4  actions/checkout@v7
-      #      1  actions/upload-artifact@v5
-      # Los DIEZ son exactamente los que VIAJAN: 8 en plantilla/.github/workflows/ (que
-      # el andamio copia a cada proyecto nuevo) y 2 en los action.yml de cobertura-diff
-      # y guardrail-deltas (que ejecuta cada consumidor). En .github/workflows/ no queda
-      # ninguno: los 22 que corrian aca —14 actions/checkout y 8 actions/setup-node—
-      # pasaron a SHA con el tag en el comentario de al lado, que es la forma que
-      # Dependabot reescribe. Los otros 2 pines por SHA de los 24 son las dos lineas de
-      # anthropics/claude-code-action, una aca y otra en el andamio.
+      # ESTADO MEDIDO EL 2026-08-25, DESPUES DE CERRAR EL ANDAMIO: cero `uses:` a
+      # organizaciones ajenas por tag movil. El censo completo, con el comando que lo
+      # reproduce (git ls-files -- '*.yml' '*.yaml' | xargs grep -hE '^[[:space:]]*(-[[:space:]]+)?uses:'):
+      #      40  invocaciones, sin contar las que llevan marcador {{...}}
+      #      34  por SHA de 40 hex, con el tag en el comentario de al lado
+      #       6  por tag, y las SEIS son el marco apuntandose a si mismo:
+      #            4  rutas locales (./.github/..., ./actions/...)
+      #            2  im-diego-ec/Projects/actions/... por version del propio marco
+      # Esas seis NO son deuda: un repo no se pina por SHA a si mismo, y la version
+      # exacta es justamente el canal por el que un consumidor recibe los cambios.
+      # Lo que cerro este censo fue el ANDAMIO: sus 8 invocaciones viajaban por tag a
+      # cada proyecto nuevo, y hoy van por SHA como las del marco.
       #
       # OJO CON EL 8, que no es el 14 del censo de `uses:` del andamio y por eso
       # se explica en vez de dejarlo raro: plantilla/.github/workflows/ tiene 14
@@ -590,6 +590,58 @@ jobs:
           echo
 
           echo "::warning::${PENDIENTES} de ${TOTAL} uses: a organizaciones ajenas van por tag movil y no por SHA, contra la frontera que AGENTS.md declara. Este paso avisa y todavia no rompe, a proposito: los SHA se resuelven con red y estrenar el rojo dejaria al marco y al andamio en rojo sin poder cerrarlo. Los comandos exactos estan arriba; cuando no quede ninguno, este paso pasa a ::error:: y exit 1"
+
+      - name: El pipeline que reparte el andamio tambien pasa actionlint
+        shell: bash
+        env:
+          VERSION_ACTIONLINT: "1.7.12"
+        run: |
+          set -euo pipefail
+
+          # POR QUE ES UN PASO APARTE Y NO SALE GRATIS CON LA HIGIENE DE ARRIBA.
+          # actionlint descubre workflows mirando SOLO `.github/workflows/` de la RAIZ:
+          # `plantilla/` nunca entra. Medido el 2026-08-25: con un SC2086 vivo en
+          # plantilla/.github/workflows/ci.yml —la lista de raices de Terraform sin
+          # comillas— actionlint en la raiz salia EXIT 0, y cada repo nacido del andamio
+          # arrancaba con su CI en ROJO por una linea que el marco nunca habia mirado.
+          # El marco validaba su propio pipeline y no el que le reparte a todo el mundo.
+          #
+          # Y NO SE PUEDE LINTEAR plantilla/ TAL CUAL: sus workflows llevan marcadores
+          # {{ASI}} que shellcheck lee como sintaxis rota (SC1083) y llenan la salida de
+          # ruido que no existe en ningun repo real. Por eso se INSTANCIA primero con los
+          # valores de ejemplo de la propia herramienta, y se lintea el resultado — que
+          # es, byte por byte, el archivo que recibe el consumidor.
+
+          TMP="$(mktemp -d)"
+          node herramientas/projects-init.mjs --ejemplo > "${TMP}/valores.json"
+          mkdir -p "${TMP}/repo"
+          node herramientas/projects-init.mjs \
+            --valores "${TMP}/valores.json" --destino "${TMP}/repo" --sin-herramientas > /dev/null
+
+          if [ ! -d "${TMP}/repo/.github/workflows" ]; then
+            echo "::error::el andamio instanciado no dejo .github/workflows: o projects-init fallo, o el andamio dejo de repartir su pipeline. En los dos casos este paso NO declara verde"
+            exit 1
+          fi
+
+          CUANTOS="$(find "${TMP}/repo/.github/workflows" -name '*.yml' | wc -l | tr -d ' ')"
+          if [ "${CUANTOS}" -eq 0 ]; then
+            echo "::error::cero workflows en el andamio instanciado. Un cero aca es este paso roto, no un andamio limpio"
+            exit 1
+          fi
+          echo "linteando ${CUANTOS} workflow(s) del andamio instanciado"
+
+          BASE="https://github.com/rhysd/actionlint/releases/download/v${VERSION_ACTIONLINT}"
+          TAR="actionlint_${VERSION_ACTIONLINT}_linux_amd64.tar.gz"
+          curl -fsSL --max-time 60 --retry 2 --retry-all-errors -o "${TMP}/${TAR}" "${BASE}/${TAR}"
+          curl -fsSL --max-time 60 --retry 2 --retry-all-errors -o "${TMP}/sums.txt" "${BASE}/actionlint_${VERSION_ACTIONLINT}_checksums.txt"
+          ( cd "${TMP}" && grep " ${TAR}\$" sums.txt | sha256sum --check --ignore-missing )
+          tar -xzf "${TMP}/${TAR}" -C "${TMP}" actionlint
+
+          if ! ( cd "${TMP}/repo" && git init -q . && "${TMP}/actionlint" -color ); then
+            echo "::error::el pipeline que el andamio reparte no pasa actionlint (archivo y linea, arriba). Ese archivo es el que recibe cada proyecto nuevo, asi que esto no es un detalle del marco: es un CI en rojo el dia uno del consumidor. Reproducilo local: instancia el andamio y corre actionlint dentro"
+            exit 1
+          fi
+          echo "el pipeline del andamio pasa actionlint"
 
       # EL MARCO NO SE AUTO-IDENTIFICA POR UN LITERAL DE SU CUENTA.
       #
