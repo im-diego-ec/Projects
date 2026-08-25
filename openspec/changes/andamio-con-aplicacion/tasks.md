@@ -1,10 +1,23 @@
 ---
 artefacto: tasks
 dri: Builder 1
-aprueba: Builder 1 (builder) # gate de `calidad-codigo`, no del PO
+aprueba: Builder 2 (builder par) # gate de `calidad-codigo`, no del PO — y NO el `dri`:
+                                # hasta el 2026-08-24 decía `Builder 1`, o sea el
+                                # propio autor, que no es un review
 informado: PO / Builder 2
 estado: pendiente-de-revision
 ---
+
+> **Parte de este change YA está en el contrato canónico, y hay que saberlo antes de
+> archivar.** El 2026-08-24 se promovió a `openspec/specs/calidad-codigo/spec.md` el
+> requirement **«El esqueleto que entrega el andamio encaja consigo mismo»**, que
+> describe los acoples que el andamio ya reparte y que `pruebas/andamio/acoples-del-andamio.test.mjs`
+> ya hace fallar solos en el CI del marco. Motivo: una compuerta en producción sin
+> requirement escrito es una regla que el consumidor no puede anticipar leyendo
+> `openspec/specs/`.
+>
+> Al archivar, revisar la superposición con los `ADDED` de este change y resolverla con
+> `MODIFIED`/`RENAMED`, no dejando dos enunciados paralelos.
 
 El orden manda, y acá tiene una razón concreta: **los controles estáticos del
 bloque 2 se escriben ANTES de absorber los archivos** (bloque 3), para que el rojo

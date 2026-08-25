@@ -24,10 +24,19 @@ const CODEOWNERS = [".github/CODEOWNERS", "plantilla/.github/CODEOWNERS"];
 const PARA_EL_PO = "docs/para-el-po.md";
 const GLOSARIO = "docs/glosario.md";
 
-/** Las rutas que CODEOWNERS le asigna al PO, en este repo y en el andamio.
+/** Las rutas que CODEOWNERS SACA del catch-all, en este repo y en el andamio.
  *  Una linea de CODEOWNERS es `<ruta> <owner>...`; nos quedamos con las que
- *  terminan en el equipo del PO, que es `/po` aqui y `/{{EQUIPO_PO}}` alla. */
-function rutasDelPo() {
+ *  declaran un patron propio, o sea todas menos la regla `*`.
+ *
+ *  ANTES SE IDENTIFICABAN POR EL OWNER —las que terminaban en el equipo del PO,
+ *  `/po` aqui y `/{{EQUIPO_PO}}` alla— y esa senal dejo de existir de este lado:
+ *  el CODEOWNERS del marco vive en una cuenta personal, donde no hay equipos,
+ *  asi que sus reglas nombran todas al mismo owner y el rol ya no se lee en el
+ *  archivo. La senal que sobrevive es la carve-out: una ruta que alguien saco a
+ *  mano del `*` es una ruta que se le pide aprobar a alguien en particular, y
+ *  esa es exactamente la que el documento del PO tiene que explicar. Ademas no
+ *  depende de como se escriba el owner, que es lo que se acaba de pudrir. */
+function rutasConDuenioPropio() {
   const rutas = new Set();
   for (const archivo of CODEOWNERS) {
     for (const linea of leer(archivo).split("\n")) {
@@ -35,28 +44,28 @@ function rutasDelPo() {
       if (!limpia || limpia.startsWith("#")) continue;
       const campos = limpia.split(/\s+/);
       if (campos.length < 2) continue;
-      const duenios = campos.slice(1);
-      if (duenios.some((d) => /\/(po|\{\{EQUIPO_PO\}\})$/.test(d))) rutas.add(campos[0]);
+      if (campos[0] === "*") continue;
+      rutas.add(campos[0]);
     }
   }
   return [...rutas].sort();
 }
 
-test("el escaneo encuentra rutas del PO: un cero aca es el banco roto, no un CODEOWNERS limpio", () => {
-  const rutas = rutasDelPo();
+test("el escaneo encuentra rutas con dueño propio: un cero aca es el banco roto, no un CODEOWNERS limpio", () => {
+  const rutas = rutasConDuenioPropio();
   assert.ok(
     rutas.length >= 5,
-    `solo encontre ${rutas.length} ruta(s) del PO en ${CODEOWNERS.join(" y ")}. ` +
-      "Este repo le asigna dos y el andamio tres, asi que menos de cinco significa que el " +
-      "parseo dejo de reconocer el formato de CODEOWNERS: revisá el regex del equipo antes " +
+    `solo encontre ${rutas.length} ruta(s) fuera del catch-all en ${CODEOWNERS.join(" y ")}. ` +
+      "Este repo saca dos y el andamio tres, asi que menos de cinco significa que el " +
+      "parseo dejo de reconocer el formato de CODEOWNERS: revisá el parseo antes " +
       "de creerle al verde.",
   );
 });
 
-test("cada ruta que CODEOWNERS le asigna al PO esta explicada en para-el-po.md", () => {
+test("cada ruta que CODEOWNERS saca del catch-all esta explicada en para-el-po.md", () => {
   const doc = leer(PARA_EL_PO);
   const sinExplicar = [];
-  for (const ruta of rutasDelPo()) {
+  for (const ruta of rutasConDuenioPropio()) {
     // Se busca la ruta ENTRE BACKTICKS, no como subcadena suelta, y el motivo es
     // un falso verde medido: `/openspec/specs/` es subcadena de
     // `/openspec/specs/gobierno-contribucion/`, asi que una busqueda de subcadena
@@ -67,7 +76,7 @@ test("cada ruta que CODEOWNERS le asigna al PO esta explicada en para-el-po.md",
   assert.deepEqual(
     sinExplicar,
     [],
-    `estas rutas son del PO segun CODEOWNERS y ${PARA_EL_PO} no las nombra entre backticks: ` +
+    `CODEOWNERS le pone dueño propio a estas rutas y ${PARA_EL_PO} no las nombra entre backticks: ` +
       `${sinExplicar.join(", ")}. El PO tiene que poder leer que se le pide aprobar.`,
   );
 });

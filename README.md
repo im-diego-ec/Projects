@@ -112,32 +112,81 @@ commit de código. **Lo mecánico lo hace `projects init`**; lo que queda es dec
 valores y tocar GitHub, que son actos humanos.
 
 ```bash
-git clone --depth 1 https://github.com/im-diego-ec/Projects /tmp/projects
+# 0. El clon del marco, UNA vez. Va por `gh` y no por `git clone` de una URL:
+#    este repo es privado, y el HTTPS anónimo contesta 404 —indistinguible de un
+#    typo en la ruta— o se para a pedir credenciales. `gh` usa la sesión que ya
+#    tenés. Anotá dónde quedó: <ruta-al-clon> es esa ruta.
+gh repo clone im-diego-ec/Projects
 
 # 1. El esqueleto de valores, con una clave por decisión
-node /tmp/projects/herramientas/projects-init.mjs --ejemplo > valores.json
+node <ruta-al-clon>/herramientas/projects-init.mjs --ejemplo > valores.json
 
 # 2. Llenarlo (qué va en cada uno: plantilla/README.md sección 2)
 
 # 3. Instanciar, desde la raíz del repo nuevo
-node /tmp/projects/herramientas/projects-init.mjs --valores valores.json --destino .
+node <ruta-al-clon>/herramientas/projects-init.mjs --valores valores.json --destino .
 ```
 
-Eso copia los 75 archivos del andamio —dotfiles incluidos, que es donde falla el
-copiado a mano— sustituye las 157 ocurrencias de los 21 marcadores, corre
+El clon **no va a `/tmp`**: ese directorio no existe en Windows nativo, y el clon
+te sirve para todos los proyectos, no para uno. El paso a paso completo —con gemelo
+en PowerShell **en los bloques donde el comando no es el mismo en las dos shells**,
+que son los menos: `git`, `node`, `pnpm`, `npx` y `gh` corren igual en los tres
+sistemas— está en [`docs/arrancar-un-proyecto.md`](docs/arrancar-un-proyecto.md).
+
+Eso copia **el andamio entero** —dotfiles incluidos, que es donde falla el copiado
+a mano— sustituye **todas** las ocurrencias de sus marcadores, corre
 `openspec init` con el pin del marco y renderiza la porción del marco de la
 constitución. **Falla cerrado**: un valor que falta, un marcador que sobrevive o un
 destino que ya tiene andamio abortan sin escribir nada, con el nombre de lo que
 falta. Y verifica lo que hizo releyendo el árbol, no confiando en su propio
 resultado.
 
+> **Cuántos archivos y cuántas ocurrencias, exactamente: se mide, no se escribe
+> acá.** Este README llegó a decir «copia los 22 archivos» y «sustituye las 89
+> ocurrencias» mientras el encabezado de la herramienta decía `23/122` para el mismo
+> acto, y las dos cifras estaban mal. No es descuido de nadie: **crecen con cada
+> archivo que entra a `plantilla/`**, y un número escrito a mano al lado de algo que
+> crece es exactamente la clase de dato que este repo existe para no mantener a
+> mano. Comprobado midiendo dos veces el mismo día con un archivo nuevo en el medio:
+> la cifra se movió entre las dos.
+>
+> El comando que la produce —con las **mismas piezas** que usa la herramienta, así
+> que mide lo que la corrida hace y no una aproximación con `grep`— está entero en el
+> encabezado de [`herramientas/projects-init.mjs`](herramientas/projects-init.mjs),
+> bajo *ESOS CUATRO NUMEROS SE MIDEN*. Y una corrida real lo dice sola en su primera
+> línea, con la forma `escritos N archivos, M ocurrencias sustituidas`.
+>
+> Lo que sí está fijo y sí se escribe es **21 marcadores**: es el largo de la lista
+> `REQUERIDOS` de la herramienta, y esa lista no crece al agregar un archivo — crece
+> sólo cuando se agrega una **decisión**, que es un acto deliberado y con PR. Quien la
+> sostiene es un banco del marco, `pruebas/andamio/tabla-de-valores.test.mjs`: se pone
+> rojo si `plantilla/.projects-valores.json` deja de declarar uno de los 21, y rojo si
+> la tabla de `plantilla/README.md` se queda sin la fila de uno. Medido borrando
+> `ID_MCP_SLACK` del registro del andamio: el caso `registro · el andamio declara los
+> valores en su .projects-valores.json` falla nombrando la clave.
+>
+> **Y conviene saber qué NO hace `projects init` con esa cifra, porque es fácil
+> suponerlo de más.** El desfase del andamio no lo mira: sobre el destino ya escrito lo
+> reporta como `::warning::` y sale **0** (medido: `guarda 20 de los 21 valores`,
+> `EXIT=0`, el andamio entero copiado igual). Lo que sí lo pone rojo es el otro lado
+> —un marcador del andamio que el archivo de valores no declara— y ahí es `::error::`
+> con `EXIT=1`, pero **después** de la copia, no antes: esa corrida igual arranca
+> imprimiendo `escritos N archivos` y el destino queda con esos N. El motivo de las dos
+> decisiones está en el JSDoc de `clavesQueElRegistroNoDeclara`, y no es un descuido: un
+> andamio mínimo sin registro es un caso legítimo.
+>
+> Las otras dos cifras —archivos y ocurrencias— hoy no las sostiene nadie, y lo que
+> falta para que envejecer sea rojo es un caso en `pruebas/init/projects-init.test.mjs`
+> que recompute los cuatro números y falle nombrando los lugares a actualizar.
+
 Lo que **no** hace, porque no es transcripción:
 
 1. **Crear el repo vacío** en la organización.
-2. **Decidir los valores.** Los 22 salen de la tabla de `plantilla/README.md`
-   sección 2, con ejemplo y caso borde cada uno. Tres tienen un camino "si no
-   existe" que exige borrar bloques a mano: la herramienta los **nombra al final**
-   en vez de adivinar el borrado.
+2. **Decidir los valores.** Los 21 que la herramienta pide salen de la tabla de
+   `plantilla/README.md` sección 2, con ejemplo y caso borde cada uno (el 22.º,
+   `{{PAQUETES}}`, **no se pregunta**: se deriva de los tres paquetes). Tres tienen
+   un camino "si no existe" que exige borrar bloques a mano: la herramienta los
+   **nombra al final** en vez de adivinar el borrado.
 3. **Cargar `vars` y `secrets`** del repo en GitHub Actions: todo lo que el
    pipeline consume en runtime (URLs de sondas, ARNs, log groups, tokens) va
    ahí, nunca hardcodeado en el scaffold.
@@ -208,6 +257,23 @@ Sin big bang: se adopta por partes, empezando por lo referenciado.
    `ci.yml` armado que describe el paso 1 es el que el scaffold ya trae en
    [`plantilla/.github/workflows/ci.yml`](plantilla/.github/workflows/ci.yml):
    sirve de referencia para migrar.
+
+   ⚠️ **`Projects` va con mayúscula, y en este archivo eso no lo sostiene ningún
+   check.** GitHub resuelve el `uses:` sin distinguir mayúsculas, así que la
+   ortografía mala **funciona** y no hay rojo que la denuncie; lo que se rompe son
+   los escaneos que el marco construye alrededor de ese slug, que van por texto —ya
+   se rompieron dos veces por eso, y una guarda que no encuentra la línea que viene a
+   auditar sale verde por construcción. El banco que vigila la ortografía
+   (`pruebas/andamio/lo-que-viaja-al-proyecto.test.mjs`, bloque 4) recorre
+   `archivosDelAndamio()`, o sea **sólo `plantilla/`**: comprobado bajando a minúscula
+   las tres apariciones de este README sobre una copia, el banco completo sale verde
+   igual. Lo que falta es extender ese bloque a la prosa del repo, con esta forma —el
+   `[p]` entre corchetes evita que el comando se encuentre a sí mismo:
+
+   ```bash
+   grep -rn 'im-diego-ec/[p]rojects' --include='*.md' .
+   ```
+
 2. **Dejar lo específico del proyecto donde está.** Lo que no es marco —el
    deploy con su topología de infraestructura, sus migraciones, sus sondas—
    sigue viviendo en el repo del proyecto.
@@ -239,11 +305,28 @@ Los ejemplos de la tabla son **inventados a propósito**: en el marco no se
 escriben handles, cuentas ni dominios reales de ningún proyecto. Es una frontera
 🛑 de [AGENTS.md](AGENTS.md) y un ítem del checklist de PR.
 
+**La tabla es la lista COMPLETA de los 21, y eso es una frontera 🛑 de
+[AGENTS.md](AGENTS.md)** («Dejar `{{PLACEHOLDER}}` sin documentar en el README»).
+Que esté completa se comprueba con un comando, y hasta que un caso de banco lo corra
+solo, la única defensa es correrlo:
+
+```bash
+diff <(grep -rhoE '\{\{[A-Z0-9_]+\}\}' plantilla --exclude=README.md | sort -u) \
+     <(grep -oE '^\| `\{\{[A-Z0-9_]+\}\}`' README.md | grep -oE '\{\{[A-Z0-9_]+\}\}' | sort -u)
+```
+
+Hoy no imprime nada. El caso que falta vive en `pruebas/andamio/manifiestos.test.mjs`
+y compara `REQUERIDOS` de `herramientas/projects-init.mjs` contra esta tabla **y** la
+de `plantilla/README.md`.
+
 | Placeholder | Qué es | Ejemplo |
 |---|---|---|
 | `{{PROYECTO}}` | Nombre del proyecto y del repo | `people-agenda` |
-| `{{ORG}}` | Organización de GitHub | `po` |
-| `{{PAQUETES}}` | Paquetes del monorepo | `web, api, e2e` |
+| `{{ORG}}` | Organización de GitHub: el handle de la org, no un equipo dentro de ella. Se interpola en `uses: {{ORG}}/Projects/...` | `Ejemplo-Org` |
+| `{{PAQUETE_API}}` | Carpeta del paquete de backend en el monorepo | `api` |
+| `{{PAQUETE_WEB}}` | Carpeta del paquete de frontend. Si el proyecto no tiene frontend, el valor se pide igual y quedan los bloques `[FRONT]` de `eslint.config.mjs` **y sus imports**, que hay que borrar a mano | `web` |
+| `{{PAQUETE_E2E}}` | Carpeta de la suite end-to-end. Sin suite E2E, hay que borrar esa entrada del glob de Node **y** las dos excepciones de `ci.yml` | `e2e` |
+| `{{GENERAR_CLIENTE_DATOS}}` | El comando que genera el cliente de la capa de datos, que el CI corre antes de compilar. Si el proyecto no genera ninguno, borrar el paso de `.github/workflows/ci.yml` **no alcanza**: el mismo valor viaja al script `datos` de `package.json` y al `build` de `api/package.json`, donde sin comando queda un `&&` colgando. `grep -rn GENERAR_CLIENTE_DATOS plantilla/` los enumera todos | `prisma generate` |
 | `{{EQUIPO_BUILDERS}}` | Slug del equipo de builders en la org (va en `CODEOWNERS`) | `builders` |
 | `{{EQUIPO_PO}}` | Slug del equipo del PO (va en `CODEOWNERS`) | `po` |
 | `{{BUILDER_1}}` | Handle del builder que sostiene la llave de producción | `@builder-uno` |
@@ -252,19 +335,20 @@ escriben handles, cuentas ni dominios reales de ningún proyecto. Es una fronter
 | `{{CUENTA_DEV}}` | Cuenta AWS de dev | `111111111111` |
 | `{{CUENTA_PROD}}` | Cuenta AWS de producción | `222222222222` |
 | `{{REGION}}` | Región AWS | `us-east-1` |
-| `{{PERFIL_DEV}}` | Perfil local de la CLI para dev | `la organización-dev` |
-| `{{PERFIL_PROD}}` | Perfil local de la CLI para producción | `la organización-prod` |
+| `{{PERFIL_DEV}}` | Perfil local de la CLI para dev | `ejemplo-dev` |
+| `{{PERFIL_PROD}}` | Perfil local de la CLI para producción | `ejemplo-prod` |
 | `{{DOMINIO_DEV}}` | Dominio del ambiente dev | `agenda-dev.ejemplo.com` |
 | `{{DOMINIO_PROD}}` | Dominio de producción | `agenda.ejemplo.com` |
 | `{{CANAL_ALERTAS}}` | Canal donde suenan las alarmas | `#alertas-prod` |
+| `{{ID_MCP_SLACK}}` | ⚠️ Cómo **tu cliente local** nombra al servidor MCP de Slack, sin el prefijo `mcp__`. No se genera ni se pide a nadie: se copia de un repo que ya funciona. Con el valor mal, cinco entradas del allowlist no matchean nada y **ningún check lo detecta** — un UUID de ceros no es un marcador sin resolver | `00000000-0000-0000-0000-000000000000` |
 | `{{PREFIJO_RECURSOS}}` | Prefijo de recursos AWS y raíz de las rutas de SSM (`/<prefijo>/<env>/<NOMBRE>`) | `agenda` |
 
-El scaffold define además unos pocos placeholders **derivados** —los paquetes
-uno por rol (`{{PAQUETE_API}}`, `{{PAQUETE_WEB}}`, `{{PAQUETE_E2E}}`), que los
-globs de lint y Dependabot necesitan por separado, y `{{ID_MCP_SLACK}}`, el
-identificador del servidor MCP de Slack— con sus casos borde (qué borrar si el proyecto no tiene
-frontend, o no usa Slack). La tabla operativa completa, esa que se sigue
-mientras se hace el bootstrap, vive en
+**Y uno que el andamio usa y la herramienta NO pregunta:** `{{PAQUETES}}`, la lista
+del monorepo (`web, api, e2e`), que se **deriva** de los tres paquetes de arriba. Una
+lista escrita aparte de sus elementos es una segunda declaración que puede divergir,
+así que no está en `valores.json` — quien llene el archivo buscando una clave
+`PAQUETES` está buscando una que no existe. La tabla operativa completa, esa que se
+sigue mientras se hace el bootstrap, con caso borde de cada valor, vive en
 [`plantilla/README.md`](plantilla/README.md).
 
 **Regla para decidir si algo es placeholder:** si el valor cambia sin que
@@ -310,10 +394,14 @@ diff.
 ├── openspec/              # CANÓNICO: el contrato del marco
 │   ├── config.yaml        #   contexto y reglas de OpenSpec para este repo
 │   ├── specs/             #   los specs vivos del marco (una carpeta por capability)
-│   └── changes/           #   los changes en vuelo (5 activos) y su historia en changes/archive/
-└── docs/                  # el porqué: ADRs, reglas no escritas, upgrade del CLI y plantillas
-                           #   de documentos de proceso (post-mortem, runbook)
+│   └── changes/           #   los changes en vuelo (`openspec list`) y su historia en changes/archive/
+└── docs/                  # el porqué: ADRs, reglas no escritas, upgrade del CLI, cómo forkear
+                           #   el marco a otra cuenta, y plantillas de documentos de proceso
+                           #   (post-mortem, runbook). El índice completo: docs/README.md
 ```
+
+El mapa de arriba nombra las carpetas; **[`docs/README.md`](docs/README.md) es el
+índice de la documentación**, con qué es cada documento y cómo evoluciona cada uno.
 
 Las cuatro formas de distribución no son una metáfora: son carpetas. Si al
 agregar una pieza no sabés en cuál va, la pregunta correcta es cómo tiene que

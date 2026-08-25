@@ -39,6 +39,12 @@ concurrency:
 jobs:
   # Lo que hereda del marco: carril de docs + OpenSpec (guardrail y --strict).
   marco:
+    # SIN timeout-minutes, y no es un olvido: un job que llama a un workflow
+    # reusable solo admite name, uses, with, secrets, needs, if, permissions,
+    # strategy y concurrency — la referencia de GitHub no lista `timeout-minutes`
+    # entre ellas, y ponerlo aca hace que el workflow no valide. El techo de esta
+    # llamada lo ponen los jobs del reusable, que lo llevan cada uno.
+    #
     # Entre comillas a proposito: sin ellas, el placeholder de doble llave hace
     # que YAML lea un mapa en flujo y el archivo no parsea antes de sustituirlo.
     uses: "{{ORG}}/Projects/.github/workflows/marco-ci.yml@v1.7.0"
@@ -82,6 +88,14 @@ jobs:
   # ---------------------------------------------------------------------------
   constitucion:
     name: constitucion
+    # TECHO DE TIEMPO. El default de GitHub son 360 minutos POR JOB: un runner
+    # colgado se lleva seis horas de cola y mantiene su GITHUB_TOKEN valido todo
+    # ese rato, y nada avisa —el sintoma es un check que no vuelve, no un rojo—.
+    # El criterio del numero es el mismo en todo este archivo: mas o menos el
+    # doble de lo que el job tarda cuando anda bien, no una cifra redonda. Este
+    # job clona, levanta node y renderiza texto: no instala dependencias ni sale
+    # a la red.
+    timeout-minutes: 10
     runs-on: ubuntu-latest
     # Minimo real y declarado POR JOB, no heredado del workflow: la action no
     # llama a la API de GitHub, solo lee el arbol ya checkouteado. Es lo que la
@@ -90,11 +104,11 @@ jobs:
     permissions:
       contents: read
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       # La action necesita node en el PATH y lo dice con el arreglo escrito si no
       # esta. No hace falta pnpm ni instalar dependencias: esto lee y renderiza
       # texto, no interroga al toolchain del proyecto.
-      - uses: actions/setup-node@v7
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
         with:
           node-version: "22"
       - id: marco_constitucion
@@ -106,7 +120,7 @@ jobs:
       # a mano, y esa es la salida que el mensaje de fallo promete. Sin
       # if: !cancelled() no se subiria justo en la corrida que lo necesita.
       - if: "!cancelled()"
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5
         with:
           name: constitucion-al-dia
           path: ${{ steps.marco_constitucion.outputs.corregidos }}
@@ -117,6 +131,10 @@ jobs:
     name: build-test
     needs: marco
     if: needs.marco.outputs.solo_docs == 'false'
+    # El mas largo de los tres, y por eso el que mas necesita el techo: es el
+    # unico que instala dependencias, compila y corre las suites, o sea el unico
+    # con pasos que pueden quedarse esperando a la red en vez de fallar.
+    timeout-minutes: 25
     runs-on: ubuntu-latest
     # EL MINIMO REAL Y DECLARADO POR JOB, no heredado del encabezado. Este es el
     # unico job del repositorio que descarga y EJECUTA codigo que nadie leyo
@@ -127,11 +145,11 @@ jobs:
     permissions:
       contents: read
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       # corepack en vez de una action de terceros: menos superficie que auditar
       # y una dependencia menos que pinear por SHA.
       - run: corepack enable
-      - uses: actions/setup-node@v7
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
         with:
           node-version: "22"
       # SIN `cache: pnpm` EN EL SETUP-NODE DE ARRIBA, y es una decision escrita,
@@ -539,6 +557,9 @@ jobs:
     name: ci-ok
     needs: [marco, constitucion, build_test]
     if: always()
+    # 5 minutos: no hace checkout ni toca la red, solo lee los resultados de sus
+    # needs, que vienen del contexto.
+    timeout-minutes: 5
     runs-on: ubuntu-latest
     # VACIO A PROPOSITO: este job no clona el arbol, no llama a ninguna API y no
     # lee mas que los resultados de sus needs, que vienen del contexto y no del

@@ -112,7 +112,13 @@ outputs:
 runs:
   using: composite
   steps:
-    - id: detectar
+    # EL name: NO ES DECORACION. La logica de esta action vive inline en este
+    # bloque run: y no en un .mjs al lado, asi que la unica forma de probarla es
+    # extraer el texto del YAML y correrlo contra fixtures. El extractor del
+    # banco ubica un paso por su "- name:", y sin el este bloque era el unico
+    # codigo publicado del marco que ningun banco podia siquiera leer.
+    - name: Detectar si el cambio toca solo rutas neutras
+      id: detectar
       shell: bash
       env:
         GH_TOKEN: ${{ inputs.token }}
@@ -148,11 +154,21 @@ runs:
         }
 
         # --- patron de rutas neutras -----------------------------------------
-        PATRON=$(printf '%s\n' "$RUTAS_NEUTRAS" \
-          | grep -v '^[[:space:]]*#' \
-          | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//' \
-          | grep -v '^$' \
-          | paste -sd '|' -)
+        # UNA SOLA HERRAMIENTA, Y NO UNA TUBERIA, POR EL CASO VACIO. La version
+        # anterior era `grep -v ... | sed ... | grep -v '^$' | paste`, y el
+        # ultimo grep sale 1 cuando no queda ninguna linea. `shell: bash` corre
+        # el bloque con errexit, y una asignacion cuyo comando falla mata el
+        # paso ahi mismo: exit 1 y CERO lineas de salida, en la unica action del
+        # marco que promete no fallar nunca. O sea que el caso que la guarda de
+        # abajo existe para atender no llegaba nunca a la guarda. awk sale 0
+        # tenga o no tenga lineas, asi que la lista vacia vuelve a ser un VALOR
+        # y la decide fail_open, que es lo que estaba escrito que pasara.
+        PATRON=$(printf '%s\n' "$RUTAS_NEUTRAS" | awk '
+          { sub(/^[[:space:]]+/, ""); sub(/[[:space:]]+$/, "") }
+          $0 == "" || $0 ~ /^#/ { next }
+          { patron = (patron == "" ? $0 : patron "|" $0) }
+          END { print patron }
+        ')
         [ -n "$PATRON" ] || fail_open "la lista de rutas neutras quedo vacia"
         echo "== rutas neutras =="
         echo "$PATRON"

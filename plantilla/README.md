@@ -50,15 +50,23 @@ fallback. Lo que la herramienta no hace está en la sección 5.
 # Git Bash / macOS / Linux
 git clone --depth 1 https://github.com/{{ORG}}/Projects /tmp/projects
 cp -r /tmp/projects/plantilla/. .        # el "/." final copia TAMBIEN los dotfiles
-rm README.md                          # este archivo es la guia del scaffold, no el README del proyecto
+rm README.md                             # este archivo es la guia del scaffold, no el del proyecto
+mv README-del-proyecto.md README.md      # y ESTE si es el del proyecto: aterriza con su nombre
 ```
 
 ```powershell
 # Windows (robocopy no se traga los dotfiles ni deja archivos atras)
 git clone --depth 1 https://github.com/{{ORG}}/Projects $env:TEMP\projects
 robocopy "$env:TEMP\projects\plantilla" . /E /XF README.md
+Rename-Item README-del-proyecto.md README.md
 # robocopy devuelve exit code 1 cuando copio archivos: es exito, no error
 ```
+
+Los dos pasos son **uno solo**, y por eso van pegados: en la raiz del scaffold conviven dos
+documentos que en el repo nuevo se llamarian igual —la guia del bootstrap y el README del
+proyecto—, asi que el segundo viaja como `README-del-proyecto.md` y se renombra al aterrizar.
+Saltear el `mv` deja el repo **sin portada**: lo unico que GitHub renderiza al entrar es
+`README.md`, y su ausencia no pone nada en rojo.
 
 Verificá que llegaron los ocultos: `ls -a` (o `Get-ChildItem -Force`) tiene que mostrar
 `.claude/` (con `settings.json`, `skills/` y `agents/` adentro), `.github/` (con
@@ -67,9 +75,10 @@ Verificá que llegaron los ocultos: `ls -a` (o `Get-ChildItem -Force`) tiene que
 `.projects-desvios.json`. Y en la raíz, junto a `eslint.config.mjs` y
 `tsconfig.base.json`, tiene que estar `vitest.config.base.mjs`: ahí viaja el
 **umbral de cobertura del total** que el marco reparte, para que un paquete nuevo no
-lo tenga que inventar. El número que un paquete se pone a sí mismo termina siendo el
-que la medición dio ese día — así llegó el consumidor a tener `functions: 70.6`
-fijado en su propio valor medido, un umbral cumplido por construcción.
+lo tenga que inventar. Un umbral que cada paquete se pone a sí mismo termina siendo el
+número que la medición dio el día que se escribió: un valor con decimales —`functions: 70.6`
+y parecidos— es la firma de esa forma de fijarlo, y no exige nada, porque ya está cumplido
+por construcción en el momento en que se anota.
 
 Lo que llega en `.github/workflows/ci.yml` es un **llamador delgado**: hereda del marco el
 carril de docs y la validación de OpenSpec con `uses: {{ORG}}/Projects/...@v1.7.0`, y deja el
@@ -86,8 +95,12 @@ propio encabezado explicando qué exigen del repo antes de funcionar.
 contenido byte a byte —el artefacto de la constitución, los fixtures de sus actions—, así
 que un repo que materialice CRLF en el checkout sale rojo por un motivo que no es el suyo.
 
-**No copies `plantilla/README.md`** (este archivo). El README del proyecto se escribe
-aparte: qué hace la app, ambientes, cómo correr en local, cómo verificar, pipeline.
+**No copies `plantilla/README.md`** (este archivo): es la guía del bootstrap. El README del
+proyecto llega en `README-del-proyecto.md` y aterriza renombrado, con la estructura puesta y
+los valores ya sustituidos —estructura del repo, ambientes, cómo correr en local, cómo se
+verifica un cambio, quién revisa qué— y con huecos `RELLENAR` que son las respuestas que
+ninguna herramienta puede inventar. Cuántos son lo dice el grep, no este párrafo: se llenan
+antes del primer push con `grep -n RELLENAR README.md`.
 
 ---
 
@@ -106,7 +119,7 @@ vez**, al crear el repo, con un buscar-y-reemplazar sobre todo el árbol.
 | Placeholder | Qué poner | Ejemplo |
 |---|---|---|
 | `{{PROYECTO}}` | Nombre del repo, kebab-case | `people-agenda` |
-| `{{ORG}}` | Org de GitHub | `po` |
+| `{{ORG}}` | Org de GitHub: el handle de la organización, no un equipo dentro de ella. Se interpola en `uses: {{ORG}}/Projects/...`, o sea en la coordenada con la que GitHub resuelve el marco | `Ejemplo-Org` |
 | `{{PAQUETES}}` | Paquetes del monorepo, lista legible | `web, api, e2e` |
 
 ### Paquetes (derivados de `{{PAQUETES}}`, uno por rol)
@@ -135,13 +148,13 @@ agrega junto a este.
 
 ### Personas, por ROL (nunca nombres propios en la prosa)
 
-| Placeholder | Qué poner |
-|---|---|
-| `{{EQUIPO_BUILDERS}}` | Slug del **equipo** de builders en la organización (ej. `builders`). Se usa en `CODEOWNERS` |
-| `{{EQUIPO_PO}}` | Slug del **equipo** del PO (ej. `po`). Se usa en `CODEOWNERS` |
-| `{{BUILDER_1}}` | Handle de GitHub del builder que sostiene **la llave de producción**: su OK explícito es obligatorio para toda escritura en prod |
-| `{{BUILDER_2}}` | Handle del otro builder (el review cruzado es simétrico entre ambos) |
-| `{{PO}}` | Handle del PO: dueño de proposals y specs |
+| Placeholder | Qué poner | Ejemplo |
+|---|---|---|
+| `{{EQUIPO_BUILDERS}}` | Slug del **equipo** de builders en la organización: el de la URL del equipo, **en minúsculas**, no su nombre para mostrar. Se usa en `CODEOWNERS` | `builders` |
+| `{{EQUIPO_PO}}` | Slug del **equipo** del PO, con la misma regla. Se usa en `CODEOWNERS` | `po` |
+| `{{BUILDER_1}}` | Handle de GitHub del builder que sostiene **la llave de producción**: su OK explícito es obligatorio para toda escritura en prod. **Sin la arroba**: el scaffold la pone donde va | `handle-del-builder-1` |
+| `{{BUILDER_2}}` | Handle del otro builder, sin arroba (el review cruzado es simétrico entre ambos) | `handle-del-builder-2` |
+| `{{PO}}` | Handle del PO, sin arroba: dueño de proposals y specs | `handle-del-po` |
 
 **Equipos en `CODEOWNERS`, handles en la prosa**, y la distinción tiene motivo. La
 asignación automática de reviewers va por equipo: sobrevive a que un rol cambie de persona
@@ -169,8 +182,8 @@ persona, se cambia el handle en `AGENTS.md` y en `.github/PULL_REQUEST_TEMPLATE.
 | `{{CUENTA_DEV}}` | ID de cuenta AWS de dev (12 dígitos) | `111111111111` |
 | `{{CUENTA_PROD}}` | ID de cuenta AWS de producción | `222222222222` |
 | `{{REGION}}` | Región | `us-east-1` |
-| `{{PERFIL_DEV}}` | Nombre del perfil de la CLI para dev | `la organización-dev` |
-| `{{PERFIL_PROD}}` | Nombre del perfil de la CLI para prod | `la organización-prod` |
+| `{{PERFIL_DEV}}` | Nombre del perfil de la CLI para dev. **Sin espacios**: viaja dentro del patrón `Bash(AWS_PROFILE={{PERFIL_DEV}} terraform plan *)` de la allowlist de `.claude/settings.json`, donde un espacio no rompe el JSON, rompe el patrón — y una entrada de allowlist que no matchea nada no avisa | `ejemplo-dev` |
+| `{{PERFIL_PROD}}` | Ídem, para producción | `ejemplo-prod` |
 | `{{PREFIJO_RECURSOS}}` | Prefijo de nombres de recursos AWS **y** raíz de las rutas de SSM (`/{{PREFIJO_RECURSOS}}/<env>/<NOMBRE>`). Sin em dashes | `agenda` |
 
 > Los IDs de cuenta y los dominios de esta tabla son **de ejemplo, inventados**. Los reales
@@ -184,7 +197,7 @@ persona, se cambia el handle en `AGENTS.md` y en `.github/PULL_REQUEST_TEMPLATE.
 | `{{DOMINIO_DEV}}` | Host del frontend de dev, sin esquema | `agenda-dev.ejemplo.com` |
 | `{{DOMINIO_PROD}}` | Host del frontend de producción, sin esquema | `agenda.ejemplo.com` |
 | `{{CANAL_ALERTAS}}` | Canal donde caen las alarmas de producción | `#alertas-prod` |
-| `{{ID_MCP_SLACK}}` | ID del servidor MCP de Slack, tal como aparece en el nombre de sus tools: `mcp__<id>__slack_read_channel`. Si el equipo no usa Slack, borrá esas cinco entradas de `.claude/settings.json` | — |
+| `{{ID_MCP_SLACK}}` | ID del servidor MCP de Slack, tal como aparece en el nombre de sus tools: `mcp__<id>__slack_read_channel`. Alfanumérico y guiones, **sin guiones bajos**: uno acá corre el separador `__` y la entrada deja de matchear. Si el equipo no usa Slack, borrá esas cinco entradas de `.claude/settings.json` | `00000000-0000-0000-0000-000000000000` |
 
 ### Verificar que no quedó ninguno
 
@@ -447,6 +460,11 @@ Lo que hace que el marco se cumpla solo depende de que estos puntos queden hecho
 vez**; después ninguno pide que alguien se acuerde de nada.
 
 - [ ] `grep -rnE "\{\{[A-Z0-9_]+\}\}" .` sin resultados (fuera de `node_modules` y `.git`)
+- [ ] `README.md` es el del PROYECTO (llegó como `README-del-proyecto.md` y se renombró) y
+      `grep -n RELLENAR README.md` no devuelve nada. Es lo único que GitHub renderiza en la
+      portada del repositorio, así que es lo primero que lee quien llega — y un README con
+      los rótulos del scaffold todavía puestos no pone nada en rojo: se lee como si el
+      proyecto no tuviera la respuesta
 - [ ] Tabla de stack de `AGENTS.md` llena y sección "🕳️ Antes del primer commit" borrada
 - [ ] `.projects-valores.json` con los valores reales y las superficies que el equipo usa. De
       ahí sale el texto de la constitución que los agentes cargan todos los días: es la

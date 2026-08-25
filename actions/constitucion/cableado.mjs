@@ -137,15 +137,15 @@ export const DIR_WORKFLOWS = ".github/workflows";
 /** El segmento de ruta de la action que verifica la constitución. Se busca el
  *  SEGMENTO y no `@v1` porque la validación contra un consumidor real apunta a la
  *  rama del change antes de que el tag móvil se mueva. */
-export const SEGMENTO_ACTION = "actions/constitucion";
+const SEGMENTO_ACTION = "actions/constitucion";
 
 /** El nombre del veredicto agregado que el ruleset de `main` exige. Está escrito una
  *  sola vez y acá: es el mismo nombre que el `AGENTS.md` del marco declara como
  *  «único check requerido». */
-export const VEREDICTO_AGREGADO = "ci-ok";
+const VEREDICTO_AGREGADO = "ci-ok";
 
 /** El scaffold que identifica a un DISTRIBUIDOR del marco. */
-export const CI_DEL_SCAFFOLD = "plantilla/.github/workflows/ci.yml";
+const CI_DEL_SCAFFOLD = "plantilla/.github/workflows/ci.yml";
 
 /** El archivo cuya presencia RASTREADA significa «este repo adoptó la constitución». */
 export const VALORES = ".projects-valores.json";
@@ -159,7 +159,7 @@ export const VALORES = ".projects-valores.json";
  * push. `reopened` no hace falta: los check runs viven pegados al SHA, y reabrir un PR
  * no le cambia la cabeza.
  */
-export const TIPOS_NECESARIOS = ["opened", "synchronize"];
+const TIPOS_NECESARIOS = ["opened", "synchronize"];
 
 const escaparRegex = (texto) => String(texto).replace(/[.*+?^${}()|[\]\\]/g, (c) => `\\${c}`);
 
@@ -175,7 +175,7 @@ const esComentario = (linea) => /^ *#/.test(String(linea));
 
 /** Corta el comentario de final de línea sin tocar un `#` que viva dentro de
  *  comillas (un `group: ci-#${{...}}` no es un comentario). */
-export function sinComentario(texto) {
+function sinComentario(texto) {
   const t = String(texto ?? "");
   let dentro = null;
   for (let i = 0; i < t.length; i++) {
@@ -202,7 +202,7 @@ export function sinComentario(texto) {
  *  de espacio o de fin de línea. Devuelve null si la línea no es una entrada de mapa:
  *  así un valor con dos puntos (`uses: org/repo@v1`, una URL) no se confunde con una
  *  clave. */
-export function partirClave(texto) {
+function partirClave(texto) {
   const t = String(texto ?? "");
   let dentro = null;
   for (let i = 0; i < t.length; i++) {
@@ -305,7 +305,7 @@ function partirFlujo(texto) {
   return partes;
 }
 
-export function parsearFlujo(texto) {
+function parsearFlujo(texto) {
   const t = String(texto ?? "").trim();
   if (t.startsWith("[")) {
     return partirFlujo(t.slice(1, t.lastIndexOf("]") >= 0 ? t.lastIndexOf("]") : t.length)).map((p) =>
@@ -517,7 +517,7 @@ const vinoEntrecomillado = (mapa, clave) =>
  *   · `\`  escapa el carácter especial que sigue, para un match literal.
  * `!` no se trata acá: es de la LISTA, no del patrón, y lo resuelve `admiteRama`.
  */
-export function patronARegex(patron) {
+function patronARegex(patron) {
   const t = String(patron ?? "");
   const atomos = [];
   for (let i = 0; i < t.length; i++) {
@@ -895,7 +895,7 @@ export function dependeDe(jobs, desde, buscado, vistos = new Set()) {
  * toda corrida, y un salteado reporta Success. Es el segundo fixture de la clase 3 de
  * la refutación (`needs: [nunca]`, con `nunca` en `if: false`).
  */
-export function cadenaApagada(jobs, clave, vistos = new Set()) {
+function cadenaApagada(jobs, clave, vistos = new Set()) {
   if (vistos.has(clave)) return null;
   vistos.add(clave);
   for (const necesario of comoLista(jobs?.[clave]?.needs).map((n) => String(n))) {
@@ -918,7 +918,7 @@ export function cadenaApagada(jobs, clave, vistos = new Set()) {
  * condicional «reports Success» y «may not block merging», y un job cuyo `needs` falló
  * queda salteado. Las dos formas que corren igual son `always()` y `!cancelled()`.
  */
-export function correAunConFallo(job) {
+function correAunConFallo(job) {
   const valor = job?.if;
   if (valor === undefined || valor === null) return false;
   let t = String(valor).trim();
@@ -961,7 +961,7 @@ export function correAunConFallo(job) {
  * a nivel PASO pasaron de exit 1 a exit 0, incluida la mas barata de todas, poner
  * continue-on-error: true en el paso del veredicto para desbloquear un merge.
  */
-export function textosAmortiguadosDe(job) {
+function textosAmortiguadosDe(job) {
   const trozos = [];
   let motivo = '';
   for (const paso of Array.isArray(job?.steps) ? job.steps : []) {
@@ -998,7 +998,7 @@ export function textosVivosDe(job) {
  *  imprimió —y un job que falló antes de imprimir deja el output VACÍO, que es
  *  indistinguible de un job verde sin outputs—, así que leer `.outputs` no es cobrar el
  *  rojo. Las formas son las de la referencia de expresiones, no ortografías de shell. */
-export function consultaElResultado(texto, eslabon) {
+function consultaElResultado(texto, eslabon) {
   const t = String(texto ?? "");
   if (/needs\s*\.\s*\*\s*\.\s*result|to_?json\s*\(\s*needs\s*\)/i.test(t)) return true;
   const nombre = escaparRegex(eslabon);
@@ -1469,7 +1469,7 @@ export function evaluarCableado({ archivos, adopto, distribuye, scaffoldCablea, 
 
 /** El job listo para pegar, que es lo que el mensaje de fallo promete. Lleva las dos
  *  mitades de la condición 5, porque el `needs` solo no bloquea nada. */
-export const JOB_SUGERIDO = [
+const JOB_SUGERIDO = [
   "  constitucion:",
   "    name: constitucion",
   "    runs-on: ubuntu-latest",
@@ -1505,7 +1505,7 @@ export const JOB_SUGERIDO = [
  * ese caso no se confunde con «no rastrea nada», porque uno vuelve el check estricto y
  * el otro lo apagaría.
  */
-export function rastreadosEn(raiz, directorio) {
+function rastreadosEn(raiz, directorio) {
   const r = spawnSync("git", ["ls-files", "-z", "--", directorio], {
     cwd: raiz,
     encoding: "utf8",

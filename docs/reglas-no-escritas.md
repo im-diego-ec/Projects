@@ -610,7 +610,10 @@ arriba porque un check ya falla solo cuando alguien se aparta:
 > Dónde vive cada uno, para no leer de más: la validación estricta de OpenSpec,
 > el guardrail de deltas y el veredicto que reporta en los dos carriles los trae
 > Projects como pieza **referenciada** (`marco-ci.yml` y las composite actions), y
-> un proyecto los hereda con `uses: ...@v1` sin escribir nada. El resto es
+> un proyecto los hereda con `uses: ...@vX.Y.Z` sin escribir nada — **la versión
+> exacta, nunca `@v1`**: un repo pinado al tag mayor no recibe PR de bump y no
+> aparece en el censo, y no falla en rojo (`README.md`, «Nunca `@v1` en el repo de
+> un proyecto»). El resto es
 > **contrato del marco** —lo especifica `openspec/specs/`— y lo ejecuta el
 > pipeline de cada proyecto. La protección de `main` es un acto humano
 > deliberado y su estado real se documenta en cada repo

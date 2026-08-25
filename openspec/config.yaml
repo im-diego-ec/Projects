@@ -6,12 +6,15 @@ context: |
   en producción, no teoría de escritorio, y evoluciona con vida propia.
   Qué contiene, según cómo evoluciona cada pieza:
     - Referenciado: workflows reusables y composite actions que los proyectos
-      consumen con `uses: <org>/projects/...@v<major>`. Cambian una vez para todos.
+      consumen con `uses: <org>/Projects/...@v<major>`. Cambian una vez para todos.
     - Scaffold: plantillas que se copian UNA vez al crear el proyecto y luego
       son del proyecto (AGENTS.md, CODEOWNERS, plantilla de PR, configuración
       de lint y de agentes). Usan placeholders {{DOBLE_LLAVE}} documentados.
     - Canónico: los specs de marco (`openspec/specs/`) viven SOLO en este repo;
-      los proyectos adoptantes no los copian, los cumplen.
+      los proyectos adoptantes no los copian, los cumplen. Qué parte de ese
+      contrato tiene compuerta que falla sola —una fila por requirement, con la
+      ruta y la línea del paso o del test, o «ninguno»— está medido en
+      `openspec/cobertura-de-requirements.md`.
     - Regenerado: las skills y comandos de OpenSpec no se vendoran; el marco
       pina la versión del CLI y cada repo las regenera.
   Premisa dura: el cumplimiento del marco debe ser AUTOMÁTICO (CI, scaffolds,
@@ -34,6 +37,26 @@ rules:
     - Declarar a qué categoría de distribución pertenece lo que cambia
       (referenciado, scaffold, canónico o regenerado) y si rompe a los
       adoptantes existentes
+    - Abrir con un frontmatter YAML de CINCO campos obligatorios, en este
+      orden - `artefacto`, `dri`, `aprueba`, `informado`, `estado`. No es
+      decoración - `aprueba` es lo que decide quién gatea el change, y
+      `informado` es lo único que mantiene al rol de producto en el circuito
+      de los changes técnicos que su gate no cubre. Un proposal sin
+      frontmatter deja a ese rol afuera sin que nada lo diga
+    - "`artefacto` vale siempre `proposal`; `dri` y `aprueba` nombran ROLES
+      con la persona entre paréntesis cuando haga falta; `informado` admite
+      varios separados por `/`; `estado` es UNO de este conjunto cerrado -
+      `pendiente-de-revision`, `aprobado-en-sesion`, `en-ejecucion`,
+      `archivado`. Los campos opcionales que el marco ya usa son
+      `experimental` (booleano) y `veredicto_antes_de` (fecha ISO), y van
+      juntos - un change experimental sin fecha de veredicto es permanente
+      por defecto"
+    - "`dri` y `aprueba` NO pueden nombrar a la misma persona. Un autor que
+      se aprueba a sí mismo no es un review, y hoy nada lo detiene - el
+      repositorio corre con `required_approving_review_count` en `0` y
+      `require_code_owner_review` en `false`, así que CODEOWNERS sugiere
+      revisores y no gatea. Mientras esa configuración siga así, este campo
+      es la única constancia escrita de quién revisó"
   specs:
     - Usar escenarios con viñetas WHEN / THEN bajo `#### Scenario:` (prosa en
       español, keywords en inglés). No usar Dado / Cuando / Entonces
@@ -42,6 +65,15 @@ rules:
       que cada proyecto fija por su cuenta
   design:
     - Registrar las alternativas descartadas con su motivo
+    - "Nada de FUERA del change puede depender de una ruta de adentro de
+      `openspec/changes/<nombre>/`. Es una carpeta transitoria por
+      construcción - archivar la mueve a `changes/archive/` y descartar el
+      change la borra -, así que una dependencia en esa dirección convierte un
+      archive rutinario en un rojo de CI por algo que no tiene que ver con
+      specs. Si el change necesita traer una herramienta o un arnés, vive
+      fuera de `openspec/changes/` desde el primer commit. La guarda que lo
+      hace cumplir corre en el paso 2 de la skill de archivado
+      (`aplicar-deltas.mjs`), que sale 1 y no escribe nada"
     - Justificar cómo el cambio se hace cumplir solo (qué check falla si
       alguien no lo cumple); si el cumplimiento depende de que alguien se
       acuerde, decirlo explícitamente como deuda

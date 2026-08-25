@@ -63,4 +63,18 @@ runs:
       shell: bash
       env:
         CENSO_RAIZ: ${{ inputs.directorio-trabajo }}
-      run: node "${GITHUB_ACTION_PATH}/censo-fuentes.mjs"
+      # ESTA ACTION NO INSTALA NODE, Y ESO ES DELIBERADO: el requisito que no es
+      # negociable es que corra DESPUES del install del repo, o sea con el
+      # toolchain del consumidor ya montado, y montarlo exige un setup-node que
+      # ya corrio. Instalar node aca lo pisaria. Lo que si es obligatorio es no
+      # morir con "node: command not found", que es un mensaje del shell y no
+      # dice que hacer: el guard convierte esa muerte muda en el arreglo.
+      run: |
+        set -euo pipefail
+
+        if ! command -v node > /dev/null 2>&1; then
+          echo "::error::no hay 'node' en el PATH y sin el no se puede censar las fuentes del repo. Arreglo: agrega 'uses: actions/setup-node@v7' a este job, antes de este paso — este paso va DESPUES de instalar las dependencias, asi que el job ya tiene que traer su setup-node; si igual falta, es que este paso quedo antes de esa parte del job"
+          exit 1
+        fi
+
+        node "${GITHUB_ACTION_PATH}/censo-fuentes.mjs"

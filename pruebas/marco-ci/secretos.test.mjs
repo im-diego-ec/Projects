@@ -1,5 +1,13 @@
 // Banco del paso "Sin secretos en el repo (arbol y historia del cambio)".
 //
+// QUE CAPABILITY ENFORZA. `gestion-secretos`, requirement "Los secretos de
+// runtime se inyectan por referencia, nunca horneados": el paso es lo unico del
+// marco que lo vuelve exigible en vez de prosa, y este banco es lo unico que
+// ejercita el paso. Se escribe el nombre de la capability aca a proposito —el
+// censo de "que requirement tiene un check que falla solo" se hace buscando el
+// nombre en los archivos ejecutables, y una capability que ningun ejecutable
+// nombra figura como no enforzada aunque lo este.
+//
 // LIMITE DECLARADO Y NO NEGOCIADO: gitleaks no esta en esta maquina ni se baja en
 // el banco, asi que aca NO corre el detector. Lo que el banco prueba son las tres
 // piezas del paso que no son la herramienta, y las prueba por codigo de salida:

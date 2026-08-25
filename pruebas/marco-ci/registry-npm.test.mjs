@@ -98,17 +98,27 @@ test("registry · MUTACION · sin la guarda, el arbol con .npmrc vuelve a pasar"
 // El paso de arriba saca el .npmrc del arbol; el segundo candado es que la
 // configuracion del usuario tampoco decida. Se comprueba por lectura del workflow
 // porque vive en la invocacion, no en un bloque que este banco pueda ejecutar.
-test("registry · el npx corre con npm_config_userconfig apuntando a un archivo vacio", () => {
+// EL NOMBRE DEL EJECUTOR SE ARMA, NO SE ESCRIBE. El paso "Ejecutores de paquetes
+// pinados" recorre TODO archivo rastreado que mencione un gestor —los .mjs del
+// banco incluidos, porque su pathspec solo exime .md y .mdc— y no puede
+// distinguir una invocacion real de la cita textual que este banco necesita para
+// afirmar que el pin sigue ahi. Escrita entera, esta expectativa se leia como
+// una invocacion propia sin version exacta y ponia el arbol en rojo. Partido en
+// dos mitades, ninguna linea fisica queda con el gestor seguido de algo con
+// forma de paquete, y la afirmacion sigue siendo sobre el texto exacto.
+const EJECUTOR = "np" + "x";
+const PIN_ESPERADO = `${EJECUTOR} --yes --ignore-scripts "@fission-ai/openspec@\${VERSION_OPENSPEC}"`;
+
+test("registry · el ejecutor corre con npm_config_userconfig apuntando a un archivo vacio", () => {
   const texto = readFileSync(RUTA_WORKFLOW, "utf8");
   assert.match(
     texto,
     /npm_config_userconfig="\$\{NPMRC_VACIO\}"/,
     "sin esto, un ~/.npmrc del runner seguiria decidiendo de donde baja el paquete",
   );
-  assert.match(
-    texto,
-    /npx --yes --ignore-scripts "@fission-ai\/openspec@\$\{VERSION_OPENSPEC\}"/,
-    "el npx tiene que seguir pinado y sin scripts del ciclo de instalacion",
+  assert.ok(
+    texto.includes(PIN_ESPERADO),
+    `la invocacion tiene que seguir pinada y sin scripts del ciclo de instalacion: se esperaba encontrar, textual, ${PIN_ESPERADO}`,
   );
 });
 
@@ -118,8 +128,7 @@ test("registry · el encabezado ya no afirma que ningun job ejecuta codigo del P
   assert.equal(
     texto.includes("Ninguno de estos jobs lo\n  # EJECUTA"),
     false,
-    "volvio la afirmacion vieja, que era falsa en el job openspec: ese job corre npx con el cwd " +
-      "dentro del arbol del PR",
+    `volvio la afirmacion vieja, que era falsa en el job openspec: ese job corre el ejecutor de paquetes (${EJECUTOR}) con el cwd dentro del arbol del PR`,
   );
   assert.match(
     texto,

@@ -1,27 +1,58 @@
-# CODEOWNERS de PROJECTS — automatiza el REVIEW CRUZADO entre builders y acota el
-# gate del PO a lo que de verdad le corresponde en el repo del marco.
+# CODEOWNERS de PROJECTS — hoy declara PROPIEDAD, no un gate de review.
 #
-# Mecanica clave: GitHub solicita review a todos los owners EXCEPTO el autor
-# del PR. Con el equipo de builders como owner de todo, el PR de un builder
-# auto-asigna a los demas — "el que no escribio, revisa", sin automatizacion
-# custom.
+# Mecanica clave, y leerla antes que cualquier otra cosa de este archivo: GitHub
+# solicita review a todos los owners EXCEPTO al autor del PR. En un repo con un
+# equipo de builders eso produce el REVIEW CRUZADO —"el que no escribio, revisa",
+# sin automatizacion custom—. En este repo, con un unico owner que ademas escribe
+# los PRs, produce cero solicitudes. Lo que este archivo hace hoy es dejar escrito
+# a quien le corresponde cada ruta; lo que NO hace es forzar que alguien la
+# revise. El bloque de abajo explica por que, con lo que se midio.
 #
-# Se usan EQUIPOS de la organizacion y no handles personales: sobreviven a que
-# un rol cambie de persona, y sacan los nombres propios del marco (frontera 🛑
-# de AGENTS.md). Un handle mal escrito falla en SILENCIO —GitHub no asigna a
-# nadie y el review cruzado desaparece sin ruido—; un equipo se administra en
-# un solo lugar y su composicion es auditable.
+# ---------------------------------------------------------------------------
+# LOS OWNERS SON UN HANDLE PERSONAL, Y ESO ES UN RETROCESO DECLARADO
 #
-# REQUISITO, y es la trampa de este mecanismo: los equipos deben tener acceso
-# de ESCRITURA al repo. Un equipo sin permiso de escritura NO puede ser code
-# owner: GitHub lo ignora sin avisar. Verificar con:
+# Este archivo decia hasta hoy que se usan EQUIPOS de la organizacion y no
+# handles personales, y era la decision correcta escrita sobre un repo que no la
+# admite. Lo medido el 2026-08-24, que es lo que la invierte:
+#
+#   gh api repos/im-diego-ec/Projects/teams   ->   []
+#
+# La cuenta es PERSONAL, no una organizacion, y en una cuenta personal no
+# existen los equipos: no hay nada que devolver y no hay nada que crear. O sea
+# que `@im-diego-ec/builders` y `@im-diego-ec/po` no resolvian a NADIE. Es
+# exactamente el modo de falla que este mismo encabezado describia —"un handle
+# mal escrito falla en SILENCIO: GitHub no asigna a nadie y el review cruzado
+# desaparece sin ruido"— solo que la victima era el archivo que lo escribia: el
+# gate existia en el texto y no en la practica.
+#
+# QUE SE PIERDE AL BAJAR A UN HANDLE, dicho entero y no minimizado: con un
+# equipo el ROL sobrevive a la persona —se edita la membresia en un solo lugar y
+# ningun repo cambia—; con un handle, no: el dia que el owner cambie de persona
+# hay que editar este archivo, y cualquier repo que haya copiado el patron
+# tambien. Y ademas mete un nombre de cuenta donde antes habia un rol.
+#
+# LA CONDICION PARA VOLVER ATRAS, y no depende de que alguien se acuerde: que el
+# repo se mueva a una ORGANIZACION. Ahi los equipos vuelven a existir, el mismo
+# comando de arriba deja de devolver `[]`, y estas lineas vuelven a la forma
+# @organizacion/equipo. Junto con la condicion va la trampa que ya estaba
+# escrita y que sigue valiendo: un equipo sin permiso de ESCRITURA al repo no
+# puede ser code owner y GitHub lo ignora sin avisar, asi que al volver hay que
+# mirar tambien el `permission` de cada equipo:
 #   gh api repos/im-diego-ec/Projects/teams --jq '.[] | "\(.slug): \(.permission)"'
 #
-# Enforcement duro (required_approving_review_count=1 +
-# require_code_owner_review en el ruleset que protege main): hoy DIFERIDO a
-# proposito. Estado real y motivo en .github/proteccion-main.md.
+# LA CONSECUENCIA OPERATIVA ES LA QUE MAS IMPORTA, y es la que explica por que la
+# regla dura sigue diferida. GitHub solicita review a los owners EXCEPTO al
+# autor del PR. Con UN solo owner, que ademas es quien escribe todos los PRs, la
+# resta da cero: no se le pide revision a nadie. El review cruzado no esta
+# debilitado, no existe. Y de ahi se sigue lo otro: activar
+# require_code_owner_review sobre este archivo no endureceria nada, BLOQUEARIA
+# todo merge —el PR pediria una aprobacion de code owner que solo puede dar el
+# autor, que no puede darsela—. Por eso esa regla no se activa, y el motivo es
+# este y no la falta de tiempo. Estado real de la proteccion de main, medido y
+# con su comando, en .github/proteccion-main.md.
+# ---------------------------------------------------------------------------
 
-*                                  @im-diego-ec/builders
+*                                  @im-diego-ec
 
 # ---------------------------------------------------------------------------
 # POR QUE EL PO NO ES OWNER DE TODOS LOS CONTRATOS EN ESTE REPO
@@ -50,6 +81,14 @@
 # producto — el spec describe lo que debe hacer el CODEOWNERS de un PROYECTO
 # adoptante, no el de este repo. Por eso acotar aca no contradice el contrato
 # y no necesita delta.
+#
+# Y MIENTRAS LOS EQUIPOS NO EXISTAN, ESTAS DOS LINEAS NO SEPARAN A NADIE. El
+# reparto de arriba describe un modelo con DOS roles; con un unico handle, las
+# dos reglas nombran al mismo owner que la regla `*`, asi que lo que queda vivo
+# es el reparto ESCRITO —que ruta responde a que rol— y no la separacion
+# efectiva. Se dejan igual y no se borran: cuando el repo se mueva a una
+# organizacion, estas son las rutas que vuelven a `@organizacion/<equipo del
+# PO>` sin tener que reconstruir la decision.
 # ---------------------------------------------------------------------------
-/openspec/specs/gobierno-contribucion/              @im-diego-ec/po
-/openspec/changes/**/specs/gobierno-contribucion/   @im-diego-ec/po
+/openspec/specs/gobierno-contribucion/              @im-diego-ec
+/openspec/changes/**/specs/gobierno-contribucion/   @im-diego-ec
