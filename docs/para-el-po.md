@@ -11,6 +11,13 @@ repositorios es de las que se confunden solas, así que la sección 2 los separa
 uno por uno. Cuando una palabra suene rara, está definida en una línea en el
 [glosario](glosario.md).
 
+**Palabras del marco que vas a ver acá**, cada una definida en una línea:
+[andamio](glosario.md), [builder](glosario.md), [change](glosario.md),
+[CODEOWNERS](glosario.md), [compuerta](glosario.md), [delta](glosario.md),
+[guardrail](glosario.md), [PO](glosario.md), [proposal](glosario.md),
+[requirement](glosario.md), [scenario](glosario.md), [SHALL](glosario.md),
+[spec](glosario.md).
+
 ---
 
 ## 1. Qué es esto y por qué existe
@@ -59,10 +66,11 @@ aprobación es la gobernanza del **trabajo**: los roles, quién aprueba qué, c�
 se revisa.
 
 **Lo que no aprobás**: el diseño técnico (`design.md`), el plan de trabajo
-(`tasks.md`), el código, los pipelines y la infraestructura. Seguís informado de
+(`tasks.md`), el código, las verificaciones automáticas y la infraestructura.
+Seguís informado de
 todo change —la convención es que el encabezado de cada documento lleve un campo
-`informado:` con tu rol— y podés revisar lo que quieras. Acotar el gate te quita
-la obligación, no el acceso.
+`informado:` con tu rol— y podés revisar lo que quieras. Acotar tu aprobación te
+quita la obligación, no el acceso.
 
 Con una salvedad honesta sobre ese `informado:`: es convención, no compuerta.
 Nada lo verifica todavía, y hoy hay documentos de changes en vuelo que no lo
@@ -74,7 +82,7 @@ campo estuvo.
 > **diferida a propósito** tanto acá como en el andamio de un proyecto nuevo:
 > con un solo builder operativo, encenderla bloquearía todo. Está declarada como
 > diferida, con motivo, en [`.github/proteccion-main.md`](../.github/proteccion-main.md).
-> Mientras tanto GitHub te asigna como revisor pero no frena el merge. El día
+> Mientras tanto GitHub te asigna como revisor pero no frena la integración. El día
 > que se enciende, tu aprobación pasa a ser la puerta, sin excepciones para
 > nadie. Lo que sigue vale igual: la práctica no espera al interruptor.
 
@@ -135,7 +143,7 @@ Es un **delta**: solo lo que cambia, bajo tres encabezados posibles.
 | Encabezado | Qué significa | Qué mirar |
 |---|---|---|
 | `## ADDED Requirements` | Una promesa **nueva** | ¿Trae su escenario? ¿El THEN se puede observar? |
-| `## MODIFIED Requirements` | Una promesa vigente que se **reemplaza entera** | Que repita **todos** los escenarios que siguen valiendo: lo que no reproduce, se pierde al fusionarse. Hay un check que caza este caso, y existe porque ya borró escenarios una vez |
+| `## MODIFIED Requirements` | Una promesa vigente que se **reemplaza entera** | Que repita **todos** los escenarios que siguen valiendo: lo que no reproduce, se pierde al fusionarse. Hay una verificación automática que caza este caso, y existe porque ya borró escenarios una vez |
 | `## REMOVED Requirements` | Una promesa que se **retira** | Es la más cara de todas. Preguntá qué deja de estar garantizado y para quién |
 
 ---

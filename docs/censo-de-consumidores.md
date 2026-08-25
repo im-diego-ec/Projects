@@ -1,5 +1,14 @@
 # El censo de consumidores
 
+**Para quién es esta página.** Para quien mantiene el marco y tiene que contestar
+«quién lo está usando». **Es una página técnica** y se lee como una investigación
+con su estado: qué mecanismo hay, qué se midió de él y qué falta.
+
+**Palabras del marco que vas a ver acá**, cada una definida en una línea:
+[builder](glosario.md), [bump](glosario.md), [canónico](glosario.md),
+[censo](glosario.md), [cooldown](glosario.md), [fail-open](glosario.md),
+[pin](glosario.md), [reusable](glosario.md).
+
 > **Estado, al 2026-08-24.** El caso 3 —el que este documento dejó **abierto**—
 > quedó **explicado y arreglado**: ver [abajo](#el-caso-3-explicado-2026-08-24). Lo
 > que sigue sin mecanismo es la pregunta «quién consume el marco»: **B1 está a

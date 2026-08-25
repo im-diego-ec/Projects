@@ -10,126 +10,27 @@
 // edicion posterior la escribe alguien que ya se sabe el vocabulario y para quien
 // "compuerta", "delta" o "carril" son palabras normales. La degradacion es
 // invisible desde adentro — quien la introduce no puede verla, porque entiende lo
-// que escribio. Lo unico que la vuelve visible es derivarla del glosario, que es
-// justamente la lista de las palabras que este repo sabe que no son normales.
+// que escribio.
 //
-// LA PRIMERA REGLA: si la pagina usa una palabra del glosario, esa palabra tiene
-// que estar ENLAZADA al glosario en la propia pagina. No se exige que evite el
-// vocabulario —una pagina que no puede nombrar las cosas no explica nada—: se
-// exige que no lo suponga sabido.
+// DONDE VIVE AHORA CADA REGLA, y por que este archivo encogio. Las dos reglas de
+// vocabulario que nacieron aca —cada palabra del glosario, enlazada; nada de
+// jerga de oficio que el glosario no define— dejaron de ser de esta pagina: son
+// EL ESTANDAR DE docs/, valen para todas las paginas y se miden en
+// pruebas/docs/estandar-de-lectura.test.mjs, que ademas les corre las
+// refutaciones. Su definicion unica esta en pruebas/docs/lectura.mjs, y esta
+// pagina entra ahi por CARRIL_SIN_JERGA. Dejar una segunda copia aca solo servia
+// para que una de las dos se endureciera y la otra no.
 //
-// LA SEGUNDA REGLA, Y POR QUE HIZO FALTA. La primera se deriva del glosario, asi
-// que solo ve las palabras que el repo YA sabe que no son normales. La jerga de
-// todos los dias no esta ahi: "pipeline" no es un termino propio del marco, es
-// vocabulario de oficio, y por eso la regla del glosario nunca lo miraba. La
-// pagina lo usaba dos veces —una de ellas dentro de la lista concreta de lo que
-// hay que hacer para arrancar— con el banco entero en verde. La segunda regla es
-// una lista ESCRITA de palabras que esta pagina tiene prohibido usar porque todas
-// tienen traduccion corriente. Escrita y no derivada a proposito: no hay ningun
-// archivo del repo que enumere "las palabras que un BA no tiene por que saber",
-// y fingir que se deriva de algo seria el mismo falso verde de nuevo.
+// LO QUE SE QUEDA ACA es lo que solo le toca a esta pagina: que conteste las
+// cuatro preguntas para las que se escribio, que use vocabulario del marco en vez
+// de esquivarlo, y que se llegue a ella desde las dos puertas.
 import test from "node:test";
 import assert from "node:assert/strict";
-import { leer } from "./versiones.mjs";
+import { leer, terminosDelGlosario, terminosUsados } from "./lectura.mjs";
 
 const PAGINA = "docs/empezar-sin-ser-tecnico.md";
-const GLOSARIO = "docs/glosario.md";
 const TEXTO = leer(PAGINA);
-
-/** Los terminos que el glosario define: la primera celda de cada fila, que el
- *  archivo escribe entre asteriscos. Es la misma forma que ya usa el banco de
- *  documentacion para contar filas, asi que las dos comprobaciones se rompen
- *  juntas si alguien cambia el formato de la tabla — y ninguna se queda leyendo
- *  cero filas en silencio. */
-function terminosDelGlosario() {
-  return leer(GLOSARIO)
-    .split("\n")
-    .map((linea) => linea.match(/^\|\s*\*\*(.+?)\*\*/))
-    .filter(Boolean)
-    .map((marca) => marca[1].trim());
-}
-
 const TERMINOS = terminosDelGlosario();
-
-function escapar(texto) {
-  return texto.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-}
-
-/** Los terminos del glosario que un texto USA sin enlazarlos al glosario.
- *
- *  Puro sobre el texto a proposito: la refutacion de mas abajo le pasa una copia
- *  mutada y exige que los vea. Los bloques cercados quedan fuera —ahi va codigo,
- *  no prosa dirigida al lector— y el plural se acepta porque "specs" y "spec"
- *  son la misma palabra para quien la lee por primera vez. */
-export function terminosUsados(texto, terminos) {
-  const prosa = texto.replace(/```[\s\S]*?```/g, "");
-  return terminos.filter((t) => new RegExp(`\\b${escapar(t)}(?:s|es)?\\b`, "i").test(prosa));
-}
-
-export function jergaSinEnlazar(texto, terminos) {
-  const prosa = texto.replace(/```[\s\S]*?```/g, "");
-  const sinEnlazar = [];
-  for (const termino of terminosUsados(texto, terminos)) {
-    const enlazado = new RegExp(`\\[[^\\]]*${escapar(termino)}[^\\]]*\\]\\((?:\\./)?glosario\\.md\\)`, "i");
-    if (!enlazado.test(prosa)) sinEnlazar.push(termino);
-  }
-  return sinEnlazar;
-}
-
-/** Palabras de oficio que esta pagina tiene prohibido usar. NINGUNA esta en el
- *  glosario —hay un caso abajo que lo comprueba—: las del glosario se pueden usar
- *  enlazadas, estas no se usan y punto, porque el castellano corriente ya las
- *  dice (verificacion, entrega, cambio, integrar, herramienta que revisa...).
- *
- *  LA UNICA EXENCION, declarada: `stack` seguido de `.md` es el nombre de un
- *  archivo del repo, no la palabra. La pagina enlaza esa pagina dos veces y
- *  llamarla de otra forma seria mentir sobre la ruta. */
-const SIN_TRADUCCION = [
-  "pipeline",
-  "check",
-  "deploy",
-  "commit",
-  "merge",
-  "mergear",
-  "branch",
-  "runner",
-  "workflow",
-  "linter",
-  "lockfile",
-  "backend",
-  "frontend",
-  "stack",
-  "build",
-  "endpoint",
-  "framework",
-  "ORM",
-  "CLI",
-  "API",
-  "banco de pruebas",
-];
-
-/** La prosa que el lector lee de verdad: sin bloques cercados ni codigo en linea
- *  (ahi va lo que se copia y se pega, no lo que se lee) y sin los destinos de los
- *  enlaces (una ruta no es una frase). */
-export function prosaDeLaPagina(texto) {
-  return texto
-    .replace(/```[\s\S]*?```/g, "")
-    .replace(/`[^`]*`/g, "")
-    .replace(/\]\([^)]*\)/g, "]");
-}
-
-export function jergaDeOficio(texto, palabras) {
-  const prosa = prosaDeLaPagina(texto);
-  return palabras.filter((palabra) => new RegExp(`\\b${escapar(palabra)}\\b(?!\\.md)`, "i").test(prosa));
-}
-
-test("entrada · el glosario se leyo: cero terminos aca es el parseo roto, no un glosario vacio", () => {
-  assert.ok(
-    TERMINOS.length >= 20,
-    `lei ${TERMINOS.length} termino(s) de ${GLOSARIO} y se esperaban al menos 20. Sin terminos, el caso de la ` +
-      "jerga pasaria vacuamente: no habria nada que buscar en la pagina.",
-  );
-});
 
 test("entrada · la pagina existe y dice algo", () => {
   assert.ok(
@@ -139,52 +40,19 @@ test("entrada · la pagina existe y dice algo", () => {
   );
 });
 
-test("entrada · ninguna palabra del glosario se usa sin enlazarla ahi mismo", (t) => {
-  // La pagina TIENE que usar vocabulario del marco: es una puerta de entrada al
-  // marco, no un folleto. Si no usara ninguno, el caso de abajo pasaria vacuamente
-  // y este banco estaria certificando una pagina que no nombra nada.
+test("entrada · la pagina NOMBRA el vocabulario del marco en vez de esquivarlo", (t) => {
+  // El estandar exige que lo que use este enlazado; este caso exige que use
+  // algo. Sin el, la forma mas facil de estar en verde seria no nombrar nada — y
+  // una puerta de entrada que no nombra las cosas no explica nada. Es tambien la
+  // guarda de que el escaneo sigue reconociendo terminos: si dejara de hacerlo,
+  // la regla del enlace pasaria vacuamente sobre esta pagina.
   const usados = terminosUsados(TEXTO, TERMINOS);
   t.diagnostic(`palabras del glosario que la pagina usa y enlaza: ${usados.join(", ")}`);
   assert.ok(
     usados.length >= 4,
     `${PAGINA} usa ${usados.length} palabra(s) del glosario. Menos de cuatro significa una de dos: o la pagina ` +
       "esquiva el vocabulario en vez de explicarlo —y entonces no sirve de puerta de entrada—, o el escaneo dejo " +
-      "de reconocer los terminos y todo lo de abajo pasa vacuamente.",
-  );
-  assert.deepEqual(
-    jergaSinEnlazar(TEXTO, TERMINOS),
-    [],
-    `${PAGINA} usa estas palabras del marco sin enlazarlas al glosario. La pagina es para quien NO es tecnico: ` +
-      "cada palabra propia del marco que aparezca tiene que llevar su enlace la primera vez, con la forma " +
-      "[palabra](glosario.md). No hace falta evitar el vocabulario —una pagina que no puede nombrar las cosas no " +
-      "explica nada—; hace falta no suponerlo sabido.",
-  );
-});
-
-test("entrada · la lista de jerga prohibida no pisa al glosario", () => {
-  // Si una palabra estuviera en las dos listas, la pagina recibiria dos ordenes
-  // opuestas —usala enlazada / no la uses— y la primera persona que las viera
-  // apagaria una. El dia que una de estas entre al glosario, este caso lo dice y
-  // hay que elegir una de las dos reglas para ella.
-  const pisadas = SIN_TRADUCCION.filter((p) => TERMINOS.some((t) => t.toLowerCase() === p.toLowerCase()));
-  assert.deepEqual(
-    pisadas,
-    [],
-    `${pisadas.join(", ")} esta en la lista de jerga prohibida Y en ${GLOSARIO}. Las dos reglas se contradicen ` +
-      "sobre esa palabra: o se saca de la lista y se usa enlazada, o se saca del glosario.",
-  );
-});
-
-test("entrada · la pagina no usa jerga de oficio que el glosario no define", () => {
-  const encontradas = jergaDeOficio(TEXTO, SIN_TRADUCCION);
-  assert.deepEqual(
-    encontradas,
-    [],
-    `${PAGINA} usa ${encontradas.join(", ")}. Son palabras de oficio que el glosario NO define, asi que el caso ` +
-      "de arriba —que se deriva del glosario— no las mira: esta pagina es para quien no es tecnico y todas " +
-      "tienen traduccion corriente. Arreglo: 'pipeline' es 'las verificaciones automaticas', 'check' es " +
-      "'verificacion', 'banco de pruebas' es 'una comprobacion automatica'. Si una hace falta de verdad, " +
-      "explicala en la propia pagina y sacala de esta lista en el mismo cambio.",
+      "de reconocer los terminos y la regla del enlace pasa vacuamente sobre ella.",
   );
 });
 
@@ -233,50 +101,14 @@ test("entrada · la pagina esta enlazada desde el README y desde el indice de do
   );
 });
 
-// ---------------------------------------------------------------------------
-// REFUTACIONES: la comprobacion de la jerga, sobre copias mutadas en memoria.
-// ---------------------------------------------------------------------------
-
-test("refutacion · una palabra del glosario metida sin enlace se ve", () => {
-  const termino = TERMINOS.find((t) => !new RegExp(`\\b${escapar(t)}(?:s|es)?\\b`, "i").test(TEXTO));
-  assert.ok(termino, "todas las palabras del glosario ya aparecen en la pagina: no queda ninguna con que mutar");
-  const mutada = `${TEXTO}\n\nY entonces el equipo revisa el ${termino} antes de integrar.\n`;
-  assert.deepEqual(
-    jergaSinEnlazar(mutada, TERMINOS),
-    [termino],
-    `le meti "${termino}" a la pagina sin enlace y la comprobacion no lo vio: entonces su verde no significa nada`,
-  );
-});
-
-test("refutacion · una palabra de oficio metida en la prosa se ve", () => {
-  const mutada = `${TEXTO}\n\nY despues se revisa que el pipeline haya quedado verde.\n`;
+test("entrada · la pagina manda al lector a la guia que se hace CON el", () => {
+  // La division de trabajo entre las dos paginas es a proposito: esta contesta
+  // "que es y por que", y la de al lado contesta "que corro y que voy a ver".
+  // Quien llega aca decidido a arrancarlo tiene que encontrar la puerta; si no,
+  // termina en el runbook tecnico, que no esta escrito para el.
   assert.ok(
-    jergaDeOficio(mutada, SIN_TRADUCCION).includes("pipeline"),
-    "le meti 'pipeline' a la prosa y la lista de jerga no lo vio: entonces su verde no significa nada. Es " +
-      "textualmente la frase que estuvo en la pagina con el banco entero en verde.",
-  );
-});
-
-test("refutacion · control · la misma palabra dentro de codigo, y el nombre del archivo stack.md, no se marcan", () => {
-  const mutada = `${TEXTO}\n\nEl input se llama \`pipeline\` y la pagina del stack.md lo cuenta.\n`;
-  // Contra lo que la pagina ya da hoy, no contra la lista vacia: si la pagina
-  // estuviera sucia, este control tiene que seguir diciendo que el codigo en
-  // linea no agrega nada, no volverse rojo de rebote.
-  assert.deepEqual(
-    jergaDeOficio(mutada, SIN_TRADUCCION),
-    jergaDeOficio(TEXTO, SIN_TRADUCCION),
-    "la lista mordio codigo en linea o el nombre de un archivo del repo. Si muerde ahi, la pagina no puede " +
-      "nombrar ni una ruta y la proxima persona apaga la regla en vez de arreglarla",
-  );
-});
-
-test("refutacion · control · la misma palabra CON su enlace no se marca", () => {
-  const termino = TERMINOS.find((t) => !new RegExp(`\\b${escapar(t)}(?:s|es)?\\b`, "i").test(TEXTO));
-  const mutada = `${TEXTO}\n\nY entonces el equipo revisa el [${termino}](glosario.md) antes de integrar.\n`;
-  assert.deepEqual(
-    jergaSinEnlazar(mutada, TERMINOS),
-    [],
-    "la comprobacion marca una palabra que SI esta enlazada: asi la regla seria imposible de cumplir y la " +
-      "proxima persona la apagaria en vez de arreglarla",
+    TEXTO.includes("paso-a-paso-sin-ser-tecnico.md"),
+    `${PAGINA} no enlaza la guia paso a paso. Esta pagina explica QUE ES; el lector que ya decidio necesita el ` +
+      "HAZLO CONMIGO, y sin el enlace su unico camino es arrancar-un-proyecto.md, que es un runbook tecnico.",
   );
 });
