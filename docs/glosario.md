@@ -1,5 +1,10 @@
 # Glosario
 
+**Para quién es esta página.** Para cualquiera que se tope con una palabra rara
+en este repositorio, sea técnico o no. Es la única página de `docs/` a la que el
+resto enlaza: cuando otra página usa una palabra propia del marco, la enlaza acá,
+y acá está su línea.
+
 Este archivo existe porque el vocabulario del marco es corto pero cerrado: son
 las treinta y siete palabras de la tabla de abajo, que se repiten por todo el
 repositorio y que hasta hoy ningún archivo definía. Acá no va cuántas veces

@@ -6,6 +6,21 @@ y en Slack, y sobrevivían mientras las mismas tres personas siguieran acá.
 Cada una se compró con un incidente, una corrida perdida o una discusión
 que no queremos repetir. Acá quedan escritas por primera vez.
 
+**Para quién es esta página.** Para quien entra al equipo y va a trabajar
+**dentro** del marco. **Es una página técnica**: los ADRs explican por qué el
+sistema es así, y ésta explica cómo se trabaja adentro de él.
+
+**Palabras del marco que vas a ver acá**, cada una definida en una línea:
+[ADR](glosario.md), [andamio](glosario.md), [archive](glosario.md),
+[builder](glosario.md), [bump](glosario.md), [carril](glosario.md),
+[censo](glosario.md), [change](glosario.md), [ci-ok](glosario.md),
+[CODEOWNERS](glosario.md), [compuerta](glosario.md), [constitución](glosario.md),
+[delta](glosario.md), [estreno](glosario.md), [fail-open](glosario.md),
+[guardrail](glosario.md), [marcador](glosario.md), [modo aviso](glosario.md),
+[pin](glosario.md), [referenciado](glosario.md), [requirement](glosario.md),
+[reusable](glosario.md), [ruleset](glosario.md), [scaffold](glosario.md),
+[spec](glosario.md).
+
 **La premisa del marco**: un ritual que alguien debe recordar **no cuenta
 como enforcement**. Solo cuentan los checks que fallan solos. Por eso cada
 regla se registra con su estado real y, cuando todavía no es automática,

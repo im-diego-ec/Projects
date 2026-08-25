@@ -141,6 +141,12 @@ Cada uno está enumerado, con su trampa conocida, en
 repositorio» a «las verificaciones están en verde». No traigas una estimación de
 acá: traé la lista, que es lo que se puede planificar.
 
+**Y si lo vas a hacer vos**, sin ser técnico, hay una página que te acompaña
+comando por comando: [paso-a-paso-sin-ser-tecnico.md](paso-a-paso-sin-ser-tecnico.md).
+Cada paso dice qué copiar, **qué vas a ver en pantalla**, cómo saber que salió
+bien y cuánto tarda; trae además las cuentas que hay que abrir con sus límites
+gratuitos medidos, y una tabla de los rojos que son esperados.
+
 ### ¿Qué decisiones voy a tener que tomar yo?
 
 Tres grupos, y ninguno es técnico en el sentido de escribir código:
@@ -221,6 +227,9 @@ abrir una línea de código.
 
 ## Si querés seguir
 
+- [paso-a-paso-sin-ser-tecnico.md](paso-a-paso-sin-ser-tecnico.md) — el «hacelo
+  conmigo»: qué comando copiar, qué vas a ver en pantalla, cómo saber que salió
+  bien, y qué rojos son normales.
 - [glosario.md](glosario.md) — cada palabra propia del marco en una línea, con
   el archivo que manda sobre ella.
 - [para-el-po.md](para-el-po.md) — si vas a aprobar cambios: qué te toca, cómo

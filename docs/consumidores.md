@@ -1,5 +1,14 @@
 # Registro de consumidores del marco
 
+**Para quién es esta página.** Para quien mantiene el marco y necesita saber a
+quién le rompe un cambio. **Es una página técnica y hoy es una tabla vacía**: no
+hay nada que hacer acá salvo agregar una fila cuando un repositorio adopta el
+marco.
+
+**Palabras del marco que vas a ver acá**, cada una definida en una línea:
+[bump](glosario.md), [censo](glosario.md), [fail-open](glosario.md),
+[pin](glosario.md).
+
 > **Este archivo está VACÍO a propósito y eso no significa «cero consumidores».**
 > Significa que ninguna adopción pasó todavía por él. Es la mitad barata de la
 > recomendación B1 de [censo-de-consumidores.md](censo-de-consumidores.md): el lugar
