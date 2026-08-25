@@ -6,7 +6,40 @@ y que su **estado real** viva escrito en el repo. Este es ese documento para
 Projects. El equivalente para los proyectos se copia del scaffold
 ([`plantilla/.github/proteccion-main.md`](../plantilla/.github/proteccion-main.md)).
 
-## Estado real: **`main` no tiene ninguna protección activa**
+## Estado real: **`main` no tiene ninguna protección activa, y hoy no puede tenerla**
+
+> **La causa no es que nadie la haya aplicado: es el plan de la cuenta.** Medido el
+> 2026-08-25 intentando aplicarla por las dos vías, con `gh` autenticado y con permiso
+> de administrador sobre el repositorio:
+>
+> ```bash
+> gh api -X POST repos/im-diego-ec/Projects/rulesets --input ruleset-main.json
+> # -> 403 Upgrade to GitHub Pro or make this repository public to enable this feature
+>
+> gh api -X PUT repos/im-diego-ec/Projects/branches/main/protection --input -
+> # -> 403 el mismo mensaje
+> ```
+>
+> GitHub no ofrece protección de rama en repositorios **privados** del plan gratuito.
+> Este repositorio es privado a propósito, así que la compuerta no existe y **no
+> depende de que alguien se acuerde de encenderla**. Las tres salidas, escritas para
+> que la decisión sea explícita y no un olvido:
+>
+> | Salida | Qué desbloquea | Qué cuesta |
+> |---|---|---|
+> | GitHub Pro en la cuenta personal | Rulesets sobre repos privados | Una suscripción mensual |
+> | Mover el repositorio a una organización con plan Team | Lo mismo, más equipos reales en `CODEOWNERS` | Una suscripción por asiento |
+> | Hacer el repositorio público | Lo mismo, gratis | Publica el contenido |
+>
+> Mientras ninguna se tome, lo único que separa a `main` de un push equivocado es el
+> hook `pre-push` de [`herramientas/hooks/`](../herramientas/hooks/), que es
+> **client-side y se salta con `--no-verify`**. Eso no es una compuerta: es un cinturón
+> que uno mismo se abrocha, y este documento lo dice para que nadie lo confunda con la
+> protección que describe el resto de la página.
+>
+> El ruleset ya está escrito y probado como JSON válido: cuando alguna de las tres
+> salidas se tome, se aplica en un comando. Está más abajo, en «Cómo aplicarla».
+
 
 Medido el 2026-08-24, con los dos endpoints que cubren las dos formas en que
 GitHub puede proteger una rama —el moderno (rulesets) y el heredado (branch

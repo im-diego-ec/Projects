@@ -848,12 +848,28 @@ test("el canonico real no filtra valores de ningun proyecto concreto", () => {
   // Los valores de abajo son los que el render inyecta desde `.projects-valores.json`:
   // si alguno aparece en el canonico, el canonico dejo de ser del marco.
   // La lista cubre UNA ranura de `.projects-valores.json` por clase de dato, y
-    // `{{PROYECTO}}` es la mas propensa a filtrarse porque aparece en prosa y no solo
-    // en configuracion: sin ella, el nombre de un proyecto concreto podria entrar al
-    // canonico sin que nadie lo viera.
-    for (const prohibido of ["un-proyecto-anterior", "la organización-dev", "la organización-prod", "111111111111", "222222222222", "@builder-uno"]) {
+  // `{{PROYECTO}}` es la mas propensa a filtrarse porque aparece en prosa y no solo
+  // en configuracion: sin ella, el nombre de un proyecto concreto podria entrar al
+  // canonico sin que nadie lo viera.
+  //
+  // LAS CUENTAS DE AWS SE CAZAN POR FORMA Y NO POR VALOR, y el cambio no es de
+  // estilo: listar los numeros reales obligaba a TENERLOS ESCRITOS aca para poder
+  // prohibirlos, o sea que la guarda contra filtrar una cuenta era, ella misma, el
+  // lugar donde las cuentas vivian filtradas. Doce digitos seguidos en el canonico
+  // no tienen ningun uso legitimo, asi que la forma alcanza — y ademas cubre las
+  // cuentas que nadie penso en poner en una lista.
+  for (const prohibido of ["un-proyecto-anterior", "la organización-dev", "la organización-prod", "@builder-uno"]) {
     assert.equal(cuerpo.includes(prohibido), false, `el canonico nombra ${prohibido}, que es de un proyecto`);
   }
+
+  const EJEMPLOS = new Set(["111111111111", "222222222222", "000000000000"]);
+  const cuentas = [...cuerpo.matchAll(/\b\d{12}\b/g)].map((m) => m[0]).filter((c) => !EJEMPLOS.has(c));
+  assert.deepEqual(
+    cuentas,
+    [],
+    `el canonico lleva ${cuentas.length} numero(s) de doce digitos que no son de ejemplo ` +
+      `(${cuentas.join(", ")}): una cuenta de AWS de un proyecto concreto no entra al marco`,
+  );
 });
 
 test("el piso de permisos que publica el canonico real no lleva placeholders", () => {

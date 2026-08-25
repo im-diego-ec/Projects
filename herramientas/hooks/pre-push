@@ -1,0 +1,59 @@
+#!/bin/sh
+# Hook pre-push del marco. Corre lo mismo que el CI antes de dejar empujar.
+#
+# POR QUE EXISTE, y por que NO es la proteccion de rama. En este repositorio la
+# proteccion de `main` no existe y hoy no puede existir: GitHub no la ofrece en
+# repos privados del plan gratuito, medido con un 403 por las dos vias (esta
+# escrito en .github/proteccion-main.md). Sin compuerta del lado del servidor,
+# cualquier push entra a `main` sin que nada lo mire.
+#
+# Este hook es lo unico que queda, y hay que ser honesto sobre lo que es:
+#   · Es CLIENT-SIDE. Vive en tu .git/hooks, no en el repositorio remoto.
+#   · Se salta con `git push --no-verify`, sin dejar rastro.
+#   · No lo tiene quien clona el repo hasta que lo instala a mano.
+# O sea: es un cinturon que uno mismo se abrocha, no una compuerta. La doctrina
+# del marco dice que lo que depende de que alguien se acuerde no cuenta como
+# enforcement, y esto depende de eso. Se instala igual porque atrapa el error
+# honesto —el push que rompe algo sin querer— aunque no atrape al que decide
+# saltarselo.
+#
+# INSTALAR:
+#   ln -sf ../../herramientas/hooks/pre-push .git/hooks/pre-push
+#
+# El enlace simbolico y no la copia, a proposito: asi el hook se actualiza con
+# `git pull` en vez de quedarse en la version del dia que alguien lo copio.
+
+set -eu
+
+echo "pre-push: corriendo lo mismo que el CI antes de dejar empujar"
+
+# 1. El banco completo. Es lo que el job `pruebas-*` corre en CI.
+BANCOS=$(find pruebas actions -name '*.test.mjs' 2>/dev/null | sort)
+if [ -z "${BANCOS}" ]; then
+  echo "pre-push: ERROR — no encontre ningun banco de pruebas." >&2
+  echo "  Un cero aca es el hook roto, no un repo sin pruebas: si moviste los" >&2
+  echo "  bancos, actualiza este patron antes de creerle al verde." >&2
+  exit 1
+fi
+# shellcheck disable=SC2086
+if ! node --test ${BANCOS}; then
+  echo "pre-push: ERROR — el banco esta en rojo. Arreglalo antes de empujar," >&2
+  echo "  o si de verdad tenes que empujar: git push --no-verify (y deja dicho por que)." >&2
+  exit 1
+fi
+
+# 2. actionlint, si esta. Es el check que puso el CI en rojo dos veces seguidas
+#    mientras el banco local salia verde: el banco no valida el esquema de
+#    GitHub Actions ni pasa shellcheck por los bloques `run:`.
+if command -v actionlint > /dev/null 2>&1; then
+  if ! actionlint; then
+    echo "pre-push: ERROR — actionlint rechaza las definiciones de pipeline." >&2
+    exit 1
+  fi
+else
+  echo "pre-push: AVISO — actionlint no esta instalado, asi que la validacion del"
+  echo "  pipeline NO se corrio aca y solo la vas a ver en el CI. Instalalo con:"
+  echo "    brew install actionlint shellcheck"
+fi
+
+echo "pre-push: OK"
