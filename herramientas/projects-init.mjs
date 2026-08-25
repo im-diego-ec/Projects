@@ -746,6 +746,711 @@ export function avisosDelRegistroDeValores(destino) {
   ];
 }
 
+// ─────────────────────────── El arranque del proyecto ───────────────────────────
+//
+// POR QUE ESTO ES PARTE DE LA HERRAMIENTA Y NO UNA LISTA IMPRESA. Hasta este
+// cambio `projects init` dejaba el repo ESCRITO y le imprimia a la persona
+// cuatro comandos para que los corriera: install, format, datos, verificar.
+// Ninguno de los cuatro es una decision —no hay nada que elegir, no hay nada que
+// mirar, la respuesta correcta es siempre la misma— asi que eran exactamente lo
+// mismo que la copia de 76 archivos que esta herramienta ya reemplazo:
+// transcripcion. Y la transcripcion a mano falla igual de mal aca: quien se
+// saltea el install empuja el commit fundacional SIN lockfile y el CI muere en
+// `--frozen-lockfile`; quien se saltea el format empuja un README desalineado y
+// el CI muere en `format:check`. En los dos casos el rojo aparece media hora
+// despues, en un pipeline, y no en la maquina donde se podia arreglar en un
+// segundo.
+//
+// LO QUE SIGUE SIENDO HUMANO Y POR QUE. Crear el repo en GitHub, decidir los
+// valores, y los ajustes de la cuenta y de la organizacion (proteccion de main,
+// Dependabot, equipos, secrets, labels). Ninguno se puede hacer desde aca sin
+// credenciales que esta herramienta no pide y no deberia tener.
+
+/** Los cuatro pasos, en el UNICO orden en que salen verdes.
+ *
+ *  EL ORDEN NO ES ESTETICO Y ESTA MEDIDO. `datos` va antes que cualquier cosa
+ *  que lea tipos: genera el cliente de la capa de datos, y sin el `lint` y
+ *  `typecheck` salen rojos por un import que no resuelve — un rojo que no es de
+ *  quien corre la herramienta y que manda a diagnosticar el lugar equivocado. Y
+ *  `format` va antes que `verificar` porque al sustituir los marcadores cambian
+ *  los anchos del texto y el formateador alinea las tablas de markdown por
+ *  ancho: sin esa pasada, `format:check` —que esta DENTRO de verificar— sale
+ *  rojo sobre un README que nadie escribio mal.
+ *
+ *  `verificar` vuelve a correr `datos` por su cuenta (es el primer eslabon de su
+ *  cadena) y esa repeticion se deja a proposito: correrlo aparte es lo que hace
+ *  que un fallo del generador se lea como "el paso datos fallo" en vez de como
+ *  un rojo adentro de una cadena de seis. */
+export const PASOS_DEL_ARRANQUE = [
+  {
+    clave: "instalado",
+    titulo: "instalar las dependencias",
+    args: ["install"],
+    necesitaRed: true,
+    porQue:
+      "el andamio trae los manifiestos con sus rangos pero NO el lockfile (un lockfile no convive con marcadores). " +
+      "El CI corre con --frozen-lockfile: sin este install, el primer push muere ahi",
+    arreglo:
+      "corre `pnpm install` en el destino y lee el error. Causa habitual: un Node por debajo del que exigen las " +
+      "dependencias del andamio — copiar el andamio y poder instalarlo son dos pisos distintos, y este es el alto",
+  },
+  {
+    clave: "datos",
+    titulo: "generar el cliente de la capa de datos",
+    args: ["run", "datos"],
+    necesitaRed: false,
+    porQue: "lint y typecheck leen los tipos que genera este paso: sin el salen rojos por un import que no resuelve",
+    arreglo:
+      "corre `pnpm datos` en el destino. Si el proyecto NO genera cliente de datos, el valor GENERAR_CLIENTE_DATOS " +
+      "no corresponde y hay que borrar ese script y su paso del ci.yml (esta en la lista de limpiezas manuales de abajo)",
+  },
+  {
+    clave: "formateado",
+    titulo: "formatear el arbol",
+    args: ["run", "format"],
+    necesitaRed: false,
+    porQue:
+      "al sustituir los marcadores cambian los anchos del texto y el formateador alinea las tablas de markdown por " +
+      "ancho: sin esta pasada el repo nace desalineado y `format:check` sale rojo por una razon que no es de nadie",
+    arreglo: "corre `pnpm format` en el destino",
+  },
+  {
+    clave: "verificado",
+    titulo: "verificar el proyecto entero",
+    args: ["run", "verificar"],
+    necesitaRed: false,
+    porQue: "es la misma cadena que corre el CI: datos, lint, format:check, typecheck, test y build",
+    arreglo:
+      "corre `pnpm verificar` en el destino: encadena seis comprobaciones y el primer rojo corta, asi que la salida " +
+      "dice cual fue. Es el MISMO rojo que daria el CI en el primer push, con la diferencia de que aca se arregla antes",
+  },
+];
+
+/** Con que se corren los scripts del proyecto.
+ *
+ *  `corepack` primero y `pnpm` despues, y no al reves: corepack VIENE CON NODE, y
+ *  usa la version de pnpm que el propio proyecto declara en `packageManager`. Un
+ *  `pnpm` suelto del PATH es el que tenga instalado esa maquina, que puede ser de
+ *  otra mayor — y desde la mayor 11 de pnpm la lista de scripts de instalacion
+ *  permitidos SOLO se lee de pnpm-workspace.yaml, asi que un pnpm 9 sobre este
+ *  andamio no falla claro: falla con ERR_PNPM_IGNORED_BUILDS y de paso escribe
+ *  relleno en ese archivo.
+ *
+ *  Devuelve `null` cuando no hay ninguno, que NO es un error de esta herramienta:
+ *  es una maquina sin gestor de paquetes, y lo que corresponde es decirlo y
+ *  seguir. */
+export function ejecutorDeScripts(existe = comandoDisponible) {
+  if (existe("corepack")) return { comando: "corepack", prefijo: ["pnpm"], nombre: "corepack pnpm" };
+  if (existe("pnpm")) return { comando: "pnpm", prefijo: [], nombre: "pnpm" };
+  return null;
+}
+
+/** El entorno de los procesos hijos del arranque.
+ *
+ *  `COREPACK_ENABLE_DOWNLOAD_PROMPT=0` no es un capricho: la primera vez que
+ *  corepack tiene que bajar la version de pnpm que el proyecto declara, PREGUNTA
+ *  por la terminal. En una corrida sin nadie mirando —o con la salida
+ *  redirigida— esa pregunta no la contesta nadie y el arranque se cuelga, que es
+ *  el mismo modo de falla que esta herramienta cierra en todos lados. Con la
+ *  variable en 0 baja sin preguntar. */
+export function entornoDelArranque(env = process.env) {
+  return { ...env, COREPACK_ENABLE_DOWNLOAD_PROMPT: "0" };
+}
+
+function comandoDisponible(cmd) {
+  try {
+    execFileSync(cmd, ["--version"], { stdio: "ignore", shell: process.platform === "win32" });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/** Corre UN paso del arranque en el destino.
+ *
+ *  `stdio: "inherit"` a proposito: lo que este paso hace tarda minutos y quien lo
+ *  mira tiene que ver la salida REAL del gestor de paquetes mientras pasa, no un
+ *  spinner y un resumen al final. Es tambien lo que hace que el diagnostico de un
+ *  fallo sea el del programa que fallo y no una parafrasis de esta herramienta.
+ *
+ *  Sobre el `shell` en Windows: los argumentos de estos pasos son TODOS literales
+ *  de este archivo ("install", "run", "datos"...). No hay un solo valor de la
+ *  persona en ese vector, que es lo que hace que la concatenacion sin escapar de
+ *  cmd.exe —la que obliga a acotar el pin de OpenSpec unos bloques mas arriba— no
+ *  tenga aca ninguna superficie. */
+export function correrPaso(ejecutor, paso, destino, env = process.env) {
+  try {
+    execFileSync(ejecutor.comando, [...ejecutor.prefijo, ...paso.args], {
+      cwd: destino,
+      stdio: "inherit",
+      env: entornoDelArranque(env),
+      shell: process.platform === "win32",
+    });
+    return { ok: true, error: null };
+  } catch (e) {
+    return { ok: false, error: `${e?.status !== undefined && e?.status !== null ? `salio ${e.status}` : e?.code ?? "fallo"}` };
+  }
+}
+
+/** El modulo que sabe hablarle al registro de npm, cargado SOLO cuando el
+ *  arranque lo va a usar y por `import()` y no por `import` de arriba.
+ *
+ *  POR QUE NO ES UN IMPORT NORMAL, y es una propiedad que este archivo tenia y
+ *  casi se pierde en el mismo cambio que trajo el arranque. Un `import` estatico
+ *  de un archivo hermano se resuelve al CARGAR el modulo, o sea antes de la
+ *  primera linea de main(): si esta herramienta esta copiada sin su hermano al
+ *  lado —el caso que el guard de marco-ci.yml ya contempla, un clon parcial o el
+ *  archivo copiado fuera de su arbol— el proceso muere con un
+ *  ERR_MODULE_NOT_FOUND del cargador de ESM, con traza del runtime, sin escribir
+ *  nada y sin una sola linea de esta herramienta. Es exactamente el modo de
+ *  falla que el encabezado declara cerrado, reintroducido por una linea de
+ *  import. Medido: el caso del banco que copia SOLO este archivo a un directorio
+ *  temporal salia asi.
+ *
+ *  Cargado aca abajo y con guarda, la ausencia del hermano cuesta lo que de
+ *  verdad cuesta: la comprobacion previa de red, que es una comodidad de
+ *  diagnostico. El arranque se intenta igual. */
+async function moduloDelRegistro() {
+  try {
+    return await import("./registro-npm.mjs");
+  } catch {
+    return null;
+  }
+}
+
+/** El resumen del arranque, en las palabras del encargo: instalado, formateado,
+ *  verificado — o exactamente que fallo y como se arregla. Puro sobre lo que
+ *  paso, para que el banco lo pueda afirmar sin correr un install. */
+export function lineasDelResumen(hechos, destino) {
+  const hechas = hechos.filter((h) => h.ok).map((h) => h.paso.clave);
+  const fallo = hechos.find((h) => !h.ok);
+  const l = [];
+  if (!fallo) {
+    l.push(`ARRANCADO Y EN VERDE: ${hechas.join(", ")}. El proyecto de ${destino} instala, formatea y verifica.`);
+    return l;
+  }
+  l.push(
+    hechas.length
+      ? `::error::el arranque llego hasta "${hechas.join(", ")}" y se corto en el paso "${fallo.paso.titulo}" (${fallo.error}).`
+      : `::error::el arranque se corto en su primer paso, "${fallo.paso.titulo}" (${fallo.error}).`,
+  );
+  l.push(`  Por que ese paso: ${fallo.paso.porQue}.`);
+  l.push(`  Como se arregla: ${fallo.arregloConcreto ?? fallo.paso.arreglo}.`);
+  l.push(`  La salida del programa que fallo esta arriba, tal cual: este arranque no la parafrasea.`);
+  l.push(
+    `  Los ${PASOS_DEL_ARRANQUE.length - hechas.length - 1} paso(s) que venian despues NO se corrieron, para que ` +
+      `el rojo que se lee sea el primero y no una cascada.`,
+  );
+  l.push(`  El repo YA quedo escrito en ${destino}: esto no hay que volver a instanciarlo, solo destrabar ese paso.`);
+  return l;
+}
+
+// ───────────── El diagnostico de la proteccion de main ─────────────
+//
+// EL DEFECTO QUE ESTE BLOQUE CIERRA, y es el que este marco existe para
+// prohibir. Hasta este cambio `projects init` copiaba `.github/proteccion-main.md`
+// TAL CUAL y no medía nada. Ese documento se presenta como "el estado real" del
+// repositorio y manda, en un recuadro, aplicar las cuatro reglas del primer
+// bloque. Medido contra la cuenta que hoy hospeda el marco:
+//
+//   gh api repos/<org>/<repo>/rulesets
+//   -> 403 {"message":"Upgrade to GitHub Pro or make this repository public to
+//           enable this feature.","status":"403"}
+//
+// O sea que las cuatro reglas que el andamio manda aplicar NO EXISTEN y NO
+// PUEDEN existir: GitHub no ofrece proteccion de rama en repositorios privados
+// del plan gratuito. La persona que sigue el paso a paso se choca con un error
+// que el documento no contempla —solo contempla "si la salida no coincide con la
+// tabla"— y se queda sin salida escrita. Repartir un documento que afirma un
+// estado que el repositorio desmiente es la definicion de fallar ABIERTO: no hay
+// compuerta y ningun texto lo dice.
+//
+// LA REGLA DE ESTE BLOQUE, y es una sola: se MIDE, no se pregunta. Preguntarle
+// al arrancar "tenes GitHub Pro?" falla de tres formas —la persona no lo sabe,
+// lo sabe mal, o el plan cambia despues y nadie vuelve a preguntar— y las tres
+// terminan escribiendo una afirmacion que nadie comprobo.
+//
+// Y HAY UN TERCER ESTADO que no se puede colapsar con los otros dos: "no pude
+// mirar". Sin `gh`, sin autenticacion o sin red, esta herramienta no sabe nada
+// del repositorio, y "no pude mirar" NO es "no hay problema". Confundirlos es
+// exactamente el fail-open de arriba con otro disfraz, asi que cada uno de esos
+// caminos escribe que NO se midio y no afirma nada.
+//
+// LO QUE ESTE BLOQUE NO HACE: aplicar el ruleset. La sonda es de SOLO LECTURA —un
+// GET alcanza para saberlo, no hace falta intentar escribir—. Cambiar un ajuste
+// de seguridad de un repositorio no se hace en silencio, y un programa con
+// permiso para editar la proteccion de main es un programa con permiso para
+// quitarla; es la razon por la que el propio documento declara que aplicarla es
+// un acto humano deliberado. Lo que esta herramienta deja escrito es el comando.
+
+/** El documento del proyecto nuevo donde se escribe el estado medido. */
+export const RUTA_PROTECCION = ".github/proteccion-main.md";
+
+/** Cuanto se espera a la sonda antes de darla por no contestada. Es una consulta
+ *  de un objeto chico; quince segundos es holgado y es corto frente a lo que
+ *  cuesta la alternativa, que es dejar colgado un `projects init` sobre un repo
+ *  ya escrito. Al vencer se cae en "no pude mirar", que es lo correcto. */
+export const TIMEOUT_DE_LA_SONDA = 15000;
+
+/** Los estados que la sonda puede dejar, y por que son siete y no dos.
+ *
+ *  Los dos primeros son MEDICIONES —el repositorio contesto— y los cinco
+ *  ultimos son AUSENCIA de medicion. La linea que separa esos dos grupos es la
+ *  unica que de verdad importa en este archivo. */
+export const ESTADOS_DE_PROTECCION = {
+  puede: "el repositorio SI admite rulesets: la sonda contesto 200",
+  "sin-compuertas": "el repositorio NO admite rulesets con su plan y visibilidad de hoy: 403 de upgrade",
+  "sin-gh": "no se pudo mirar: no hay `gh` en el PATH",
+  "sin-auth": "no se pudo mirar: `gh` no esta autenticado",
+  "sin-red": "no se pudo mirar: no se llego a la API de GitHub",
+  "sin-repo": "no se pudo mirar: GitHub contesto 404 sobre ese repositorio",
+  "no-se-sabe": "no se pudo mirar: la sonda contesto algo que esta herramienta no sabe leer",
+};
+
+/** Los estados en los que esta herramienta NO midio nada y por lo tanto no
+ *  afirma nada. Es UNA lista, para que agregar un estado nuevo no pueda dejarlo
+ *  del lado equivocado por olvido. */
+export const ESTADOS_SIN_MEDICION = new Set(["sin-gh", "sin-auth", "sin-red", "sin-repo", "no-se-sabe"]);
+
+export function seMidio(estado) {
+  return !ESTADOS_SIN_MEDICION.has(estado);
+}
+
+/** Que dijo la sonda, leido de lo que el proceso dejo.
+ *
+ *  NO SE CLASIFICA POR CODIGO DE SALIDA, y esto esta medido: `gh` sale 1 tanto
+ *  con el 403 del plan gratuito como cuando no hay red, asi que un `switch` sobre
+ *  el codigo mete "no puede tener compuertas" y "no pude mirar" en el mismo
+ *  cajon — que es justamente la confusion que este bloque existe para no
+ *  cometer. Lo que SI distingue es el cuerpo: el 403 trae un JSON con `status` y
+ *  un `message`, y el corte de red no trae cuerpo ninguno.
+ *
+ *  Las cinco salidas reales, medidas contra la API el dia que se escribio esto:
+ *    · 200  -> exit 0, stdout con el array JSON de rulesets, stderr vacio
+ *    · 403  -> exit 1, stdout {"message":"Upgrade to GitHub Pro or make this
+ *              repository public to enable this feature.","status":"403"}
+ *    · 404  -> exit 1, stdout {"message":"Not Found","status":"404"}
+ *    · red  -> exit 1, stdout VACIO, stderr con el error de transporte
+ *    · auth -> exit 4, stdout vacio, stderr "please run:  gh auth login"
+ *
+ *  Recibe lo que dejo el proceso y no lo corre: asi el banco puede ver las siete
+ *  ramas sin red, sin cuenta de GitHub y sin `gh` instalado. */
+export function clasificarSondaDeRulesets({ presente = true, codigo = null, stdout = "", stderr = "", error = null } = {}) {
+  if (!presente) return { estado: "sin-gh", detalle: "no encontre el ejecutable `gh` en el PATH", rulesets: [] };
+  const salida = String(stdout ?? "");
+  const err = String(stderr ?? "");
+  const todo = `${salida}\n${err}`;
+
+  // El estado HTTP, leido del cuerpo primero (que es la fuente) y del mensaje de
+  // `gh` despues (que es una parafrasis, pero sirve cuando el cuerpo no vino).
+  let http = null;
+  const delCuerpo = /"status"\s*:\s*"?(\d{3})"?/.exec(salida);
+  if (delCuerpo) http = Number.parseInt(delCuerpo[1], 10);
+  else {
+    const delMensaje = /\(HTTP (\d{3})\)/.exec(todo);
+    if (delMensaje) http = Number.parseInt(delMensaje[1], 10);
+  }
+
+  const m = /"message"\s*:\s*"((?:[^"\\]|\\.)*)"/.exec(salida);
+  let mensaje = "";
+  if (m) {
+    try {
+      mensaje = JSON.parse(`"${m[1]}"`);
+    } catch {
+      mensaje = m[1];
+    }
+  } else {
+    mensaje = err.trim().split("\n")[0] ?? "";
+  }
+
+  if (http === 403) {
+    // El 403 de plan/visibilidad y el 403 de "no sos admin de este repo" son
+    // cosas distintas: el primero es una MEDICION ("no puede") y el segundo es
+    // una ausencia de medicion ("no pude mirar"). Colapsarlos afirmaria sobre un
+    // repositorio que esta herramienta no llego a ver.
+    if (/Upgrade to GitHub Pro|make this repository public/i.test(todo)) {
+      return { estado: "sin-compuertas", detalle: mensaje || "Upgrade to GitHub Pro or make this repository public to enable this feature.", rulesets: [] };
+    }
+    return { estado: "no-se-sabe", detalle: `403, y no es el del plan gratuito: ${mensaje || "sin mensaje"}`, rulesets: [] };
+  }
+  if (http === 404) return { estado: "sin-repo", detalle: mensaje || "Not Found", rulesets: [] };
+  if (http === 401) return { estado: "sin-auth", detalle: mensaje || "401", rulesets: [] };
+  if (/gh auth login|GH_TOKEN environment variable|authentication token/i.test(todo)) {
+    return { estado: "sin-auth", detalle: err.trim().split("\n")[0] || "gh no esta autenticado", rulesets: [] };
+  }
+  if (codigo === 0) {
+    try {
+      const cuerpo = JSON.parse(salida);
+      if (Array.isArray(cuerpo)) {
+        return {
+          estado: "puede",
+          detalle: `200, ${cuerpo.length} ruleset(s) hoy`,
+          rulesets: cuerpo.map((r) => (r && typeof r.name === "string" ? r.name : "(sin nombre)")),
+        };
+      }
+    } catch {
+      // Salio 0 y lo que contesto no es la lista que documenta la API. No se
+      // declara "puede" sobre eso: cae abajo, en "no se sabe".
+    }
+    return { estado: "no-se-sabe", detalle: "la sonda salio 0 y lo que contesto no es la lista de rulesets que documenta la API", rulesets: [] };
+  }
+  if (error || salida.trim() === "") {
+    return { estado: "sin-red", detalle: error || err.trim().split("\n")[0] || `la sonda salio ${codigo} sin cuerpo`, rulesets: [] };
+  }
+  return { estado: "no-se-sabe", detalle: `la sonda salio ${codigo}: ${mensaje || err.trim() || salida.trim()}`, rulesets: [] };
+}
+
+/** Corre la sonda de verdad. Un GET y nada mas: SOLO LECTURA.
+ *
+ *  `shell: false` a proposito. En Windows `gh` se instala como `gh.exe`, que Node
+ *  resuelve sin shell; y sin shell los dos valores que entran a la linea de
+ *  comandos no pasan nunca por cmd.exe, que es donde Node concatena sin escapar
+ *  (DEP0190). Ademas los dos se validan aca: main() ya los valido, pero esta
+ *  funcion se exporta y no puede dar por hecho quien la llama.
+ *
+ *  Y SE VALIDAN CONTRA LA FORMA DE GITHUB, no contra FORMATOS.PROYECTO. No es un
+ *  descuido: FORMATOS.PROYECTO exige kebab-case en minusculas, que es la
+ *  CONVENCION del marco para un proyecto nuevo, mientras que lo que esta funcion
+ *  necesita es que el valor sea seguro como segmento de una ruta. La diferencia
+ *  no es teorica —el propio repositorio del marco se llama `Projects`, con
+ *  mayuscula— y con el patron del marco esta sonda contestaria "no se sabe"
+ *  sobre repositorios que existen. Un guard que se equivoca sobre el caso real
+ *  no es un guard: es ruido que ensena a ignorarlo. */
+const FORMA_DE_REPO_EN_GITHUB = /^(?!\.{1,2}$)[A-Za-z0-9._-]{1,100}$/;
+
+export function sondarProteccion({ org, proyecto, correr = correrGh } = {}) {
+  if (!FORMATOS.ORG.patron.test(String(org ?? "")) || !FORMA_DE_REPO_EN_GITHUB.test(String(proyecto ?? ""))) {
+    return {
+      estado: "no-se-sabe",
+      detalle: `no se sondeo: ${JSON.stringify(`${org}/${proyecto}`)} no tiene la forma de un <org>/<repo> de GitHub`,
+      rulesets: [],
+    };
+  }
+  return clasificarSondaDeRulesets(correr({ org, proyecto }));
+}
+
+/** El GET, y nada mas que el GET.
+ *
+ *  El vector va ESCRITO ACA, entero y a la vista, y no armado en otro lado y
+ *  pasado como variable: el banco de esta herramienta audita los argumentos de
+ *  cada `execFileSync` contra una lista de residuos declarados, y un vector que
+ *  llega como identificador se le escapa a esa auditoria sin poner nada en rojo.
+ *  El unico residuo de este es la ruta del repositorio, cuyas dos piezas
+ *  `sondarProteccion` acaba de validar contra formas que no admiten ni un
+ *  metacaracter de shell — y que ademas no pasan por ninguno, porque esta
+ *  invocacion va con `shell: false`. */
+function correrGh({ org, proyecto }) {
+  try {
+    const stdout = execFileSync("gh", ["api", `repos/${org}/${proyecto}/rulesets`], {
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "pipe"],
+      timeout: TIMEOUT_DE_LA_SONDA,
+      shell: false,
+    });
+    return { presente: true, codigo: 0, stdout, stderr: "", error: null };
+  } catch (e) {
+    if (e?.code === "ENOENT") return { presente: false, codigo: null, stdout: "", stderr: "", error: "ENOENT" };
+    const vencio = e?.killed === true;
+    return {
+      presente: true,
+      codigo: typeof e?.status === "number" ? e.status : null,
+      stdout: String(e?.stdout ?? ""),
+      stderr: String(e?.stderr ?? ""),
+      error: vencio ? `la sonda no contesto en ${TIMEOUT_DE_LA_SONDA} ms` : typeof e?.status === "number" ? null : (e?.message ?? "fallo"),
+    };
+  }
+}
+
+/** El Markdown que se escribe en el documento del proyecto nuevo.
+ *
+ *  Puro sobre `{ estado, detalle, rulesets, org, proyecto, fecha }`: no mide, no
+ *  lee disco y no imprime, asi que el banco puede afirmar el texto de las siete
+ *  ramas sin red. Markdown CON acentos, que es la convencion de la documentacion
+ *  del marco (los comentarios de YAML son los que van sin).
+ *
+ *  Devuelve DOS cosas porque hay dos cirugias: `lineas` es el bloque medido que
+ *  reemplaza al recuadro 🕳️, y `frase` es la que reemplaza a la afirmacion
+ *  "Se encienden ahora. Son las cuatro que el repo de referencia tiene
+ *  funcionando" — que es falsa cuando el repositorio no puede tenerlas. */
+export function bloqueDeProteccion({ estado, detalle = "", rulesets = [], org, proyecto, fecha }) {
+  const dia = fecha ?? new Date().toISOString().slice(0, 10);
+  const sonda = `gh api repos/${org}/${proyecto}/rulesets`;
+  const l = [];
+  const pie = () => {
+    l.push("");
+    l.push("Esta sección la escribió `projects init` **midiendo**, no copiándola de una plantilla.");
+    l.push("Cuando cambie el plan, la visibilidad o el ruleset, volvé a correr la sonda de arriba y");
+    l.push("actualizá esto con la fecha: un documento de estado que nadie vuelve a medir es una");
+    l.push("afirmación vencida.");
+  };
+
+  if (estado === "puede") {
+    l.push(`### 🟢 Este repositorio **sí puede** tener protección de rama — medido el ${dia}`);
+    l.push("");
+    l.push("```");
+    l.push(`$ ${sonda}`);
+    l.push(`→ ${detalle}`);
+    l.push("```");
+    l.push("");
+    if (rulesets.length === 0) {
+      l.push("**Hoy no hay ninguno activo.** Los 🔴 de la tabla de abajo son 🔴 de verdad: hasta que");
+      l.push("apliques las cuatro reglas, `main` acepta push directo y ningún check es obligatorio");
+      l.push("para integrar.");
+    } else {
+      l.push(`**Hoy hay ${rulesets.length}**: ${rulesets.map((n) => `\`${n}\``).join(", ")}. Que existan rulesets no dice que sean`);
+      l.push("estos: contrastá regla por regla contra la tabla de abajo antes de pasar un 🔴 a 🟢.");
+    }
+    l.push("");
+    l.push("**Aplicarlas es un acto humano y esta herramienta no lo hace por vos**, ni te lo preguntó");
+    l.push("al pasar: un programa con permiso para editar la protección de `main` es un programa con");
+    l.push("permiso para quitarla. Los pasos por la interfaz están más abajo, en «Aplicarla desde");
+    l.push("cero». Para contrastar el resultado desde la terminal:");
+    l.push("");
+    l.push("```bash");
+    l.push(`${sonda} --jq '.[] | "\\(.id)  \\(.name)  \\(.enforcement)"'`);
+    l.push("```");
+    l.push("");
+    l.push("**Y no antes de que el CI haya corrido una vez:** el check `ci-ok` no aparece en la lista");
+    l.push("de checks disponibles del ruleset hasta que exista una corrida que lo haya reportado. El");
+    l.push("bootstrap entra a `main` por push directo; la protección se aplica después.");
+    pie();
+    return {
+      lineas: l,
+      frase: [
+        "**Las cuatro que hay que encender.** Este repositorio puede tenerlas —está medido acá",
+        "arriba— y alcanzan para que nada entre a `main` sin pasar por un PR verde:",
+      ],
+    };
+  }
+
+  if (estado === "sin-compuertas") {
+    l.push(`### 🔴 Este repositorio **no puede** tener protección de rama hoy — medido el ${dia}`);
+    l.push("");
+    l.push("```");
+    l.push(`$ ${sonda}`);
+    l.push(`→ 403 ${detalle}`);
+    l.push("```");
+    l.push("");
+    l.push("GitHub **no ofrece protección de rama en repositorios privados del plan gratuito**. No es");
+    l.push("un ajuste que falte marcar ni un permiso que falte pedir: con este plan y esta");
+    l.push("visibilidad, el endpoint no existe. Las cuatro reglas de la tabla de abajo describen lo");
+    l.push("que hay que aplicar **cuando se pueda**, y hasta entonces sus 🔴 son 🔴.");
+    l.push("");
+    l.push("**Qué significa mientras tanto, escrito sin eufemismos.** `main` acepta push directo y");
+    l.push("force-push de cualquiera con permiso de escritura, se puede borrar, y ningún check es");
+    l.push("obligatorio para integrar. Lo único que queda es el hook de cliente");
+    l.push("(`herramientas/hooks/pre-push`), que cada quien tiene que instalar en su clon y que se");
+    l.push("saltea con `--no-verify`. En cualquier informe de estado esto se escribe **«no hay");
+    l.push("compuerta»**, nunca «está pendiente»: pendiente es lo que se puede hacer y todavía no se");
+    l.push("hizo.");
+    l.push("");
+    l.push("**Las tres salidas, y hay que elegir una:**");
+    l.push("");
+    // LA TABLA VA YA ALINEADA, y no es cosmetica: el formateador del andamio
+    // alinea las tablas de markdown por ancho, asi que una escrita a ojo deja el
+    // documento en rojo para `format:check` — que es el mismo defecto por el que
+    // el arranque corre `pnpm format` antes de `verificar`. Estas cinco lineas
+    // son la salida literal del formateador sobre este mismo contenido: si
+    // alguna celda cambia de texto, hay que volver a pasarle el formateador y
+    // copiar el resultado.
+    l.push("| Salida                                              | Qué habilita                                                                                                                               | Qué cuesta                                                                                                                            |");
+    l.push("| --------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------- |");
+    l.push("| **GitHub Pro** en la cuenta personal dueña del repo | Rulesets en los repos privados de esa cuenta                                                                                               | Suscripción mensual por usuario. Es la salida más barata si el repo se queda donde está                                               |");
+    l.push("| **Mover el repo a una organización** con plan Team  | Rulesets en los repos privados de la organización, y además equipos de verdad — que es lo que `CODEOWNERS` necesita para asignar a alguien | Suscripción por usuario y mes de la organización, más el trabajo de transferir el repo y rehacer secrets, variables y permisos        |");
+    l.push("| **Hacer el repo público**                           | Rulesets sin costo, con el plan que ya tenés                                                                                               | El código, los issues y los PRs pasan a ser públicos. Antes hay que revisar el historial completo: lo que se publica no se despublica |");
+    l.push("");
+    l.push("Los precios los publica GitHub y cambian, así que acá no van copiados: esta tabla dice");
+    l.push("**qué** hay que decidir. El número de hoy está en <https://github.com/pricing>.");
+    l.push("");
+    l.push("Cuando cambies de plan o de visibilidad, volvé a correr la sonda de arriba. En cuanto");
+    l.push("conteste `200`, aplicá las cuatro reglas y actualizá esta sección con la fecha.");
+    pie();
+    return {
+      lineas: l,
+      frase: [
+        "**Las cuatro que habría que encender** — y que este repositorio **no puede** tener hoy",
+        "(medido acá arriba, con la respuesta textual de GitHub). Sus 🔴 van a seguir en 🔴 hasta que",
+        "cambie el plan o la visibilidad. Alcanzan para que nada entre a `main` sin pasar por un PR",
+        "verde:",
+      ],
+    };
+  }
+
+  // Los cinco caminos de "no pude mirar". Comparten forma a proposito: lo que
+  // tienen que dejar claro es lo mismo, y es que esta herramienta NO afirma nada
+  // sobre este repositorio.
+  const titulos = {
+    "sin-gh": "no encontré `gh` en el PATH",
+    "sin-auth": "`gh` no está autenticado",
+    "sin-red": "no se llegó a la API de GitHub",
+    "sin-repo": `GitHub no conoce (todavía) a \`${org}/${proyecto}\``,
+    "no-se-sabe": "la sonda contestó algo que esta herramienta no sabe leer",
+  };
+  const comoSeDestraba = {
+    "sin-gh": ["Instalá GitHub CLI (<https://cli.github.com>), corré `gh auth login`, y después la sonda de arriba."],
+    "sin-auth": ["Corré `gh auth login` y después la sonda de arriba."],
+    "sin-red": [
+      "Es un problema de red o de proxy, no del repositorio. Reintentá la sonda de arriba desde una",
+      "máquina con salida a `api.github.com`.",
+    ],
+    "sin-repo": [
+      "Lo más probable es que el repositorio todavía no exista: `projects init` corre **antes** del",
+      "primer push. También puede ser que el nombre no sea ese, o que la cuenta autenticada no lo",
+      "vea. Volvé a correr la sonda de arriba después del push fundacional.",
+    ],
+    "no-se-sabe": [
+      "Copiá la salida tal cual al reportarlo: esta herramienta sabe leer 200, 403, 404, la falta de",
+      "autenticación y el corte de red, y esto no fue ninguno de los cinco.",
+    ],
+  };
+  l.push(`### ⚪ No se pudo medir: ${titulos[estado] ?? estado} — intentado el ${dia}`);
+  l.push("");
+  l.push("```");
+  l.push(`$ ${sonda}`);
+  l.push(`→ ${detalle || "sin detalle"}`);
+  l.push("```");
+  l.push("");
+  l.push("**«No pude mirar» no es «no hay problema».** Esta herramienta no llegó a ver este");
+  l.push("repositorio, así que **no afirma nada** sobre su protección de rama: ni que la tenga, ni");
+  l.push("que pueda tenerla. Hasta que la sonda conteste, el estado de la protección de `main` acá es");
+  l.push("**desconocido**, y así hay que escribirlo en cualquier informe.");
+  l.push("");
+  for (const linea of comoSeDestraba[estado] ?? []) l.push(linea);
+  l.push("");
+  l.push("Y hay una respuesta concreta que conviene tener leída de antemano, porque el paso a paso no la");
+  l.push("contemplaba. Si la sonda contesta");
+  l.push("**403 «Upgrade to GitHub Pro or make this repository public»**, no es que este documento esté");
+  l.push("desactualizado: es que GitHub no ofrece protección de rama en repositorios privados del plan");
+  l.push("gratuito, y hay que elegir entre GitHub Pro, mover el repo a una organización con plan Team, o");
+  l.push("hacerlo público.");
+  pie();
+  return {
+    lineas: l,
+    frase: [
+      "**Las cuatro que hay que encender** si este repositorio puede tenerlas — y eso **no se pudo",
+      "medir** (está acá arriba, con el motivo). Alcanzan para que nada entre a `main` sin pasar por",
+      "un PR verde:",
+    ],
+  };
+}
+
+/** El aviso corto para la terminal. Quien corre la herramienta tiene que
+ *  enterarse SIN abrir el documento: el 403 medido no es una nota al pie, es la
+ *  diferencia entre tener compuerta y no tenerla. */
+export function avisoDeProteccion({ estado, detalle, org, proyecto }) {
+  if (estado === "puede") {
+    return `PROTECCION DE MAIN: medido — ${org}/${proyecto} SI admite rulesets (${detalle}). El estado real quedo escrito en ${RUTA_PROTECCION}; aplicarlas es un acto humano y esta herramienta no lo hace`;
+  }
+  if (estado === "sin-compuertas") {
+    return (
+      `::warning::PROTECCION DE MAIN: medido — ${org}/${proyecto} NO puede tener proteccion de rama hoy. ` +
+      `La sonda de solo lectura contesto 403: "${detalle}". GitHub no la ofrece en repos privados del plan ` +
+      `gratuito, asi que este repo nace SIN compuerta del lado del servidor: nada impide un push directo a ` +
+      `main. Las tres salidas —GitHub Pro, una organizacion con plan Team, o hacer el repo publico— quedaron ` +
+      `escritas con su costo en ${RUTA_PROTECCION}`
+    );
+  }
+  return (
+    `::warning::PROTECCION DE MAIN: NO se pudo medir (${estado}: ${detalle}). "No pude mirar" no es "no hay ` +
+    `problema": esta herramienta no afirma nada sobre la proteccion de ${org}/${proyecto}. Quedo escrito asi ` +
+    `en ${RUTA_PROTECCION}, con como destrabarlo`
+  );
+}
+
+/** Mete el bloque medido en el documento del proyecto nuevo.
+ *
+ *  DOS CIRUGIAS ANCLADAS Y UN AGREGADO, y ninguna reescribe el documento entero:
+ *  lo que ese archivo explica bien —por que el check requerido es `ci-ok`, por
+ *  que las cuatro diferidas se dejan apagadas, los pasos de la interfaz— vive en
+ *  el andamio, y copiarlo aca seria una segunda declaracion que diverge.
+ *
+ *   1. El recuadro 🕳️ que manda "aplicá las cuatro reglas" se REEMPLAZA por el
+ *      bloque medido. Es la instruccion que mandaba de cabeza contra el 403, y
+ *      esta justo donde tiene que ir la medicion: arriba de las tablas.
+ *   2. La frase que afirma "Se encienden ahora. Son las cuatro que el repo de
+ *      referencia tiene funcionando" se reemplaza por la del estado medido. Esa
+ *      frase es falsa en el repo de referencia, y lo es en cualquiera que no
+ *      pueda tener rulesets.
+ *   3. Al final se agrega que hacer cuando la sonda de contraste conteste 403,
+ *      que esa seccion no contemplaba: solo contemplaba "si la salida no
+ *      coincide con la tabla".
+ *
+ *  QUE PASA SI UN ANCLA NO ESTA. Se AVISA y el bloque medido se escribe igual,
+ *  arriba de todo. El documento puede cambiar de redaccion en el andamio, y la
+ *  respuesta correcta a eso no es dejar al proyecto nuevo sin la medicion —seria
+ *  cambiar un fail-open por otro—. Lo que no se hace nunca es callarse: cada
+ *  ancla que no aparecio sale por `avisos`, para que la divergencia se vea. */
+export function insertarProteccionMedida(texto, { lineas: bloque, frase }) {
+  const lineas = String(texto).split("\n");
+  const avisos = [];
+
+  // 1. El recuadro 🕳️: la corrida contigua de lineas que empiezan con ">" que
+  //    contiene el emoji.
+  const i = lineas.findIndex((l) => /^>/.test(l) && l.includes("🕳️"));
+  if (i === -1) {
+    avisos.push(`no encontre el recuadro 🕳️ en ${RUTA_PROTECCION}, asi que el bloque medido va arriba de todo. Si el andamio le cambio la redaccion, hay que reapuntar esta ancla en herramientas/projects-init.mjs`);
+    const h1 = lineas.findIndex((l) => l.startsWith("# "));
+    lineas.splice(h1 === -1 ? 0 : h1 + 1, 0, "", ...bloque);
+  } else {
+    let j = i;
+    while (j < lineas.length && /^>/.test(lineas[j])) j++;
+    lineas.splice(i, j - i, ...bloque);
+  }
+
+  // 2. La frase que afirma cuatro reglas funcionando.
+  const k = lineas.findIndex((l) => l.startsWith("**Se encienden ahora.**"));
+  if (k === -1) {
+    avisos.push(`no encontre la frase «Se encienden ahora.» en ${RUTA_PROTECCION}: quedo la que trajera el andamio, y si afirma un estado no medido hay que corregirla ahi`);
+  } else {
+    let fin = k;
+    while (fin < lineas.length && lineas[fin].trim() !== "") fin++;
+    lineas.splice(k, fin - k, ...frase);
+  }
+
+  // 3. El agregado del final, que no necesita ancla y por eso no puede fallar.
+  //
+  // Las lineas vacias del final se sacan ANTES de agregar. Sin esto el documento
+  // quedaba con un renglon en blanco de mas y —porque el texto original termina
+  // en salto— sin salto final: dos cosas que el formateador del andamio corrige,
+  // o sea dos formas de que `format:check` salga rojo en el primer CI de un repo
+  // recien nacido por algo que escribio esta herramienta.
+  while (lineas.length && lineas[lineas.length - 1].trim() === "") lineas.pop();
+  lineas.push(
+    "",
+    "> **Y si esa sonda contesta 403 «Upgrade to GitHub Pro or make this repository public»**, la",
+    "> lectura no es «el documento está desactualizado»: es que este repositorio, con su plan y su",
+    "> visibilidad de hoy, no puede tener rulesets. Está medido y explicado arriba, en el bloque que",
+    "> escribió `projects init`.",
+    "",
+  );
+  return { texto: lineas.join("\n"), avisos };
+}
+
+/** Mide y escribe, en el destino ya instanciado. Devuelve lo medido para que la
+ *  salida de la terminal y el resumen final digan lo MISMO que el documento.
+ *
+ *  El archivo TIENE que estar: `faltantesDeCopia` ya garantizo que todo el
+ *  andamio aterrizo, asi que si no esta es que el andamio dejo de repartirlo — y
+ *  entonces esta herramienta no puede cumplir lo que promete. Eso es rojo, no
+ *  aviso: seguir seria entregar un repo sin ninguna linea escrita sobre su
+ *  proteccion de rama, que es el estado del que nadie se entera. */
+export function escribirProteccionMedida(destino, medido) {
+  const abs = path.join(destino, ...RUTA_PROTECCION.split("/"));
+  let texto;
+  try {
+    texto = fs.readFileSync(abs, "utf8");
+  } catch (e) {
+    return { ok: false, error: `no pude leer ${RUTA_PROTECCION} en el destino (${e.code ? `${e.code} — ` : ""}${e.message})`, avisos: [] };
+  }
+  const r = insertarProteccionMedida(texto, bloqueDeProteccion(medido));
+  try {
+    fs.writeFileSync(abs, r.texto, "utf8");
+  } catch (e) {
+    return { ok: false, error: `no pude escribir ${RUTA_PROTECCION} en el destino (${e.code ? `${e.code} — ` : ""}${e.message})`, avisos: r.avisos };
+  }
+  return { ok: true, error: null, avisos: r.avisos };
+}
+
 // ─────────────────────────── El programa ───────────────────────────
 
 const EJEMPLO = {
@@ -799,11 +1504,12 @@ function valorDeBandera(argv, i, bandera) {
 }
 
 function argumentos(argv) {
-  const o = { herramientas: true, forzar: false };
+  const o = { herramientas: true, arranque: true, forzar: false };
   for (let i = 0; i < argv.length; i++) {
     if (argv[i] === "--valores") o.valores = valorDeBandera(argv, ++i, "--valores");
     else if (argv[i] === "--destino") o.destino = valorDeBandera(argv, ++i, "--destino");
     else if (argv[i] === "--sin-herramientas") o.herramientas = false;
+    else if (argv[i] === "--sin-arranque") o.arranque = false;
     else if (argv[i] === "--forzar") o.forzar = true;
     else if (argv[i] === "--ejemplo") o.ejemplo = true;
     else if (argv[i] === "--version-openspec") o.versionOpenspec = valorDeBandera(argv, ++i, "--version-openspec");
@@ -830,6 +1536,10 @@ function lineasDeUso() {
     "  --valores <ruta.json>      los valores del proyecto. `--ejemplo` imprime el esqueleto",
     "  --destino <ruta>           la raiz del repo nuevo, que tiene que existir",
     "  --sin-herramientas         no corre `openspec init` ni el render de la constitucion",
+    "  --sin-arranque             no instala, no formatea y no verifica el proyecto nuevo:",
+    "                             deja esos cuatro comandos como tarea humana, que es como",
+    "                             se hacia antes. Util cuando no hay red o se quiere revisar",
+    "                             el arbol escrito antes de bajar una sola dependencia",
     "  --forzar                   sobreescribe un destino que ya tiene archivos del andamio",
     "  --version-openspec <x.y.z> pin del CLI de OpenSpec cuando no se puede leer del default de",
     "                             `version_openspec` en marco-ci.yml. Version EXACTA (0.9.4), no",
@@ -895,7 +1605,7 @@ export function rutasDelRender(textoDeOutputs) {
     .filter(Boolean);
 }
 
-function main(argv) {
+async function main(argv) {
   // ── El piso de Node, antes de tocar NADA ──
   // El aviso sale por stderr a proposito: `--ejemplo` escribe el JSON en stdout y
   // normalmente se redirige a un archivo. Una linea de aviso ahi lo corrompe.
@@ -1162,6 +1872,32 @@ function main(argv) {
   // mandaria a la persona a un callejon.
   for (const linea of avisosDelRegistroDeValores(o.destino)) console.error(linea);
 
+  // ── El diagnostico de la proteccion de main: se MIDE y se escribe ──
+  //
+  // Va aca y no al final por dos motivos. Uno: el documento del proyecto nuevo
+  // ya esta escrito y todavia no lo leyo nadie, asi que corregirlo ahora es
+  // corregirlo antes de que exista una copia con la afirmacion falsa. Dos: si el
+  // arranque sale rojo, main() vuelve con 1 y no imprime las tareas humanas —
+  // pero el documento ya quedo con el estado REAL, que es justo lo que hay que
+  // leer despues de un rojo. Ver el bloque de arriba para el defecto que cierra.
+  const proteccion = sondarProteccion({ org: valores.ORG, proyecto: valores.PROYECTO });
+  const escrituraDeProteccion = escribirProteccionMedida(o.destino, { ...proteccion, org: valores.ORG, proyecto: valores.PROYECTO });
+  if (!escrituraDeProteccion.ok) {
+    console.error(
+      `::error::${escrituraDeProteccion.error}. Esta herramienta promete escribir en ${RUTA_PROTECCION} el estado ` +
+        `REAL de la proteccion de rama de este repositorio, medido; sin ese archivo no puede, y entregar el repo ` +
+        `callada dejaria el unico documento de estado de la compuerta sin escribir. El andamio YA quedo escrito ` +
+        `en ${o.destino}: revisa que plantilla/${RUTA_PROTECCION} exista y volve a correr con --forzar.`,
+    );
+    return 1;
+  }
+  for (const aviso of escrituraDeProteccion.avisos) console.error(`::warning::${aviso}`);
+  {
+    const linea = avisoDeProteccion({ ...proteccion, org: valores.ORG, proyecto: valores.PROYECTO });
+    if (linea.startsWith("::warning::")) console.error(linea);
+    else console.log(linea);
+  }
+
   // ── Las dos herramientas que el andamio no puede traer ──
   if (o.herramientas) {
     // El guard de mas arriba ya exigio que el archivo EXISTA antes de escribir
@@ -1318,9 +2054,89 @@ function main(argv) {
     console.log(`la constitucion dejo ${artefactos.length} archivo(s): ${artefactos.join(", ")}`);
   }
 
+  // ── El arranque: instalado, formateado, verificado ──
+  //
+  // Este bloque NUNCA se salta por su cuenta y NUNCA se cuelga esperando a
+  // nadie. Tiene tres salidas y las tres estan dichas en pantalla:
+  //   · no se pidio (--sin-arranque) o no hay con que correrlo (ninguna maquina
+  //     esta obligada a tener corepack ni pnpm) o no hay red -> AVISO, se
+  //     imprimen los comandos exactos y la corrida sigue hasta el final;
+  //   · corrio y salio verde -> "instalado, formateado, verificado";
+  //   · corrio y salio rojo -> ::error::, que paso fallo, por que existe ese
+  //     paso, como se arregla, y exit 1. Un rojo aca es un rojo REAL: es el
+  //     mismo que daria el CI en el primer push, adelantado a la maquina donde
+  //     se arregla en un minuto.
+  let arranque = null;
+  if (!o.arranque) {
+    console.error("");
+    console.error("::warning::se pidio --sin-arranque: el repo quedo ESCRITO pero sin instalar, sin formatear y sin verificar.");
+    console.error("Antes del primer push hay que correr, en la raiz del destino:");
+    for (const paso of PASOS_DEL_ARRANQUE) console.error(`  pnpm ${paso.args.join(" ")}`);
+    console.error("Sin el install no hay lockfile, y el CI corre con --frozen-lockfile: el primer push moriria ahi.");
+  } else {
+    const ejecutor = ejecutorDeScripts();
+    // La comprobacion previa de red es una COMODIDAD, no un requisito: si el
+    // modulo que la hace no esta al lado, se sigue igual y el arranque se
+    // intenta. Lo que se pierde es el buen diagnostico de "no hay red", no la
+    // funcion.
+    const npm = ejecutor ? await moduloDelRegistro() : null;
+    if (ejecutor && !npm) {
+      console.error("::warning::no encontre herramientas/registro-npm.mjs al lado de esta herramienta, asi que el arranque no puede comprobar la red antes de instalar. Se intenta igual: si no hay registro alcanzable, el fallo va a salir del gestor de paquetes y no de aca");
+    }
+    const red = ejecutor && npm ? await npm.alcanzaElRegistro({ registro: npm.registroDe() }) : { ok: true, error: null };
+    if (!ejecutor) {
+      console.error("");
+      console.error("::warning::no encontre ni `corepack` (que viene con Node) ni `pnpm` en el PATH, asi que el arranque");
+      console.error("no se pudo intentar. El repo quedo ESCRITO y completo; lo que falta son cuatro comandos en su raiz:");
+      for (const paso of PASOS_DEL_ARRANQUE) console.error(`  pnpm ${paso.args.join(" ")}`);
+      console.error("Corepack se habilita con `corepack enable`; pnpm tambien se instala suelto (npm i -g pnpm).");
+    } else if (!red.ok) {
+      // Preguntar primero cuesta medio segundo y evita el peor diagnostico que
+      // hay: sin red el install no falla rapido ni claro, tarda decenas de
+      // segundos en agotar reintentos y muere con un volcado del gestor que no
+      // dice "no hay red" en ninguna parte — encima de un repo recien escrito.
+      console.error("");
+      console.error(`::warning::no llego a ${red.registro} (${red.error}), asi que el arranque no se intenta: sin registro`);
+      console.error("alcanzable el install no falla rapido, falla tarde y con un mensaje que no habla de la red.");
+      console.error("El repo quedo ESCRITO y completo. Cuando tengas red, en su raiz:");
+      for (const paso of PASOS_DEL_ARRANQUE) console.error(`  pnpm ${paso.args.join(" ")}`);
+    } else {
+      console.log("");
+      console.log(`ARRANQUE con ${ejecutor.nombre} en ${o.destino} — ${PASOS_DEL_ARRANQUE.length} pasos, la salida de cada uno tal cual sale:`);
+      const hechos = [];
+      for (const paso of PASOS_DEL_ARRANQUE) {
+        console.log("");
+        console.log(`── ${hechos.length + 1}/${PASOS_DEL_ARRANQUE.length}  ${paso.titulo}  (${ejecutor.nombre} ${paso.args.join(" ")})`);
+        const r = correrPaso(ejecutor, paso, o.destino);
+        hechos.push({ paso, ...r });
+        // Se corta en el primero que falla: los que vienen despues dependen de
+        // el, y dejarlos correr convierte un rojo legible en una cascada donde
+        // el primero —el unico que importa— queda cuatro pantallas arriba.
+        if (!r.ok) break;
+      }
+      arranque = hechos;
+      console.log("");
+      const resumen = lineasDelResumen(hechos, o.destino);
+      const rojo = hechos.some((h) => !h.ok);
+      for (const linea of resumen) {
+        if (rojo) console.error(linea);
+        else console.log(linea);
+      }
+      if (rojo) {
+        console.error("");
+        console.error("Lo que sigue —las tareas humanas— NO se imprime: primero hay que dejar el proyecto en verde.");
+        return 1;
+      }
+    }
+  }
+
   // ── Lo que queda, y es humano ──
   console.log("");
-  console.log("LISTO. Lo que sigue NO lo puede hacer esta herramienta:");
+  console.log(
+    arranque
+      ? "LISTO, y el proyecto quedo arrancado y en verde. Lo que sigue NO lo puede hacer esta herramienta:"
+      : "LISTO. Lo que sigue NO lo puede hacer esta herramienta:",
+  );
   console.log("");
   console.log("  EL ORDEN IMPORTA. Lo medido: el bootstrap va a main por PUSH DIRECTO y la");
   console.log("  proteccion se aplica DESPUES. El plano del cambio de la compuerta de cobertura");
@@ -1330,21 +2146,7 @@ function main(argv) {
   console.log("  haya corrido una vez. Push -> CI verde -> recien ahi el ruleset -> y desde");
   console.log("  ese momento todo por PR.");
   console.log("");
-  console.log("  1. ANTES DEL PRIMER PUSH — `pnpm install && pnpm format`:");
-  console.log("     El andamio trae los manifiestos con sus rangos, pero NO el lockfile: un");
-  console.log("     lockfile no convive con marcadores. El CI corre con --frozen-lockfile, asi");
-  console.log("     que sin ese install el primer push muere en el cuarto paso. Corriendolo,");
-  console.log("     el lockfile entra al commit fundacional y queda versionado.");
-  console.log("     El `format` va pegado y no es cosmetico: al sustituir los marcadores");
-  console.log("     cambian los anchos del texto, y el formateador alinea las tablas de");
-  console.log("     markdown por ancho — asi que el README nace desalineado y `pnpm");
-  console.log("     verificar` sale rojo en el primer intento por una razon que no es tuya.");
-  console.log("     Una pasada lo deja en verde y no vuelve a pasar.");
-  console.log("     Lo que YA viene hecho y antes habia que pegar a mano: los excluidos de");
-  console.log("     cobertura del andamio, el cableado de vitest.config.base.mjs en cada");
-  console.log("     paquete, el proveedor de cobertura, y los scripts que el CI invoca.");
-  console.log("");
-  console.log("  2. ANTES DEL PRIMER PUSH — llenar `README.md`:");
+  console.log("  1. ANTES DEL PRIMER PUSH — llenar `README.md`:");
   console.log("     El andamio deja un README con la estructura puesta y los valores ya");
   console.log("     sustituidos, y con huecos marcados RELLENAR donde van las respuestas");
   console.log("     que ninguna herramienta puede inventar: que hace el proyecto, su");
@@ -1355,9 +2157,30 @@ function main(argv) {
   console.log("     tuviera la respuesta. Cuantos quedan lo dice el grep, no esta lista:");
   console.log("          grep -n RELLENAR README.md");
   console.log("");
-  console.log("  3. Proteccion de main: las 4 reglas probadas, no las 8 (.github/proteccion-main.md)");
+  // Esta linea decia "las 4 reglas probadas, no las 8" sobre CUALQUIER repo, sin
+  // haber mirado ninguno. En la cuenta que hospeda el marco esas cuatro no
+  // existen ni pueden existir, asi que era una tarea humana imposible impresa
+  // como si fuera un tramite. Ahora dice lo que se MIDIO, y cuando no se pudo
+  // medir lo dice tambien.
+  if (proteccion.estado === "puede") {
+    console.log(`  2. Proteccion de main: las 4 reglas probadas, no las 8 (${RUTA_PROTECCION}).`);
+    console.log(`     MEDIDO: ${valores.ORG}/${valores.PROYECTO} admite rulesets (${proteccion.detalle}).`);
+    console.log("     Aplicarlas es tuyo: esta herramienta no toca ajustes de seguridad de un repo.");
+  } else if (proteccion.estado === "sin-compuertas") {
+    console.log(`  2. Proteccion de main: NO SE PUEDE HOY, y esta medido (${RUTA_PROTECCION}).`);
+    console.log(`     gh api repos/${valores.ORG}/${valores.PROYECTO}/rulesets -> 403 "${proteccion.detalle}"`);
+    console.log("     GitHub no ofrece proteccion de rama en repos privados del plan gratuito. Este");
+    console.log("     repo nace SIN compuerta: nada impide un push directo a main. Hay que elegir");
+    console.log("     entre GitHub Pro, una organizacion con plan Team, o hacer el repo publico —");
+    console.log("     las tres estan con su costo en ese documento. NO lo anotes como \"pendiente\".");
+  } else {
+    console.log(`  2. Proteccion de main: NO SE PUDO MEDIR (${proteccion.estado}), y eso NO es "esta bien".`);
+    console.log(`     ${proteccion.detalle}`);
+    console.log(`     El documento (${RUTA_PROTECCION}) dice como destrabar la sonda. Correla antes de`);
+    console.log("     declarar en ningun informe que este repo tiene compuerta.");
+  }
   console.log("");
-  console.log("  4. Dependabot, y son DOS cosas en DOS lugares distintos:");
+  console.log("  3. Dependabot, y son DOS cosas en DOS lugares distintos:");
   console.log("     a) En ESTE repo: Settings -> Advanced Security -> Dependency graph y");
   console.log("        Dependabot security updates. NO se encienden solos en un repo nuevo.");
   console.log("        Sin eso el repo no recibe versiones nuevas del marco NI aparece en su censo.");
@@ -1366,14 +2189,14 @@ function main(argv) {
   console.log("        access), no del repo del marco. Verificar antes de tocar nada:");
   console.log("          gh api orgs/<ORG>/dependabot/repository-access");
   console.log("");
-  console.log("  5. Los handles de CODEOWNERS existen en la org, ESTAN EN SU EQUIPO y tienen escritura");
+  console.log("  4. Los handles de CODEOWNERS existen en la org, ESTAN EN SU EQUIPO y tienen escritura");
   console.log("     Tres formas de que el review cruzado no exista y ningun check lo diga:");
   console.log("     un handle mal escrito, un equipo VACIO, y un equipo sin permiso de escritura");
   console.log("     (GitHub simplemente no asigna a nadie, sin aviso). Y el permiso se le");
   console.log("     pregunta al REPO, no a la org: el endpoint de la org informa el default.");
   console.log("          gh api repos/<ORG>/<REPO>/teams --jq '.[] | \"\\(.slug): \\(.permission)\"'");
   console.log("");
-  console.log("  6. El issue macro en el Project del area, y las SEIS labels `area:*`, que no");
+  console.log("  5. El issue macro en el Project del area, y las SEIS labels `area:*`, que no");
   console.log("     se heredan de ningun molde — un repo nuevo nace sin ninguna:");
   console.log('          gh label create "area:backend"   --color 0052CC --description "Area: backend"');
   console.log('          gh label create "area:ci-cd"     --color 006B75 --description "Area: ci-cd"');
@@ -1382,13 +2205,26 @@ function main(argv) {
   console.log('          gh label create "area:infra"     --color 5319E7 --description "Area: infra"');
   console.log('          gh label create "area:seguridad" --color B60205 --description "Area: seguridad"');
   console.log("");
-  console.log("  7. Los secrets, que son DOS y ninguno gatea el pipeline:");
+  console.log("  6. Los secrets, que son DOS y ninguno gatea el pipeline:");
   console.log("     CLAUDE_CODE_OAUTH_TOKEN (para que el bot conteste; `claude setup-token`)");
   console.log("     TOKEN_ACTUALIZAR_MARCO   (OPCIONAL: sin el, el PR semanal del marco nace");
   console.log("                               sin checks y el propio workflow lo avisa)");
   for (const [k, texto] of Object.entries(CON_LIMPIEZA_MANUAL)) {
     console.log(`  · ${k} = "${valores[k]}" — ${texto}`);
   }
+
+  // LA OTRA HERRAMIENTA, nombrada ACA y no solo en la documentacion. Es el unico
+  // momento garantizado en que alguien esta mirando esta salida, y la pregunta
+  // que contesta —"lo que acabo de instalar, sigue siendo lo ultimo estable?"—
+  // aparece justo despues, no antes. Sin esta linea la herramienta existe y no
+  // la encuentra nadie, que para el caso es lo mismo que no existir.
+  console.log("");
+  console.log("Y UNA MAS, PARA DESPUES. El stack que acaba de nacer envejece: los rangos de los");
+  console.log("manifiestos se quedan donde estan y el lockfile los congela. Para comparar lo que");
+  console.log("este proyecto DECLARA contra la ultima estable publicada de cada paquete —y decidir,");
+  console.log("con dos preguntas, si actualizar todo el stack o solo una parte—:");
+  console.log(`     node <clon-del-marco>/herramientas/projects-versiones.mjs --raiz ${o.destino}`);
+  console.log("Sin terminal (en CI) solo imprime el informe y sale 0: nunca pregunta ni escribe.");
   return 0;
 }
 
@@ -1431,11 +2267,16 @@ function meInvocaronAMi() {
  *  a medias, y fija el codigo en 1. La traza va DEBAJO y anunciada, porque para
  *  reportar el defecto hace falta; lo que no puede pasar es que sea la respuesta
  *  entera. */
+//  Y POR QUE AHORA ES UN `catch` DE PROMESA. `main` paso a ser async cuando el
+//  arranque empezo a preguntarle al registro de npm si hay red antes de intentar
+//  el install. Con una funcion async, un `throw` de adentro NO llega al try/catch
+//  sincronico que habia aca: sale como rechazo, y un rechazo sin manejar termina
+//  en `ERR_UNHANDLED_REJECTION` — o sea el mismo volcado del runtime que este
+//  bloque existe para no tener, reintroducido por un `async` en la linea de al
+//  lado. Las dos formas se cubren: el `try` por si `main` tira antes del primer
+//  await, y el `.catch` por lo demas.
 if (meInvocaronAMi()) {
-  let codigo;
-  try {
-    codigo = main(process.argv.slice(2));
-  } catch (e) {
+  const morir = (e) => {
     console.error(
       `::error::la corrida murio con una excepcion que ningun control de esta herramienta atrapo: ` +
         `${e?.code ? `${e.code} — ` : ""}${e?.message ?? e}`,
@@ -1446,7 +2287,13 @@ if (meInvocaronAMi()) {
         "Lo que sigue es la traza, para reportarlo:",
     );
     console.error(e?.stack ?? String(e));
-    codigo = 1;
+    process.exit(1);
+  };
+  try {
+    main(process.argv.slice(2))
+      .then((codigo) => process.exit(codigo))
+      .catch(morir);
+  } catch (e) {
+    morir(e);
   }
-  process.exit(codigo);
 }
