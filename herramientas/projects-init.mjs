@@ -853,8 +853,84 @@ export function ejecutorDeScripts(existe = comandoDisponible) {
  *  redirigida— esa pregunta no la contesta nadie y el arranque se cuelga, que es
  *  el mismo modo de falla que esta herramienta cierra en todos lados. Con la
  *  variable en 0 baja sin preguntar. */
-export function entornoDelArranque(env = process.env) {
-  return { ...env, COREPACK_ENABLE_DOWNLOAD_PROMPT: "0" };
+export function entornoDelArranque(env = process.env, dirDeShims = null) {
+  const base = { ...env, COREPACK_ENABLE_DOWNLOAD_PROMPT: "0" };
+  if (!dirDeShims) return base;
+  // La clave se busca sin mirar mayusculas y se REUSA la que ya estaba. En
+  // Windows la variable se llama "Path", y agregar una segunda clave "PATH" al
+  // objeto no la reemplaza: deja dos, y cual gana en el hijo no esta definido.
+  const clave = Object.keys(base).find((k) => k.toUpperCase() === "PATH") ?? "PATH";
+  const actual = base[clave] ?? "";
+  base[clave] = actual ? `${dirDeShims}${path.delimiter}${actual}` : dirDeShims;
+  return base;
+}
+
+/** Si hace falta materializar el shim de `pnpm` antes de arrancar.
+ *
+ *  EL DEFECTO QUE ESTO CIERRA, medido el 2026-08-25 en un runner limpio de CI:
+ *
+ *    $ pnpm --filter api --fail-if-no-match exec prisma generate
+ *    sh: 1: pnpm: not found
+ *
+ *  El paso 1 del arranque —`corepack pnpm install`— pasaba, y el 2 se cortaba.
+ *  La razon es que los scripts del andamio se llaman entre si con `pnpm` PELADO
+ *  (`pnpm -C api run typecheck`, `pnpm datos && pnpm lint && ...`), que es la
+ *  forma idiomatica de un workspace de pnpm y no se va a cambiar: escribir
+ *  "corepack pnpm" dentro de cada script del proyecto del consumidor seria
+ *  filtrarle a su package.json un detalle de COMO lo arrancamos nosotros.
+ *
+ *  Lo que hace que esto no se vea en la maquina de quien lo escribe: si hay un
+ *  `pnpm` global en el PATH, los scripts anidados lo encuentran y todo pasa. O
+ *  sea que el unico lugar donde el defecto aparece es exactamente el que este
+ *  andamio promete cubrir —una maquina limpia, sin instalar nada global, que es
+ *  para lo que existe corepack— y por eso paso desapercibido hasta que lo corrio
+ *  un runner de CI.
+ *
+ *  `corepack enable --install-directory <dir> pnpm` escribe los shims en un
+ *  directorio propio en vez de en el prefijo global de Node. No toca la maquina:
+ *  el directorio es temporal y lo unico que lo usa es el PATH de los procesos
+ *  hijos de este arranque. */
+export function necesitaShimDePnpm(ejecutor, existe = comandoDisponible) {
+  return Boolean(ejecutor) && ejecutor.comando === "corepack" && !existe("pnpm");
+}
+
+/** Escribe los shims y devuelve el directorio, o `null` si no se pudo.
+ *
+ *  `null` NO se trata como error fatal a proposito: si el shim no se pudo
+ *  materializar, el arranque igual se intenta y quien falla es el script anidado
+ *  con SU mensaje —el `pnpm: not found` de arriba, que es preciso—. Convertirlo
+ *  aca en un corte anticipado cambiaria un diagnostico exacto por uno inventado
+ *  por esta herramienta. */
+export function materializarShimDePnpm(dir, correr = corepackEnable) {
+  try {
+    fs.mkdirSync(dir, { recursive: true });
+    correr(dir);
+    // Que el comando salga 0 no alcanza: lo que importa es que el archivo este.
+    // En Windows el shim es `pnpm.cmd` y en el resto `pnpm`, y un cero aca es
+    // este paso roto, no un shim escrito.
+    const hay = fs.readdirSync(dir).some((f) => f === "pnpm" || f.toLowerCase() === "pnpm.cmd");
+    return hay ? dir : null;
+  } catch {
+    return null;
+  }
+}
+
+function corepackEnable(dir) {
+  // EL DIRECTORIO VA POR `cwd` Y EL ARGUMENTO ES UN PUNTO LITERAL, no la ruta.
+  // En Windows esta invocacion pasa por cmd.exe —corepack ahi es un `.cmd` y no
+  // se puede ejecutar sin shell— y los argumentos se concatenan SIN escapar. La
+  // ruta viene de `os.tmpdir()`, que en Windows es del estilo
+  // `C:\Users\Jose Luis\AppData\Local\Temp`: un espacio en el nombre de la
+  // persona partia el argumento en dos y corepack escribia los shims en
+  // cualquier parte. `cwd` es una opcion de spawn y no toca la linea de
+  // comandos, asi que el vector queda de literales de este archivo y la
+  // superficie desaparece en vez de quedar declarada como aceptable.
+  execFileSync("corepack", ["enable", "--install-directory", ".", "pnpm"], {
+    cwd: dir,
+    stdio: "ignore",
+    env: entornoDelArranque(),
+    shell: process.platform === "win32",
+  });
 }
 
 function comandoDisponible(cmd) {
@@ -878,12 +954,12 @@ function comandoDisponible(cmd) {
  *  persona en ese vector, que es lo que hace que la concatenacion sin escapar de
  *  cmd.exe —la que obliga a acotar el pin de OpenSpec unos bloques mas arriba— no
  *  tenga aca ninguna superficie. */
-export function correrPaso(ejecutor, paso, destino, env = process.env) {
+export function correrPaso(ejecutor, paso, destino, env = process.env, dirDeShims = null) {
   try {
     execFileSync(ejecutor.comando, [...ejecutor.prefijo, ...paso.args], {
       cwd: destino,
       stdio: "inherit",
-      env: entornoDelArranque(env),
+      env: entornoDelArranque(env, dirDeShims),
       shell: process.platform === "win32",
     });
     return { ok: true, error: null };
@@ -2103,11 +2179,20 @@ async function main(argv) {
     } else {
       console.log("");
       console.log(`ARRANQUE con ${ejecutor.nombre} en ${o.destino} — ${PASOS_DEL_ARRANQUE.length} pasos, la salida de cada uno tal cual sale:`);
+      // Los scripts del andamio se llaman entre si con `pnpm` pelado. Sin un
+      // pnpm global —la maquina limpia que corepack existe para cubrir— el paso
+      // 1 pasa y el 2 muere con "pnpm: not found". Ver necesitaShimDePnpm.
+      let dirDeShims = null;
+      if (necesitaShimDePnpm(ejecutor)) {
+        dirDeShims = materializarShimDePnpm(path.join(fs.mkdtempSync(path.join(os.tmpdir(), "projects-shims-")), "bin"));
+        if (dirDeShims) console.log(`(sin pnpm en el PATH: shim de corepack en ${dirDeShims}, solo para estos pasos)`);
+        else console.error("::warning::no se pudo materializar el shim de pnpm. Si un paso muere con \"pnpm: not found\", es esto: corre `corepack enable` una vez y volve a intentar");
+      }
       const hechos = [];
       for (const paso of PASOS_DEL_ARRANQUE) {
         console.log("");
         console.log(`── ${hechos.length + 1}/${PASOS_DEL_ARRANQUE.length}  ${paso.titulo}  (${ejecutor.nombre} ${paso.args.join(" ")})`);
-        const r = correrPaso(ejecutor, paso, o.destino);
+        const r = correrPaso(ejecutor, paso, o.destino, process.env, dirDeShims);
         hechos.push({ paso, ...r });
         // Se corta en el primero que falla: los que vienen despues dependen de
         // el, y dejarlos correr convierte un rojo legible en una cascada donde
