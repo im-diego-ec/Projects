@@ -28,7 +28,7 @@ puede mentir. Este documento es el procedimiento y las tres trampas.
 
 | Lugar | Qué es | Cómo se actualiza |
 |---|---|---|
-| **Workflow de validación del marco** | La línea `npx --yes @fission-ai/openspec@X.Y.Z validate --all --strict`. **Este es el pin canónico.** | A mano, en un PR del marco |
+| **Workflow reusable del marco** | El `default` del input `version_openspec` en [`.github/workflows/marco-ci.yml`](../.github/workflows/marco-ci.yml). **Este es el pin canónico**, y es el único lugar donde el número está escrito: las invocaciones de `npx` de ese archivo lo reciben como variable (`${VERSION_OPENSPEC}`), no lo repiten | A mano, en un PR del marco |
 | **Las máquinas del equipo** | Cada quien invoca por `npx` con la misma versión, o tiene instalada esa versión | Se sigue del pin canónico |
 | **`generatedBy` de las skills y comandos** | Front-matter de cada `SKILL.md` y de cada comando `opsx` generado | Se **regenera**, no se edita |
 | **El allowlist del agente, en cada repo** | Los patrones `Bash(npx --yes @fission-ai/openspec@X.Y.Z ...)` de `.claude/settings.json`. **Es el único lugar que repite el número a la fuerza**: el permiso se concede por coincidencia literal de texto, así que no puede referenciar el pin canónico | A mano, en el mismo PR que sube el pin — en `plantilla/` y en cada repo ya creado |
@@ -52,15 +52,73 @@ otra línea rastreada que no sea `.md`— corre un paquete sin versión exacta.
 Que el número esté **atrasado** sigue siendo cosa de este procedimiento; que
 esté **ausente** ya no depende de que nadie se acuerde.
 
-Para saber qué versión está pineada hoy, sin adivinar:
+Para saber qué versión está pineada hoy, sin adivinar. Desde la raíz del clon del
+marco:
 
 ```bash
-grep -rn "@fission-ai/openspec@" .github/
+awk '/^      version_openspec:/{f=1} f && /default:/{print; exit}' .github/workflows/marco-ci.yml
 ```
 
-```powershell
-Select-String -Path ".github\workflows\*.yml" -Pattern "@fission-ai/openspec@"
+**Verificación del comando:** tiene que imprimir **una** línea `default: "X.Y.Z"`
+con un número de verdad. Si imprime vacío, no estás parado en el checkout del
+marco. Es el mismo comando que usan las skills `projects-adoptar` y
+`projects-archive-change`, a propósito: dos formas distintas de buscar el mismo pin
+son dos formas de que una envejezca.
+
+`awk` no viene con Windows nativo. Esta forma corre igual en las tres —`node` es el
+mismo programa en todas, y la guía de arranque ya lo declara así— e imprime **solo
+el número**:
+
+```bash
+node -e 'const m=require("fs").readFileSync(".github/workflows/marco-ci.yml","utf8").match(/^      version_openspec:[\s\S]*?^\s*default: "(.+)"/m); console.log(m ? m[1] : "NO ENCONTRADO")'
 ```
+
+**Los `^` y el flag `/m` no son adorno, y sin ellos el comando miente.** El ancla
+tiene que ser **la línea** que empieza con seis espacios y `version_openspec:` —la
+declaración del input—, no la subcadena `version_openspec:` esté donde esté. Sin
+anclar, la regex engancha la primera aparición textual del archivo, que hoy es el
+ejemplo **comentado** del encabezado (`#       #   version_openspec: "1.9.0"`) y no la
+declaración real, y a partir de ahí imprime el primer `default: "..."` que encuentre
+—el de cualquier input, no el de éste—. Hoy acertaría por orden; el día que entre un
+input nuevo por encima, devuelve el número de ese otro **sin decir nada**. Es el
+mismo modo de falla que el recuadro de acá abajo: da un número plausible en vez de
+dar error.
+
+Las dos mutaciones que lo muestran, en treinta segundos. Receta de bash, y **el árbol
+real no se toca**: todo pasa dentro de una copia desechable. Se corre el comando de
+arriba después de cada `perl`, parado en `$C`:
+
+```bash
+C=$(mktemp -d)/marco && mkdir -p "$C/.github/workflows"
+cp .github/workflows/marco-ci.yml "$C/.github/workflows/" && cd "$C"
+# (1) desaparece el ancla real: tiene que contestar NO ENCONTRADO, no un numero
+perl -0pi -e 's/^      version_openspec:$/      version_openspec_x:/m' .github/workflows/marco-ci.yml
+# (2) entra otro input ANTES del pin: tiene que seguir contestando el pin
+perl -0pi -e 's/^      version_openspec_x:$/      intruso:\n        default: "NO-ES-EL-PIN"\n      version_openspec:/m' .github/workflows/marco-ci.yml
+```
+
+Medido: la forma anclada contesta `NO ENCONTRADO` en (1) y `1.9.0` en (2). La forma
+sin anclar contesta `1.9.0` en (1) —o sea que no puede ver que el pin no está— y
+`NO-ES-EL-PIN` en (2).
+
+> 🛑 **No lo busques con `grep -rn "@fission-ai/openspec@" .github/`.** Es el error
+> que este documento recomendaba y que las dos skills prohíben por escrito. En el
+> marco devuelve varias líneas y en **todas** la versión es una variable de shell
+> (`${VERSION_OPENSPEC}`, `${PIN}`); en un repo consumidor no devuelve ninguna. En
+> los dos casos te quedás sin número y el resto del procedimiento —regenerar
+> skills, actualizar el allowlist de `plantilla/.claude/settings.json`— queda hecho
+> contra una versión inventada. **Falla dando líneas, no dando error**, que es por
+> lo que se pudo recomendar durante meses.
+>
+> Y en un repo consumidor **el pin no vive en el repo**: se hereda del reusable. Ahí
+> el comando de arriba corta con `ENOENT: no such file or directory, open
+> '.github/workflows/marco-ci.yml'`, que es la respuesta correcta —ruidosa— a «este
+> no es el repo donde está el número».
+>
+> **Lo que falta para que esto no pueda volver a pudrirse**, y es un caso de banco
+> de diez líneas en `pruebas/marco-ci/artefactos.test.mjs`: correr el comando que
+> este documento publica y fallar si su salida no contiene un `X.Y.Z`. Hoy la única
+> defensa es que alguien lo corra al leerlo.
 
 ## Trampa 1: Dependabot es CIEGO a este pin
 

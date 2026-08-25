@@ -1,7 +1,22 @@
 ---
 name: projects-release
 description: Cortar y publicar una version del marco Projects — CHANGELOG, pines internos, PR de release, tag inmutable vX.Y.Z y notas del release en GitHub. Usar cuando haya que publicar una version del marco o cuando alguien pregunte como se saca una version de Projects. El tag movil v1 dejo de ser el canal de distribucion pero SIGUE EXISTIENDO por una razon estructural, y el paso 5 lo mueve.
-allowed-tools: Bash(git:*), Bash(gh:*), Bash(grep:*), Bash(sed:*), Bash(awk:*), Bash(mktemp:*), Bash(node:*), Bash(head:*), Bash(wc:*), Read, Edit
+# ALLOWLIST ACOTADO. `allowed-tools` es un allowlist de agente con el mismo poder
+# que el archivo de ajustes: `Bash(git:*)` autoriza `git push --force` y `Bash(gh:*)`
+# autoriza `gh pr merge`, `gh release create` y `gh api -X DELETE`. Un comodin en la
+# posicion del subcomando autoriza mas de lo que nadie reviso, asi que aca solo entran
+# LECTURAS acotadas.
+# Lo que ESCRIBE fuera del arbol —git tag, git push, gh release create, gh pr create y gh pr merge— queda deliberadamente afuera: no es que la
+# skill no lo haga, es que cada una de esas corridas se PIDE en la sesion. Buscar en el
+# arbol va por las tools `Grep` y `Glob` en vez de por `Bash(grep:*)`.
+# TAMPOCO ENTRA UNA LECTURA cuando la entrada que la cubriria concede demasiado. El
+# `node -e` del paso 1 —el que compara el ledger del canonico contra el CHANGELOG— solo
+# lee dos archivos, pero la unica entrada capaz de autorizarlo es `Bash(node -e:*)`, que
+# autoriza CUALQUIER programa de Node y por lo tanto cualquier escritura. Por eso la
+# unica entrada de node de este allowlist es `Bash(node --test pruebas:*)`, acotada al
+# banco, y ese `node -e` se pide en la sesion igual que los comandos de arriba. El
+# criterio no es escribe contra lee: es cuanto poder concede la entrada.
+allowed-tools: Bash(git status:*), Bash(git diff:*), Bash(git log:*), Bash(git show:*), Bash(git rev-parse:*), Bash(git ls-files:*), Bash(git grep:*), Bash(git tag -l:*), Bash(node --test pruebas:*), Bash(gh pr view:*), Bash(gh pr checks:*), Bash(gh run list:*), Bash(gh run view:*), Bash(gh release view:*), Read, Grep, Glob, Edit
 metadata:
   author: Transformación Digital y Data
   version: "1.0"
@@ -108,13 +123,75 @@ la version exacta, y la documentacion de `actions/`, el andamio y la skill de
 adopcion tambien la nombran. Todos tienen que decir la version que se esta cortando:
 
 ```bash
-grep -rnE 'uses:.*projects[^ "]*@v[0-9]+\.[0-9]+\.[0-9]+' \
+grep -rnE 'uses:.*Projects[^ "]*@v[0-9]+\.[0-9]+\.[0-9]+' \
   .github/workflows actions plantilla .claude/skills | grep -v /pruebas/
 ```
+
+> **El slug va con `P` mayuscula.** El repo se llama `Projects`, y hasta el
+> 2026-08-24 este comando lo escribia en minuscula: `grep` distingue mayusculas, asi
+> que devolvia **cero lineas** sobre un arbol que tiene veintiuna. Un comando de
+> checklist que no encuentra nada se lee como "no hay nada que mover", que es el peor
+> verde posible en un release. Comprobalo antes de creerle: si imprime 0 lineas,
+> el roto es el comando, no el arbol.
 
 No hace falta acordarse de esta lista: `node --test pruebas/andamio/pinado.test.mjs`
 compara cada pin contra la version mas alta del CHANGELOG y se pone **rojo** si
 alguno quedo atras. Corrilo despues de editar, antes del PR.
+
+**Y despues barre `docs/`, que ningun check alcanza.** El grep de arriba y el banco de
+pinado miran las mismas cuatro superficies (`pruebas/andamio/pinado.test.mjs` las
+declara en su constante `SUPERFICIES`: `.github/workflows`, `actions`, `plantilla`,
+`.claude/skills`), y `docs/` no esta en ninguna de las dos. Medido el 2026-08-24 con la
+version vigente: el grep de arriba da **21 literales en 7 archivos** y el conteo del
+arbol entero da **25 en 9** — los cuatro de la diferencia estan todos fuera de las
+cuatro superficies, y `docs/` aporta la mayoria. **No le creas a estas dos cifras: son
+una medicion con fecha y la de la derecha se mueve cada vez que alguien escribe un
+numero de version en prosa.** Lo que no se mueve es la diferencia: hay literales de la
+version que el grep de arriba NO ve, y salen con este comando:
+
+```bash
+git ls-files | grep -v '^CHANGELOG.md$' | xargs grep -nF '<version que se esta cortando>'
+```
+
+Esto es un **item de revision manual del release, no una compuerta**, y el motivo esta
+escrito: los literales que viven en prosa no son todos sustituibles. El caso claro esta
+en la documentacion de arranque, donde un par acoplado —el artefacto de la constitucion
+«va a declarar la version del canonico y no la del release, y esta bien»— codifica la
+relacion entre las dos versiones. Ahi no se sustituye un numero: se reescribe la frase
+entera decidiendo si la relacion sigue valiendo. Distinguir eso de un literal que solo hay que
+mover no es decidible con un escaneo de texto, que es la misma clase de limite que ya
+esta escrita para el check del pin sobre la prosa. La salida de fondo sigue siendo
+derivar el pin en vez de repetirlo (`github.job_workflow_ref` para el workflow
+reusable, `GITHUB_ACTION_REF` para una composite action).
+
+**El ledger del canonico se compara contra el CHANGELOG, y hoy nada lo obliga.** La
+version de una entrada de `manifiesto.json` es la del release que la publica, y el unico
+mecanismo que lo exige es el checkbox del final — o sea la clase que este marco
+prohibe: una regla que depende de que alguien se acuerde. El caso hermano ya esta
+resuelto con una compuerta (`pruebas/andamio/pinado.test.mjs` lee el CHANGELOG y exige
+que todo pin exacto sea la version mas alta), asi que el hueco es de este ledger y de
+ninguno mas. Mientras la compuerta no exista, por lo menos que el checkbox sea
+DECIDIBLE en vez de una pregunta:
+
+```bash
+node -e 'const l=require("./actions/constitucion/canonico/manifiesto.json").versiones.map(v=>v.version);
+const cmp=(a,b)=>a.split(".").map(Number).reduce((r,n,i)=>r!==0?r:n-Number(b.split(".")[i]),0);
+const ledger=l.sort(cmp).at(-1);
+const ch=[...require("fs").readFileSync("CHANGELOG.md","utf8").matchAll(/^## \[(\d+\.\d+\.\d+)\]/gm)].map(m=>m[1]).sort(cmp).at(-1);
+console.log("ledger",ledger,"| CHANGELOG",ch, cmp(ledger,ch)>0?"<- ROJO: el ledger publica una version que no existe":"ok");'
+```
+
+Un ledger POR DEBAJO del CHANGELOG es legitimo y esta explicado en la documentacion de
+arranque: el manifiesto versiona el CANONICO, no el release, asi que si el texto del
+canonico no cambio, su version se queda atras a proposito. Lo que nunca puede pasar es
+al reves. **Esto NO es una compuerta**, y decirlo importa: el comando hay que correrlo.
+La compuerta que lo cerraria vive en `pruebas/andamio/` —el mismo directorio del caso
+hermano— y tiene que afirmar dos cosas: (a) la version mas alta del ledger es menor o
+igual que la mas alta del CHANGELOG; (b) si el arbol `actions/constitucion/canonico/*.md`
+cambio respecto del tag de la ultima version del ledger, el ledger tiene una entrada
+nueva. La (b) es la que convierte este checkbox en compuerta, y el dia que exista, este
+checkbox y este comando **se borran**: dos mecanismos para lo mismo terminan en que la
+declaracion pierde contra el check.
 
 **Y el canonico de la constitucion**, si el texto de `actions/constitucion/canonico/`
 cambio en esta version: `manifiesto.json` necesita una entrada nueva en `versiones`
@@ -444,6 +521,9 @@ El orden 1 → 6 de esta skill es el orden. No se reordena por comodidad.
 - [ ] CHANGELOG cortado: `## [X.Y.Z] — YYYY-MM-DD` + `## [No publicado]` nuevo y vacio
 - [ ] **Pines internos movidos a `X.Y.Z`** y `node --test pruebas/andamio/pinado.test.mjs` en verde
 - [ ] Si el canonico de la constitucion cambio: entrada nueva en `manifiesto.json`
+- [ ] El ledger del canonico no declara una version que no existe: corrido el `node -e`
+      del paso 1 («El ledger del canonico se compara contra el CHANGELOG») y su salida
+      leida (no es una compuerta — ver la nota que lo acompaña)
 - [ ] PR de release con `ci-ok` en verde y solo tu commit en la rama
 - [ ] `reviewDecision` en `APPROVED` (el ruleset NO lo exige hoy: la parada es tuya) y `mergeStateStatus` sin `BEHIND`
 - [ ] Merge a `main` y `<SHA>` anotado

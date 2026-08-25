@@ -47,7 +47,7 @@ runs:
     # No hay pnpm install ni build; corre en segundos incluso en un repo grande.
     - name: Node para el guardrail
       if: inputs.instalar-node == 'true'
-      uses: actions/setup-node@v7
+      uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
       with:
         node-version: ${{ inputs.version-node }}
 
@@ -59,4 +59,18 @@ runs:
       # GITHUB_ACTION_PATH apunta a la copia de ESTA action (projects), no al repo
       # del consumidor: por eso el script viaja con la action y el proyecto no
       # vendora ninguna copia que se pueda quedar vieja.
-      run: node "${GITHUB_ACTION_PATH}/check-openspec-deltas.mjs"
+      #
+      # EL setup-node DE ARRIBA ES CONDICIONAL: su default es "true", pero el
+      # input existe justamente para ponerlo en "false" cuando el job ya hizo su
+      # setup-node, y con "false" esta action no instala nada. Sin guard, un job
+      # que lo apaga y no trae Node muere con "node: command not found" — un
+      # mensaje del shell, que no dice ni que instalar ni de quien es el job.
+      run: |
+        set -euo pipefail
+
+        if ! command -v node > /dev/null 2>&1; then
+          echo "::error::no hay 'node' en el PATH y sin el no se puede comparar los deltas de OpenSpec. Arreglo: pasale 'instalar-node: true' a esta action (es su default; alguien lo apago en la invocacion), o agrega 'uses: actions/setup-node@v7' a este job, antes de este paso"
+          exit 1
+        fi
+
+        node "${GITHUB_ACTION_PATH}/check-openspec-deltas.mjs"

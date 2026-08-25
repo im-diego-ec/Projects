@@ -235,11 +235,15 @@ test("distribuidor · los dos jobs que se saltean consumen ESTA sonda y no un no
 // exactamente lo que hace GitHub antes de escribir el script— y corre el bash real.
 // La alternativa era no medir la mitad que decide, que es como llego el fail-open
 // anterior: las dos puntas compartian la derivacion y NADA las ejercitaba.
-function veredicto({ distribuidor, constitucion, deltas }) {
+function veredicto({ distribuidor, constitucion, deltas, terraform = "success" }) {
   const valores = {
     "needs.cambios.result": "success",
     "needs.openspec.result": "success",
     "needs.higiene.result": "success",
+    // El job terraform NO tiene `if:`, asi que corre siempre y su default aca es
+    // "success". Se pasa por parametro para que exista un caso que lo refute: un
+    // valor por defecto que nadie contradice no prueba que el veredicto lo mire.
+    "needs.terraform.result": terraform,
     "needs.cambios.outputs.es_distribuidor": distribuidor,
     "needs.constitucion_cableada.result": constitucion,
     "needs.deltas.result": deltas,
@@ -292,4 +296,21 @@ test("veredicto · un salteo con la sonda VACIA tambien es rojo", () => {
 test("veredicto · con los dos jobs en success no hace falta ninguna sonda", () => {
   const { exit, salida } = veredicto({ distribuidor: "false", constitucion: "success", deltas: "success" });
   assert.equal(exit, 0, salida);
+});
+
+test("veredicto · un terraform que no salio success es rojo, y la sonda no lo compra", () => {
+  // El job terraform corre siempre —no tiene `if:`—, asi que la sonda del
+  // distribuidor no autoriza ningun salteo suyo. Sin este caso, el valor del
+  // banco seria un default que nada contradice: el veredicto podria dejar de
+  // mirarlo y todo lo de arriba seguiria en verde.
+  for (const resultado of ["failure", "skipped", "cancelled"]) {
+    const { exit, salida } = veredicto({
+      distribuidor: "true",
+      constitucion: "skipped",
+      deltas: "skipped",
+      terraform: resultado,
+    });
+    assert.equal(exit, 1, `terraform en '${resultado}' tiene que ser rojo:\n${salida}`);
+    assert.match(salida, /raices de Terraform/, salida);
+  }
 });

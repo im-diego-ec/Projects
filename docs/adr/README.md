@@ -89,10 +89,42 @@ se escribió, describiendo algo de hace un mes, miente sobre el historial.
 | [001](001-openspec-fuente-de-verdad.md) | OpenSpec como fuente de verdad del comportamiento |
 | [002](002-trunk-based-promocion.md) | Trunk-based single-main con promoción por ambientes |
 | [003](003-verificacion-in-pipeline.md) | Verificación post-deploy dentro del pipeline (read-only en prod) |
+| [005](005-pin-y-constitucion-en-un-solo-pr.md) | El bump del pin y la constitución regenerada viajan en un solo PR, abierto por el repo del proyecto — **aceptada, implementación diferida** con trigger de reevaluación escrito |
+
+**Por qué no hay 004, y no es un olvido.** El número está tomado por un ADR que
+todavía vive en una rama sin mergear (*El área fija su base tecnológica, incluida
+la infraestructura*). El 005 nació como 004 y se renumeró para no colisionar
+cuando esa rama entre. Se comprueba sin salir del repo:
+
+```bash
+git log --all --oneline --diff-filter=AR --name-only -- 'docs/adr/00*'
+git branch -a --contains "$(git log --all --format=%H --diff-filter=A -1 \
+  -- 'docs/adr/004-base-tecnologica-del-area.md')"
+```
+
+El primer comando muestra el `004-base-tecnologica-del-area.md` que ocupa el
+número; el segundo, la rama donde vive. Si esa rama se abandona, el hueco deja de
+tener motivo y el 005 se renumera; mientras exista, renumerar sería reintroducir
+la colisión.
+
+> **Lo que este índice todavía no hace cumplir solo, y el comando que lo cierra.**
+> Que las filas de arriba y los archivos del directorio sean los mismos es
+> completamente decidible, y hoy depende de que alguien se acuerde — que es lo que
+> este marco declara que no cuenta. El caso de banco que falta compara los dos
+> conjuntos y exige biyección:
+>
+> ```bash
+> diff <(ls docs/adr/0*.md | xargs -n1 basename | sed 's/-.*//') \
+>      <(sed -n 's/^| \[\([0-9]\{3\}\)\].*/\1/p' docs/adr/README.md)
+> ```
+>
+> Hoy sale vacío (comprobado). Vive en `pruebas/docs/documentacion.test.mjs`,
+> junto al caso que ya exige que `para-el-po.md` y `glosario.md` estén enlazados
+> desde el índice de `docs/`.
 
 ### Procedencia
 
-Los tres nacieron en el proyecto piloto, donde estaban numerados
+Los tres primeros nacieron en el proyecto piloto, donde estaban numerados
 `006`, `007` y `010` entre ADRs de producto (base de datos, auth, zona
 horaria) que **no** son del marco y se quedaron allá. La renumeración es
 deliberada: acá el `001` es el primer ADR *del marco*, no el sexto de un

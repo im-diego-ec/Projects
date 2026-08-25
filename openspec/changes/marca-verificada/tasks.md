@@ -1,10 +1,25 @@
 ---
 artefacto: tasks
 dri: Builder 1
-aprueba: Builder 1 (builder) # gate de `calidad-codigo`, no del PO
+aprueba: Builder 2 (builder par) # gate de `calidad-codigo`, no del PO — y NO el `dri`:
+                                # hasta el 2026-08-24 decía `Builder 1`, o sea el
+                                # propio autor, que no es un review
 informado: PO / Builder 2
 estado: pendiente-de-revision
 ---
+
+> **Parte de este change YA está en el contrato canónico, y hay que saberlo antes de
+> archivar.** El 2026-08-24 se promovió a `openspec/specs/calidad-codigo/spec.md` el
+> requirement **«Las reglas de identidad visual del área viajan como reglas de lint
+> verificadas»**, que describe lo que este change ya reparte y ya hace fallar solo
+> (el bloque de reglas de `plantilla/eslint.config.mjs`, la sección de identidad del
+> canónico y `pruebas/marca/reglas-marca.test.mjs`, que corre hoy en el CI del marco).
+> Motivo: una compuerta en producción sin requirement escrito es una regla que el
+> consumidor no puede anticipar leyendo `openspec/specs/`.
+>
+> Al archivar, revisar la superposición entre ese requirement promovido y los `ADDED` de
+> este change, y resolverla con `MODIFIED`/`RENAMED` en vez de dejar dos enunciados
+> paralelos.
 
 El orden manda. El bloque 1 se puede hacer **sin tocar la mecánica que heredan
 todos los consumidores** y por eso va primero: deja al proyecto nuevo naciendo

@@ -5,6 +5,22 @@ revisa: Builder 2 (builder par)
 estado: pendiente-de-revision
 ---
 
+> **Parte de este change YA está en el contrato canónico, y hay que saberlo antes de
+> archivar.** El 2026-08-24 se promovió a `openspec/specs/operacion-infra/spec.md` el
+> requirement **«El andamio entrega los huecos de decisión de infraestructura con su
+> criterio»**, que describe exactamente lo que este change ya reparte y ya hace fallar
+> solo (`plantilla/infra/pendientes.tf`, `plantilla/infra-prod/pendientes.tf` y
+> `pruebas/andamio/infra-pendientes.test.mjs`, que corre hoy en el CI del marco). Se
+> promovió porque una compuerta que ya enrojece a alguien sin requirement escrito es una
+> regla invisible: el consumidor no puede anticipar por qué su pipeline se pone rojo
+> leyendo `openspec/specs/`.
+>
+> Lo que este change conserva es lo que TODAVÍA no existe: la compuerta que exige que el
+> hueco esté RESUELTO. Al archivarlo, su `ADDED` no colisiona por título, pero SÍ se
+> superpone: decidir en ese momento si el requirement nuevo **reemplaza** al promovido
+> (`MODIFIED` + `RENAMED`) o convive con él, y dejarlo escrito. Dos requirements que
+> dicen lo mismo con distinta fuerza es la forma en que un contrato empieza a mentir.
+
 # infra-exigible — Tasks
 
 Tres bloques. El 1 es el único que toca el andamio; el 2 verifica que la compuerta muerda de

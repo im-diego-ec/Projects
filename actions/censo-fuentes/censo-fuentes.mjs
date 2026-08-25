@@ -48,7 +48,7 @@ export const EXTENSIONES_FUENTE = [".ts", ".tsx", ".mts", ".cts", ".js", ".jsx",
 // Extensiones cuyo lenguaje TIENE verificación de tipos. El requirement exige
 // programa de tipos solo "cuando el lenguaje tenga verificación de tipos": un
 // .mjs alcanza con que lo mire el analizador estático.
-export const EXTENSIONES_CON_TIPOS = [".ts", ".tsx", ".mts", ".cts"];
+const EXTENSIONES_CON_TIPOS = [".ts", ".tsx", ".mts", ".cts"];
 
 const esFuente = (ruta) => EXTENSIONES_FUENTE.some((e) => ruta.endsWith(e));
 const necesitaTipos = (ruta) => EXTENSIONES_CON_TIPOS.some((e) => ruta.endsWith(e));
@@ -157,7 +157,7 @@ const leerJsonc = (ruta) => JSON.parse(limpiarJsonc(readFileSync(ruta, "utf8")))
 // ---------------------------------------------------------------------------
 // SONDA 1 — el universo: los archivos que el control de versiones rastrea.
 // ---------------------------------------------------------------------------
-export function sondarRastreados(raiz) {
+function sondarRastreados(raiz) {
   const r = spawnSync("git", ["ls-files", "-z"], { cwd: raiz, encoding: "utf8", maxBuffer: 1 << 28 });
   if (r.status !== 0) {
     throw new Error(`git ls-files falló en ${raiz}: ${(r.stderr || "").trim() || r.error?.message || "sin detalle"}`);
@@ -165,7 +165,7 @@ export function sondarRastreados(raiz) {
   return r.stdout.split("\0").filter(Boolean).map(aPosix);
 }
 
-export function raizDelRepo() {
+function raizDelRepo() {
   if (process.env.CENSO_RAIZ) return aPosix(process.env.CENSO_RAIZ).replace(/\/$/, "");
   const r = spawnSync("git", ["rev-parse", "--show-toplevel"], { encoding: "utf8" });
   if (r.status === 0 && r.stdout.trim()) return aPosix(r.stdout.trim());
@@ -342,7 +342,7 @@ const ESCALERA_DE_LISTADO = [
  * "no se pudo enumerar" convertiría este censo en ruido. Lo que decide es si
  * hubo listado.
  */
-export function listarProgramaDeTipos(raiz, tsconfigRel) {
+function listarProgramaDeTipos(raiz, tsconfigRel) {
   const abs = join(raiz, tsconfigRel);
   const dir = dirname(abs);
   const tsc = resolverTsc(dir);
@@ -374,7 +374,7 @@ export function listarProgramaDeTipos(raiz, tsconfigRel) {
   return { tsconfig: tsconfigRel, archivos: [], error: `tsc no listó ningún archivo. Detalle: ${ultimoDetalle || "sin salida"}` };
 }
 
-export function sondarTipos(raiz, rastreados) {
+function sondarTipos(raiz, rastreados) {
   const tsconfigs = rastreados.filter((p) => /(^|\/)tsconfig[^/]*\.json$/.test(p));
   const declarantes = tsconfigs.filter((p) => declaraEntradas(join(raiz, p)));
   return {
@@ -460,7 +460,7 @@ export function esFechaIso(texto) {
  * que revisar, y sin fecha el piso termina siendo el mínimo de hecho, que es
  * exactamente el agujero que este campo existe para cerrar.
  */
-export function validarDeuda(declarado) {
+function validarDeuda(declarado) {
   if (!esObjetoPlano(declarado)) {
     return { error: 'projects.cobertura.deuda debe ser un objeto con "motivo" y "fecha"' };
   }

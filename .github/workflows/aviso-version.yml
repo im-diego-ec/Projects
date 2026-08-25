@@ -104,7 +104,7 @@ jobs:
       # el CHANGELOG que se lee es el de ESA version, no el de main. En el
       # dispatch cae en la rama elegida, y por eso el reenvio despues de
       # arreglar una entrada faltante se dispara desde main.
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
       # Local a proposito (./actions/...), no @v1: cada PR prueba la version del
       # aviso que ESE PR propone, no la ya publicada. Mismo criterio que ci.yml.

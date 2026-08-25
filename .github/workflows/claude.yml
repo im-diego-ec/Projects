@@ -189,7 +189,7 @@ jobs:
           exit 1
 
       - name: Checkout del repositorio
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           # Profundidad 1: el bot opina sobre el arbol de HOY, no hace
           # arqueologia. Si alguna vez hace falta historia o tags —comparar el

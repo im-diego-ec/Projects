@@ -144,7 +144,7 @@ runs:
     # El comparador es un script sin dependencias: alcanza con un Node moderno.
     - name: Node para el comparador
       if: inputs.instalar-node == 'true'
-      uses: actions/setup-node@v7
+      uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
       with:
         node-version: ${{ inputs.version-node }}
 
@@ -162,4 +162,19 @@ runs:
       # vendora ninguna copia que se pueda quedar vieja. Un checkout del repo
       # del marco daria 404 — el GITHUB_TOKEN del consumidor no lee otro repo
       # (comprobado el 2026-08-14).
-      run: node "${GITHUB_ACTION_PATH}/medir-cobertura-diff.mjs"
+      #
+      # EL setup-node DE ARRIBA ES CONDICIONAL, y por eso el guard no sobra: el
+      # default de instalar-node es "false", asi que en la configuracion POR
+      # DEFECTO esta action no instala nada y depende de que el job ya traiga
+      # Node. Cuando no lo trae, sin guard el paso muere con
+      # "node: command not found" — un mensaje del shell, que no dice ni que
+      # instalar ni de quien es el job.
+      run: |
+        set -euo pipefail
+
+        if ! command -v node > /dev/null 2>&1; then
+          echo "::error::no hay 'node' en el PATH y sin el no se puede medir la cobertura del cambio. Arreglo: pasale 'instalar-node: true' a esta action (su default es 'false' porque para llegar aca el job normalmente ya corrio las pruebas), o agrega 'uses: actions/setup-node@v7' a este job, antes de este paso"
+          exit 1
+        fi
+
+        node "${GITHUB_ACTION_PATH}/medir-cobertura-diff.mjs"

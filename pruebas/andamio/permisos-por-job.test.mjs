@@ -25,6 +25,11 @@
 // pull-requests: read la deteccion del carril de docs no puede listar los
 // archivos del PR y cae al fail-open (incidente del 2026-08-05).
 //
+// EL LECTOR DE JOBS NO VIVE ACA sino en ./workflows.mjs, porque el banco del
+// techo de tiempo mira los mismos archivos y necesita el mismo recorrido. Dos
+// copias del lector se desincronizan, y la que se queda vieja sale VERDE: un
+// lector que no encuentra el job que audita no reporta nada.
+//
 // LO QUE ESTA GUARDA NO PUEDE. No evalua permisos: eso solo lo hace GitHub, con
 // red y con un token. Verifica lo unico decidible desde el arbol —que la
 // decision este ESCRITA en el job y no delegada a una pantalla— que es
@@ -34,66 +39,7 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
-
-const RAIZ = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
-
-// Los dos arboles, con su rotulo. Se recorren enteros: agregar un workflow lo
-// mete en el alcance solo, sin tocar este archivo.
-const ARBOLES = [
-  { rotulo: "marco", dir: path.join(RAIZ, ".github", "workflows") },
-  { rotulo: "andamio", dir: path.join(RAIZ, "plantilla", ".github", "workflows") },
-];
-
-/**
- * Los jobs de un workflow, leidos POR SANGRIA y no con un parser de YAML.
- *
- * Es a proposito: los workflows del andamio traen marcadores de doble llave
- * (`{{ORG}}`) que un parser de YAML lee como un mapa en flujo y rechaza. Un
- * banco que tiene que sustituir el arbol antes de poder leerlo prueba el arbol
- * sustituido, no el que se commitea. La forma de estos archivos es fija —dos
- * espacios para el job, cuatro para sus claves— y esa es toda la gramatica que
- * hace falta.
- *
- * Devuelve, por job: su nombre, la linea donde arranca (1-indexada), si declara
- * `permissions:` y si es una llamada a un workflow reusable.
- */
-export function jobsDelWorkflow(ruta) {
-  const lineas = fs.readFileSync(ruta, "utf8").split(/\r?\n/);
-  const inicioJobs = lineas.findIndex((l) => /^jobs:\s*$/.test(l));
-  if (inicioJobs === -1) throw new Error(`${ruta} no tiene bloque "jobs:"`);
-
-  const jobs = [];
-  let actual = null;
-  for (let i = inicioJobs + 1; i < lineas.length; i += 1) {
-    const linea = lineas[i];
-    if (linea.trim() === "" || /^\s*#/.test(linea)) continue;
-    // Una clave a nivel raiz cierra el bloque de jobs.
-    if (/^\S/.test(linea)) break;
-
-    const abre = linea.match(/^ {2}([A-Za-z_][A-Za-z0-9_-]*):\s*$/);
-    if (abre) {
-      actual = { job: abre[1], linea: i + 1, permisos: false, reusable: false };
-      jobs.push(actual);
-      continue;
-    }
-    if (!actual) continue;
-    // Claves del job: exactamente cuatro espacios. Mas adentro ya son pasos.
-    if (/^ {4}permissions:/.test(linea)) actual.permisos = true;
-    if (/^ {4}uses:/.test(linea)) actual.reusable = true;
-  }
-  if (jobs.length === 0) throw new Error(`${ruta} no declaro ningun job`);
-  return jobs;
-}
-
-/** Todos los workflows de un directorio, ordenados. */
-function workflows(dir) {
-  return fs
-    .readdirSync(dir)
-    .filter((n) => /\.ya?ml$/.test(n))
-    .sort()
-    .map((n) => path.join(dir, n));
-}
+import { ARBOLES, jobsDelWorkflow, workflows } from "./workflows.mjs";
 
 /** Los jobs sin `permissions:` de un arbol de workflows, con su ubicacion. */
 export function jobsSinPermisos(dir, rotulo = dir) {

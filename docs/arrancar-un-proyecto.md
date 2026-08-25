@@ -74,17 +74,19 @@ como en Windows. Sirve para no traducir comandos; no te saca de ninguna fila de 
 
 Los pares son una promesa, y una promesa que nadie mide se rompe sola. Hoy hay **una sola**
 cosa comprobable de un comando, y es que el inventario **no encoja**: el archivo tiene **9**
-gemelos y **28** bloques ` ```bash `, y eso lo dicen
+gemelos y **29** bloques ` ```bash `, y eso lo dicen
 ` grep -c '^```powershell' docs/arrancar-un-proyecto.md ` y ` grep -c '^```bash' ` sobre el
 mismo archivo. Está probado a la mala, que es la única forma de saber que un check sirve:
 borrando los nueve gemelos, uno por uno, sobre una copia. Los **nueve** bajan el conteo a 8 y
 ponen la comprobación en rojo — ninguno se escapa.
 
 Lo que ese conteo **no** ve, y conviene decirlo antes de que alguien se confíe: que un bloque
-` ```bash ` **nuevo** que no sea portable entre sin su gemelo. El lado bash sube a 29 y la
+` ```bash ` **nuevo** que no sea portable entre sin su gemelo. El lado bash sube a 30 y la
 comprobación se pone roja, sí, pero roja **porque el inventario cambió**, no porque falte un
-gemelo: quien la vea puede apagarla cambiando el 28 por 29 sin haberse preguntado si el
-bloque nuevo era portable. Distinguir un caso del otro a máquina pide adivinar qué comando
+gemelo: quien la vea puede apagarla cambiando el 29 por 30 sin haberse preguntado si el
+bloque nuevo era portable. Ya pasó una vez: el 28 de la versión anterior de esta línea es hoy
+un 29 porque la sección 3.1 sumó un bloque `node --input-type=module`, que **sí** corre igual
+en las dos shells — pero eso lo decidió una lectura, no el conteo. Distinguir un caso del otro a máquina pide adivinar qué comando
 corre igual en las dos shells, y adivinar es exactamente lo que un check no debe hacer; así
 que eso hoy lo ve una persona leyendo el diff, y por eso es otra fila del mismo
 [backlog de automatización](reglas-no-escritas.md#backlog-de-automatización) que la
@@ -414,22 +416,92 @@ Lo único que cambia es la barra invertida del final de línea, que en PowerShel
 continúa el comando**: parte la invocación en dos y `node` arranca sin `--valores`. La barra
 de las rutas no hace falta cambiarla — Node y `gh` aceptan `/` en Windows.
 
-Eso es todo. **No hay una segunda pieza que traer**: `projects init` escribe **75 archivos
-con 156 sustituciones** — la mecánica, los tres paquetes con sus pruebas pasando, **y los
-dos directorios de infraestructura**.
+Eso es todo. **No hay una segunda pieza que traer**: `projects init` escribe **el andamio
+entero** — la mecánica, los tres paquetes con sus pruebas pasando, **y los dos directorios
+de infraestructura**. La corrida te lo dice sola en su primera línea, con la forma
+`escritos N archivos, M ocurrencias sustituidas`; qué hacer con esos dos números está en
+3.1. **Acá no van escritos a propósito**: crecen con cada archivo que entra al andamio, y
+esta línea ya los tuvo mal por eso.
 
 Si el repo que querés usar **ya existía**, el primer comando falla: eso es la 3.3.
 
+### 3.0 Las otras cuatro banderas, y la única que vas a necesitar algún día
+
+Además de `--valores` y `--destino`, que son las del comando de arriba, la herramienta
+acepta cuatro banderas más.
+`node <ruta-al-clon-de-projects>/herramientas/projects-init.mjs --help` las imprime todas —
+la lista de acá sale de esa salida, no de la memoria de nadie. Tres son de escape y se usan
+poco; la cuarta merece un párrafo porque su ausencia **aborta el arranque** y el mensaje no
+se parece a un problema de banderas.
+
+| Bandera | Cuándo |
+|---|---|
+| `--ejemplo` | Fase 2: imprime el esqueleto de `valores.json` |
+| `--forzar` | Sobrescribe un destino que **ya tiene** archivos del andamio. Es la bandera que apaga la protección contra pisar trabajo: se usa para reintentar un arranque que se cortó a la mitad, no para «probar otra vez» |
+| `--sin-herramientas` | No corre `openspec init` ni el render de la constitución. Te deja el andamio copiado y nada más — el repo queda **sin** `openspec/` y sin `.projects/`, o sea sin las dos piezas de la fase 7 |
+| `--version-openspec <x.y.z>` | Ver abajo |
+
+⚠️ **`--version-openspec` es el escape para cuando el pin no se puede leer.** La herramienta
+**no lleva el número adentro**: lo lee del `default` del input `version_openspec` de
+`.github/workflows/marco-ci.yml`, en el clon del marco desde el que la corrés. Una sola
+declaración, para que no haya dos que puedan divergir. Si ese archivo no está —un clon
+parcial, un *sparse checkout*, un fork sin `.github/workflows/`, la herramienta copiada
+fuera de su árbol— la corrida **aborta sin escribir nada** y lo dice entero:
+
+```
+::error::no encontre <ruta>/.github/workflows/marco-ci.yml. De ahi sale el pin del CLI de
+OpenSpec (el `default` del input `version_openspec`), y sin el este arranque no puede correr
+`openspec init`. NO se escribio nada. Dos salidas: pasa el pin a mano con
+--version-openspec <x.y.z>, o corre esto desde un clon COMPLETO del repo del marco (un clon
+parcial o un fork sin .github/workflows/ no trae ese archivo). Si el arranque no necesita
+las dos herramientas, --sin-herramientas tampoco lo pide.
+```
+
+Las dos salidas son literales: o corrés desde un clon completo —que es lo normal y lo que
+dice la sección 2 de esta guía— o pasás el pin a mano. Para saber qué número pasar, el
+comando está en [upgrade-openspec.md](upgrade-openspec.md); si no tenés el archivo, tampoco
+tenés de dónde leerlo, así que sale del repo del marco en GitHub.
+
+**Espera una versión EXACTA**, no un rango ni `latest`, y lo comprueba **antes** de tocar
+un solo archivo:
+
+```
+::error::--version-openspec = "latest" no es una version exacta x.y.z (se espera algo como
+0.9.4, sin rangos ni "latest"). No se escribio nada. Ese valor se concatena en la linea de
+comandos del ejecutor de paquetes: en Windows esa invocacion va por cmd.exe sin escapar los
+argumentos.
+```
+
+El motivo está en el propio mensaje y no es pedantería: ese valor termina dentro de la línea
+de comandos de un proceso hijo. Y ⚠️ **la bandera lleva valor: si la escribís al final del
+`argv` sin él, el error de arriba es lo que te salva** — antes se colaba como `undefined` y
+llegaba entera hasta el `npx`.
+
 ### 3.1 Qué quedó en el repo
 
-**102 archivos**, y el mensaje dice `escritos 75`. Las dos cosas están bien, y el desglose
-medido es este:
+**Van a quedar bastantes más archivos de los que dice el mensaje `escritos N`, y las dos
+cosas están bien.** El mensaje cuenta **sólo el andamio**; los otros dos pasos escriben
+por su cuenta y no entran en esa cuenta:
 
 | De dónde | Cuántos |
 |---|---|
-| El andamio — lo que `projects init` copia y sustituye | **75** |
-| `openspec init`, que `projects init` corre en su último paso (12 comandos `/opsx:*`, 12 skills `openspec-*`, y el árbol de `openspec/`) | **25** |
-| El render de la constitución (`.projects/` y `.cursor/rules/`) | **2** |
+| El andamio — lo que `projects init` copia y sustituye | El `N` de `escritos N archivos` |
+| `openspec init`, que `projects init` corre en su último paso | **25**: 12 comandos `/opsx:*`, 12 skills `openspec-*`, y el árbol de `openspec/` |
+| El render de la constitución | **2**: `.projects/AGENTS-marco.md` y `.cursor/rules/00-marco.mdc` |
+
+⚠️ **La cifra del andamio no está escrita acá a propósito, y esta línea la tuvo mal.**
+Traía dos cifras fijas —la del andamio y el total— y las dos crecen con cada archivo que
+entra a `plantilla/`: se movieron entre dos mediciones **del mismo día**, con un archivo
+nuevo en el medio. La que vale es la que imprime **tu** corrida. Si querés el
+número antes de correr nada, el comando está en el encabezado de
+`herramientas/projects-init.mjs`, bajo *ESOS CUATRO NUMEROS SE MIDEN*:
+
+```bash
+cd <ruta-al-clon-de-projects> && node --input-type=module -e '
+import { archivosDelAndamio } from "./herramientas/projects-init.mjs";
+console.log(archivosDelAndamio("plantilla").length);
+'
+```
 
 ⚠️ **El artefacto de la constitución va a declarar `version=1.6.0` y no 1.7.0, y está bien.**
 Versiona el **canónico**, no el release: como el texto del canónico no cambió en la 1.7.0, el
@@ -726,9 +798,20 @@ verde, pero es un verde **vacuo** — no hay nada que validar.
 change tenga su delta. Así que el change se crea y se completa en la misma sesión, o
 se trabaja en una rama sin PR abierto todavía.
 
-Los seis pasos y quién aprueba cada uno están en
-[`AGENTS.md`](../AGENTS.md): proposal y specs los aprueba el **PO**; design y tasks
-los revisa **el otro builder**. Los **12 comandos `/opsx:*`** y las 12 skills
+Los seis pasos y quién aprueba cada uno están en **`.projects/AGENTS-marco.md` de tu
+repo** —la porción del marco de la constitución, que `projects init` te dejó
+renderizada; su fuente vive en
+[`actions/constitucion/canonico/10-openspec.md`](../actions/constitucion/canonico/10-openspec.md)—:
+proposal y specs los aprueba el **PO**; design y tasks los revisa **el otro builder**.
+
+⚠️ **No lo busques en el [`AGENTS.md`](../AGENTS.md) de este repo, que dice lo
+contrario a propósito.** Acá el PO **no** aprueba proposals ni specs, porque en el
+marco no hay producto: todo change es técnico y ese reparto convertiría al PO en
+revisor obligatorio de cada guardrail de ingeniería. En **tu** proyecto sí los
+aprueba, porque ahí proposal y spec son el qué y el por qué del negocio. Son dos
+constituciones distintas y la que te gobierna es la tuya.
+
+Los **12 comandos `/opsx:*`** y las 12 skills
 `openspec-*` cubren el ciclo: los deja `openspec init`, que `projects init` corre en su último
 paso — si ese paso falló, no están, y hay que correrlo a mano.
 

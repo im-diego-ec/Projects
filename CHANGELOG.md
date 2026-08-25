@@ -69,10 +69,13 @@ mueve sobre un cambio incompatible.
   agrega el paso «El arbol del PR no redirige el registry de npm» (rojo si el árbol trae
   un `.npmrc`) y el `npx` corre con `npm_config_userconfig` apuntando a un archivo
   vacío. Banco: `pruebas/marco-ci/registry-npm.test.mjs`.
-- **Los cinco checkouts de `marco-ci.yml` declaran `persist-credentials: false`.** Con
+- **Los seis checkouts de `marco-ci.yml` declaran `persist-credentials: false`.** Con
   el default, bajo `pull_request_target` el checkout dejaba el token del repo
   **llamador** escrito como `extraheader` en el `.git/config` de un árbol que es código
-  de un tercero. Banco: `pruebas/marco-ci/checkouts.test.mjs`.
+  de un tercero. Eran **cinco** cuando se escribió esta entrada y hoy son seis: el job
+  `terraform` de más abajo sumó el suyo, y la cifra no se recuerda, se remide con
+  `grep -c 'persist-credentials: false' .github/workflows/marco-ci.yml`. Banco:
+  `pruebas/marco-ci/checkouts.test.mjs`.
 - **El `allowed-tools:` del frontmatter de skills y agentes pasa a ser COMPUERTA en el
   repo que distribuye el marco.** Seguía en modo aviso en todas partes: medido sobre
   este árbol, 30 entradas que autorizan una escritura (`Bash(gh:*)` habilita `gh pr
@@ -117,12 +120,37 @@ mueve sobre un cambio incompatible.
   `.github/dependabot.yml` no existía acá. Ahora existe, con el ecosistema de
   github-actions y el motivo de cada exclusión escrito.
 
-- **Aviso de invocaciones a acciones ajenas sin pinar por SHA.** `AGENTS.md` declara en sus
-  fronteras que una acción de terceros «se pina por SHA, no por tag móvil ajeno», y medido
-  sobre el árbol solo una lo cumple. El job `higiene` ahora las detecta y las reporta con
-  `::warning::` —modo aviso y no rojo, porque estrenarle un rojo a un consumidor sin
-  anunciárselo es lo que este marco prohíbe— con el comando que cierra cada una y la
-  condición escrita para pasarlo a rojo. Qué tiene que hacer un consumidor: nada todavía.
+  **Dos notas de ese archivo se corrigieron en este mismo cambio**, y las dos eran
+  afirmaciones medibles que habían dejado de ser ciertas —van declaradas acá porque una
+  edición que no figura en ninguna entrada es un archivo de más para quien revise el
+  diff—: el motivo por el que `terraform` queda **fuera** decía «ningún job del marco
+  corre `terraform`», y hoy sí hay un job `terraform` en `marco-ci.yml` —sólo que
+  verifica las raíces del repo **que lo consume**, y en éste no encuentra ninguna, así
+  que la decisión no cambia pero el motivo escrito sí—; y el censo de `uses:` decía
+  **44 / 28 / 16** cuando hoy son **45 / 29 / 16**. El comando que reproduce las tres
+  cifras está en el propio archivo, dos líneas más abajo de donde se escriben.
+
+- **Aviso de invocaciones a acciones ajenas sin pinar por SHA — y las que corren acá ya
+  están pinadas.** `AGENTS.md` declara en sus fronteras que una acción de terceros «se
+  pina por SHA, no por tag móvil ajeno», y cuando este check se escribió lo cumplían
+  **dos** líneas en todo el árbol, las dos de `anthropics/claude-code-action`. El job
+  `higiene` las detecta y las reporta con `::warning::` —modo aviso y no rojo, porque
+  estrenarle un rojo a un consumidor sin anunciárselo es lo que este marco prohíbe— con
+  el comando que cierra cada una y la condición escrita para pasarlo a rojo.
+
+  **Y ahora tiene bastante menos que reportar:** los **22** `uses:` ajenos de
+  `.github/workflows/` —14 `actions/checkout` y 8 `actions/setup-node`— pasaron a SHA de
+  40 hex con el tag en el comentario de al lado, que es la forma que Dependabot
+  reescribe. Medido con el método del propio paso, hoy quedan **10 de 34** por tag móvil,
+  y son exactamente los que **viajan**: 8 en `plantilla/.github/workflows/` y 2 en los
+  `action.yml` de `cobertura-diff` y `guardrail-deltas`. El paso sigue avisando hasta que
+  no quede ninguno; ahí pasa a `::error::` y `exit 1`, y ese endurecimiento se anuncia en
+  «Para consumidores» **antes** de hacerlo.
+
+  **Un SHA no se mueve, y eso es lo que lo vuelve peligroso si nadie lo descongela:** lo
+  que reescribe el SHA y su comentario `# v7` es la entrada de `github-actions` de
+  `.github/dependabot.yml`, que pasa de cubrir dos líneas a cubrir 24. Las dos piezas se
+  necesitan; ninguna sola sirve. Qué tiene que hacer un consumidor: nada todavía.
 
 ### Corregido
 
@@ -151,14 +179,63 @@ mueve sobre un cambio incompatible.
   destino** en vez de lo que la corrida acababa de escribir: un `{{ALGO}}` preexistente en
   un repo con contenido abortaba por un motivo ajeno.
 
+- **El repo afirmaba dos compuertas de gobierno que no existen, y ahora dice lo que se
+  midió.** Las dos se remidieron contra la API de GitHub el 2026-08-24 y las dos salieron
+  vacías. Un repo que **afirma** una compuerta que no existe está peor que uno que no
+  afirma ninguna: el que lo lee deja de buscar.
+
+  - **`main` no tiene ninguna protección activa.** `.github/proteccion-main.md` declaraba
+    un ruleset `main-protegida` con `enforcement: active` y cinco reglas en verde. Contra
+    las dos formas en que GitHub puede proteger una rama —la moderna y la heredada—:
+    `gh api repos/im-diego-ec/Projects/rulesets` devuelve `[]` y
+    `gh api repos/im-diego-ec/Projects/branches/main/protection` devuelve `404`. No hay
+    ruleset ni protección heredada: hoy un push directo a `main` entra, y el check
+    `ci-ok` corre, reporta y **nadie lo exige**. El documento pasa a tener la tabla
+    entera en rojo, con los pasos para aplicarla y esos dos comandos para remedirla antes
+    de creerle. **Con lo que se puede leer desde acá no se reconstruye qué pasó** —si el
+    ruleset se creó y se borró, o si nunca existió— y esa parte se deja sin respuesta en
+    vez de rellenarla. El comentario de `ci-ok` en `ci.yml`, que decía «check REQUERIDO
+    por el ruleset main-protegida», dice ahora lo mismo: el nombre del job sigue siendo
+    el contrato público —renombrarlo es breaking— aunque hoy no lo exija nadie.
+  - **Los owners de `.github/CODEOWNERS` bajan de equipos a un handle personal.** El
+    archivo asignaba `@im-diego-ec/builders` y `@im-diego-ec/po`, y
+    `gh api repos/im-diego-ec/Projects/teams` devuelve `[]`: la cuenta es **personal**, y
+    en una cuenta personal los equipos no existen —no hay nada que devolver ni nada que
+    crear—, así que esos owners no resolvían a **nadie**. Es el fallo mudo que el propio
+    encabezado del archivo describía, esta vez sobre el archivo que lo escribía: el gate
+    existía en el texto y no en la práctica. Ahora dicen `@im-diego-ec`.
+    **Qué se pierde, dicho entero y no minimizado:** con un equipo el **rol** sobrevive a
+    la persona —la membresía se edita en un solo lugar y ningún repo cambia—; con un
+    handle no, y el día que el owner cambie de persona hay que editar este archivo.
+    **La condición para volver atrás** no depende de que alguien se acuerde: que el repo
+    se mueva a una **organización**, donde el mismo comando deja de devolver `[]` y estas
+    líneas vuelven a la forma `@organizacion/equipo`.
+    **Y la consecuencia operativa es la que más importa:** GitHub solicita review a los
+    owners **excepto** al autor del PR, así que con un único owner que además escribe
+    todos los PRs la resta da cero y no se le pide revisión a nadie. De ahí que activar
+    `require_code_owner_review` no endurecería nada: **bloquearía todo merge**, porque el
+    PR pediría una aprobación de code owner que sólo puede dar el autor. Por eso esa
+    regla sigue diferida, y el motivo es ése y no la falta de tiempo. Banco:
+    `pruebas/docs/codeowners.test.mjs`, que exige la forma `@usuario` en este archivo y la
+    de equipo en el del andamio, porque son repos distintos y la forma válida no es la
+    misma en los dos.
+
+  **Qué tiene que hacer un consumidor: nada.** Ninguno de los dos archivos viaja con esos
+  valores: el `CODEOWNERS` del andamio conserva sus placeholders de organización y equipo,
+  que es la forma que sí resuelve en el repo al que llega.
+
 ### Añadido
 
 - **`docs/para-el-po.md` y `docs/glosario.md`.** El rol con más poder de veto del marco —el
-  PO, dueño exclusivo de rutas en CODEOWNERS— no tenía ningún documento dirigido a él, y la
-  palabra «glosario» no aparecía en ningún archivo del repo. Con `pruebas/docs/` detrás, que
-  comprueba que cada ruta que CODEOWNERS le asigna al PO esté explicada y que la cifra del
-  glosario sea la cantidad real de filas: las dos reglas fallan solas si alguien toca
-  CODEOWNERS o agrega una fila.
+  PO, a quien CODEOWNERS le reserva rutas propias, sacadas a mano del catch-all— no tenía
+  ningún documento dirigido a él, y la palabra «glosario» no aparecía en ningún archivo del
+  repo. Con `pruebas/docs/` detrás, que comprueba que cada ruta que CODEOWNERS saca del
+  catch-all esté explicada y que la cifra del glosario sea la cantidad real de filas: las
+  dos reglas fallan solas si alguien toca CODEOWNERS o agrega una fila. Ese banco
+  identifica las rutas por el carve-out y **no** por el owner desde que los owners de este
+  repo son un handle personal: con un único handle, las reglas del PO nombran al mismo
+  owner que la regla `*` y el rol ya no se lee en el archivo (ver la entrada de CODEOWNERS
+  en «Corregido»).
 
 - **La guía de arranque deja de asumir un solo shell.** Tenía 25 bloques `bash`, cero de
   PowerShell y una sola mención de Windows —y era un aviso de que un paso falla—. Ahora
@@ -212,6 +289,133 @@ mueve sobre un cambio incompatible.
   1.4.2 pasó. Verificado que las fechas de commit y de release de los tags coinciden, así que
   no es eso. Algo más entra en el cálculo y no se pudo reconstruir del log. **No cambia el
   arreglo**: `exclude` saca al marco del filtro cualquiera sea la aritmética.
+
+### Seguridad — el árbol npm que el CI de cada consumidor ejecuta
+
+- **En cada corrida, el job `openspec` descargaba y ejecutaba un conjunto de paquetes que
+  nadie podía enumerar.** El pin de `version_openspec` dice **qué** paquete baja; no dice
+  **cuál árbol arrastra**. Las dependencias del CLI se resolvían frescas en cada corrida y
+  un ejecutor de paquetes no deja lockfile: el código que terminaba corriendo dentro del CI
+  de un consumidor podía cambiar entre **dos corridas del mismo commit**, sin PR y sin diff.
+  Tres cosas cambian:
+
+  1. **El árbol se materializa en un directorio propio del `RUNNER_TEMP`**, con `npm` corriendo
+     con su cwd ahí y no adentro del árbol del consumidor. Bajo `pull_request_target` ese árbol
+     es el head de un PR de fork, o sea código de un tercero: el vector conocido —un `.npmrc`
+     que redirige el `registry=`— ya estaba cerrado, pero la **forma** seguía siendo correr el
+     gestor de paquetes parado adentro de lo que se está juzgando. Ya no.
+  2. **La instalación deja un `package-lock.json`**, y el paso arma con él un manifiesto con la
+     ruta, la versión y el `integrity` de **cada** paquete, lo imprime entero en un `::group::` y
+     lo resume en un sha256. Un paquete sin `integrity` sale con `::warning::` y su nombre.
+  3. **El CLI se ejecuta desde ese árbol ya medido**, derivando el ejecutable de
+     `node_modules/.bin` en vez de escribirlo de memoria. Si el paquete dejara de exponer un
+     ejecutable reconocible, el paso vuelve al ejecutor anterior **avisando** en vez de
+     degradarse callado.
+
+  **Input nuevo: `huella_openspec`, vacío por default.** Vacío, el paso mide e imprime; con
+  valor, un árbol distinto es **rojo** con los dos manifiestos en el log. El default vacío no
+  es una omisión: la huella depende del registry y no se puede resolver sin red, así que el
+  marco no puede traerla escrita. **Qué tiene que hacer un consumidor:** nada obligatorio. Si
+  quiere el pin del árbol, mira el `::notice::` de su próxima corrida —trae la huella medida y
+  la línea lista para copiar— y la declara en el `with:` de su `uses:`. A partir de ahí,
+  subir `version_openspec` obliga a remedir; el `::notice::` lo dice cada vez.
+
+- **Los 10 jobs que no declaraban `permissions:` quedaron en cero, y hasta ahora no se había
+  escrito acá.** Un job sin bloque `permissions:` corre con el default del **repositorio**:
+  una perilla de Settings que no vive en el árbol, que no aparece en ningún diff y que en
+  muchas organizaciones sigue siendo read/write sobre todo. El `permissions:` del encabezado
+  no cierra ese hueco, lo tapa: es un default para los jobs que no declaran, no un techo.
+  Medido sobre los dos árboles de workflows —el del marco y el que reparte el andamio—: de
+  20 jobs, 10 no declaraban; hoy declaran **los 23**, con el mínimo real o con `{}`, que es
+  una respuesta y no un silencio. **Qué tiene que hacer un consumidor:** nada. Lo que le
+  llega es un techo más angosto, nunca uno más ancho — y el job que llama al reusable sigue
+  concediendo `pull-requests: read`, sin el cual la detección del carril de docs cae al
+  fail-open. Banco: `pruebas/andamio/permisos-por-job.test.mjs`.
+
+### Añadido — la infraestructura se verifica desde el marco, no desde una copia
+
+- **Job nuevo en el CI heredado: `terraform`.** La verificación de formato y validez de las
+  raíces de Terraform vivía **inline en el `ci.yml` que reparte el andamio**, o sea en un
+  archivo que el repo nuevo recibe como propio: un paso que cualquiera puede borrar, que un
+  repo anterior al andamio nunca tuvo y que un repo creado a mano no tiene. Ahora vive en
+  `marco-ci.yml`, que se consume por `uses:` y no se edita. Verifica lo mismo y con las
+  mismas dos comprobaciones, y **una de las dos no es inerte**, al revés de lo que decía
+  el primer borrador de esta entrada: `terraform fmt -check` sí lo es —lee texto— pero
+  `terraform init -backend=false` + `terraform validate` no. Lo que dice el
+  `-backend=false` es que **no se inicializa el state remoto**: no toca ningún bucket, no
+  pide credenciales de ninguna cuenta y no necesita que el repo se haya desplegado nunca.
+  Eso es más angosto que «inerte»: `init` **descarga** los providers y módulos que
+  declaran los `.tf` del árbol que se está mirando —un `required_providers` puede nombrar
+  cualquier host de registry, un `source` de módulo puede ser `git::` o `http`— y
+  `validate` **arranca** esos binarios de provider para leerles el schema.
+
+  **Consecuencia, y viene cerrada de fábrica:** bajo `pull_request` eso es el trato normal
+  de cualquier CI de Terraform (el árbol es el merge del PR, el token de un PR de fork es
+  de solo lectura y no hay secretos). Bajo `pull_request_target` no lo es —ahí el token y
+  los secretos son los del repo llamador— así que **bajo ese evento el paso corre solo el
+  `fmt` y anuncia con un `::notice::` que la validez quedó sin verificar**. Un check que se
+  achica en silencio bajo un evento es un verde que nadie sabe leer.
+
+  **Corre siempre, sin `needs` y sin mirar el carril de docs, y ese detalle decide todo lo
+  demás:** el default de `rutas_carril_docs` incluye `^infra/` y `^infra-prod/`, así que un
+  PR que toca **únicamente** Terraform sale con `solo_docs=true`. Un job que se salteara en
+  el carril rápido no verificaría nunca la infraestructura justo en los PRs que solo la
+  tocan.
+
+  **Dos inputs nuevos:** `raices_terraform` (default `"infra infra-prod"`) y
+  `ventana_terraform` (default `"2026-09-30"`).
+
+  **Qué tiene que hacer un consumidor:**
+  - **Si tu repo no tiene `infra/` ni `infra-prod/`:** nada. El job sale verde en segundos con
+    un `::notice::` que dice que no verificó nada, que no es lo mismo que verificar y no
+    encontrar problemas. Si tus raíces se llaman de otra forma, declaralas en
+    `raices_terraform`.
+  - **Si tu repo sí las tiene:** mirá el log de tu próxima corrida. **Hasta el 2026-09-30 un
+    hallazgo avisa; desde el 2026-10-01 detiene el CI**, sin que nadie toque ningún archivo:
+    la gravedad se deriva del reloj. Esa ventana es el plazo para arreglar lo que reporte. Si
+    necesitás más, `ventana_terraform` la mueve — y esa postergación queda escrita en tu
+    `ci.yml`, con autor y fecha.
+  - **La ausencia del binario cuenta como fallo, no como caso neutro**, y comparte la misma
+    ventana. «No pude verificar» no es «verifiqué y está bien»: avisar para siempre cuando
+    falta `terraform` convertiría el job en un verde perpetuo. **Límite declarado:** el
+    binario sale hoy de la imagen del runner; el `hashicorp/setup-terraform` pinado por SHA
+    que lo garantiza todavía no está, porque el SHA se resuelve con red. Los dos comandos que
+    lo resuelven —sin copiarlo de memoria— están escritos en el encabezado del job.
+  - La copia inline del andamio **sigue en pie a propósito**: su banco la extrae por nombre y
+    retirarla es un cambio de dos archivos que no es este. Mientras convivan, un repo del
+    andamio verifica sus raíces dos veces: cuesta segundos y no cambia ningún veredicto.
+
+  **Hueco declarado, y se escribe acá porque un consumidor lo hereda:** el paso de este job
+  **todavía no tiene banco propio**, y la compuerta que vigila justamente eso
+  —`pruebas/marco-ci/cobertura-de-los-pasos.test.mjs`, que pregunta si algún banco menciona
+  el nombre de un paso con `run:`— lo da por cubierto **por colisión de nombre**: el banco de
+  la copia del andamio menciona ese mismo nombre porque la copia se llama igual, pero extrae
+  su texto de `plantilla/.github/workflows/ci.yml`, que es otro archivo. O sea que el verde
+  que hoy trae este paso lo compró esa coincidencia y no un caso que lo haya corrido. Sus
+  ramas —ventana con forma inválida, raíces declaradas vacías, sin raíces en el árbol, sin
+  binario, `fmt` en rojo, `validate` en rojo, el recorte por `pull_request_target`, y las dos
+  gravedades de cada una— se ejercitaron a mano contra el `run:` extraído antes de escribir
+  esta entrada, pero **eso no es un banco commiteado**: el arreglo es uno propio en
+  `pruebas/marco-ci/` que extraiga **este** paso de **este** archivo y le corra las ramas con
+  un `terraform` falso en el PATH, y va en su propio cambio. Está escrito también en el
+  encabezado del job, con el comando que lo verifica.
+
+- **El banco de `projects init` estrena el segundo eje de su matriz: la versión de Node.** La
+  matriz de sistemas operativos ya existía; la de versiones no, y era la que faltaba. La
+  herramienta declara dos números en su código —`NODE_MINIMO = "18.17.0"` y
+  `NODE_RECOMENDADO = "20.12.0"`— y las dos ramas de esa decisión solo se ejercitaban con una
+  versión **simulada**: la corrida real era siempre en Node 22, o sea la única franja donde
+  el guard no hace nada. Eso ya se pagó una vez y en la dirección cara: la herramienta usaba
+  `import.meta.dirname`, que llegó en Node 20.11 y vale `undefined` en 18.17, así que en el
+  piso que ella misma declaraba soportado moría con un `TypeError` antes de escribir un
+  archivo. **Un número que nadie ejecuta no es un piso, es una afirmación.** Cinco patas y no
+  nueve: los tres sistemas operativos con el Node del runner, más 20.12.0 y 18.17.0 sobre
+  ubuntu, porque lo que esas dos ejercitan es la versión del **intérprete**. La pata de
+  18.17.0 **entra avisando** —nadie corrió nunca ese banco en esa versión, así que su primer
+  resultado es también su primera medición— y la condición para promoverla está escrita en la
+  propia matriz: en cuanto se la vea verde una vez, `modo: aviso` pasa a `modo: rojo`. La de
+  20.12.0 entra en rojo desde el primer día. Esto vive en el `ci.yml` **del marco**, que
+  ningún consumidor consume: **qué tiene que hacer un consumidor, nada**.
 
 ---
 

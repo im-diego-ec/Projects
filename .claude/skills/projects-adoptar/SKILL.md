@@ -1,7 +1,15 @@
 ---
 name: projects-adoptar
 description: Adoptar el marco Projects en un repo que YA existe (no nacido del scaffold) — llamar al workflow reusable conservando el nombre del check requerido, declarar permissions pull-requests read, cablear el censo de fuentes y la cobertura por diff, regenerar los artefactos del CLI al pin vigente y cerrar los archivos que el censo deja fuera de alcance. Usar cuando un proyecto existente tenga que empezar a consumir el marco.
-allowed-tools: Bash(git:*), Bash(gh:*), Bash(node:*), Bash(npx:*), Bash(grep:*), Bash(awk:*), Bash(pnpm:*), Read, Edit, Write
+# ALLOWLIST ACOTADO. `allowed-tools` es un allowlist de agente con el mismo poder
+# que el archivo de ajustes: `Bash(git:*)` autoriza `git push --force` y `Bash(gh:*)`
+# autoriza `gh pr merge`, `gh release create` y `gh api -X DELETE`. Un comodin en la
+# posicion del subcomando autoriza mas de lo que nadie reviso, asi que aca solo entran
+# LECTURAS acotadas.
+# Lo que ESCRIBE fuera del arbol —git checkout, git pull, git add, git commit, git push, gh pr create, pnpm install y los `npx` del CLI de OpenSpec (que descargan y ejecutan un paquete)— queda deliberadamente afuera: no es que la
+# skill no lo haga, es que cada una de esas corridas se PIDE en la sesion. Buscar en el
+# arbol va por las tools `Grep` y `Glob` en vez de por `Bash(grep:*)`.
+allowed-tools: Bash(git status:*), Bash(git diff:*), Bash(git log:*), Bash(git rev-parse:*), Bash(git ls-files:*), Bash(git grep:*), Bash(gh pr view:*), Bash(gh pr checks:*), Bash(gh run list:*), Bash(gh run view:*), Read, Grep, Glob, Edit, Write
 metadata:
   author: Transformación Digital y Data
   version: "1.0"

@@ -53,9 +53,37 @@ on:
   pull_request_review_comment:
     types: [created]
   issues:
-    types: [opened, assigned]
+    # SOLO `opened`, y `assigned` se fue a proposito. Un assign no es una pregunta
+    # nueva: es un evento sobre un issue cuyo CUERPO ya contiene "@claude", asi que
+    # el `if` de mas abajo lo dejaba pasar y cada assign y cada unassign volvia a
+    # levantar un runner, hacia checkout y cargaba el secret. En un repo con
+    # colaboradores externos eso es un disparador que no depende de escribir nada.
+    types: [opened]
   pull_request_review:
     types: [submitted]
+
+# UN HILO, UNA CORRIDA. A este workflow lo dispara CUALQUIERA que pueda comentar,
+# y sin concurrency cada mencion levanta un runner propio, hace checkout y carga
+# el secret, sin techo. El `if` del job no ayuda: filtra por el texto del
+# comentario, no por cuantas corridas hay vivas, y el control de QUIEN puede
+# invocarlo tampoco vive aca —esta en la action, que corta DESPUES del checkout—.
+# O sea que todo lo que se puede acotar desde el archivo se acota aca o no se
+# acota.
+#
+# cancel-in-progress: true, y es lo correcto para un bot que contesta: una mencion
+# nueva en el mismo hilo REEMPLAZA a la anterior, no hace cola detras de ella. La
+# respuesta que se estaba escribiendo ya no es la que se pidio. El criterio seria
+# el contrario para un workflow que ENVIA algo —ahi cancelar a la mitad deja el
+# envio hecho a medias— y por eso no se copia sin mirar que hace el workflow.
+#
+# El `github.run_id` del final no es relleno: en un evento sin issue ni
+# pull_request en el payload el grupo quedaria en "claude-" y dos corridas ajenas
+# se cancelarian entre si. Con el run_id ese caso degrada a "un grupo por
+# corrida", que es no agrupar — que es exactamente lo que corresponde cuando no se
+# sabe a que hilo pertenece.
+concurrency:
+  group: claude-${{ github.event.issue.number || github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: true
 
 jobs:
   claude:
@@ -157,7 +185,7 @@ jobs:
           exit 1
 
       - name: Checkout del repositorio
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           # Profundidad 1: el bot opina sobre el arbol de HOY, no hace
           # arqueologia. Si alguna vez hace falta historia, se sube este numero

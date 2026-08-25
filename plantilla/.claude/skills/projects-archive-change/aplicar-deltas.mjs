@@ -43,6 +43,7 @@
 // ---------------------------------------------------------------------------
 import { readFileSync, writeFileSync, readdirSync, existsSync, mkdirSync } from "node:fs";
 import { join, dirname, posix } from "node:path";
+import { spawnSync } from "node:child_process";
 
 const CHANGES = process.env.OPENSPEC_CHANGES || "openspec/changes";
 const SPECS = process.env.OPENSPEC_SPECS || "openspec/specs";
@@ -52,8 +53,312 @@ const args = process.argv.slice(2);
 const SIMULACRO = args.includes("--simulacro");
 const CHANGE = args.find((a) => !a.startsWith("--"));
 
+
+// ---------------------------------------------------------------------------
+// LOS TRES MODOS PORTABLES, y por que existen.
+//
+// Este procedimiento se usa sobre todo en Windows, que es donde el CLI de
+// archive miente. Hasta el 2026-08-24 la skill exigia Git Bash porque tres de
+// sus pasos estaban escritos en shell de Unix: un `awk` para leer un campo de
+// un YAML, un `diff <(...) <(...)` —sustitucion de procesos, que ni siquiera
+// existe en `sh`— para comparar dos conteos, y un `${var#...}` para recortar un
+// prefijo de ruta. O sea que la herramienta pensada para la plataforma menos
+// confiable exigia justo el interprete que ahi puede faltar, y "abri bash
+// primero" no es un requisito que ningun otro documento del proyecto pida.
+//
+// Los tres viven aca ahora. Node ya era requisito del paso 2 y corre en las
+// tres plataformas; lo unico que queda en la linea de comandos es `git`, `node`
+// y —en el repo del marco— `gh`, que tambien son de las tres.
+// ---------------------------------------------------------------------------
+
+/** Corre git y devuelve { rc, salida }. No revienta por rc distinto de 0: cada
+ *  modo decide que significa un rc, que es la diferencia entre "no hubo
+ *  coincidencias" y "no pude mirar". */
+function git(...argumentos) {
+  const r = spawnSync("git", argumentos, { encoding: "utf8" });
+  if (r.error) {
+    console.error(
+      `::error::no se pudo ejecutar git (${r.error.message}). Sin git este paso no puede afirmar nada, y lo no verificable es rojo.`
+    );
+    process.exit(1);
+  }
+  return { rc: r.status, salida: r.stdout || "" };
+}
+
+// ---------------------------------------------------------------------------
+// GUARDA DE ACOPLE — vive en una funcion porque tiene que correr en TODO camino
+// que archive, y no solo en el que aplica deltas.
+//
+// `openspec/changes/<nombre>/` es una carpeta TRANSITORIA por definicion del
+// propio marco: archivar la mueve a `changes/archive/<fecha>-<nombre>/` y
+// descartar un change la borra. Asi que NADA de afuera puede depender de una
+// ruta de adentro. Cuando pasa, el archive —que es una operacion rutinaria—
+// rompe algo que no tiene nada que ver con specs. El caso medido: un banco de
+// pruebas REQUERIDO ejecutaba un script guardado dentro de un change en vuelo,
+// o sea que archivar ese change dejaba el CI en rojo.
+//
+// DONDE CORRE, y esto fue un defecto real de este mismo archivo: estaba escrita
+// una sola vez, en el camino de los deltas, y los otros dos caminos que archivan
+// —`--mover`, y el change que no lleva deltas y se mueve con `git mv` a secas—
+// pasaban de largo. O sea que la guarda no cubria el paso que de verdad mueve la
+// carpeta. Ahora la llaman los tres, y `--acople` la corre sola para el change
+// sin deltas, que es el unico que no toca ningun otro modo.
+//
+// DOS CLASES DE REFERENCIA, y confundirlas fue el otro defecto. Una dependencia
+// EJECUTABLE —un `import`, un `node <ruta>`, un `uses:` de un workflow— se ROMPE
+// al archivar: es ROJA. Una mencion en PROSA —un `.md` que nombra la ruta para
+// explicar algo— solo queda VIEJA: es AVISO. Tratarlas igual bloqueaba el
+// archive por una frase de un documento, y ninguna de las dos salidas que ofrece
+// el mensaje rojo se puede aplicar a una frase.
+//
+// POR QUE LA EJECUTABLE ES ROJA Y NO AVISO: el arreglo esta siempre disponible
+// (mover el dependiente, o moverlo junto con el change en el mismo commit) y un
+// aviso en un script que se corre a mano no lo lee nadie. No hay pipeline de
+// consumidor que este rojo pueda estrenar: ningun workflow invoca este script
+// —se corre en la maquina de quien archiva— asi que el unico que lo ve es quien
+// pidio archivar.
+// ---------------------------------------------------------------------------
+const EXTENSIONES_DE_PROSA = /\.(md|markdown|txt|adoc|rst)$/i;
+
+function guardaDeAcople(change) {
+  const raiz = CHANGES.replace(/\\/g, "/").replace(/\/+$/, "");
+  const rutaDelChange = `${raiz}/${change}`;
+  const rutaArchive = `${raiz}/archive/`;
+
+  const buscada = spawnSync("git", ["grep", "--full-name", "-n", "-I", "-F", rutaDelChange], {
+    encoding: "utf8",
+  });
+
+  if (buscada.error || (buscada.status !== 0 && buscada.status !== 1)) {
+    console.error(
+      `::error::no se pudo preguntarle a git quien referencia "${rutaDelChange}" (${
+        buscada.error ? buscada.error.message : `git grep salio ${buscada.status}`
+      }), asi que NO se puede afirmar que archivar este change no rompa nada de afuera. Lo no verificable es rojo, nunca exito mudo. Arreglo: corre el script desde la raiz de un arbol git con el change ya rastreado.`
+    );
+    process.exit(1);
+  }
+
+  const deFuera = (buscada.stdout || "")
+    .split(/\r?\n/)
+    .filter(Boolean)
+    .map((linea) => ({ linea, archivo: linea.slice(0, linea.indexOf(":")) }))
+    // Lo de ADENTRO del change puede nombrarse a si mismo cuanto quiera: se
+    // mueve entero. Y el archive viejo tampoco cuenta: ya esta archivado.
+    .filter(
+      ({ archivo }) => !archivo.startsWith(`${rutaDelChange}/`) && !archivo.startsWith(rutaArchive)
+    );
+
+  const prosa = deFuera.filter(({ archivo }) => EXTENSIONES_DE_PROSA.test(archivo));
+  const ejecutables = deFuera.filter(({ archivo }) => !EXTENSIONES_DE_PROSA.test(archivo));
+
+  for (const { linea } of prosa)
+    console.log(`::warning::mencion en prosa que va a quedar vieja: ${linea}`);
+  if (prosa.length > 0) {
+    console.log(
+      `::warning::${prosa.length} mencion(es) en PROSA nombran "${rutaDelChange}", que despues del archive no existe mas. No frenan el archive —una frase vieja no rompe ningun pipeline— pero se actualizan a la ruta de archive en el MISMO commit, o el documento empieza a mentir.`
+    );
+  }
+
+  if (ejecutables.length === 0) return;
+
+  console.error(
+    `::error::${ejecutables.length} linea(s) de FUERA del change DEPENDEN de "${rutaDelChange}", que es una ruta transitoria: archivar el change las deja apuntando a un lugar que ya no existe. NO se movio ni se aplico NADA.`
+  );
+  for (const { linea } of ejecutables) console.error(`  ${linea}`);
+  console.error(
+    "Arreglo, una de dos: (a) mover lo referenciado FUERA de openspec/changes/ —a herramientas/ si es una herramienta, o al lado de quien lo usa— y actualizar la ruta en quien lo nombra; (b) si de verdad tiene que viajar con el change, mover al dependiente DENTRO del change y archivarlo junto en el mismo commit. Un `git mv` que deja media dependencia atras es el mismo rojo, un dia despues."
+  );
+  process.exit(1);
+}
+
+// --- MODO 1: el pin del CLI de OpenSpec -----------------------------------
+// Reemplaza:  awk '/^      version_openspec:/{f=1} f && /default:/{print; exit}'
+// El pin vive en el `default` del input `version_openspec` del workflow
+// reusable. Se lee de un archivo, o de la entrada estandar con "-" (que es
+// como llega cuando se lo baja del marco sin clonarlo).
+if (args.includes("--pin-openspec")) {
+  const i = args.indexOf("--pin-openspec");
+  const fuente = args[i + 1] && !args[i + 1].startsWith("--") ? args[i + 1] : "-";
+  let texto;
+  try {
+    texto = readFileSync(fuente === "-" ? 0 : fuente, "utf8");
+  } catch (error) {
+    console.error(
+      `::error::no se pudo leer "${fuente}" (${error.message}). Sin el workflow reusable no hay pin que leer, y el pin NO se adivina: una version inventada del CLI corre otro programa.`
+    );
+    process.exit(1);
+  }
+  const lineas = texto.split(/\r?\n/);
+  let dentro = false;
+  let pin = null;
+  for (const linea of lineas) {
+    if (/^\s*version_openspec:\s*$/.test(linea)) { dentro = true; continue; }
+    if (!dentro) continue;
+    const m = linea.match(/^\s*default:\s*"?([0-9]+\.[0-9]+\.[0-9]+)"?\s*$/);
+    if (m) { pin = m[1]; break; }
+    // Otro input empezo: el default que buscabamos no estaba.
+    if (/^\s{6}[a-z_]+:\s*$/.test(linea)) break;
+  }
+  if (!pin) {
+    console.error(
+      `::error::no encontre un "default: <X.Y.Z>" bajo el input "version_openspec" en "${fuente}". NO se concluyo que no haya pin: se concluyo que no se pudo leer. Revisa que la fuente sea el workflow reusable del marco (.github/workflows/marco-ci.yml) y no otro archivo.`
+    );
+    process.exit(1);
+  }
+  console.log(pin);
+  process.exit(0);
+}
+
+// --- MODO 2: el conteo de escenarios, antes contra despues -----------------
+// Reemplaza:  diff <(git grep -c ... HEAD ...) <(git grep -c ... )
+// El "antes" se lee de HEAD y el "despues" del arbol de trabajo, sin tocar el
+// arbol: NO se usa `git stash`, que sobre un arbol limpio imprime "No local
+// changes to save", sale 0, y deja que un `git stash pop` encadenado saque y
+// descarte un stash ajeno.
+if (args.includes("--escenarios")) {
+  const PATRON = "^#### Scenario:";
+  const contar = (revision) => {
+    const argumentos = ["grep", "-c", "-E", PATRON];
+    if (revision) argumentos.push(revision);
+    argumentos.push("--", SPECS);
+    const { rc, salida } = git(...argumentos);
+    // rc 0 = hubo coincidencias; rc 1 = ninguna; cualquier otro = no se pudo mirar.
+    if (rc !== 0 && rc !== 1) {
+      console.error(
+        `::error::git grep salio ${rc} contando escenarios en ${revision || "el arbol de trabajo"}: no se pudo tomar la medicion, asi que NO se puede afirmar que no se haya perdido contrato.`
+      );
+      process.exit(1);
+    }
+    const mapa = new Map();
+    for (const linea of salida.split(/\r?\n/).filter(Boolean)) {
+      // Formato: [<revision>:]<ruta>:<conteo>
+      const corte = linea.lastIndexOf(":");
+      let ruta = linea.slice(0, corte);
+      const total = Number(linea.slice(corte + 1));
+      if (revision && ruta.startsWith(`${revision}:`)) ruta = ruta.slice(revision.length + 1);
+      mapa.set(ruta.replace(/\\/g, "/"), total);
+    }
+    return mapa;
+  };
+
+  const antes = contar("HEAD");
+  const despues = contar(null);
+  const rutas = [...new Set([...antes.keys(), ...despues.keys()])].sort();
+
+  let bajas = 0;
+  let diferencias = 0;
+  for (const ruta of rutas) {
+    const a = antes.get(ruta) ?? 0;
+    const d = despues.get(ruta) ?? 0;
+    if (a === d) continue;
+    diferencias += 1;
+    const signo = d > a ? "+" : "-";
+    if (d < a) bajas += 1;
+    console.log(`${signo} ${ruta}: ${a} -> ${d}`);
+  }
+
+  if (diferencias === 0) {
+    console.log(
+      "sin diferencias: ningun spec vivo cambio su cantidad de escenarios. Si el script dijo que aplico operaciones, mira el `git diff` antes de seguir — un archive que no movio nada es la misma clase de fallo que el CLI que dice 'listo' sin haber hecho nada."
+    );
+  }
+  if (bajas > 0) {
+    console.log(
+      `AVISO: ${bajas} spec(s) PERDIERON escenarios. Eso solo es correcto si el delta declaraba un REMOVED. Si no lo declaraba, PARA: es contrato perdido.`
+    );
+  }
+  process.exit(0);
+}
+
+// --- MODO 3: mover el change archivo por archivo ---------------------------
+// Reemplaza el bucle con `${f#openspec/changes/<change>/}` y `dirname`.
+// Mueve TODO lo rastreado —deltas y archivos ocultos incluidos—, que es justo
+// lo que se pierde cuando alguien mueve a mano solo los `.md` que recuerda.
+if (args.includes("--mover")) {
+  const i = args.indexOf("--mover");
+  const DESTINO = args[i + 1];
+  if (!DESTINO || DESTINO.startsWith("--")) {
+    console.error("uso: node aplicar-deltas.mjs <nombre-del-change> --mover <destino> [--simulacro]");
+    process.exit(2);
+  }
+  if (!CHANGE) {
+    console.error("uso: node aplicar-deltas.mjs <nombre-del-change> --mover <destino> [--simulacro]");
+    process.exit(2);
+  }
+  // Este es el paso que de verdad mueve la carpeta: la guarda va ANTES del
+  // primer `git mv`, tambien en simulacro. Un acople que se descubre despues de
+  // mover medio change no se descubre, se sufre.
+  guardaDeAcople(CHANGE);
+  const origen = `${CHANGES.replace(/\\/g, "/").replace(/\/+$/, "")}/${CHANGE}`;
+  const { rc, salida } = git("ls-files", "--", origen);
+  if (rc !== 0) {
+    console.error(`::error::git ls-files salio ${rc} sobre "${origen}": no se pudo listar que archivos mover.`);
+    process.exit(1);
+  }
+  const archivos = salida.split(/\r?\n/).filter(Boolean);
+  if (archivos.length === 0) {
+    console.error(
+      `::error::"${origen}" no tiene NI UN archivo rastreado. NO se concluyo que ya este archivado: se concluyo que no hay nada que mover desde aca. Revisa el nombre del change y que estes en la raiz del repo.`
+    );
+    process.exit(1);
+  }
+  let movidos = 0;
+  for (const archivo of archivos) {
+    const relativo = archivo.replace(/\\/g, "/").slice(origen.length + 1);
+    const destinoArchivo = `${DESTINO.replace(/\\/g, "/").replace(/\/+$/, "")}/${relativo}`;
+    if (SIMULACRO) {
+      console.log(`[simulacro] git mv ${archivo} ${destinoArchivo}`);
+      movidos += 1;
+      continue;
+    }
+    mkdirSync(dirname(destinoArchivo), { recursive: true });
+    const r = git("mv", archivo, destinoArchivo);
+    if (r.rc !== 0) {
+      console.error(
+        `::error::git mv fallo (${r.rc}) moviendo "${archivo}". Se movieron ${movidos} archivo(s) antes de este; el change quedo A MEDIAS y hay que terminarlo o revertirlo a mano — 'git status --short' te dice exactamente donde quedo.`
+      );
+      process.exit(1);
+    }
+    movidos += 1;
+  }
+  console.log(
+    SIMULACRO
+      ? `[simulacro] ${movidos} archivo(s) planificados y NO movidos. Corre sin --simulacro para moverlos.`
+      : `${movidos} archivo(s) movidos a ${DESTINO}. Verificalo: 'git ls-files ${origen}' tiene que salir VACIO.`
+  );
+  process.exit(0);
+}
+
+// --- MODO 4: la guarda de acople, sola -------------------------------------
+// Para el change que NO lleva deltas de spec: ese se archiva con `git mv` a
+// secas y por eso nunca pasaba por el camino de los deltas. Este modo es el que
+// se corre antes de ese `git mv`, y es el unico trabajo que hace.
+if (args.includes("--acople")) {
+  if (!CHANGE) {
+    console.error("uso: node aplicar-deltas.mjs <nombre-del-change> --acople");
+    process.exit(2);
+  }
+  // Un change que no existe no tiene quien lo referencie, y ese "cero" se veria
+  // igual que el verde legitimo. Se corta antes de poder decirlo.
+  if (!existsSync(join(CHANGES, CHANGE))) {
+    console.error(
+      `::error::no existe el change "${CHANGE}" en ${CHANGES}: NO se concluyo que nadie dependa de el, se concluyo que no se pudo mirar. Revisa el nombre y que estes en la raiz del repo.`
+    );
+    process.exit(2);
+  }
+  guardaDeAcople(CHANGE);
+  console.log(
+    `nada de fuera de "${CHANGES.replace(/\\/g, "/").replace(/\/+$/, "")}/${CHANGE}" depende de una ruta de adentro: archivarlo no deja a nadie apuntando al vacio.`
+  );
+  process.exit(0);
+}
+
 if (!CHANGE) {
   console.error("uso: node aplicar-deltas.mjs <nombre-del-change> [--simulacro]");
+  console.error("     node aplicar-deltas.mjs --pin-openspec <ruta-al-marco-ci.yml | ->");
+  console.error("     node aplicar-deltas.mjs --escenarios");
+  console.error("     node aplicar-deltas.mjs <nombre-del-change> --mover <destino> [--simulacro]");
+  console.error("     node aplicar-deltas.mjs <nombre-del-change> --acople");
   process.exit(2);
 }
 
@@ -157,12 +462,18 @@ if (!existsSync(dirChange)) {
   process.exit(2);
 }
 
+// La guarda de acople va ACA, antes de la comprobacion de deltas y antes de
+// escribir una sola linea: asi tambien la ve el change que NO lleva deltas, que
+// es el que se archiva con `git mv` a secas y por eso es el mas facil de mover
+// con una dependencia colgando.
+guardaDeAcople(CHANGE);
+
 if (!existsSync(dirDeltas)) {
   console.error(
     `::error::el change "${CHANGE}" EXISTE pero no tiene carpeta de deltas (${dirDeltas}): no hay NADA que aplicar.`
   );
   console.error(
-    "Si el change de verdad no lleva deltas de spec, archivalo solo con `git mv` y decilo en el PR. Este script no se usa en ese caso."
+    "Si el change de verdad no lleva deltas de spec, archivalo solo con `git mv` y decilo en el PR (la guarda de acople de arriba ya corrio: este script no vuelve a hacer falta)."
   );
   process.exit(1);
 }

@@ -230,7 +230,7 @@ export const esFuente = (r) => EXTENSIONES_FUENTE.some((e) => r.endsWith(e));
  * rojo que ninguna prueba puede apagar. Es deliberadamente conservador — ante
  * la duda, la linea CUENTA como contenido.
  */
-export function pareceEjecutable(texto) {
+function pareceEjecutable(texto) {
   const t = String(texto ?? "").trim();
   if (!t) return false;
   if (/^(?:\/\/|\/\*|\*\/|\*|#)/.test(t)) return false; // comentarios
@@ -269,7 +269,7 @@ const sinLiterales = (t) =>
  * archivo se acaba sin cerrarla, no se descarta NADA de ella: ante la duda, la
  * linea cuenta como contenido.
  */
-export function lineasDeTipos(lineas) {
+function lineasDeTipos(lineas) {
   const dentro = new Set();
   let activo = false;
   let abiertas = 0;
@@ -346,7 +346,7 @@ function recorrer(raiz, relativa = "", encontrados = []) {
   return encontrados;
 }
 
-export function buscarLcov(raiz, patrones) {
+function buscarLcov(raiz, patrones) {
   const regexes = patrones
     .split(/\r?\n/)
     .map((p) => p.trim())
@@ -465,7 +465,7 @@ export function parsearDiff(texto) {
 // ------------------------------------------------------------------ lcov ---
 
 /** El registro vacio de un archivo: las tres metricas, sin un solo dato. */
-export const registroVacio = () => ({
+const registroVacio = () => ({
   lineas: new Map(),
   funciones: new Map(),
   ramas: new Map(),
@@ -951,7 +951,7 @@ export function agregarPorPaquete({ cobertura, paquetes, exclusionDe }) {
  * Los DOS planos la comparten: si el plano del diff perdonara un archivo que el
  * del total sigue contando, la misma exclusion querria decir dos cosas.
  */
-export function crearExclusionDe(paquetes) {
+function crearExclusionDe(paquetes) {
   return (archivo) => {
     const paq = paqueteDe(paquetes, archivo);
     if (!paq || paq.error) return null;

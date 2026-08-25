@@ -1,4 +1,22 @@
-# Auditoria de cierre de v1
+# Auditoria de cierre de v1 — documento HISTORICO, foto del 2026-08-20
+
+> **NO ES EL ESTADO DE HOY, Y NO SE ACTUALIZA.** Todo lo que sigue está escrito en
+> imperativo («no mergear», «no mover `v1`») sobre PRs que estaban abiertos ese día
+> y sobre un canal de distribución que ya no existe: **el tag móvil `v1` dejó de ser
+> el canal el 2026-08-21**, el día siguiente a esta corrida (`AGENTS.md`, sección
+> del tag móvil). Un `git log --oneline docs/auditoria-cierre-v1.md` da la fecha de
+> la foto; el `CHANGELOG.md` da todo lo que pasó después.
+>
+> **Para qué sirve entonces:** es el registro de método —veinte afirmaciones puestas
+> a prueba con fixtures y código de salida, cada una con su comando y su exit— y la
+> lista de hallazgos que se citan por número desde otros documentos. Se lee para
+> saber **qué se midió y cómo**, nunca para saber qué hacer ahora. Si un hallazgo de
+> acá sigue vivo, lo que manda es la fila que le corresponda en
+> [reglas-no-escritas.md](reglas-no-escritas.md), no este archivo.
+>
+> Su categoría en el [índice](README.md) es **Histórico**: no se edita para ponerlo
+> al día. Corregirlo borraría el dato que lo hace valioso, que es qué se sabía el
+> 2026-08-20.
 
 Corrida del 2026-08-20 sobre los cinco PRs abiertos de Projects (12, 14, 15, 16) y el PR 154 del
 repo consumidor que sirvio de banco de pruebas. Veinte afirmaciones del

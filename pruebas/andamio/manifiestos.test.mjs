@@ -18,9 +18,18 @@
 //   2. los scripts que el pipeline invoca estan declarados donde los busca, y
 //      ninguna excepcion del ci.yml apunta a un paquete que no existe;
 //   3. cada paquete verificable extiende la cobertura del marco Y emite reporte;
-//   4. ningun MARCADOR vive en una RUTA del andamio.
+//   4. ninguna RUTA del andamio lleva un marcador, ni choca con otra al aterrizar.
 //
-// Mas una quinta que hace que las cuatro signifiquen algo: cada una MUERDE. Se
+// LA 4 CAMBIO DE ALCANCE, y el motivo es un cambio del andamio, no un gusto:
+// hasta que existieron los RENOMBRES, la ruta de destino de un archivo ERA su
+// ruta en el andamio, asi que mirar el arbol de origen alcanzaba. Desde que un
+// archivo puede aterrizar con otro nombre, la ruta que llega al repo nuevo ya no
+// se lee del `readdir`: hay que preguntarsela a la herramienta. Y aparece un
+// segundo modo de falla que antes era imposible por construccion —dos archivos
+// del andamio compitiendo por el MISMO nombre en el destino, donde el segundo
+// pisa al primero y la corrida sale 0 igual—, asi que se comprueba tambien.
+//
+// Mas una que hace que las cuatro signifiquen algo: cada una MUERDE. Se
 // mutan copias en un directorio temporal —nunca el arbol del repo— y se exige
 // que la comprobacion que le toca reporte el problema.
 import test from "node:test";
@@ -29,6 +38,9 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+// El renombre se le PREGUNTA a la herramienta que lo hace, no se repite aca: una
+// segunda copia del mapa es exactamente lo que se desincroniza del original.
+import { destinoDe, seExcluyeDelCopiado } from "../../herramientas/projects-init.mjs";
 
 const RAIZ = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 const ANDAMIO = path.join(RAIZ, "plantilla");
@@ -248,16 +260,54 @@ const COMPROBACIONES = {
     return problemas.length ? problemas.join("\n  ") : null;
   },
 
-  "ningun marcador vive en una RUTA del andamio": (raiz) => {
-    // POR QUE ESTA. `projects init` sustituye el CONTENIDO de los archivos y copia
-    // las RUTAS tal cual. Un directorio llamado {{PAQUETE_API}} llegaria literal
-    // al repo nuevo, y el check de marcadores sobrevivientes —que lee contenido—
-    // firmaria "cero" sobre ese repositorio.
-    const conMarcador = rutasDelAndamio(raiz).filter((r) => r.includes("{{"));
+  "ningun marcador vive en una RUTA del andamio": (raiz, renombrar = destinoDe) => {
+    // POR QUE ESTA. `projects init` sustituye el CONTENIDO de los archivos; una
+    // RUTA no pasa por esa sustitucion. Un directorio llamado {{PAQUETE_API}}
+    // llegaria literal al repo nuevo, y el check de marcadores sobrevivientes
+    // —que lee contenido— firmaria "cero" sobre ese repositorio.
+    //
+    // Se miran las rutas de los DOS lados: la del andamio y la de destino. Un
+    // renombre cuyo destino trajera un marcador tiene el mismo efecto y no
+    // aparece en ningun `readdir`, porque ese nombre no existe todavia en disco.
+    const conMarcador = [];
+    for (const r of rutasDelAndamio(raiz)) {
+      if (r.includes("{{")) conMarcador.push(r);
+      const d = renombrar(r);
+      if (d !== r && d.includes("{{")) conMarcador.push(`${r} -> ${d}`);
+    }
     return conMarcador.length
-      ? `estas rutas del andamio llevan un marcador: ${conMarcador.join(", ")}. Las rutas se ` +
-          "copian tal cual, asi que llegarian literales al repo nuevo y el check de marcadores " +
-          "sobrevivientes no las ve porque solo lee contenido"
+      ? `estas rutas llevan un marcador: ${conMarcador.join(", ")}. Una ruta no pasa por la ` +
+          "sustitucion de contenido, asi que llegaria literal al repo nuevo y el check de marcadores " +
+          "sobrevivientes no la ve porque solo lee contenido"
+      : null;
+  },
+
+  "ninguna ruta de destino la reclaman dos archivos del andamio": (raiz, renombrar = destinoDe) => {
+    // POR QUE ESTA, y es un modo de falla que el renombre ESTRENO. Mientras cada
+    // archivo aterrizaba con su propio nombre, dos archivos del andamio no podian
+    // chocar: el sistema de archivos ya garantizaba nombres unicos en el origen.
+    // Un renombre rompe esa garantia — el destino es un nombre INVENTADO, que
+    // puede coincidir con el de otro archivo que si viaja.
+    //
+    // Y el choque no se nota: la copia escribe los dos en orden, el segundo pisa
+    // al primero, el conteo de archivos escritos sale bien, no queda ningun
+    // marcador sobreviviente y la corrida declara exito. El repo nuevo pierde un
+    // archivo entero sin una sola linea de diagnostico.
+    const porDestino = new Map();
+    for (const rel of rutasDelAndamio(raiz)) {
+      // Solo archivos que VIAJAN: un directorio no se pisa, y el excluido no llega.
+      if (!fs.statSync(path.join(raiz, rel)).isFile()) continue;
+      if (seExcluyeDelCopiado(rel)) continue;
+      const d = renombrar(rel);
+      porDestino.set(d, [...(porDestino.get(d) ?? []), rel]);
+    }
+    const choques = [...porDestino].filter(([, origenes]) => origenes.length > 1);
+    return choques.length
+      ? choques
+          .map(([d, origenes]) => `${origenes.join(" y ")} aterrizan los dos como "${d}"`)
+          .join("; ") +
+          ". La copia los escribe en orden y el segundo PISA al primero, sin que nada lo diga: el conteo " +
+          "de archivos escritos sale bien y no queda ningun marcador sobreviviente"
       : null;
   },
 };
@@ -333,6 +383,29 @@ const MUTACIONES = [
     mutar: (raiz) => fs.renameSync(path.join(raiz, "api"), path.join(raiz, "{{PAQUETE_API}}")),
   },
   {
+    // LAS DOS DE ABAJO NO MUTAN EL ARBOL sino el MAPA DE RENOMBRES, y se pasa
+    // uno fabricado en vez de tocar el de la herramienta. El motivo es el mismo
+    // por el que la guarda de procedencias fabrica su excepcion: probar la
+    // mitad rota con la entrada REAL haria que esta prueba se cayera sola el dia
+    // que alguien arregle esa entrada, que es lo que hay que celebrar y no lo
+    // que hay que reparar. Ademas un renombre no se puede simular renombrando el
+    // archivo en disco: ahi el origen y el destino cambiarian juntos y no habria
+    // desfase que medir.
+    nombre: "un renombre apunta a una ruta que lleva un marcador",
+    rompe: "ningun marcador vive en una RUTA del andamio",
+    mutar: () => {},
+    renombrar: (rel) => (rel === "package.json" ? "{{PROYECTO}}/package.json" : rel),
+  },
+  {
+    nombre: "dos archivos del andamio aterrizan con el mismo nombre",
+    rompe: "ninguna ruta de destino la reclaman dos archivos del andamio",
+    mutar: () => {},
+    // El caso realista: se agrega un renombre nuevo y su destino ya lo ocupa un
+    // archivo que viaja. Nadie lo ve, porque el nombre de destino no existe en
+    // el arbol del andamio y no aparece en ningun listado.
+    renombrar: (rel) => (rel === "AGENTS.md" ? "CLAUDE.md" : rel),
+  },
+  {
     nombre: "el andamio se queda sin manifiestos",
     rompe: "el andamio trae manifiestos, y estan donde el workspace dice",
     mutar: (raiz) => {
@@ -352,7 +425,15 @@ test("cada comprobacion muerde: el andamio mutado da rojo donde corresponde", ()
       const copia = path.join(tmp, `m${i}`);
       copiar(ANDAMIO, copia);
       m.mutar(copia);
-      const problema = COMPROBACIONES[m.rompe](copia);
+      const problema = COMPROBACIONES[m.rompe](copia, m.renombrar);
+      // Una mutacion que no cambia nada —ni el arbol ni el renombre— seria una
+      // entrada de esta lista que no prueba nada, y saldria verde igual.
+      if (m.renombrar) {
+        assert.ok(
+          rutasDelAndamio(copia).some((r) => m.renombrar(r) !== r),
+          `la mutacion "${m.nombre}" trae un renombre que no aplica a ningun archivo del andamio: el ancla que usa se movio`,
+        );
+      }
       assert.ok(
         problema !== null,
         `la mutacion "${m.nombre}" NO puso en rojo a "${m.rompe}": esa comprobacion pasa ` +

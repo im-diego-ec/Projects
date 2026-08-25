@@ -7,7 +7,15 @@ description: >-
   despliegue de este repo; y cuando un gate esta verde y nadie puede explicar
   que ejecuto. Enumera exhaustivamente cada salida exitosa, reproduce cada
   sospecha con un caso ejecutable y reporta. No arregla nada.
-tools: Read, Grep, Glob, Bash
+# `tools` es un ALLOWLIST DE AGENTE, con la misma semantica y el mismo poder que el
+# archivo de ajustes: un `Bash` pelado autoriza CUALQUIER comando de shell, y
+# cualquiera incluye los que escriben fuera del arbol (un push, un merge, un borrado
+# en la nube). Este subagente no arregla nada, asi que su piso preautorizado es de
+# LECTURA, y el directorio temporal donde arma sus fixtures.
+# Reproducir un caso ejecutable sigue siendo el nucleo del trabajo (regla 2): lo que
+# cambia es que cada corrida se PIDE en la sesion en vez de venir pre-aprobada. Un
+# parrafo que dice "me detengo a pedir OK" no es enforcement; un allowlist si.
+tools: Read, Grep, Glob, Bash(git status:*), Bash(git diff:*), Bash(git log:*), Bash(git show:*), Bash(git ls-files:*), Bash(git grep:*), Bash(git rev-parse:*), Bash(mktemp -d)
 # model queda en `inherit` A PROPOSITO. Ver "Sobre el modelo" en el cuerpo:
 # escalar de modelo en esta area exige OK humano PREVIO, y una definicion de
 # subagente no es el lugar para tomar esa decision por nadie.

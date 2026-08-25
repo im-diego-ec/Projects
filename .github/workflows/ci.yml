@@ -14,13 +14,15 @@ name: CI
 # a proposito: asi cada PR se valida contra la version del marco que ESE PR
 # propone, no contra la etiqueta @v1 ya publicada.
 #
-# DOS SUPERFICIES, DOS EXIGENCIAS DE SISTEMA OPERATIVO. Casi todo lo que el marco
-# hace ocurre en un runner, y ahi el marco elige el suyo: Linux x86-64, declarado
-# en el input `runner` de marco-ci.yml y comprobado por el primer paso de higiene.
-# Pero `herramientas/projects-init.mjs` NO corre en un runner: corre en la maquina
-# de quien inicia un proyecto, que puede ser Windows, macOS o Linux. Por eso el
-# unico job con matriz de sistemas operativos en este archivo es `pruebas-init`
-# (los tres), y por eso el resto sigue en ubuntu-latest: una matriz que no
+# DOS SUPERFICIES, DOS EXIGENCIAS DE PLATAFORMA. Casi todo lo que el marco hace
+# ocurre en un runner, y ahi el marco elige el suyo: Linux x86-64 con la version de
+# Node que declara el input `version_node` de marco-ci.yml, comprobado por el primer
+# paso de higiene. Pero `herramientas/projects-init.mjs` NO corre en un runner: corre
+# en la maquina de quien inicia un proyecto, y ahi el marco no elige NADA — ni el
+# sistema operativo, que puede ser Windows, macOS o Linux, ni la version de Node, que
+# es la que esa persona tenga instalada—. Por eso el unico job con matriz en este
+# archivo es `pruebas-init`, y la matriz tiene DOS ejes: sistema operativo y version
+# de Node. El resto sigue en ubuntu-latest con un solo Node, porque una matriz que no
 # corresponde a una superficie real se paga en minutos y no compra evidencia.
 on:
   push:
@@ -92,9 +94,9 @@ jobs:
     permissions:
       contents: read
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
-      - uses: actions/setup-node@v7
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
         with: { node-version: "22" }
 
       # Que actions quedan SIN banco, derivado del arbol y no de una lista que
@@ -187,8 +189,9 @@ jobs:
           # pruebas/init/ SE EXCLUYE ACA PORQUE CORRE EN OTRO LADO, no porque se
           # haya apagado: es el unico banco del marco cuyo sujeto no vive en un
           # runner sino en la maquina del desarrollador, asi que lo corre el job
-          # `pruebas-init` sobre los tres sistemas operativos. Ejecutarlo tambien
-          # aca solo repetiria la pasada de Linux.
+          # `pruebas-init` sobre los tres sistemas operativos y sobre las dos
+          # versiones de Node que la herramienta declara. Ejecutarlo tambien aca solo
+          # repetiria la pasada de Linux con el Node del runner.
           #
           # La exclusion no puede quedar apuntando al vacio: si alguien mueve o
           # borra pruebas/init/, esta condicion se pone roja en vez de dejar de
@@ -197,7 +200,7 @@ jobs:
           # el motivo.)
           INIT=(pruebas/init/*.test.mjs)
           if [ ${#INIT[@]} -eq 0 ]; then
-            echo "::error::este paso excluye pruebas/init/ porque el job 'pruebas-init' lo corre sobre ubuntu, windows y macos, pero pruebas/init/ no tiene ningun *.test.mjs. Si moviste ese banco, mueve tambien la exclusion y la matriz; si lo borraste, la herramienta de init se quedo sin la unica prueba que la ejercita fuera de Linux"
+            echo "::error::este paso excluye pruebas/init/ porque el job 'pruebas-init' lo corre en una matriz de dos ejes —ubuntu, windows y macos, y ademas Node 18.17.0 y 20.12.0 sobre ubuntu—, pero pruebas/init/ no tiene ningun *.test.mjs. Si moviste ese banco, mueve tambien la exclusion y la matriz; si lo borraste, la herramienta de init se quedo sin la unica prueba que la ejercita fuera de Linux y fuera del Node del runner"
             exit 1
           fi
 
@@ -219,7 +222,12 @@ jobs:
 
           node --test "${PRUEBAS[@]}"
 
-  # LA HERRAMIENTA DE INIT, EN LOS TRES SISTEMAS OPERATIVOS.
+  # LA HERRAMIENTA DE INIT, EN LOS TRES SISTEMAS OPERATIVOS Y EN LAS DOS VERSIONES
+  # DE NODE QUE ELLA MISMA DECLARA.
+  #
+  # DOS Y NO TRES: las que la herramienta declara son NODE_MINIMO y NODE_RECOMENDADO
+  # —dos constantes, no tres—; la tercera version que aparece en la matriz es el Node
+  # del runner, que no lo elige la herramienta.
   #
   # POR QUE ES UN JOB APARTE Y CON MATRIZ. `herramientas/projects-init.mjs` es la
   # unica pieza del marco que NO se ejecuta en un runner: se ejecuta en la maquina
@@ -228,14 +236,44 @@ jobs:
   # ubuntu-latest, dentro del job de arriba: o sea que el marco pedia que la
   # herramienta sirviera en las tres y solo tenia evidencia de una.
   #
-  # POR QUE LA MATRIZ NO VA EN TODO EL CI. Porque el resto del marco corre en un
-  # runner y ahi el marco ELIGE la plataforma —Linux x86-64, declarado en el input
-  # `runner` de marco-ci.yml—. Multiplicar por tres jobs cuya plataforma esta
-  # fijada por contrato cuesta minutos y no compra una sola asercion nueva.
+  # EL SEGUNDO EJE ES LA VERSION DE NODE, y cierra el hueco gemelo del anterior. La
+  # herramienta declara DOS numeros en su codigo —`NODE_MINIMO = "18.17.0"`, el piso
+  # duro, y `NODE_RECOMENDADO = "20.12.0"`, debajo del cual avisa y sigue— y hasta
+  # este cambio las dos patas de esa decision solo se ejercitaban con una version
+  # SIMULADA que el banco le pasa a `revisarNodo()`. La corrida real era siempre en
+  # Node 22, o sea la unica franja donde el guard no hace nada. Eso ya se pago una
+  # vez y en la direccion cara: la herramienta usaba `import.meta.dirname`, que llego
+  # en Node 20.11 y vale `undefined` en 18.17, asi que en el piso que ella misma
+  # declaraba soportado moria con un TypeError antes de escribir un archivo. Un
+  # numero que nadie ejecuta no es un piso, es una afirmacion. Los anclas de los dos
+  # numeros van sin linea a proposito —ese archivo se edita seguido—:
+  #   grep -n 'NODE_MINIMO\|NODE_RECOMENDADO' herramientas/projects-init.mjs
+  #
+  # POR QUE ESAS DOS VERSIONES Y NO UN ABANICO. 18.17.0 es el piso exacto: es donde
+  # `readdirSync(..., { recursive: true })` recien existe, y un parche menos convierte
+  # esa opcion en una clave desconocida que se ignora EN SILENCIO (medido en el
+  # encabezado de la herramienta: 16 de 75 archivos escritos y exit 0). 20.12.0 es el
+  # borde del aviso: la primera version que NO lo dispara. Las dos versiones corren
+  # solo sobre ubuntu-latest: lo que ejercitan es la version del INTERPRETE, y
+  # multiplicarlas por los tres sistemas operativos daria nueve patas para medir la
+  # misma propiedad tres veces.
+  #
+  # LA PATA DE 18.17.0 ENTRA EN MODO AVISO, y el motivo esta medido y no supuesto:
+  # nadie corrio nunca este banco en esa version, ni siquiera una vez, asi que su
+  # primer resultado es tambien su primera medicion. Estrenarla en rojo bloquearia
+  # `main` con un resultado que no se sabe leer todavia — y una de las formas de fallar
+  # que tiene es que el rojo NO venga de la herramienta sino del `node --test` de esa
+  # version, que es de la primera generacion del runner de pruebas. La promocion no
+  # depende de que alguien se acuerde: esta escrita abajo en la propia matriz. En
+  # cuanto la pata se vea verde una vez, se cambia `modo: aviso` por `modo: rojo` en
+  # la entrada de 18.17.0 del `include:` y el aviso pasa a ser compuerta. La pata de
+  # 20.12.0 entra en ROJO desde el primer dia: ahi el runner de pruebas ya es el
+  # maduro y la herramienta afirma soporte pleno.
   #
   # fail-fast: false a proposito: si init se rompe en Windows, querer saber ademas
-  # si se rompe en macOS es la mitad del diagnostico, y cancelar las otras dos
-  # patas lo esconde.
+  # si se rompe en macOS es la mitad del diagnostico, y cancelar las otras patas lo
+  # esconde. Con el segundo eje vale doble: un rojo en 18.17.0 y uno en macOS son
+  # dos diagnosticos distintos y hay que verlos juntos.
   #
   # QUE HACE FALTA PARA QUE ESTO SIRVA DE VERDAD, y esta cuidado: el paso corre
   # con `shell: bash` (en windows-latest eso es el bash de Git, que viene en el
@@ -254,26 +292,60 @@ jobs:
   # Windows no rematerializa CRLF y las comparaciones byte a byte del banco
   # siguen valiendo.
   pruebas_init:
-    name: pruebas-init (${{ matrix.so }})
+    name: pruebas-init (${{ matrix.so }} · node ${{ matrix.node }})
     # 20 y no 15: la pata de windows-latest arranca mas lento que las otras dos, y el
     # techo se pone sobre la mas lenta o deja de ser techo y pasa a ser un rojo con el
     # nombre equivocado.
     timeout-minutes: 20
     strategy:
       fail-fast: false
+      # DOS EJES Y CINCO PATAS, no nueve. El producto base son los tres sistemas
+      # operativos sobre el Node del runner; las dos entradas de `include:` agregan
+      # las dos versiones que la herramienta declara, y solo sobre ubuntu.
+      #
+      # POR QUE APARECEN COMO PATAS NUEVAS Y NO PISAN LAS DE ARRIBA: `node` y `modo`
+      # son claves del producto base, asi que una entrada de `include:` que les da
+      # otro valor no se puede fusionar con ninguna combinacion existente sin
+      # sobreescribirla, y GitHub crea una combinacion nueva. Es la regla del
+      # `include:`, no una casualidad de como quedo escrito; si algun dia `node`
+      # saliera del producto base, estas dos entradas dejarian de sumar patas y
+      # pasarian a modificar las que hay.
+      #
+      # `modo` NO es cosmetico: lo lee el ultimo bloque del paso de abajo y decide si
+      # un banco en rojo detiene el CI o solo avisa. El motivo de que la pata de
+      # 18.17.0 arranque en `aviso` esta escrito entero en el encabezado del job,
+      # junto con la condicion exacta para promoverla.
       matrix:
         so: [ubuntu-latest, windows-latest, macos-latest]
+        node: ["22"]
+        modo: [rojo]
+        include:
+          # El borde del aviso: la primera version que NO dispara el ::warning:: de
+          # NODE_RECOMENDADO. Rojo desde el primer dia.
+          - so: ubuntu-latest
+            node: "20.12.0"
+            modo: rojo
+          # El piso duro exacto: NODE_MINIMO. Ver el encabezado del job para por que
+          # entra avisando y que hay que ver para ponerla en rojo.
+          - so: ubuntu-latest
+            node: "18.17.0"
+            modo: aviso
     runs-on: ${{ matrix.so }}
     permissions:
       contents: read
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
-      - uses: actions/setup-node@v7
-        with: { node-version: "22" }
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        with: { node-version: "${{ matrix.node }}" }
 
       - name: Banco de la herramienta de init
         shell: bash
+        # Por `env:` y no interpolado adentro del `run:`, que es la convencion del
+        # repo: asi el valor de la matriz no se concatena en el texto del script.
+        env:
+          MODO: ${{ matrix.modo }}
+          NODE_PEDIDO: ${{ matrix.node }}
         run: |
           set -euo pipefail
           shopt -s nullglob
@@ -282,16 +354,42 @@ jobs:
 
           # Misma disciplina que los demas bancos: "no encontre pruebas" jamas se
           # reporta como exito. Aca ademas la matriz lo multiplica — un patron
-          # que deja de matchear daria TRES verdes sin una sola asercion.
+          # que deja de matchear daria CINCO verdes sin una sola asercion.
           if [ ${#PRUEBAS[@]} -eq 0 ]; then
-            echo "::error::no se encontro ningun archivo en pruebas/init/*.test.mjs. Si moviste el banco de la herramienta de init, actualiza este patron y la exclusion del job pruebas-actions; si lo borraste, la herramienta que corre en la maquina de la gente se quedo sin banco en los tres sistemas operativos"
+            echo "::error::no se encontro ningun archivo en pruebas/init/*.test.mjs. Si moviste el banco de la herramienta de init, actualiza este patron y la exclusion del job pruebas-actions; si lo borraste, la herramienta que corre en la maquina de la gente se quedo sin banco en los tres sistemas operativos ni en las dos versiones de Node que ella misma declara soportadas"
             exit 1
           fi
 
-          echo "== banco de init en $(uname -s) ($(uname -m)), node $(node --version) =="
+          # El modo se valida en vez de suponerse: un valor que no sea ninguno de los
+          # dos significa que la matriz se edito mal, y el default silencioso de un
+          # `case` seria "no detiene", o sea el fail-open exacto que este bloque
+          # existe para no tener.
+          case "${MODO}" in
+            rojo | aviso) ;;
+            *)
+              echo "::error::la pata de la matriz llego con modo='${MODO}', que no es 'rojo' ni 'aviso'. Lo decide la clave 'modo' del strategy.matrix de este job: si agregaste una version de Node al include:, dale tambien su modo"
+              exit 1
+              ;;
+          esac
+
+          echo "== banco de init en $(uname -s) ($(uname -m)), node $(node --version) (pedido: ${NODE_PEDIDO}), modo ${MODO} =="
           printf '%s\n' "${PRUEBAS[@]}"
 
-          node --test "${PRUEBAS[@]}"
+          # El `if` alrededor del banco es lo unico que apaga el `-e` para esta linea:
+          # sin el, un banco en rojo mataria el script antes de que el modo se pueda
+          # leer, y la pata en aviso avisaria... poniendose roja.
+          if node --test "${PRUEBAS[@]}"; then
+            echo "el banco de init pasa entero en $(uname -s) con node $(node --version)"
+            exit 0
+          fi
+
+          if [ "${MODO}" = "aviso" ]; then
+            echo "::warning::el banco de la herramienta de init NO pasa con Node ${NODE_PEDIDO}, que es el piso duro que la propia herramienta declara (NODE_MINIMO). Esta pata avisa y no detiene PORQUE ES LA PRIMERA VEZ QUE SE MIDE: hasta este cambio el banco solo habia corrido en Node 22. Mira la salida de arriba antes de asumir nada — hay dos causas posibles y el arreglo es distinto: (a) la herramienta de verdad no funciona en ${NODE_PEDIDO}, y entonces o se arregla o NODE_MINIMO esta mintiendo y hay que subirlo; (b) el que no soporta el banco es el 'node --test' de esa version, que es de la primera generacion del runner de pruebas, y entonces lo que cambia es como se invoca el banco, no la herramienta. Cuando esta pata se vea verde una vez, promovela: en el strategy.matrix de este job, entrada del include: con node ${NODE_PEDIDO}, cambia 'modo: aviso' por 'modo: rojo'"
+            exit 0
+          fi
+
+          echo "::error::el banco de la herramienta de init termino en rojo con Node ${NODE_PEDIDO} en $(uname -s). La herramienta corre en la maquina de quien inicia un proyecto, no en un runner: este rojo es un rojo real para una persona real con esa version instalada"
+          exit 1
 
   # PINES DE ACTIONS DE TERCEROS: LA FRONTERA QUE EL MARCO DECLARA Y NADIE MEDIA.
   #
@@ -308,7 +406,7 @@ jobs:
     permissions:
       contents: read
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
       # AGENTS.md declara la frontera textual: "Agregar una dependencia o una
       # action de terceros al marco: entra al pipeline de todos los consumidores.
@@ -320,40 +418,47 @@ jobs:
       # POR QUE IMPORTA MAS QUE UN PIN CUALQUIERA. Es la unica clase de cambio que
       # llega a todos los consumidores a la vez sin que nadie mergee nada: mover un
       # tag ajeno no abre un PR, no produce diff y no dispara aviso. La asimetria
-      # lo dice sola — la unica action de terceros que el repo trata como tal
-      # (anthropics/claude-code-action, la unica linea que devuelve
-      # `grep -n 'claude-code-action@' .github/workflows/claude.yml`) esta
-      # pinada por SHA con su comentario `# v1.0.196` al lado, y las de GitHub,
-      # que corren en cada job de cada repo, no.
+      # que lo hacia evidente ya no existe, y decirlo importa porque este parrafo
+      # la usaba de argumento: hasta este cambio la unica action de terceros pinada
+      # por SHA era anthropics/claude-code-action, y las de GitHub —que corren en
+      # cada job de cada repo— iban por tag. Hoy las de este arbol tambien van por
+      # SHA; lo que queda pendiente es lo que el marco REPARTE.
       #
-      # ESTADO MEDIDO DESPUES DEL ULTIMO CAMBIO DE ESTE ARCHIVO: 31 de 33 `uses:` ajenos
-      # van por tag movil y no por SHA. El desglose por action:
-      #     17  actions/checkout@v7
-      #     13  actions/setup-node@v7
+      # ESTADO MEDIDO DESPUES DEL ULTIMO CAMBIO DE ESTE ARCHIVO: 10 de 34 `uses:` ajenos
+      # van por tag movil y no por SHA. El desglose por action de esos 10:
+      #      5  actions/setup-node@v7
+      #      4  actions/checkout@v7
       #      1  actions/upload-artifact@v5
-      # De esos 31, DIEZ viajan: 8 en plantilla/.github/workflows/ (que el andamio
-      # copia a cada proyecto nuevo) y 2 en los action.yml de cobertura-diff y
-      # guardrail-deltas (que ejecuta cada consumidor). Los otros 21 solo corren aca,
-      # en .github/workflows/.
+      # Los DIEZ son exactamente los que VIAJAN: 8 en plantilla/.github/workflows/ (que
+      # el andamio copia a cada proyecto nuevo) y 2 en los action.yml de cobertura-diff
+      # y guardrail-deltas (que ejecuta cada consumidor). En .github/workflows/ no queda
+      # ninguno: los 22 que corrian aca —14 actions/checkout y 8 actions/setup-node—
+      # pasaron a SHA con el tag en el comentario de al lado, que es la forma que
+      # Dependabot reescribe. Los otros 2 pines por SHA de los 24 son las dos lineas de
+      # anthropics/claude-code-action, una aca y otra en el andamio.
       #
       # OJO CON EL 8, que no es el 14 del censo de `uses:` del andamio y por eso
       # se explica en vez de dejarlo raro: plantilla/.github/workflows/ tiene 14
-      # `uses:`, pero 5 son marcadores sin resolver ({{ORG}}/Projects/...) que
-      # este paso saltea porque no son referencias, y 1 es el
-      # anthropics/claude-code-action que ya va por SHA. Quedan 8 pendientes.
+      # `uses:`, pero 5 son marcadores sin resolver ({{ORG}}/Projects/...) que este
+      # paso saltea porque no son referencias, y 1 es el anthropics/claude-code-action
+      # que ya va por SHA. Quedan 8 pendientes.
       #
-      # LOS NUMEROS NO SE MANTIENEN A MANO, Y YA SE PUDRIERON UNA VEZ: este parrafo
-      # decia 27 de 29, con 15/11/1 y 17/8/2, y dejo de cerrar en cuanto un cambio
-      # agrego jobs con checkout y setup-node sin que nadie los volviera a contar. Los
-      # mide ESTE MISMO PASO, y sus anotaciones ::warning agrupadas por archivo dan
-      # 21 / 8 / 2. Si un cambio agrega un `uses:` ajeno, la corrida imprime el total
-      # nuevo y este parrafo queda viejo a la vista, que es preferible a un total que
-      # nadie puede reproducir — pero "a la vista" solo sirve si alguien mira: la regla
-      # es que el PR que agrega un `uses:` ajeno remide estas cifras.
+      # LOS NUMEROS NO SE MANTIENEN A MANO, Y YA SE PUDRIERON DOS VECES: este parrafo
+      # decia 27 de 29, con 15/11/1 y 17/8/2, y despues 31 de 33 con 21/8/2, y las dos
+      # veces dejo de cerrar en cuanto un cambio agrego jobs con checkout y setup-node
+      # sin que nadie los volviera a contar (la segunda fue el job terraform de
+      # marco-ci.yml, que suma un checkout). Los mide ESTE MISMO PASO, y sus
+      # anotaciones ::warning agrupadas por archivo dan hoy 0 / 8 / 2 —
+      # .github/workflows/, plantilla/ y actions/—. Si un cambio agrega un `uses:`
+      # ajeno, la corrida imprime el total nuevo y este parrafo queda viejo a la
+      # vista, que es preferible a un total que nadie puede reproducir — pero "a la
+      # vista" solo sirve si alguien mira: la regla es que el PR que agrega un
+      # `uses:` ajeno remide estas cifras.
       #
-      # Si, este paso se denuncia a si mismo: el checkout de arriba es uno de los
-      # 31. Eso es lo que tiene que hacer — un auditor que se exceptua deja de ser
-      # una medicion y pasa a ser una opinion.
+      # Si, este paso se sigue auditando a si mismo: el checkout de arriba es uno de
+      # los 24 que hoy van por SHA, y el dia que alguien lo devuelva a un tag este
+      # mismo paso lo denuncia. Eso es lo que tiene que hacer — un auditor que se
+      # exceptua deja de ser una medicion y pasa a ser una opinion.
       #
       # POR QUE ESTE PASO NO RESUELVE LOS SHA. Resolverlos exige red
       # (`gh api .../commits/<tag>`), y un SHA inventado es peor que un tag: pina
@@ -366,11 +471,23 @@ jobs:
       # el de cualquier proyecto que se inicie despues, sin habersele anunciado a
       # nadie; es exactamente el endurecimiento sin aviso que el marco prohibe.
       # La condicion para invertirlo esta escrita y no depende de una fecha ni de
-      # que alguien se acuerde: en cuanto los 27 pines de la lista de arriba esten
+      # que alguien se acuerde: en cuanto los 10 pines de la lista de arriba esten
       # por SHA —o sea, en cuanto este paso imprima "los N uses: ... van pinados
       # por SHA de 40 hex"— se cambia el ::warning:: final por ::error:: y exit 1,
       # y se anota en el CHANGELOG bajo "Para consumidores". Antes no: un rojo que
       # nadie puede cerrar sin red ensena a ignorar los rojos.
+      #
+      # Y ESTA MAS CERCA DE LO QUE PARECE, con el trabajo repartido escrito: los 10
+      # que faltan viven en CINCO archivos, ninguno de ellos este workflow —
+      # plantilla/.github/workflows/ci.yml (5), .../actualizar-marco.yml (2),
+      # .../claude.yml (1), y los action.yml de cobertura-diff y de guardrail-deltas
+      # (1 cada uno)—. Dos de las tres actions que les faltan ya estan resueltas en
+      # este mismo arbol y se copian de las lineas `uses:` de aca en vez de
+      # resolverse otra vez: actions/checkout # v7 y actions/setup-node # v7. La
+      # tercera, actions/upload-artifact, no se invoca en .github/workflows y su
+      # unica linea vive en el andamio; su SHA para el tag v5 es
+      # 330a01c490aca151604b8cf639adc76d48f6c5d4, resuelto contra la API publica y
+      # anotado aca para que ese cambio tampoco necesite red.
       #
       # Lo que NO mira, declarado: no juzga si el SHA apunta a un commit real ni
       # si la version es la ultima. Eso es de Dependabot (.github/dependabot.yml),
@@ -611,8 +728,8 @@ jobs:
     permissions:
       contents: read
     steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-node@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
         with: { node-version: "22" }
       - name: Constitucion del marco cableada
         uses: ./actions/constitucion
@@ -641,15 +758,30 @@ jobs:
     permissions:
       contents: read
     steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-node@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
         with: { node-version: "22" }
       - name: Deltas de OpenSpec sin perdida de escenarios
         uses: ./actions/guardrail-deltas
         with:
           instalar-node: "false"
 
-  # Check REQUERIDO por el ruleset main-protegida (nombre exacto: "ci-ok").
+  # EL CHECK QUE MAIN VA A EXIGIR, y hoy NO exige: "ci-ok" (nombre exacto).
+  #
+  # Este comentario decia "check REQUERIDO por el ruleset main-protegida" y era una
+  # compuerta afirmada y no medida. Medido el 2026-08-24, contra las dos formas en
+  # que GitHub protege una rama:
+  #   gh api repos/im-diego-ec/Projects/rulesets              -> []
+  #   gh api repos/im-diego-ec/Projects/branches/main/protection  -> 404
+  # O sea que no hay ruleset ni proteccion heredada: este job corre y reporta, y
+  # nadie lo exige. Un repo que AFIRMA una compuerta que no existe esta peor que uno
+  # que no afirma ninguna, porque el que lo lee deja de buscar. El estado real, la
+  # tabla entera y los pasos para aplicarla viven en .github/proteccion-main.md, y
+  # se remiden con esos dos comandos antes de creerle a esta linea.
+  #
+  # Nada de lo de abajo depende de eso: el nombre del job es el contrato publico
+  # —lo que se agrega como check requerido el dia que el ruleset exista— y por eso
+  # renombrarlo es breaking aunque hoy no lo exija nadie.
   #
   # if: always() no es opcional: si "marco" falla y este job se saltea, el check
   # requerido nunca reporta y el PR queda esperando para siempre una senal que
@@ -695,7 +827,7 @@ jobs:
       contents: read
       pull-requests: read
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           # El diff se compara contra la base del PR, y con el default (1) ese
           # commit no esta en el clon.
@@ -774,12 +906,15 @@ jobs:
             echo "::error::el banco de pruebas de las actions termino en '${{ needs.pruebas_actions.result }}'"
             exit 1
           }
-          # Un job con matriz reporta un solo resultado agregado: es "success"
-          # solo si las TRES patas lo son. Un rojo en windows-latest o en
-          # macos-latest llega aca igual que uno en ubuntu, que es justamente el
-          # punto de tener la matriz.
+          # Un job con matriz reporta un solo resultado agregado: es "success" solo si
+          # TODAS sus patas lo son. Hoy son CINCO —tres sistemas operativos con el Node
+          # del runner, mas Node 20.12.0 y 18.17.0 sobre ubuntu— y un rojo en
+          # cualquiera de ellas llega aca igual que uno en ubuntu, que es justamente el
+          # punto de tener la matriz. La pata de 18.17.0 esta en modo aviso: si falla,
+          # sale verde con un ::warning:: en su propio log y NO llega hasta aca. El
+          # motivo y la condicion de promocion estan en el encabezado de ese job.
           [ "${{ needs.pruebas_init.result }}" = "success" ] || {
-            echo "::error::el banco de la herramienta de init termino en '${{ needs.pruebas_init.result }}' en al menos uno de los tres sistemas operativos. Mira cual: la herramienta corre en la maquina de quien inicia un proyecto, no en un runner, asi que un rojo en windows o macos es un rojo real para un usuario real"
+            echo "::error::el banco de la herramienta de init termino en '${{ needs.pruebas_init.result }}' en al menos una de las cinco patas de su matriz. Mira cual: la herramienta corre en la maquina de quien inicia un proyecto, no en un runner, asi que un rojo en windows, en macos o en la version de Node que la herramienta declara como piso es un rojo real para un usuario real"
             exit 1
           }
           # El job higiene-del-marco lleva DOS pasos con dos severidades distintas, y

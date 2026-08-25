@@ -127,10 +127,10 @@ const MS_POR_DIA = 86400000;
 
 /** Marca de regla. Va en comentario HTML para que sea greppable sin ser prosa, y su
  *  id es ESTABLE: un desvío lo nombra, y un desvío cuya regla desapareció es rojo. */
-export const MARCA_REGLA = /^<!--\s*projects:regla\s+id=([a-z0-9][a-z0-9-]*)\s*-->\s*$/;
+const MARCA_REGLA = /^<!--\s*projects:regla\s+id=([a-z0-9][a-z0-9-]*)\s*-->\s*$/;
 
 /** Cabecera del artefacto. Una línea, en comentario, al principio del cuerpo. */
-export const MARCA_CABECERA = /^<!--\s*projects:constitucion\s+(.*?)\s*-->\s*$/;
+const MARCA_CABECERA = /^<!--\s*projects:constitucion\s+(.*?)\s*-->\s*$/;
 
 /**
  * Superficies de instrucciones que el marco sabe emitir (D2).
@@ -425,7 +425,7 @@ export function validarPiso(piso) {
  *  paréntesis (`Bash(pnpm lint)` -> `bash`). Sin paréntesis, la entrada entera es la
  *  herramienta y no declara comando: `Bash` a secas autoriza cualquier cosa y
  *  `mcp__x__y` autoriza una tool de un servidor MCP. */
-export function herramientaDe(entrada) {
+function herramientaDe(entrada) {
   const t = String(entrada ?? "").trim();
   const corte = t.indexOf("(");
   return (corte >= 0 ? t.slice(0, corte) : t).trim().toLowerCase();
@@ -433,7 +433,7 @@ export function herramientaDe(entrada) {
 
 /** El COMANDO que autoriza una entrada: lo de adentro del paréntesis. Vacío cuando la
  *  entrada no declara ninguno. */
-export function comandoDe(entrada) {
+function comandoDe(entrada) {
   const t = String(entrada ?? "").trim();
   const abre = t.indexOf("(");
   const cierra = t.lastIndexOf(")");
@@ -452,7 +452,7 @@ export function comandoDe(entrada) {
  * piso 100% cubierto con seis entradas que no corren ninguna verificación. Un límite
  * declarado no deja de ser un agujero.
  */
-export function programaDe(comando) {
+function programaDe(comando) {
   for (const palabra of String(comando ?? "")
     .trim()
     .split(/\s+/)
@@ -599,7 +599,7 @@ export function versionPendienteMasVieja(versiones, versionDeclarada) {
 // ---------------------------------------------------------------------------
 
 /** Un marcador del scaffold sin resolver, en cualquier parte de un texto. */
-export const MARCADOR_SIN_RESOLVER = /\{\{([A-Z0-9_]+)\}\}/;
+const MARCADOR_SIN_RESOLVER = /\{\{([A-Z0-9_]+)\}\}/;
 
 /**
  * ¿El valor declarado FALTA de verdad?
@@ -619,7 +619,7 @@ export const MARCADOR_SIN_RESOLVER = /\{\{([A-Z0-9_]+)\}\}/;
  * Se rechaza el marcador en CUALQUIER posición del valor y no solo cuando el valor es
  * el marcador entero: `"org-{{ORG}}-sufijo"` deja el artefacto igual de a medias.
  */
-export function valorFaltante(valor) {
+function valorFaltante(valor) {
   if (valor === undefined || valor === null) return true;
   const texto = String(valor).trim();
   return texto === "" || MARCADOR_SIN_RESOLVER.test(texto);
@@ -655,7 +655,7 @@ export function sustituir(texto, valores) {
  *  puede aflojarse con un cambio de una línea, y esto vuelve a mirar el cuerpo que
  *  está a punto de sellarse. La propiedad prometida es «el artefacto nunca sale con
  *  dobles llaves», no «la contabilidad dio bien». */
-export function marcadoresDe(texto) {
+function marcadoresDe(texto) {
   const encontrados = new Set();
   for (const [, nombre] of String(texto ?? "").matchAll(/\{\{([A-Z0-9_]+)\}\}/g)) encontrados.add(nombre);
   return [...encontrados].sort();
@@ -946,7 +946,7 @@ export function clasificarDesvios(declarados, idsDelCanonico) {
 // ---------------------------------------------------------------------------
 
 /** Primeras diferencias entre dos textos ya normalizados, con número de línea. */
-export function diffLineas(esperado, actual, tope = 12) {
+function diffLineas(esperado, actual, tope = 12) {
   const a = String(esperado).split("\n");
   const b = String(actual).split("\n");
   const salida = [];
@@ -1313,7 +1313,7 @@ export function verificar({
  * desde `exigible_desde`, `::error::`. Nunca verde: el ausente no tiene rama
  * silenciosa de «no aplica».
  */
-export function hallazgoPorFecha({ codigo, ruta, pendiente, hoy, mensaje, arreglo }) {
+function hallazgoPorFecha({ codigo, ruta, pendiente, hoy, mensaje, arreglo }) {
   const fecha = pendiente?.exigible_desde;
   const exigible = esFecha(fecha) ? aFecha(fecha) <= hoy : true;
   const cola = esFecha(fecha)

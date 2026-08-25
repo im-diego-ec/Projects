@@ -1,9 +1,16 @@
 ---
 name: projects-archive-change
 description: Archivar un change de OpenSpec sin usar el CLI de archive — funde los deltas en los specs vivos, mueve el change a changes/archive con git mv y verifica que no se perdio contrato. Usar al cerrar un change de OpenSpec, sobre todo en Windows, donde `openspec archive` miente.
-allowed-tools: Bash(git:*), Bash(node:*), Bash(npx:*), Bash(grep:*), Bash(awk:*), Bash(diff:*), Bash(sed:*), Bash(ls:*), Bash(mkdir:*), Read, Edit
+# ALLOWLIST ACOTADO. `allowed-tools` es un allowlist de agente con el mismo poder
+# que el archivo de ajustes: `Bash(git:*)` autoriza `git push --force` y `Bash(gh:*)`
+# autoriza `gh pr merge`, `gh release create` y `gh api -X DELETE`. Un comodin en la
+# posicion del subcomando autoriza mas de lo que nadie reviso, asi que aca solo entran
+# LECTURAS acotadas.
+# Lo que ESCRIBE fuera del arbol —git checkout, git pull, git add, git commit, git push, gh pr create, el `gh api` que lee el pin del marco y los `npx` del CLI de OpenSpec (que descargan y ejecutan un paquete)— queda deliberadamente afuera: no es que la
+# skill no lo haga, es que cada una de esas corridas se PIDE en la sesion. Buscar en el
+# arbol va por las tools `Grep` y `Glob` en vez de por `Bash(grep:*)`.
+allowed-tools: Bash(git status:*), Bash(git diff:*), Bash(git log:*), Bash(git ls-files:*), Bash(git grep:*), Bash(git mv:*), Bash(node .claude/skills/projects-archive-change/aplicar-deltas.mjs:*), Read, Grep, Glob, Edit
 metadata:
-  author: Transformación Digital y Data
   version: "1.0"
 ---
 
@@ -27,10 +34,17 @@ Archivar es el **merge** del ciclo de vida de los specs: los deltas del change
 Despues de archivar nadie lee el delta para entender el sistema: lee el spec
 vivo. El archive responde "por que quedo asi".
 
-Todos los comandos se corren **desde la raiz del repo** y **en Git Bash**, no en
-PowerShell: usan `awk`, `sed`, sustitucion de procesos (`<(...)`) y `${var#...}`.
-Si estas en PowerShell, abri `bash` primero — esta skill se usa sobre todo en
-Windows, que es donde el CLI falla.
+Todos los comandos se corren **desde la raiz del repo**, y **corren igual en
+PowerShell, en bash y en zsh**: los unicos ejecutables que se invocan son `git`,
+`node`, `npx` y `gh`, que estan en las tres plataformas, mas `ls` en una sola
+verificacion (en PowerShell `ls` es un alias de `Get-ChildItem` y hace lo mismo).
+**No hace falta abrir Git Bash.**
+Hasta el 2026-08-24 si hacia falta —tres pasos usaban `awk`, sustitucion de
+procesos (`<(...)`) y `${var#...}`, que en PowerShell no existen— y esa exigencia
+era justo al reves de lo que esta skill necesita: se usa sobre todo en Windows,
+que es donde el CLI de archive falla y donde menos se puede dar por hecho que hay
+un bash. Los tres pasos viven ahora en el script `aplicar-deltas.mjs`, que ya
+viajaba con la skill.
 
 El script del paso 2 **exige la raiz del repo**: comproba `openspec/changes/` y
 el change antes de mirar los deltas, y si no los encuentra te dice cual de las
@@ -88,11 +102,13 @@ Se lee del marco sin clonarlo:
 ```bash
 gh api repos/{{ORG}}/Projects/contents/.github/workflows/marco-ci.yml \
   -H "Accept: application/vnd.github.raw" \
-  | awk '/^      version_openspec:/{f=1} f && /default:/{print; exit}'
+  | node .claude/skills/projects-archive-change/aplicar-deltas.mjs --pin-openspec -
 ```
 
-**Verificacion del pin:** tiene que imprimir una linea `default: "X.Y.Z"` con un
-numero de verdad. Ese numero es el `X.Y.Z` de todos los comandos `npx` de abajo.
+**Verificacion del pin:** tiene que imprimir **solo el numero**, `X.Y.Z`, y ese es
+el numero de todos los comandos `npx` de abajo. Si lo que llega por la tuberia no
+es el workflow reusable, el comando sale **1** diciendo que no pudo leer el pin,
+en vez de imprimir vacio y dejarte concluir que no hay ninguno.
 Si imprime vacio, **para**: no tenes el pin y no se adivina. Las dos causas
 reales son que `gh` no este autenticado contra la organizacion o que el marco
 haya movido ese input de lugar; en el segundo caso el numero se pide a un builder
@@ -103,7 +119,7 @@ pegada (`npx --yes @fission-ai/openspec@X.Y.Z ...`), pero eso es **lo que este
 repo cree**, no la fuente: si difiere de lo que devolvio el comando de arriba, el
 allowlist quedo atrasado y actualizarlo es parte de este trabajo.
 
-**No busques el pin con `grep -rn "@fission-ai/openspec@" .github/`**: en el marco
+**No busques el pin con `git grep -n "@fission-ai/openspec@" -- .github/`**: en el marco
 devuelve lineas donde la version es una variable de shell (`${VERSION_OPENSPEC}`,
 `${PIN}`) y en este repo no devuelve ninguna. En los dos casos te quedas sin
 numero, y el paso siguiente pasa a ser una adivinanza.
@@ -118,11 +134,12 @@ que hoy todo valida:
 ```bash
 npx --yes @fission-ai/openspec@X.Y.Z list
 npx --yes @fission-ai/openspec@X.Y.Z validate --all --strict
-grep -c "^- \[ \]" openspec/changes/<nombre-del-change>/tasks.md
+git grep -c "^- \[ \]" -- openspec/changes/<nombre-del-change>/tasks.md
 ```
 
 `validate` tiene que estar en verde **antes** de tocar nada, y el conteo de
-tareas incompletas deberia ser 0. Si quedan tareas abiertas, para y decilo: se
+tareas incompletas deberia ser 0 — `git grep -c` no imprime la linea cuando el
+conteo es cero y sale 1, asi que **sin salida es cero tareas abiertas**. Si quedan tareas abiertas, para y decilo: se
 archiva lo terminado, no lo que va quedando.
 
 ---
@@ -130,8 +147,8 @@ archiva lo terminado, no lo que va quedando.
 ## Paso 1 — Inventariar lo que el delta va a hacer
 
 ```bash
-grep -rn "^## .* Requirements" openspec/changes/<nombre-del-change>/specs/
-grep -rn "^### Requirement: " openspec/changes/<nombre-del-change>/specs/
+git grep -n -E "^## .* Requirements" -- openspec/changes/<nombre-del-change>/specs/
+git grep -n "^### Requirement: " -- openspec/changes/<nombre-del-change>/specs/
 ```
 
 Anota cuantas operaciones esperas por capability. Ese numero es con lo que vas a
@@ -145,7 +162,7 @@ requirement del delta no existe en el spec vivo, no avisa**. Compara titulo por
 titulo contra el spec vivo:
 
 ```bash
-grep -n "^### Requirement: " openspec/specs/<capability>/spec.md
+git grep -n "^### Requirement: " -- openspec/specs/<capability>/spec.md
 ```
 
 Un retitulado es legitimo, pero **se declara** en `## RENAMED Requirements` con
@@ -157,6 +174,29 @@ existe.
 ## Paso 2 — Aplicar los deltas a los specs vivos
 
 Con el script que viaja junto a esta skill. Primero en seco:
+
+> **Antes de planificar nada, el script comprueba quien depende del change.**
+> `openspec/changes/<nombre>/` es una carpeta **transitoria**: archivar la mueve y
+> descartar el change la borra. Si algo de FUERA del change **depende** de una ruta
+> de adentro —un `import`, un `node <ruta>`, un `uses:` de un workflow—, el script
+> sale **1** sin escribir una linea y te imprime cada dependencia con su archivo y
+> su numero de linea. No es teorico: ya paso — un banco de pruebas **requerido**
+> ejecutaba un script guardado dentro de un change en vuelo, o sea que un archive
+> rutinario dejaba el CI en rojo por algo que no tenia nada que ver con specs. El
+> arreglo es siempre uno de dos —mover el dependiente fuera de
+> `openspec/changes/`, o moverlo dentro del change y archivarlo junto en el mismo
+> commit—, y los dos estan escritos en el mensaje.
+>
+> **Una mencion en PROSA no frena el archive.** Un `.md` que nombra la ruta para
+> explicar algo no se rompe al archivar: queda viejo. Y ninguna de las dos salidas
+> de arriba se le puede aplicar a una frase. Esas salen como `::warning::` con su
+> linea, para actualizarlas a la ruta de archive en el mismo commit. La distincion
+> importa: tratarlas igual bloqueaba el archive de un change porque un documento
+> del repo lo mencionaba.
+>
+> **La guarda corre en los TRES caminos que archivan**, no solo en este: tambien
+> en `--mover` —antes del primer `git mv`, incluso en simulacro— y en `--acople`,
+> que es el modo para el change sin deltas, el unico que no pasa por este paso 2.
 
 ```bash
 node .claude/skills/projects-archive-change/aplicar-deltas.mjs <nombre-del-change> --simulacro
@@ -202,15 +242,16 @@ importa (ningun escenario desaparece sin que vos lo hayas decidido). El "antes"
 se lee de `HEAD`, **sin tocar el arbol de trabajo**:
 
 ```bash
-diff <(git grep -c "^#### Scenario:" HEAD -- openspec/specs | sed "s|^HEAD:||" | sort) \
-     <(git grep -c "^#### Scenario:" -- openspec/specs | sort)
+node .claude/skills/projects-archive-change/aplicar-deltas.mjs --escenarios
 ```
 
-Salida esperada: **solo** las lineas de los requirements que tocaste, y ninguna
-baja que no corresponda a un `REMOVED` declarado. Si baja sin REMOVED, **para**:
-es contrato perdido. Sin diferencias, `diff` no imprime nada y sale 0 — que
-tambien es una senal: si el script dijo que aplico operaciones y el conteo no se
-movio en ningun lado, mira el `git diff` antes de seguir.
+Salida esperada: **solo** los specs que tocaste, con su conteo antes y despues, y
+ninguna baja que no corresponda a un `REMOVED` declarado. Una baja sin REMOVED
+sale con la palabra `AVISO` y ahi **paras**: es contrato perdido. Si no hay
+ninguna diferencia lo dice con todas las letras en vez de no imprimir nada — el
+silencio y "no cambio nada" se ven iguales y no lo son: si el script dijo que
+aplico operaciones y el conteo no se movio en ningun lado, mira el `git diff`
+antes de seguir.
 
 > **No uses `git stash` para tomar el "antes".** La receta obvia
 > —`git stash && grep ... && git stash pop`— tiene un modo de fallo destructivo y
@@ -253,10 +294,26 @@ change.
 2026-08-19: mueve el directorio completo, con los deltas anidados
 (`specs/<capability>/spec.md`) y los archivos ocultos (`.openspec.yaml`).
 
+**Primero la guarda de acople, y no es opcional.** Un `git mv` a secas no
+comprueba nada: mueve la carpeta y deja apuntando al vacio a cualquiera que
+dependa de una ruta de adentro. Si venis del paso 2, la guarda ya corrio ahi y no
+hace falta repetirla. Si el change **no lleva deltas de spec** —y entonces el
+paso 2 no se corre nunca— este comando es la unica vez que corre:
+
 ```bash
-mkdir -p openspec/changes/archive
+node .claude/skills/projects-archive-change/aplicar-deltas.mjs <nombre-del-change> --acople
+```
+
+Sale **0** con una linea diciendo que nadie de afuera depende del change, **1**
+nombrando cada dependiente, y **2** si el nombre del change no existe — que no es
+lo mismo que "nadie depende de el", y por eso no sale 0.
+
+```bash
 git mv openspec/changes/<nombre-del-change> openspec/changes/archive/YYYY-MM-DD-<nombre-del-change>
 ```
+
+(La carpeta `openspec/changes/archive/` ya existe con los archives anteriores. Si
+fuera el primero, el rodeo de abajo la crea solo.)
 
 **Si eso te da EPERM** (el mismo lock que tumba al CLI), el rodeo por archivo
 tambien esta verificado y mueve TODO lo rastreado, incluidos deltas y ocultos —
@@ -264,13 +321,22 @@ que es justo lo que se pierde cuando alguien mueve a mano solo los tres `.md`
 que recuerda:
 
 ```bash
-DEST=openspec/changes/archive/YYYY-MM-DD-<nombre-del-change>
-git ls-files "openspec/changes/<nombre-del-change>" | while read -r f; do
-  rel="${f#openspec/changes/<nombre-del-change>/}"
-  mkdir -p "$DEST/$(dirname "$rel")"
-  git mv "$f" "$DEST/$rel"
-done
+node .claude/skills/projects-archive-change/aplicar-deltas.mjs <nombre-del-change> \
+  --mover openspec/changes/archive/YYYY-MM-DD-<nombre-del-change> --simulacro
+node .claude/skills/projects-archive-change/aplicar-deltas.mjs <nombre-del-change> \
+  --mover openspec/changes/archive/YYYY-MM-DD-<nombre-del-change>
 ```
+
+Este rodeo corre la guarda de acople por su cuenta, antes del primer `git mv` y
+tambien en simulacro, asi que no hace falta el `--acople` de arriba si usas este
+camino. Primero en seco, como el paso 2: imprime un `git mv` por archivo sin
+mover nada.
+Sin `--simulacro` los ejecuta uno a uno, creando los subdirectorios que hagan
+falta. Si un `git mv` falla a mitad, para ahi y te dice cuantos archivos alcanzo
+a mover — un movimiento a medias que se anuncia es recuperable con
+`git status --short`; uno que sigue de largo, no. Y si la ruta no tiene NI UN
+archivo rastreado es rojo, no un verde mudo: "no hay nada que mover" y "ya estaba
+archivado" se ven igual y no son lo mismo.
 
 **La fecha del prefijo es la del archive.** Si el nombre del change ya empieza
 con `YYYY-MM-DD-`, no le apiles otra.
@@ -318,7 +384,7 @@ desactualizado sobrevive al archive: los deltas **no transportan** la seccion
 intactos. No es un bug, es el formato.
 
 ```bash
-grep -rn "Purpose: TBD\|^TBD$" openspec/specs/
+git grep -n -E "Purpose: TBD|^TBD$" -- openspec/specs/
 ```
 
 Todo lo que aparezca se completa **en este mismo PR**. En el proyecto donde nacio
@@ -356,7 +422,7 @@ contenido nuevo — es la pregunta que sale en review todas las veces.
 | Script de archive que no aplica nada | "deltas aplicados" con cero operaciones y exit 0                                                                        | El script de esta skill sale 1 en ese caso. Si ves un verde con 0 operaciones, el script esta roto |
 | MODIFIED que omite escenarios        | `validate --strict` en **verde** y aun asi el spec vivo pierde escenarios al archivar                                   | Comparar titulo por titulo antes de aplicar + conteo de escenarios antes/despues                   |
 | Retitulado sin declarar              | El guardrail **no avisa** cuando el titulo del delta no existe en el spec vivo                                          | Declarar el par FROM/TO en `## RENAMED Requirements`                                               |
-| Capability nueva                     | Nace con `Purpose: TBD` y nadie lo nota                                                                                 | `grep -rn "Purpose: TBD" openspec/specs/` y completarlo en el mismo PR                             |
+| Capability nueva                     | Nace con `Purpose: TBD` y nadie lo nota                                                                                 | `git grep -n "Purpose: TBD" -- openspec/specs/` y completarlo en el mismo PR                             |
 
 ## Estado de verificacion del script
 
@@ -365,16 +431,20 @@ cubre**: no es una composite action del marco ni un paquete de este repo, y su
 unica verificacion es la de abajo. Se verifico a mano el 2026-08-19 sobre fixtures
 sinteticas, en estos casos:
 
-| Caso                                                   | Resultado esperado                                                                          | Verificado |
-| ------------------------------------------------------ | ------------------------------------------------------------------------------------------- | ---------- |
-| RENAMED + MODIFIED + REMOVED + ADDED en una capability | 4 operaciones, requirement reemplazado completo, escenario nuevo presente                   | ✔          |
-| Capability nueva (solo ADDED, sin spec vivo)           | Se crea el spec con `Purpose: TBD` y `::warning::` nombrandolo                              | ✔          |
-| Delta sin ninguna seccion de operaciones               | exit 1 por la guarda de cero operaciones; el spec vivo intacto                              | ✔          |
-| MODIFIED contra un requirement inexistente             | exit 1 al planificar, **sin escribir ni un archivo** (md5 del spec vivo sin cambio)         | ✔          |
-| Change que existe pero sin carpeta `specs/`            | exit 1 diciendo que el change EXISTE y no lleva deltas                                      | ✔          |
-| Corrido fuera de la raiz del repo                      | exit **2** nombrando la causa real (no estas en la raiz), sin concluir nada sobre el change | ✔          |
-| Nombre del change con typo                             | exit **2** listando los changes activos, sin concluir que el change no tenga deltas         | ✔          |
-| Archivos con CRLF (Windows)                            | Aplica igual: el lector normaliza los saltos de linea                                       | ✔          |
+| Caso                                                   | Resultado esperado                                                                                                 | Verificado |
+| ------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------ | ---------- |
+| RENAMED + MODIFIED + REMOVED + ADDED en una capability | 4 operaciones, requirement reemplazado completo, escenario nuevo presente                                          | ✔          |
+| Capability nueva (solo ADDED, sin spec vivo)           | Se crea el spec con `Purpose: TBD` y `::warning::` nombrandolo                                                     | ✔          |
+| Delta sin ninguna seccion de operaciones               | exit 1 por la guarda de cero operaciones; el spec vivo intacto                                                     | ✔          |
+| MODIFIED contra un requirement inexistente             | exit 1 al planificar, **sin escribir ni un archivo** (md5 del spec vivo sin cambio)                                | ✔          |
+| Change que existe pero sin carpeta `specs/`            | exit 1 diciendo que el change EXISTE y no lleva deltas                                                             | ✔          |
+| Corrido fuera de la raiz del repo                      | exit **2** nombrando la causa real (no estas en la raiz), sin concluir nada sobre el change                        | ✔          |
+| Nombre del change con typo                             | exit **2** listando los changes activos, sin concluir que el change no tenga deltas                                | ✔          |
+| Archivos con CRLF (Windows)                            | Aplica igual: el lector normaliza los saltos de linea                                                              | ✔          |
+| Dependencia EJECUTABLE de fuera del change (`.mjs`)    | exit **1** en los tres caminos —deltas, `--mover` (incluso en simulacro) y `--acople`—, sin mover ni escribir nada | ✔          |
+| Mencion en PROSA de fuera del change (`.md`)           | `::warning::` con la linea y exit **0**: una frase vieja no rompe nada y no frena el archive                       | ✔          |
+| `--acople` sobre un nombre de change que no existe     | exit **2** diciendo que no se pudo mirar, no que nadie dependa                                                     | ✔          |
+| `git` fuera del PATH, en cualquier camino              | exit **1** en la guarda: lo no verificable es rojo, nunca verde mudo                                               | ✔          |
 
 Los tres codigos de salida son distintos a proposito: **0** aplico, **1** el
 change esta mal (o el script esta roto), **2** el que se equivoco fue quien lo
@@ -384,7 +454,7 @@ tiene deltas" — el mismo mensaje del caso legitimo — y ese mensaje **invita 
 archivar con `git mv` a secas**, o sea a mover el change sin fundir sus deltas.
 Verde por el camino equivocado, contrato perdido en silencio.
 
-Si cambias el script, repeti esos nueve casos antes de usarlo sobre specs
+Si cambias el script, repeti esos doce casos antes de usarlo sobre specs
 reales.
 
 ## Checklist

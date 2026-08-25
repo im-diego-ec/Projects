@@ -83,3 +83,46 @@ cadena de autoridad del proveedor, sin modos que omitan esa verificación.
 #### Scenario: Conexión TLS verificada
 - **WHEN** el servicio abre una conexión a la base de datos en producción
 - **THEN** la conexión valida la cadena de certificados del servidor y falla si no puede verificarla
+
+### Requirement: El andamio entrega los huecos de decisión de infraestructura con su criterio
+
+El andamio SHALL entregar las raíces de infraestructura como código del
+repositorio, y NO SHALL dejar que existan por acuerdo verbal: un repositorio que
+nace del andamio las recibe.
+
+Cada pieza que todavía no se puede decidir SHALL llegar como un **hueco de
+decisión** que declara tres cosas: qué falta, **con qué criterio se decide**, y
+qué queda sin garantía si no se resuelve. Un hueco que solo dice qué falta lo
+puede resolver únicamente quien ya sabía la respuesta.
+
+Lo que se exige de las alarmas SHALL ser que su hueco viva en la raíz del
+ambiente que las necesita y NO SHALL ser cuáles ni cuántas: qué vigilar es del
+negocio de cada proyecto, y una cantidad esperada pondría en rojo a un proyecto
+que eligió bien.
+
+La verificación SHALL fallar cuando un hueco pierda cualquiera de sus tres
+partes, cuando su numeración deje de ser correlativa, cuando un puntero de la
+raíz apunte a una sección que ya no existe, o cuando un hueco de un ambiente
+aparezca en la raíz de otro.
+
+**Lo que este requirement NO exige todavía, dicho para que su verde no se lea
+como lo que no es:** que el hueco esté RESUELTO. Esa compuerta necesita que
+«este repositorio se despliega» sea verificable, y hasta que exista, un
+repositorio recién nacido pasa con todos sus huecos abiertos — lo que se acredita
+es que lleguen escritos de forma que alguien pueda resolverlos.
+
+#### Scenario: Un hueco de decisión sin su criterio
+- **WHEN** un hueco de decisión de la infraestructura del andamio declara qué falta pero no con qué criterio se decide
+- **THEN** la verificación falla nombrando el hueco y la parte que le falta
+
+#### Scenario: El hueco de las alarmas en el ambiente equivocado
+- **WHEN** el hueco de las alarmas aparece en la raíz del ambiente de desarrollo
+- **THEN** la verificación falla, porque las alarmas se exigen donde la caída le cuesta al negocio
+
+#### Scenario: Un puntero que quedó huérfano
+- **WHEN** se borra una sección de la infraestructura y un puntero de la raíz sigue nombrándola
+- **THEN** la verificación falla señalando el puntero, para que la documentación de la raíz no sobreviva a lo que describía
+
+#### Scenario: Un repositorio con todos sus huecos abiertos
+- **WHEN** un repositorio recién nacido del andamio corre su integración con todos sus huecos de decisión sin resolver, pero cada uno escrito con sus tres partes
+- **THEN** la verificación pasa, porque lo que acredita hoy es que los huecos lleguen decidibles, no que estén decididos

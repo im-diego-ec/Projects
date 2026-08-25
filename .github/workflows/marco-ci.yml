@@ -26,9 +26,18 @@ name: Marco CI (reusable)
 #                   `if` de cualquier paso. Se saltea en el distribuidor, que lo corre
 #                   por ruta local en su propio ci.yml
 #   4. constitucion-cableada -> misma particion, para actions/constitucion
-#   5. marco-ok  -> veredicto agregado de los cinco jobs anteriores. Cobra tambien los
-#                   SALTEOS: un skip de los dos jobs de arriba solo vale si la sonda
-#                   del job cambios dijo que este repo distribuye el marco
+#   4b. terraform -> formato y validez de las raices de Terraform del repo. `fmt -check`
+#                   si es inerte; `init -backend=false` NO lo es: descarga los providers
+#                   y modulos que eligen los .tf del PR. Por eso el paso se recorta bajo
+#                   pull_request_target, y esta escrito abajo. Corre
+#                   SIEMPRE, tambien en el carril rapido de docs, porque las rutas de
+#                   infraestructura caen dentro de ese carril: un job que se salteara
+#                   ahi no verificaria nunca los PRs que solo tocan Terraform
+#   5. marco-ok  -> veredicto agregado de los seis jobs anteriores. Cobra tambien los
+#                   SALTEOS: un skip de los dos jobs que invocan composite actions
+#                   solo vale si la sonda del job cambios dijo que este repo
+#                   distribuye el marco, y terraform no se puede saltear porque no
+#                   tiene `if:`
 #
 # El proyecto consumidor NO copia estos jobs: los referencia. Un arreglo aca
 # arregla el CI de todos los repos a la vez.
@@ -60,6 +69,14 @@ name: Marco CI (reusable)
 #       # Opcional: solo si el default no sirve para este repo.
 #       # with:
 #       #   version_openspec: "1.9.0"
+#       #   # sha256 del arbol npm que se instala para correr ese CLI. Vacio por
+#       #   # default: el job lo mide igual y lo imprime en un ::notice::. Declarado,
+#       #   # un arbol distinto es rojo. Se copia de esa corrida, no se inventa.
+#       #   huella_openspec: ""
+#       #   # Raices de Terraform de ESTE repo, separadas por espacios, y el ultimo
+#       #   # dia en que un hallazgo avisa en vez de detener.
+#       #   raices_terraform: "infra infra-prod"
+#       #   ventana_terraform: "2026-09-30"
 #
 #     build_test:
 #       name: build-test
@@ -99,20 +116,66 @@ on:
           Version pineada del CLI de OpenSpec. OJO: el paquete es
           @fission-ai/openspec; el nombre pelado "openspec" en npm es un
           placeholder ajeno (0.0.0, squatting), asi que una invocacion sin
-          version exacta puede descargar y ejecutar otra cosa. El check
-          "Ejecutores de paquetes pinados" del job higiene lo verifica solo,
-          en este repo y en todos los consumidores. Dependabot NO ve este pin
+          version exacta puede descargar y ejecutar otra cosa.
+          QUE VERIFICA SOLO ESE PIN Y QUE NO, medido y no supuesto. El check
+          "Ejecutores de paquetes pinados" del job higiene cubre la rama de
+          EMERGENCIA del job openspec —la que invoca el CLI con el ejecutor
+          directo de npm, con el paquete y su version pegados—, en este repo y
+          en todos los consumidores. NO cubre el camino PRINCIPAL: desde que la
+          instalacion se materializa en un directorio propio del RUNNER_TEMP,
+          ese camino es un `npm install "@fission-ai/openspec@<version>"`, y el
+          alfabeto de ese check enumera los ejecutores que DESCARGAN Y CORREN
+          en un solo comando (los dos directos y los subcomandos exec, x y dlx
+          de cada gestor); "install" no esta ahi. Meterlo no es gratis y por eso
+          no se hizo de apuro: un `npm install` sin argumentos o con un paquete
+          sin version es el pan de cada workflow, asi que el alfabeto ampliado
+          estrenaria un rojo masivo en cada consumidor por invocaciones que no
+          son de esta clase. CONSECUENCIA HONESTA MIENTRAS TANTO: si alguien le
+          saca la version a esa linea, hoy no se pone rojo nada. El arreglo no
+          toca el alfabeto y va en su propio PR — es un caso mas en
+          pruebas/marco-ci/registry-npm.test.mjs que exija el paquete con su
+          version en la linea de instalacion del paso, como el banco ya lo
+          exige en la de la rama de emergencia:
+          node --test pruebas/marco-ci/registry-npm.test.mjs
+          Dependabot NO ve este pin
           porque mira manifests, no una invocacion inline: se sube a mano aca
           y todos los repos del marco lo heredan.
           LIMITE DECLARADO: este pin fija UNA version de UN paquete, no el
           arbol transitivo que esa version arrastra ni el contenido de sus
-          dependencias, que se resuelven frescas en cada corrida y no tienen
-          lockfile. Lo que acota ese resto es la bandera --ignore-scripts de la
-          invocacion, que impide que los scripts de instalacion de ese arbol
-          corran; el codigo del CLI si se ejecuta, porque es lo que se invoco.
+          dependencias, que se resuelven frescas en cada corrida. Lo que acota
+          ese resto son tres cosas, y ninguna es este numero: --ignore-scripts,
+          que impide que los scripts de instalacion de ese arbol corran; la
+          instalacion en un directorio propio fuera del arbol del consumidor; y
+          el input huella_openspec, que convierte ese arbol en algo que se puede
+          declarar y comparar. Ver la description de huella_openspec.
         type: string
         required: false
         default: "1.9.0"
+      huella_openspec:
+        description: >-
+          sha256 del arbol npm que el job openspec instala para correr el CLI.
+          Vacio por default, y ese default no es una omision: es lo que hace que
+          este input no le estrene un rojo a nadie.
+          QUE PROBLEMA CIERRA. El pin de version_openspec dice QUE paquete baja,
+          no CUAL arbol arrastra: las dependencias de ese paquete se resuelven
+          frescas en cada corrida, asi que el codigo que termina ejecutandose
+          dentro del CI de un consumidor puede cambiar entre dos corridas del
+          MISMO commit, sin PR y sin diff. Con este input ese arbol se declara:
+          el job lo instala, arma un manifiesto con la ruta, la version y el
+          integrity de CADA paquete, lo hashea, y compara.
+          COMO SE OBTIENE, sin inventarlo: dejalo vacio en la primera corrida.
+          El job imprime la huella medida en un ::notice:: junto con el
+          manifiesto entero, y esa es la que se copia al with: del uses:. A
+          partir de ahi, un arbol distinto es ROJO con el manifiesto de las dos
+          corridas en el log.
+          CUANDO CAMBIA LEGITIMAMENTE: al subir version_openspec, y cuando una
+          dependencia del CLI publica una version nueva dentro del rango que el
+          CLI declara. Las dos veces se remide igual: se vacia el input, se lee
+          el ::notice:: y se vuelve a declarar, en un PR que dice cual de las dos
+          cosas paso.
+        type: string
+        required: false
+        default: ""
       version_node:
         description: >-
           Version de Node para TODOS los jobs del marco que la necesitan: el
@@ -178,6 +241,32 @@ on:
           ^\.github/
           ^infra/
           ^infra-prod/
+      raices_terraform:
+        description: >-
+          Directorios raiz de Terraform del repo consumidor, separados por
+          espacios. El job `terraform` verifica formato y validez de los que
+          EXISTAN y no dice nada de los que no. El default son los dos que
+          reparte el andamio; un repo con otro layout escribe los suyos, y uno
+          que no usa Terraform no toca nada: sin ninguno de estos directorios el
+          job sale en verde diciendo que no verifico nada, que no es lo mismo
+          que verificar y no encontrar problemas.
+        type: string
+        required: false
+        default: "infra infra-prod"
+      ventana_terraform:
+        description: >-
+          Ultimo dia (ISO, YYYY-MM-DD) en que un hallazgo del job `terraform`
+          AVISA en vez de detener. A partir del dia siguiente el mismo hallazgo
+          es rojo, sin que nadie toque este archivo: la gravedad se deriva del
+          reloj y no de un checklist. La ventana existe porque para casi todo
+          consumidor la primera corrida de este job es tambien la primera vez
+          que alguien mira sus .tf, asi que el plazo es para arreglar lo que
+          reporte, no para decidir si se mira. Moverla hacia adelante es
+          declarar una postergacion: queda escrita en el ci.yml del consumidor,
+          con autor y fecha, en vez de vivir en la cabeza de alguien.
+        type: string
+        required: false
+        default: "2026-09-30"
       runner:
         description: >-
           Runner para todos los jobs de marco. TIENE que ser Linux x86-64, y el
@@ -192,11 +281,11 @@ on:
           primer paso del job higiene, que resuelve la plataforma con `uname`
           —no con el texto del input— y falla con este mismo motivo, para que el
           rechazo no llegue como un 404 de curl a mitad del job. Los otros
-          cinco jobs (cambios, openspec, deltas-openspec, constitucion-cableada
-          y marco-ok) leen
+          seis jobs (cambios, openspec, deltas-openspec, constitucion-cableada,
+          terraform y marco-ok) leen
           el mismo input y NO lo comprueban por su cuenta: arrancan sobre lo que
           se les pase. Aun asi el valor queda rechazado para la corrida entera,
-          y no por costumbre: el input es uno solo para los seis jobs, higiene
+          y no por costumbre: el input es uno solo para los siete jobs, higiene
           no tiene `if:` (corre siempre) y marco-ok lo lleva en su `needs` y
           exige que termine en success. Ahi se apoya la palabra TIENE, y en
           ningun otro lado. Si algun dia higiene se saltea, se condiciona o sale
@@ -281,28 +370,46 @@ jobs:
   # abajo): a partir de ahora, bajo `pull_request_target`, el marco LEE el codigo del
   # head del PR, que en un PR de fork es codigo de un tercero.
   #
-  # NINGUN JOB EJECUTA CODIGO DEL PR, Y HAY UN CASO QUE HUBO QUE CERRAR PARA PODER
-  # DECIRLO. La primera version de este parrafo afirmaba "ninguno de estos jobs lo
-  # EJECUTA —actionlint, gitleaks y los `node -e` leen texto—" y era falsa en el unico
-  # job que baja un paquete: `openspec` corre
-  # `npx --yes "@fission-ai/openspec@${VERSION_OPENSPEC}" validate --all --strict` con
+  # NINGUN JOB EJECUTA CODIGO DEL PR BAJO ESTE EVENTO, Y HUBO QUE CERRAR DOS CASOS
+  # PARA PODER DECIRLO. La frase se escribe con el evento adentro a proposito: bajo
+  # `pull_request` el arbol es el merge del PR y ejecutar cosas de ahi es el trato
+  # normal de todo CI —token de solo lectura en un PR de fork y sin secretos—; lo
+  # que esta linea promete es lo otro, que es donde el token y los secretos son los
+  # del repo llamador.
+  #
+  # CASO 1, npm. La primera version de este parrafo afirmaba "ninguno de estos jobs
+  # lo EJECUTA —actionlint, gitleaks y los `node -e` leen texto—" y era falsa en el
+  # job que baja un paquete: `openspec` corria el CLI con un ejecutor de paquetes y con
   # el cwd DENTRO del arbol ya checkouteado, y npm resuelve su configuracion leyendo el
   # `.npmrc` del directorio de trabajo. Un PR de fork que agregue un `.npmrc` con otro
-  # `registry=` hace que npx descargue y ejecute otro paquete bajo ese nombre, con los
-  # permisos que el llamador le concedio a la corrida de pull_request_target. Por eso
-  # ese job lleva ahora, ANTES del npx, el paso "El arbol del PR no redirige el registry
-  # de npm", que es rojo si el arbol trae un `.npmrc`, y el npx corre ademas con
-  # `npm_config_userconfig` apuntando a un archivo vacio del RUNNER_TEMP. Sin ese paso
-  # la frase de arriba no se podia escribir; con el, se puede.
+  # `registry=` hacia que se descargara y ejecutara otro paquete bajo ese nombre, con
+  # los permisos que el llamador le concedio a la corrida de pull_request_target. Hoy
+  # ese hueco esta cerrado por TRES cosas, no por una: el paso "El arbol del PR no
+  # redirige el registry de npm", que es rojo si el arbol trae un `.npmrc`; el
+  # `npm_config_userconfig` apuntando a un archivo vacio del RUNNER_TEMP; y la forma
+  # misma de la instalacion, que ya no corre npm con el cwd adentro del arbol del
+  # consumidor sino en un directorio propio del RUNNER_TEMP. Sin eso la frase de arriba
+  # no se podia escribir; con eso, se puede.
   #
-  # El techo de permisos de este workflow sigue siendo `contents: read`, y los cinco
-  # checkouts del archivo llevan `persist-credentials: false`: sin eso, bajo pull_request_target el
-  # checkout del head de un fork dejaba el token del LLAMADOR escrito en el
-  # .git/config de un arbol que es codigo de un tercero. Lo que si cambia para un
-  # consumidor es que checks que estaban
-  # verdes pueden ponerse rojos: no es un rojo nuevo del marco, es el rojo que ya se
-  # debia y que el default del checkout estaba tapando. Por eso el aviso lo dice con
-  # todas las letras en vez de dejar que aparezca como una regresion.
+  # CASO 2, terraform. El job `terraform` llego despues y abrio un hueco del mismo
+  # genero sin que nadie releyera este parrafo: `terraform init` descarga los
+  # providers y modulos que declaran los .tf DEL PR —un required_providers nombra
+  # el host de registry que quiera, un source de modulo puede ser git:: o http— y
+  # `terraform validate` arranca esos binarios de provider para leerles el schema.
+  # `terraform fmt -check` si es inerte; esa otra mitad no lo es, y llamarla
+  # "inerte" fue exactamente el error. Cerrado del unico modo que no depende de
+  # que el .tf sea de confianza: bajo `pull_request_target` el paso corre SOLO el
+  # fmt y anuncia con un ::notice:: que la validez quedo sin verificar. El resto
+  # de los eventos no cambia.
+  #
+  # El techo de permisos de este workflow sigue siendo `contents: read`, y los seis
+  # checkouts del archivo llevan `persist-credentials: false`: sin eso, bajo
+  # pull_request_target el checkout del head de un fork dejaba el token del LLAMADOR
+  # escrito en el .git/config de un arbol que es codigo de un tercero. Lo que si
+  # cambia para un consumidor es que checks que estaban verdes pueden ponerse rojos:
+  # no es un rojo nuevo del marco, es el rojo que ya se debia y que el default del
+  # checkout estaba tapando. Por eso el aviso lo dice con todas las letras en vez de
+  # dejar que aparezca como una regresion.
   # ---------------------------------------------------------------------------
   cambios:
     name: cambios
@@ -310,7 +417,7 @@ jobs:
     # GitHub son 360 minutos, y en un workflow REUSABLE ese default no lo paga el
     # marco sino el consumidor: con el cancel-in-progress del scaffold, un job colgado
     # bloquea la cola de ese PR, y un job vivo mantiene su GITHUB_TOKEN valido las seis
-    # horas. Los seis jobs de este archivo llevan techo por eso.
+    # horas. Los siete jobs de este archivo llevan techo por eso.
     timeout-minutes: 10
     runs-on: ${{ inputs.runner }}
     # EL UNICO JOB DE ESTE ARCHIVO QUE PIDE MAS QUE contents: read, y lo pide por
@@ -349,7 +456,7 @@ jobs:
       # fetch-depth: el carril de push necesita la historia para el diff del rango; en
       # PR la sonda solo mira `git ls-files`, asi que alcanza con profundidad 1.
       - name: Checkout (diff del carril de push y sonda del distribuidor)
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           persist-credentials: false
           ref: ${{ (github.event_name == 'pull_request' || github.event_name == 'pull_request_target') && github.base_ref || '' }}
@@ -452,10 +559,11 @@ jobs:
 
           # EL AVISO DEL CAMBIO DE COMPORTAMIENTO, y va aca porque este es el primer
           # job del marco y el unico que corre siempre antes que los demas. Ver el
-          # bloque "PULL_REQUEST_TARGET" del encabezado de este job: hasta el cambio que
-          # introduce este aviso, los checkouts del marco caian en la rama BASE bajo este evento y todo el
-          # veredicto era verde sobre un cambio que nunca se miro. No se calla porque
-          # el consumidor tiene que poder atribuir un rojo nuevo a esto y no a su PR.
+          # bloque "PULL_REQUEST_TARGET" del encabezado de este job: hasta el cambio
+          # que introduce este aviso, los checkouts del marco caian en la rama BASE
+          # bajo este evento y todo el veredicto era verde sobre un cambio que nunca
+          # se miro. No se calla porque el consumidor tiene que poder atribuir un rojo
+          # nuevo a esto y no a su PR.
           if [ "${GITHUB_EVENT_NAME}" = "pull_request_target" ]; then
             echo "::warning::este repo dispara el marco con pull_request_target. Desde esta version del marco los checkouts apuntan al HEAD DEL PR y no a la rama base: antes los checks de higiene, la validacion de OpenSpec y el detector de secretos leian el codigo que ya estaba en la rama base y salian verdes sobre un cambio que nunca miraron. Si aparece un rojo que ayer no estaba, es un hallazgo real del PR que el default anterior tapaba, no una regresion del marco. Y el otro lado de la moneda, que decide TU repo y no el marco: bajo pull_request_target el head de un PR de fork es codigo de un tercero — el marco lo LEE (actionlint, gitleaks y los lectores de manifiestos no ejecutan codigo del repo) pero cualquier job PROPIO tuyo que corra en esa misma corrida si lo ejecuta, y ahi los secrets del repo estan a mano"
           fi
@@ -541,7 +649,7 @@ jobs:
       contents: read
     steps:
       - name: Checkout del repo consumidor
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           # Bajo pull_request_target el default de actions/checkout es la rama BASE:
           # el guardrail de deltas y la validacion --strict corrian sobre lo que ya
@@ -557,7 +665,7 @@ jobs:
           # cwd. Ningun paso de este job hace fetch ni push, asi que no cuesta nada.
           persist-credentials: false
 
-      - uses: actions/setup-node@v7
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
         with: { node-version: "${{ inputs.version_node }}" }
 
       # El pin viaja por `env` y no interpolado en el `run`: es la convencion de este
@@ -587,7 +695,7 @@ jobs:
       # pin no protege de eso, porque el pin dice que bajar y no de donde—, dentro de
       # una corrida que tiene los permisos del repo llamador.
       #
-      # DOS CANDADOS, y hacen falta los dos:
+      # TRES CANDADOS, y ninguno reemplaza a los otros dos:
       #   · Este paso: si el arbol trae un `.npmrc` en cualquier nivel, es ROJO. Se
       #     mira el arbol de TRABAJO y no `git ls-files` a proposito: bajo
       #     pull_request_target lo que importa es el archivo que va a estar en disco
@@ -595,11 +703,17 @@ jobs:
       #   · El `npm_config_userconfig` del paso siguiente, que apunta a un archivo
       #     vacio del RUNNER_TEMP: sin el, un `~/.npmrc` del runner seguiria mandando.
       #     Es cinturon y tirantes, y el barato es este.
+      #   · La forma de la instalacion, que desde el cambio que introdujo la medicion
+      #     del arbol corre npm con el cwd en un directorio del RUNNER_TEMP y no
+      #     adentro del arbol del consumidor. Ese tercero es el que vuelve inalcanzable
+      #     el `.npmrc` del repo para la instalacion — pero NO para la salida de
+      #     emergencia del paso siguiente, que si vuelve a usar un ejecutor de paquetes
+      #     con este cwd. Mientras esa rama exista, este paso sigue haciendo falta.
       #
       # ROJO EN TODOS LOS EVENTOS Y NO SOLO EN pull_request_target: un `.npmrc` en el
-      # repo de un consumidor tambien redirige este npx, y "es tu repo" no lo vuelve
-      # deliberado. El mensaje trae la salida, que existe: quien de verdad necesita un
-      # registry propio instala el CLI el mismo antes de llamar al marco.
+      # repo de un consumidor tambien redirige esa salida de emergencia, y "es tu repo"
+      # no lo vuelve deliberado. El mensaje trae la salida, que existe: quien de verdad
+      # necesita un registry propio instala el CLI el mismo antes de llamar al marco.
       - name: El arbol del PR no redirige el registry de npm
         shell: bash
         run: |
@@ -607,7 +721,7 @@ jobs:
 
           ENCONTRADOS="$(find . -name .npmrc -not -path './.git/*' 2>/dev/null | sort)"
           if [ -n "${ENCONTRADOS}" ]; then
-            echo "::error::este arbol trae uno o mas .npmrc y el paso siguiente corre el CLI de OpenSpec con un ejecutor de paquetes y el cwd adentro de este arbol: npm lee esa configuracion antes que la del usuario, asi que un 'registry=' de ahi decide de donde baja el paquete que este job ejecuta. Bajo pull_request_target ese archivo puede venir del head de un PR de fork, o sea de un tercero, y el pin de version no protege —el pin dice QUE bajar, no DE DONDE—. Arreglo: saca el .npmrc del arbol; si tu proyecto necesita un registry propio, instala el CLI de OpenSpec vos mismo antes de llamar a este workflow"
+            echo "::error::este arbol trae uno o mas .npmrc, y npm lee esa configuracion antes que la del usuario cuando corre con el cwd adentro de este arbol: un 'registry=' de ahi decide de donde baja el paquete que este job ejecuta. La instalacion normal del CLI ya no corre aca adentro —usa un directorio propio del RUNNER_TEMP—, pero la salida de emergencia del paso siguiente si vuelve al ejecutor de paquetes con este cwd, asi que el vector no esta cerrado mientras el archivo exista. Bajo pull_request_target puede venir del head de un PR de fork, o sea de un tercero, y el pin de version no protege —el pin dice QUE bajar, no DE DONDE—. Arreglo: saca el .npmrc del arbol; si tu proyecto necesita un registry propio, instala el CLI de OpenSpec vos mismo antes de llamar a este workflow"
             echo "== .npmrc encontrados =="
             printf '%s\n' "${ENCONTRADOS}"
             exit 1
@@ -617,9 +731,9 @@ jobs:
 
       # --ignore-scripts NO es decorativo y no lo cubre el pin. El pin decide QUE
       # se descarga; --ignore-scripts decide que de lo descargado se EJECUTA
-      # antes de que nadie lo invoque. Sin el, `npx` corre los preinstall/install/
-      # postinstall del paquete Y DE TODO SU ARBOL TRANSITIVO — que este pin no
-      # fija, porque un pin exacto fija una version y no el cierre de sus
+      # antes de que nadie lo invoque. Sin el, el ejecutor corre los preinstall/
+      # install/postinstall del paquete Y DE TODO SU ARBOL TRANSITIVO — que este
+      # pin no fija, porque un pin exacto fija una version y no el cierre de sus
       # dependencias— dentro del job que tiene el GITHUB_TOKEN del consumidor.
       # Con la bandera, el CLI se descarga igual y se ejecuta igual: lo unico que
       # deja de correr son los scripts del ciclo de instalacion, que un validador
@@ -629,16 +743,159 @@ jobs:
       # candado del paso de arriba. Se crea en el mismo `run:` para que no dependa de
       # que exista, y una variable de entorno gana sobre cualquier .npmrc segun el
       # orden de precedencia de npm (linea de comandos, entorno, archivos).
+      #
+      # EL ARBOL SE MATERIALIZA EN UN DIRECTORIO PROPIO, Y ESO CIERRA DOS COSAS A LA
+      # VEZ. Hasta este cambio la unica forma del paso era un ejecutor de paquetes
+      # con el cwd DENTRO del arbol del consumidor, y de ahi salian los dos huecos:
+      #
+      #   1. npm corria con su directorio de trabajo adentro de codigo de un tercero
+      #      —bajo pull_request_target, el head de un PR de fork—. El paso anterior
+      #      cierra el vector conocido (un .npmrc que redirige el registry), pero la
+      #      forma seguia siendo "correr el gestor de paquetes parado adentro del
+      #      arbol que se esta juzgando". Ahora npm corre con el cwd en un directorio
+      #      del RUNNER_TEMP que este workflow crea y llena, y el arbol del consumidor
+      #      solo es el cwd del CLI ya instalado, que es lo unico que necesita leerlo.
+      #
+      #   2. EL ARBOL TRANSITIVO NO SE PODIA NI MIRAR. Un ejecutor de paquetes baja
+      #      el cierre de dependencias a una cache y lo ejecuta; no deja un lockfile
+      #      que alguien pueda leer, comparar o declarar. O sea que el CI de un
+      #      consumidor ejecutaba, en cada corrida, un conjunto de paquetes que nadie
+      #      podia enumerar y que podia cambiar entre dos corridas del mismo commit.
+      #      Instalar en un directorio propio deja un package-lock.json con la ruta,
+      #      la version y el integrity de CADA paquete: recien ahi el arbol es un
+      #      objeto que se puede declarar. El input huella_openspec es esa
+      #      declaracion, y su description dice como se obtiene el valor.
+      #
+      # LO QUE ESTE PASO TODAVIA NO HACE, dicho entero: con huella_openspec vacio
+      # —el default— la huella se MIDE y se IMPRIME, y no se compara contra nada. Eso
+      # detecta cero. La comparacion existe y muerde en cuanto el input tiene valor, y
+      # el default es vacio por la razon de siempre: la huella depende del registry y
+      # no se puede resolver sin red, asi que el marco no puede traerla escrita ni
+      # inventarla. El comando que la consigue es la propia corrida.
       - name: Validacion estricta de changes y specs
         shell: bash
         env:
           VERSION_OPENSPEC: ${{ inputs.version_openspec }}
+          HUELLA_DECLARADA: ${{ inputs.huella_openspec }}
         run: |
           set -euo pipefail
+          shopt -s nullglob
+
+          # El cwd de este paso es la raiz del repo del consumidor y sigue siendolo:
+          # el unico comando que se corre en otro lado es npm, y va en un subshell con
+          # su propio `cd`. El CLI necesita este cwd para encontrar openspec/.
           NPMRC_VACIO="${RUNNER_TEMP}/npmrc-vacio"
           : > "${NPMRC_VACIO}"
-          npm_config_userconfig="${NPMRC_VACIO}" \
-            npx --yes --ignore-scripts "@fission-ai/openspec@${VERSION_OPENSPEC}" validate --all --strict
+          export npm_config_userconfig="${NPMRC_VACIO}"
+
+          # Directorio propio, recreado en cada corrida: si un paso anterior dejo algo
+          # ahi, el arbol que se mide no seria el que este paso instalo.
+          CLI="${RUNNER_TEMP}/openspec-cli"
+          rm -rf "${CLI}"
+          mkdir -p "${CLI}"
+          # El package.json minimo evita que npm suba por el arbol de directorios
+          # buscando uno: sin el, la instalacion podria terminar decidiendose con un
+          # manifiesto que no es de este workflow.
+          printf '%s\n' '{"name":"corredor-openspec","private":true,"version":"0.0.0"}' > "${CLI}/package.json"
+
+          ( cd "${CLI}" && npm install --ignore-scripts --no-audit --no-fund --loglevel=error "@fission-ai/openspec@${VERSION_OPENSPEC}" )
+
+          LOCK="${CLI}/package-lock.json"
+          [ -f "${LOCK}" ] || {
+            echo "::error::la instalacion del CLI de OpenSpec no dejo package-lock.json en ${LOCK}, y sin el no se puede enumerar el arbol que este job va a ejecutar. Un paso que no puede medir no se reporta como medido. Esto es un fallo DEL MARCO, no de tu repo: abri un issue en el repo del marco con la salida del npm install de arriba"
+            exit 1
+          }
+
+          # El manifiesto es RUTA + VERSION + INTEGRITY de cada paquete, ordenado. No
+          # se hashea el lockfile crudo a proposito: ese archivo lleva campos que
+          # dependen de la version de npm del runner (lockfileVersion entre ellos) y
+          # una huella que cambia porque cambio la imagen del runner seria una alarma
+          # que nadie puede distinguir de un arbol distinto.
+          #
+          # El script va inline y no en un archivo aparte: un heredoc no puede cerrar
+          # dentro de un bloque de YAML indentado.
+          MANIFIESTO="${RUNNER_TEMP}/openspec-arbol.txt"
+          node -e '
+            const { readFileSync, writeFileSync } = require("node:fs");
+            const { createHash } = require("node:crypto");
+
+            const lock = JSON.parse(readFileSync(process.argv[1], "utf8"));
+            const paquetes = lock.packages || {};
+
+            // La clave "" es el proyecto contenedor que este mismo paso escribio:
+            // no es parte del arbol que se descarga y no cuenta.
+            // Los avisos y los errores van por STDERR, y no es estilo: la stdout de
+            // este script esta redirigida a un archivo que el paso lee despues, asi
+            // que un ::error:: impreso ahi se lo traga el redirect y la corrida sale
+            // roja SIN un solo motivo en pantalla. Medido: es lo que pasaba con la
+            // primera version de este bloque.
+            const rutas = Object.keys(paquetes).filter((k) => k !== "").sort();
+            if (rutas.length === 0) {
+              console.error("::error::el package-lock.json no declaro un solo paquete. O el CLI no se instalo, o el formato del lockfile cambio y este lector dejo de entenderlo: en los dos casos la huella que saldria de aca seria la de un arbol vacio, o sea una huella estable que no vigila nada");
+              process.exit(1);
+            }
+
+            const lineas = rutas.map((ruta) => {
+              const p = paquetes[ruta] || {};
+              return ruta + " " + (p.version || "SIN-VERSION") + " " + (p.integrity || "SIN-INTEGRITY");
+            });
+            const texto = lineas.join("\n") + "\n";
+            writeFileSync(process.argv[2], texto);
+
+            const sinIntegrity = lineas.filter((l) => l.endsWith("SIN-INTEGRITY"));
+            if (sinIntegrity.length > 0) {
+              console.error("::warning::" + sinIntegrity.length + " de " + lineas.length + " paquetes del arbol del CLI no traen integrity en el lockfile. Un paquete sin integrity no vino del registry con su hash: suele ser un enlace local o una dependencia de git, y es exactamente lo que un pin no alcanza a cubrir. Los nombres estan en el manifiesto que este paso imprime");
+            }
+
+            console.log("PAQUETES=" + lineas.length);
+            console.log("HUELLA=" + createHash("sha256").update(texto).digest("hex"));
+          ' "${LOCK}" "${MANIFIESTO}" > "${RUNNER_TEMP}/openspec-huella.txt"
+          cat "${RUNNER_TEMP}/openspec-huella.txt"
+
+          PAQUETES="$(sed -n 's/^PAQUETES=//p' "${RUNNER_TEMP}/openspec-huella.txt")"
+          HUELLA="$(sed -n 's/^HUELLA=//p' "${RUNNER_TEMP}/openspec-huella.txt")"
+          [ -n "${HUELLA}" ] || {
+            echo "::error::el lector del lockfile no imprimio ninguna huella. Es un fallo DEL MARCO: abri un issue en el repo del marco con la salida de este paso"
+            exit 1
+          }
+
+          echo "::group::arbol npm que este job va a ejecutar (${PAQUETES} paquetes)"
+          cat "${MANIFIESTO}"
+          echo "::endgroup::"
+
+          if [ -z "${HUELLA_DECLARADA}" ]; then
+            echo "::notice::el arbol npm del CLI de OpenSpec NO esta declarado: este job lo midio pero no lo comparo contra nada. La huella de esta corrida es ${HUELLA} (${PAQUETES} paquetes, manifiesto completo en el grupo de arriba). Para que un arbol distinto sea rojo, copiala al with: del uses: de marco-ci.yml en tu ci.yml, como huella_openspec: \"${HUELLA}\". Sin eso, el pin de version_openspec sigue fijando QUE paquete baja y no cual arbol arrastra"
+          elif [ "${HUELLA_DECLARADA}" != "${HUELLA}" ]; then
+            echo "::error::el arbol npm del CLI de OpenSpec NO es el declarado. Declarado en huella_openspec: ${HUELLA_DECLARADA}. Medido en esta corrida: ${HUELLA} (${PAQUETES} paquetes; el manifiesto entero esta en el grupo de arriba, con la version y el integrity de cada paquete). Dos causas posibles y el arreglo es distinto: (a) subiste version_openspec, o una dependencia del CLI publico una version nueva dentro del rango que el CLI declara — se remide, se declara la huella nueva y el PR dice cual de las dos cosas paso; (b) nadie cambio nada y el arbol cambio igual, y eso es justamente lo que este check existe para no dejar pasar en silencio"
+            exit 1
+          else
+            echo "el arbol npm del CLI (${PAQUETES} paquetes) coincide con la huella declarada"
+          fi
+
+          # EL BINARIO SE DERIVA DEL ARBOL INSTALADO, no se escribe de memoria: el
+          # nombre del ejecutable de un paquete lo decide su campo "bin", y adivinarlo
+          # seria estrenar un rojo en el CI de todos los consumidores si no acierta.
+          BIN=""
+          if [ -x "${CLI}/node_modules/.bin/openspec" ]; then
+            BIN="${CLI}/node_modules/.bin/openspec"
+          else
+            CANDIDATOS=("${CLI}"/node_modules/.bin/*)
+            if [ "${#CANDIDATOS[@]}" -eq 1 ]; then BIN="${CANDIDATOS[0]}"; fi
+          fi
+
+          if [ -n "${BIN}" ]; then
+            echo "corriendo el CLI ya instalado y medido: ${BIN}"
+            "${BIN}" validate --all --strict
+            exit 0
+          fi
+
+          # Salida de emergencia, y avisa: si el arbol instalado no expone un
+          # ejecutable reconocible, el paso vuelve a la forma anterior en vez de dejar
+          # sin validar las specs del consumidor. Lo que se pierde ahi es la medicion,
+          # y por eso lo dice en vez de degradarse callado.
+          echo "::warning::el arbol instalado del CLI de OpenSpec no expone un ejecutable unico en node_modules/.bin, asi que este paso vuelve al ejecutor de paquetes y la validacion corre SIN la medicion del arbol de arriba. Es un fallo DEL MARCO, no de tu repo: el campo bin del paquete cambio de forma. Abri un issue en el repo del marco con el listado de node_modules/.bin que sigue"
+          ls -la "${CLI}/node_modules/.bin" || true
+          npx --yes --ignore-scripts "@fission-ai/openspec@${VERSION_OPENSPEC}" validate --all --strict
 
   # ---------------------------------------------------------------------------
   # EL GUARDRAIL DE DELTAS, EN SU PROPIO JOB Y CON LA MISMA PARTICION QUE LA
@@ -715,7 +972,7 @@ jobs:
       contents: read
     steps:
       - name: Checkout del repo consumidor para el guardrail de deltas
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           # Ver el bloque "PULL_REQUEST_TARGET" del encabezado del job cambios: sin
           # esto, bajo ese evento el guardrail leia la rama BASE y salia verde sobre un
@@ -725,7 +982,7 @@ jobs:
           # repo llamador: no se le escribe en el .git/config.
           persist-credentials: false
 
-      - uses: actions/setup-node@v7
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
         # La version que el consumidor pidio, no la que traiga la imagen del runner.
         with: { node-version: "${{ inputs.version_node }}" }
 
@@ -747,14 +1004,15 @@ jobs:
     name: higiene
     # 20 y no 10: es el job largo del marco —dos binarios descargados y verificados por
     # sha256, diez lectores y un barrido de la historia del cambio— y el que mas red
-    # usa, que no es lo mismo que el unico: el job openspec baja un paquete de npm en
-    # cada corrida (`npx --yes "@fission-ai/openspec@..."`), y los cinco jobs con
-    # `uses:` —este incluido— bajan ademas cada action que invocan. El default de
-    # GitHub son 360 minutos, y este workflow es reusable: el minuto colgado lo paga
-    # el consumidor. Los cuatro curl de mas abajo llevan ademas su propio --max-time,
-    # que es el techo del paso; este es el del job. De las descargas que este archivo
-    # hace desde un `run:`, el npx de openspec es la unica sin techo propio: la corta
-    # el timeout-minutes de 10 de ese job y nada mas.
+    # usa, que no es lo mismo que el unico: el job openspec instala el CLI de OpenSpec
+    # desde npm en cada corrida (`npm install "@fission-ai/openspec@..."` en un
+    # directorio del RUNNER_TEMP), y los seis jobs con `uses:` —este incluido— bajan
+    # ademas cada action que invocan. El default de GitHub son 360 minutos, y este
+    # workflow es reusable: el minuto colgado lo paga el consumidor. Los cuatro curl
+    # de mas abajo llevan ademas su propio --max-time, que es el techo del paso; este
+    # es el del job. De las descargas que este archivo hace desde un `run:`, la del
+    # CLI de OpenSpec es la unica sin techo propio: la corta el timeout-minutes de 10
+    # de ese job y nada mas.
     timeout-minutes: 20
     runs-on: ${{ inputs.runner }}
     # Minimo real por job: es el job que mas HACE y el que menos NECESITA. Clona
@@ -819,7 +1077,7 @@ jobs:
       # encabezado del job cambios. Sin el, bajo ese evento los nueve checks de
       # este job leian la rama BASE y reportaban verde sobre un cambio que nunca
       # miraron — el detector de secretos incluido.
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           fetch-depth: 0
           ref: ${{ github.event_name == 'pull_request_target' && github.event.pull_request.head.sha || '' }}
@@ -845,7 +1103,7 @@ jobs:
       # version deja de ser la que sopla la imagen: `inputs.version_node`, el mismo
       # numero que el job de openspec. La description de ese input decia "para el
       # guardrail y el CLI de OpenSpec" justamente porque higiene no lo honraba.
-      - uses: actions/setup-node@v7
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
         with: { node-version: "${{ inputs.version_node }}" }
 
       # HUECO 1 — "regenerado" era la unica forma de distribucion del marco que
@@ -3542,7 +3800,7 @@ jobs:
     permissions:
       contents: read
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           # Bajo pull_request_target el default de actions/checkout es la rama BASE:
           # ver el bloque del checkout del job higiene, que explica entero por que ese
@@ -3551,7 +3809,7 @@ jobs:
           # Mismo motivo que los otros tres checkouts de este archivo: no se le deja
           # el token del llamador en el .git/config a un arbol de un tercero.
           persist-credentials: false
-      - uses: actions/setup-node@v7
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
         # La version que el consumidor pidio, no la que traiga la imagen del runner:
         # este job leia manifiestos con un node que nadie eligio.
         with: { node-version: "${{ inputs.version_node }}" }
@@ -3567,12 +3825,245 @@ jobs:
           # permanente que el marco admite.
           rama_por_defecto: ${{ github.event.repository.default_branch }}
 
+  # ---------------------------------------------------------------------------
+  # LA INFRAESTRUCTURA TAMBIEN SE VERIFICA, Y AHORA DESDE EL MARCO.
+  #
+  # DE DONDE VIENE. Esta verificacion nacio inline en el ci.yml que reparte el
+  # andamio, o sea en un archivo que el repo nuevo recibe COMO PROPIO: un paso que
+  # cualquiera puede borrar, que un repo anterior al andamio nunca tuvo, y que un
+  # repo creado a mano no tiene. Aca deja de ser eso. Un consumidor consume este
+  # workflow por `uses:` y no puede editarlo, asi que la verificacion pasa a ser
+  # parte del marco y no de una copia que cada repo mantiene por su cuenta.
+  #
+  # POR QUE NO TIENE `needs: [cambios]` NI MIRA EL CARRIL DE DOCS, y esta es la
+  # razon que decide la forma del job: el default de `rutas_carril_docs` incluye
+  # `^infra/` y `^infra-prod/`. O sea que un PR que toca UNICAMENTE Terraform sale
+  # con solo_docs=true. Un job que se salteara en el carril rapido no verificaria
+  # nunca la infraestructura justo en los PRs que solo la tocan — el fail-open mas
+  # limpio que se puede escribir sin querer. Corre siempre, y cuando no hay nada
+  # que mirar termina en segundos diciendolo.
+  #
+  # QUE HACE CADA COMPROBACION, Y CUAL DE LAS DOS NO ES INERTE. La primera version
+  # de este parrafo decia "las dos comprobaciones son INERTES" y era falsa en la
+  # segunda. `fmt -check` si lo es: lee texto y nada mas, sin red, sin providers y
+  # sin credenciales. `init -backend=false` + `validate` no. Lo que dice el
+  # `-backend=false` es que NO se inicializa el state remoto —no toca ningun
+  # bucket, no pide credenciales de ninguna cuenta, no necesita que el repo se
+  # haya desplegado nunca—, y esa es una afirmacion mas ANGOSTA que "inerte". Lo
+  # que `init` si hace es descargar los providers y los modulos que declaran los
+  # .tf DEL ARBOL QUE SE ESTA MIRANDO: un `required_providers` puede nombrar
+  # cualquier host de registry y un `source` de modulo puede ser `git::` o `http`.
+  # Y lo que `validate` hace despues es ARRANCAR esos binarios de provider para
+  # leerles el schema. O sea descarga y ejecucion de codigo de terceros elegido
+  # por el arbol que se juzga.
+  #
+  # CON QUE EVENTO ESO ES ACEPTABLE, Y CON CUAL NO. Bajo `pull_request` es el
+  # trato normal de cualquier CI de Terraform: el arbol es el merge del PR, el
+  # token de un PR de fork es de solo lectura y no hay secretos. Bajo
+  # `pull_request_target` no lo es —ahi el token y los secretos son los del repo
+  # llamador—, asi que la mitad de `init` + `validate` NO CORRE bajo ese evento:
+  # queda `fmt -check`, que es la que si es inerte, y el paso lo dice con un
+  # ::notice:: en vez de dejar el hueco callado. Ver la rama por evento del paso
+  # de abajo y el bloque PULL_REQUEST_TARGET del encabezado del job cambios.
+  #
+  # VENTANA DE GRACIA, derivada del reloj y no de un checklist: hasta el dia que
+  # diga el input `ventana_terraform` un hallazgo AVISA; a partir del siguiente
+  # detiene. Es lo que hace que este job entre en modo aviso para todo el mundo sin
+  # depender de que alguien lo apague despues.
+  #
+  # EL BINARIO AUSENTE ES UN CASO DE FALLO, NO UN CASO NEUTRO, y comparte la misma
+  # ventana. "No pude verificar" no es "verifique y esta bien": avisar para siempre
+  # cuando falta el binario convierte este job en un verde perpetuo, y bastaria con
+  # que la imagen del runner dejara de traer terraform para que dejara de verificar
+  # sin que nadie se entere.
+  #
+  # LO QUE FALTA PARA CERRAR EL LIMITE DE RAIZ, y ya NO es el SHA: el binario sale
+  # HOY de la imagen del runner. Lo que lo garantiza es un
+  # `uses: hashicorp/setup-terraform@<sha> # <tag>` como primer paso de este job.
+  # Ese SHA estaba declarado como el bloqueo —"no se puede resolver sin red"— y dejo
+  # de estarlo: para el tag v3 es
+  #   b9cd54a3c349d3f38e8881555d616ced269862dd
+  # resuelto contra la API publica de GitHub y contrastado con los dos llamados que
+  # este bloque ya traia escritos, que siguen siendo la forma de rehacerlo:
+  #   curl -sS https://api.github.com/repos/hashicorp/setup-terraform/git/ref/tags/v3
+  #   curl -sS https://api.github.com/repos/hashicorp/setup-terraform/git/tags/<sha-del-objeto-tag>
+  # el object.sha del segundo llamado es el commit que va en el `uses:`, y el campo
+  # message del mismo llamado es de donde sale la version exacta del comentario: ese
+  # numero de patch NO se leyo aca, asi que el pin va con el tag que si se resolvio
+  # —`# v3`— y no con un `vX.Y.Z` escrito de memoria.
+  #
+  # POR QUE NO SE AGREGA EL PASO EN ESTE MISMO CAMBIO. Agregarlo no es pinar una
+  # invocacion existente: es un paso NUEVO en un job que corre en el CI de todos los
+  # consumidores, que descarga un binario en cada corrida —tambien en los repos que
+  # no tienen una sola raiz— y que necesita su propio banco, porque este paso ya
+  # arrastra el hueco de cobertura declarado mas abajo. Va en su propio cambio, con
+  # el SHA de arriba ya resuelto. Mientras ese paso no exista, la rama "no hay
+  # binario" de abajo es la que sostiene la promesa, y por eso no es neutra.
+  #
+  # LA COPIA DEL ANDAMIO SIGUE EN PIE, A PROPOSITO Y NO POR OLVIDO. El mismo paso
+  # vive todavia inline en plantilla/.github/workflows/ci.yml, y su banco
+  # (pruebas/andamio/terraform-en-ci.test.mjs) lo EXTRAE de ahi por nombre: borrarlo
+  # sin tocar el banco lo pone rojo. Retirarlo es un cambio de dos archivos que no
+  # es este, y el comando que dice exactamente que hay que mover es:
+  #   grep -n 'Formato y validez de las raices de Terraform' plantilla/.github/workflows/ci.yml pruebas/andamio/terraform-en-ci.test.mjs
+  # Mientras las dos copias convivan, un repo del andamio verifica sus raices dos
+  # veces: cuesta segundos y no cambia ningun veredicto.
+  #
+  # ESTE PASO TODAVIA NO TIENE BANCO PROPIO, Y EL CHECK QUE VIGILA ESO LO DA POR
+  # CUBIERTO POR COLISION DE NOMBRE. Queda escrito aca porque es lo unico que se
+  # puede hacer desde este archivo, y porque un hueco que no esta escrito se
+  # redescubre a mano una auditoria por vez.
+  # `pruebas/marco-ci/cobertura-de-los-pasos.test.mjs` pregunta si ALGUN banco
+  # MENCIONA el nombre del paso; el banco de la copia del andamio menciona este
+  # mismo nombre porque la copia se llama igual, pero extrae su texto de
+  # plantilla/.github/workflows/ci.yml, que es otro archivo. O sea que el verde
+  # que hoy trae este paso lo compro esa coincidencia y no un caso que lo haya
+  # corrido: ninguna de sus ramas —ventana con forma invalida, raices declaradas
+  # vacias, sin raices en el arbol, sin binario, fmt rojo, validate rojo, el
+  # recorte por `pull_request_target`, y las dos gravedades de cada una— la
+  # ejercita un caso commiteado. La forma de verlo, sin creerle a este comentario:
+  #   node --test pruebas/marco-ci/cobertura-de-los-pasos.test.mjs
+  #   grep -n 'Formato y validez de las raices de Terraform' pruebas/andamio/terraform-en-ci.test.mjs
+  # y el arreglo es un banco propio en pruebas/marco-ci/ que extraiga ESTE paso de
+  # ESTE archivo —pruebas/marco-ci/extraer.mjs ya extrae por nombre sobre
+  # RUTA_WORKFLOW— y le corra las ramas con un `terraform` falso en el PATH.
+  # ---------------------------------------------------------------------------
+  terraform:
+    name: terraform
+    # 10 minutos: checkout, un fmt que lee texto y un init sin backend por raiz. El
+    # default de GitHub son 360, y este workflow es reusable: el minuto colgado lo
+    # paga el consumidor.
+    timeout-minutes: 10
+    runs-on: ${{ inputs.runner }}
+    # Minimo real: clona el arbol del consumidor y corre dos comandos locales sobre
+    # el. No consulta ninguna API de GitHub.
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout del repo consumidor para verificar sus raices de Terraform
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          # Ver el bloque "PULL_REQUEST_TARGET" del encabezado del job cambios: sin
+          # esto, bajo ese evento este job leeria la rama BASE y saldria verde sobre
+          # unos .tf que nunca miro.
+          ref: ${{ github.event_name == 'pull_request_target' && github.event.pull_request.head.sha || '' }}
+          # El arbol que se trae puede ser codigo de un tercero y el token es el del
+          # repo llamador: no se le escribe en el .git/config. Ningun paso de este
+          # job hace fetch ni push.
+          persist-credentials: false
+
+      - name: Formato y validez de las raices de Terraform
+        shell: bash
+        env:
+          RAICES_DECLARADAS: ${{ inputs.raices_terraform }}
+          VENTANA_TERRAFORM: ${{ inputs.ventana_terraform }}
+          EVENTO: ${{ github.event_name }}
+        run: |
+          set -euo pipefail
+
+          # La ventana se valida ANTES de usarse. Comparar fechas ISO como texto
+          # ordena igual que el calendario, pero solo si las dos SON fechas ISO: un
+          # valor con cualquier otra forma haria que la comparacion decidiera al azar
+          # y el job quedara clavado en aviso sin que nadie lo note.
+          if ! printf '%s' "${VENTANA_TERRAFORM}" | grep -qE '^[0-9]{4}-[0-9]{2}-[0-9]{2}$'; then
+            echo "::error::el input ventana_terraform llego como '${VENTANA_TERRAFORM}', que no es una fecha ISO YYYY-MM-DD. La gravedad de este job se decide comparando esa fecha con el reloj, asi que un valor con otra forma dejaria la compuerta clavada en un lado sin decir cual. Arreglo: escribi la fecha en el 'with:' del uses: de marco-ci.yml en tu ci.yml, o saca el input y deja el default"
+            exit 1
+          fi
+
+          # Y LA LISTA DE RAICES SE VALIDA IGUAL, por simetria y porque el fallo
+          # que evita es peor que el de la ventana. Sin esta guarda,
+          # `raices_terraform: ""` en el `with:` de un consumidor dejaba el bucle
+          # de abajo sin nada que recorrer, el job salia VERDE en segundos y el
+          # ::notice:: afirmaba "no hay raices de Terraform en este repositorio"
+          # sobre un arbol que puede tener infra/ entera: no es un job apagado, es
+          # un job que MIENTE, y se lee como un veredicto. Es el mismo "no pude
+          # verificar no es verifique y esta bien" que este paso le aplica al
+          # binario ausente, resuelto para el mismo lado. Un input vacio no
+          # describe un repo sin infraestructura: describe un `with:` mal escrito.
+          if ! printf '%s' "${RAICES_DECLARADAS}" | grep -q '[^[:space:]]'; then
+            echo "::error::el input raices_terraform llego vacio (o con puros espacios), asi que este paso no tendria ni un directorio que mirar y saldria verde diciendo que no hay infraestructura, sea o no cierto. Arreglo: sacalo del 'with:' del uses: de marco-ci.yml en tu ci.yml para heredar el default, o declara ahi los nombres de tus raices separados por espacios"
+            exit 1
+          fi
+
+          RAICES=""
+          for D in ${RAICES_DECLARADAS}; do
+            if [ -d "${D}" ]; then RAICES="${RAICES}${RAICES:+ }${D}"; fi
+          done
+
+          if [ -z "${RAICES}" ]; then
+            echo "::notice::no hay raices de Terraform en este repositorio (se buscaron: ${RAICES_DECLARADAS}): no se verifico infraestructura porque no hay ninguna. Si tus raices se llaman de otra forma, declaralas en el input raices_terraform del uses: de marco-ci.yml"
+            exit 0
+          fi
+          echo "raices de Terraform encontradas: ${RAICES}"
+
+          # La gravedad se DERIVA del reloj, y se deriva ANTES de mirar si hay
+          # binario: el binario ausente comparte la ventana con los otros dos
+          # fallos, no queda fuera de ella.
+          HOY="$(date -u +%F)"
+          if [ "${HOY}" \> "${VENTANA_TERRAFORM}" ]; then
+            GRAVEDAD="error"
+          else
+            GRAVEDAD="warning"
+            echo "::notice::verificacion de Terraform en modo aviso hasta el ${VENTANA_TERRAFORM} (hoy es ${HOY}). Despues de esa fecha un fallo de fmt, de validate o la ausencia del binario detienen el CI sin que nadie toque ningun archivo"
+          fi
+
+          if ! command -v terraform >/dev/null 2>&1; then
+            echo "::${GRAVEDAD}::hay raices de Terraform (${RAICES}) y este runner no trae el binario, asi que NO se verifico formato ni validez. Este es un fallo DEL MARCO y no de tu repo: el paso que garantiza el binario es un hashicorp/setup-terraform pinado por SHA que este job todavia no lleva. El SHA ya esta resuelto y escrito en el encabezado de este job, junto con los dos comandos que lo rehacen y con el motivo por el que agregar el paso va en su propio cambio. Si ademas usas un runner propio, garantiza 'terraform' en el PATH antes de llamar a este workflow"
+            if [ "${GRAVEDAD}" = "error" ]; then exit 1; fi
+            exit 0
+          fi
+          terraform version
+
+          HUBO_FALLO=0
+
+          # 1. FORMATO. Solo lee texto: ni providers, ni red, ni credenciales.
+          if ! terraform fmt -check -recursive -no-color ${RAICES}; then
+            echo "::${GRAVEDAD}::hay archivos de Terraform sin formatear (la lista esta arriba, un archivo por linea). Arreglo: corre 'terraform fmt -recursive ${RAICES}' y commitea el resultado"
+            HUBO_FALLO=1
+          fi
+
+          # 2. VALIDEZ, raiz por raiz. Y ESTA MITAD NO ES INERTE, al reves de lo
+          # que decia la primera version de este comentario. El `-backend=false`
+          # dice que no se inicializa el state remoto —ni bucket, ni credenciales,
+          # ni despliegue previo—, que es mas angosto que "no ejecuta nada": init
+          # descarga los providers y modulos que declaran los .tf de ESTE arbol (un
+          # required_providers nombra el host de registry que quiera, un source de
+          # modulo puede ser git:: o http) y validate arranca esos binarios de
+          # provider para leerles el schema.
+          #
+          # Por eso bajo pull_request_target esta mitad NO CORRE: ahi el arbol es
+          # el head de un PR que puede ser de un fork y el token y los secretos son
+          # los del repo llamador, o sea la combinacion exacta que el bloque
+          # PULL_REQUEST_TARGET del encabezado del job cambios declara cerrada.
+          # Bajo pull_request el mismo trabajo si corre, y es el trato normal de
+          # cualquier CI de Terraform: token de solo lectura y sin secretos.
+          #
+          # El recorte se ANUNCIA. Un check que se achica en silencio bajo un
+          # evento es un verde que nadie sabe leer.
+          if [ "${EVENTO}" = "pull_request_target" ]; then
+            echo "::notice::bajo pull_request_target este paso verifica FORMATO y no validez: 'terraform init' descarga providers y modulos que eligen los .tf del PR y 'terraform validate' los ejecuta para leerles el schema, y bajo ese evento el token y los secretos son los del repo llamador. Lo que quedo sin verificar es la validez de ${RAICES}. Si necesitas validate sobre PRs de fork, corrilo en un workflow aparte disparado por pull_request, que trae token de solo lectura y sin secretos"
+          else
+            for D in ${RAICES}; do
+              echo "::group::${D}: terraform init -backend=false && terraform validate"
+              if ! ( cd "${D}" && terraform init -backend=false -input=false -no-color && terraform validate -no-color ); then
+                echo "::endgroup::"
+                echo "::${GRAVEDAD}::terraform validate fallo en '${D}'. Reproducilo local con: cd ${D} && terraform init -backend=false && terraform validate"
+                HUBO_FALLO=1
+                continue
+              fi
+              echo "::endgroup::"
+            done
+          fi
+
+          if [ "${HUBO_FALLO}" -eq 1 ] && [ "${GRAVEDAD}" = "error" ]; then exit 1; fi
+
   # Veredicto agregado DEL MARCO. Reporta siempre (docs o codigo). No conoce el
   # build/test del producto: ese lo agrega el ci-ok del repo consumidor, que es
   # el check requerido por el ruleset.
+  #
   marco_ok:
     name: marco-ok
-    needs: [cambios, openspec, deltas, higiene, constitucion_cableada]
+    needs: [cambios, openspec, deltas, higiene, constitucion_cableada, terraform]
     if: always()
     # 5 minutos: este job no hace checkout ni toca la red, solo lee los resultados de
     # sus needs. Si tarda mas que esto es que se colgo el runner, no el veredicto.
@@ -3590,6 +4081,17 @@ jobs:
           [ "${{ needs.cambios.result }}" = "success" ] || { echo "::error::la deteccion de cambios fallo"; exit 1; }
           [ "${{ needs.openspec.result }}" = "success" ] || { echo "::error::la validacion de OpenSpec fallo"; exit 1; }
           [ "${{ needs.higiene.result }}" = "success" ] || { echo "::error::los checks de higiene del marco fallaron"; exit 1; }
+          # El job terraform no tiene `if:`: corre siempre, y por lo tanto la sonda del
+          # distribuidor no le compra ningun salteo. "skipped" aca significa que alguien
+          # le puso un `if:`, y eso es apagarlo — la doc de GitHub dice que un job
+          # salteado reporta Success, asi que esta linea es la que convierte el salteo
+          # en rojo. Mientras la ventana del input ventana_terraform siga abierta sus
+          # hallazgos avisan y el job termina en success igual, o sea que un rojo suyo
+          # antes de esa fecha significa que no pudo medir, no que encontro algo.
+          [ "${{ needs.terraform.result }}" = "success" ] || {
+            echo "::error::la verificacion de las raices de Terraform termino en '${{ needs.terraform.result }}'. Ese job corre siempre y no se puede saltear: si dice 'skipped' es que alguien le agrego un if:, y si dice 'failure' mira su log — dentro de la ventana de gracia sus hallazgos solo avisan, asi que un rojo ahi adentro es que NO PUDO medir"
+            exit 1
+          }
 
           # LOS DOS JOBS QUE INVOCAN COMPOSITE ACTIONS DEL MARCO SE COBRAN IGUAL, y con
           # la MISMA sonda que decide su `if`. El salteo tiene UNA sola excusa valida
