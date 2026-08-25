@@ -615,8 +615,14 @@ jobs:
           TMP="$(mktemp -d)"
           node herramientas/projects-init.mjs --ejemplo > "${TMP}/valores.json"
           mkdir -p "${TMP}/repo"
+          # `--sin-arranque` ademas de `--sin-herramientas`: lo que este paso lintea son
+          # los .yml YA renderizados, y para eso no hace falta instalar dependencias ni
+          # generar el cliente de datos ni verificar el proyecto. Arrancarlo aca ataria
+          # un lint de sintaxis de workflows al registro de npm y a minutos de install:
+          # una caida del registro se leeria como "el andamio no pasa actionlint", que
+          # es exactamente el diagnostico equivocado.
           node herramientas/projects-init.mjs \
-            --valores "${TMP}/valores.json" --destino "${TMP}/repo" --sin-herramientas > /dev/null
+            --valores "${TMP}/valores.json" --destino "${TMP}/repo" --sin-herramientas --sin-arranque > /dev/null
 
           if [ ! -d "${TMP}/repo/.github/workflows" ]; then
             echo "::error::el andamio instanciado no dejo .github/workflows: o projects-init fallo, o el andamio dejo de repartir su pipeline. En los dos casos este paso NO declara verde"
