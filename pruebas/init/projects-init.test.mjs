@@ -35,6 +35,11 @@ import {
   avisosDelRegistroDeValores,
   RENOMBRES,
   destinoDe,
+  PASOS_DEL_ARRANQUE,
+  ejecutorDeScripts,
+  entornoDelArranque,
+  correrPaso,
+  lineasDelResumen,
 } from "../../herramientas/projects-init.mjs";
 
 // ---------------------------------------------------------------------------
@@ -85,12 +90,31 @@ function tmp(nombre) {
   return d;
 }
 
+/** LA BANDERA QUE LLEVAN TODAS LAS INVOCACIONES DE ESTE BANCO, y por que va en
+ *  los helpers y no suelta en cada llamada.
+ *
+ *  Desde que `projects init` ARRANCA el proyecto por su cuenta —instala,
+ *  formatea y verifica—, cualquier corrida que llegue al final del camino feliz
+ *  lanza un `pnpm install` de verdad sobre el destino: red, store y minutos. Los
+ *  casos de este banco deciden otra cosa (la copia, los marcadores, el rollback,
+ *  los dos procesos hijos), asi que lo apagan. Medido sin la bandera: el banco
+ *  paso de ~3 segundos a mas de 126 y hubo que matarlo.
+ *
+ *  El arranque tiene sus propios casos, mas abajo, con un gestor de paquetes de
+ *  mentira delante del PATH: es la unica forma de ver ROJO un paso del arranque
+ *  sin depender de que la maquina del banco tenga red.
+ *
+ *  Va en los helpers y no en cada llamada para que un caso NUEVO nazca rapido:
+ *  la version que dependiera de acordarse de escribirla estaria a un olvido de
+ *  volver a tardar dos minutos por caso. */
+const SIN_ARRANQUE = "--sin-arranque";
+
 /** Corre la CLI de verdad y devuelve codigo + salida junta. Un exit 0 tambien
  *  pasa por aca: el banco tiene que poder afirmar el camino feliz, no solo los
  *  rojos. */
 function correr(...args) {
   try {
-    const salida = execFileSync(process.execPath, [HERRAMIENTA, ...args], { encoding: "utf8", stdio: "pipe" });
+    const salida = execFileSync(process.execPath, [HERRAMIENTA, SIN_ARRANQUE, ...args], { encoding: "utf8", stdio: "pipe" });
     return { codigo: 0, salida };
   } catch (e) {
     return { codigo: e.status ?? -1, salida: `${e.stdout ?? ""}${e.stderr ?? ""}` };
@@ -662,6 +686,39 @@ test("un {{MARCADOR}} que ya estaba en el destino NO tumba la corrida", () => {
   assert.equal(fs.readFileSync(path.join(destino, "NOTAS.md"), "utf8"), "pendiente {{DECIDIR_ESTO}}\n");
 });
 
+// EL DIAGNOSTICO DE LA PROTECCION DE MAIN, de punta a punta.
+//
+// Este caso corre la sonda DE VERDAD contra la maquina donde se ejecuta el
+// banco, asi que no puede afirmar QUE estado sale: en un runner sin GH_TOKEN
+// sale "sin-auth", en una maquina sin `gh` sale "sin-gh", con `gh` autenticado y
+// un repo que no existe sale "sin-repo". Lo que SI afirma —y es lo que importa—
+// es que el documento del proyecto nuevo deja de ser una plantilla que declara
+// un estado que nadie comprobo: cualquiera sea la rama, queda con una medicion
+// fechada, sin el recuadro que manda aplicar cuatro reglas que pueden no existir
+// y sin la frase que las da por funcionando. Las siete ramas, una por una y con
+// su texto, se afirman en pruebas/init/proteccion.test.mjs.
+test("el documento de proteccion de main queda MEDIDO, no copiado", () => {
+  const destino = tmp("proteccion-medida");
+  const vals = valoresEn(destino);
+  const { codigo, salida } = correr("--valores", vals, "--destino", destino, "--sin-herramientas");
+  assert.equal(codigo, 0, salida);
+
+  const doc = fs.readFileSync(path.join(destino, ".github/proteccion-main.md"), "utf8");
+  assert.equal(doc.includes("🕳️"), false, "quedo el recuadro que manda aplicar las cuatro reglas sin haberlas medido");
+  assert.equal(doc.includes("Se encienden ahora."), false, "quedo la frase que afirma cuatro reglas funcionando");
+  assert.match(doc, /Esta sección la escribió `projects init` \*\*midiendo\*\*/);
+  assert.match(doc, new RegExp(`gh api repos/${VALORES_OK.ORG}/${VALORES_OK.PROYECTO}/rulesets`));
+  // Una de las tres formas de encabezar, y exactamente una.
+  const veredictos = [/sí puede\*\* tener protección de rama/, /no puede\*\* tener protección de rama hoy/, /No se pudo medir:/]
+    .filter((p) => p.test(doc));
+  assert.equal(veredictos.length, 1, `el documento quedo con ${veredictos.length} veredictos`);
+  // Y la herramienta lo dijo tambien por pantalla: nadie deberia tener que abrir
+  // el documento para enterarse de si el repo tiene compuerta.
+  assert.match(salida, /Proteccion de main:/);
+  // El agregado del final, que cierra el hueco del paso a paso.
+  assert.match(doc, /Y si esa sonda contesta 403/);
+});
+
 test("un --version-openspec con metacaracteres de shell muere ANTES de escribir nada", () => {
   // El vector real no es un atacante: es una linea que alguien copia y pega de un
   // runbook o de la salida de un agente. En Windows esa invocacion va por cmd.exe
@@ -995,9 +1052,40 @@ test("la unica entrada que puede llegar a un shell es el pin, y esta acotada", (
   // argumento interpolado ahi no romperia ninguna prueba de comportamiento, y el
   // repo tiene medido que ese es el modo de falla que solo ve quien no lo puede
   // depurar: el escapado es asimetrico por sistema operativo.
+  //
+  // ESTE CONTROL CAMBIO DE FORMA, y el motivo es que la version anterior no
+  // sobrevivia a que la herramienta lanzara un segundo proceso. Contaba las
+  // lineas con `shell:` y exigia que hubiera UNA. Desde que existe el arranque
+  // hay tres invocaciones —el sondeo del gestor de paquetes, el ejecutor de
+  // OpenSpec y cada paso del arranque— y las tres necesitan el shell en Windows
+  // por el mismo motivo (los ejecutables son .cmd, y spawnear un .cmd sin shell
+  // falla con EINVAL desde la correccion de CVE-2024-27980). Contarlas obligaba
+  // a subir el numero a mano en cada cambio, que es un control que se relaja
+  // solo. Lo que hay que sostener no es CUANTAS son sino QUE LES ENTRA: por eso
+  // ahora se audita el vector de argumentos de TODAS —lleven shell o no— contra
+  // una lista de residuos DECLARADOS, cada uno con por que es seguro.
+  //
+  // `shell: false` CUENTA COMO ACOTADO, y no es una excepcion que afloje este
+  // control: es mas estricto que lo que pide. No dice "shell solo en Windows",
+  // dice "shell en ningun lado". Lo usa la sonda de la proteccion de main, cuyo
+  // ejecutable (`gh`) se instala como .exe tambien en Windows y por lo tanto no
+  // necesita la excepcion de los .cmd que obliga a las otras tres invocaciones.
+  // Sin esta rama, la unica forma de pasar el control seria RELAJAR esa
+  // invocacion a `shell: true` en Windows — o sea, empeorarla para satisfacer a
+  // un guard que existe para endurecerlas.
   const conShell = LINEAS_DE_CODIGO.filter((l) => l.includes("shell:"));
-  assert.equal(conShell.length, 1, `hay ${conShell.length} invocaciones con shell: ${conShell.join(" || ")}`);
-  assert.match(conShell[0].trim(), /shell: process\.platform === "win32"/);
+  assert.ok(conShell.length >= 1, "no quedo ninguna invocacion con shell: este control dejo de mirar lo que cree que mira");
+  for (const linea of conShell) {
+    assert.match(
+      linea.trim(),
+      /shell: (process\.platform === "win32"|false)/,
+      `un shell que no esta acotado ni a Windows ni a nada: ${linea.trim()}`,
+    );
+  }
+  assert.ok(
+    conShell.some((l) => /shell: process\.platform === "win32"/.test(l)),
+    "no quedo ninguna invocacion con el shell acotado a Windows: si desaparecieron todas, este control y su motivo hay que releerlos antes de darlo por bueno",
+  );
 
   // Y ninguna forma de lanzar un proceso que reciba la linea de comandos entera
   // como un solo string, que es donde el escapado deja de existir.
@@ -1028,19 +1116,76 @@ test("la unica entrada que puede llegar a un shell es el pin, y esta acotada", (
   // Sobre `codigo` y no sobre FUENTE: el docblock de pinValido CITA esta misma
   // invocacion con un `...` en el medio para explicarla, y una prosa no es un
   // argumento que viaje a cmd.exe.
-  const invocaciones = [...codigo.matchAll(/execFileSync\("npx", \[([^\]]*)\]/g)];
-  assert.ok(
-    invocaciones.length >= 1,
-    "no encontre la invocacion de npx: si cambio de forma, este control dejo de mirar lo que cree que mira",
-  );
-  for (const inv of invocaciones) {
-    const sinLiterales = inv[1].replace(/"(?:[^"\\]|\\.)*"/g, "").replace(/[\s,]/g, "");
-    assert.equal(
-      sinLiterales,
+  //
+  // LOS RESIDUOS PERMITIDOS, uno por uno y con su motivo. Cualquier otro es
+  // rojo: agregar manana un argumento variable a cualquiera de estas
+  // invocaciones obliga a venir aca y escribir por que es seguro, que es
+  // exactamente la friccion que este control existe para poner.
+  const RESIDUOS = new Map([
+    ["", "el vector es 100% literal de este archivo: no hay nada de la persona adentro"],
+    [
       "`@fission-ai/openspec@${pin}`",
-      `en Windows esos argumentos van concatenados sin escapar, asi que el unico variable tiene que ser el ` +
-        `pin (que pinValido acota). Sobro esto: ${sinLiterales || "(nada)"} — en [${inv[1]}]`,
+      "el pin de OpenSpec, que pinValido acota a x.y.z antes de llegar aca (dos veces: la bandera y el valor resuelto)",
+    ],
+    [
+      "...ejecutor.prefijo...paso.args",
+      "los dos salen de constantes de este archivo (ejecutorDeScripts y PASOS_DEL_ARRANQUE) y no de ninguna entrada; " +
+        "los casos de mas abajo lo comprueban sobre los VALORES, que es lo que de verdad viaja",
+    ],
+    [
+      "path.join(raizMarco)",
+      "la ruta del script de la constitucion dentro del clon del marco; ademas esa invocacion no lleva shell",
+    ],
+    [
+      "`repos/${org}/${proyecto}/rulesets`",
+      "la ruta del repositorio en la sonda de proteccion de main. sondarProteccion valida las dos piezas " +
+        "inmediatamente antes contra FORMATOS.ORG.patron y FORMA_DE_REPO_EN_GITHUB, que no admiten ni un " +
+        "metacaracter de shell; y esa invocacion va con shell: false, asi que no pasa por cmd.exe en ningun " +
+        "sistema operativo. El caso de mas abajo lo comprueba sobre los VALORES",
+    ],
+  ]);
+  const invocaciones = [...codigo.matchAll(/execFileSync\(([^,]+),\s*\[([^\]]*)\]/g)];
+  assert.ok(
+    invocaciones.length >= 3,
+    `solo ${invocaciones.length} invocacion(es) de execFileSync: si cambiaron de forma, este control dejo de mirar lo que cree que mira`,
+  );
+  const conPin = invocaciones.filter((inv) => inv[2].includes("openspec@")).length;
+  assert.equal(conPin, 1, "no encontre la invocacion del ejecutor de paquetes con el pin: era la que este control nacio para acotar");
+  for (const inv of invocaciones) {
+    const sinLiterales = inv[2].replace(/"(?:[^"\\]|\\.)*"/g, "").replace(/[\s,]/g, "");
+    assert.ok(
+      RESIDUOS.has(sinLiterales),
+      `en Windows estos argumentos van concatenados sin escapar. Este vector deja un residuo variable no ` +
+        `declarado: ${sinLiterales || "(nada)"} — en execFileSync(${inv[1]}, [${inv[2]}]). Si es seguro, ` +
+        `agregalo a RESIDUOS con el motivo; si no, sacalo de ahi.`,
     );
+  }
+});
+
+test("lo que el arranque le pasa al shell son literales, medido sobre los VALORES", () => {
+  // ANTI-VACUIDAD del residuo `...ejecutor.prefijo...paso.args` de arriba: ese
+  // caso mira la FORMA del codigo y por si solo no dice nada sobre lo que corre.
+  // Esto mira los valores, que es lo unico que de verdad viaja a cmd.exe.
+  const conCorepack = ejecutorDeScripts(() => true);
+  assert.deepEqual(conCorepack, { comando: "corepack", prefijo: ["pnpm"], nombre: "corepack pnpm" });
+  const soloPnpm = ejecutorDeScripts((cmd) => cmd === "pnpm");
+  assert.deepEqual(soloPnpm, { comando: "pnpm", prefijo: [], nombre: "pnpm" });
+  assert.equal(ejecutorDeScripts(() => false), null, "sin gestor de paquetes tiene que devolver null, no un ejecutor inventado");
+
+  // Ni un metacaracter de shell en nada de lo que se concatena. La lista es la
+  // de cmd.exe y la del shell de POSIX juntas, porque la herramienta corre en
+  // los tres sistemas operativos.
+  const peligrosos = /[&|<>^"'`$;()\s]/;
+  for (const pieza of [conCorepack.comando, ...conCorepack.prefijo, soloPnpm.comando, ...soloPnpm.prefijo]) {
+    assert.equal(peligrosos.test(pieza), false, `"${pieza}" trae un caracter que en un shell no es texto`);
+  }
+  assert.ok(PASOS_DEL_ARRANQUE.length >= 1, "sin pasos, este caso no mide nada");
+  for (const paso of PASOS_DEL_ARRANQUE) {
+    assert.ok(Array.isArray(paso.args) && paso.args.length >= 1, `el paso ${paso.clave} no declara argumentos`);
+    for (const arg of paso.args) {
+      assert.equal(typeof arg, "string", `el paso ${paso.clave} declara un argumento que no es texto`);
+      assert.equal(peligrosos.test(arg), false, `el paso ${paso.clave} declara el argumento "${arg}", que en un shell no es texto`);
+    }
   }
 });
 
@@ -1096,7 +1241,7 @@ function marcoConAndamio(nombre, archivos) {
  *  lanzar ningun proceso hijo. `spawnSync` por el mismo motivo que
  *  `correrEnMarco`: hacen falta los dos flujos. */
 function correrEnMarcoPelado(marco, ...args) {
-  const r = spawnSync(process.execPath, [path.join(marco, "herramientas", "projects-init.mjs"), ...args], {
+  const r = spawnSync(process.execPath, [path.join(marco, "herramientas", "projects-init.mjs"), SIN_ARRANQUE, ...args], {
     encoding: "utf8",
   });
   return { codigo: r.status ?? -1, salida: `${r.stdout ?? ""}${r.stderr ?? ""}` };
@@ -1146,7 +1291,7 @@ const NPX_QUE_ESCRIBE = [
  *  emitido en el camino feliz —que es justo donde vive el de openspec/— era
  *  invisible para este banco. */
 function correrEnMarco(marco, bin, ...args) {
-  const r = spawnSync(process.execPath, [path.join(marco, "herramientas", "projects-init.mjs"), ...args], {
+  const r = spawnSync(process.execPath, [path.join(marco, "herramientas", "projects-init.mjs"), SIN_ARRANQUE, ...args], {
     encoding: "utf8",
     env: { ...process.env, PATH: `${bin}${path.delimiter}${process.env.PATH}` },
   });
@@ -1500,7 +1645,7 @@ test("la corrida completa avisa por stderr y sigue saliendo 0", () => {
   // falta ver los DOS flujos por separado, y execFileSync solo devuelve stdout.
   const destino = tmp("aviso-registro");
   const vals = valoresEn(destino);
-  const r = spawnSync(process.execPath, [HERRAMIENTA, "--valores", vals, "--destino", destino, "--sin-herramientas"], {
+  const r = spawnSync(process.execPath, [HERRAMIENTA, SIN_ARRANQUE, "--valores", vals, "--destino", destino, "--sin-herramientas"], {
     encoding: "utf8",
   });
   assert.equal(r.status, 0, r.stderr);
