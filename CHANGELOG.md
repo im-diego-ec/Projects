@@ -41,7 +41,64 @@ mueve sobre un cambio incompatible.
 
 ## [No publicado]
 
+### Añadido
+
+- **El stack se revisa solo al arrancar.** `herramientas/projects-versiones.mjs` compara
+  la versión que el proyecto tiene con la estable publicada y, si difieren, hace dos
+  preguntas en este orden: si querés actualizar, y si querés aplicarlo al stack entero.
+  Solo pregunta si hay una persona mirando (`process.stdin.isTTY`); en CI y en cualquier
+  tubería informa y sigue. **Sin red no se pone rojo** — no saber cuál es la última
+  versión no es un defecto del proyecto. Y **no toca el lockfile**: deja el comando
+  escrito. `herramientas/registro-npm.mjs` es el único punto que habla con la red, para
+  que el banco lo sustituya por `pruebas/init/registro-falso.mjs` y no dependa de
+  internet. Qué tiene que hacer un consumidor: nada.
+- **Documentación que se lee sin ser técnico, y un banco que lo vigila.**
+  `docs/empezar-sin-ser-tecnico.md`, `docs/paso-a-paso-sin-ser-tecnico.md`,
+  `docs/para-el-po.md`, `docs/stack.md` y un `docs/glosario.md` de 37 términos — cada
+  palabra que el resto de los documentos usaba sin explicar.
+  `pruebas/docs/estandar-de-lectura.test.mjs` mide los documentos de entrada contra el
+  estándar en vez de confiar en que alguien lo recuerde.
+
+### Cambiado
+
+- **El andamio pasa a TypeScript 7.0.2 y a Supabase Auth.** TS 7 en los tres paquetes
+  (`api`, `web`, `e2e`), con el *type-aware linting* comprobado metiéndole un error de
+  tipos a propósito, no solo declarado en un `package.json`. La autenticación verifica
+  **JWKS/RS256** con `jwtVerify` y `requiredClaims`, no un secreto compartido; Clerk
+  queda como alternativa documentada, no como dependencia. Qué tiene que hacer un
+  consumidor: nada — esto viaja al crear un proyecto nuevo, no reescribe uno existente.
+
+### Corregido
+
+- **Todo proyecto nacido del andamio arrancaba ROJO en su primer CI.**
+  `plantilla/.github/workflows/ci.yml` expandía `${RAICES}` sin comillas (SC2086). El
+  arreglo ya existía en el workflow del marco y faltaba portarlo a la copia que viaja.
+  Sobre un array, `${RAICES}` no es un detalle de estilo: expande el elemento 0 y nada
+  más — con dos raíces daba `[infra] [dos]` en vez de `[infra dos] [infra-prod]`.
+- **`actionlint` no miraba el andamio, que era justo donde estaba el error.** Descubre
+  workflows mirando **solo** `.github/workflows/` de la raíz, así que «actionlint limpio»
+  era cierto y no decía nada sobre lo que se reparte. El job `higiene` ahora **instancia**
+  el andamio con los valores de ejemplo de la propia herramienta —tal cual no se puede
+  lintear: sus marcadores `{{ASI}}` son sintaxis rota para shellcheck (SC1083)— y lintea
+  el resultado, que es exactamente lo que recibe un proyecto nuevo. Comprobado que muerde:
+  devolviendo el defecto a propósito, el paso sale 1.
+
 ### Seguridad
+
+- **El andamio repartía un documento que afirmaba compuertas que el repositorio
+  desmiente.** `projects init` copiaba `.github/proteccion-main.md` tal cual; ese
+  documento se presenta como «el estado real» y manda aplicar cuatro reglas. Medido:
+  `gh api repos/<org>/<repo>/rulesets` responde **403 «Upgrade to GitHub Pro or make this
+  repository public»**, o sea que las cuatro reglas no existen y **no pueden** existir en
+  un repo privado del plan gratuito. Eso es fallar abierto: no hay compuerta y ningún
+  texto lo dice. Ahora se **mide**, no se pregunta — preguntar «¿tenés GitHub Pro?» falla
+  de tres formas (no lo sabe, lo sabe mal, o el plan cambia y nadie vuelve a preguntar) y
+  las tres escriben una afirmación que nadie comprobó. Y **«no pude mirar» es un tercer
+  estado**, no un sinónimo de «no hay problema»: sin `gh`, sin autenticación o sin red se
+  escribe que no se midió y no se afirma nada. La sonda es un **GET de solo lectura** y no
+  aplica el ruleset: un programa con permiso para editar la protección de `main` es un
+  programa con permiso para quitarla. Deja el comando escrito, con las tres salidas y su
+  costo. Banco: `pruebas/init/proteccion.test.mjs`.
 
 - **Un consumidor llamado `<su-cuenta>/Projects` se salteaba la compuerta de la
   constitución, y el veredicto agregado le aceptaba el salteo en silencio.** El `if` de
