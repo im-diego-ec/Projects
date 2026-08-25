@@ -1,7 +1,8 @@
 # {{PROYECTO}}
 
-> **Este archivo llega del scaffold con la estructura puesta y los valores del proyecto ya
-> sustituidos, pero con varios huecos marcados `RELLENAR`.** Son las respuestas que ninguna
+> **Este archivo lo genera la herramienta que creó el repositorio: llega con la estructura
+> puesta y los valores del proyecto ya sustituidos, pero con varios huecos marcados
+> `RELLENAR`.** Son las respuestas que ninguna
 > herramienta puede inventar, y cuántos son lo dice el comando, no esta línea:
 >
 > ```bash
@@ -84,13 +85,15 @@ cambio a producción tiene un responsable con nombre.
 
 ## Quién revisa qué
 
-El review cruzado está automatizado en `.github/CODEOWNERS` y no depende de que nadie se
-acuerde:
+Quién tiene que aprobar cada archivo está escrito en `.github/CODEOWNERS` —un archivo que
+GitHub lee solo para asignar los revisores de cada pull request—, así que el reparto no
+depende de que nadie se acuerde:
 
-- Todo el código lo revisa el equipo de builders (**@{{BUILDER_1}}**, **@{{BUILDER_2}}**):
-  el que no escribió, revisa.
-- Las propuestas y los contratos de `openspec/` los aprueba el PO (**@{{PO}}**), y esa
-  aprobación es un gate propio que un builder no puede satisfacer.
+- Todo el código lo revisa quien no lo escribió (**@{{BUILDER_1}}**, **@{{BUILDER_2}}**,
+  las personas que programan en este proyecto).
+- Las propuestas y los acuerdos escritos de `openspec/` los aprueba **@{{PO}}**, que es
+  quien decide qué se construye. Es una aprobación aparte: por más que las dos personas
+  que programan aprueben el cambio, sin esta el pull request no se puede mergear.
 
 Si un PR no se auto-asigna a nadie, el problema no es del PR: es que el equipo no tiene
 permiso de escritura sobre el repositorio, y GitHub no lo reporta. Se comprueba así:
@@ -101,10 +104,14 @@ gh api repos/{{ORG}}/{{PROYECTO}}/teams --jq '.[] | "\(.slug): \(.permission)"'
 
 ## Cómo se verifica un cambio
 
-El único check requerido para mergear a `main` se llama **`ci-ok`**. Es un veredicto
-agregado, y eso es deliberado: en un cambio de solo documentación el trabajo de build y
-pruebas se omite, y un check omitido nunca reporta —el merge quedaría esperando para
-siempre una señal que no va a llegar—. `ci-ok` reporta en los dos carriles.
+La única comprobación obligatoria para mergear a `main` se llama **`ci-ok`**. No hace
+trabajo propio: mira el resultado de todas las demás y las resume en un sí o un no.
+
+Eso es deliberado. En un cambio que solo toca documentación, compilar y correr las pruebas
+no tiene sentido y esos pasos se saltean; pero un paso salteado **nunca informa un
+resultado**, así que si la regla exigiera ese paso, el pull request se quedaría esperando
+para siempre una respuesta que no va a llegar. `ci-ok` sí responde en los dos casos —el
+cambio de código y el de solo documentación—, y por eso es el único que se exige.
 
 Parte del pipeline llega por referencia al marco de ingeniería
 (`{{ORG}}/Projects`), pinado por versión exacta: una versión nueva entra como PR y se

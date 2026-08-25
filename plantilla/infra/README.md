@@ -38,10 +38,12 @@ la base compartida y la referencia a la red. No hay que tocar nada de eso.
 **Sin resolver, en `pendientes.tf`**: seis. Cada uno dice qué falta, **con qué
 criterio se decide** y qué garantía del marco queda sin cumplir si no se hace.
 
-⚠️ **Todavía no hay compuerta**: el pipeline **no** se pone rojo por estos
+⚠️ **Todavía no hay compuerta** —una comprobación que bloquea el merge—: el pipeline
+**no** se pone rojo por estos
 pendientes. Es a propósito —un token que cuenta desde el día uno pondría rojo a un
 repositorio recién nacido por decisiones que todavía no puede tomar— y la
-compuerta llega con el change del despliegue. Hasta entonces se revisa a mano:
+compuerta llega con el change —la propuesta escrita— del despliegue. Hasta entonces se
+revisa a mano:
 `grep -rn PENDIENTE-INFRA infra infra-prod`.
 
 Dos de los seis —el bucket del state y el identificador del cluster— se parecen

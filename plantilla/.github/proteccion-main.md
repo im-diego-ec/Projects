@@ -9,8 +9,9 @@ configuración.
 > 🕳️ **Al crear el repo**: aplicá las cuatro reglas del primer bloque, pasá esos
 > 🔴 a 🟢 con la fecha, escribí el motivo de las diferidas, y borrá este recuadro.
 >
-> **Y no antes de que el CI haya corrido una vez:** el check `ci-ok` no aparece en
-> la lista de checks disponibles del ruleset hasta que exista una corrida que lo
+> **Y no antes de que el CI haya corrido una vez:** la comprobación `ci-ok` no aparece
+> en la lista que ofrece el *ruleset* —el conjunto de reglas de GitHub que protege una
+> rama— hasta que exista una corrida que la
 > haya reportado. El bootstrap entra a `main` por push directo; la protección se
 > aplica después.
 
@@ -32,8 +33,8 @@ protección** — no en un TODO aparte:
 
 | Regla                          | Estado      | Por qué no todavía                                                                                                                                                       |
 | ------------------------------ | ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| 1 aprobación requerida         | 🔴 diferida | Con un solo builder efectivo, exigir una aprobación y dejar la bypass list vacía **bloquea todo merge sin salida**. Se enciende cuando el segundo builder esté operativo |
-| Review de code owner requerido | 🔴 diferida | Es lo que convierte `CODEOWNERS` en gate; sin la fila de arriba no agrega nada, y con el equipo del PO vacío tampoco asignaría a nadie                                   |
+| 1 aprobación requerida         | 🔴 diferida | Con una sola persona programando, exigir la aprobación de otra y no dejar a nadie en la lista de excepciones **bloquea todo merge sin salida**. Se enciende cuando haya una segunda persona |
+| Review de code owner requerido | 🔴 diferida | Es lo que convierte `CODEOWNERS` —el archivo que dice quién aprueba qué— en una condición real de merge; sin la fila de arriba no agrega nada, y con el equipo vacío no asignaría a nadie |
 | Rama al día antes del merge    | 🔴 diferida | Útil con varios PRs en vuelo; con uno solo agrega una vuelta de CI por merge                                                                                             |
 | Commits firmados               | 🔴 diferida | Exige que cada quien tenga su clave configurada; se enciende cuando todos la tengan, no antes                                                                            |
 
@@ -47,11 +48,12 @@ motivo y el issue que lo rastrea. Nunca se omite ni se presenta como activo.
 
 ## El check requerido es `ci-ok`, y no es un detalle
 
-`ci-ok` es el veredicto agregado de `.github/workflows/ci.yml`: corre con
-`if: always()` y **reporta en los dos carriles**, el de código y el de docs.
+`ci-ok` no hace trabajo propio: mira el resultado de todo lo demás que corre en
+`.github/workflows/ci.yml` y lo resume en un sí o un no. Corre con `if: always()`
+y **responde en los dos casos**, el cambio de código y el de solo documentación.
 
-Exigir un job que solo reporta en un carril —`build-test`, que en un PR de solo
-documentación queda `skipped`— deja ese carril bloqueado para siempre esperando
+Exigir un trabajo que solo responde en uno de los dos —`build-test`, que en un pull
+request de solo documentación queda salteado— deja ese caso bloqueado para siempre esperando
 una señal que nunca llega. Un check `skipped` **no reporta**. Es el error más
 caro y más silencioso de la configuración inicial.
 

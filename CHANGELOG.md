@@ -70,6 +70,21 @@ mueve sobre un cambio incompatible.
 
 ### Corregido
 
+- **Lo que el andamio le reparte al consumidor no tenía ninguna regla de lectura encima.**
+  El estándar de lectura mide `docs/` y el `README.md` de la raíz, y su regla es enlazar
+  cada palabra del vocabulario al glosario. Esa regla **no se puede aplicar a lo que
+  viaja**: el glosario vive en `docs/` del marco y no se copia — medido, de los 10 `.md`
+  que recibe un proyecto nuevo, ninguno es un glosario—, así que un enlace nacería roto el
+  día uno. Y sin embargo son las páginas que más lee alguien que no es técnico: el
+  `README.md` del repositorio donde aterriza, la plantilla que se abre en **cada** pull
+  request, y el documento de la protección de `main`. Se reescribieron explicando el
+  vocabulario **en la propia página** —«ci-ok no hace trabajo propio: mira el resultado de
+  todas las demás y las resume en un sí o un no»— y la regla quedó fijada en
+  `pruebas/docs/lo-que-lee-el-consumidor.test.mjs`: cada término del marco que use una
+  página que viaja va declarado, o con la frase que lo explica (y el banco comprueba que
+  esa frase esté de verdad en el texto), o con el motivo por el que no la necesita. Un
+  `.md` nuevo en el andamio obliga a clasificarlo. Comprobado que muerde por los dos
+  lados.
 - **El arranque automático moría en una máquina limpia — la única que corepack existe
   para cubrir.** Medido en un runner de CI sin `pnpm` global: el paso 1
   (`corepack pnpm install`) pasaba y el 2 se cortaba con `sh: pnpm: not found`. La causa
