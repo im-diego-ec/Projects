@@ -3985,16 +3985,19 @@ jobs:
             exit 1
           fi
 
-          RAICES=""
+          # Array y no cadena: sin comillas una raiz con espacio se parte, y con
+          # comillas se pasarian todas como UN argumento. El array es lo unico que
+          # no obliga a elegir entre los dos fallos.
+          RAICES=()
           for D in ${RAICES_DECLARADAS}; do
-            if [ -d "${D}" ]; then RAICES="${RAICES}${RAICES:+ }${D}"; fi
+            if [ -d "${D}" ]; then RAICES+=("${D}"); fi
           done
 
-          if [ -z "${RAICES}" ]; then
+          if [ ${#RAICES[@]} -eq 0 ]; then
             echo "::notice::no hay raices de Terraform en este repositorio (se buscaron: ${RAICES_DECLARADAS}): no se verifico infraestructura porque no hay ninguna. Si tus raices se llaman de otra forma, declaralas en el input raices_terraform del uses: de marco-ci.yml"
             exit 0
           fi
-          echo "raices de Terraform encontradas: ${RAICES}"
+          echo "raices de Terraform encontradas: ${RAICES[*]}"
 
           # La gravedad se DERIVA del reloj, y se deriva ANTES de mirar si hay
           # binario: el binario ausente comparte la ventana con los otros dos
@@ -4008,7 +4011,7 @@ jobs:
           fi
 
           if ! command -v terraform >/dev/null 2>&1; then
-            echo "::${GRAVEDAD}::hay raices de Terraform (${RAICES}) y este runner no trae el binario, asi que NO se verifico formato ni validez. Este es un fallo DEL MARCO y no de tu repo: el paso que garantiza el binario es un hashicorp/setup-terraform pinado por SHA que este job todavia no lleva. El SHA ya esta resuelto y escrito en el encabezado de este job, junto con los dos comandos que lo rehacen y con el motivo por el que agregar el paso va en su propio cambio. Si ademas usas un runner propio, garantiza 'terraform' en el PATH antes de llamar a este workflow"
+            echo "::${GRAVEDAD}::hay raices de Terraform (${RAICES[*]}) y este runner no trae el binario, asi que NO se verifico formato ni validez. Este es un fallo DEL MARCO y no de tu repo: el paso que garantiza el binario es un hashicorp/setup-terraform pinado por SHA que este job todavia no lleva. El SHA ya esta resuelto y escrito en el encabezado de este job, junto con los dos comandos que lo rehacen y con el motivo por el que agregar el paso va en su propio cambio. Si ademas usas un runner propio, garantiza 'terraform' en el PATH antes de llamar a este workflow"
             if [ "${GRAVEDAD}" = "error" ]; then exit 1; fi
             exit 0
           fi
@@ -4017,8 +4020,8 @@ jobs:
           HUBO_FALLO=0
 
           # 1. FORMATO. Solo lee texto: ni providers, ni red, ni credenciales.
-          if ! terraform fmt -check -recursive -no-color ${RAICES}; then
-            echo "::${GRAVEDAD}::hay archivos de Terraform sin formatear (la lista esta arriba, un archivo por linea). Arreglo: corre 'terraform fmt -recursive ${RAICES}' y commitea el resultado"
+          if ! terraform fmt -check -recursive -no-color "${RAICES[@]}"; then
+            echo "::${GRAVEDAD}::hay archivos de Terraform sin formatear (la lista esta arriba, un archivo por linea). Arreglo: corre 'terraform fmt -recursive ${RAICES[*]}' y commitea el resultado"
             HUBO_FALLO=1
           fi
 
@@ -4041,9 +4044,9 @@ jobs:
           # El recorte se ANUNCIA. Un check que se achica en silencio bajo un
           # evento es un verde que nadie sabe leer.
           if [ "${EVENTO}" = "pull_request_target" ]; then
-            echo "::notice::bajo pull_request_target este paso verifica FORMATO y no validez: 'terraform init' descarga providers y modulos que eligen los .tf del PR y 'terraform validate' los ejecuta para leerles el schema, y bajo ese evento el token y los secretos son los del repo llamador. Lo que quedo sin verificar es la validez de ${RAICES}. Si necesitas validate sobre PRs de fork, corrilo en un workflow aparte disparado por pull_request, que trae token de solo lectura y sin secretos"
+            echo "::notice::bajo pull_request_target este paso verifica FORMATO y no validez: 'terraform init' descarga providers y modulos que eligen los .tf del PR y 'terraform validate' los ejecuta para leerles el schema, y bajo ese evento el token y los secretos son los del repo llamador. Lo que quedo sin verificar es la validez de ${RAICES[*]}. Si necesitas validate sobre PRs de fork, corrilo en un workflow aparte disparado por pull_request, que trae token de solo lectura y sin secretos"
           else
-            for D in ${RAICES}; do
+            for D in "${RAICES[@]}"; do
               echo "::group::${D}: terraform init -backend=false && terraform validate"
               if ! ( cd "${D}" && terraform init -backend=false -input=false -no-color && terraform validate -no-color ); then
                 echo "::endgroup::"
