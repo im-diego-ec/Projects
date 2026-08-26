@@ -1,7 +1,8 @@
 # Introducción
 
-**Empezá por acá.** Es la primera de doce páginas numeradas, y el número dice en
-qué lugar del camino va cada una — no cuánto importa.
+**Empezá por acá.** Es la primera de una serie numerada, y el número dice en qué
+lugar del camino va cada una — no cuánto importa. Cuántas son lo dice la carpeta,
+no esta línea.
 
 Esta página es para quien tiene que **entender y aplicar** este marco sin
 escribir código: un analista de negocio, alguien que recién ocupa el rol de

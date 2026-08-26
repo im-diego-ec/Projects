@@ -96,3 +96,69 @@ test("MUERDE: un conteo equivocado se caza", () => {
   assert.deepEqual(n, [12], "el detector tiene que ver el numero");
   assert.notEqual(n[0], COMANDOS_DEL_PROYECTO.length, "y 12 no puede ser el numero real, o este caso no mide nada");
 });
+
+// ---------------------------------------------------------------------------
+// LA TERCERA VEZ QUE UN NUMERO ESCRITO A MANO ENVEJECE SIN QUE NADA LO MIDA.
+//
+// Primero fueron «12 comandos y 12 skills» cuando eran 6 y 6. Despues «la
+// primera de doce paginas» cuando eran quince, y «el estandar mide 14 paginas»
+// cuando mide diecisiete. Las tres veces el defecto es el mismo: una cifra
+// escrita al lado de algo que otra cosa decide, sin nada que las compare.
+//
+// La regla del repositorio ya existe y la aplica la pagina del stack: ahi los
+// numeros NO se escriben, se imprimen con un comando. Este banco extiende esa
+// regla a las cifras que hablan de la propia documentacion.
+// ---------------------------------------------------------------------------
+
+/** Cifras que la documentacion afirma sobre si misma, con como se miden.
+ *
+ *  Cada entrada es un patron que caza la afirmacion y una funcion que devuelve
+ *  el numero de verdad. Si el patron no aparece en ningun lado, no pasa nada: la
+ *  pagina dejo de afirmarlo, que es justamente lo que se prefiere. */
+const CIFRAS_SOBRE_SI_MISMA = [
+  {
+    nombre: "paginas de la raiz de docs/ mas el README",
+    patron: /el est(á|a)ndar mide \*\*(\d+) p(á|a)ginas\*\*/gi,
+    grupo: 2,
+    medir: async () => (await import("./lectura.mjs")).paginasDelAlcance().length,
+  },
+  {
+    nombre: "paginas numeradas del camino",
+    patron: /la primera de (\d+) p(á|a)ginas numeradas/gi,
+    grupo: 1,
+    medir: () =>
+      execFileSync("git", ["ls-files", "docs/*.md"], { cwd: RAIZ, encoding: "utf-8" })
+        .trim()
+        .split("\n")
+        .filter((f) => /\/\d\d-/.test(f)).length,
+  },
+];
+
+test("ninguna cifra que la documentacion afirma sobre si misma esta vieja", async () => {
+  const mal = [];
+  for (const f of docs()) {
+    const texto = fs.readFileSync(path.join(RAIZ, f), "utf-8");
+    for (const cifra of CIFRAS_SOBRE_SI_MISMA) {
+      for (const m of texto.matchAll(cifra.patron)) {
+        const dice = Number(m[cifra.grupo]);
+        const real = await cifra.medir();
+        if (dice !== real) mal.push(`${f} → dice ${dice} y son ${real} (${cifra.nombre})`);
+      }
+    }
+  }
+  assert.deepEqual(
+    mal,
+    [],
+    "es la tercera vez que pasa lo mismo: un numero escrito a mano al lado de algo que otra cosa decide. La salida no " +
+      "es corregirlo otra vez, es dejar de escribirlo — la pagina del stack ya lo resuelve publicando el comando que lo " +
+      `imprime.\n  ${mal.join("\n  ")}`,
+  );
+});
+
+test("MUERDE: una cifra vieja se caza", async () => {
+  const inventado = "El estándar mide **999 páginas**: el README y las demás.";
+  const cifra = CIFRAS_SOBRE_SI_MISMA[0];
+  const encontradas = [...inventado.matchAll(cifra.patron)].map((m) => Number(m[cifra.grupo]));
+  assert.deepEqual(encontradas, [999], "el detector tiene que ver la cifra");
+  assert.notEqual(await cifra.medir(), 999, "y 999 no puede ser el numero real, o este caso no mide nada");
+});

@@ -18,7 +18,8 @@ Lo que se hace acá y quién lo aprueba, que no es lo mismo:
 | `tasks.md` — los pasos, en orden | el otro builder |
 
 **Palabras del marco que vas a ver acá**, cada una definida en una línea en el
-[glosario](02-glosario.md): [ADR](02-glosario.md), [andamio](02-glosario.md), [archive](02-glosario.md), [carril](02-glosario.md), [change](02-glosario.md), [CODEOWNERS](02-glosario.md), [constitución](02-glosario.md), [delta](02-glosario.md), [PRD](02-glosario.md), [proposal](02-glosario.md), [spec](02-glosario.md).
+[glosario](02-glosario.md): [ADR](02-glosario.md), [andamio](02-glosario.md), [archive](02-glosario.md), [carril](02-glosario.md), [change](02-glosario.md), [CODEOWNERS](02-glosario.md), [constitución](02-glosario.md), [delta](02-glosario.md), [PRD](02-glosario.md), [proposal](02-glosario.md), [spec](02-glosario.md),
+[requirement](02-glosario.md), [scenario](02-glosario.md), [SHALL](02-glosario.md).
 
 Esa tabla está en `.github/CODEOWNERS` y GitHub la hace cumplir sin que nadie se
 acuerde. Lo que sigue explica cómo se escribe cada parte; qué te toca a vos y qué
@@ -160,6 +161,52 @@ apuntando al intermediario en vez de a la fuente.
 
 ⚠️ **Crear el change deja el CI rojo hasta que tenga su delta.** Se crea y se completa en la
 misma sesión, o se trabaja en una rama sin PR abierto todavía.
+
+### La trampa del castellano, y es la que más cuesta descubrir sola
+
+**Todo se escribe en castellano menos una palabra.** La línea que declara qué tiene que
+hacer el sistema —el [requirement](02-glosario.md)— necesita la palabra
+**[`SHALL`](02-glosario.md)** o **`MUST`**, en
+inglés y en mayúsculas. No es un gusto: es lo que el validador busca para reconocerla, y
+ese validador es el que corre en las verificaciones automáticas.
+
+Medido con el validador que este marco usa:
+
+```text
+"El sistema DEBE avisar al responsable..."    ->  falla, exit 1
+"El sistema SHALL avisar al responsable..."   ->  pasa,  exit 0
+```
+
+Y el error que te va a dar **no menciona la palabra**: dice que el change no valida, sin
+decir cuál es el renglón. Es la trampa que más cuesta descubrir por cuenta propia.
+
+**Un delta completo, para copiar la forma.** Los tres encabezados son obligatorios y van
+en ese orden — `## ADDED Requirements`, `### Requirement:` y `#### Scenario:`:
+
+```markdown
+# recepcion-de-mercaderia — Delta
+
+## ADDED Requirements
+
+### Requirement: La recepción registra quién recibió y cuándo
+
+El sistema SHALL registrar, por cada entrega recibida, la persona que la recibió y
+la fecha y hora en que ocurrió.
+
+#### Scenario: Se recibe una entrega completa
+
+- **WHEN** el encargado marca una entrega como recibida
+- **THEN** queda guardada la persona y el momento
+- **AND** la entrega deja de aparecer en la lista de pendientes
+
+#### Scenario: Se recibe una entrega incompleta
+
+- **WHEN** el encargado marca una entrega como recibida con faltantes
+- **THEN** queda guardada igual, y además qué faltó
+```
+
+Todo lo demás —el título, lo que dice el requirement, los escenarios— va en castellano.
+Lo único en inglés son las tres palabras de estructura y el `SHALL`.
 
 ### 8 · La tercera columna, y con eso el PR
 
