@@ -7,7 +7,7 @@ cuando alguien la busca, y por eso esta página existe.
 **De dónde sale esto, y de dónde no.** El mecanismo está medido en este árbol: los
 comandos de más abajo enumeran, hoy, cada línea que lleva la cuenta escrita a mano.
 Lo que **no** hay es un incidente registrado —ni entrada de CHANGELOG, ni fila de
-[08-reglas-no-escritas.md](08-reglas-no-escritas.md), ni commit— de que esto le haya pasado
+[10-reglas-no-escritas.md](10-reglas-no-escritas.md), ni commit— de que esto le haya pasado
 a alguien. La página se sostiene por lo que se puede contar con `grep`, no por una
 anécdota.
 
@@ -143,7 +143,7 @@ la lógica.
   → Code security → Dependabot → repository access`), no del repo. Sin eso los
   consumidores no reciben PRs de bump — y como el PR de bump **es** el canal de
   distribución y el censo, el fork queda sin canal y sin censo, en silencio. Ver
-  [10-censo-de-consumidores.md](10-censo-de-consumidores.md).
+  [12-censo-de-consumidores.md](12-censo-de-consumidores.md).
 - **El secret `AVISO_VERSION_DESTINO`.** Los secrets no se forkean. Sin él, cada
   release del fork se publica sin avisarle a ningún consumidor; el workflow lo dice
   con un `::warning::` ruidoso y deja el mensaje en el resumen de la corrida, así que
