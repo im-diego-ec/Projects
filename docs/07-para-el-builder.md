@@ -169,7 +169,7 @@ cinco minutos.
 - [06-para-el-po.md](06-para-el-po.md) — la otra mitad de este reparto: qué
   aprueba el PO, cómo lee un spec y con qué preguntas lo devuelve. Aunque hagas
   los dos roles, vale leerla como el rol que no estás ocupando.
-- [08-reglas-no-escritas.md](08-reglas-no-escritas.md) — las reglas que el equipo
+- [10-reglas-no-escritas.md](10-reglas-no-escritas.md) — las reglas que el equipo
   practica y ningún archivo declaraba, con cuáles ya son automáticas y cuáles
   todavía dependen de que alguien se acuerde.
 - [05-arrancar-tecnico.md](05-arrancar-tecnico.md) — si además te toca crear el

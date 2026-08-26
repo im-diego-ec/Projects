@@ -11,7 +11,7 @@ marco.
 
 > **Este archivo está VACÍO a propósito y eso no significa «cero consumidores».**
 > Significa que ninguna adopción pasó todavía por él. Es la mitad barata de la
-> recomendación B1 de [10-censo-de-consumidores.md](10-censo-de-consumidores.md): el lugar
+> recomendación B1 de [12-censo-de-consumidores.md](12-censo-de-consumidores.md): el lugar
 > donde se escribe la línea existe; **lo que falta es lo que la escribe**, y eso vive
 > en `herramientas/projects-init.mjs`. Leer una tabla vacía como «nadie consume el
 > marco» sería exactamente el fail-open que el censo denuncia — un escaneo que no
@@ -23,7 +23,7 @@ El marco no puede razonar sobre su propio impacto si no sabe quién lo consume: 
 quién le rompe un cambio breaking, quién quedó atrás de una corrección de seguridad,
 y si una regla nueva la está cumpliendo alguien. El diseño vigente para contestarlo
 —los PRs de bump de Dependabot **son** el censo— tiene un punto ciego estructural que
-[10-censo-de-consumidores.md](10-censo-de-consumidores.md) explica entero: depende del
+[12-censo-de-consumidores.md](12-censo-de-consumidores.md) explica entero: depende del
 comportamiento de un tercero que el marco no puede verificar, y si ese tercero deja de
 proponer bumps el censo no falla en rojo, se queda vacío y callado.
 

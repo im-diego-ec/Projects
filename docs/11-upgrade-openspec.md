@@ -148,7 +148,7 @@ Es la razón por la que este documento existe en vez de ser un comentario en
 el YAML.
 
 **Cómo volverlo automático** (entra al backlog de
-[08-reglas-no-escritas.md](08-reglas-no-escritas.md)): un job programado —
+[10-reglas-no-escritas.md](10-reglas-no-escritas.md)): un job programado —
 semanal, en el mismo día que corre Dependabot — que compare la última
 versión publicada contra el pin y **abra un issue** si difieren. No un PR
 automático: el upgrade incluye regenerar skills y revalidar todo, y eso
@@ -222,7 +222,7 @@ propio, va en la constitución del repo, no en un archivo generado.
 Una sola sesión, en una rama `chore/openspec-<version>`.
 
 1. **Rama desde `main` actualizado** (regla 8 de
-   [08-reglas-no-escritas.md](08-reglas-no-escritas.md)):
+   [10-reglas-no-escritas.md](10-reglas-no-escritas.md)):
 
    ```bash
    git checkout main && git pull --ff-only && git checkout -b chore/openspec-X.Y.Z

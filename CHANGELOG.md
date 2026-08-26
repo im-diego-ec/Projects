@@ -41,6 +41,30 @@ mueve sobre un cambio incompatible.
 
 ## [No publicado]
 
+### Cambiado
+
+- **La guía técnica tenía adentro el ciclo de trabajo entero, y se partió en tres.** Eran
+  **1429 líneas**, y su «Fase 7» ocupaba **547 de ellas — el 38%** contando algo que no es
+  arrancar un proyecto: cómo se descubre qué construir y cómo se construye. El corte no lo
+  inventó esta reorganización, ya estaba escrito adentro: la propia Fase 7 tenía un
+  subtítulo llamado *«Dos sesiones, y qué se hace en cada una»*, y sus ocho pasos se parten
+  solos en 1–6 (de los documentos del negocio a un **PRD**) y 7–8 (de ese PRD a un change y
+  a un pull request).
+  - **`08-descubrimiento.md`** — le habla al PO y es **la página que la auditoría dijo que
+    faltaba**: no existía ninguna dirigida a él para arrancar el descubrimiento. El
+    contenido ya estaba escrito y era bueno; lo que estaba mal era dónde vivía y a quién le
+    hablaba. Dice de frente lo que **no** te da: el descubrimiento llega hasta el PRD y no
+    hay ningún comando que convierta un PRD en un spec.
+  - **`09-construir-con-openspec.md`** — le habla al builder, empieza donde termina la
+    anterior, y abre con la tabla de quién aprueba cada parte del change, que es lo que
+    `.github/CODEOWNERS` hace cumplir.
+  - **`05-arrancar-tecnico.md`** baja a **882 líneas** y termina donde le corresponde: con
+    el repositorio sano. Cierra apuntando a las dos nuevas.
+
+  El camino de lectura queda como el ciclo real: **entender → arrancar → los dos roles →
+  descubrir → construir → cómo se trabaja**. Son 105 referencias reescritas en 31 archivos
+  para renumerar de la 11 a la 15, con **0 enlaces rotos**.
+
 ### Añadido
 
 - **`07-para-el-builder.md`: la hermana de la página del PO, que faltaba.** El reparto
