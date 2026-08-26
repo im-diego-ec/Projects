@@ -103,6 +103,7 @@ import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { execFileSync } from "node:child_process";
+import readline from "node:readline";
 
 /** ESTE archivo y su directorio, resueltos con `fileURLToPath(import.meta.url)`
  *  y NO con `import.meta.dirname`.
@@ -1588,6 +1589,8 @@ function argumentos(argv) {
     else if (argv[i] === "--sin-arranque") o.arranque = false;
     else if (argv[i] === "--forzar") o.forzar = true;
     else if (argv[i] === "--ejemplo") o.ejemplo = true;
+    else if (argv[i] === "--asistente") o.asistente = true;
+    else if (argv[i] === "--solo-valores") o.soloValores = valorDeBandera(argv, ++i, "--solo-valores");
     else if (argv[i] === "--version-openspec") o.versionOpenspec = valorDeBandera(argv, ++i, "--version-openspec");
     // `--help` y `-h` son lo PRIMERO que tipea cualquiera frente a una
     // herramienta que no conoce, y hasta este cambio caian en el `throw` de
@@ -1617,6 +1620,13 @@ function lineasDeUso() {
     "                             se hacia antes. Util cuando no hay red o se quiere revisar",
     "                             el arbol escrito antes de bajar una sola dependencia",
     "  --forzar                   sobreescribe un destino que ya tiene archivos del andamio",
+    "  --asistente                te PREGUNTA las decisiones en castellano y escribe el archivo de",
+    "                             valores por vos. Es el camino del PO: 8 preguntas en el caso",
+    "                             simple, en vez de 21 casillas a mano. Con --valores usa lo que ya",
+    "                             hay como respuesta por defecto, asi que volver a correrlo no",
+    "                             obliga a contestar todo de nuevo",
+    "  --solo-valores <ruta.json> con --asistente: escribe el archivo de valores y NO arma nada. Es",
+    "                             el gemelo interactivo de --ejemplo",
     "  --version-openspec <x.y.z> pin del CLI de OpenSpec cuando no se puede leer del default de",
     "                             `version_openspec` en marco-ci.yml. Version EXACTA (0.9.4), no",
     "                             un rango: el valor se concatena en la linea de comandos de npx",
@@ -1714,6 +1724,97 @@ async function main(argv) {
     process.stdout.write(JSON.stringify(EJEMPLO, null, 2) + "\n");
     return 0;
   }
+  // EL CAMINO DEL PO. `--valores` es el camino del builder: ya decidiste y lo
+  // escribiste. Este pregunta y ESCRIBE ESE MISMO ARCHIVO — no es una segunda
+  // puerta al motor, es un generador de la entrada que el motor ya acepta. Todo
+  // lo que sigue mas abajo corre igual para los dos.
+  if (o.asistente) {
+    const asis = await import("./projects-asistente.mjs");
+    const versiones = await import("./projects-versiones.mjs");
+
+    // Se pregunta por STDIN y no por stdout: lo que hace falta para una pregunta
+    // es que haya alguien que pueda CONTESTAR. Con la salida redirigida a un
+    // archivo y el teclado disponible, preguntar sigue teniendo sentido; al
+    // reves —salida a la terminal y stdin cerrado, que es como corre un paso de
+    // CI— la pregunta no la contesta nadie nunca.
+    if (!versiones.hayTerminal()) {
+      console.error("::error::--asistente necesita a alguien que conteste, y stdin no es una terminal. No se escribio nada.");
+      console.error("Estas son las preguntas que iba a hacer:");
+      for (const p of asis.PREGUNTAS) console.error(`  - ${typeof p.texto === "function" ? p.texto({}) : p.texto}`);
+      console.error("");
+      console.error("En una tuberia o en CI se usa --valores <archivo>. El esqueleto sale de --ejemplo.");
+      return 2;
+    }
+
+    const previos = o.valores && fs.existsSync(o.valores) ? JSON.parse(fs.readFileSync(o.valores, "utf-8")) : {};
+    const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
+
+    // POR QUE UNA COLA Y NO `rl.question` A SECAS. Dos modos de falla, los dos
+    // medidos:
+    //
+    //  (a) `rl.question` no llama a su callback cuando llega el fin de la
+    //      entrada. La promesa queda colgada, el bucle de eventos se vacia, y
+    //      node sale con CERO habiendo escrito nada: exit 0, ningun archivo, dos
+    //      lineas de salida. Un cero que no hizo nada se lee como que salio
+    //      bien, que es la definicion de fallar abierto.
+    //
+    //  (b) Escuchar `close` para arreglar (a) rompe el caso de las respuestas
+    //      pegadas de un tiron: readline lee TODO el pipe de una y emite `close`
+    //      mientras todavia quedan lineas sin entregar. Se cortaba en la segunda
+    //      pregunta con seis respuestas ya buffereadas adentro.
+    //
+    // Con la cola, `close` solo es un error cuando ademas NO quedan lineas.
+    const cola = [];
+    const esperando = [];
+    let cerrada = false;
+    rl.on("line", (linea) => {
+      const pendiente = esperando.shift();
+      if (pendiente) pendiente.resolver(linea);
+      else cola.push(linea);
+    });
+    rl.on("close", () => {
+      cerrada = true;
+      for (const p of esperando.splice(0)) p.rechazar(new Error("la entrada se cerro antes de contestar todas las preguntas"));
+    });
+    const preguntarPorTeclado = (texto) => {
+      process.stdout.write(texto);
+      if (cola.length) return Promise.resolve(cola.shift());
+      if (cerrada) return Promise.reject(new Error("la entrada se cerro antes de contestar todas las preguntas"));
+      return new Promise((resolver, rechazar) => esperando.push({ resolver, rechazar }));
+    };
+
+    let resultado;
+    try {
+      resultado = await asis.correrAsistente(preguntarPorTeclado, previos, FORMATOS, (linea) => process.stdout.write(`${linea}\n`));
+    } catch (e) {
+      console.error("");
+      console.error(`::error::${e.message}. NO se escribio nada.`);
+      console.error("Si estabas pegando respuestas desde otro lado, faltaron algunas. Se puede volver a correr:");
+      console.error("las respuestas que ya diste se ofrecen como valor por defecto si le pasas --valores con el archivo.");
+      return 1;
+    } finally {
+      rl.close();
+    }
+    for (const linea of asis.lineasDeResumen(resultado.respuestas, resultado.desvios)) process.stdout.write(`${linea}\n`);
+
+    const salida = o.soloValores ?? o.valores ?? path.join(process.cwd(), ".projects-valores.json");
+    fs.writeFileSync(salida, `${JSON.stringify(resultado.valores, null, 2)}\n`);
+    process.stdout.write(`\nEscrito: ${salida}\n`);
+    if (resultado.desvios.length) {
+      const rutaDesvios = path.join(path.dirname(salida), ".projects-desvios.json");
+      fs.writeFileSync(rutaDesvios, `${JSON.stringify(resultado.desvios, null, 2)}\n`);
+      process.stdout.write(`Escrito: ${rutaDesvios}  (${resultado.desvios.length} desvio(s) declarado(s))\n`);
+    }
+
+    // `--solo-valores` es el gemelo interactivo de `--ejemplo`: deja el archivo
+    // y no toca ningun destino. Sirve para revisar lo elegido antes de armar nada.
+    if (o.soloValores || !o.destino) {
+      process.stdout.write(`\nNo se armo ningun proyecto. Para armarlo:\n  node ${path.relative(process.cwd(), fileURLToPath(import.meta.url))} --valores ${salida} --destino <carpeta>\n`);
+      return 0;
+    }
+    o.valores = salida;
+  }
+
   if (!o.valores || !o.destino) {
     for (const linea of lineasDeUso()) console.error(linea);
     return 2;
