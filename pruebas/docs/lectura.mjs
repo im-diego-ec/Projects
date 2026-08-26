@@ -27,7 +27,7 @@ export function leer(rel) {
   return readFileSync(join(RAIZ, rel), "utf8");
 }
 
-export const GLOSARIO = "docs/glosario.md";
+export const GLOSARIO = "docs/02-glosario.md";
 export const INDICE = "docs/README.md";
 
 /** Los terminos que el glosario define: la primera celda de cada fila, que el
@@ -57,8 +57,8 @@ export function terminosUsados(texto, terminos) {
 
 /** Los terminos del glosario que un texto usa SIN enlazarlos al glosario.
  *
- *  El destino se acepta con cualquier prefijo de ruta (`glosario.md`,
- *  `./glosario.md`, `docs/glosario.md`) porque el README de la raiz enlaza desde
+ *  El destino se acepta con cualquier prefijo de ruta (`02-glosario.md`,
+ *  `./02-glosario.md`, `docs/02-glosario.md`) porque el README de la raiz enlaza desde
  *  un nivel mas arriba y es una pagina del alcance como cualquier otra. Lo que se
  *  exige no es la ruta: es que la palabra este enlazada en la propia pagina. */
 export function jergaSinEnlazar(texto, terminos) {
@@ -210,7 +210,7 @@ export function prosaDeLaPagina(texto) {
 /** Las palabras prohibidas que un texto usa en su PROSA.
  *
  *  EL PLURAL CUENTA, y no contaba: `\bpipeline\b` no encuentra "pipelines", asi
- *  que docs/para-el-po.md escribio "los pipelines" durante todo este tiempo con
+ *  que docs/06-para-el-po.md escribio "los pipelines" durante todo este tiempo con
  *  el carril en verde. Es el mismo `(?:s|es)?` que ya usa terminosUsados() para
  *  el glosario — una sola forma de contar una palabra en los dos lados. */
 export function jergaDeOficio(texto, palabras) {
@@ -247,7 +247,7 @@ export function jergaEntreBackticks(texto, palabras) {
 }
 
 /** El techo de fragmentos de codigo en linea con jerga por pagina. MEDIDO, no
- *  elegido: la que mas usa hoy es docs/paso-a-paso-sin-ser-tecnico.md con 6
+ *  elegido: la que mas usa hoy es docs/04-arrancar-acompanado.md con 6
  *  —comandos reales y mensajes que salen en pantalla—, y le sigue docs/README.md
  *  con 4, que son los tres nombres que la propia regla prohibe mas la ruta de un
  *  archivo de pruebas. Diez deja aire para cuatro comandos mas y sigue estando
@@ -271,7 +271,7 @@ export const ABERTURAS = ["Para quién es esta página", "Esta página es para",
 /** Cuantas lineas del principio cuentan como "el principio".
  *
  *  MEDIDO, no elegido de memoria: la pagina que mas tarda en decirlo hoy es
- *  docs/stack.md, en la linea 15. Veinte deja aire para un titulo mas largo y
+ *  docs/03-stack.md, en la linea 15. Veinte deja aire para un titulo mas largo y
  *  sigue significando "antes de que el lector tenga que decidir si sigue". */
 export const LINEAS_DE_APERTURA = 20;
 
@@ -338,9 +338,9 @@ export function subcarpetasDeDocs() {
  *  estandar es otro —jerga DEFINIDA y una frase que diga para quien es—: un
  *  runbook convertido en folleto no sirve para correr el runbook. */
 export const CARRIL_SIN_JERGA = [
-  "docs/empezar-sin-ser-tecnico.md",
-  "docs/paso-a-paso-sin-ser-tecnico.md",
-  "docs/para-el-po.md",
+  "docs/01-introduccion.md",
+  "docs/04-arrancar-acompanado.md",
+  "docs/06-para-el-po.md",
   "docs/README.md",
 ];
 
@@ -348,7 +348,7 @@ export const CARRIL_SIN_JERGA = [
  *  glosario. Exigirle que se enlace a si misma treinta y siete veces no ayuda a
  *  nadie a leer nada. */
 export const EXENTAS_DE_ENLACE = {
-  "docs/glosario.md": "es el glosario: cada termino esta definido en la propia pagina",
+  "docs/02-glosario.md": "es el glosario: cada termino esta definido en la propia pagina",
 };
 
 /** Como evoluciona cada documento, leido del indice: la tercera columna de la
@@ -381,12 +381,18 @@ export function evolucionSegunElIndice(texto = leer(INDICE)) {
  *  que tiene que enumerarlas todas y que eso "no lo hace cumplir un check"; esta
  *  funcion es la mitad que faltaba.
  *
- *  SE BUSCA EL DESTINO DE UN ENLACE, `](nombre.md)`, y no el nombre suelto. El
- *  motivo es un falso verde con nombre y apellido en este repo:
- *  `consumidores.md` es subcadena de `censo-de-consumidores.md`, asi que una
- *  busqueda de subcadena daria por indexada una pagina gracias a la mencion de
- *  OTRA. Es el mismo tropiezo que ya se midio con /openspec/specs/ en el banco de
- *  para-el-po.md. */
+ *  SE BUSCA EL DESTINO DE UN ENLACE, `](nombre.md)`, y no el nombre suelto.
+ *
+ *  EL MOTIVO ORIGINAL YA NO SE PUEDE MEDIR, y se deja escrito porque la regla
+ *  sigue siendo la correcta. Hasta que las paginas se numeraron, `consumidores.md`
+ *  era subcadena de `censo-de-consumidores.md`: una busqueda de subcadena daba por
+ *  indexada una pagina gracias a la mencion de OTRA, y este repositorio ya se
+ *  habia comido ese falso verde una vez. Con los numeros adelante la colision
+ *  murio sola —`"09-censo-de-consumidores.md".includes("10-consumidores.md")` es
+ *  `false`—, pero buscar el destino del enlace y no el nombre suelto no depende
+ *  de los nombres de hoy: el mismo tropiezo esta medido con /openspec/specs/ en
+ *  el banco de 06-para-el-po.md, y el proximo par de nombres que colisione va a
+ *  llegar sin avisar. */
 export function sinIndexar(paginas, indice = leer(INDICE)) {
   return paginas
     .filter((p) => p.startsWith("docs/") && p !== INDICE)

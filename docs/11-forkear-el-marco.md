@@ -7,7 +7,7 @@ cuando alguien la busca, y por eso esta página existe.
 **De dónde sale esto, y de dónde no.** El mecanismo está medido en este árbol: los
 comandos de más abajo enumeran, hoy, cada línea que lleva la cuenta escrita a mano.
 Lo que **no** hay es un incidente registrado —ni entrada de CHANGELOG, ni fila de
-[reglas-no-escritas.md](reglas-no-escritas.md), ni commit— de que esto le haya pasado
+[07-reglas-no-escritas.md](07-reglas-no-escritas.md), ni commit— de que esto le haya pasado
 a alguien. La página se sostiene por lo que se puede contar con `grep`, no por una
 anécdota.
 
@@ -16,11 +16,11 @@ cuenta de GitHub** y tiene que dejarlo apuntando a la cuenta nueva. **Es una
 página técnica y muy acotada**: si no estás haciendo eso, no es tuya.
 
 **Palabras del marco que vas a ver acá**, cada una definida en una línea:
-[andamio](glosario.md), [builder](glosario.md), [bump](glosario.md),
-[censo](glosario.md), [change](glosario.md), [CODEOWNERS](glosario.md),
-[delta](glosario.md), [guardrail](glosario.md), [marcador](glosario.md),
-[PO](glosario.md), [pin](glosario.md), [reusable](glosario.md),
-[scaffold](glosario.md).
+[andamio](02-glosario.md), [builder](02-glosario.md), [bump](02-glosario.md),
+[censo](02-glosario.md), [change](02-glosario.md), [CODEOWNERS](02-glosario.md),
+[delta](02-glosario.md), [guardrail](02-glosario.md), [marcador](02-glosario.md),
+[PO](02-glosario.md), [pin](02-glosario.md), [reusable](02-glosario.md),
+[scaffold](02-glosario.md).
 
 ⚠️ **Y forkear el marco no es una salida para un proyecto.** [`AGENTS.md`](../AGENTS.md)
 lo lista entre lo que no se hace nunca («Hacer fork de Projects para un proyecto»),
@@ -29,7 +29,7 @@ existen dos copias, la divergencia es cuestión de tiempo y la corrección de un
 incidente deja de propagarse. Esta página **es para quien se lleva el marco entero a
 otra cuenta u organización** —que es otro caso, y no lo resuelve un `Ctrl+C`—, no para
 quien adopta el marco en un proyecto: eso es
-[arrancar-un-proyecto.md](arrancar-un-proyecto.md).
+[05-arrancar-tecnico.md](05-arrancar-tecnico.md).
 
 ## Por qué no hay un rojo que lo avise
 
@@ -143,7 +143,7 @@ la lógica.
   → Code security → Dependabot → repository access`), no del repo. Sin eso los
   consumidores no reciben PRs de bump — y como el PR de bump **es** el canal de
   distribución y el censo, el fork queda sin canal y sin censo, en silencio. Ver
-  [censo-de-consumidores.md](censo-de-consumidores.md).
+  [09-censo-de-consumidores.md](09-censo-de-consumidores.md).
 - **El secret `AVISO_VERSION_DESTINO`.** Los secrets no se forkean. Sin él, cada
   release del fork se publica sin avisarle a ningún consumidor; el workflow lo dice
   con un `::warning::` ruidoso y deja el mensaje en el resumen de la corrida, así que

@@ -8,7 +8,7 @@ name: Aviso de version a consumidores
 # —incluido un check que lo pone en rojo— SIN HABER LEIDO NADA. Paso el
 # 2026-08-19: al mover v1, el segundo consumidor quedo a un push de un rojo que
 # nadie le anuncio. Este workflow convierte la publicacion de una version en una
-# NOTIFICACION (fila 14 del backlog de docs/reglas-no-escritas.md).
+# NOTIFICACION (fila 14 del backlog de docs/07-reglas-no-escritas.md).
 #
 # EL EVENTO ES LA VERSION, NO EL PUSH. Se dispara al publicar un release, no en
 # cada push a main: un consumidor no necesita enterarse de cada commit del marco,

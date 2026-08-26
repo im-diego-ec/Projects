@@ -11,19 +11,19 @@ los archivos. Donde algo falla, lo dice y dice el mensaje exacto que vas a ver.
 moverse en una consola: es un runbook técnico, denso a propósito, y no evita el
 vocabulario del oficio. Si no sos técnico y tenés que arrancarlo igual, la
 versión acompañada —paso por paso, con lo que vas a ver en pantalla— es
-[paso-a-paso-sin-ser-tecnico.md](paso-a-paso-sin-ser-tecnico.md); esta página
+[04-arrancar-acompanado.md](04-arrancar-acompanado.md); esta página
 sigue siendo la que manda cuando las dos se contradigan.
 
 **Palabras del marco que vas a ver acá**, cada una definida en una línea:
-[ADR](glosario.md), [andamio](glosario.md), [archive](glosario.md),
-[builder](glosario.md), [bump](glosario.md), [canónico](glosario.md),
-[capability](glosario.md), [carril](glosario.md), [censo](glosario.md),
-[change](glosario.md), [ci-ok](glosario.md), [CODEOWNERS](glosario.md),
-[compuerta](glosario.md), [constitución](glosario.md), [delta](glosario.md),
-[guardrail](glosario.md), [marcador](glosario.md), [PO](glosario.md),
-[PRD](glosario.md), [pin](glosario.md), [proposal](glosario.md),
-[requirement](glosario.md), [ruleset](glosario.md), [scaffold](glosario.md),
-[spec](glosario.md).
+[ADR](02-glosario.md), [andamio](02-glosario.md), [archive](02-glosario.md),
+[builder](02-glosario.md), [bump](02-glosario.md), [canónico](02-glosario.md),
+[capability](02-glosario.md), [carril](02-glosario.md), [censo](02-glosario.md),
+[change](02-glosario.md), [ci-ok](02-glosario.md), [CODEOWNERS](02-glosario.md),
+[compuerta](02-glosario.md), [constitución](02-glosario.md), [delta](02-glosario.md),
+[guardrail](02-glosario.md), [marcador](02-glosario.md), [PO](02-glosario.md),
+[PRD](02-glosario.md), [pin](02-glosario.md), [proposal](02-glosario.md),
+[requirement](02-glosario.md), [ruleset](02-glosario.md), [scaffold](02-glosario.md),
+[spec](02-glosario.md).
 
 Marcas que vas a encontrar:
 
@@ -66,7 +66,7 @@ adentro de WSL tu verificación y la del pipeline corren sobre el mismo sistema 
 las rutas. Las cuatro filas de sistema de archivos de la tabla de fallos silenciosos del final
 **desaparecen** en WSL; ninguna desaparece en PowerShell. Y hay una quinta, medida en este
 repo: `openspec archive` sobre Windows nativo imprime **`Specs updated successfully`** y no
-aplica nada ([upgrade-openspec.md, trampa 3](upgrade-openspec.md)).
+aplica nada ([08-upgrade-openspec.md, trampa 3](08-upgrade-openspec.md)).
 
 PowerShell nativo **sigue soportado** —hay quien no puede instalar WSL— y por eso los pares
 existen. Lo que **no** está soportado es `cmd.exe`, ni **Windows PowerShell 5.1**: la consola
@@ -93,7 +93,7 @@ como en Windows. Sirve para no traducir comandos; no te saca de ninguna fila de 
 Los pares son una promesa, y una promesa que nadie mide se rompe sola. Hoy hay **una sola**
 cosa comprobable de un comando, y es que el inventario **no encoja**: el archivo tiene **9**
 gemelos y **29** bloques ` ```bash `, y eso lo dicen
-` grep -c '^```powershell' docs/arrancar-un-proyecto.md ` y ` grep -c '^```bash' ` sobre el
+` grep -c '^```powershell' docs/05-arrancar-tecnico.md ` y ` grep -c '^```bash' ` sobre el
 mismo archivo. Está probado a la mala, que es la única forma de saber que un check sirve:
 borrando los nueve gemelos, uno por uno, sobre una copia. Los **nueve** bajan el conteo a 8 y
 ponen la comprobación en rojo — ninguno se escapa.
@@ -107,12 +107,12 @@ un 29 porque la sección 3.1 sumó un bloque `node --input-type=module`, que **s
 en las dos shells — pero eso lo decidió una lectura, no el conteo. Distinguir un caso del otro a máquina pide adivinar qué comando
 corre igual en las dos shells, y adivinar es exactamente lo que un check no debe hacer; así
 que eso hoy lo ve una persona leyendo el diff, y por eso es otra fila del mismo
-[backlog de automatización](reglas-no-escritas.md#backlog-de-automatización) que la
+[backlog de automatización](07-reglas-no-escritas.md#backlog-de-automatización) que la
 comprobación de prerrequisitos del punto 3. Ojo con esa ancla si la vas a buscar con `grep`:
 lleva tilde, y `grep -i` pliega mayúsculas pero **no** acentos, así que escrita sin tilde la
 búsqueda devuelve **cero** coincidencias y sale **1** — que se lee como que el enlace está
 roto, cuando no lo está. Lo que sí lo demuestra es buscar el encabezado del otro lado:
-` grep -n '^## Backlog de automatización' docs/reglas-no-escritas.md ` contesta con una sola
+` grep -n '^## Backlog de automatización' docs/07-reglas-no-escritas.md ` contesta con una sola
 línea, la 475.
 
 ⚠️ **Ninguno de los nueve gemelos se ejecutó, y en CI no corre ninguno.** El
@@ -257,7 +257,7 @@ marco dice que eso no cuenta. Lo que la convertiría en algo que falla solo es u
 de arriba, imprima cuál falló y salga distinto de 0. No se implementa acá — esta guía es la
 **especificación de qué tiene que comprobar**, no el lugar donde vive. Mientras no exista,
 el ítem es una fila del
-[backlog de automatización](reglas-no-escritas.md#backlog-de-automatización).
+[backlog de automatización](07-reglas-no-escritas.md#backlog-de-automatización).
 
 ### 4. Los documentos del negocio, si ya existen
 
@@ -477,7 +477,7 @@ las dos herramientas, --sin-herramientas tampoco lo pide.
 
 Las dos salidas son literales: o corrés desde un clon completo —que es lo normal y lo que
 dice la sección 2 de esta guía— o pasás el pin a mano. Para saber qué número pasar, el
-comando está en [upgrade-openspec.md](upgrade-openspec.md); si no tenés el archivo, tampoco
+comando está en [08-upgrade-openspec.md](08-upgrade-openspec.md); si no tenés el archivo, tampoco
 tenés de dónde leerlo, así que sale del repo del marco en GitHub.
 
 **Espera una versión EXACTA**, no un rango ni `latest`, y lo comprueba **antes** de tocar
@@ -1393,7 +1393,7 @@ Bash, que corren sobre NTFS igual. La postura completa está en «Antes de empez
 | **Fin de línea (CRLF)** | `pnpm verificar` sale rojo en el paso de formato sobre archivos que **nadie tocó**, y `git diff` no muestra nada: `[warn] Code style issues found in the above file(s). Run Prettier with --write to fix.` Está medido en este marco, el 2026-08-19: con `core.autocrlf=true` —el default de Git para Windows— los fixtures llegaban en CRLF, las pruebas los escribían en LF, y el diff veía el archivo entero reescrito: el caso «un cambio que solo **borra** líneas» pasaba a tener **2 líneas agregadas** y salía con **EXIT 1**. Quedaban 90 de 91 pruebas verdes, y la única roja lo era por el fin de línea del disco, no por el código | El andamio trae `.gitattributes` con `* text=auto eol=lf`, y por eso no es cosmético. Pero solo gobierna **desde** la fase 3: un checkout hecho antes ya está en CRLF en disco. `git config --global core.autocrlf false` y después `git add --renormalize .` |
 | **Mayúsculas del sistema de archivos** | Verde en tu máquina, rojo en el CI y solo ahí: `error TS2307: Cannot find module './Boton'`. macOS y Windows no distinguen `boton.tsx` de `Boton.tsx`; Linux sí. Su hermano peor es el renombre: `git mv boton.tsx Boton.tsx` en macOS o Windows **no hace nada y no dice nada**, así que el repo se queda con el nombre viejo y vos ves el nuevo | `git config core.ignorecase false` en el repo, y renombrar con `git mv -f`. El typecheck ya ayuda —`forceConsistentCasingInFileNames` está prendido en el `tsconfig.base.json` del andamio— pero solo sobre lo que pasa por el compilador: la ruta de una imagen, un nombre dentro de un glob o un archivo nombrado en el YAML del CI no los mira nadie hasta el runner |
 | **Windows PowerShell 5.1 en vez de `pwsh` 7** | Dos cortes exactos: `The token '&&' is not a valid statement separator in this version.` en las fases 4 y 5, y un `valores.json` en **UTF-16** que la fase 3 rechaza como JSON inválido en el primer carácter — lo que se lee como que llenaste mal el archivo | Instalar `pwsh` 7, que es un paquete aparte y convive con el 5.1. `$PSVersionTable.PSVersion.Major` tiene que decir 7 |
-| **`openspec archive` sobre Windows nativo** | Imprime **`Specs updated successfully`** y hace rollback de todo, specs incluidos. Verificado el 2026-08-14, reproducido dos veces | No mirar el mensaje: mirar `git status --short`. El procedimiento y los tres rodeos están en [upgrade-openspec.md, trampa 3](upgrade-openspec.md) |
+| **`openspec archive` sobre Windows nativo** | Imprime **`Specs updated successfully`** y hace rollback de todo, specs incluidos. Verificado el 2026-08-14, reproducido dos veces | No mirar el mensaje: mirar `git status --short`. El procedimiento y los tres rodeos están en [08-upgrade-openspec.md, trampa 3](08-upgrade-openspec.md) |
 
 ---
 
@@ -1411,4 +1411,4 @@ Sus dos reglas de uso, acá también porque son las que se rompen: **no arregles
 guía mientras la corrés** —arreglar sobre la marcha te deja un documento que
 funciona para vos y para nadie más, y borra el dato que vinimos a buscar— y **un
 tropiezo cuyo arreglo empieza con «hay que recordar que…» no va a la guía**: va como
-fila al backlog de [reglas no escritas](reglas-no-escritas.md#backlog-de-automatización).
+fila al backlog de [reglas no escritas](07-reglas-no-escritas.md#backlog-de-automatización).

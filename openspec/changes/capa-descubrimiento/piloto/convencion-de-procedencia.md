@@ -88,7 +88,7 @@ seis meses después necesita saber de qué clase de pieza vino sin ir a buscarla
 | `F` | el feedback de usuario sobre el prototipo | igual que `E` si está grabado; igual que `D` si está escrito |
 
 > **Nota fechada del 2026-08-23 — la guía de arranque usa un juego REDUCIDO de letras.**
-> `docs/arrancar-un-proyecto.md` reparte solo **`D`** (cualquier cosa escrita) y **`P`** (el
+> `docs/05-arrancar-tecnico.md` reparte solo **`D`** (cualquier cosa escrita) y **`P`** (el
 > prototipo), y define `E` como la tercera que se agrega el día que exista una grabación. El
 > motivo es el principio que esta misma tabla usa sin enunciarlo: **una letra existe solo si el
 > localizador se resuelve distinto.** Con esa vara `F` no sobrevive —su propia celda dice

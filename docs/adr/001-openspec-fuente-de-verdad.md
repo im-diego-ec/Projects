@@ -50,7 +50,7 @@ Reglas duras que acompañan la decisión:
    equipo. Dos motivos: que la validación dé el mismo veredicto en los dos
    lados, y que el nombre `openspec` a secas en npm sea un paquete ajeno
    (squatting) — el correcto es `@fission-ai/openspec`. El proceso para
-   subir el pin vive en [upgrade-openspec.md](../upgrade-openspec.md).
+   subir el pin vive en [08-upgrade-openspec.md](../08-upgrade-openspec.md).
 2. **`openspec validate --all --strict` en CI**, en TODO PR y push, sea de
    código o de docs. Es barato (sin base de datos, sin instalar el
    monorepo) y es el único check que corre en los dos carriles.
@@ -91,7 +91,7 @@ revocada — si contradice a `openspec/`, gana `openspec/`.
     archive.
   - En Windows, `openspec archive` puede fallar con `EPERM` y hacer
     rollback silencioso de todo — ver
-    [upgrade-openspec.md](../upgrade-openspec.md).
+    [08-upgrade-openspec.md](../08-upgrade-openspec.md).
 
 ## Cómo lo hace cumplir el marco
 
@@ -106,4 +106,4 @@ Lo que **no** está automatizado y depende de disciplina: la relectura de
 coherencia entre artefactos, el `Purpose` real de una capability nacida por
 archive, y la conservación textual de los títulos de requirement. Los tres
 están anotados como backlog en
-[reglas-no-escritas.md](../reglas-no-escritas.md).
+[07-reglas-no-escritas.md](../07-reglas-no-escritas.md).

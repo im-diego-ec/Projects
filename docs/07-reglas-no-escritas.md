@@ -11,15 +11,15 @@ que no queremos repetir. Acá quedan escritas por primera vez.
 sistema es así, y ésta explica cómo se trabaja adentro de él.
 
 **Palabras del marco que vas a ver acá**, cada una definida en una línea:
-[ADR](glosario.md), [andamio](glosario.md), [archive](glosario.md),
-[builder](glosario.md), [bump](glosario.md), [carril](glosario.md),
-[censo](glosario.md), [change](glosario.md), [ci-ok](glosario.md),
-[CODEOWNERS](glosario.md), [compuerta](glosario.md), [constitución](glosario.md),
-[delta](glosario.md), [estreno](glosario.md), [fail-open](glosario.md),
-[guardrail](glosario.md), [marcador](glosario.md), [modo aviso](glosario.md),
-[pin](glosario.md), [referenciado](glosario.md), [requirement](glosario.md),
-[reusable](glosario.md), [ruleset](glosario.md), [scaffold](glosario.md),
-[spec](glosario.md).
+[ADR](02-glosario.md), [andamio](02-glosario.md), [archive](02-glosario.md),
+[builder](02-glosario.md), [bump](02-glosario.md), [carril](02-glosario.md),
+[censo](02-glosario.md), [change](02-glosario.md), [ci-ok](02-glosario.md),
+[CODEOWNERS](02-glosario.md), [compuerta](02-glosario.md), [constitución](02-glosario.md),
+[delta](02-glosario.md), [estreno](02-glosario.md), [fail-open](02-glosario.md),
+[guardrail](02-glosario.md), [marcador](02-glosario.md), [modo aviso](02-glosario.md),
+[pin](02-glosario.md), [referenciado](02-glosario.md), [requirement](02-glosario.md),
+[reusable](02-glosario.md), [ruleset](02-glosario.md), [scaffold](02-glosario.md),
+[spec](02-glosario.md).
 
 **La premisa del marco**: un ritual que alguien debe recordar **no cuenta
 como enforcement**. Solo cuentan los checks que fallan solos. Por eso cada

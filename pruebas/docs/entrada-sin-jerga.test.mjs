@@ -1,7 +1,7 @@
-// BANCO DE docs/empezar-sin-ser-tecnico.md: LA PUERTA DE ENTRADA DE QUIEN NO ES
+// BANCO DE docs/01-introduccion.md: LA PUERTA DE ENTRADA DE QUIEN NO ES
 // TECNICO.
 //
-// QUE CIERRA. El marco tenia dos documentos para el rol de PO —para-el-po.md y el
+// QUE CIERRA. El marco tenia dos documentos para el rol de PO —06-para-el-po.md y el
 // glosario— y ninguno para el paso anterior: alguien que no es tecnico y quiere
 // entender que es esto, que le da, que le exige y como se empieza. La puerta que
 // habia era el README, que abre hablando de guardrails de CI/CD.
@@ -28,7 +28,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { leer, terminosDelGlosario, terminosUsados } from "./lectura.mjs";
 
-const PAGINA = "docs/empezar-sin-ser-tecnico.md";
+const PAGINA = "docs/01-introduccion.md";
 const TEXTO = leer(PAGINA);
 const TERMINOS = terminosDelGlosario();
 
@@ -81,21 +81,21 @@ test("entrada · las cuatro preguntas siguen contestadas", () => {
 
 test("entrada · la pagina esta enlazada desde el README y desde el indice de docs/", () => {
   assert.ok(
-    leer("README.md").includes("docs/empezar-sin-ser-tecnico.md"),
+    leer("README.md").includes("docs/01-introduccion.md"),
     "README.md no enlaza la puerta de entrada de quien no es tecnico. Sin ese enlace, el unico camino sigue " +
       "siendo el README, que abre hablando de guardrails de CI/CD: exactamente el problema que esta pagina vino " +
       "a cerrar.",
   );
   const indice = leer("docs/README.md");
   assert.ok(
-    indice.includes("empezar-sin-ser-tecnico.md"),
-    "docs/README.md no menciona empezar-sin-ser-tecnico.md, y ese indice se vende como el mapa de la " +
+    indice.includes("01-introduccion.md"),
+    "docs/README.md no menciona 01-introduccion.md, y ese indice se vende como el mapa de la " +
       "documentacion: un documento que no aparece ahi es un documento que nadie encuentra.",
   );
   const desde = indice.indexOf("## Por dónde empezar");
   assert.ok(desde !== -1, "no encontre la seccion '## Por dónde empezar' en docs/README.md: actualiza este ancla");
   assert.ok(
-    indice.slice(desde).includes("empezar-sin-ser-tecnico.md"),
+    indice.slice(desde).includes("01-introduccion.md"),
     "'Por dónde empezar' de docs/README.md no ofrece la puerta de entrada de quien no es tecnico. Esa seccion es " +
       "la que se lee cuando alguien no sabe por donde arrancar, que es literalmente el caso de este lector.",
   );
@@ -107,8 +107,8 @@ test("entrada · la pagina manda al lector a la guia que se hace CON el", () => 
   // Quien llega aca decidido a arrancarlo tiene que encontrar la puerta; si no,
   // termina en el runbook tecnico, que no esta escrito para el.
   assert.ok(
-    TEXTO.includes("paso-a-paso-sin-ser-tecnico.md"),
+    TEXTO.includes("04-arrancar-acompanado.md"),
     `${PAGINA} no enlaza la guia paso a paso. Esta pagina explica QUE ES; el lector que ya decidio necesita el ` +
-      "HAZLO CONMIGO, y sin el enlace su unico camino es arrancar-un-proyecto.md, que es un runbook tecnico.",
+      "HAZLO CONMIGO, y sin el enlace su unico camino es 05-arrancar-tecnico.md, que es un runbook tecnico.",
   );
 });

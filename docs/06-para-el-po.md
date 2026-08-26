@@ -9,14 +9,14 @@ rutas que solo él aprueba en el repositorio de un proyecto, dos en **este**, el
 del marco— y era el único sin puerta de entrada. Esa diferencia entre los dos
 repositorios es de las que se confunden solas, así que la sección 2 los separa
 uno por uno. Cuando una palabra suene rara, está definida en una línea en el
-[glosario](glosario.md).
+[glosario](02-glosario.md).
 
 **Palabras del marco que vas a ver acá**, cada una definida en una línea:
-[andamio](glosario.md), [builder](glosario.md), [change](glosario.md),
-[CODEOWNERS](glosario.md), [compuerta](glosario.md), [delta](glosario.md),
-[guardrail](glosario.md), [PO](glosario.md), [proposal](glosario.md),
-[requirement](glosario.md), [scenario](glosario.md), [SHALL](glosario.md),
-[spec](glosario.md).
+[andamio](02-glosario.md), [builder](02-glosario.md), [change](02-glosario.md),
+[CODEOWNERS](02-glosario.md), [compuerta](02-glosario.md), [delta](02-glosario.md),
+[guardrail](02-glosario.md), [PO](02-glosario.md), [proposal](02-glosario.md),
+[requirement](02-glosario.md), [scenario](02-glosario.md), [SHALL](02-glosario.md),
+[spec](02-glosario.md).
 
 ---
 
@@ -195,7 +195,7 @@ discusiones —las tuyas incluidas— se ganan citándolo.
 
 ## Si querés seguir
 
-- [glosario.md](glosario.md) — el vocabulario del marco, una línea por palabra,
+- [02-glosario.md](02-glosario.md) — el vocabulario del marco, una línea por palabra,
   con el archivo que manda sobre cada una.
 - [`README.md`](../README.md) — qué es Projects para el equipo entero; empieza
   con la tabla de incidentes que explica por qué existe cada regla.

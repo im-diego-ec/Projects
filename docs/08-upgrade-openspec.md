@@ -12,11 +12,11 @@ versión fijada de una herramienta. **Es un procedimiento técnico**, corto y co
 comandos: si no estás subiendo esa versión, no es tuya.
 
 **Palabras del marco que vas a ver acá**, cada una definida en una línea:
-[ADR](glosario.md), [archive](glosario.md), [canónico](glosario.md),
-[change](glosario.md), [constitución](glosario.md), [delta](glosario.md),
-[guardrail](glosario.md), [pin](glosario.md), [referenciado](glosario.md),
-[regenerado](glosario.md), [requirement](glosario.md), [reusable](glosario.md),
-[scaffold](glosario.md), [spec](glosario.md).
+[ADR](02-glosario.md), [archive](02-glosario.md), [canónico](02-glosario.md),
+[change](02-glosario.md), [constitución](02-glosario.md), [delta](02-glosario.md),
+[guardrail](02-glosario.md), [pin](02-glosario.md), [referenciado](02-glosario.md),
+[regenerado](02-glosario.md), [requirement](02-glosario.md), [reusable](02-glosario.md),
+[scaffold](02-glosario.md), [spec](02-glosario.md).
 
 ## Por qué está pineada
 
@@ -148,7 +148,7 @@ Es la razón por la que este documento existe en vez de ser un comentario en
 el YAML.
 
 **Cómo volverlo automático** (entra al backlog de
-[reglas-no-escritas.md](reglas-no-escritas.md)): un job programado —
+[07-reglas-no-escritas.md](07-reglas-no-escritas.md)): un job programado —
 semanal, en el mismo día que corre Dependabot — que compare la última
 versión publicada contra el pin y **abra un issue** si difieren. No un PR
 automático: el upgrade incluye regenerar skills y revalidar todo, y eso
@@ -222,7 +222,7 @@ propio, va en la constitución del repo, no en un archivo generado.
 Una sola sesión, en una rama `chore/openspec-<version>`.
 
 1. **Rama desde `main` actualizado** (regla 8 de
-   [reglas-no-escritas.md](reglas-no-escritas.md)):
+   [07-reglas-no-escritas.md](07-reglas-no-escritas.md)):
 
    ```bash
    git checkout main && git pull --ff-only && git checkout -b chore/openspec-X.Y.Z

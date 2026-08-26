@@ -2,7 +2,7 @@
 // Aviso de versión a consumidores: ARMA el mensaje que reciben los proyectos
 // cuando el marco publica una versión. **No lo envía**, y no conoce el destino.
 //
-// Por qué existe (fila 14 del backlog de `docs/reglas-no-escritas.md`): el
+// Por qué existe (fila 14 del backlog de `docs/07-reglas-no-escritas.md`): el
 // CHANGELOG y el release son superficie de CONSULTA, no de NOTIFICACIÓN. Con un
 // bump del PR de Dependabot (o, hasta la 1.3.0, por el tag móvil), un consumidor
 // recibe comportamiento nuevo —incluido un check que lo

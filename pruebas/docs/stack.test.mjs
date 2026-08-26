@@ -1,4 +1,4 @@
-// BANCO DE docs/stack.md: LA PAGINA DEL STACK CONTRA LO QUE LOS MANIFIESTOS
+// BANCO DE docs/03-stack.md: LA PAGINA DEL STACK CONTRA LO QUE LOS MANIFIESTOS
 // DECLARAN.
 //
 // POR QUE EXISTE. La pagina dice que pieza usa el marco, quien la decide y en
@@ -241,13 +241,13 @@ test("stack · la pagina esta enlazada desde el README y desde el indice de docs
   const raiz = leer("README.md");
   const indice = leer("docs/README.md");
   assert.ok(
-    raiz.includes("docs/stack.md"),
-    "README.md no enlaza docs/stack.md. La pagina se vende como el unico sitio donde el stack esta declarado: " +
+    raiz.includes("docs/03-stack.md"),
+    "README.md no enlaza docs/03-stack.md. La pagina se vende como el unico sitio donde el stack esta declarado: " +
       "si la puerta de entrada del repositorio no la nombra, no es el unico sitio, es un sitio mas.",
   );
   assert.ok(
-    indice.includes("stack.md"),
-    "docs/README.md no menciona stack.md, y ese indice se vende como el mapa de la documentacion: un documento " +
+    indice.includes("03-stack.md"),
+    "docs/README.md no menciona 03-stack.md, y ese indice se vende como el mapa de la documentacion: un documento " +
       "que no aparece ahi es un documento que nadie encuentra.",
   );
 });
@@ -334,11 +334,11 @@ test("stack · el README no vuelve a nombrar un proveedor entre lo que el marco 
     [],
     `la seccion 'Qué NO es Projects' del README nombra ${encontrados.join(", ")}. Lo que el marco fija se enumera ` +
       "sin proveedor: el flujo de specs, el pipeline, la gobernanza y los guardrails. Donde se despliega es " +
-      "decision del proyecto —la de mas impacto en el costo— y se explica en docs/stack.md.",
+      "decision del proyecto —la de mas impacto en el costo— y se explica en docs/03-stack.md.",
   );
   assert.ok(
-    cuerpo.includes("docs/stack.md"),
-    "la seccion 'Qué NO es Projects' del README no enlaza docs/stack.md, que es donde el stack esta declarado " +
+    cuerpo.includes("docs/03-stack.md"),
+    "la seccion 'Qué NO es Projects' del README no enlaza docs/03-stack.md, que es donde el stack esta declarado " +
       "capa por capa. Sin el enlace, el lector se queda con el resumen y sin el detalle.",
   );
 });
@@ -348,7 +348,7 @@ test("stack · el README no vuelve a nombrar un proveedor entre lo que el marco 
 // QUE CIERRA. El README manda apuntar a la version exacta y escribe el marcador
 // `@vX.Y.Z` cuando lo explica, pero su bloque de ejemplo traia un pin literal
 // —`@v1.4.1`— que nadie movia: el andamio ya pinaba otro. Un numero de version en
-// la prosa envejece igual aca que en docs/stack.md, y este repo ya se comio esa
+// la prosa envejece igual aca que en docs/03-stack.md, y este repo ya se comio esa
 // leccion dos veces. El marcador no envejece; la version vigente la declara
 // plantilla/.github/workflows/ci.yml, que es el ejemplo que de verdad se copia.
 function pinesLiterales(texto) {
@@ -415,7 +415,7 @@ test("stack · ningun spec vivo del marco nombra un proveedor de infraestructura
     `estos specs del marco nombran un proveedor: ${encontrados.join(", ")}. Un requirement que nombra la ` +
       "implementacion de referencia deja de poder cumplirlo un proyecto que despliega en otro lado, y ahi el " +
       "marco pasa a fijar la plataforma sin decirlo. Las propiedades se enuncian sin proveedor —promocion, " +
-      "compuertas, verificacion de lo desplegado, secretos— y la pieza concreta se nombra en docs/stack.md.",
+      "compuertas, verificacion de lo desplegado, secretos— y la pieza concreta se nombra en docs/03-stack.md.",
   );
 });
 
