@@ -494,7 +494,58 @@ paso no cambia nada, te da el mapa.
 
 ---
 
-## Paso 7 — Volver a comprobarlo cada vez que toques algo · *13 segundos (medido)*
+## Paso 7 — Ver tu proyecto andando · *3 minutos*
+
+**Qué vas a hacer.** Levantarlo en tu computadora y abrirlo en el navegador. Es la
+primera vez en todo el camino que vas a ver algo que se parece a una aplicación, y
+vale la pena: hasta acá tenés un repositorio sano, que no es lo mismo que un
+proyecto que hace algo.
+
+**Qué copiar** (en la carpeta de tu proyecto, las tres líneas):
+
+```bash
+cp api/.env.example api/.env
+cp web/.env.example web/.env
+corepack pnpm dev
+```
+
+Las dos primeras copian los archivos de configuración de ejemplo. Traen valores
+que sirven para tu computadora y **para nada más**: no hay ninguna contraseña de
+verdad adentro.
+
+**Qué vas a ver.** Texto de las dos partes arrancando, y en algún momento estas
+dos líneas, que son las que importan:
+
+```
+web dev:   VITE v8.2.2  ready in 104 ms
+web dev:   ➜  Local:   http://localhost:5173/
+api dev: {"puerto":3000,"nivel":"info","msg":"tu-proyecto-api escuchando"}
+```
+
+Abrí `http://localhost:5173` en el navegador. Vas a ver una página con el
+nombre de tu proyecto. Es fea a propósito: es el punto de partida, no un diseño.
+
+**Cómo sabés que salió bien.** La página abre y el título de la pestaña dice el
+nombre de tu proyecto. Si querés comprobar la otra mitad, abrí
+`http://localhost:3000/api/health`: tiene que contestar algo así:
+
+```json
+{ "estado": "ok", "servicio": "tu-proyecto-api" }
+```
+
+Para apagarlo, **Ctrl+C** en la terminal.
+
+> **Una parte NO va a andar, y es esperado.** Todo lo que necesita la base de
+> datos —por ejemplo `http://localhost:3000/api/db/health`— va a contestar un
+> error. Es correcto: la base todavía no existe. Para levantarla hace falta
+> **Docker**, que no está en la lista de programas de esta página porque no lo
+> necesitás hasta que empieces a guardar datos de verdad. Cuando llegue ese
+> momento, los comandos están en `comandos-levantar-servicios.txt`, en la raíz
+> de tu proyecto.
+
+---
+
+## Paso 8 — Volver a comprobarlo cada vez que toques algo · *13 segundos (medido)*
 
 **Qué vas a hacer.** Correr en tu computadora **las mismas verificaciones** que
 GitHub va a correr después. Es la diferencia entre enterarte ahora o enterarte
@@ -532,7 +583,7 @@ apareció `[ELIFECYCLE] Command failed`.
 
 ---
 
-## Paso 8 — Llenar la portada y hacer el primer envío · *20 minutos*
+## Paso 9 — Llenar la portada y hacer el primer envío · *20 minutos*
 
 **Qué vas a hacer.** Dos cosas: escribir lo que solo vos sabés de tu proyecto, y
 después guardar todo y enviarlo. **Sin propuesta de cambio y sin revisión**, y
@@ -588,14 +639,14 @@ vacía, y en la pestaña **Actions** aparece una corrida en curso.
 > - El [veredicto agregado](02-glosario.md) —la única verificación que la rama
 >   principal va a exigir, y que se llama [`ci-ok`](02-glosario.md)— **no aparece en
 >   la lista de GitHub hasta que haya corrido una vez**. O sea que la protección
->   del paso 10 no se puede encender antes de este envío.
+>   del paso 11 no se puede encender antes de este envío.
 >
 > El orden es: enviar → que corran las verificaciones → **recién ahí** proteger
 > la rama → y desde ese momento, todo por propuesta.
 
 ---
 
-## Paso 9 — Mirar las verificaciones, y esperar un rojo · *4 minutos de reloj*
+## Paso 10 — Mirar las verificaciones, y esperar un rojo · *4 minutos de reloj*
 
 **Qué vas a hacer.** Abrir la pestaña **Actions** del repositorio y mirar la
 corrida. Va a haber **un rojo**, y es el rojo correcto.
@@ -610,11 +661,11 @@ gh run watch
 menos uno: **«Sin marcadores del scaffold sin resolver»**.
 
 **Cómo sabés que salió bien.** Que el único rojo sea ése. Cualquier otro rojo sí
-es un problema, y el paso 12 te dice adónde ir.
+es un problema, y el paso 13 te dice adónde ir.
 
 ---
 
-## Paso 10 — Proteger la rama principal · *10 minutos*
+## Paso 11 — Proteger la rama principal · *10 minutos*
 
 **Qué vas a hacer.** Encender la regla que hace que, de ahora en adelante,
 **nada entre sin pasar por revisión y sin las verificaciones en verde**. Es un
@@ -647,7 +698,7 @@ repositorio queda con su estado real escrito, y la verificación exigida es
 
 ---
 
-## Paso 11 — Los cinco ajustes que nadie extraña · *15 minutos*
+## Paso 12 — Los cinco ajustes que nadie extraña · *15 minutos*
 
 **Qué vas a hacer.** Encender cinco cosas cuya falta **no produce ningún rojo**.
 Ése es exactamente el problema: si no las hacés, nada te avisa.
@@ -684,7 +735,7 @@ gh label list
 
 ---
 
-## Paso 12 — Apagar el rojo esperado y quedar en verde · *20 minutos de trabajo real*
+## Paso 13 — Apagar el rojo esperado y quedar en verde · *20 minutos de trabajo real*
 
 **Qué vas a hacer.** Resolver los **tres recuadros 🕳️** que el andamio dejó a
 propósito, borrarlos, y enviar de nuevo.
@@ -726,8 +777,8 @@ Cinco casos reales. Ninguno es un defecto de tu repositorio.
 | Cuándo | Qué vas a ver | Por qué pasa | Qué hacer |
 |---|---|---|---|
 | Paso 7, si te saltaste el `format` del paso 6 | `[warn] README.md` y `Code style issues found in the above file` | Al reemplazar los marcadores cambian los anchos del texto y las tablas quedan desalineadas | `corepack pnpm run format` y de nuevo. Pasa una sola vez |
-| Paso 9, primera corrida | Un solo trabajo en rojo: «Sin marcadores del scaffold sin resolver» | Los tres recuadros 🕳️ que un humano tiene que resolver. Y **no se pueden resolver todos antes** del primer envío: uno de ellos manda proteger la rama, y eso necesita que las verificaciones hayan corrido una vez | Paso 12 |
-| Si intentás enviar el esqueleto como propuesta en vez de directo | La [compuerta](02-glosario.md) de cobertura en rojo | Mide las líneas que una propuesta agrega sin pruebas, y el esqueleto entero son muchas | Enviar directo a la rama principal la primera vez, como dice el paso 8 |
+| Paso 9, primera corrida | Un solo trabajo en rojo: «Sin marcadores del scaffold sin resolver» | Los tres recuadros 🕳️ que un humano tiene que resolver. Y **no se pueden resolver todos antes** del primer envío: uno de ellos manda proteger la rama, y eso necesita que las verificaciones hayan corrido una vez | Paso 13 |
+| Si intentás enviar el esqueleto como propuesta en vez de directo | La [compuerta](02-glosario.md) de cobertura en rojo | Mide las líneas que una propuesta agrega sin pruebas, y el esqueleto entero son muchas | Enviar directo a la rama principal la primera vez, como dice el paso 9 |
 | En el paso 7, un recuadro con `Update available` | No es rojo, pero parece un problema | Es la herramienta de la base de datos avisando que hay versión nueva | Nada. Las versiones nuevas llegan como propuesta revisable |
 | Semanas después, si elegiste Supabase y el proyecto estuvo quieto | Las pruebas fallan con un error **de conexión** que no dice «pausado» | El plan gratuito **pausa el proyecto tras una semana sin actividad** | Despertarlo desde su panel. Si el proyecto va a tener rachas, está escrito qué decidir en [`plantilla/infra/adaptadores.md`](../plantilla/infra/adaptadores.md) |
 
@@ -739,9 +790,10 @@ Cinco casos reales. Ninguno es un defecto de tu repositorio.
 |---|---|
 | Pasos 0 a 2 — comprobar, traer el marco, crear el repositorio | **unos 5 minutos** |
 | Pasos 3 y 4 — contestar las decisiones y revisarlas | **de 10 minutos a dos días**, y lo que lo estira no es escribir: es decidir y esperar a otra gente |
-| Pasos 5 y 7 — armar, bajar piezas y comprobar | **unos 40 segundos de máquina** *(medido: 25 s el 5 y 13 s el 7)* |
+| Pasos 5 y 8 — armar, bajar piezas y comprobar | **unos 40 segundos de máquina** *(medido: 25 s el 5 y 13 s el 8)* |
 | Paso 6 — entender qué hizo el arranque | **5 minutos de lectura tuya**, y no hay nada que correr |
-| Pasos 8 a 12 — llenar la portada, enviar, proteger, ajustar y quedar en verde | **una hora y cuarto**: 20 minutos de escribir lo que solo vos sabés, el resto en pantallas de GitHub |
+| Paso 7 — verlo andando en tu navegador | **3 minutos**, y es la primera vez que ves algo |
+| Pasos 9 a 13 — llenar la portada, enviar, proteger, ajustar y quedar en verde | **una hora y cuarto**: 20 minutos de escribir lo que solo vos sabés, el resto en pantallas de GitHub |
 
 **La lectura honesta:** lo mecánico no se mide en días —son segundos—, y lo que
 ocupa el día es **decidir** y **esperar a otra gente**. Si alguien te pide una
