@@ -122,7 +122,7 @@ un PR por bloque con `Closes #<sub-issue>` desde su creación.
       bloques dejaron, y agregarle lo que el bloque 2 haya cambiado.
       **Evidencia**: el check `changelog-en-el-pr` en verde en el PR del bloque 1.
 
-- [x] **3.3** Dos filas en `docs/07-reglas-no-escritas.md`, no una — la corrección de D8 agregó
+- [x] **3.3** Dos filas en `docs/08-reglas-no-escritas.md`, no una — la corrección de D8 agregó
       la segunda:
       · **fila 22**, la compuerta que falta, con la medición que explica por qué no se puede
         poner hoy (3 marcadores → 21, y `ci-ok` inalcanzable el día uno);

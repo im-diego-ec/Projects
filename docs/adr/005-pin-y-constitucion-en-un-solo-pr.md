@@ -89,14 +89,14 @@ Es la propiedad que se está comprando; todo lo demás es consecuencia.
 **El disparador se corrige de paso.** El evento que importa no es el calendario
 sino *el marco publicó una versión*. El cron semanal queda como aproximación
 barata mientras no exista el aviso de publicación (fila 14 del backlog de
-[reglas no escritas](../07-reglas-no-escritas.md)), pero deja de pretender que
+[reglas no escritas](../08-reglas-no-escritas.md)), pero deja de pretender que
 hace algo que medimos que no hace.
 
 **Corolario que hay que decir en voz alta**: el bump del marco **deja de venir
 por Dependabot**. Con él se cae la idea de usar sus PRs como censo de
 consumidores — y no es pérdida: barrer la organización por API da la lista en un
 minuto y **no depende del comportamiento de un tercero**, que era el punto ciego
-que [el censo](../09-censo-de-consumidores.md) ya nombraba. Cada mecanismo hace una
+que [el censo](../10-censo-de-consumidores.md) ya nombraba. Cada mecanismo hace una
 cosa: el censo sale del barrido, el bump sale de este workflow.
 
 ## Consecuencias
@@ -136,7 +136,7 @@ cosa: el censo sale del barrido, el bump sale de este workflow.
 |---|---|
 | El artefacto de la constitución no puede quedar atrás del pin | Ya existe: el job de marco del `ci.yml` se pone rojo y sube el artefacto corregido como `constitucion-al-dia` |
 | Ningún `uses:` del marco apunta a un tag móvil ni a una versión vieja | Ya existe: `pruebas/andamio/pinado.test.mjs` |
-| **El pin y el artefacto se mueven juntos, en un PR** | **Nada, todavía** — fila 21 del [backlog](../07-reglas-no-escritas.md#backlog-de-automatización) |
+| **El pin y el artefacto se mueven juntos, en un PR** | **Nada, todavía** — fila 21 del [backlog](../08-reglas-no-escritas.md#backlog-de-automatización) |
 
 La tercera fila es la decisión de este ADR y hoy **no está enforzada**: hasta que
 el workflow mueva el pin, lo que pasa es la alternativa 1 —el paso manual—, y el

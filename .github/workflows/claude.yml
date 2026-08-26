@@ -113,7 +113,7 @@ jobs:
     timeout-minutes: 15
 
     # PERMISOS, auditados ACCION POR ACCION antes del estreno: es la regla 6 de
-    # docs/07-reglas-no-escritas.md, la leccion que otro repo aprendio TRES
+    # docs/08-reglas-no-escritas.md, la leccion que otro repo aprendio TRES
     # veces, siempre con la misma forma —falta un permiso, la API responde 403 y
     # el 403 se disfraza de comportamiento normal—. Cada linea esta porque una
     # llamada concreta la necesita; ninguna esta por las dudas:

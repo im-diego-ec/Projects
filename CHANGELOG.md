@@ -41,6 +41,24 @@ mueve sobre un cambio incompatible.
 
 ## [No publicado]
 
+### Añadido
+
+- **`07-para-el-builder.md`: la hermana de la página del PO, que faltaba.** El reparto
+  entre los dos roles es el corazón de cómo trabaja este marco, y solo uno de los dos
+  tenía puerta de entrada. La nueva tiene la **misma forma y el mismo orden** que
+  `06-para-el-po.md` a propósito: qué te toca y qué no, qué aprobás y qué no, y —donde el
+  PO aprende a **leer** un spec— el builder aprende a **escribir** un change.
+
+  **Y sirve igual trabajando solo**, que es el caso más común al empezar: trabajar solo no
+  elimina los dos roles, los junta en una cabeza. Su sección 5 es la que dice, en una
+  tabla, qué se apaga —**una** cosa: la aprobación de otra persona— y qué **no**: el pull
+  request, la verificación en verde y escribir el change antes de programar siguen en pie.
+  Y dice lo que se pierde y ninguna verificación reemplaza: el otro par de ojos.
+
+  El camino de lectura pasa de siete páginas a ocho, y las cinco de consulta se renumeran
+  de la 09 a la 13. Son 103 referencias reescritas en 30 archivos, con **0 enlaces rotos**
+  después — que es exactamente para lo que se escribió el verificador de enlaces.
+
 ### Cambiado
 
 - **La elección de plataforma por fin decide algo.** Era el hallazgo más caro de la

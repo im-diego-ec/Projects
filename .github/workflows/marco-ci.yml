@@ -1957,7 +1957,7 @@ jobs:
           # rechazo con razon: «el sello lo valida UNA sola pieza», y dos lugares
           # interpretando el mismo sello es exactamente el defecto de las 12 contra 64
           # posiciones hexadecimales que se arreglo esta misma semana. Queda en
-          # docs/07-reglas-no-escritas.md.
+          # docs/08-reglas-no-escritas.md.
           CANDIDATOS="${RUNNER_TEMP}/ejecutores.txt"
           set +e
           git -c core.quotePath=false grep -I -l -z -E 'np[mx]|yarn|bun' -- ':!*.md' ':!*.mdc' > "${CANDIDATOS}"
@@ -2356,7 +2356,7 @@ jobs:
             // caso de clase "residuo", asi que el dia que se cierre el banco se
             // cae y se ve en el diff.
             const criticos = [...dudosos.values()].filter((item) => item.critico);
-            const RESIDUO_A16 = " RESIDUO DECLARADO (A16, modo aviso desde el 2026-08-21): esto es AVISO y no rojo porque la clase no se puede cerrar leyendo texto. El alfabeto compara el gestor y su subcomando por igualdad exacta, y el comodin del allowlist escrito SEPARADO por un espacio no es puntuacion que recortar: medido, cuatro entradas de un gestor con subcomando y comodin separado dieron exit 0 con cero anotaciones y la del ejecutor directo dio exit 1, o sea el mismo permiso con dos suertes distintas. Poner rojo solo la ortografia que este lector alcanza seria enforzar una ortografia y llamarla compuerta. El diagnostico y su fila de backlog viven en docs/07-reglas-no-escritas.md";
+            const RESIDUO_A16 = " RESIDUO DECLARADO (A16, modo aviso desde el 2026-08-21): esto es AVISO y no rojo porque la clase no se puede cerrar leyendo texto. El alfabeto compara el gestor y su subcomando por igualdad exacta, y el comodin del allowlist escrito SEPARADO por un espacio no es puntuacion que recortar: medido, cuatro entradas de un gestor con subcomando y comodin separado dieron exit 0 con cero anotaciones y la del ejecutor directo dio exit 1, o sea el mismo permiso con dos suertes distintas. Poner rojo solo la ortografia que este lector alcanza seria enforzar una ortografia y llamarla compuerta. El diagnostico y su fila de backlog viven en docs/08-reglas-no-escritas.md";
             // LAS DOS CLASES NO SE MEZCLAN. Un archivo que no se pudo leer es un
             // hecho decidido y va en ROJO: el propio paso ya trata el rc>1 de
             // git grep asi, con el argumento de que sin poder mirar no se declara
@@ -3717,7 +3717,7 @@ jobs:
   #     no se afloja lo que funciona. El residuo sale en la salida del paso en TODA
   #     corrida, incluida la verde, porque desde aca el falso verde es
   #     indistinguible del cableado sano. Su fila esta en
-  #     docs/07-reglas-no-escritas.md.
+  #     docs/08-reglas-no-escritas.md.
   #
   # SKIP DEL DISTRIBUIDOR, ahora como PROPIEDAD POSITIVA y con tres candados:
   # el repo que reparte el scaffold es el marco y no es consumidor de su propia
