@@ -150,13 +150,19 @@ export const PREGUNTAS = [
           "el día uno, y para configurarlo hay que saber qué es una cuenta, una región y un perfil. Acá " +
           "Terraform SÍ vale la pena, y es lo único que el andamio trae preparado hoy.",
       },
-      {
-        valor: "gcp",
-        etiqueta: "GCP (Google)",
-        detalle:
-          "Mismo perfil que AWS: potente, pide tarjeta, requiere saber de cuentas y regiones. Aviso " +
-          "honesto: hoy el andamio NO lo trae preparado — habría que construirlo.",
-      },
+      // GCP SALE DE LAS OPCIONES, y es la misma leccion que Slack.
+      //
+      // Su propio texto admitia que «hoy el andamio NO lo trae preparado», y aun
+      // asi se ofrecia como elegible: quien la elegia recibia un proyecto sin
+      // infraestructura y sin nada que se lo explicara, igual que quien elegia
+      // Slack recibia un archivo que el motor rechazaba. Una opcion que se
+      // ofrece y no funciona es peor que no ofrecerla.
+      //
+      // Vuelve el dia que exista su adaptador, y ese dia la fila de la carta y
+      // esta opcion se mueven JUNTAS —hay un banco que lo exige—. Mientras
+      // tanto, quien quiera GCP elige «todavia no se» y lo deja anotado como
+      // desvio, que es lo honesto: el proyecto queda sin infraestructura, y eso
+      // es exactamente lo que el marco puede darle hoy.
       {
         valor: "ninguna",
         etiqueta: "Todavía no sé",

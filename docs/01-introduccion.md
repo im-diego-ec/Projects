@@ -280,7 +280,7 @@ adelante se abren el día que hace falta y no antes.
 | --- | --- | --- |
 | **01** | Introducción | ← estás acá |
 | **02** | [02-glosario.md](02-glosario.md) | Cada palabra rara del marco en una línea. Va segunda a propósito: de la 03 en adelante todas las páginas enlazan acá, y conviene haberla visto antes de tropezarse con el primer enlace |
-| **03** | [03-stack.md](03-stack.md) | Con qué tecnología corre esto y, sobre todo, la decisión de **dónde va a vivir tu proyecto** — la que más cuesta si se toma tarde |
+| **03** | [03-stack.md](03-stack.md) | **La carta: las cuatro formas de construir** —un sitio para leer, una aplicación con puerta, una app de teléfono— con por qué elegirías cada una y su límite real. Y con qué tecnología corre todo esto |
 | **04** | [04-arrancar-acompanado.md](04-arrancar-acompanado.md) | El «hacelo conmigo»: qué comando copiar, qué vas a ver en pantalla, cómo saber que salió bien y qué rojos son normales |
 | **05** | [05-arrancar-tecnico.md](05-arrancar-tecnico.md) | El mismo camino, contado para quien se mueve en una consola. Es el que manda si las dos se contradicen |
 | **06** | [06-para-el-po.md](06-para-el-po.md) | Cuando el repositorio ya está verde y hay que aprobar o devolver la primera propuesta |

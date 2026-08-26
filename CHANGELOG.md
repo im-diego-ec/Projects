@@ -43,6 +43,38 @@ mueve sobre un cambio incompatible.
 
 ### Corregido
 
+- **El Paso 2 te hacía crear un repositorio privado y el Paso 3 te recomendaba público**,
+  con una pantalla de distancia. Ahora el comando crea `--public` y explica en el mismo
+  lugar **por qué** —es lo único que te da gratis la protección de la rama principal— y
+  **cómo cambiarlo** si tu código no puede ser público, con lo que se pierde al hacerlo.
+- **Cinco referencias cruzadas quedaron viejas** al insertar el Paso 7: apuntaban a pasos
+  que se corrieron un número.
+- **La carta no estaba enlazada desde ninguna de las dos páginas que la persona sigue.**
+  La decisión más cara del proyecto vivía en una página que se autodeclara técnica. Ahora
+  la guía acompañada abre con un tramo «antes del Paso 0» que la enlaza y —esto es lo que
+  faltaba— **dice de frente qué forma le va a tocar hoy**: de las cuatro hay una
+  construida, y si tu proyecto es claramente un sitio para leer o una app de teléfono, es
+  mejor saberlo ahora que a mitad de camino.
+- **El desempate entre B y B+ mandaba a una forma que no existe** sin decirlo.
+- **La trampa del puerto en el Paso 7.** Cuando el 5173 está ocupado, la herramienta se
+  muda al 5174 y avisa — pero la guía daba la dirección fija, así que la persona abría el
+  puerto de otro programa. Ahora dice que la dirección buena es siempre la que imprime
+  `Local:`.
+- **GCP se ofrecía como elegible mientras su propio texto admitía que el andamio no lo
+  trae preparado** — el mismo defecto que Slack, en su tercera casilla. Sale de las
+  opciones hasta que exista su adaptador, y la tabla de la guía lo dice con un 🕳️ en vez
+  de presentarlo como una opción más.
+
+### Cambiado
+
+- **«Que no quede en papel» deja de ser una regla de la carta y pasa a ser una regla del
+  marco.** El banco nuevo exige que el asistente no ofrezca **ninguna** plataforma que el
+  marco no sostenga, y que toda plataforma sostenida se pueda elegir — las dos mitades del
+  mismo defecto. Cada estado va con su motivo escrito, porque un estado sin motivo es una
+  decisión que la próxima persona no va a poder revisar.
+
+### Corregido
+
 - **El arreglo anterior cambió un aborto ruidoso por una pérdida silenciosa, que es
   estrictamente peor.** Eximir los tres archivos del asistente del guard del destino
   ocupado destrabó la corrida — pero después el copiado los pisaba igual. Medido: el
