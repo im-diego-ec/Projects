@@ -43,6 +43,32 @@ mueve sobre un cambio incompatible.
 
 ### Corregido
 
+- **La señal de éxito del Paso 9 era inalcanzable como estaba escrita.** De los nueve
+  `RELLENAR` del `README.md` que recibe un proyecto, **tres viven adentro del recuadro de
+  instrucciones** que el propio recuadro manda borrar entero. La guía decía «reemplazá cada
+  `RELLENAR`» y prometía que el comando dejaría de imprimir — y con esa instrucción nunca
+  llegaba a cero. Ahora dice que son seis huecos y un recuadro, y qué significa si quedan
+  líneas que empiezan con `>`.
+- **La trampa que más cuesta descubrir sola: el validador exige `SHALL` o `MUST`, en
+  inglés.** La guía manda escribir todo en castellano y nunca lo decía. Medido con el
+  validador que este marco pinea: con `DEBE` sale **exit 1**, con `SHALL` sale **exit 0** —
+  y ese mismo comando corre en las verificaciones automáticas. Peor: **el error no menciona
+  la palabra**. Ahora está dicho en las dos páginas que importan, con un delta completo de
+  ejemplo para copiar la forma.
+- **La portada del proyecto afirmaba un despliegue que no existe.** `README-del-proyecto.md`
+  traía una tabla de ambientes con prefijo de recursos y región —de AWS— aunque la
+  plataforma elegida no fuera AWS y el proyecto no recibiera una sola línea de
+  infraestructura. La primera pantalla que ve cualquiera que entre al repositorio. Ahora la
+  tabla es condicional y **arriba va un aviso en los dos casos**: este proyecto se verifica
+  solo, pero nada lo publica todavía.
+- **Dos cifras más que la documentación afirmaba sobre sí misma y ya no eran ciertas** —«la
+  primera de doce páginas» cuando son quince, «el estándar mide 14» cuando mide diecisiete—.
+  Es la **tercera vez** que pasa lo mismo, así que la salida no fue corregirlas otra vez:
+  se dejaron de escribir, y el índice publica el comando que las cuenta. Y entró el guard
+  que compara toda cifra que la documentación afirma sobre sí misma contra la medición real.
+
+### Corregido
+
 - **El Paso 2 te hacía crear un repositorio privado y el Paso 3 te recomendaba público**,
   con una pantalla de distancia. Ahora el comando crea `--public` y explica en el mismo
   lugar **por qué** —es lo único que te da gratis la protección de la rama principal— y

@@ -309,6 +309,18 @@ export function podarPorPlataforma(texto, rel, plataforma) {
   if (rel === ".github/dependabot.yml") {
     return texto.replace(/[ \t]*# projects:solo-si-hay-infra\n[\s\S]*?# projects:fin-solo-si-hay-infra\n/g, "");
   }
+  if (rel === "README-del-proyecto.md") {
+    // La portada del proyecto describia una tabla de ambientes de nube con
+    // prefijo de recursos y region — de AWS — aunque la plataforma elegida no
+    // fuera AWS y el proyecto no recibiera una sola linea de infraestructura. La
+    // primera pantalla que ve cualquiera que entre al repositorio afirmaba un
+    // despliegue que no existe. El centinela va en el propio andamio, con la
+    // forma de cita de markdown para que el bloque se lea igual mientras esta.
+    return texto.replace(/> # projects:solo-si-hay-infra\n[\s\S]*?> # projects:fin-solo-si-hay-infra\n/g,
+      "> ⚠️ **Este proyecto todavía no se publica en ningún lado.** Se verifica solo, pero nada\n" +
+      "> lo lleva a una dirección donde otra persona pueda entrar. Mientras tanto se levanta en\n" +
+      "> tu máquina con `pnpm dev`.\n");
+  }
   if (rel === ".claude/settings.json") {
     // JSON no admite comentarios, asi que el centinela no sirve: se filtran las
     // entradas por lo que nombran. `terraform` y `AWS_PROFILE` son literales de
