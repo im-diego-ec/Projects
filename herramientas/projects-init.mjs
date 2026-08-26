@@ -346,6 +346,24 @@ export function podarPorPlataforma(texto, rel, plataforma) {
  *  destruya. Pisarlos es exactamente lo que corresponde. */
 export const LO_QUE_ESCRIBE_EL_ASISTENTE = new Set([".projects-valores.json", ".projects-respuestas.json", ".projects-desvios.json"]);
 
+/** Si un archivo del andamio NO debe pisar lo que ya hay en el destino.
+ *
+ *  LA SEGUNDA MITAD DEL MISMO DEFECTO, y el arreglo anterior la dejo abierta.
+ *  Eximir estos tres del guard del destino ocupado destrabo la corrida, si — pero
+ *  despues el copiado los pisaba igual. Medido: el asistente declaraba TRES
+ *  desvios con su motivo y su fecha de revision, el copiado escribia encima la
+ *  plantilla vacia del andamio (`{"desvios": []}`), y la persona terminaba con un
+ *  archivo que dice que no se aparto de nada. O sea que el arreglo cambio un
+ *  aborto RUIDOSO por una perdida SILENCIOSA, que es estrictamente peor: el
+ *  aborto por lo menos avisaba.
+ *
+ *  La regla correcta: lo que el asistente escribio es la ENTRADA de esta corrida
+ *  y no se pisa. Si el archivo no esta, se copia la plantilla del andamio como
+ *  siempre. */
+export function noPisaLoQueYaEsta(rel) {
+  return LO_QUE_ESCRIBE_EL_ASISTENTE.has(rel);
+}
+
 /** La plataforma declarada en el archivo de valores.
  *
  *  Va en minuscula y FUERA de los 21, porque no es un marcador que el andamio
@@ -715,6 +733,12 @@ export function instanciar({ raizAndamio, destino, valores }) {
     const relDestino = destinoDe(rel, plataforma);
     const origen = path.join(raizAndamio, rel);
     const salida = path.join(destino, ...relDestino.split("/"));
+    // Lo que el asistente dejo escrito es la ENTRADA de esta corrida, no algo
+    // que este copiado deba reemplazar. Ver noPisaLoQueYaEsta.
+    if (noPisaLoQueYaEsta(relDestino) && fs.existsSync(salida)) {
+      escritos.push(relDestino);
+      continue;
+    }
     try {
       // Se poda ANTES de sustituir: lo que se saca puede tener marcadores
       // adentro —`{{PERFIL_DEV}}` vivia en el bloque de permisos de AWS— y

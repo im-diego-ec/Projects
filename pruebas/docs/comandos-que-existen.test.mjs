@@ -31,8 +31,11 @@ const RAIZ = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..")
  *  independencia, y el comentario de arriba dice como reproducirla. */
 export const COMANDOS_DEL_PROYECTO = ["apply", "archive", "explore", "propose", "sync", "update"];
 
-/** Y las skills, medidas igual. Siete: las seis de OpenSpec mas la del marco. */
-export const CUANTAS_SKILLS = 7;
+/** Las skills que deja `openspec init`. SEIS, y ese numero es el correcto para la
+ *  documentacion: la septima que aparece en un proyecto —`projects-archive-change`—
+ *  la pone ESTE MARCO, no OpenSpec. Decir «siete skills de openspec» es contar una
+ *  que no es suya, y fue el error que reemplazo al «doce» anterior. */
+export const CUANTAS_SKILLS = 6;
 
 const docs = () =>
   execFileSync("git", ["ls-files", "docs/*.md", "*.md"], { cwd: RAIZ, encoding: "utf-8" })

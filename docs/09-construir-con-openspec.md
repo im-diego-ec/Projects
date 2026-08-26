@@ -35,7 +35,7 @@ CLAUDE.md  ──importa──►  AGENTS.md  ──importa──►  .projects/
                          (lo del proyecto)         (las reglas del área)
 ```
 
-Más `.claude/settings.json`, y los **6 comandos `/opsx:*`** y las 7 skills `openspec-*` que
+Más `.claude/settings.json`, y los **6 comandos `/opsx:*`** y las 6 skills `openspec-*` que
 dejó `openspec init` (lo corre `projects init` en su último paso; si ese paso falló, no están y
 hay que correrlo a mano).
 
@@ -66,23 +66,30 @@ change está vivo, es solo el nombre.
 
 ##### 7.b Crear el change
 
-**El directorio lo creás vos, y el proposal se escribe antes que todo lo demás.**
+**El directorio lo crea un comando, y el proposal se escribe antes que todo lo demás.**
 
 ```bash
-mkdir -p openspec/changes/recepcion-de-mercaderia/specs
+openspec new change recepcion-de-mercaderia
 ```
 
-Y adentro, `proposal.md` primero. La página [07-para-el-builder.md](07-para-el-builder.md)
+Crea `openspec/changes/recepcion-de-mercaderia/` y **para ahí**: no escribe ningún
+artefacto. Eso es exactamente lo que hace falta, porque el primero que se escribe es
+`proposal.md` y lo escribís vos. La página [07-para-el-builder.md](07-para-el-builder.md)
 sección 3 dice qué contesta cada archivo del change y en qué orden.
 
-> **Por qué a mano y no con un comando.** Medido contra el CLI que este marco pinea
-> (`@fission-ai/openspec@1.9.0`) y contra lo que `openspec init` deja en un proyecto
-> recién creado: **no existe ningún comando que cree un change vacío**. El CLI tiene
-> `openspec change show`, `list` y `validate` — ninguno crea. Y de los **seis** comandos
-> que llegan al proyecto (`/opsx:explore`, `propose`, `apply`, `archive`, `sync`,
-> `update`), el único que crea es `/opsx:propose`, y su propia descripción dice que
-> *«genera todos los artefactos en un solo paso»*: proposal, deltas, `design.md` y
-> `tasks.md` juntos.
+> **Por qué este comando y no `/opsx:propose`.** Los dos crean el change, pero `propose`
+> dice de sí mismo que *«genera todos los artefactos en un solo paso»*: proposal, deltas,
+> `design.md` y `tasks.md` juntos. Eso rompe la [compuerta](02-glosario.md) del PO — el PO
+> terminaría aprobando un proposal cuyo diseño ya está escrito, o sea decidiendo el *qué*
+> cuando el *cómo* ya está decidido.
+>
+> **Lo que sí conviene usar antes:** `/opsx:explore`, que es para pensar el problema en voz
+> alta sin escribir todavía ningún artefacto. Y una vez que el proposal está aprobado,
+> `/opsx:apply` para implementar las tareas.
+>
+> Los comandos `/opsx:*` que llegan al proyecto son **seis** —`explore`, `propose`,
+> `apply`, `archive`, `sync`, `update`— y las skills de OpenSpec son **seis**; la séptima
+> que vas a ver, `projects-archive-change`, la pone este marco y no OpenSpec.
 >
 > **Eso rompe la [compuerta](02-glosario.md) del PO**, y por eso esta página no lo usa para empezar: el PO
 > terminaría aprobando un proposal cuyo diseño ya está escrito, o sea decidiendo el *qué*

@@ -41,6 +41,34 @@ mueve sobre un cambio incompatible.
 
 ## [No publicado]
 
+### Corregido
+
+- **El arreglo anterior cambió un aborto ruidoso por una pérdida silenciosa, que es
+  estrictamente peor.** Eximir los tres archivos del asistente del guard del destino
+  ocupado destrabó la corrida — pero después el copiado los pisaba igual. Medido: el
+  asistente declaraba **tres desvíos** con su motivo y su fecha de revisión, el copiado
+  escribía encima la plantilla vacía del andamio (`{"desvios": []}`), y la persona
+  terminaba con un archivo que dice que no se apartó de nada. El aborto por lo menos
+  avisaba. Ahora lo que el asistente escribió no se pisa: es la **entrada** de esa corrida.
+- **La documentación afirmaba en negrita que no existe ningún comando para crear un
+  change, y es falso.** `openspec new change <nombre>` existe, crea el directorio y **para
+  ahí** —sin escribir ningún artefacto—, que es exactamente lo que hacía falta. El error
+  fue mío y su causa también: miré `openspec change --help`, vi solo `show`, `list` y
+  `validate`, y concluí de ahí en vez de buscar. La página ahora usa el comando, y el
+  motivo de no usar `/opsx:propose` se conserva porque ése sigue siendo cierto.
+- **«7 skills» también era falso**, y reemplazaba al «12» anterior. `openspec init` deja
+  **seis**; la séptima que aparece en un proyecto la pone este marco, no OpenSpec.
+
+### Cambiado
+
+- **El banco de la carta era decorativo en su afirmación central, y se endureció.** Un
+  escéptico lo rompió **cuatro veces** con el banco en verde: una fila con una letra fuera
+  del rango pasaba entera sin sección ni explicación; una flecha sin destino dejaba a una
+  forma exenta de las tres reglas a la vez; borrar el aviso que le dice al lector que hoy
+  no puede elegir no movía nada; y el caso llamado «MUERDE» era tautológico — armaba la
+  lista falsa en memoria y se comprobaba a sí mismo sin ejecutar nunca la comparación real.
+  Los cuatro ataques se repitieron contra el banco endurecido y **los cuatro salen rojos**.
+
 ### Añadido
 
 - **La carta: las cuatro formas de construir, nombradas y explicadas, para que la persona
