@@ -1841,7 +1841,12 @@ async function main(argv) {
     // `--solo-valores` es el gemelo interactivo de `--ejemplo`: deja el archivo
     // y no toca ningun destino. Sirve para revisar lo elegido antes de armar nada.
     if (o.soloValores || !o.destino) {
-      process.stdout.write(`\nNo se armo ningun proyecto. Para armarlo:\n  node ${path.relative(process.cwd(), fileURLToPath(import.meta.url))} --valores ${salida} --destino <carpeta>\n`);
+      // EL COMANDO QUE SE IMPRIME ACA TIENE QUE SER EL MISMO QUE MANDA LA GUIA.
+      // Antes se imprimia con `--destino <carpeta>` y una ruta relativa al
+      // ejecutable, y la guia manda `--destino .` con la ruta absoluta al clon:
+      // dos comandos distintos para lo mismo, y quien acaba de contestar ocho
+      // preguntas no tiene como saber cual de los dos es el bueno.
+      process.stdout.write(`\nNo se armo ningun proyecto todavia. El paso que sigue, aca mismo:\n  node ${fileURLToPath(import.meta.url)} --valores ${path.basename(salida)} --destino .\n`);
       return 0;
     }
     o.valores = salida;
