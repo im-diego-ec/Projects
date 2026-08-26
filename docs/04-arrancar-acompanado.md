@@ -108,8 +108,22 @@ Se instalan una vez en tu computadora y sirven para todos los proyectos.
 |---|---|---|
 | **Git** | Guardar y enviar los cambios | [`git-scm.com`](https://git-scm.com) |
 | **Node** | El intérprete con el que corre todo lo del marco | [`nodejs.org`](https://nodejs.org) — la versión con soporte de largo plazo |
-| **pnpm** | El instalador de las piezas del proyecto. **No lo instalás aparte**: viene con Node y se enciende con `corepack` | Ver el paso 0 |
+| **pnpm** | El instalador de las piezas del proyecto | **No lo instalás ni lo encendés.** Viene con Node, y todos los comandos de esta página lo llaman con el prefijo `corepack pnpm` |
 | **gh** | Hablar con GitHub desde la consola | [`cli.github.com`](https://cli.github.com) |
+
+### Y una cosa más, que no es un programa
+
+**Acceso de lectura al repositorio del marco.** `im-diego-ec/Projects` es
+**privado**: si no te lo compartieron, el Paso 1 no lo va a poder bajar, y el
+error que vas a ver no dice eso. Compruébalo antes de empezar:
+
+```bash
+gh repo view im-diego-ec/Projects
+```
+
+Si contesta con el nombre del repositorio y su descripción, tenés acceso. Si
+contesta `Could not resolve to a Repository`, **todavía no**: eso lo destraba una
+persona —quien administra la cuenta te agrega como lector—, no un comando.
 
 ---
 
@@ -133,14 +147,22 @@ contesta con la cuenta de GitHub con la que estás dentro.
 ```
 git version 2.50.1
 v24.19.0
-✓ Logged in to github.com account <tu-usuario>
+github.com
+  ✓ Logged in to github.com account <tu-usuario> (keyring)
+  - Active account: true
+  - Git operations protocol: https
+  - Token: gho_************************
 0.35.0
 ```
 
-**Cómo sabés que salió bien.** Los cuatro contestaron. Si `gh auth status` dice
-que no estás dentro, corré `gh auth login` y volvé acá; si te lo salteás, el paso 1
-falla con un **«no encontrado»** que parece un error de escritura en la ruta y
-no lo es.
+**Lo que va a ser distinto en tu pantalla, y está bien.** Los números de versión
+van a ser otros. `git` puede agregar algo entre paréntesis según cómo esté
+instalado. Y `gh auth status` imprime varias líneas más que las de acá: **lo
+único que tenés que encontrar es la línea con el tilde `✓ Logged in`**.
+
+**Cómo sabés que salió bien.** Los cuatro contestaron algo y ninguno dijo
+`command not found`. Si `gh auth status` dice que no estás dentro, corré
+`gh auth login` y volvé acá.
 
 > **Node tiene un piso.** La herramienta de arranque exige una versión mínima y
 > lo dice sola si no la alcanza, con la frase «esta herramienta necesita Node
@@ -157,13 +179,36 @@ sola vez**, y sirve para todos los proyectos que arranques.
 
 ```bash
 gh repo clone im-diego-ec/Projects
+cd Projects
+pwd
+cd ..
 ```
 
-**Qué vas a ver.** Las líneas de la descarga y, al final, la carpeta creada.
+**Qué vas a ver.** Una sola línea de la descarga, `Cloning into 'Projects'...`, y
+después la ruta completa de la carpeta que imprime `pwd`, algo así:
 
-**Cómo sabés que salió bien.** Existe una carpeta `Projects` y adentro hay un
-archivo `README.md`. **Anotá dónde quedó**: en los pasos siguientes esa ruta se
-escribe como `<ruta-al-clon>`.
+```
+Cloning into 'Projects'...
+/Users/tu-nombre/Projects
+```
+
+**Copiá esa segunda línea y guardala** en una nota o en un papel. Es lo que en
+los Pasos 3 y 5 se escribe como `<ruta-al-clon>`. Ningún otro comando la vuelve
+a imprimir.
+
+**Cómo sabés que salió bien.** Existe una carpeta `Projects`, adentro hay un
+archivo `README.md`, y tenés la ruta anotada.
+
+> **Si en vez de la descarga ves `Could not resolve to a Repository`**, hay dos
+> causas y la página no puede saber cuál es la tuya:
+>
+> 1. **No estás autenticado.** Corré `gh auth login` y volvé a intentar.
+> 2. **Estás autenticado pero no te dieron acceso** al repositorio, que es
+>    privado. Eso lo destraba una persona, no un comando: pedile a quien
+>    administra la cuenta que te agregue como lector.
+>
+> El síntoma es idéntico en los dos casos porque GitHub responde lo mismo para
+> «no existe» y para «existe y no es tuyo», a propósito.
 
 > **No la pongas en una carpeta temporal.** El clon te sirve para todos los
 > proyectos, no para éste, y en Windows la carpeta `/tmp` ni siquiera existe.
@@ -175,6 +220,17 @@ escribe como `<ruta-al-clon>`.
 **Qué vas a hacer.** Crear el repositorio en GitHub, vacío, y bajarlo a tu
 computadora. La herramienta del paso 5 **no crea repositorios**: escribe adentro
 de uno que ya existe.
+
+**Antes de copiar nada, salí de la carpeta del marco.** El proyecto nuevo va
+**al lado** del clon, nunca adentro:
+
+```bash
+cd ..
+pwd
+```
+
+Esa ruta **no** tiene que terminar en `/Projects`. Si termina ahí, volvé a correr
+`cd ..`.
 
 **Qué copiar** (cambiá `<org>` y `<proyecto>` por los tuyos):
 
@@ -198,67 +254,105 @@ está vacía salvo por la carpeta oculta `.git`.
 
 ---
 
-## Paso 3 — Pedir la hoja de decisiones · *1 minuto*
+## Paso 3 — Contestar las decisiones · *de 5 minutos a dos días*
 
-**Qué vas a hacer.** Generar un archivo con **una casilla por cada decisión** que
-una plantilla no puede adivinar. Son 21.
+**Qué vas a hacer.** Contestar unas preguntas en castellano. El programa arma con
+tus respuestas el archivo que necesita para construir el proyecto, así que no
+tenés que llenar nada a mano.
+
+**Qué copiar** (parado en la carpeta donde va tu proyecto, no adentro del clon):
+
+```bash
+node <ruta-al-clon>/herramientas/projects-init.mjs --asistente --solo-valores valores.json
+```
+
+**Qué vas a ver.** Una pregunta por vez, numerada, con sus opciones. Cada opción
+te dice por qué la elegirías, qué te cuesta y qué límite tiene. Así:
+
+```
+[3/8]  ¿Trabajás solo en este proyecto, o hay más gente que va a revisar el código?
+
+  1) Solo yo, por ahora   ← recomendada
+     El marco automatiza que otra persona revise cada cambio antes de que entre.
+     Con una sola persona eso es imposible por construcción: GitHub le pide
+     revisión a los dueños del código EXCEPTO al autor, así que todo cambio tuyo
+     le pediría revisión a nadie. Encender esa exigencia te bloquearía TODO merge
+     sin salida. Se deja apagada, se anota como decisión firmada, y el pull
+     request con su verificación en verde siguen siendo obligatorios.
+
+  2) Somos dos o más
+     ...
+
+  Elegí un número [Enter = 1]:
+```
+
+**Cuántas preguntas son.** Depende de lo que contestes, y ésa es la idea:
+
+| Si elegís | Son |
+| --- | --- |
+| Supabase, trabajando solo, sin dominio propio | **8 preguntas**, y solo dos hay que escribirlas |
+| AWS con dos copias del proyecto | **15**, porque ahí los datos de la nube existen de verdad |
+
+Las que no escribís se contestan con **Enter**, que elige la opción recomendada.
+Nunca te va a pedir un dato de AWS si no elegiste AWS.
+
+**Si te equivocás en una.** No pasa nada: al terminar imprime un resumen de todo
+lo que elegiste, y podés volver a correr el mismo comando —lo que ya contestaste
+se te ofrece como respuesta por omisión, así que solo cambiás lo que quieras.
+
+**Cómo sabés que salió bien.** Termina con el resumen de tus ocho decisiones y
+dice `Escrito: valores.json`. Si además te apartaste de algo que el marco supone
+—por ejemplo trabajar solo—, escribe un segundo archivo,
+`.projects-desvios.json`, con qué queda apartado, por qué, y cuándo conviene
+revisarlo.
+
+> **Lo que no puede adivinar nadie.** Dos respuestas dependen de otra persona o
+> de una cuenta que quizá no tenés todavía: el nombre del repositorio y tu
+> usuario de GitHub. El resto tiene una recomendación puesta.
+
+---
+
+## Paso 4 — Revisar lo que quedó escrito · *5 minutos*
+
+**Qué vas a hacer.** Abrir el archivo que armó el asistente y mirarlo una vez.
+No para corregirlo —ya está validado— sino para saber qué hay adentro.
 
 **Qué copiar:**
 
 ```bash
-node <ruta-al-clon>/herramientas/projects-init.mjs --ejemplo > valores.json
+cat valores.json
 ```
 
-**Qué vas a ver.** Nada en pantalla: la hoja se escribió en el archivo. Abrilo y
-vas a encontrar esto, con valores de ejemplo ya puestos:
+**Qué vas a ver.** Las 21 casillas que el programa necesita, llenas con lo que
+derivó de tus 8 respuestas. Por ejemplo, si dijiste que no tenés dominio propio,
+vas a encontrar la dirección gratuita de Cloudflare ya puesta:
 
 ```json
 {
-  "PROYECTO": "people-agenda",
-  "ORG": "Ejemplo-Org",
-  "PAQUETE_API": "api",
-  "PAQUETE_WEB": "web",
-  "PAQUETE_E2E": "e2e",
-  "GENERAR_CLIENTE_DATOS": "prisma generate",
-  "EQUIPO_BUILDERS": "builders",
-  "EQUIPO_PO": "po",
-  "...": "y trece más"
+  "PROYECTO": "agenda-de-personas",
+  "ORG": "tu-usuario",
+  "DOMINIO_PROD": "agenda-de-personas.pages.dev",
+  ...
 }
 ```
 
-**Cómo sabés que salió bien.** El archivo `valores.json` existe y empieza con
-`{`.
+**Qué hacer si algo no te gusta.** Volvé a correr el comando del paso 3 con
+`--valores valores.json` agregado: te vuelve a preguntar, ofreciéndote lo que ya
+habías contestado, y reescribe el archivo.
 
----
+**Cómo sabés que salió bien.** El archivo existe y ninguna casilla dice
+`RELLENAR` ni tiene dobles llaves `{{así}}`.
 
-## Paso 4 — Llenar las 21 decisiones · *de media hora a dos días*
+> **Si preferís llenarlo a mano.** El camino de antes sigue existiendo y es
+> idéntico: `--ejemplo > valores.json` te da la hoja con las 21 casillas y sus
+> valores de ejemplo, y qué va en cada una está en la sección 2 de
+> [`plantilla/README.md`](../plantilla/README.md). Es el camino de quien ya sabe
+> lo que quiere; el asistente es el mismo destino por otra puerta.
 
-**Qué vas a hacer.** Reemplazar cada valor de ejemplo por el de tu proyecto.
-**Éste es el paso largo**, y no por escribir: dos de las casillas dependen de
-otra persona —el nombre del equipo que revisa y el del [PO](02-glosario.md)— y ésas
-se piden **el primer día**, no el último.
-
-**Dónde está escrito qué va en cada una.** En
-[`plantilla/README.md`](../plantilla/README.md), sección 2: una fila por casilla,
-con un ejemplo y el caso raro de cada una. Es la lista que manda.
-
-**Qué copiar.** Nada, y es el único paso donde no hay nada que copiar: éste se
-escribe. Abrí `valores.json` con cualquier editor de texto, cambiá el valor que
-está a la derecha de cada dos puntos y **no toques lo que está a la izquierda**,
-que es el nombre de la casilla. Dejá las comillas y las comas donde están.
-
-**Qué vas a ver.** El mismo archivo del paso 3, con tus valores en vez de los de
-ejemplo: `"PROYECTO": "el-nombre-de-tu-proyecto"` en vez de
-`"PROYECTO": "people-agenda"`, y así con las 21. Ninguna casilla queda vacía y
-ninguna dice todavía `Ejemplo-Org`.
-
-**Cómo sabés que salió bien.** No lo sabés todavía: lo dice el paso 5. Si dejás
-una casilla vacía o de más, la herramienta **no escribe nada** y te nombra la
-que falta.
-
-> **Las cuentas y los dominios de ejemplo son inventados a propósito.** En el
-> marco no se escriben datos reales de ningún proyecto: los números de cuenta
-> de los ejemplos son `111111111111` y `222222222222`.
+> **Los números de cuenta de los ejemplos son inventados a propósito.** En el
+> marco no se escriben datos reales de ningún proyecto: son `111111111111` y
+> `222222222222`, y hay una comprobación automática que se pone roja si alguien
+> escribe uno de verdad.
 
 ---
 
@@ -577,8 +671,8 @@ Cinco casos reales. Ninguno es un defecto de tu repositorio.
 
 | Tramo | Tiempo |
 |---|---|
-| Pasos 0 a 3 — comprobar, traer el marco, crear el repositorio, pedir la hoja | **unos 6 minutos** |
-| Paso 4 — llenar las 21 decisiones | **de media hora a dos días**, y depende de otras personas |
+| Pasos 0 a 2 — comprobar, traer el marco, crear el repositorio | **unos 5 minutos** |
+| Pasos 3 y 4 — contestar las decisiones y revisarlas | **de 10 minutos a dos días**, y lo que lo estira no es escribir: es decidir y esperar a otra gente |
 | Pasos 5 a 7 — armar, bajar piezas y comprobar | **menos de 30 segundos de máquina** *(medido: 1 s + 11 s + 13 s)* |
 | Pasos 8 a 12 — enviar, proteger, ajustar y quedar en verde | **una hora**, casi toda en pantallas de GitHub |
 
