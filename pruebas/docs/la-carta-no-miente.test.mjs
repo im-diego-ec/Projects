@@ -35,7 +35,12 @@ const FALTA = "🕳️";
 export function formasDeLaCarta(texto = fs.readFileSync(CARTA, "utf-8")) {
   const formas = [];
   for (const linea of texto.split("\n")) {
-    const m = /^\|\s*\*\*([A-D]\+?)\*\*\s*\|([^|]+)\|([^|]+)\|([^|]+)\|/.exec(linea);
+    // La clave se acepta ABIERTA —cualquier letra con un + opcional— y no
+    // acotada a la A..D. Un esceptico agrego una fila «**E** | Un bot de
+    // WhatsApp | ✅» sin seccion, sin beneficio y sin limite, y el banco quedo
+    // en verde porque el regex ni la veia. Una regla que solo mira las filas
+    // que ya existian no vigila lo que se agrega, que es justo cuando hace falta.
+    const m = /^\|\s*\*\*([A-Z]\+?)\*\*\s*\|([^|]+)\|([^|]+)\|([^|]+)\|/.exec(linea);
     if (m) formas.push({ clave: m[1], nombre: m[2].trim(), estado: m[4].trim() });
   }
   return formas;
@@ -54,6 +59,10 @@ test("la carta nombra las formas, y un cero aca es este banco roto", () => {
 });
 
 test("cada forma declara su estado, y no hay estados inventados", () => {
+  // La flecha es un estado legitimo —«esta forma cae en otra»— pero NO puede ser
+  // una puerta trasera: un esceptico le puso «→ ver abajo» a una forma pendiente
+  // y quedo fuera de pendientes, fuera de disponibles y exenta de tener seccion.
+  // Por eso el caso de abajo exige que la flecha diga A DONDE cae.
   const raros = FORMAS.filter((f) => !f.estado.includes(DISPONIBLE) && !f.estado.includes(FALTA) && !f.estado.includes("→"));
   assert.deepEqual(
     raros.map((f) => `${f.clave}: "${f.estado}"`),
@@ -63,10 +72,26 @@ test("cada forma declara su estado, y no hay estados inventados", () => {
   );
 });
 
-/** Las formas que el asistente OFRECE hoy, leidas de sus preguntas. */
+/** El id de la pregunta con la que el asistente ofrecera las formas.
+ *
+ *  TODAVIA NO EXISTE, y eso es correcto: hoy hay UNA forma construida y no se
+ *  pregunta por algo que no tiene alternativa. Pero que no exista NO puede
+ *  volver vacuo el cruce de abajo, que es lo que pasaba: `PREGUNTAS.find(...)`
+ *  devolvia undefined, la lista de ofrecidas salia vacia, y todos los casos que
+ *  la usaban pasaban sin comprobar nada. Un esceptico lo rompio de cuatro
+ *  formas distintas con el banco en verde.
+ *
+ *  Por eso el id se declara aca y hay un caso que vigila la transicion: el dia
+ *  que haya dos formas disponibles, la pregunta pasa a ser obligatoria. */
+const ID_DE_LA_PREGUNTA = "forma";
+
+function preguntaDeLasFormas() {
+  return PREGUNTAS.find((p) => p.id === ID_DE_LA_PREGUNTA) ?? null;
+}
+
 function formasQueElAsistenteOfrece() {
-  const pregunta = PREGUNTAS.find((p) => p.id === "forma");
-  return pregunta ? pregunta.opciones.map((o) => o.valor.toUpperCase()) : [];
+  const p = preguntaDeLasFormas();
+  return p ? p.opciones.map((o) => o.valor.toUpperCase()) : [];
 }
 
 test("NINGUNA forma marcada como pendiente se ofrece en el asistente", () => {
@@ -136,4 +161,71 @@ test("MUERDE: una forma pendiente ofrecida en el asistente se caza", () => {
     pendientes.some((c) => ofrecidasFalsas.includes(c)),
     "con la forma pendiente agregada a la lista de ofrecidas, la deteccion tiene que verla",
   );
+});
+
+test("una flecha tiene que decir A DONDE cae, y ese destino tiene que existir", () => {
+  // El agujero que un esceptico encontro: poniendole «→ ver abajo» a una forma
+  // pendiente quedaba fuera de pendientes, fuera de disponibles y exenta de
+  // tener seccion propia. Tres exenciones de una, escribiendo dos palabras.
+  const claves = new Set(FORMAS.map((f) => f.clave));
+  const rotas = [];
+  for (const f of FORMAS) {
+    if (!f.estado.includes("→")) continue;
+    const destinos = [...f.estado.matchAll(/\b([A-Z]\+?)\b/g)].map((m) => m[1]).filter((c) => claves.has(c) && c !== f.clave);
+    if (destinos.length === 0) rotas.push(`${f.clave}: "${f.estado}" no nombra ninguna otra forma de la tabla`);
+  }
+  assert.deepEqual(
+    rotas,
+    [],
+    "una flecha sin destino es una forma que se escapa de las tres reglas a la vez: no cuenta como pendiente, no " +
+      `cuenta como disponible, y no necesita seccion. Tiene que decir en que otra forma cae.\n  ${rotas.join("\n  ")}`,
+  );
+});
+
+test("el aviso que le dice al lector que hoy NO puede elegir sigue estando", () => {
+  // Un esceptico borro entero ese recuadro —la unica frase que le dice al lector
+  // que las formas marcadas 🕳️ estan explicadas pero no se pueden elegir— y el
+  // banco no se movio. La honestidad que este archivo dice sostener no estaba
+  // sostenida por ningun caso.
+  const texto = fs.readFileSync(CARTA, "utf-8");
+  const hayPendientes = FORMAS.some((f) => f.estado.includes(FALTA));
+  if (!hayPendientes) return; // todas construidas: el aviso ya no hace falta
+
+  assert.match(
+    texto,
+    /el asistente todav(í|i)a no te la ofrece/i,
+    "hay formas marcadas como pendientes y la carta ya no explica que eso significa que NO se pueden elegir. Sin esa " +
+      "frase, la tabla se lee como un menu completo y la persona elige algo que no existe",
+  );
+  assert.match(
+    texto,
+    /ofrecer una opci(ó|o)n que despu(é|e)s no funciona/i,
+    "y tiene que decir POR QUE no se ofrece: es la leccion que este repositorio ya pago con Slack",
+  );
+});
+
+test("MUERDE: una forma pendiente ofrecida por el asistente pone el banco en rojo", () => {
+  // El caso anterior era tautologico: armaba la lista falsa en memoria y despues
+  // se comprobaba a si mismo, sin ejecutar nunca la asercion real. Este ejecuta
+  // LA MISMA comparacion que hace el caso de verdad, con datos fabricados.
+  const pendientes = FORMAS.filter((f) => f.estado.includes(FALTA)).map((f) => f.clave);
+  assert.ok(pendientes.length > 0, "hoy tiene que haber al menos una pendiente para que este caso signifique algo");
+
+  const comparar = (ofrecidas) => pendientes.filter((c) => ofrecidas.includes(c));
+  assert.deepEqual(comparar(formasQueElAsistenteOfrece()), [], "el arbol real tiene que estar limpio");
+  assert.deepEqual(
+    comparar([pendientes[0]]),
+    [pendientes[0]],
+    "y con la forma pendiente en la lista de ofrecidas, la MISMA comparacion tiene que devolverla. Si no, el caso de " +
+      "verdad no esta midiendo nada",
+  );
+});
+
+test("MUERDE: una fila con una letra que no estaba tambien se vigila", () => {
+  // El regex acotado a A..D dejaba pasar una fila «**E**» entera, sin seccion y
+  // sin explicacion. Se comprueba sobre texto, sin tocar el arbol.
+  const fabricada = "| **Z** | Un bot de mensajeria | cualquiera | ✅ es lo que hay hoy |";
+  const vistas = formasDeLaCarta(fabricada);
+  assert.equal(vistas.length, 1, "el detector tiene que ver una fila con una letra que no estaba en la tabla original");
+  assert.equal(vistas[0].clave, "Z");
 });
