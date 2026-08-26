@@ -329,6 +329,23 @@ export function podarPorPlataforma(texto, rel, plataforma) {
   return texto;
 }
 
+/** Lo que el asistente deja escrito ANTES de que corra el copiado, y que por eso
+ *  no cuenta como "trabajo ajeno" para el guard del destino ocupado.
+ *
+ *  EL DEFECTO QUE ESTO CIERRA ROMPIA EL CAMINO FELIZ ENTERO, y era 100%
+ *  reproducible siguiendo la guia al pie de la letra: el Paso 3 corre el
+ *  asistente, que escribe `.projects-desvios.json` en la carpeta del proyecto;
+ *  el Paso 5 corre el copiado, ve que ese archivo YA EXISTE en el destino —es
+ *  tambien un archivo del andamio— y aborta con exit 1 y un mensaje que habla de
+ *  "no sobreescribir trabajo". Trabajo que lo habia escrito la propia
+ *  herramienta dos pasos antes.
+ *
+ *  El guard esta bien y se queda: su trabajo es no pisar el README ni el
+ *  workflow que ese repositorio ya tuviera. Lo que estaba mal era el conjunto:
+ *  estos tres archivos son la ENTRADA del copiado, no algo que el copiado
+ *  destruya. Pisarlos es exactamente lo que corresponde. */
+export const LO_QUE_ESCRIBE_EL_ASISTENTE = new Set([".projects-valores.json", ".projects-respuestas.json", ".projects-desvios.json"]);
+
 /** La plataforma declarada en el archivo de valores.
  *
  *  Va en minuscula y FUERA de los 21, porque no es un marcador que el andamio
@@ -2078,6 +2095,7 @@ async function main(argv) {
   // pisaba sin --forzar el README que ese repo ya tuviera.
   const yaTiene = archivosDelAndamio(raizAndamio, plataforma)
     .map((rel) => destinoDe(rel, plataforma))
+    .filter((r) => !LO_QUE_ESCRIBE_EL_ASISTENTE.has(r))
     .filter((r) => fs.existsSync(path.join(o.destino, ...r.split("/"))));
   if (yaTiene.length && !o.forzar) {
     console.error(`::error::el destino ya tiene ${yaTiene.length} archivo(s) del andamio. Se aborta para no sobreescribir trabajo:`);

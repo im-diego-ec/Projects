@@ -368,7 +368,15 @@ export function derivar(r) {
     PREFIJO_RECURSOS: kebab(r.PROYECTO).slice(0, 20),
     DOMINIO_DEV: dominioDev,
     DOMINIO_PROD: unDominio,
-    ...(r.avisos === "slack" ? { CANAL_ALERTAS: r.CANAL_ALERTAS } : RELLENO_SLACK),
+    // EL RELLENO VA SIEMPRE Y EL CANAL LO PISA. Escrito al reves —el relleno
+    // ENTERO solo cuando no hay Slack— elegir Slack dejaba `ID_MCP_SLACK` sin
+    // valor, y el archivo salia invalido: `::error::falta ID_MCP_SLACK`, exit 1.
+    // O sea que la opcion menos usada del asistente era la unica que no
+    // funcionaba, y quien la elegia quedaba tirado con un error que no habla de
+    // lo que eligio. El id de MCP no se pregunta a proposito: es un UUID que
+    // sale de la configuracion de la herramienta, no una decision de negocio.
+    ...RELLENO_SLACK,
+    ...(r.avisos === "slack" ? { CANAL_ALERTAS: r.CANAL_ALERTAS } : {}),
   };
 }
 
@@ -456,6 +464,15 @@ function envolver(texto, ancho) {
  *  ORDEN. Metido adentro de main() la unica forma de probarlo seria simular un
  *  teclado, y eso en los tres sistemas donde corre este banco no existe.
  *
+ *  `preguntar` recibe DOS argumentos: el texto y el ID DE LA PREGUNTA. El segundo
+ *  no lo usa la terminal —a una persona el id no le dice nada— y existe para el
+ *  banco, por un defecto medido: mientras el falso preguntador contestaba por
+ *  POSICION, un guion escrito a mano se desalineaba en silencio en cuanto una
+ *  pregunta condicional cambiaba de lugar. El caso llamado «slack» del banco
+ *  contestaba «correo» y pasaba en verde, asi que el camino de Slack estuvo roto
+ *  —el archivo salia sin `ID_MCP_SLACK` y `projects init` abortaba— con 580
+ *  pruebas en verde. Contestando por id eso no puede volver a pasar.
+ *
  *  `previos` son respuestas que ya se tienen —de una corrida anterior— y se
  *  ofrecen como valor por defecto. Es lo que hace que volver a correrlo no
  *  obligue a contestar todo de nuevo.
@@ -502,7 +519,7 @@ export async function correrAsistente(preguntar, previos = {}, formatos = {}, em
       if (p.opciones) {
         const porDefecto = previo ?? p.opciones.find((o) => o.recomendada)?.valor;
         const idx = p.opciones.findIndex((o) => o.valor === porDefecto);
-        const cruda = (await preguntar(`\n  Elegí un número [Enter = ${idx + 1}]: `)).trim();
+        const cruda = (await preguntar(`\n  Elegí un número [Enter = ${idx + 1}]: `, p.id)).trim();
         if (!cruda) {
           respuestas[p.id] = porDefecto;
           decir(`  → ${p.opciones[idx].etiqueta}`);
@@ -519,7 +536,7 @@ export async function correrAsistente(preguntar, previos = {}, formatos = {}, em
       }
 
       const sufijo = previo ? ` [Enter mantiene: ${previo}]` : "";
-      const cruda = (await preguntar(`\n  Tu respuesta${sufijo}: `)).trim();
+      const cruda = (await preguntar(`\n  Tu respuesta${sufijo}: `, p.id)).trim();
       const valor = cruda ? (p.normaliza ? p.normaliza(cruda) : cruda) : previo;
       if (!valor) {
         decir("  ✗ Esta no tiene valor por defecto: hay que contestarla.");

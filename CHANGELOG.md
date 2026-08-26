@@ -41,6 +41,29 @@ mueve sobre un cambio incompatible.
 
 ## [No publicado]
 
+### Corregido
+
+- **El camino feliz de la guía estaba roto de punta a punta, y era 100% reproducible.** El
+  Paso 3 corre el asistente, que deja `.projects-desvios.json` en la carpeta del proyecto.
+  El Paso 5 corre el copiado, ve que ese archivo **ya existe** —es también un archivo del
+  andamio— y aborta con **exit 1** y un mensaje que habla de «no sobreescribir trabajo».
+  Trabajo que había escrito la propia herramienta dos pasos antes. El guard se queda —su
+  trabajo es no pisar el `README` que ese repositorio ya tuviera—; lo que estaba mal era
+  el conjunto: esos tres archivos son la **entrada** del copiado, no algo que destruya.
+- **Elegir Slack producía un archivo inválido.** El relleno de Slack se aplicaba entero
+  solo cuando **no** se elegía Slack, así que elegirlo dejaba `ID_MCP_SLACK` sin valor y
+  `projects init` abortaba con `::error::falta ID_MCP_SLACK`. La opción menos usada del
+  asistente era la única que no funcionaba, y quien la elegía quedaba con un error que no
+  habla de lo que eligió.
+- **Y el caso del banco que decía probar Slack contestaba «correo».** Los guiones del
+  falso preguntador eran **posicionales**, así que se desalineaban en silencio cuando una
+  pregunta condicional cambiaba de lugar: el caso pasaba en verde afirmando que probaba
+  algo que no probaba, y el camino de Slack estuvo roto con **580 pruebas en verde**. El
+  preguntador recibe ahora el **id de la pregunta**, con lo que un guion desalineado es
+  imposible, y entró la prueba que faltaba: **cada opción de cada pregunta**, de punta a
+  punta contra el validador de verdad. Comprobado que muerde con los dos defectos
+  devueltos a propósito.
+
 ### Cambiado
 
 - **La guía técnica tenía adentro el ciclo de trabajo entero, y se partió en tres.** Eran

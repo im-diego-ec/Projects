@@ -15,6 +15,7 @@ import {
   archivosDelAndamio,
   archivosDelAndamioAMano,
   instanciar,
+  LO_QUE_ESCRIBE_EL_ASISTENTE,
 } from "../../herramientas/projects-init.mjs";
 
 const RAIZ = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
@@ -219,4 +220,43 @@ test("y se escribe TAMBIEN cuando la plataforma es aws", () => {
   const escrito = JSON.parse(podarPorPlataforma(inventado, ".projects-valores.json", "aws"));
   assert.equal(escrito.plataforma, "aws", "el valor del andamio no manda sobre la eleccion, ni siquiera cuando coinciden");
   assert.equal(escrito.PROYECTO, "x", "y el resto del archivo se queda entero");
+});
+
+test("lo que el asistente escribe NO bloquea el copiado que viene despues", () => {
+  // EL DEFECTO QUE ESTE CASO VIGILA ROMPIA EL CAMINO FELIZ ENTERO, y era 100%
+  // reproducible siguiendo la guia al pie de la letra: el Paso 3 corre el
+  // asistente, que deja `.projects-desvios.json` en la carpeta del proyecto; el
+  // Paso 5 corre el copiado, ve que ese archivo ya existe —es tambien un archivo
+  // del andamio— y aborta con exit 1 y un mensaje que habla de «no sobreescribir
+  // trabajo». Trabajo que habia escrito la propia herramienta dos pasos antes.
+  //
+  // El guard esta bien y se queda: su trabajo es no pisar el README ni el
+  // workflow que ese repositorio ya tuviera. Lo que estaba mal era el conjunto.
+  const delAndamio = new Set(archivosDelAndamio(ANDAMIO, "supabase").map((r) => destinoDe(r, "supabase")));
+  const solapados = [...LO_QUE_ESCRIBE_EL_ASISTENTE].filter((r) => delAndamio.has(r));
+  assert.ok(
+    solapados.length > 0,
+    "si NINGUNO de los archivos que escribe el asistente fuera tambien del andamio, este caso no estaria midiendo nada " +
+      "y la exencion sobraria. Hoy se solapan: " + [...LO_QUE_ESCRIBE_EL_ASISTENTE].join(", "),
+  );
+  for (const r of LO_QUE_ESCRIBE_EL_ASISTENTE) {
+    assert.equal(typeof r, "string");
+    assert.ok(!r.includes("/"), `${r} tiene que vivir en la raiz del proyecto: el guard compara rutas de destino`);
+  }
+});
+
+test("de punta a punta: el Paso 3 y el Paso 5 de la guia, uno detras del otro", () => {
+  // La secuencia exacta que manda docs/04-arrancar-acompanado.md, sin terminal:
+  // primero se escriben los tres archivos del asistente, despues se instancia.
+  const destino = fs.mkdtempSync(path.join(os.tmpdir(), "paso3y5-"));
+  const valores = JSON.parse(fs.readFileSync(path.join(ANDAMIO, ".projects-valores.json"), "utf-8"));
+  valores.plataforma = "supabase";
+
+  // Paso 3: lo que deja el asistente.
+  for (const r of LO_QUE_ESCRIBE_EL_ASISTENTE) fs.writeFileSync(path.join(destino, r), "{}\n");
+
+  // Paso 5: el copiado NO puede abortar por lo que dejo el Paso 3.
+  const r = instanciar({ raizAndamio: ANDAMIO, destino, valores });
+  assert.ok(r.escritos.length >= 60, `el copiado tiene que completarse; escribio ${r.escritos.length}`);
+  assert.ok(fs.existsSync(path.join(destino, "README.md")), "y el proyecto tiene que quedar armado");
 });
