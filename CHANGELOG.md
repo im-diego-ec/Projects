@@ -116,6 +116,37 @@ mueve sobre un cambio incompatible.
 
 ### Corregido
 
+- **El propio arreglo de la puerta introdujo dos bloqueos nuevos, y los cazó el recorrido
+  adversarial.** El bloque del Paso 1 termina con `cd ..`, así que la persona ya sale del
+  clon ahí; el Paso 2 le daba **otro** `cd ..` y terminaba una carpeta **más arriba** del
+  clon, donde probablemente no puede escribir. Y el Paso 3 y el Paso 5 la paraban en dos
+  carpetas distintas —«donde va tu proyecto» contra «la carpeta del proyecto»— sin ningún
+  `cd` entre medio. Ahora los dos comprueban con `pwd` y dicen exactamente cuál es, y hay
+  una sola subida de carpeta en toda la cadena.
+- **Tres afirmaciones nuevas de la guía eran falsas, medidas contra la pantalla.** «El
+  síntoma es idéntico en los dos casos» —no lo es, los mensajes difieren y ahora la guía
+  enseña a distinguirlos—; «15 preguntas con AWS» —son **13**, y **16** el máximo—; y la
+  comprobación de acceso prometía «nombre y descripción» cuando la descripción viene
+  vacía y la salida son 487 líneas.
+- **El asistente decía «pregunta 13 de 8».** El total se fijaba antes de empezar, cuando
+  no se sabía todavía cuántas preguntas iba a haber: elegir AWS agrega cinco. Ahora se
+  recalcula en cada pregunta, así que el denominador crece con honestidad — `[1/8]`,
+  después `[6/13]`.
+- **Volver a correr el asistente borraba en silencio las respuestas de AWS.** El archivo
+  de valores guarda las 21 claves **derivadas**, no las respuestas, así que al releerlo la
+  pregunta de la plataforma volvía con «supabase» de recomendada, Enter la aceptaba, y las
+  cinco respuestas tipeadas desaparecían: 13 preguntas la primera vez, 8 la segunda, y el
+  resumen decía otra cosa sin avisar. Ahora las respuestas se guardan en
+  `.projects-respuestas.json` y la corrida arranca diciendo `Retomando lo que contestaste
+  antes`. Medido: 14 preguntas las dos veces y la cuenta de AWS intacta.
+- **El resumen se llamaba «todo lo que elegiste» y se comía justo las cinco de AWS** — las
+  únicas que la persona tuvo que ir a buscar a otro lado.
+- **La tabla de programas prometía comprobar `pnpm` y el Paso 0 comprueba `corepack`.** La
+  fila ahora nombra lo que el Paso 0 realmente corre.
+- **El segundo archivo se presentaba como una excepción y sale siempre.** Aceptando todas
+  las opciones recomendadas igual quedan tres desvíos declarados —trabajar solo ya es
+  uno—. La guía ahora lo dice y explica que no es una señal de que algo salió mal.
+
 - **La guía dejaba a la persona trabada en el paso 1 de 12, y le daba la causa
   equivocada.** El repositorio del marco es **privado** y la guía nunca decía que hay
   que pedir acceso. Peor: anticipaba el error que iba a ver —un «no encontrado»— y le

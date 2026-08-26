@@ -1746,7 +1746,37 @@ async function main(argv) {
       return 2;
     }
 
-    const previos = o.valores && fs.existsSync(o.valores) ? JSON.parse(fs.readFileSync(o.valores, "utf-8")) : {};
+    // DE DONDE SALEN LAS RESPUESTAS DE ANTES, y por que no del archivo de valores.
+    //
+    // El defecto que esto cierra, medido: el archivo de valores guarda las 21
+    // claves DERIVADAS (PROYECTO, CUENTA_DEV, ...), no las RESPUESTAS
+    // (plataforma, equipo, ambientes). Leerlo como respuestas previas ofrecia
+    // valor por defecto para lo primero y nada para lo segundo, asi que al
+    // volver a correrlo la pregunta de la plataforma salia de nuevo con
+    // "supabase" como recomendada, apretar Enter la aceptaba, y las cinco
+    // respuestas de AWS que la persona habia tipeado se BORRABAN EN SILENCIO:
+    // 13 preguntas la primera vez, 8 la segunda, y el resumen decia otra cosa
+    // sin avisar que algo se habia perdido.
+    //
+    // Por eso las respuestas se guardan aparte y se leen de ahi. El archivo vive
+    // al lado del de valores para que se muevan juntos.
+    const rutaDeValores = o.soloValores ?? o.valores ?? path.join(process.cwd(), ".projects-valores.json");
+    const rutaDeRespuestas = path.join(path.dirname(rutaDeValores), ".projects-respuestas.json");
+    let previos = {};
+    if (fs.existsSync(rutaDeRespuestas)) {
+      try {
+        previos = JSON.parse(fs.readFileSync(rutaDeRespuestas, "utf-8"));
+        process.stdout.write(`Retomando lo que contestaste antes (${rutaDeRespuestas}). Enter mantiene cada respuesta.\n`);
+      } catch {
+        // Un archivo ilegible no es motivo para no dejar arrancar: se pregunta
+        // todo de nuevo, que es exactamente lo que pasaba antes de que existiera.
+        console.error(`::warning::no pude leer ${rutaDeRespuestas}, asi que voy a preguntar todo de nuevo`);
+      }
+    } else if (o.valores && fs.existsSync(o.valores)) {
+      // Compatibilidad con quien ya tiene un archivo de valores escrito a mano:
+      // las claves que coinciden con una pregunta se ofrecen igual.
+      previos = JSON.parse(fs.readFileSync(o.valores, "utf-8"));
+    }
     const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
 
     // POR QUE UNA COLA Y NO `rl.question` A SECAS. Dos modos de falla, los dos
@@ -1797,9 +1827,11 @@ async function main(argv) {
     }
     for (const linea of asis.lineasDeResumen(resultado.respuestas, resultado.desvios)) process.stdout.write(`${linea}\n`);
 
-    const salida = o.soloValores ?? o.valores ?? path.join(process.cwd(), ".projects-valores.json");
+    const salida = rutaDeValores;
     fs.writeFileSync(salida, `${JSON.stringify(resultado.valores, null, 2)}\n`);
+    fs.writeFileSync(rutaDeRespuestas, `${JSON.stringify(resultado.respuestas, null, 2)}\n`);
     process.stdout.write(`\nEscrito: ${salida}\n`);
+    process.stdout.write(`Escrito: ${rutaDeRespuestas}  (para que volver a correrlo no te haga contestar todo de nuevo)\n`);
     if (resultado.desvios.length) {
       const rutaDesvios = path.join(path.dirname(salida), ".projects-desvios.json");
       fs.writeFileSync(rutaDesvios, `${JSON.stringify(resultado.desvios, null, 2)}\n`);
