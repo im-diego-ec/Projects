@@ -40,16 +40,37 @@ const ENLACE = /\[[^\]]*\]\((?!https?:\/\/|mailto:|#)([^)\s]+)(?:\s+"[^"]*")?\)/
  *  ahi es historia correcta, no un defecto. */
 const FUERA = new Set(["CHANGELOG.md"]);
 
+/** Las paginas .md rastreadas Y las que todavia no se comprometieron.
+ *
+ *  `--others --exclude-standard` no es un adorno: sin eso este banco solo ve lo
+ *  que ya esta en el indice de git, y un archivo recien escrito queda INVISIBLE
+ *  hasta el commit. Medido el 2026-08-26, y es el propio banco el que se lo
+ *  hizo: en local dio 418 enlaces y verde, y en CI dio 419 y rojo, porque el
+ *  archivo con el enlace malo se habia escrito despues de la ultima corrida y
+ *  antes del `git add`. Un banco que solo ve lo comprometido avisa DESPUES de
+ *  que el defecto ya viajo, que es justo cuando ya no sirve. */
 function paginas() {
-  return execFileSync("git", ["ls-files", "*.md"], { cwd: RAIZ, encoding: "utf-8" })
-    .trim()
-    .split("\n")
-    .filter((f) => f && !FUERA.has(f));
+  const listar = (args) =>
+    execFileSync("git", args, { cwd: RAIZ, encoding: "utf-8" }).trim().split("\n").filter(Boolean);
+  const todas = new Set([...listar(["ls-files", "*.md"]), ...listar(["ls-files", "--others", "--exclude-standard", "*.md"])]);
+  return [...todas].filter((f) => !FUERA.has(f)).sort();
 }
 
-/** El texto sin los bloques cercados. Adentro de un bloque hay comandos y
- *  ejemplos: una ruta ahi no es un enlace que alguien vaya a clickear. */
-const prosa = (t) => t.replace(/```[\s\S]*?```/g, "");
+/** El texto sin bloques cercados NI codigo en linea.
+ *
+ *  Los bloques cercados quedan fuera porque adentro vive el comando, y una ruta
+ *  ahi no es un enlace que alguien vaya a clickear.
+ *
+ *  EL CODIGO EN LINEA QUEDA FUERA POR LA MISMA RAZON, y este banco aprendio la
+ *  leccion en su primer viaje: markdown NO renderiza un enlace adentro de
+ *  comillas invertidas. Un documento de este repositorio escribe
+ *  `[compuerta](…)` entre backticks para ILUSTRAR como se ve un enlace al
+ *  glosario, y la version anterior de este archivo lo leyo como un enlace de
+ *  verdad y se puso roja por una ruta que ningun lector puede clickear. Medir
+ *  como enlace algo que el lector ve como texto es reportar un defecto que no
+ *  existe, y eso gasta la confianza que un banco necesita para que le crean el
+ *  dia que tiene razon. */
+const prosa = (t) => t.replace(/```[\s\S]*?```/g, "").replace(/`[^`\n]*`/g, "");
 
 /** Los destinos de una pagina, ya separados en ruta y ancla. */
 export function destinosDe(texto) {
