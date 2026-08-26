@@ -50,7 +50,7 @@ Cuatro matices que hacen que esto funcione en la práctica:
   runtime — **no despliega nada en ningún ambiente**. La detección es por
   los archivos del PR y es **fail-open**: ante cualquier duda o error al
   listarlos, se despliega todo. Jamás omitir un deploy de código en
-  silencio (ver [reglas no escritas](../08-reglas-no-escritas.md), regla 3).
+  silencio (ver [reglas no escritas](../10-reglas-no-escritas.md), regla 3).
 - **Reuso de verificación por TREE HASH, no por SHA.** El flujo cuidadoso
   —desplegar la rama a dev por dispatch, verificarla, recién ahí mergear—
   hacía pagar la promoción dos veces por el mismo contenido. La identidad
@@ -105,5 +105,5 @@ Producción ni se entera.
 | Deploy manual a producción rastreable | Es un `workflow_dispatch`: queda run, autor, inputs y logs |
 
 Sigue dependiendo de disciplina: **ramificar siempre desde `main`
-actualizado** (regla 8 de [reglas no escritas](../08-reglas-no-escritas.md)) y
+actualizado** (regla 8 de [reglas no escritas](../10-reglas-no-escritas.md)) y
 coordinar el uso manual del ambiente compartido.

@@ -51,7 +51,7 @@ línea: [ADR](02-glosario.md), [andamio](02-glosario.md), [bump](02-glosario.md)
 > de lectura, y `pruebas/docs/documentacion.test.mjs` sigue exigiendo que
 > `06-para-el-po.md` y `02-glosario.md` estén enlazados acá.
 
-## El camino, del 01 al 08
+## El camino, del 01 al 10
 
 Se leen **en orden**. El número dice en qué lugar del camino va cada una, no
 cuánto importa.
@@ -65,19 +65,21 @@ cuánto importa.
 | [05-arrancar-tecnico.md](05-arrancar-tecnico.md) | El paso a paso de **no tener repo** a `ci-ok` verde y el primer change en marcha: un solo comando que deja el repo completo, y la tabla de fallos silenciosos del día 1 | **Canónico** — se actualiza cuando alguien arranca un proyecto y encuentra algo que no está |
 | [06-para-el-po.md](06-para-el-po.md) | La puerta del **PO**: qué es el marco sin jerga, qué rutas aprueba —con las de `CODEOWNERS` textuales—, cómo se lee un spec real línea por línea, qué significa «bloqueado» y las cuatro preguntas con las que se devuelve un change | **Canónico** — se actualiza cuando `CODEOWNERS` cambia lo que el PO aprueba, o cuando la protección de `main` enciende una de sus reglas diferidas |
 | [07-para-el-builder.md](07-para-el-builder.md) | La otra mitad del reparto: qué le toca al **[builder](02-glosario.md)**, o sea a quien construye —qué aprueba y qué no, cómo se escribe un change de verdad (no cómo se lee), qué verificación lo va a poner en rojo y qué hacer con cada una— y qué se apaga y qué NO cuando el equipo es una sola persona | **Canónico** — se actualiza cuando `.github/CODEOWNERS` cambia el reparto, o cuando las verificaciones automáticas ganan o pierden una [compuerta](02-glosario.md) |
-| [08-reglas-no-escritas.md](08-reglas-no-escritas.md) | Las reglas que el equipo practica y ningún archivo declaraba, con su estado de enforcement y el backlog de automatización | **Canónico** — se actualiza cuando un post-mortem compra una regla o cuando una verificación nueva la vuelve automática |
+| [08-descubrimiento.md](08-descubrimiento.md) | De los documentos del negocio a un **[PRD](02-glosario.md)** que dice qué hay que construir: el directorio aparte, la lista de cobertura, el PRD y sus vueltas de pulido. Le habla al PO, y termina **antes** de los specs — no hay ningún comando que convierta un PRD en un [spec](02-glosario.md) | **Canónico** — se actualiza cuando cambia la herramienta de descubrimiento o el camino de la lista de cobertura |
+| [09-construir-con-openspec.md](09-construir-con-openspec.md) | De ese PRD a un change de OpenSpec y de ahí a un pull request: el [proposal](02-glosario.md), los deltas, la tercera columna de la lista. Le habla al [builder](02-glosario.md) | **Canónico** — se actualiza cuando cambia el flujo de OpenSpec o lo que `.github/CODEOWNERS` reparte |
+| [10-reglas-no-escritas.md](10-reglas-no-escritas.md) | Las reglas que el equipo practica y ningún archivo declaraba, con su estado de enforcement y el backlog de automatización | **Canónico** — se actualiza cuando un post-mortem compra una regla o cuando una verificación nueva la vuelve automática |
 
-## Lo que se abre el día que hace falta, del 09 al 13
+## Lo que se abre el día que hace falta, del 11 al 15
 
 Ninguna hace falta para arrancar. Se abren cuando aparece su problema.
 
 | Documento | Qué es | Cómo evoluciona |
 |---|---|---|
-| [09-upgrade-openspec.md](09-upgrade-openspec.md) | Cómo subir la versión pineada de la herramienta de línea de comandos de OpenSpec, con sus tres trampas conocidas | **Canónico** |
-| [10-censo-de-consumidores.md](10-censo-de-consumidores.md) | Quién consume el marco: el diseño vigente (los PRs de bump de Dependabot), lo que se midió de él, y el plan B con su decisión de credencial pendiente | **Canónico** — se actualiza cuando el mecanismo del censo cambia o cuando se mide otra vez |
-| [11-consumidores.md](11-consumidores.md) | El registro de quién consume el marco: una fila por repo, con la fecha de adopción y la versión con la que nació. **Hoy está vacío**, y ahí mismo se dice por qué eso no significa «cero consumidores» | **Canónico** — se agrega una fila en el PR de cada adopción. Mientras la fila la escriba una persona y no la herramienta, la mitad que falta está declarada en el propio archivo |
-| [12-forkear-el-marco.md](12-forkear-el-marco.md) | Qué hay que cambiar para que un fork del marco a otra cuenta deje de ejecutar las actions de la cuenta original, con el comando que enumera cada referencia | **Canónico** — se actualiza cuando aparece una referencia nueva a la cuenta del marco |
-| [13-auditoria-cierre-v1.md](13-auditoria-cierre-v1.md) | La auditoría del 2026-08-20: veinte afirmaciones que los PRs del cierre de la v1 hacían sobre sí mismos, puestas a prueba con fixtures y código de salida — trece refutadas, siete sostenidas | **Histórico** — es una foto fechada y **no se actualiza**: se cita y se cierra por sus hallazgos. Su primera línea dice de cuándo es y qué caducó desde entonces |
+| [11-upgrade-openspec.md](11-upgrade-openspec.md) | Cómo subir la versión pineada de la herramienta de línea de comandos de OpenSpec, con sus tres trampas conocidas | **Canónico** |
+| [12-censo-de-consumidores.md](12-censo-de-consumidores.md) | Quién consume el marco: el diseño vigente (los PRs de bump de Dependabot), lo que se midió de él, y el plan B con su decisión de credencial pendiente | **Canónico** — se actualiza cuando el mecanismo del censo cambia o cuando se mide otra vez |
+| [13-consumidores.md](13-consumidores.md) | El registro de quién consume el marco: una fila por repo, con la fecha de adopción y la versión con la que nació. **Hoy está vacío**, y ahí mismo se dice por qué eso no significa «cero consumidores» | **Canónico** — se agrega una fila en el PR de cada adopción. Mientras la fila la escriba una persona y no la herramienta, la mitad que falta está declarada en el propio archivo |
+| [14-forkear-el-marco.md](14-forkear-el-marco.md) | Qué hay que cambiar para que un fork del marco a otra cuenta deje de ejecutar las actions de la cuenta original, con el comando que enumera cada referencia | **Canónico** — se actualiza cuando aparece una referencia nueva a la cuenta del marco |
+| [15-auditoria-cierre-v1.md](15-auditoria-cierre-v1.md) | La auditoría del 2026-08-20: veinte afirmaciones que los PRs del cierre de la v1 hacían sobre sí mismos, puestas a prueba con fixtures y código de salida — trece refutadas, siete sostenidas | **Histórico** — es una foto fechada y **no se actualiza**: se cita y se cierra por sus hallazgos. Su primera línea dice de cuándo es y qué caducó desde entonces |
 
 ## Las carpetas, que no llevan número
 
@@ -108,7 +110,7 @@ copian a otro repositorio cuando hacen falta.
 - **Sos el PO**: [06-para-el-po.md](06-para-el-po.md), y nada más. Es una página, no
   supone que escribas código, y trae las rutas que aprobás y las preguntas con
   las que se rechaza un change. El resto de esta carpeta es de ingeniería.
-- **Entrando al equipo**: [08-reglas-no-escritas.md](08-reglas-no-escritas.md)
+- **Entrando al equipo**: [10-reglas-no-escritas.md](10-reglas-no-escritas.md)
   primero. Los ADRs explican el sistema; esa página explica cómo se
   trabaja dentro de él.
 - **Arrancando un proyecto**: [05-arrancar-tecnico.md](05-arrancar-tecnico.md),

@@ -112,7 +112,7 @@ author: la organización
 #     verde es indistinguible del cableado sano— y el resto de las condiciones sigue en
 #     rojo. Consecuencia honesta: que este modo no diga nada sobre el camino NO
 #     acredita que el rojo llegue al check requerido. El diagnostico y su fila de
-#     backlog viven en docs/08-reglas-no-escritas.md.
+#     backlog viven en docs/10-reglas-no-escritas.md.
 #   · El motivo de un desvio se verifica que EXISTA, no que sea sincero, y nada
 #     limita cuantos declara un proyecto.
 # ---------------------------------------------------------------------------
@@ -151,7 +151,7 @@ inputs:
       —que exista el check run del veredicto, que cuelgue de la compuerta por needs,
       que declare if: always(), que ningun nodo del camino lave el rojo con
       continue-on-error o un if constante falso— sigue siendo rojo. El diagnostico
-      completo y su fila de backlog viven en docs/08-reglas-no-escritas.md.
+      completo y su fila de backlog viven en docs/10-reglas-no-escritas.md.
     required: false
     default: verificar
   rama_por_defecto:
