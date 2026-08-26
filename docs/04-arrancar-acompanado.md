@@ -108,7 +108,7 @@ Se instalan una vez en tu computadora y sirven para todos los proyectos.
 |---|---|---|
 | **Git** | Guardar y enviar los cambios | [`git-scm.com`](https://git-scm.com) |
 | **Node** | El intérprete con el que corre todo lo del marco | [`nodejs.org`](https://nodejs.org) — la versión con soporte de largo plazo |
-| **pnpm** | El instalador de las piezas del proyecto | **No lo instalás ni lo encendés.** Viene con Node, y todos los comandos de esta página lo llaman con el prefijo `corepack pnpm` |
+| **corepack** | Lo que trae el instalador de las piezas del proyecto (`pnpm`) sin que tengas que instalarlo aparte | **No lo instalás.** Viene con Node, y el Paso 0 lo comprueba. Todos los comandos de esta página lo llaman con el prefijo `corepack pnpm` |
 | **gh** | Hablar con GitHub desde la consola | [`cli.github.com`](https://cli.github.com) |
 
 ### Y una cosa más, que no es un programa
@@ -121,9 +121,11 @@ error que vas a ver no dice eso. Compruébalo antes de empezar:
 gh repo view im-diego-ec/Projects
 ```
 
-Si contesta con el nombre del repositorio y su descripción, tenés acceso. Si
-contesta `Could not resolve to a Repository`, **todavía no**: eso lo destraba una
-persona —quien administra la cuenta te agrega como lector—, no un comando.
+Si contesta cualquier cosa que empiece con `name:` seguido del nombre del
+repositorio, **tenés acceso** — no te fijes en nada más, el resto de la salida es
+larga y no importa. Si en cambio contesta
+`Could not resolve to a Repository`, **todavía no**: eso lo destraba una persona
+—quien administra la cuenta te agrega como lector—, no un comando.
 
 ---
 
@@ -207,8 +209,14 @@ archivo `README.md`, y tenés la ruta anotada.
 >    privado. Eso lo destraba una persona, no un comando: pedile a quien
 >    administra la cuenta que te agregue como lector.
 >
-> El síntoma es idéntico en los dos casos porque GitHub responde lo mismo para
-> «no existe» y para «existe y no es tuyo», a propósito.
+> **Cómo distinguirlas.** El mensaje no es el mismo, y eso ayuda:
+>
+> - Si dice `Could not resolve to a Repository`, GitHub te está contestando que
+>   ese repositorio no existe **para vos** — o sea, la causa 2. Responde eso
+>   tanto para lo que no existe como para lo que existe y no es tuyo, a propósito,
+>   así que no podés saber cuál de las dos es sin preguntarle a una persona.
+> - Si en cambio el mensaje habla de que no estás dentro de tu cuenta, es la
+>   causa 1 y la arreglás vos con `gh auth login`.
 
 > **No la pongas en una carpeta temporal.** El clon te sirve para todos los
 > proyectos, no para éste, y en Windows la carpeta `/tmp` ni siquiera existe.
@@ -221,18 +229,19 @@ archivo `README.md`, y tenés la ruta anotada.
 computadora. La herramienta del paso 5 **no crea repositorios**: escribe adentro
 de uno que ya existe.
 
-**Antes de copiar nada, salí de la carpeta del marco.** El proyecto nuevo va
-**al lado** del clon, nunca adentro:
+**Antes de copiar nada, comprobá dónde estás parado.** El proyecto nuevo va **al
+lado** del clon, nunca adentro:
 
 ```bash
-cd ..
 pwd
 ```
 
-Esa ruta **no** tiene que terminar en `/Projects`. Si termina ahí, volvé a correr
-`cd ..`.
+Si el Paso 1 lo hiciste tal cual está escrito, ya estás en el lugar correcto: ese
+bloque terminaba con `cd ..`, que te devolvió justo afuera del clon. La ruta que
+ves **no** tiene que terminar en `/Projects`. Si termina ahí, corré `cd ..` una
+vez —**una sola**— y volvé a comprobar.
 
-**Qué copiar** (cambiá `<org>` y `<proyecto>` por los tuyos):
+**Qué copiar (cambiá `<org>` y `<proyecto>` por los tuyos):
 
 ```bash
 gh repo create <org>/<proyecto> --private --clone
@@ -260,7 +269,17 @@ está vacía salvo por la carpeta oculta `.git`.
 tus respuestas el archivo que necesita para construir el proyecto, así que no
 tenés que llenar nada a mano.
 
-**Qué copiar** (parado en la carpeta donde va tu proyecto, no adentro del clon):
+**Dónde tenés que estar parado.** Adentro de la carpeta de tu proyecto — que es
+donde te dejó el Paso 2, con su `cd <proyecto>`. Compruébalo antes de seguir:
+
+```bash
+pwd
+```
+
+La ruta tiene que terminar con el nombre de tu proyecto. **No** es la carpeta del
+marco: si termina en `/Projects`, estás en el lugar equivocado.
+
+**Qué copiar:**
 
 ```bash
 node <ruta-al-clon>/herramientas/projects-init.mjs --asistente --solo-valores valores.json
@@ -291,20 +310,32 @@ te dice por qué la elegirías, qué te cuesta y qué límite tiene. Así:
 | Si elegís | Son |
 | --- | --- |
 | Supabase, trabajando solo, sin dominio propio | **8 preguntas**, y solo dos hay que escribirlas |
-| AWS con dos copias del proyecto | **15**, porque ahí los datos de la nube existen de verdad |
+| AWS con dos copias del proyecto | **13**, porque ahí los datos de la nube existen de verdad |
+| Todo lo que suma: AWS, dos copias, otra persona, dominio propio y Slack | **16**, el máximo |
 
 Las que no escribís se contestan con **Enter**, que elige la opción recomendada.
 Nunca te va a pedir un dato de AWS si no elegiste AWS.
 
-**Si te equivocás en una.** No pasa nada: al terminar imprime un resumen de todo
-lo que elegiste, y podés volver a correr el mismo comando —lo que ya contestaste
-se te ofrece como respuesta por omisión, así que solo cambiás lo que quieras.
+**El número de la izquierda sube y el de la derecha también.** Vas a ver `[1/8]` y
+más adelante `[6/13]`: no es un error. Cuántas preguntas quedan depende de lo que
+vayas contestando, así que el total se recalcula en cada una.
 
-**Cómo sabés que salió bien.** Termina con el resumen de tus ocho decisiones y
-dice `Escrito: valores.json`. Si además te apartaste de algo que el marco supone
-—por ejemplo trabajar solo—, escribe un segundo archivo,
-`.projects-desvios.json`, con qué queda apartado, por qué, y cuándo conviene
-revisarlo.
+**Si te equivocás en una.** No pasa nada: al terminar imprime un resumen de todo
+lo que elegiste. Y podés volver a correr **el mismo comando** en la misma
+carpeta: lo primero que va a decir es `Retomando lo que contestaste antes`, y
+cada pregunta te ofrece tu respuesta anterior —Enter la mantiene—, así que solo
+cambiás lo que quieras.
+
+**Cómo sabés que salió bien.** Termina con el resumen de tus decisiones y dice
+`Escrito: valores.json`, más otros dos archivos:
+
+- **`.projects-respuestas.json`** — lo que contestaste, para que volver a
+  correrlo no te haga empezar de cero.
+- **`.projects-desvios.json`** — qué queda apartado de lo que el marco supone,
+  por qué, y cuándo conviene revisarlo. **Casi siempre va a haber al menos uno**,
+  y no es una señal de que algo salió mal: trabajar solo ya es uno, porque apaga
+  la revisión de otra persona. Leelo: es la lista de las cosas que el marco
+  normalmente te garantiza y en tu caso no.
 
 > **Lo que no puede adivinar nadie.** Dos respuestas dependen de otra persona o
 > de una cuenta que quizá no tenés todavía: el nombre del repositorio y tu
@@ -364,7 +395,7 @@ reemplazando cada [marcador](02-glosario.md) por tu valor, y después **arranca 
 proyecto**: baja las piezas, arma el cliente de la base de datos, ordena el texto
 y corre todas las verificaciones.
 
-**Qué copiar** (parado en la carpeta del proyecto; el punto final significa
+**Qué copiar** (en la misma carpeta del Paso 3, la de tu proyecto; el punto final significa
 «acá»):
 
 ```bash
