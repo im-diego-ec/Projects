@@ -260,3 +260,79 @@ test("de punta a punta: el Paso 3 y el Paso 5 de la guia, uno detras del otro", 
   assert.ok(r.escritos.length >= 60, `el copiado tiene que completarse; escribio ${r.escritos.length}`);
   assert.ok(fs.existsSync(path.join(destino, "README.md")), "y el proyecto tiene que quedar armado");
 });
+
+// ---------------------------------------------------------------------------
+// LA MISMA REGLA DE LA CARTA, APLICADA A LA PREGUNTA DE AL LADO.
+//
+// «Que no quede en papel» no es una regla de la carta: es una regla del marco.
+// Se escribio para las cuatro formas de construir y no se le aplico a la
+// pregunta que estaba justo al lado, asi que el asistente siguio ofreciendo GCP
+// como elegible mientras su propio texto admitia que «hoy el andamio NO lo trae
+// preparado». Es el mismo defecto que Slack —una opcion ofrecida que no
+// funciona— en su tercera casilla.
+// ---------------------------------------------------------------------------
+
+/** Que puede darle el marco a cada plataforma, HOY.
+ *
+ *  `infra` = trae infraestructura escrita y verificable.
+ *  `sin-infra` = no la necesita, y eso es una respuesta legitima y completa.
+ *  `no-existe` = haria falta y no esta: NO se puede ofrecer.
+ *
+ *  Se escribe a mano y con el motivo, porque es una declaracion de lo que el
+ *  marco sostiene. Derivarla de que exista un directorio daria por buena
+ *  cualquier carpeta vacia. */
+export const PLATAFORMAS = {
+  aws: { estado: "infra", motivo: "el andamio reparte infra/ e infra-prod/ con Terraform, y el pipeline las verifica" },
+  supabase: { estado: "sin-infra", motivo: "el proyecto se crea desde el panel de Supabase; no hay infraestructura que declarar" },
+  ninguna: { estado: "sin-infra", motivo: "es la respuesta de quien todavia no decidio, y el proyecto nace sin infraestructura a proposito" },
+  gcp: { estado: "no-existe", motivo: "haria falta un adaptador que hoy no esta escrito. Vuelve a las opciones el dia que exista" },
+};
+
+test("el asistente NO ofrece una plataforma que el marco no sostiene", async () => {
+  const { PREGUNTAS } = await import("../../herramientas/projects-asistente.mjs");
+  const pregunta = PREGUNTAS.find((p) => p.id === "plataforma");
+  assert.ok(pregunta, "la pregunta de plataforma tiene que existir: es la decision mas cara del proyecto");
+
+  const ofrecidas = pregunta.opciones.map((o) => o.valor);
+  const rotas = ofrecidas.filter((v) => (PLATAFORMAS[v]?.estado ?? "no-existe") === "no-existe");
+  assert.deepEqual(
+    rotas,
+    [],
+    "el asistente ofrece una plataforma que el marco no sostiene. Quien la elige recibe un proyecto sin nada que se lo " +
+      "explique, que es el mismo defecto que ya se pago dos veces —Slack y GCP—. O se construye su adaptador, o sale de " +
+      `las opciones.\n  ofrecidas de mas: ${rotas.join(", ")}`,
+  );
+});
+
+test("y toda plataforma que el marco SI sostiene se puede elegir", async () => {
+  const { PREGUNTAS } = await import("../../herramientas/projects-asistente.mjs");
+  const ofrecidas = PREGUNTAS.find((p) => p.id === "plataforma").opciones.map((o) => o.valor);
+  const sostenidas = Object.entries(PLATAFORMAS)
+    .filter(([, v]) => v.estado !== "no-existe")
+    .map(([k]) => k);
+  const escondidas = sostenidas.filter((v) => !ofrecidas.includes(v));
+  assert.deepEqual(
+    escondidas,
+    [],
+    `estas plataformas funcionan y el asistente no las ofrece: ${escondidas.join(", ")}. Tener algo construido y no ` +
+      "dejarlo elegir es la otra mitad del mismo defecto",
+  );
+});
+
+test("cada plataforma declarada dice POR QUE esta donde esta", () => {
+  const sinMotivo = Object.entries(PLATAFORMAS).filter(([, v]) => !v.motivo || v.motivo.length < 40);
+  assert.deepEqual(
+    sinMotivo.map(([k]) => k),
+    [],
+    "un estado sin motivo escrito es una decision que nadie va a poder revisar: la proxima persona no sabe si sigue " +
+      "vigente ni que haria falta para cambiarlo",
+  );
+});
+
+test("MUERDE: devolver GCP a las opciones pone esto en rojo", async () => {
+  const { PREGUNTAS } = await import("../../herramientas/projects-asistente.mjs");
+  const ofrecidas = PREGUNTAS.find((p) => p.id === "plataforma").opciones.map((o) => o.valor);
+  const comparar = (lista) => lista.filter((v) => (PLATAFORMAS[v]?.estado ?? "no-existe") === "no-existe");
+  assert.deepEqual(comparar(ofrecidas), [], "el arbol real tiene que estar limpio");
+  assert.deepEqual(comparar([...ofrecidas, "gcp"]), ["gcp"], "y con GCP devuelto, la MISMA comparacion tiene que cazarlo");
+});
