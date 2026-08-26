@@ -269,7 +269,7 @@ abrir una línea de código.
 
 ## El camino, y dónde estás
 
-Vas por la primera. Las siete primeras se leen **en orden**; de la 08 en
+Vas por la primera. Las **ocho** primeras se leen **en orden**; de la 09 en
 adelante se abren el día que hace falta y no antes.
 
 | | Página | Qué te deja |
@@ -280,7 +280,8 @@ adelante se abren el día que hace falta y no antes.
 | **04** | [04-arrancar-acompanado.md](04-arrancar-acompanado.md) | El «hacelo conmigo»: qué comando copiar, qué vas a ver en pantalla, cómo saber que salió bien y qué rojos son normales |
 | **05** | [05-arrancar-tecnico.md](05-arrancar-tecnico.md) | El mismo camino, contado para quien se mueve en una consola. Es el que manda si las dos se contradicen |
 | **06** | [06-para-el-po.md](06-para-el-po.md) | Cuando el repositorio ya está verde y hay que aprobar o devolver la primera propuesta |
-| **07** | [07-reglas-no-escritas.md](07-reglas-no-escritas.md) | Cómo se trabaja adentro una vez que todo anda |
+| **07** | [07-para-el-builder.md](07-para-el-builder.md) | La otra mitad del reparto: qué le toca a quien construye. Aunque hagas los dos roles, vale leer la que no estás ocupando |
+| **08** | [08-reglas-no-escritas.md](08-reglas-no-escritas.md) | Cómo se trabaja adentro una vez que todo anda |
 
 Y el [`README.md`](../README.md) del repositorio, que es la puerta de entrada
 para el equipo entero, empezando por la tabla de incidentes: cada verificación
