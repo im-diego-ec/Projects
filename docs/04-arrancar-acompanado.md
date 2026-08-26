@@ -532,10 +532,37 @@ apareció `[ELIFECYCLE] Command failed`.
 
 ---
 
-## Paso 8 — El primer envío va DIRECTO a la rama principal · *5 minutos*
+## Paso 8 — Llenar la portada y hacer el primer envío · *20 minutos*
 
-**Qué vas a hacer.** Guardar todo el esqueleto y enviarlo. **Sin propuesta de
-cambio y sin revisión**, y ésta es la única vez que eso está bien.
+**Qué vas a hacer.** Dos cosas: escribir lo que solo vos sabés de tu proyecto, y
+después guardar todo y enviarlo. **Sin propuesta de cambio y sin revisión**, y
+ésta es la única vez que eso está bien.
+
+### Primero: la portada, que nace con huecos
+
+El `README.md` de tu proyecto es lo primero que ve cualquiera que entre al
+repositorio, y nace con **huecos marcados `RELLENAR`**: son las respuestas que
+ninguna herramienta puede inventar —qué hace tu proyecto, a quién le sirve, a
+quién llamar cuando algo se rompe—. La herramienta del Paso 5 ya te lo dijo: es
+lo primero de su lista de pendientes.
+
+**Qué copiar** (para ver cuántos son y dónde están):
+
+```bash
+grep -n RELLENAR README.md
+```
+
+**Qué vas a ver.** Una línea por hueco, con su número. Hoy son nueve, pero no te
+fíes de ese número: el comando te dice los que tenés vos.
+
+**Qué hacer.** Abrí el `README.md` y reemplazá cada `RELLENAR` por tu respuesta.
+No hace falta que sean largas —una o dos frases alcanzan— y se pueden mejorar
+después. Lo que no conviene es dejarlas: nada se pone en rojo por un `RELLENAR`
+sin llenar, así que si no lo hacés ahora, se queda ahí para siempre.
+
+**Cómo sabés que salió bien.** El mismo comando **no imprime nada**.
+
+### Después: el envío
 
 **Qué copiar:**
 
@@ -606,12 +633,17 @@ que esté mal escrito.
 repositorio queda con su estado real escrito, y la verificación exigida es
 [`ci-ok`](02-glosario.md) — **ninguna otra**.
 
-> **Encendé 4 de las 8 reglas, no las 8.** Exigir aprobación + revisión del
-> dueño de la ruta + nadie que pueda saltarse la regla, **con un equipo de una
-> sola persona, deja el repositorio sin ninguna forma de integrar nada**. Las
-> otras cuatro se dejan **declaradas como diferidas, con su motivo escrito**;
-> eso es una regla del marco: lo que se decide no activar se declara, nunca se
-> omite en silencio.
+> **No las encendés todas, y el archivo te dice cuáles.** Abrilo: tiene **dos
+> tablas**. La primera son las que hay que encender ahora y la segunda las que
+> quedan **diferidas, con su motivo escrito**. Contá las filas de cada una en tu
+> archivo —el número depende de lo que contestaste en el Paso 3— y no te fíes de
+> ningún número escrito acá, que envejecería solo.
+>
+> **Por qué no se encienden todas.** Exigir aprobación + revisión del dueño de la
+> ruta + nadie que pueda saltarse la regla, **con un equipo de una sola persona,
+> deja el repositorio sin ninguna forma de integrar nada**: todo cambio tuyo
+> pediría la aprobación de alguien que no existe. Lo que se decide no activar se
+> **declara**, nunca se omite en silencio.
 
 ---
 
@@ -663,8 +695,11 @@ propósito, borrarlos, y enviar de nuevo.
 grep -rn "🕳" --include="*.md" .
 ```
 
-**Qué vas a ver.** Tres resultados: dos en `AGENTS.md` y uno en
-`.github/proteccion-main.md`.
+**Qué vas a ver.** **Dos** resultados, los dos en `AGENTS.md`.
+
+Antes había un tercero en `.github/proteccion-main.md`, y ya no está porque la
+herramienta del Paso 5 **reescribió ese archivo con lo que midió** de tu
+repositorio en vez de dejarte el hueco. No lo busques.
 
 **Qué hay que resolver en cada uno:**
 
@@ -672,8 +707,6 @@ grep -rn "🕳" --include="*.md" .
    **borrá la fila** de lo que este proyecto no vaya a tener.
 2. `AGENTS.md`, `reglas de este repo` — escribí las propias, o borrá el recuadro
    si todavía no hay ninguna.
-3. `.github/proteccion-main.md` — pasá los 🔴 a 🟢 con la fecha, y escribí el
-   motivo de las reglas que dejaste diferidas.
 
 **Cómo sabés que salió bien.** El comando de arriba **no imprime nada**, y el
 siguiente envío deja todas las verificaciones en verde.
@@ -706,8 +739,9 @@ Cinco casos reales. Ninguno es un defecto de tu repositorio.
 |---|---|
 | Pasos 0 a 2 — comprobar, traer el marco, crear el repositorio | **unos 5 minutos** |
 | Pasos 3 y 4 — contestar las decisiones y revisarlas | **de 10 minutos a dos días**, y lo que lo estira no es escribir: es decidir y esperar a otra gente |
-| Pasos 5 a 7 — armar, bajar piezas y comprobar | **menos de 30 segundos de máquina** *(medido: 1 s + 11 s + 13 s)* |
-| Pasos 8 a 12 — enviar, proteger, ajustar y quedar en verde | **una hora**, casi toda en pantallas de GitHub |
+| Pasos 5 y 7 — armar, bajar piezas y comprobar | **unos 40 segundos de máquina** *(medido: 25 s el 5 y 13 s el 7)* |
+| Paso 6 — entender qué hizo el arranque | **5 minutos de lectura tuya**, y no hay nada que correr |
+| Pasos 8 a 12 — llenar la portada, enviar, proteger, ajustar y quedar en verde | **una hora y cuarto**: 20 minutos de escribir lo que solo vos sabés, el resto en pantallas de GitHub |
 
 **La lectura honesta:** lo mecánico no se mide en días —son segundos—, y lo que
 ocupa el día es **decidir** y **esperar a otra gente**. Si alguien te pide una

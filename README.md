@@ -228,6 +228,13 @@ Lo que **no** hace, porque no es transcripción:
 > la fuente de verdad de los valores y manda sobre este resumen; también documenta
 > el camino **manual**, que sigue siendo válido y es el fallback si `projects init`
 > falla.
+>
+> **Y no hace falta llenarla a mano.** `projects init --asistente` hace entre 8 y 16
+> preguntas en castellano —depende de lo que contestes— y deriva los 21 valores de
+> las respuestas: no pide un id de cuenta de AWS a quien no eligió AWS. Produce este
+> mismo archivo y lo valida con el mismo `validarValores`, así que no son dos caminos
+> que puedan divergir: es un generador y una puerta. El paso a paso está en
+> [`docs/04-arrancar-acompanado.md`](docs/04-arrancar-acompanado.md).
 
 > **`projects init` se estrenó el 2026-08-22 como piloto acotado**, con el camino manual
 > intacto al lado. Es superficie nueva del marco: lo que le corresponde es un change
