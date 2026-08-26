@@ -41,7 +41,41 @@ mueve sobre un cambio incompatible.
 
 ## [No publicado]
 
-### Añadido
+### Cambiado
+
+- **La elección de plataforma por fin decide algo.** Era el hallazgo más caro de la
+  auditoría de la ruta no técnica: la guía tiene una tabla para elegir entre cinco
+  plataformas —con lo que da cada una gratis, en números medidos— y la clave `plataforma`
+  existía en el archivo de valores del andamio… y **ninguna herramienta la leía**. Quien
+  leía la tabla, elegía Supabase para no gastar, y recibía igual `infra/` e `infra-prod/`
+  con el proveedor `hashicorp/aws` adentro. Una tabla que invita a elegir y una
+  herramienta que ignora la elección es peor que no ofrecer la elección.
+
+  Ahora, con una plataforma que no sea AWS, el proyecto nuevo **no recibe una sola línea
+  de Terraform**: 69 archivos en vez de 75, sin `infra/`, sin `infra-prod/`, y el catálogo
+  de las cinco plataformas mudado a `PLATAFORMAS.md` en la raíz —vivía dentro de `infra/`,
+  que es justo lo que no viaja, y es la única página que explica cómo se conecta cada una.
+
+  **No alcanzaba con vaciar los directorios:** el paso de Terraform del pipeline decide
+  con `[ -d "$D" ]`, no con «hay `.tf` adentro», así que un `infra/` con un solo documento
+  seguiría contando como raíz y el proyecto arrancaría verificando infraestructura que no
+  tiene. Hay un caso que fija esa lectura del pipeline, para que si cambia se revise esta
+  decisión.
+
+  **`aws` sigue siendo el valor por defecto a propósito:** un archivo de valores escrito
+  antes de que esta clave se leyera describe un proyecto de AWS, y sacarle la
+  infraestructura en silencio sería un modo de falla mucho peor.
+
+### Corregido
+
+- **Dos archivos quedaban con referencias muertas que no se quejan, que es lo que las hace
+  peligrosas.** `.github/dependabot.yml` seguía con dos entradas de Terraform apuntando a
+  `/infra` y `/infra-prod`: Dependabot no encuentra manifiestos ahí y **simplemente no
+  hace nada** —sin error y sin aviso—, así que quien lea el archivo va a creer que su
+  infraestructura se mantiene al día. Y `.claude/settings.json` conservaba permisos para
+  correr `terraform` con un perfil de AWS que no existe. Los dos se podan ahora, y el
+  bloque a sacar lo delimita el **propio andamio** con un centinela, no una lista de
+  números de línea escrita en la herramienta que envejecería al primer cambio.
 
 - **`projects init --asistente`: el camino del PO, al lado del camino del builder.**
   Hasta ahora la única entrada era un archivo con **21 claves** que alguien llenaba a
