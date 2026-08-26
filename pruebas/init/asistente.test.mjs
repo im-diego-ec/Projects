@@ -19,13 +19,36 @@ import { REQUERIDOS, FORMATOS, validarValores } from "../../herramientas/project
 // validaciones distintas divergen, y la que se pudre es la que nadie mira.
 // ---------------------------------------------------------------------------
 
-/** Un preguntador de mentira: devuelve el guion y ANOTA lo que se pregunto. */
+/** Un preguntador de mentira: devuelve el guion y ANOTA lo que se pregunto.
+ *
+ *  SE MANTIENE EL POSICIONAL porque hay casos que necesitan afirmar el ORDEN,
+ *  pero para elegir respuestas concretas se usa `contestador` de abajo. */
 function guionista(respuestas) {
   const preguntado = [];
   let i = 0;
   const preguntar = async (texto) => {
     preguntado.push(texto);
     return respuestas[i++] ?? "";
+  };
+  return { preguntar, preguntado };
+}
+
+/** Contesta POR ID DE PREGUNTA, no por posicion.
+ *
+ *  EL DEFECTO QUE ESTA FUNCION CIERRA, y es el que dejo pasar dos bugs que
+ *  rompian el camino feliz: con guiones posicionales, un caso de este mismo
+ *  archivo se llamaba «solo, sin plataforma, slack, privado» y contestaba
+ *  «correo», porque su guion se habia desalineado cuando una pregunta
+ *  condicional cambio de lugar. El caso pasaba en VERDE afirmando que probaba
+ *  Slack, y el camino de Slack estuvo roto con 580 pruebas en verde.
+ *
+ *  Contestando por id, un guion desalineado es imposible: o la pregunta se hace
+ *  y se contesta lo que se quiso, o no se hace y no aparece en `preguntado`. */
+function contestador(mapa) {
+  const preguntado = [];
+  const preguntar = async (_texto, id) => {
+    preguntado.push(id);
+    return mapa[id] ?? "";
   };
   return { preguntar, preguntado };
 }
@@ -80,7 +103,7 @@ test("LO QUE MAS IMPORTA: lo que produce el asistente pasa el validador de siemp
     "PO solo, supabase, publico": PO_SOLO,
     "equipo, AWS, dos ambientes": AWS_DOS,
     "solo, AWS, un ambiente": ["api-interna", "alguien", "", "2", "", "111111111111", "sa-east-1", "mi-perfil", "", "", "2", "#alertas", "2"],
-    "solo, sin plataforma, slack, privado": ["idea-nueva", "alguien", "", "4", "", "", "", "2", "#avisos", "2"],
+
     "equipo, gcp, dominio propio": ["otra-cosa", "org2", "2", "revisor", "3", "", "2", "midominio.com", "", "", ""],
   };
   const rotos = [];
@@ -289,3 +312,91 @@ test("si la entrada se corta a mitad, el asistente NO devuelve valores a medias"
     "el corte tiene que propagarse como error: quien llama lo traduce a exit 1 y a no escribir nada",
   );
 });
+
+// ---------------------------------------------------------------------------
+// LA PRUEBA QUE FALTABA, y sin la cual los dos defectos de arriba pudieron
+// existir con todo el banco en verde: CADA OPCION DE CADA PREGUNTA, de punta a
+// punta, contra el validador de verdad.
+//
+// Los dos defectos que esto caza y que estuvieron vivos:
+//   · Elegir Slack producia un archivo SIN `ID_MCP_SLACK`, y `projects init`
+//     abortaba con exit 1. La opcion menos usada era la unica rota.
+//   · El caso que decia probar Slack contestaba «correo» por un guion
+//     posicional desalineado, asi que nadie lo media.
+// ---------------------------------------------------------------------------
+
+/** Un valor valido para cada pregunta de texto libre, por id. */
+const TEXTO_VALIDO = {
+  PROYECTO: "un-proyecto",
+  ORG: "una-cuenta",
+  BUILDER_2: "la-otra-persona",
+  CUENTA_DEV: "111111111111",
+  CUENTA_PROD: "222222222222",
+  REGION: "us-east-1",
+  PERFIL_DEV: "perfil-dev",
+  PERFIL_PROD: "perfil-prod",
+  DOMINIO_PROD: "midominio.com",
+  CANAL_ALERTAS: "#alertas",
+};
+
+test("CADA opcion de CADA pregunta produce un archivo que el validador acepta", async () => {
+  const rotos = [];
+  let combinaciones = 0;
+
+  for (const pregunta of PREGUNTAS) {
+    if (!pregunta.opciones) continue;
+    for (const opcion of pregunta.opciones) {
+      combinaciones += 1;
+      // Todo lo demas en su recomendada; solo esta pregunta se fuerza.
+      const mapa = { ...TEXTO_VALIDO, [pregunta.id]: String(pregunta.opciones.indexOf(opcion) + 1) };
+      const { preguntar, preguntado } = contestador(mapa);
+      const { valores, respuestas } = await correrAsistente(preguntar, {}, FORMATOS);
+
+      if (respuestas[pregunta.id] !== opcion.valor) {
+        rotos.push(`${pregunta.id}="${opcion.valor}": se contesto por id y quedo "${respuestas[pregunta.id]}"`);
+        continue;
+      }
+      const faltan = REQUERIDOS.filter((k) => !(k in valores) || valores[k] === undefined);
+      const { problemas } = validarValores(valores);
+      if (faltan.length || problemas.length) {
+        rotos.push(`${pregunta.id}="${opcion.valor}" (se preguntaron ${preguntado.length}): faltan [${faltan}] problemas [${problemas.join(" | ")}]`);
+      }
+    }
+  }
+
+  assert.ok(combinaciones >= 12, `se esperaban al menos 12 opciones que ejercitar; se ejercitaron ${combinaciones}`);
+  assert.deepEqual(
+    rotos,
+    [],
+    `${rotos.length} de ${combinaciones} opciones producen un archivo que el motor rechaza. Una opcion que el ` +
+      "asistente ofrece y que despues no funciona es peor que no ofrecerla: la persona eligio bien y el error " +
+      `no habla de lo que eligio.\n  ${rotos.join("\n  ")}`,
+  );
+});
+
+test("elegir Slack deja las DOS claves de Slack, no una", async () => {
+  // El defecto exacto, con nombre: `RELLENO_SLACK` se aplicaba ENTERO solo
+  // cuando NO se elegia Slack, asi que elegirlo dejaba `ID_MCP_SLACK` sin valor.
+  const { preguntar } = contestador({ ...TEXTO_VALIDO, avisos: "2" });
+  const { valores, respuestas } = await correrAsistente(preguntar, {}, FORMATOS);
+  assert.equal(respuestas.avisos, "slack", "el caso tiene que llegar de verdad a Slack, no decir que llega");
+  assert.equal(valores.CANAL_ALERTAS, "#alertas", "el canal sale de la respuesta");
+  assert.ok(valores.ID_MCP_SLACK, "y el id de MCP NO puede quedar sin valor: sin el, projects init aborta con exit 1");
+  assert.match(valores.ID_MCP_SLACK, FORMATOS.ID_MCP_SLACK.patron, "y tiene que pasar su propio patron");
+});
+
+test("MUERDE: si una opcion dejara una clave sin valor, el caso de arriba lo ve", async () => {
+  // Anti-vacuidad. Se simula el defecto sobre el resultado de derivar, sin
+  // tocar el arbol: si el aserto no mirara `undefined`, esto pasaria.
+  const { preguntar } = contestador(TEXTO_VALIDO);
+  const { valores } = await correlacionSinUna(preguntar);
+  const { problemas } = validarValores(valores);
+  assert.ok(problemas.length > 0, "un archivo al que le falta una clave requerida TIENE que ser rechazado por el validador");
+});
+
+async function correlacionSinUna(preguntar) {
+  const { valores } = await correrAsistente(preguntar, {}, FORMATOS);
+  const mutado = { ...valores };
+  delete mutado.ID_MCP_SLACK;
+  return { valores: mutado };
+}
