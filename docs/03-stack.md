@@ -29,6 +29,199 @@ va a pedir, empezá por
 
 ---
 
+## La carta: qué vas a construir
+
+**Ésta es la decisión que más cuesta si se toma tarde**, y es la primera. No es
+sobre tecnologías —eso se deriva de acá— sino sobre **quién entra a lo que estás
+construyendo y cómo llega**.
+
+Son cuatro formas. Cada una trae un andamio distinto, y elegir bien acá te ahorra
+mantener piezas que tu proyecto no usa.
+
+| | Forma | Quién entra | Estado |
+| --- | --- | --- | --- |
+| **A** | Un sitio para leer | cualquiera, sin cuenta | 🕳️ falta construirlo |
+| **B** | Una aplicación detrás de una puerta | quien tiene usuario | 🕳️ falta construirlo |
+| **B+** | Lo mismo, con servidor propio | quien tiene usuario | ✅ **es lo que hay hoy** |
+| **C** | Las dos cosas a la vez | ambos | → cae en A o en B, ver abajo |
+| **D** | Una app que se instala en el teléfono | quien la baja de la tienda | 🕳️ falta construirlo |
+
+> **La columna «estado» dice la verdad y va a cambiar.** Una forma marcada con
+> 🕳️ está explicada acá pero **el asistente todavía no te la ofrece**, porque
+> ofrecer una opción que después no funciona es peor que no ofrecerla. Cuando una
+> forma esté construida y probada, aparece en las preguntas del asistente y esta
+> tabla lo dice.
+
+---
+
+### A · Un sitio para leer
+
+Páginas que alguien abre y lee: un blog, un manual, la web de un producto, un
+catálogo. **Nadie se registra, nadie inicia sesión, nadie guarda nada.**
+
+**Por qué la elegirías.** Es la más barata de todas, en todo sentido: no hay base
+de datos que mantener, no hay servidor que se caiga, no hay contraseñas que
+proteger. Y las páginas se abren instantáneamente porque no hay nada que esperar
+—la herramienta que trae esta forma, **Astro**, manda cero programa al navegador
+por defecto y solo agrega lo justo donde de verdad hace falta interactividad—.
+Además es lo único que aparece bien en Google y se previsualiza al compartir un
+enlace.
+
+**Qué te cuesta.** No hay botón de publicar. Cada corrección de un texto es un
+cambio en el repositorio, no una edición en una pantalla de administración.
+
+**El límite real, el que sorprende después.** El día que dos o tres personas
+quieran escribir sin tocar código, vas a necesitar un gestor de contenido, y eso
+es otro proyecto. En un sitio de una persona no molesta nunca; con tres autores
+te lo piden a los dos meses.
+
+---
+
+### B · Una aplicación detrás de una puerta
+
+La gente entra con usuario y contraseña y trabaja adentro un rato largo: un panel
+de gestión, un inventario, un sistema interno, una herramienta de trabajo.
+
+**Por qué la elegirías.** Se siente como un programa y no como un sitio: entrás
+una vez y de ahí en adelante las pantallas cambian al instante, sin que la página
+parpadee. Es la forma correcta para algo donde la gente **entra a hacer**, no a
+leer.
+
+**Qué te cuesta.** La primera visita se baja la aplicación entera antes de
+mostrar algo. Con buena conexión son décimas de segundo y nadie lo nota; con mala
+se nota.
+
+**El límite real.** Ninguna de tus pantallas va a aparecer en Google, ni se va a
+previsualizar cuando alguien comparta el enlace. Y **no se arregla con un
+ajuste** — se arregla mudándose a otra forma, que es un proyecto entero. Si nadie
+de afuera entra por un enlace, este límite no te toca jamás. Si algún día hay una
+parte pública, te toca seguro: conviene decidirlo ahora.
+
+**Y viene en dos sabores, que se deciden con una sola pregunta:** *¿va a haber
+alguna vez una clave secreta de un tercero — cobrar con tarjeta, mandar mails,
+hablar con un servicio que se paga?*
+
+- **No** → **B**, sin servidor propio. El navegador habla directo con la base de
+  datos, y lo que protege los datos son reglas escritas en la propia base. Menos
+  piezas, menos cosas que se rompen.
+- **Sí** → **B+**, con servidor propio. Es lo que el andamio trae hoy: un
+  programa aparte que guarda esas claves y habla con la base por vos.
+
+---
+
+### B+ · La misma aplicación, con servidor propio
+
+Es **B**, más un programa aparte que corre del lado del servidor. Es lo que el
+andamio trae hoy, y por eso es la única forma disponible mientras las otras se
+construyen.
+
+**Por qué la elegirías.** Porque hay algo que no puede vivir en el navegador de
+tu gente: una clave secreta de un tercero. Cobrar con tarjeta, mandar mails,
+hablar con un servicio que se paga — todo eso usa una clave que si viaja al
+navegador, **la puede leer cualquiera**. El servidor propio es el lugar donde esa
+clave vive sin que nadie la vea.
+
+También la elegís si tu proyecto tiene que **moler** datos: procesar archivos
+grandes, generar documentos, recorrer miles de filas. Eso no lo hace un navegador
+y tampoco lo hace bien el plan gratuito de una plataforma sin servidor.
+
+**Qué te cuesta.** Una pieza más que mantener, actualizar y que se puede caer. Y
+una advertencia medida: si tu proyecto **no** tiene ninguna de esas dos
+necesidades, este servidor no te da nada y te cobra todo — el que el andamio
+reparte hoy son veintidós archivos para tres rutas de ejemplo, contra una base
+que todavía no tiene ni una tabla.
+
+**El límite real.** Los planes gratuitos de las plataformas sin servidor cortan
+por **tiempo de procesador**, no por tiempo de reloj: esperar a la base no
+cuenta, pero calcular sí. Si tu proyecto muele datos de verdad, esta forma sale
+del plan gratuito, y conviene saberlo antes y no con la primera factura.
+
+---
+
+### C · Las dos cosas: una parte pública y una parte con llave
+
+Una portada, precios, quizás un blog — y detrás, la aplicación de verdad.
+
+**Y acá va un consejo en contra de agregar una opción**, porque es lo honesto:
+**esto casi nunca es una tercera cosa.**
+
+- Si la parte pública son **cuatro pantallas que casi no cambian**, esto es **B
+  con cuatro páginas estáticas al lado**. Elegir una herramienta «mixta» es pagar
+  complejidad sin cobrar beneficio.
+- Si la parte pública **es** el producto —un medio, un catálogo grande— y la
+  parte privada es un rincón, esto es **A con una puerta**.
+
+La pregunta que desempata: *¿dónde está el producto de verdad, adelante o
+atrás?*
+
+---
+
+### D · Una app que se instala en el teléfono
+
+Con su ícono en la pantalla del celular y su ficha en la App Store y en Google
+Play.
+
+**Por qué la elegirías.** Porque tu producto necesita algo que un sitio web no
+puede: estar en la pantalla de inicio como cualquier otra app, mandar avisos aun
+cuando está cerrada, usar la cámara o el sensor de huella con todas sus
+capacidades.
+
+**Qué te cuesta, y esto es lo que más sorprende.** Dejás de ser solamente quien
+programa. Lo que sigue lo deciden Apple y Google, no este marco, así que va con
+la fecha en que se leyó de sus páginas —y conviene volver a mirarlo antes de
+decidir, porque cambia sin avisarle a nadie:
+
+```text
+medido el 2026-08-26 en developer.apple.com y play.google.com
+
+  Apple      USD 99 por AÑO, mientras quieras seguir en la tienda.
+             No es una compra: es suscripción. Si dejás de pagar, tu app se va.
+  Google     USD 25 una sola vez.
+             Con cuenta PERSONAL: 12 personas reales instalando tu app
+             y manteniendola puesta 14 dias seguidos antes de poder publicar.
+```
+
+Y tres cosas que no se miden en dinero:
+
+- **Cada versión espera revisión humana**, incluida la corrección de una errata.
+- **Tu identidad se vuelve pública.** Si te anotás como persona física, tu nombre
+  legal aparece como vendedor.
+- **No termina nunca.** Las tiendas exigen actualizarse a versiones nuevas del
+  sistema con fecha límite, o tu app deja de aparecer.
+
+**Lo bueno, y es más de lo que parece:** la herramienta de esta forma es **React
+Native**, y no es «otro React» — **es el mismo React**. Quien sabe hacer la web
+ya sabe la mayor parte. Lo que cambia no es el cerebro, es la mano: escribís
+`<View>` y `<Text>` en vez de `<div>` y `<p>`.
+
+**El consejo, y es en contra de elegir esto primero.** Nada de la suscripción, ni
+de las personas que tienen que probarla, ni de la revisión, sirve para
+**averiguar si alguien quiere tu producto**. El camino barato es hacer la web de
+forma que se pueda **instalar en el teléfono** —se puede, y se ve con su ícono— y
+construir la app de verdad el día que haya gente pidiéndola. Ese pedido ya pagó
+la suscripción. Y como comparte React con la web, ese trabajo no se tira.
+
+---
+
+### Lo que el marco decide por vos, y lo dice
+
+Un marco puede tener opiniones. Lo que no puede es tenerlas sin declararlas, así
+que acá están: **TypeScript**, un solo gestor de paquetes, un solo comando de
+verificación, **Vitest** para las pruebas, validación de todo dato que venga de
+afuera, la base guarda las fechas en UTC, las bajas son lógicas, una sola base
+por proyecto, y los secretos se resuelven al arrancar cada tarea y jamás se
+copian al compilado.
+
+**Tres preguntas que este marco decidió NO hacerte**, con el motivo:
+
+| No se pregunta | Por qué |
+| --- | --- |
+| ¿React, Svelte o Vue? | Las tres hacen lo mismo y la diferencia no cambia nada de lo que tu producto hace. Cambiarla del lado del marco cuesta rehacer el revisor de estilo y todas las pruebas — es trasladarte un costo disfrazado de libertad |
+| ¿Qué capa de datos? | No es contestable sin saber de la cocina. La pregunta honesta que hay detrás es «¿la seguridad la hace la base o tu servidor?», y ésa ya la contestaste al elegir entre **B** y **B+** |
+| ¿Con qué corredor de pruebas? | Sin ninguna consecuencia para tu producto, y las dos opciones son gratis |
+
+---
+
 ## Por qué esta página no escribe versiones
 
 La respuesta a «¿con qué corre esto?» está repartida por el repositorio, y
