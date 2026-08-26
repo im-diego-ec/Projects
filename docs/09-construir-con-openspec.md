@@ -35,7 +35,7 @@ CLAUDE.md  ──importa──►  AGENTS.md  ──importa──►  .projects/
                          (lo del proyecto)         (las reglas del área)
 ```
 
-Más `.claude/settings.json`, y los **12 comandos `/opsx:*`** y las 12 skills `openspec-*` que
+Más `.claude/settings.json`, y los **6 comandos `/opsx:*`** y las 7 skills `openspec-*` que
 dejó `openspec init` (lo corre `projects init` en su último paso; si ese paso falló, no están y
 hay que correrlo a mano).
 
@@ -66,17 +66,32 @@ change está vivo, es solo el nombre.
 
 ##### 7.b Crear el change
 
-**El directorio lo crea el comando, no vos con `mkdir`.**
+**El directorio lo creás vos, y el proposal se escribe antes que todo lo demás.**
 
-```
-/opsx:new recepcion-de-mercaderia
+```bash
+mkdir -p openspec/changes/recepcion-de-mercaderia/specs
 ```
 
-⚠️ **No uses `/opsx:propose`.** Los dos crean el change, pero `propose` *«genera todos los
-artefactos en un solo paso»* — proposal, deltas, `design.md` y `tasks.md` juntos —, y eso es
-exactamente lo que rompe el gate del PO: aprueba un proposal cuyo diseño ya está escrito.
-`/opsx:new` crea el change, muestra la plantilla del primer artefacto y **para**; sus propias
-reglas dicen «no crear ningún artefacto todavía».
+Y adentro, `proposal.md` primero. La página [07-para-el-builder.md](07-para-el-builder.md)
+sección 3 dice qué contesta cada archivo del change y en qué orden.
+
+> **Por qué a mano y no con un comando.** Medido contra el CLI que este marco pinea
+> (`@fission-ai/openspec@1.9.0`) y contra lo que `openspec init` deja en un proyecto
+> recién creado: **no existe ningún comando que cree un change vacío**. El CLI tiene
+> `openspec change show`, `list` y `validate` — ninguno crea. Y de los **seis** comandos
+> que llegan al proyecto (`/opsx:explore`, `propose`, `apply`, `archive`, `sync`,
+> `update`), el único que crea es `/opsx:propose`, y su propia descripción dice que
+> *«genera todos los artefactos en un solo paso»*: proposal, deltas, `design.md` y
+> `tasks.md` juntos.
+>
+> **Eso rompe la [compuerta](02-glosario.md) del PO**, y por eso esta página no lo usa para empezar: el PO
+> terminaría aprobando un proposal cuyo diseño ya está escrito, o sea decidiendo el *qué*
+> cuando el *cómo* ya está decidido. Un `mkdir` y un archivo son más baratos que esa
+> confusión.
+>
+> **Lo que sí conviene usar antes:** `/opsx:explore`, que es para pensar el problema en voz
+> alta sin escribir todavía ningún artefacto. Y una vez que el proposal está aprobado,
+> `/opsx:apply` para implementar las tareas.
 
 **¿Y OpenSpec no se queja de un archivo que él no creó?** No, y está medido: el change
 `capa-descubrimiento` del propio marco tiene **seis archivos extra** adentro (un directorio

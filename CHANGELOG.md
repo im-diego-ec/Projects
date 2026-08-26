@@ -41,7 +41,30 @@ mueve sobre un cambio incompatible.
 
 ## [No publicado]
 
+### Corregido
+
+- **El primer comando del tramo de construir no existía, y era el primero.** `docs/09` decía
+  «el directorio lo crea el comando» y daba `/opsx:new`. Medido contra el CLI que el marco
+  pinea y contra lo que `openspec init` deja en un proyecto recién creado: los comandos que
+  llegan son **seis** —`explore`, `propose`, `apply`, `archive`, `sync`, `update`— y `new`
+  no es ninguno. Peor: la misma página **prohibía** `/opsx:propose`, que es el único que
+  crea, así que la persona quedaba entre un comando que no existe y otro que le dijeron que
+  no use. Con eso, el tramo de construir no arrancaba.
+
+  El razonamiento de la prohibición era correcto y se conserva —`propose` genera los cuatro
+  artefactos de un golpe y el PO terminaría aprobando un proposal cuyo diseño ya está
+  escrito—, pero ahora la página dice qué hacer en su lugar: `mkdir` y el proposal primero,
+  con `/opsx:explore` para pensar antes y `/opsx:apply` para implementar después. Y explica
+  por qué a mano: **no existe ningún comando que cree un change vacío** — `openspec change`
+  solo tiene `show`, `list` y `validate`.
+- **Tres páginas decían «12 comandos y 12 skills» cuando son 6 y 7.**
+
 ### Añadido
+
+- **`pruebas/docs/comandos-que-existen.test.mjs`.** Un comando escrito en una guía es una
+  promesa ejecutable: quien lo copia y lo pega no tiene cómo saber que no existe. El banco
+  comprueba que toda la documentación nombre solo comandos que llegan al proyecto, y que
+  los conteos que afirma coincidan con lo medido.
 
 - **La guía ahora te muestra tu proyecto andando, y era el hueco más barato de todos.** El
   andamio ya traía todo lo necesario —`pnpm dev`, los dos `.env.example`— y la guía lo
