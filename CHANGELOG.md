@@ -75,6 +75,14 @@ mueve sobre un cambio incompatible.
   con su motivo y con **cuándo se revisa**. El marco permite apartarse de casi cualquier
   pieza; lo que no permite es que apartarse sea algo que se descubre después.
 
+### Cambiado
+
+- **La guía del PO deja de mandar llenar 21 casillas a mano.** Los Pasos 3 y 4 se
+  reescribieron alrededor del asistente: el 3 contesta las preguntas, el 4 revisa lo que
+  quedó escrito. La tabla de tiempos dice ahora **8 preguntas** en el caso simple y 15
+  con AWS, en vez de «llenar las 21 decisiones». El camino de llenarlo a mano sigue
+  existiendo y está escrito ahí mismo, como lo que es: el mismo destino por otra puerta.
+
 - **Nada verificaba que un enlace apuntara a un archivo que existe, y ahora sí.**
   `pruebas/docs/enlaces.test.mjs` comprueba los 418 enlaces relativos del repositorio
   y sus anclas. El hueco estaba medido: apuntando los 217 enlaces del glosario a un
@@ -107,6 +115,31 @@ mueve sobre un cambio incompatible.
   en prosa sigue saliendo rojo.
 
 ### Corregido
+
+- **La guía dejaba a la persona trabada en el paso 1 de 12, y le daba la causa
+  equivocada.** El repositorio del marco es **privado** y la guía nunca decía que hay
+  que pedir acceso. Peor: anticipaba el error que iba a ver —un «no encontrado»— y le
+  atribuía una sola causa, no estar autenticado, con su remedio. Quien ya estaba
+  autenticado y solo le faltaba permiso veía el mismo síntoma, corría el remedio, y
+  seguía trabado. GitHub responde lo mismo para «no existe» y para «existe y no es tuyo»,
+  a propósito, así que la página no puede distinguirlos: ahora las nombra a las dos y
+  dice cuál se destraba con un comando y cuál con una persona. Y agrega el acceso como
+  tercer requisito de «antes de empezar», con `gh repo view` para comprobarlo.
+- **El Paso 1 mandaba «anotar» una ruta que ningún comando imprimía.** `pwd` aparecía
+  **0 veces** en las 614 líneas de la página, y esa ruta es obligatoria en los Pasos 3 y
+  5. Ahora el bloque a copiar la imprime, y la página dice que se copie, con la salida
+  real (`Cloning into 'Projects'...`) en vez de la que prometía.
+- **El Paso 2 no decía dónde había que estar parado**, y lo más probable era crear el
+  proyecto **adentro** del clon del marco. Ahora sale de la carpeta primero y comprueba
+  con `pwd` que la ruta no termine en `/Projects`.
+- **La salida de ejemplo del Paso 0 no coincidía con la real**, en una página cuya regla
+  es «si ves otra cosa, algo pasó». `gh auth status` imprime seis líneas y la guía
+  mostraba una. Ahora muestra la salida completa y dice qué va a ser distinto y por qué
+  no importa: lo único que hay que encontrar es la línea con el tilde.
+- **La tabla de programas prometía un encendido que el Paso 0 no hacía.** Decía que pnpm
+  «se enciende con `corepack` — Ver el paso 0», y el Paso 0 solo pregunta la versión.
+  Todos los comandos de la página llaman a pnpm con el prefijo `corepack pnpm`, así que
+  no hay nada que encender: la fila ahora lo dice.
 
 - **Dos afirmaciones del banco quedaron falsas al numerar, y se reescribieron en vez de
   dejarlas.** Hasta hoy `consumidores.md` era subcadena de `censo-de-consumidores.md`, y
