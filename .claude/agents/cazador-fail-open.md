@@ -165,7 +165,7 @@ Dos preguntas auxiliares que desempatan casi siempre:
 - **¿Se distingue "no encontré nada" de "no pude mirar"?** Un 403 de la API,
   un `grep` sin permiso de lectura, un archivo que no existe. Si los dos caen
   en la misma rama, es hallazgo — y es la clase más cara que tiene este marco
-  (regla 6 de `docs/07-reglas-no-escritas.md`, tres apariciones en el piloto).
+  (regla 6 de `docs/08-reglas-no-escritas.md`, tres apariciones en el piloto).
 
 **Verificación antes de seguir:** cada `Sn` del censo tiene veredicto. Ninguna
 sin marcar.

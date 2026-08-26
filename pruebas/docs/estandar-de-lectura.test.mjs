@@ -9,7 +9,7 @@
 // alcance.
 //
 // LOS DOS CARRILES, Y POR QUE NO SON UNO SOLO. Hay paginas inevitablemente
-// tecnicas —08-upgrade-openspec.md, 11-forkear-el-marco.md, 05-arrancar-tecnico.md—.
+// tecnicas —09-upgrade-openspec.md, 12-forkear-el-marco.md, 05-arrancar-tecnico.md—.
 // Convertirlas en folleto las arruinaria: un runbook se corre, no se hojea. Para
 // esas el estandar no es "sin jerga" sino NAVEGABLE: una frase al principio que
 // diga para quien es, y todo el vocabulario del marco enlazado al glosario. El
@@ -437,7 +437,7 @@ test("refutacion · una frase de audiencia que llega tarde no cuenta", () => {
 });
 
 test("refutacion · una palabra del glosario metida sin enlace se ve, en cualquier pagina", () => {
-  const texto = leer("docs/08-upgrade-openspec.md");
+  const texto = leer("docs/09-upgrade-openspec.md");
   const termino = TERMINOS.find((t) => !terminosUsados(texto, TERMINOS).includes(t));
   assert.ok(termino, "esa pagina ya usa todas las palabras del glosario: no queda ninguna con que mutar");
   const mutada = `${texto}\n\nY entonces el equipo revisa el ${termino} antes de integrar.\n`;
@@ -472,11 +472,11 @@ test("refutacion · una palabra de oficio metida en una pagina del carril duro s
 
 test("refutacion · una pagina de docs/ que el indice no enumera se ve", () => {
   const indice = leer(INDICE);
-  const mutado = indice.replace("](10-consumidores.md)", "](otra-cosa.md)");
-  assert.notEqual(mutado, indice, "el indice ya no enlaza 10-consumidores.md con esa forma: actualiza esta refutacion");
+  const mutado = indice.replace("](11-consumidores.md)", "](otra-cosa.md)");
+  assert.notEqual(mutado, indice, "el indice ya no enlaza 11-consumidores.md con esa forma: actualiza esta refutacion");
   assert.deepEqual(
     sinIndexar(ALCANCE, mutado),
-    ["docs/10-consumidores.md"],
+    ["docs/11-consumidores.md"],
     "saque una pagina del indice y la comprobacion no lo vio. Este caso cubria ademas el falso verde de la " +
       "subcadena, que los numeros mataron: hasta el renombrado 'consumidores.md' vivia dentro de " +
       "'censo-de-consumidores.md' y una busqueda floja daba la pagina por indexada gracias a la mencion de otra. " +
@@ -490,8 +490,8 @@ test("refutacion · control · una pagina historica no arrastra al estandar a la
   // de declararla historica, la pagina entra al estandar — y este control es el
   // que avisa de que la exencion hoy esta puesta y de quien depende.
   assert.ok(
-    esHistorica("docs/12-auditoria-cierre-v1.md"),
-    `${INDICE} dejo de declarar 12-auditoria-cierre-v1.md como **Histórico**. Entonces esa pagina entra al ` +
+    esHistorica("docs/13-auditoria-cierre-v1.md"),
+    `${INDICE} dejo de declarar 13-auditoria-cierre-v1.md como **Histórico**. Entonces esa pagina entra al ` +
       "estandar: o se le agrega la frase de audiencia y el vocabulario enlazado, o se le devuelve la etiqueta.",
   );
   assert.ok(
