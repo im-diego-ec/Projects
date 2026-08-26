@@ -23,5 +23,8 @@ dri: PO
 - [x] Partir el índice en tres secciones con el criterio escrito.
 - [x] Corregir las dos afirmaciones del banco que el renombrado dejó falsas.
 - [x] Banco completo en verde: 957/957.
+- [x] Corregir los dos defectos que el propio verificador se hizo en su primer
+      viaje: leía como enlace el código en línea, y solo veía archivos ya
+      comprometidos —por eso dio verde en local y rojo en CI—.
 - [ ] Revisión escéptica adversarial del cambio completo.
 - [ ] Entrada de CHANGELOG.
