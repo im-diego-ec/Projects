@@ -41,6 +41,23 @@ mueve sobre un cambio incompatible.
 
 ## [No publicado]
 
+### Añadido
+
+- **La guía ahora te muestra tu proyecto andando, y era el hueco más barato de todos.** El
+  andamio ya traía todo lo necesario —`pnpm dev`, los dos `.env.example`— y la guía lo
+  mencionaba **cero veces**: alguien recorría trece pasos, terminaba en verde, y **nunca
+  veía una pantalla**. Terminaba con la sensación de haber configurado algo, no de haber
+  construido algo. El **Paso 7** copia los dos archivos de configuración, levanta el
+  proyecto y lo abre en `http://localhost:5173`.
+
+  **Y no hace falta Docker**, que es lo que hacía parecer caro este paso. Medido sobre un
+  proyecto recién generado: la web contesta **200** con el nombre del proyecto en el
+  título, y la otra mitad contesta `{"estado":"ok","servicio":"<tu-proyecto>-api"}`. Lo
+  único que no anda sin base de datos son las rutas que la usan —contestan un error— y el
+  paso lo dice de frente en vez de dejar que la persona lo descubra.
+
+  La introducción también se corrigió: prometía menos de lo que ahora se logra.
+
 ### Corregido
 
 - **El camino feliz de la guía estaba roto de punta a punta, y era 100% reproducible.** El

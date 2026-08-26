@@ -18,11 +18,15 @@ Un repositorio nuevo, tuyo, con las verificaciones automáticas ya conectadas y
 en verde. Es decir: un lugar donde escribir software con las reglas del equipo
 puestas desde el primer día, en vez de acordadas y olvidadas.
 
+Y, en el paso 7, **vas a verlo andando en tu navegador**: una página con el
+nombre de tu proyecto, corriendo en tu computadora. No es gran cosa todavía —es
+fea a propósito— pero es la diferencia entre haber configurado algo y haber
+construido algo.
+
 **Lo que todavía NO vas a lograr,** y conviene saberlo antes de empezar y no a
-mitad de camino: el marco **no publica tu aplicación en internet**. Al final del
-recorrido tenés el proyecto sano y verificado en tu computadora y en GitHub, no
-una dirección que le puedas pasar a alguien. Esa parte falta y está declarada en
-la sección 6.
+mitad de camino: el marco **no lo publica en internet**. Verlo en tu computadora
+sí; darle una dirección a otra persona para que entre, todavía no. Esa parte
+falta y está declarada en la sección 6.
 
 ### Cuánto lleva
 
@@ -259,11 +263,11 @@ abrir una línea de código.
   cualquier pieza; lo que el marco exige es que apartarse sea una **decisión
   declarada, con su motivo**, y no algo que se descubre después.
 - **No publica tu aplicación, todavía.** Es el hueco más grande y está medido:
-  en las 614 líneas de la página 04 no aparece ni una vez la palabra
-  «desplegar». Al terminar el recorrido tenés el proyecto verificado y en
-  GitHub; para que alguien lo use desde internet falta una pieza que hoy no
-  existe. Se dice acá, y no escondido en una página técnica, porque enterarse
-  al final es peor que saberlo al principio.
+  en la guía paso a paso no aparece ni una vez la palabra «desplegar». Al
+  terminar el recorrido tenés el proyecto verificado, en GitHub y **andando en
+  tu computadora** —eso sí lo vas a ver, en el paso 7—; lo que falta es que
+  alguien más pueda entrar desde internet. Se dice acá, y no escondido en una
+  página técnica, porque enterarse al final es peor que saberlo al principio.
 
 ---
 
