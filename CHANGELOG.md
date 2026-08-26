@@ -43,6 +43,38 @@ mueve sobre un cambio incompatible.
 
 ### Añadido
 
+- **`projects init --asistente`: el camino del PO, al lado del camino del builder.**
+  Hasta ahora la única entrada era un archivo con **21 claves** que alguien llenaba a
+  mano. Una auditoría midió que buena parte de ellas no las puede contestar quien no es
+  técnico —`REGION` con forma de AWS, `ID_MCP_SLACK`, `GENERAR_CLIENTE_DATOS`— y, peor,
+  que **la decisión más cara no era ninguna de las 21**: la clave `plataforma` existía en
+  el andamio y **ninguna herramienta la leía**, así que quien elegía Supabase para no
+  gastar recibía el andamio de AWS igual, con seis casillas obligatorias de una nube que
+  no iba a usar.
+
+  Ahora son **8 preguntas** en el caso simple —y solo dos hay que escribirlas; el resto
+  se contestan con Enter— o **15** si elegís AWS con dos ambientes, que es cuando esos
+  datos existen de verdad. Cada opción explica **por qué la elegirías, qué te cuesta y
+  qué límite real tiene**, con números medidos: «500 MB de base, 50.000 personas al mes,
+  el proyecto se pausa si no lo tocás por una semana».
+
+  **No es una segunda puerta al motor.** Genera el mismo archivo que entra por
+  `--valores`, y valida con `validarValores`, el de siempre — dos validaciones distintas
+  divergen y la que se pudre es la que nadie mira. Lo único que cambia es *cuándo*: el
+  patrón corre en el momento de la respuesta, así que el handle mal escrito se arregla
+  ahí y no veinte preguntas después.
+
+  `--valores` **no pregunta nunca**, con o sin terminal: la bandera explícita es una
+  declaración de que ya decidiste. Sin terminal, `--asistente` no se cuelga: imprime las
+  preguntas que iba a hacer, dice que no hay a quién preguntarle y sale 2.
+
+- **Lo que el proyecto se aparta de lo que el marco supone queda firmado.** Trabajar solo
+  apaga la aprobación humana ajena —con una sola persona, exigirla bloquea **todo** merge
+  sin salida— y eso, junto con el relleno de AWS y de Slack y la protección de rama que
+  un repositorio privado gratuito no puede tener, se escribe en `.projects-desvios.json`
+  con su motivo y con **cuándo se revisa**. El marco permite apartarse de casi cualquier
+  pieza; lo que no permite es que apartarse sea algo que se descubre después.
+
 - **Nada verificaba que un enlace apuntara a un archivo que existe, y ahora sí.**
   `pruebas/docs/enlaces.test.mjs` comprueba los 418 enlaces relativos del repositorio
   y sus anclas. El hueco estaba medido: apuntando los 217 enlaces del glosario a un
