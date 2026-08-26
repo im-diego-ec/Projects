@@ -116,6 +116,29 @@ mueve sobre un cambio incompatible.
 
 ### Corregido
 
+- **Los cinco hallazgos que quedaban del recorrido adversarial.** Ninguno bloqueaba, y
+  los cinco eran la misma clase de defecto: la guía afirmando un número que otro archivo
+  decide.
+  - El Paso 12 prometía **tres** resultados del `grep` y salen **dos**: la herramienta del
+    Paso 5 reescribe `.github/proteccion-main.md` con lo que midió y se lleva el tercero
+    puesto. La guía ahora dice dos y explica dónde fue el que falta.
+  - El Paso 10 decía «encendé **4 de las 8** reglas» y el archivo al que manda tiene **5**
+    pendientes y **4** diferidas. Ahora no cablea ningún número: manda a contar las filas
+    del archivo propio, porque cuántas son depende de lo que se contestó en el Paso 3.
+  - La fila de tiempos de los Pasos 5 a 7 mezclaba tiempo de máquina con tiempo de
+    lectura: el Paso 6 son 5 minutos de leer, no de esperar. Se separó.
+- **La primera tarea que la herramienta imprime no estaba en ningún paso de la guía.** El
+  `README.md` del proyecto nuevo nace con **9 huecos `RELLENAR`** —qué hace el proyecto, a
+  quién le sirve, a quién llamar cuando se rompe— y `projects init` lo imprime como su
+  pendiente número uno, *antes del primer envío*. La guía mandaba directo a `git push`. Y
+  **nada se pone en rojo por un `RELLENAR` sin llenar**, así que lo que no se hace ahí se
+  queda para siempre. Ahora el Paso 8 llena la portada antes de enviar.
+- **El resto del repositorio no sabía que el asistente existe, y la guía dice que ese
+  resto manda sobre ella.** `README.md` y `docs/05-arrancar-tecnico.md` seguían mandando
+  llenar 21 casillas a mano como único camino. Las dos lo nombran ahora, y lo presentan
+  por lo que es: no dos caminos que puedan divergir, sino **un generador y una puerta** —
+  el asistente produce el mismo archivo y lo valida con el mismo `validarValores`.
+
 - **El propio arreglo de la puerta introdujo dos bloqueos nuevos, y los cazó el recorrido
   adversarial.** El bloque del Paso 1 termina con `cd ..`, así que la persona ya sale del
   clon ahí; el Paso 2 le daba **otro** `cd ..` y terminaba una carpeta **más arriba** del
