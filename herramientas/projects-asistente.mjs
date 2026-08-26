@@ -460,7 +460,6 @@ function envolver(texto, ancho) {
 export async function correrAsistente(preguntar, previos = {}, formatos = {}, emitir = () => {}) {
   const respuestas = { ...previos };
   const dicho = [];
-  const activas = [];
 
   // SE EMITE EN EL MOMENTO Y ADEMAS SE GUARDA, y las dos mitades hacen falta.
   // La primera version solo guardaba y quien llamaba imprimia al final: la
@@ -473,10 +472,18 @@ export async function correrAsistente(preguntar, previos = {}, formatos = {}, em
     emitir(linea);
   };
 
-  for (const p of PREGUNTAS) {
-    if (p.salta && p.salta(respuestas)) continue;
-    activas.push(p.id);
-  }
+  // EL TOTAL SE RECALCULA EN CADA PREGUNTA, y no se fija al principio.
+  //
+  // El defecto que esto cierra, medido: la primera version contaba las preguntas
+  // activas ANTES del bucle, cuando `respuestas` estaba vacio. Pero cuantas
+  // preguntas hay DEPENDE de lo que se vaya contestando —elegir AWS agrega
+  // cinco—, asi que el denominador nacia viejo y la pantalla decia `[13/8]`.
+  // "trece de ocho" no significa nada para nadie, y quien lo lee no sabe si el
+  // programa se rompio, si conto mal, o cuanto falta.
+  //
+  // Recalcularlo es honesto en todo momento: al empezar son ocho porque con las
+  // respuestas de ese momento son ocho, y en cuanto se elige AWS pasa a trece.
+  const cuantasQuedan = () => PREGUNTAS.filter((q) => !q.salta || !q.salta(respuestas)).length;
 
   let n = 0;
   for (const p of PREGUNTAS) {
@@ -485,7 +492,7 @@ export async function correrAsistente(preguntar, previos = {}, formatos = {}, em
     const previo = previos[p.id];
 
     for (;;) {
-      for (const linea of lineasDePregunta(p, n, activas.length, respuestas)) decir(linea);
+      for (const linea of lineasDePregunta(p, n, cuantasQuedan(), respuestas)) decir(linea);
 
       if (p.opciones) {
         const porDefecto = previo ?? p.opciones.find((o) => o.recomendada)?.valor;
@@ -543,6 +550,14 @@ export function lineasDeResumen(r, desviosDeR) {
     ["Avisos", r.avisos === "slack" ? r.CANAL_ALERTAS : "al correo de GitHub"],
     ["Repositorio", r.visibilidad === "publico" ? "público" : "privado"],
   ];
+  // Las de AWS son las UNICAS que la persona tuvo que ir a buscar a otro lado, y
+  // la primera version del resumen no las mostraba: se llamaba "todo lo que
+  // elegiste" y se comia justo las cinco que mas cuesta verificar.
+  if (r.plataforma === "aws") {
+    filas.push(["Cuenta de AWS", r.ambientes === "dos" ? `${r.CUENTA_DEV} (pruebas) y ${r.CUENTA_PROD} (de verdad)` : r.CUENTA_DEV]);
+    filas.push(["Región", r.REGION]);
+    filas.push(["Perfil de AWS", r.ambientes === "dos" ? `${r.PERFIL_DEV} y ${r.PERFIL_PROD}` : r.PERFIL_DEV]);
+  }
   const ancho = Math.max(...filas.map(([k]) => k.length));
   for (const [k, v] of filas) l.push(`  ${k.padEnd(ancho)}   ${v}`);
 
