@@ -1,7 +1,7 @@
 # Plantilla: registro de fricción de una adopción
 
 Se llena **mientras** alguien arranca un proyecto siguiendo
-[la guía](../arrancar-un-proyecto.md), y el resultado se guarda en
+[la guía](../05-arrancar-tecnico.md), y el resultado se guarda en
 `docs/adopciones/AAAA-MM-DD-<proyecto>.md` de este repo. No va al repo del
 proyecto: la guía es un documento del marco, y sus correcciones salen de acá.
 
@@ -14,7 +14,7 @@ escribió.
 
 **2. Un tropiezo cuyo arreglo es «acordate» no es un arreglo.** Si la corrección
 que se te ocurre empieza con *hay que recordar que…*, no va a la guía: va como fila
-al [backlog](../reglas-no-escritas.md#backlog-de-automatización). La premisa del
+al [backlog](../07-reglas-no-escritas.md#backlog-de-automatización). La premisa del
 marco es que un ritual que alguien debe recordar no cuenta como enforcement, y eso
 vale también para la documentación.
 
@@ -87,7 +87,7 @@ ya quedó en la tabla.
 - **Cómo lo saqué**:
 - **Cuánto me costó**: ____ min
 - **Clase** — marcá una, porque decide adónde va el arreglo:
-  - [ ] `guía` — no lo decía, o lo decía mal → PR a `docs/arrancar-un-proyecto.md`
+  - [ ] `guía` — no lo decía, o lo decía mal → PR a `docs/05-arrancar-tecnico.md`
   - [ ] `andamio` — lo que llegó estaba mal o faltaba → PR a `plantilla/`
   - [ ] `marco` — un check o una action se portó distinto de lo documentado → issue o change
   - [ ] `entorno` — la máquina (Windows, rutas largas, versiones locales) → nota en la guía

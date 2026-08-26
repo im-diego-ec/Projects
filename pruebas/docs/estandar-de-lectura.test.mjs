@@ -2,14 +2,14 @@
 //
 // QUE CIERRA. El estandar —"ninguna palabra tecnica aparece sin explicarse aca
 // mismo o sin enlazar al glosario"— existia declarado dentro de UNA pagina y
-// medido por UN banco, el de docs/empezar-sin-ser-tecnico.md. Todas las demas
+// medido por UN banco, el de docs/01-introduccion.md. Todas las demas
 // paginas de docs/ y el README de la raiz vivian fuera de la regla: la que mas
 // gente abre —el indice— usaba "pipeline", "check" y "deploy" sin definirlos, y
 // ninguna pagina decia para quien era. Este banco extiende el estandar a todo el
 // alcance.
 //
 // LOS DOS CARRILES, Y POR QUE NO SON UNO SOLO. Hay paginas inevitablemente
-// tecnicas —upgrade-openspec.md, forkear-el-marco.md, arrancar-un-proyecto.md—.
+// tecnicas —08-upgrade-openspec.md, 11-forkear-el-marco.md, 05-arrancar-tecnico.md—.
 // Convertirlas en folleto las arruinaria: un runbook se corre, no se hojea. Para
 // esas el estandar no es "sin jerga" sino NAVEGABLE: una frase al principio que
 // diga para quien es, y todo el vocabulario del marco enlazado al glosario. El
@@ -191,7 +191,7 @@ test("estandar · ninguna pagina usa una palabra del glosario sin enlazarla ahi 
     [],
     "estas paginas usan palabras del marco sin enlazarlas al glosario:\n  " +
       rotas.join("\n  ") +
-      "\nLa forma es [palabra](glosario.md) —desde la raiz, [palabra](docs/glosario.md)— y alcanza con UNA vez " +
+      "\nLa forma es [palabra](02-glosario.md) —desde la raiz, [palabra](docs/02-glosario.md)— y alcanza con UNA vez " +
       "por pagina. No hace falta evitar el vocabulario: una pagina que no puede nombrar las cosas no explica " +
       "nada. Lo que no vale es suponerlo sabido. La forma barata de cumplirlo es el bloque de vocabulario que " +
       "las paginas ya traen arriba: 'Palabras del marco que vas a ver aca', con cada una enlazada.",
@@ -304,7 +304,7 @@ test("refutacion · una pagina escrita en jerga entrecomillada revienta el tope"
 // LA GUIA PASO A PASO: LO QUE LA HACE UTIL, Y NO SOLO CORRECTA
 // ---------------------------------------------------------------------------
 
-const GUIA = "docs/paso-a-paso-sin-ser-tecnico.md";
+const GUIA = "docs/04-arrancar-acompanado.md";
 
 /** Las cuatro cosas que cada paso de la guia promete, y la tercera es la que
  *  casi nunca se escribe: que vas a VER. Una guia que dice que copiar pero no
@@ -388,9 +388,9 @@ test("refutacion · a un paso al que le falta una promesa se lo nombra por su ti
 
 test("guia · la guia sigue enlazada desde el README, el indice y la puerta de entrada", () => {
   const desde = {
-    "README.md": "docs/paso-a-paso-sin-ser-tecnico.md",
-    "docs/README.md": "paso-a-paso-sin-ser-tecnico.md",
-    "docs/empezar-sin-ser-tecnico.md": "paso-a-paso-sin-ser-tecnico.md",
+    "README.md": "docs/04-arrancar-acompanado.md",
+    "docs/README.md": "04-arrancar-acompanado.md",
+    "docs/01-introduccion.md": "04-arrancar-acompanado.md",
   };
   for (const [archivo, ruta] of Object.entries(desde)) {
     assert.ok(
@@ -403,7 +403,7 @@ test("guia · la guia sigue enlazada desde el README, el indice y la puerta de e
   const desdeAhi = indice.indexOf("## Por dónde empezar");
   assert.ok(desdeAhi !== -1, `no encontre '## Por dónde empezar' en ${INDICE}: actualiza este ancla`);
   assert.ok(
-    indice.slice(desdeAhi).includes("paso-a-paso-sin-ser-tecnico.md"),
+    indice.slice(desdeAhi).includes("04-arrancar-acompanado.md"),
     `'Por dónde empezar' de ${INDICE} no ofrece la guia paso a paso, y esa seccion es la que se lee cuando ` +
       "alguien no sabe por donde arrancar.",
   );
@@ -414,8 +414,8 @@ test("guia · la guia sigue enlazada desde el README, el indice y la puerta de e
 // ---------------------------------------------------------------------------
 
 test("refutacion · una pagina sin frase de audiencia se ve", () => {
-  const texto = leer("docs/stack.md");
-  assert.ok(fraseDeAudiencia(texto) !== null, "docs/stack.md perdio su frase de audiencia: arregla la pagina");
+  const texto = leer("docs/03-stack.md");
+  assert.ok(fraseDeAudiencia(texto) !== null, "docs/03-stack.md perdio su frase de audiencia: arregla la pagina");
   const mutada = texto.replace("**Para quién es esta página.**", "**De qué habla esta página.**");
   assert.equal(
     fraseDeAudiencia(mutada),
@@ -426,7 +426,7 @@ test("refutacion · una pagina sin frase de audiencia se ve", () => {
 
 test("refutacion · una frase de audiencia que llega tarde no cuenta", () => {
   // Decirlo en la linea cien es no decirlo: el lector ya decidio si sigue.
-  const texto = leer("docs/para-el-po.md");
+  const texto = leer("docs/06-para-el-po.md");
   const lineas = texto.split("\n");
   const tarde = [...lineas.slice(0, 2), ...Array(LINEAS_DE_APERTURA + 5).fill(""), ...lineas.slice(2)].join("\n");
   assert.equal(
@@ -437,7 +437,7 @@ test("refutacion · una frase de audiencia que llega tarde no cuenta", () => {
 });
 
 test("refutacion · una palabra del glosario metida sin enlace se ve, en cualquier pagina", () => {
-  const texto = leer("docs/upgrade-openspec.md");
+  const texto = leer("docs/08-upgrade-openspec.md");
   const termino = TERMINOS.find((t) => !terminosUsados(texto, TERMINOS).includes(t));
   assert.ok(termino, "esa pagina ya usa todas las palabras del glosario: no queda ninguna con que mutar");
   const mutada = `${texto}\n\nY entonces el equipo revisa el ${termino} antes de integrar.\n`;
@@ -452,7 +452,7 @@ test("refutacion · control · la misma palabra CON su enlace no se marca, y da 
   const texto = leer("README.md");
   const termino = TERMINOS.find((t) => !terminosUsados(texto, TERMINOS).includes(t));
   assert.ok(termino, "el README ya usa todas las palabras del glosario: no queda ninguna con que mutar");
-  const mutada = `${texto}\n\nY entonces se revisa el [${termino}](docs/glosario.md) antes de integrar.\n`;
+  const mutada = `${texto}\n\nY entonces se revisa el [${termino}](docs/02-glosario.md) antes de integrar.\n`;
   assert.deepEqual(
     jergaSinEnlazar(mutada, TERMINOS),
     [],
@@ -472,14 +472,16 @@ test("refutacion · una palabra de oficio metida en una pagina del carril duro s
 
 test("refutacion · una pagina de docs/ que el indice no enumera se ve", () => {
   const indice = leer(INDICE);
-  const mutado = indice.replace("](consumidores.md)", "](otra-cosa.md)");
-  assert.notEqual(mutado, indice, "el indice ya no enlaza consumidores.md con esa forma: actualiza esta refutacion");
+  const mutado = indice.replace("](10-consumidores.md)", "](otra-cosa.md)");
+  assert.notEqual(mutado, indice, "el indice ya no enlaza 10-consumidores.md con esa forma: actualiza esta refutacion");
   assert.deepEqual(
     sinIndexar(ALCANCE, mutado),
-    ["docs/consumidores.md"],
-    "saque una pagina del indice y la comprobacion no lo vio. Ademas este caso cubre el falso verde de la " +
-      "subcadena: 'consumidores.md' sigue apareciendo dentro de 'censo-de-consumidores.md', y aun asi tiene " +
-      "que contarse como no indexada",
+    ["docs/10-consumidores.md"],
+    "saque una pagina del indice y la comprobacion no lo vio. Este caso cubria ademas el falso verde de la " +
+      "subcadena, que los numeros mataron: hasta el renombrado 'consumidores.md' vivia dentro de " +
+      "'censo-de-consumidores.md' y una busqueda floja daba la pagina por indexada gracias a la mencion de otra. " +
+      "Hoy no colisionan, asi que lo que este caso vigila es lo que siempre importo: que sacar una pagina del " +
+      "indice se vea",
   );
 });
 
@@ -488,12 +490,12 @@ test("refutacion · control · una pagina historica no arrastra al estandar a la
   // de declararla historica, la pagina entra al estandar — y este control es el
   // que avisa de que la exencion hoy esta puesta y de quien depende.
   assert.ok(
-    esHistorica("docs/auditoria-cierre-v1.md"),
-    `${INDICE} dejo de declarar auditoria-cierre-v1.md como **Histórico**. Entonces esa pagina entra al ` +
+    esHistorica("docs/12-auditoria-cierre-v1.md"),
+    `${INDICE} dejo de declarar 12-auditoria-cierre-v1.md como **Histórico**. Entonces esa pagina entra al ` +
       "estandar: o se le agrega la frase de audiencia y el vocabulario enlazado, o se le devuelve la etiqueta.",
   );
   assert.ok(
-    !esHistorica("docs/stack.md"),
+    !esHistorica("docs/03-stack.md"),
     "el lector del indice esta clasificando como historica una pagina canonica: la exencion se volvio un agujero",
   );
 });

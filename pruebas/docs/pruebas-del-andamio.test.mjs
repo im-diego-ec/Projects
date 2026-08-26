@@ -1,6 +1,6 @@
 // LOS NUMEROS QUE LA GUIA PROMETE SOBRE EL ANDAMIO, ATADOS AL ARBOL.
 //
-// QUE CIERRA. docs/arrancar-un-proyecto.md le dice a quien arranca un proyecto
+// QUE CIERRA. docs/05-arrancar-tecnico.md le dice a quien arranca un proyecto
 // cuantas pruebas trae cada paquete del andamio: es como sabe, al terminar el
 // paso 5, que no le falto nada. Ese numero estuvo escrito a mano y envejecio
 // exactamente por el trabajo que lo tocaba: la pagina decia "46 pruebas" en el
@@ -22,7 +22,7 @@ import { readdirSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { RAIZ, leer } from "./lectura.mjs";
 
-const PAGINA = "docs/arrancar-un-proyecto.md";
+const PAGINA = "docs/05-arrancar-tecnico.md";
 const TEXTO = leer(PAGINA);
 
 /** Los paquetes del andamio que la guia cuenta, con la fila donde lo dice. La

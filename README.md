@@ -7,27 +7,27 @@ cumple no lo deja entrar. No decide **qué** software se construye —eso es del
 negocio—; decide **cómo** se construye, cómo se revisa y cómo se entrega. **Para quién es esta página.** Para el equipo entero, y sobre todo para quien
 llega al repositorio y no sabe qué es: la tabla de más abajo reparte el camino
 según quién sos. **Es una página técnica de punta a punta.** Si no sos técnico,
-entrá por [`docs/empezar-sin-ser-tecnico.md`](docs/empezar-sin-ser-tecnico.md)
+entrá por [`docs/01-introduccion.md`](docs/01-introduccion.md)
 —qué es esto y por qué— o por
-[`docs/paso-a-paso-sin-ser-tecnico.md`](docs/paso-a-paso-sin-ser-tecnico.md) —qué
+[`docs/04-arrancar-acompanado.md`](docs/04-arrancar-acompanado.md) —qué
 comando copiar y qué vas a ver en pantalla—.
 
 **Palabras propias de acá**, cada una definida en una línea en el
-[glosario](docs/glosario.md): [ADR](docs/glosario.md),
-[andamio](docs/glosario.md), [archive](docs/glosario.md),
-[builder](docs/glosario.md), [bump](docs/glosario.md),
-[canónico](docs/glosario.md), [capability](docs/glosario.md),
-[carril](docs/glosario.md), [censo](docs/glosario.md),
-[change](docs/glosario.md), [ci-ok](docs/glosario.md),
-[CODEOWNERS](docs/glosario.md), [compuerta](docs/glosario.md),
-[constitución](docs/glosario.md), [delta](docs/glosario.md),
-[estreno](docs/glosario.md), [fail-open](docs/glosario.md),
-[guardrail](docs/glosario.md), [marcador](docs/glosario.md),
-[monorepo](docs/glosario.md), [PO](docs/glosario.md), [pin](docs/glosario.md),
-[referenciado](docs/glosario.md), [regenerado](docs/glosario.md),
-[reusable](docs/glosario.md), [ruleset](docs/glosario.md),
-[scaffold](docs/glosario.md), [spec](docs/glosario.md),
-[veredicto agregado](docs/glosario.md).
+[glosario](docs/02-glosario.md): [ADR](docs/02-glosario.md),
+[andamio](docs/02-glosario.md), [archive](docs/02-glosario.md),
+[builder](docs/02-glosario.md), [bump](docs/02-glosario.md),
+[canónico](docs/02-glosario.md), [capability](docs/02-glosario.md),
+[carril](docs/02-glosario.md), [censo](docs/02-glosario.md),
+[change](docs/02-glosario.md), [ci-ok](docs/02-glosario.md),
+[CODEOWNERS](docs/02-glosario.md), [compuerta](docs/02-glosario.md),
+[constitución](docs/02-glosario.md), [delta](docs/02-glosario.md),
+[estreno](docs/02-glosario.md), [fail-open](docs/02-glosario.md),
+[guardrail](docs/02-glosario.md), [marcador](docs/02-glosario.md),
+[monorepo](docs/02-glosario.md), [PO](docs/02-glosario.md), [pin](docs/02-glosario.md),
+[referenciado](docs/02-glosario.md), [regenerado](docs/02-glosario.md),
+[reusable](docs/02-glosario.md), [ruleset](docs/02-glosario.md),
+[scaffold](docs/02-glosario.md), [spec](docs/02-glosario.md),
+[veredicto agregado](docs/02-glosario.md).
 
 | Qué te da | Qué te exige |
 |---|---|
@@ -40,11 +40,11 @@ comando copiar y qué vas a ver en pantalla—.
 
 | Si sos… | Empezá por | Qué vas a encontrar |
 |---|---|---|
-| **Alguien que no es técnico** — un BA, un PO que recién llega, quien tenga que decidir si esto se adopta | [`docs/empezar-sin-ser-tecnico.md`](docs/empezar-sin-ser-tecnico.md) | Qué es esto en castellano llano, qué te da y qué te exige, cuánto cuesta, qué decisiones te va a pedir a vos y qué pasa si el equipo es una sola persona |
-| **Alguien que no es técnico y tiene que arrancarlo igual** | [`docs/paso-a-paso-sin-ser-tecnico.md`](docs/paso-a-paso-sin-ser-tecnico.md) | El «hacelo conmigo»: qué comando copiar, **qué vas a ver en pantalla**, cómo saber que salió bien, cuánto tarda cada paso, las cuentas que hay que abrir con sus límites gratuitos medidos, y los rojos que son esperados |
-| **El PO** — dueño del qué y el por qué | [`docs/para-el-po.md`](docs/para-el-po.md) | Una página sin código: qué rutas aprobás, cómo se lee un spec real línea por línea, y las cuatro preguntas con las que se devuelve una propuesta |
-| **Un builder nuevo en el equipo** | [`docs/reglas-no-escritas.md`](docs/reglas-no-escritas.md), y después [`AGENTS.md`](AGENTS.md) | Cómo se trabaja acá, qué regla está automatizada y cuál todavía depende de una persona — declarado, no supuesto |
-| **Un builder arrancando un proyecto** | [`docs/arrancar-un-proyecto.md`](docs/arrancar-un-proyecto.md) | De no tener repositorio a `ci-ok` en verde, con los fallos silenciosos del día 1 |
+| **Alguien que no es técnico** — un BA, un PO que recién llega, quien tenga que decidir si esto se adopta | [`docs/01-introduccion.md`](docs/01-introduccion.md) | Qué es esto en castellano llano, qué te da y qué te exige, cuánto cuesta, qué decisiones te va a pedir a vos y qué pasa si el equipo es una sola persona |
+| **Alguien que no es técnico y tiene que arrancarlo igual** | [`docs/04-arrancar-acompanado.md`](docs/04-arrancar-acompanado.md) | El «hacelo conmigo»: qué comando copiar, **qué vas a ver en pantalla**, cómo saber que salió bien, cuánto tarda cada paso, las cuentas que hay que abrir con sus límites gratuitos medidos, y los rojos que son esperados |
+| **El PO** — dueño del qué y el por qué | [`docs/06-para-el-po.md`](docs/06-para-el-po.md) | Una página sin código: qué rutas aprobás, cómo se lee un spec real línea por línea, y las cuatro preguntas con las que se devuelve una propuesta |
+| **Un builder nuevo en el equipo** | [`docs/07-reglas-no-escritas.md`](docs/07-reglas-no-escritas.md), y después [`AGENTS.md`](AGENTS.md) | Cómo se trabaja acá, qué regla está automatizada y cuál todavía depende de una persona — declarado, no supuesto |
+| **Un builder arrancando un proyecto** | [`docs/05-arrancar-tecnico.md`](docs/05-arrancar-tecnico.md) | De no tener repositorio a `ci-ok` en verde, con los fallos silenciosos del día 1 |
 | **Alguien con un incidente en curso** | El runbook del proyecto, en **su** repo | Acá no hay recursos concretos; lo que vive acá es la plantilla con la que ese runbook se escribió ([`docs/plantillas/runbook.md`](docs/plantillas/runbook.md)) |
 
 El resto de esta página es el detalle: por qué existe cada pieza, cómo se
@@ -153,7 +153,7 @@ El clon **no va a `/tmp`**: ese directorio no existe en Windows nativo, y el clo
 te sirve para todos los proyectos, no para uno. El paso a paso completo —con gemelo
 en PowerShell **en los bloques donde el comando no es el mismo en las dos shells**,
 que son los menos: `git`, `node`, `pnpm`, `npx` y `gh` corren igual en los tres
-sistemas— está en [`docs/arrancar-un-proyecto.md`](docs/arrancar-un-proyecto.md).
+sistemas— está en [`docs/05-arrancar-tecnico.md`](docs/05-arrancar-tecnico.md).
 
 Eso copia **el andamio entero** —dotfiles incluidos, que es donde falla el copiado
 a mano— sustituye **todas** las ocurrencias de sus marcadores, corre
@@ -421,7 +421,7 @@ diff.
 │   ├── specs/             #   los specs vivos del marco (una carpeta por capability)
 │   └── changes/           #   los changes en vuelo (`openspec list`) y su historia en changes/archive/
 └── docs/                  # el porqué: ADRs, reglas no escritas, el stack declarado capa por capa
-                           #   (stack.md), la puerta de entrada para quien no es técnico, upgrade
+                           #   (03-stack.md), la puerta de entrada para quien no es técnico, upgrade
                            #   del CLI, cómo forkear el marco a otra cuenta, y plantillas de
                            #   documentos de proceso. El índice completo: docs/README.md
 ```
@@ -472,7 +472,7 @@ describen su dominio, y estas describen el carril por el que ese dominio viaja.
   esa tabla que es suya— y su dominio entero.
   La tabla capa por capa —qué fija el marco, qué trae el andamio, qué elige el
   proyecto, y en qué archivo vive la versión de cada pieza— está en
-  [`docs/stack.md`](docs/stack.md), que no escribe un solo número: los deriva de
+  [`docs/03-stack.md`](docs/03-stack.md), que no escribe un solo número: los deriva de
   los manifiestos y tiene un banco de pruebas detrás.
 - **No es un sustituto del criterio del equipo.** Los guardrails atrapan lo que
   ya nos pasó. Lo que no nos pasó todavía lo caza una revisión adversarial: ya

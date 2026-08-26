@@ -49,7 +49,7 @@ Lo bueno y lo caro. Si la decisión tiene fecha de vencimiento o un
 
 Qué check falla solo cuando alguien se aparta. Si la respuesta es "nadie
 lo revisa", el ADR está incompleto: o se automatiza, o entra al backlog de
-[reglas no escritas](../reglas-no-escritas.md).
+[reglas no escritas](../07-reglas-no-escritas.md).
 ```
 
 La última sección es propia de Projects y no es decorativa: **una decisión
@@ -119,7 +119,7 @@ la colisión.
 > ```
 >
 > Hoy sale vacío (comprobado). Vive en `pruebas/docs/documentacion.test.mjs`,
-> junto al caso que ya exige que `para-el-po.md` y `glosario.md` estén enlazados
+> junto al caso que ya exige que `06-para-el-po.md` y `02-glosario.md` estén enlazados
 > desde el índice de `docs/`.
 
 ### Procedencia

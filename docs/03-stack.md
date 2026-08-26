@@ -10,22 +10,22 @@ los declaran. Si venís buscando «qué versión de X corre acá», bajá direct
 ahí.
 
 Cuando una palabra del marco suene rara, está definida en una línea en el
-[glosario](glosario.md).
+[glosario](02-glosario.md).
 
 **Para quién es esta página.** Para quien tiene que decidir, revisar o discutir
 una pieza de tecnología: un builder, un arquitecto, y también quien evalúa si
 esto obliga a pagar algo. **Es una página técnica**, y no evita el vocabulario:
 lo que hace es dejarlo enlazado. Si lo que buscás es qué es el marco y qué te
 va a pedir, empezá por
-[empezar-sin-ser-tecnico.md](empezar-sin-ser-tecnico.md).
+[01-introduccion.md](01-introduccion.md).
 
 **Palabras del marco que vas a ver acá**, cada una definida en una línea:
-[ADR](glosario.md), [builder](glosario.md), [carril](glosario.md),
-[compuerta](glosario.md),
-[constitución](glosario.md), [delta](glosario.md), [guardrail](glosario.md),
-[marcador](glosario.md), [monorepo](glosario.md), [pin](glosario.md),
-[referenciado](glosario.md), [reusable](glosario.md), [scaffold](glosario.md),
-[spec](glosario.md), [veredicto agregado](glosario.md).
+[ADR](02-glosario.md), [builder](02-glosario.md), [carril](02-glosario.md),
+[compuerta](02-glosario.md),
+[constitución](02-glosario.md), [delta](02-glosario.md), [guardrail](02-glosario.md),
+[marcador](02-glosario.md), [monorepo](02-glosario.md), [pin](02-glosario.md),
+[referenciado](02-glosario.md), [reusable](02-glosario.md), [scaffold](02-glosario.md),
+[spec](02-glosario.md), [veredicto agregado](02-glosario.md).
 
 ---
 
@@ -42,7 +42,7 @@ cerrar: **el mapa está acá; los números siguen donde estaban.**
 Copiarlos acá los convertiría en una declaración más — y sería la única sin nadie
 que la actualice. Este repositorio ya se comió esa lección dos veces con cifras
 escritas a mano: las del andamio en el `README.md`, que crecían con cada archivo
-nuevo, y el conteo de filas del [glosario](glosario.md). Las dos terminaron
+nuevo, y el conteo de filas del [glosario](02-glosario.md). Las dos terminaron
 igual, y las dos se arreglaron igual: la prosa dice **dónde se mide**, y un banco
 de pruebas se pone rojo cuando deja de ser cierto.
 
@@ -86,13 +86,13 @@ tres— es la protección de la rama principal de un repositorio privado, el acc
 que hace falta para que un repositorio privado pueda consumir por `uses:` los
 workflows de otro, y los minutos de Actions que un repositorio privado tiene
 incluidos. Los tres están contados sin adorno, con lo que está medido y lo que
-no, en [empezar-sin-ser-tecnico.md](empezar-sin-ser-tecnico.md).
+no, en [01-introduccion.md](01-introduccion.md).
 
 ---
 
 ## Lo que el andamio trae implementado
 
-El [andamio](glosario.md) —el árbol que se copia una vez el día que nace el
+El [andamio](02-glosario.md) —el árbol que se copia una vez el día que nace el
 repositorio— no llega con huecos: trae el esqueleto de aplicación funcionando,
 con sus pruebas en verde y las compuertas del marco pasando. Estas son sus
 piezas, capa por capa:

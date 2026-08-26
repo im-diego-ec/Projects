@@ -43,6 +43,45 @@ mueve sobre un cambio incompatible.
 
 ### Añadido
 
+- **Nada verificaba que un enlace apuntara a un archivo que existe, y ahora sí.**
+  `pruebas/docs/enlaces.test.mjs` comprueba los 418 enlaces relativos del repositorio
+  y sus anclas. El hueco estaba medido: apuntando los 217 enlaces del glosario a un
+  archivo inexistente, **sin renombrar nada**, la suite daba 948 verdes de 951 — y los
+  tres rojos no eran chequeos de existencia sino proxies accidentales. Se podía romper
+  la mitad de la navegación y el pipeline quedaba prácticamente verde. El `CHANGELOG.md`
+  queda fuera con el motivo escrito: registra lo que cada versión publicada dijo, y
+  reescribir sus rutas falsifica lo que el consumidor leyó. Qué tiene que hacer un
+  consumidor: nada.
+
+### Cambiado
+
+- **Las páginas de `docs/` se numeran, y el orden se ve sin abrir el índice.** El orden
+  alfabético ponía la guía **técnica** como primer archivo de la carpeta y la única
+  página que no supone nada en quinto lugar: quien abría `docs/` empezaba por la
+  equivocada. Ahora `01-introduccion.md` → `07-reglas-no-escritas.md` es el camino, y
+  de la 08 a la 12 lo que se abre cuando aparece su problema. El número dice lugar en
+  el camino, no importancia, y el índice lo dice con esas palabras. `docs/README.md` no
+  se numera: es el índice, y con los números adelante `ls` lo deja al final, que es
+  donde se consulta.
+- **`empezar-sin-ser-tecnico.md` pasa a ser `01-introduccion.md`, y es una introducción
+  de verdad.** Abre diciendo qué se logra, **qué no se logra**, cuánto lleva cada tramo
+  y qué hay que tener antes. Entre lo que no se logra está declarado, en la página de
+  entrada y no escondido en un documento técnico, que el marco **todavía no publica la
+  aplicación en internet** — el hueco que una auditoría encontró que la ruta no técnica
+  nunca veía.
+- **La regla de dígitos de la página del stack gana su cuarta exención**, angosta y
+  declarada: dos dígitos, un guion y un nombre que termina en `.md`. Sus veinte enlaces
+  a otras páginas ahora llevan número. Comprobado en las dos direcciones: un `Node 22`
+  en prosa sigue saliendo rojo.
+
+### Corregido
+
+- **Dos afirmaciones del banco quedaron falsas al numerar, y se reescribieron en vez de
+  dejarlas.** Hasta hoy `consumidores.md` era subcadena de `censo-de-consumidores.md`, y
+  el repositorio ya se había comido una vez ese falso verde. Con los números la colisión
+  murió sola. La regla —buscar el destino del enlace y no el nombre suelto— se conserva:
+  no depende de los nombres de hoy, y el próximo par que colisione va a llegar sin avisar.
+
 - **El stack se revisa solo al arrancar.** `herramientas/projects-versiones.mjs` compara
   la versión que el proyecto tiene con la estable publicada y, si difieren, hace dos
   preguntas en este orden: si querés actualizar, y si querés aplicarlo al stack entero.

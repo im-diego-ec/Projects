@@ -1,7 +1,7 @@
 // LECTOR DE LAS VERSIONES QUE EL REPO DECLARA, Y PARSER DE LA PAGINA QUE LAS
 // SENALA.
 //
-// POR QUE EXISTE. docs/stack.md dice que pieza usa el marco, por que, y en que
+// POR QUE EXISTE. docs/03-stack.md dice que pieza usa el marco, por que, y en que
 // archivo se declara la version de cada una — pero NO escribe ningun numero. Una
 // tabla de versiones copiada a mano envejece en una semana: es exactamente la
 // clase de dato que este repo existe para no mantener a mano (el mismo argumento
@@ -26,7 +26,7 @@ import { fileURLToPath } from "node:url";
 export const RAIZ = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
 
 /** La pagina que declara el stack. Ruta relativa a la raiz del repo. */
-export const PAGINA = "docs/stack.md";
+export const PAGINA = "docs/03-stack.md";
 
 /** El README es el que declara las formas de distribucion del marco y DONDE VIVE
  *  cada una (tabla "Principio de distribucion"). Esta constante es su ancla: si
@@ -190,7 +190,7 @@ export function leer(rel) {
  *  flecha. Los backticks no son cosmetica — son lo que hace que la celda se
  *  pueda leer sin ambiguedad y lo que evita el falso verde de buscar una ruta
  *  como subcadena suelta (el mismo tropiezo que ya se midio en el banco de
- *  para-el-po.md con /openspec/specs/). */
+ *  06-para-el-po.md con /openspec/specs/). */
 export function filasDeclaradas(texto) {
   const filas = [];
   const lineas = texto.split("\n");
@@ -304,12 +304,20 @@ export function declaracionDe(fila) {
  *  olvide es un agujero por donde entra la que envejece. Comprobar "no hay
  *  digitos" no tiene agujeros y se explica en una linea.
  *
- *  TRES EXENCIONES, todas declaradas y ninguna de ellas una version:
+ *  CUATRO EXENCIONES, todas declaradas y ninguna de ellas una version:
  *   - los bloques cercados, porque ahi vive el comando que IMPRIME los numeros,
  *     que es justamente el reemplazo de la tabla escrita a mano;
  *   - el marcador de una lista numerada al principio de la linea;
  *   - el nombre del paquete `e2e`, que lleva un digito por nombre y no por
- *     version — aparece en la ruta de su manifiesto y en la del workspace. */
+ *     version — aparece en la ruta de su manifiesto y en la del workspace;
+ *   - el numero de orden de una pagina de `docs/`, desde que las paginas se
+ *     llaman `01-introduccion.md`, `02-glosario.md` y asi. Esta pagina enlaza a
+ *     otras veinte veces y ese `02` no es un numero de version escrito a mano:
+ *     es parte del nombre de un archivo, no envejece solo, y si el archivo se
+ *     renombra lo caza el verificador de enlaces (pruebas/docs/enlaces.test.mjs),
+ *     que es justo la clase de medicion cuya ausencia esta regla compensa.
+ *     La exencion es ANGOSTA a proposito: solo dos digitos, un guion, y un
+ *     nombre que termina en `.md`. Un `Node 22` en prosa sigue saliendo rojo. */
 export function digitosFueraDeBloques(texto) {
   const hallazgos = [];
   let dentro = false;
@@ -319,7 +327,12 @@ export function digitosFueraDeBloques(texto) {
       return;
     }
     if (dentro) return;
-    const limpia = linea.replace(/^(\s*)\d+\.\s/, "$1").replace(/e2e/g, "");
+    const limpia = linea
+      .replace(/^(\s*)\d+\.\s/, "$1")
+      .replace(/e2e/g, "")
+      // El numero de orden de una pagina de docs/, tanto en el destino del
+      // enlace como en el texto visible: `[01-introduccion.md](01-introduccion.md)`.
+      .replace(/\b\d{2}-(?=[a-z0-9-]+\.md\b)/g, "");
     if (/\d/.test(limpia)) hallazgos.push({ linea: i + 1, texto: linea.trim() });
   });
   return hallazgos;

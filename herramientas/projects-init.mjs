@@ -920,7 +920,7 @@ function corepackEnable(dir) {
   // En Windows esta invocacion pasa por cmd.exe —corepack ahi es un `.cmd` y no
   // se puede ejecutar sin shell— y los argumentos se concatenan SIN escapar. La
   // ruta viene de `os.tmpdir()`, que en Windows es del estilo
-  // `C:\Users\Jose Luis\AppData\Local\Temp`: un espacio en el nombre de la
+  // `C:\Users\Ana Maria\AppData\Local\Temp`: un espacio en el nombre de la
   // persona partia el argumento en dos y corepack escribia los shims en
   // cualquier parte. `cwd` es una opcion de spawn y no toca la linea de
   // comandos, asi que el vector queda de literales de este archivo y la

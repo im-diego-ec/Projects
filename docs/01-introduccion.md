@@ -1,16 +1,52 @@
-# Empezar sin ser técnico
+# Introducción
+
+**Empezá por acá.** Es la primera de doce páginas numeradas, y el número dice en
+qué lugar del camino va cada una — no cuánto importa.
 
 Esta página es para quien tiene que **entender y aplicar** este marco sin
 escribir código: un analista de negocio, alguien que recién ocupa el rol de
-[PO](glosario.md), quien tenga que decidir si esto se adopta o no. No supone
+[PO](02-glosario.md), quien tenga que decidir si esto se adopta o no. No supone
 conocimiento previo y no te va a pedir que programes.
 
 Existe porque faltaba la página de antes de todas las demás. La documentación
 que había arranca —con razón— por la maquinaria: qué corre, cuándo corre y con
 qué herramienta. Esta arranca por el problema que esa maquinaria resuelve.
 
+### Qué vas a lograr si seguís las páginas en orden
+
+Un repositorio nuevo, tuyo, con las verificaciones automáticas ya conectadas y
+en verde. Es decir: un lugar donde escribir software con las reglas del equipo
+puestas desde el primer día, en vez de acordadas y olvidadas.
+
+**Lo que todavía NO vas a lograr,** y conviene saberlo antes de empezar y no a
+mitad de camino: el marco **no publica tu aplicación en internet**. Al final del
+recorrido tenés el proyecto sano y verificado en tu computadora y en GitHub, no
+una dirección que le puedas pasar a alguien. Esa parte falta y está declarada en
+la sección 6.
+
+### Cuánto lleva
+
+| Tramo | Tiempo |
+| --- | --- |
+| Leer esta página | 10 minutos |
+| Las decisiones que solo vos podés tomar | de media hora a dos días |
+| Armar el repositorio y dejarlo en verde | menos de un minuto de reloj |
+| Dejar GitHub configurado como corresponde | una hora larga |
+
+El tramo caro no es técnico: son las decisiones. Están en la sección 4 de esta
+página y se contestan una sola vez.
+
+### Qué necesitás tener antes de empezar
+
+- **Una cuenta de GitHub.** Si no tenés, se crea gratis en un minuto.
+- **Acceso de lectura al repositorio del marco.** Es privado: si no te lo
+  compartieron, no vas a poder bajarlo, y eso lo destraba una persona, no un
+  comando.
+- **Una terminal.** No hace falta saber usarla: la página 04 te dice
+  exactamente qué escribir y qué vas a ver.
+
 **La regla de esta página:** ningún término técnico aparece sin explicarse acá
-mismo o sin enlazar al [glosario](glosario.md), donde cada palabra propia del
+mismo o sin enlazar al [glosario](02-glosario.md), donde cada palabra propia del
 marco tiene una línea. Si encontrás una que no cumple eso, es un defecto de la
 página, no de tu lectura — y hay una comprobación automática que lo mide en cada
 cambio, contra el glosario y contra una lista de palabras que esta página tiene
@@ -66,7 +102,7 @@ antes que declararla vigente porque está escrita en algún lado.
 | Las mejoras del marco llegan solas a cada proyecto, como una propuesta que alguien revisa antes de aceptar | Que el proyecto no edite el marco por su cuenta: pide un parámetro, o propone el cambio para todos |
 
 La palabra que vas a ver para «verificación que bloquea» es
-[compuerta](glosario.md): una verificación que, si lo que mira está mal, no deja
+[compuerta](02-glosario.md): una verificación que, si lo que mira está mal, no deja
 pasar el cambio. Se opone a una que solo mira y anota.
 
 ---
@@ -90,7 +126,7 @@ Los tres lugares donde sí puede aparecer un costo, dichos sin adorno:
    simultáneos no se pisen, que lo desplegado se verifique después— y esas
    propiedades se cumplen igual en un proveedor caro que en uno con plan
    gratuito. La tabla capa por capa, con quién decide cada una, está en
-   [stack.md](stack.md).
+   [03-stack.md](03-stack.md).
 2. **La cuenta de GitHub.** Acá hay tres puntos, y el más importante es cuál de
    ellos está medido y cuál no. **El marco no cobra**: lo que puede cobrar es la
    cuenta donde vive el repositorio, según su plan.
@@ -137,12 +173,12 @@ transcripción sino decisión o acto humano:
 - activar la protección de la rama principal, como acto deliberado.
 
 Cada uno está enumerado, con su trampa conocida, en
-[arrancar-un-proyecto.md](arrancar-un-proyecto.md). Esa página va de «no tengo
+[05-arrancar-tecnico.md](05-arrancar-tecnico.md). Esa página va de «no tengo
 repositorio» a «las verificaciones están en verde». No traigas una estimación de
 acá: traé la lista, que es lo que se puede planificar.
 
 **Y si lo vas a hacer vos**, sin ser técnico, hay una página que te acompaña
-comando por comando: [paso-a-paso-sin-ser-tecnico.md](paso-a-paso-sin-ser-tecnico.md).
+comando por comando: [04-arrancar-acompanado.md](04-arrancar-acompanado.md).
 Cada paso dice qué copiar, **qué vas a ver en pantalla**, cómo saber que salió
 bien y cuánto tarda; trae además las cuentas que hay que abrir con sus límites
 gratuitos medidos, y una tabla de los rojos que son esperados.
@@ -162,9 +198,9 @@ por medio.
 **Al principio del proyecto** — dónde se despliega. Es la decisión con más
 impacto en el costo y la única que el marco deliberadamente no toma por vos.
 
-**Todo el tiempo, si ocupás el rol de [PO](glosario.md)** — aprobar o devolver
+**Todo el tiempo, si ocupás el rol de [PO](02-glosario.md)** — aprobar o devolver
 cada propuesta de cambio. Eso tiene su propia página, con las cuatro preguntas
-que sirven para rechazar una: [para-el-po.md](para-el-po.md).
+que sirven para rechazar una: [06-para-el-po.md](06-para-el-po.md).
 
 ### ¿Y si el equipo es una sola persona?
 
@@ -182,8 +218,8 @@ motivo escrito**, no apagada en silencio —encenderla con un solo revisor
 bloquearía todo—. Esa distinción es una regla del marco: lo que se decide no
 activar se declara; nunca se omite ni se presenta como activo.
 
-**Lo que conviene saber**: el rol de [PO](glosario.md) y el de quien construye
-—el [builder](glosario.md)— están separados a propósito, para que nadie se
+**Lo que conviene saber**: el rol de [PO](02-glosario.md) y el de quien construye
+—el [builder](02-glosario.md)— están separados a propósito, para que nadie se
 apruebe a sí mismo. Si son la misma persona, la separación no existe. No es una
 catástrofe; es una limitación que conviene tener escrita en vez de descubierta.
 
@@ -194,19 +230,19 @@ catástrofe; es una limitación que conviene tener escrita en vez de descubierta
 Cuatro pasos. Los nombres entre paréntesis son los que vas a ver en el
 repositorio.
 
-1. **Se escribe por qué** ([proposal](glosario.md)). Un documento corto, en
+1. **Se escribe por qué** ([proposal](02-glosario.md)). Un documento corto, en
    prosa, que contesta dos cosas: qué problema resuelve y qué cambia. Sin código.
-2. **Se escribe qué tiene que pasar** (un [spec](glosario.md): la lista de
+2. **Se escribe qué tiene que pasar** (un [spec](02-glosario.md): la lista de
    promesas que el sistema va a cumplir, cada una con un caso concreto que
    permita verificarla). Esta es la parte que aprueba el negocio, y es legible
    sin ser técnico — está explicada línea por línea en
-   [para-el-po.md](para-el-po.md).
+   [06-para-el-po.md](06-para-el-po.md).
 3. **Se construye**, y en el camino las verificaciones automáticas comparan lo
    construido contra lo prometido.
 4. **Entra**, si y solo si todo pasó. Al final el contrato vigente incorpora lo
    nuevo, y a partir de ahí las discusiones se ganan citándolo.
 
-El paquete completo de esos documentos se llama [change](glosario.md), y cada
+El paquete completo de esos documentos se llama [change](02-glosario.md), y cada
 uno vive en su carpeta. Es todo texto: se puede leer, comentar y rechazar sin
 abrir una línea de código.
 
@@ -222,22 +258,30 @@ abrir una línea de código.
 - **No se aplica solo a la fuerza.** Un proyecto puede apartarse de casi
   cualquier pieza; lo que el marco exige es que apartarse sea una **decisión
   declarada, con su motivo**, y no algo que se descubre después.
+- **No publica tu aplicación, todavía.** Es el hueco más grande y está medido:
+  en las 614 líneas de la página 04 no aparece ni una vez la palabra
+  «desplegar». Al terminar el recorrido tenés el proyecto verificado y en
+  GitHub; para que alguien lo use desde internet falta una pieza que hoy no
+  existe. Se dice acá, y no escondido en una página técnica, porque enterarse
+  al final es peor que saberlo al principio.
 
 ---
 
-## Si querés seguir
+## El camino, y dónde estás
 
-- [paso-a-paso-sin-ser-tecnico.md](paso-a-paso-sin-ser-tecnico.md) — el «hacelo
-  conmigo»: qué comando copiar, qué vas a ver en pantalla, cómo saber que salió
-  bien, y qué rojos son normales.
-- [glosario.md](glosario.md) — cada palabra propia del marco en una línea, con
-  el archivo que manda sobre ella.
-- [para-el-po.md](para-el-po.md) — si vas a aprobar cambios: qué te toca, cómo
-  se lee un contrato y con qué cuatro preguntas se devuelve uno.
-- [stack.md](stack.md) — con qué tecnología corre esto, quién decide cada pieza
-  y dónde vive cada versión.
-- [arrancar-un-proyecto.md](arrancar-un-proyecto.md) — el paso a paso de crear un
-  proyecto nuevo. Es técnico, pero la lista de pasos se entiende sin serlo, y es
-  lo que se puede planificar.
-- [`README.md`](../README.md) — la puerta de entrada del repositorio para el
-  equipo entero, empezando por la tabla de incidentes.
+Vas por la primera. Las siete primeras se leen **en orden**; de la 08 en
+adelante se abren el día que hace falta y no antes.
+
+| | Página | Qué te deja |
+| --- | --- | --- |
+| **01** | Introducción | ← estás acá |
+| **02** | [02-glosario.md](02-glosario.md) | Cada palabra rara del marco en una línea. Va segunda a propósito: de la 03 en adelante todas las páginas enlazan acá, y conviene haberla visto antes de tropezarse con el primer enlace |
+| **03** | [03-stack.md](03-stack.md) | Con qué tecnología corre esto y, sobre todo, la decisión de **dónde va a vivir tu proyecto** — la que más cuesta si se toma tarde |
+| **04** | [04-arrancar-acompanado.md](04-arrancar-acompanado.md) | El «hacelo conmigo»: qué comando copiar, qué vas a ver en pantalla, cómo saber que salió bien y qué rojos son normales |
+| **05** | [05-arrancar-tecnico.md](05-arrancar-tecnico.md) | El mismo camino, contado para quien se mueve en una consola. Es el que manda si las dos se contradicen |
+| **06** | [06-para-el-po.md](06-para-el-po.md) | Cuando el repositorio ya está verde y hay que aprobar o devolver la primera propuesta |
+| **07** | [07-reglas-no-escritas.md](07-reglas-no-escritas.md) | Cómo se trabaja adentro una vez que todo anda |
+
+Y el [`README.md`](../README.md) del repositorio, que es la puerta de entrada
+para el equipo entero, empezando por la tabla de incidentes: cada verificación
+de este marco nació de uno.

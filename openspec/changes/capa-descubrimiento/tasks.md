@@ -433,7 +433,7 @@ verde. Adelantarlo compra costo hundido y el costo hundido decide veredictos.
 
 ## 7. Cierre, en cualquiera de los tres casos
 
-- [ ] 7.1 Anotar en `docs/reglas-no-escritas.md` qué queda automático y qué queda
+- [ ] 7.1 Anotar en `docs/07-reglas-no-escritas.md` qué queda automático y qué queda
       como disciplina declarada: que la procedencia se verifica pero su calidad
       no; que el insumo puede envejecer hasta mentir sin poner nada en rojo; y que
       el material crudo fuera del repositorio no lo hace cumplir ningún check.
