@@ -194,9 +194,11 @@ Cloning into 'Projects'...
 /Users/tu-nombre/Projects
 ```
 
-**Copiá esa segunda línea y guardala** en una nota o en un papel. Es lo que en
-los Pasos 3 y 5 se escribe como `<ruta-al-clon>`. Ningún otro comando la vuelve
-a imprimir.
+En tu pantalla, entre esas dos, `git` puede meter unas cuantas líneas más de la
+descarga —cuántos archivos bajó, a qué velocidad—. No importan. **La que tenés
+que copiar es la última: la que empieza con una barra `/` y termina en
+`/Projects`.** Guardala en una nota o en un papel: es lo que en los Pasos 3 y 5
+se escribe como `<ruta-al-clon>`, y ningún otro comando la vuelve a imprimir.
 
 **Cómo sabés que salió bien.** Existe una carpeta `Projects`, adentro hay un
 archivo `README.md`, y tenés la ruta anotada.
@@ -408,7 +410,7 @@ node <ruta-al-clon>/herramientas/projects-init.mjs --valores valores.json --dest
 escritos 75 archivos, 196 ocurrencias sustituidas
 cero marcadores sobrevivientes
 
-ARRANQUE con corepack pnpm en /ruta/a/tu/proyecto — 4 pasos, la salida de cada uno tal cual sale:
+ARRANQUE con corepack pnpm en . — 4 pasos, la salida de cada uno tal cual sale:
 
 ── 1/4  instalar las dependencias  (corepack pnpm install)
 ── 2/4  generar el cliente de la capa de datos  (corepack pnpm run datos)
