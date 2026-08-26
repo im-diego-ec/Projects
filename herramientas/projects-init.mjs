@@ -292,6 +292,19 @@ export function renombresPorPlataforma(plataforma) {
  *  dependabot ve por que esas lineas estan marcadas. Una lista de numeros de
  *  linea escrita en esta herramienta envejeceria al primer cambio del andamio. */
 export function podarPorPlataforma(texto, rel, plataforma) {
+  // Esta va ANTES del corte de abajo: la plataforma se declara en el archivo de
+  // valores del proyecto SIEMPRE, tambien cuando es `aws`. Si solo se escribiera
+  // en el caso raro, el literal del andamio seguiria siendo la unica fuente y
+  // volveria a poder mentir el dia que cambie.
+  if (rel === ".projects-valores.json") {
+    try {
+      const j = JSON.parse(texto);
+      j.plataforma = plataforma;
+      return `${JSON.stringify(j, null, 2)}\n`;
+    } catch {
+      return texto;
+    }
+  }
   if (plataforma === "aws") return texto;
   if (rel === ".github/dependabot.yml") {
     return texto.replace(/[ \t]*# projects:solo-si-hay-infra\n[\s\S]*?# projects:fin-solo-si-hay-infra\n/g, "");
