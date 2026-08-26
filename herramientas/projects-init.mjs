@@ -226,10 +226,105 @@ export const NO_SE_COPIA = new Set(["README.md"]);
  *  "el andamio usa marcadores que el archivo de valores no declara:
  *  DOBLE_LLAVE", que manda a agregar a REQUERIDOS algo que no existe. Se deriva
  *  de NO_SE_COPIA para que la lista siga siendo una sola declaracion. */
-export function seExcluyeDelCopiado(rel) {
+export function seExcluyeDelCopiado(rel, plataforma = "aws") {
   const bajo = rel.toLowerCase();
   for (const n of NO_SE_COPIA) if (n.toLowerCase() === bajo) return true;
+  // EL ORDEN IMPORTA, y este `if` es la razon. Un archivo que se MUDA no se
+  // excluye por vivir donde vivia: `infra/adaptadores.md` empieza con `infra/`,
+  // que es justo lo que no viaja, y sin esta linea se lo comia la exclusion
+  // antes de que el renombre llegara a mudarlo. Medido: el proyecto salia sin
+  // infra/ —correcto— y tambien sin PLATAFORMAS.md, o sea sin la unica pagina
+  // que explica las cinco plataformas.
+  if (renombresPorPlataforma(plataforma)[rel]) return false;
+  for (const n of noViajanPorPlataforma(plataforma)) if (bajo === n || bajo.startsWith(`${n}/`)) return true;
   return false;
+}
+
+/** Lo que NO viaja cuando la plataforma elegida no es la que el andamio trae.
+ *
+ *  EL DEFECTO QUE ESTO CIERRA, y es el mas caro que encontro la auditoria de la
+ *  ruta no tecnica: la clave `plataforma` existia en el archivo de valores del
+ *  andamio y NINGUNA herramienta la leia. La guia tiene una tabla excelente para
+ *  elegir entre cinco plataformas —con lo que da cada una gratis, en numeros— y
+ *  quien elegia Supabase para no gastar recibia igual `infra/` e `infra-prod/`
+ *  con el proveedor `hashicorp/aws` adentro, y seis casillas obligatorias de una
+ *  nube que no iba a usar. Una tabla que invita a elegir, y una herramienta que
+ *  ignora la eleccion.
+ *
+ *  POR QUE NO ALCANZA CON VACIAR LOS DIRECTORIOS. El paso de Terraform del
+ *  pipeline decide con `[ -d "${D}" ]`, no con "hay .tf adentro" —medido en
+ *  plantilla/.github/workflows/ci.yml—, asi que un `infra/` con un solo documento
+ *  adentro sigue contando como raiz de Terraform. O no viaja el directorio, o el
+ *  proyecto arranca verificando infraestructura que no tiene.
+ *
+ *  `aws` es el valor por defecto A PROPOSITO: un archivo de valores viejo, escrito
+ *  antes de que esta clave se leyera, describe un proyecto de AWS. Cambiar eso en
+ *  silencio le sacaria la infraestructura a un proyecto que la tiene. */
+export function noViajanPorPlataforma(plataforma) {
+  return plataforma === "aws" ? [] : ["infra", "infra-prod"];
+}
+
+/** El catalogo de plataformas vive DENTRO de `infra/`, que es justo el directorio
+ *  que no viaja cuando la plataforma no es AWS. Es el unico documento que explica
+ *  las cinco opciones y donde estan escritos los adaptadores, asi que perderlo es
+ *  peor que repartir una carpeta de mas: quien eligio Supabase se queda sin la
+ *  pagina que le dice como se conecta Supabase. Se muda a la raiz del proyecto. */
+export function renombresPorPlataforma(plataforma) {
+  return plataforma === "aws" ? {} : { "infra/adaptadores.md": "PLATAFORMAS.md" };
+}
+
+/** Saca del texto lo que solo tiene sentido con la infraestructura puesta.
+ *
+ *  DOS ARCHIVOS QUEDABAN CON REFERENCIAS MUERTAS y ninguno se queja, que es lo
+ *  que los hace peligrosos:
+ *
+ *   - `.github/dependabot.yml` seguia con dos entradas de Terraform apuntando a
+ *     `/infra` y `/infra-prod`. Dependabot no encuentra manifiestos ahi y
+ *     simplemente NO HACE NADA: no hay error, no hay aviso, y quien lea el
+ *     archivo va a creer que su infraestructura se mantiene al dia.
+ *   - `.claude/settings.json` conservaba permisos para correr `terraform` con un
+ *     perfil de AWS que no existe. Un permiso de mas no rompe nada hoy; lo que
+ *     hace es que la proxima persona que lea la lista crea que este proyecto
+ *     usa Terraform.
+ *
+ *  EL CENTINELA VA EN EL ANDAMIO Y NO ACA. El bloque a sacar lo delimita el
+ *  propio archivo con `# projects:solo-si-hay-infra`, asi que quien edite el
+ *  dependabot ve por que esas lineas estan marcadas. Una lista de numeros de
+ *  linea escrita en esta herramienta envejeceria al primer cambio del andamio. */
+export function podarPorPlataforma(texto, rel, plataforma) {
+  if (plataforma === "aws") return texto;
+  if (rel === ".github/dependabot.yml") {
+    return texto.replace(/[ \t]*# projects:solo-si-hay-infra\n[\s\S]*?# projects:fin-solo-si-hay-infra\n/g, "");
+  }
+  if (rel === ".claude/settings.json") {
+    // JSON no admite comentarios, asi que el centinela no sirve: se filtran las
+    // entradas por lo que nombran. `terraform` y `AWS_PROFILE` son literales de
+    // la propia lista, no una heuristica.
+    try {
+      const j = JSON.parse(texto);
+      const filtrar = (a) => (Array.isArray(a) ? a.filter((x) => !/terraform|AWS_PROFILE/i.test(String(x))) : a);
+      if (j?.permissions?.allow) j.permissions.allow = filtrar(j.permissions.allow);
+      if (j?.permissions?.ask) j.permissions.ask = filtrar(j.permissions.ask);
+      if (j?.permissions?.deny) j.permissions.deny = filtrar(j.permissions.deny);
+      return `${JSON.stringify(j, null, 2)}\n`;
+    } catch {
+      // Un settings.json que no parsea es un problema del andamio y lo caza otro
+      // banco. Aca se devuelve tal cual en vez de romper la corrida entera.
+      return texto;
+    }
+  }
+  return texto;
+}
+
+/** La plataforma declarada en el archivo de valores.
+ *
+ *  Va en minuscula y FUERA de los 21, porque no es un marcador que el andamio
+ *  sustituya en ningun archivo: es una decision sobre QUE archivos viajan. La
+ *  clave ya existia en `plantilla/.projects-valores.json`; lo unico que faltaba
+ *  era que alguien la leyera. */
+export function plataformaDe(valores) {
+  const v = valores?.plataforma;
+  return typeof v === "string" && v.trim() ? v.trim().toLowerCase() : "aws";
 }
 
 /** Los archivos que viajan CON OTRO NOMBRE: clave = como se llama en el andamio,
@@ -255,8 +350,8 @@ export function seExcluyeDelCopiado(rel) {
 export const RENOMBRES = new Map([["README-del-proyecto.md", "README.md"]]);
 
 /** Como se llama `rel` en el repo nuevo. Identidad para casi todo. */
-export function destinoDe(rel) {
-  return RENOMBRES.get(rel) ?? rel;
+export function destinoDe(rel, plataforma = "aws") {
+  return renombresPorPlataforma(plataforma)[rel] ?? RENOMBRES.get(rel) ?? rel;
 }
 
 /** Los 21 valores que un humano tiene que decidir —hoy, uno por cada marcador
@@ -433,13 +528,13 @@ export function marcadoresSinFormato() {
 }
 
 /** Los archivos del andamio, relativos a plantilla/, sin el que no se copia. */
-export function archivosDelAndamio(raizAndamio) {
+export function archivosDelAndamio(raizAndamio, plataforma = "aws") {
   const salida = [];
   for (const e of fs.readdirSync(raizAndamio, { withFileTypes: true, recursive: true })) {
     if (!e.isFile()) continue;
     const abs = path.join(e.parentPath ?? e.path, e.name);
     const rel = path.relative(raizAndamio, abs).split(path.sep).join("/");
-    if (seExcluyeDelCopiado(rel)) continue;
+    if (seExcluyeDelCopiado(rel, plataforma)) continue;
     salida.push(rel);
   }
   return salida.sort();
@@ -473,8 +568,8 @@ function recorrer(raiz, omitir = new Set()) {
  *  sea ROJA aunque el piso de Node no la haya atajado (main() compara los dos
  *  numeros). La gracia esta en que no comparten la llamada que se rompe: si
  *  manana las dos se escriben igual, esta defensa deja de existir. */
-export function archivosDelAndamioAMano(raizAndamio) {
-  return recorrer(raizAndamio).filter((rel) => !seExcluyeDelCopiado(rel));
+export function archivosDelAndamioAMano(raizAndamio, plataforma = "aws") {
+  return recorrer(raizAndamio).filter((rel) => !seExcluyeDelCopiado(rel, plataforma));
 }
 
 /** Que archivos del andamio NO llegaron al destino. Se le pasan las dos
@@ -564,7 +659,10 @@ function crearDirectorios(dir, creados) {
 }
 
 export function instanciar({ raizAndamio, destino, valores }) {
-  const rels = archivosDelAndamio(raizAndamio);
+  // La plataforma sale de los propios valores: `instanciar` no necesita un
+  // parametro mas, y asi no hay dos lugares donde declararla.
+  const plataforma = plataformaDe(valores);
+  const rels = archivosDelAndamio(raizAndamio, plataforma);
   if (rels.length === 0) throw new Error(`el andamio esta vacio: ${raizAndamio}`);
 
   let total = 0;
@@ -584,11 +682,14 @@ export function instanciar({ raizAndamio, destino, valores }) {
   const escritosEnDestino = [];
   const estado = () => ({ escritos, escritosEnDestino, nuevos, sobreescritos, directoriosCreados });
   for (const rel of rels) {
-    const relDestino = destinoDe(rel);
+    const relDestino = destinoDe(rel, plataforma);
     const origen = path.join(raizAndamio, rel);
     const salida = path.join(destino, ...relDestino.split("/"));
     try {
-      const texto = fs.readFileSync(origen, "utf8");
+      // Se poda ANTES de sustituir: lo que se saca puede tener marcadores
+      // adentro —`{{PERFIL_DEV}}` vivia en el bloque de permisos de AWS— y
+      // sustituirlos primero solo escribiria un relleno que despues se borra.
+      const texto = podarPorPlataforma(fs.readFileSync(origen, "utf8"), rel, plataforma);
       const r = sustituir(texto, valores);
       total += r.cuenta;
       for (const f of r.faltantes) faltantes.add(f);
@@ -1955,13 +2056,15 @@ async function main(argv) {
     console.error(`::error::el destino no existe: ${o.destino}. Crea el repo primero y corre esto en su raiz`);
     return 1;
   }
+  const plataforma = plataformaDe(valores);
+
   // La pregunta se hace por el nombre de DESTINO: lo que decide si se pisa
   // trabajo ajeno es como se va a llamar el archivo en el repo nuevo, no como
   // se llama en el andamio. Escrita con el nombre de origen, el README del
   // proyecto —que aterriza como README.md— no aparecia en este censo y se
   // pisaba sin --forzar el README que ese repo ya tuviera.
-  const yaTiene = archivosDelAndamio(raizAndamio)
-    .map(destinoDe)
+  const yaTiene = archivosDelAndamio(raizAndamio, plataforma)
+    .map((rel) => destinoDe(rel, plataforma))
     .filter((r) => fs.existsSync(path.join(o.destino, ...r.split("/"))));
   if (yaTiene.length && !o.forzar) {
     console.error(`::error::el destino ya tiene ${yaTiene.length} archivo(s) del andamio. Se aborta para no sobreescribir trabajo:`);
@@ -2032,7 +2135,7 @@ async function main(argv) {
   // piso de Node: si el recorrido con `recursive: true` se ignorara —o si un dia
   // vuelve a fallar por otro motivo— aca los dos numeros no coinciden y la
   // corrida es roja, en vez de declarar exito sobre 16 de 75 archivos.
-  const esperados = archivosDelAndamioAMano(raizAndamio);
+  const esperados = archivosDelAndamioAMano(raizAndamio, plataforma);
   const faltanEnDestino = faltantesDeCopia(r.escritos, esperados);
   if (faltanEnDestino.length) {
     console.error(

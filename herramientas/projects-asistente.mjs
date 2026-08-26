@@ -333,6 +333,11 @@ export function derivar(r) {
   const dominioDev = r.ambientes === "dos" ? `dev.${unDominio}` : unDominio;
 
   return {
+    // EN MINUSCULA Y FUERA DE LOS 21 a proposito: no es un marcador que el
+    // andamio sustituya en ningun archivo, es una decision sobre QUE archivos
+    // viajan. La clave ya existia en plantilla/.projects-valores.json; lo unico
+    // que faltaba era que alguien la leyera.
+    plataforma: r.plataforma,
     PROYECTO: r.PROYECTO,
     ORG: r.ORG,
     PAQUETE_API: "api",

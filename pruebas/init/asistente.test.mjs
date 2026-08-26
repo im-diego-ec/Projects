@@ -101,11 +101,16 @@ test("LO QUE MAS IMPORTA: lo que produce el asistente pasa el validador de siemp
 test("las 21 claves salen completas, ni una de mas ni una de menos", async () => {
   const { preguntar } = guionista(PO_SOLO);
   const { valores } = await correrAsistente(preguntar);
+  // `plataforma` va aparte y en minuscula: no es un marcador que el andamio
+  // sustituya, es la decision de QUE archivos viajan. Por eso se saca antes de
+  // comparar, y por eso se comprueba que este.
+  const { plataforma, ...marcadores } = valores;
+  assert.equal(plataforma, "supabase", "la plataforma elegida tiene que quedar escrita en el archivo de valores");
   assert.deepEqual(
-    Object.keys(valores).sort(),
+    Object.keys(marcadores).sort(),
     [...REQUERIDOS].sort(),
-    "el conjunto tiene que coincidir EXACTO con REQUERIDOS: una clave de mas la ignora el motor en silencio, " +
-      "y una de menos aborta la corrida",
+    "el conjunto de MARCADORES tiene que coincidir EXACTO con REQUERIDOS: una clave de mas la ignora el motor " +
+      "en silencio, y una de menos aborta la corrida",
   );
 });
 

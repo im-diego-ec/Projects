@@ -84,6 +84,11 @@ updates:
       - dependency-name: "node"
         versions: ["23-slim", "25-slim", "27-slim", "29-slim"]
 
+  # projects:solo-si-hay-infra
+  # Las dos entradas de abajo apuntan a `infra/` e `infra-prod/`, que solo viajan
+  # cuando la plataforma elegida es AWS. Si no lo es, `projects init` las quita en
+  # el mismo acto: una entrada de Dependabot apuntando a un directorio que no
+  # existe no se queja, simplemente no encuentra nada y nadie se entera nunca.
   - package-ecosystem: "terraform"
     directory: "/infra"
     schedule:
@@ -95,3 +100,4 @@ updates:
     schedule:
       interval: "weekly"
       day: "monday"
+  # projects:fin-solo-si-hay-infra
