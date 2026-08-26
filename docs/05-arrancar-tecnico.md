@@ -521,7 +521,7 @@ por su cuenta y no entran en esa cuenta:
 | De dónde | Cuántos |
 |---|---|
 | El andamio — lo que `projects init` copia y sustituye | El `N` de `escritos N archivos` |
-| `openspec init`, que `projects init` corre en su último paso | **25**: 12 comandos `/opsx:*`, 12 skills `openspec-*`, y el árbol de `openspec/` |
+| `openspec init`, que `projects init` corre en su último paso | **25**: 6 comandos `/opsx:*`, 7 skills `openspec-*`, y el árbol de `openspec/` |
 | El render de la constitución | **2**: `.projects/AGENTS-marco.md` y `.cursor/rules/00-marco.mdc` |
 
 ⚠️ **La cifra del andamio no está escrita acá a propósito, y esta línea la tuvo mal.**
@@ -861,7 +861,7 @@ o apuntan al lugar equivocado.
 | **Armar la lista de cobertura leyendo el PRD** | Deja de servir para lo único que sirve: detectar lo que el PRD perdió. Sale de los documentos originales | La página 08, paso 4 |
 | **Pasarle a la sesión el PRD y no los documentos** | Puede citar el PRD pero no la fuente: la lista de cobertura queda apuntando al intermediario | La página 08, paso 7 |
 | **Pedir los cuatro artefactos de OpenSpec de una** | El PO gatea proposal y specs; si el design ya está escrito, su aprobación es un trámite | La página 08, paso 7 |
-| **Usar `/opsx:propose` en vez de `/opsx:new`** | `propose` genera los cuatro artefactos en un solo paso, que es justo lo de la fila de arriba. `new` crea el change y para | La página 08, paso 7.b |
+| **Empezar el change con `/opsx:propose`** | Genera los cuatro artefactos de un solo golpe —proposal, deltas, `design.md` y `tasks.md`—, así que el PO termina aprobando un proposal cuyo diseño ya está escrito. No hay un comando que cree un change vacío: medido contra el CLI pineado, `openspec change` solo tiene `show`, `list` y `validate`. El directorio se crea con `mkdir` y el proposal se escribe primero. Ver [09-construir-con-openspec.md](09-construir-con-openspec.md) |
 | **Nombrar el change como el proyecto** | Un change se propone, se aprueba y se archiva; si su nombre abarca todo el sistema no puede cerrarse nunca. El nombre es la rebanada | La página 08, paso 7.a |
 | **Editar el prompt de una skill de BMAD** | Dejás de usar una herramienta y empezás a mantener un fork ajeno. Si no entiende los documentos, ESO es el resultado: se anota y se sigue a mano | La página 08 |
 

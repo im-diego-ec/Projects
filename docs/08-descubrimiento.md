@@ -49,7 +49,7 @@ revisor obligatorio de cada guardrail de ingeniería. En **tu** proyecto sí los
 aprueba, porque ahí proposal y spec son el qué y el por qué del negocio. Son dos
 constituciones distintas y la que te gobierna es la tuya.
 
-Los **12 comandos `/opsx:*`** y las 12 skills
+Los **6 comandos `/opsx:*`** y las 7 skills
 `openspec-*` cubren el ciclo: los deja `openspec init`, que `projects init` corre en su último
 paso — si ese paso falló, no están, y hay que correrlo a mano.
 
