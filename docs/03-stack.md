@@ -103,7 +103,9 @@ hablar con un servicio que se paga?*
 
 - **No** → **B**, sin servidor propio. El navegador habla directo con la base de
   datos, y lo que protege los datos son reglas escritas en la propia base. Menos
-  piezas, menos cosas que se rompen.
+  piezas, menos cosas que se rompen. **Ojo: esta forma todavía no está
+  construida** (🕳️ en la tabla de arriba). Mientras tanto te toca **B+**, que
+  hace lo mismo y además trae el servidor — de más, pero funciona.
 - **Sí** → **B+**, con servidor propio. Es lo que el andamio trae hoy: un
   programa aparte que guarda esas claves y habla con la base por vos.
 

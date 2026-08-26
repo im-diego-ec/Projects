@@ -85,7 +85,7 @@ archivo manda: si dice otra cosa, es porque se volvió a medir.
 |---|---|---|---|
 | **Supabase** — la base de datos y las cuentas de usuario | No | 500 MB de base de datos, 5 GB de salida de datos, 50 000 usuarios activos por mes, 1 GB de archivos | **Se pausa tras una semana sin actividad**, y hay un máximo de **2 proyectos activos** por cuenta |
 | **Cloudflare** — donde corre el programa y las pantallas | No | **100 000 peticiones por día**, 500 publicaciones de sitio por mes | **10 milisegundos de procesador por petición**: no es tiempo de reloj, es trabajo real. Comprimir o procesar imágenes no entra |
-| **Google Cloud** — contenedores | Sí, para crear la cuenta | 2 millones de peticiones por mes | La base de datos administrada **no** está en el plan siempre gratis: o se combina con Supabase, o se paga desde el primer día |
+| **Google Cloud** — contenedores | Sí, para crear la cuenta | 2 millones de peticiones por mes | 🕳️ **Hoy no se puede elegir.** El marco todavía no tiene escrito cómo se conecta, así que el asistente no te la va a ofrecer. Está acá para que sepas que existe y que no la tenés disponible, no para que la elijas |
 | **Amazon Web Services** | Sí, para crear la cuenta | Su plan gratuito es por doce meses, no permanente | El gasto aparece cuando se termina el año, no cuando se crea el recurso |
 | **`ninguna`** | — | — | Nada, mientras el proyecto no tenga que estar disponible para alguien de afuera del equipo |
 
@@ -126,6 +126,26 @@ repositorio, **tenés acceso** — no te fijes en nada más, el resto de la sali
 larga y no importa. Si en cambio contesta
 `Could not resolve to a Repository`, **todavía no**: eso lo destraba una persona
 —quien administra la cuenta te agrega como lector—, no un comando.
+
+---
+
+## Antes del Paso 0: qué vas a construir
+
+**Es la decisión que más cuesta si se toma tarde**, y conviene mirarla antes de
+tocar nada. No es sobre tecnologías: es sobre **quién entra a lo que estás
+construyendo**. Un sitio para leer, una aplicación detrás de una puerta, o una
+app que se instala en el teléfono no se arman igual.
+
+Las cuatro formas están explicadas —con por qué elegirías cada una, qué te cuesta
+y su límite real— en **[la carta de 03-stack.md](03-stack.md#la-carta-qué-vas-a-construir)**.
+Son cinco minutos de lectura y te ahorran mantener piezas que tu proyecto no usa.
+
+> **Lo que te va a tocar hoy, dicho de frente.** De las cuatro formas hay **una
+> construida**: una aplicación detrás de una puerta, con servidor propio. Las
+> otras tres están explicadas en la carta pero todavía no se pueden elegir, y
+> esta guía te va a armar la que existe. Si tu proyecto es claramente un sitio
+> para leer o una app de teléfono, leer la carta te va a decir qué te falta —y es
+> mejor saberlo ahora que a mitad de camino.
 
 ---
 
@@ -246,7 +266,7 @@ vez —**una sola**— y volvé a comprobar.
 **Qué copiar (cambiá `<org>` y `<proyecto>` por los tuyos):
 
 ```bash
-gh repo create <org>/<proyecto> --private --clone
+gh repo create <org>/<proyecto> --public --clone
 cd <proyecto>
 ```
 
@@ -256,6 +276,19 @@ cd <proyecto>
 > arriba a la derecha cuando entrás a github.com, y el mismo que te muestra
 > `gh api user --jq .login`. En `<proyecto>` va el nombre del repositorio: en
 > minúsculas y con guiones en vez de espacios.
+
+> **Por qué `--public`, y cuándo cambiarlo.** Público quiere decir que cualquiera
+> puede **leer** tu código; nadie puede cambiarlo sin que vos lo apruebes. Y hay
+> algo que solo público te da **gratis**: poder proteger la rama principal, o sea
+> que las reglas de este marco se puedan hacer cumplir de verdad. En un
+> repositorio **privado del plan gratuito esa protección no existe** —GitHub
+> responde un error— y el Paso 12 te lo va a decir de frente cuando llegues.
+>
+> **Si tu código no puede ser público**, cambiá `--public` por `--private` acá
+> mismo y seguí igual: todo lo demás funciona. Lo único que perdés es esa
+> protección, y para recuperarla hay que pagar GitHub Pro o mover el repositorio
+> a una organización. El asistente del Paso 3 te va a volver a preguntar esto y
+> deja tu respuesta anotada con su motivo.
 
 **Qué vas a ver.** La dirección del repositorio recién creado y, después, la
 descarga de una carpeta vacía.
@@ -447,7 +480,7 @@ andamio. Lo que importa es que la línea exista.
 > manda la lista**: es la que se automatiza, y esta página va detrás.
 
 > **La sección que empieza en `LISTO,` es tu lista de tareas.** No la cierres:
-> los pasos 8 a 12 de esta página son exactamente esa lista, contada despacio.
+> los pasos 9 a 13 de esta página son exactamente esa lista, contada despacio.
 > La herramienta la imprime porque **no puede hacerla ella**: son decisiones y
 > actos humanos, no transcripción.
 
@@ -525,6 +558,12 @@ api dev: {"puerto":3000,"nivel":"info","msg":"tu-proyecto-api escuchando"}
 Abrí `http://localhost:5173` en el navegador. Vas a ver una página con el
 nombre de tu proyecto. Es fea a propósito: es el punto de partida, no un diseño.
 
+> **Si la línea dice otro número, usá ése.** Cuando el 5173 ya está ocupado por
+> otra cosa, la herramienta no falla: avisa `Port 5173 is in use, trying another
+> one...` y se muda al 5174, o al siguiente libre. **La dirección buena es
+> siempre la que imprime `Local:`**, no la de este texto. Es la trampa más fácil
+> de este paso: abrir el 5173 y ver la página de otro programa, o nada.
+
 **Cómo sabés que salió bien.** La página abre y el título de la pestaña dice el
 nombre de tu proyecto. Si querés comprobar la otra mitad, abrí
 `http://localhost:3000/api/health`: tiene que contestar algo así:
@@ -575,7 +614,7 @@ Statements   : 100% ( 33/33 )
 **Cómo sabés que salió bien.** Llegó hasta la línea `✓ built in ...` y **no**
 apareció `[ELIFECYCLE] Command failed`.
 
-> **Cuándo lo vas a necesitar de verdad:** después del paso 12, cuando edites el
+> **Cuándo lo vas a necesitar de verdad:** después del paso 13, cuando edites el
 > `README.md` a mano. Medido hoy: cambiar el ancho de una celda de una tabla
 > alcanza para que la etapa del formato salga roja con `[warn] README.md` y
 > `Code style issues found in the above file`. **No es un defecto**: se arregla
@@ -762,7 +801,7 @@ repositorio en vez de dejarte el hueco. No lo busques.
 **Cómo sabés que salió bien.** El comando de arriba **no imprime nada**, y el
 siguiente envío deja todas las verificaciones en verde.
 
-> **Cuidado con «no imprime nada».** Después del paso 6 existe una carpeta
+> **Cuidado con «no imprime nada».** Después del paso 5 existe una carpeta
 > `node_modules` con miles de archivos, así que el comando tarda; y en la
 > consola vieja de Windows el emoji no sobrevive a la lectura del archivo: **no
 > encuentra nada y sale sin error**, que es justo lo que querías ver. Sin salida
@@ -776,10 +815,10 @@ Cinco casos reales. Ninguno es un defecto de tu repositorio.
 
 | Cuándo | Qué vas a ver | Por qué pasa | Qué hacer |
 |---|---|---|---|
-| Paso 7, si te saltaste el `format` del paso 6 | `[warn] README.md` y `Code style issues found in the above file` | Al reemplazar los marcadores cambian los anchos del texto y las tablas quedan desalineadas | `corepack pnpm run format` y de nuevo. Pasa una sola vez |
+| Paso 8, si algo quedó sin formatear | `[warn] README.md` y `Code style issues found in the above file` | Al reemplazar los marcadores cambian los anchos del texto y las tablas quedan desalineadas | `corepack pnpm run format` y de nuevo. Pasa una sola vez |
 | Paso 9, primera corrida | Un solo trabajo en rojo: «Sin marcadores del scaffold sin resolver» | Los tres recuadros 🕳️ que un humano tiene que resolver. Y **no se pueden resolver todos antes** del primer envío: uno de ellos manda proteger la rama, y eso necesita que las verificaciones hayan corrido una vez | Paso 13 |
 | Si intentás enviar el esqueleto como propuesta en vez de directo | La [compuerta](02-glosario.md) de cobertura en rojo | Mide las líneas que una propuesta agrega sin pruebas, y el esqueleto entero son muchas | Enviar directo a la rama principal la primera vez, como dice el paso 9 |
-| En el paso 7, un recuadro con `Update available` | No es rojo, pero parece un problema | Es la herramienta de la base de datos avisando que hay versión nueva | Nada. Las versiones nuevas llegan como propuesta revisable |
+| En el paso 5, un recuadro con `Update available` | No es rojo, pero parece un problema | Es la herramienta de la base de datos avisando que hay versión nueva | Nada. Las versiones nuevas llegan como propuesta revisable |
 | Semanas después, si elegiste Supabase y el proyecto estuvo quieto | Las pruebas fallan con un error **de conexión** que no dice «pausado» | El plan gratuito **pausa el proyecto tras una semana sin actividad** | Despertarlo desde su panel. Si el proyecto va a tener rachas, está escrito qué decidir en [`plantilla/infra/adaptadores.md`](../plantilla/infra/adaptadores.md) |
 
 ---
