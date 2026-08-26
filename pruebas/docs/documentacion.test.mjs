@@ -1,6 +1,6 @@
 // Banco de la documentacion de entrada.
 //
-// POR QUE EXISTE. docs/para-el-po.md y docs/glosario.md nacieron para cerrar el
+// POR QUE EXISTE. docs/06-para-el-po.md y docs/02-glosario.md nacieron para cerrar el
 // hueco de que el rol con mas poder de veto del marco —el PO, dueño exclusivo de
 // rutas en CODEOWNERS— no tenia ningun documento dirigido a el. Pero un documento
 // que explica rutas se desincroniza en cuanto alguien toca CODEOWNERS, y una cifra
@@ -21,8 +21,8 @@ const RAIZ = path.resolve(import.meta.dirname, "..", "..");
 const leer = (rel) => readFileSync(path.join(RAIZ, rel), "utf8");
 
 const CODEOWNERS = [".github/CODEOWNERS", "plantilla/.github/CODEOWNERS"];
-const PARA_EL_PO = "docs/para-el-po.md";
-const GLOSARIO = "docs/glosario.md";
+const PARA_EL_PO = "docs/06-para-el-po.md";
+const GLOSARIO = "docs/02-glosario.md";
 
 /** Las rutas que CODEOWNERS SACA del catch-all, en este repo y en el andamio.
  *  Una linea de CODEOWNERS es `<ruta> <owner>...`; nos quedamos con las que
@@ -62,7 +62,7 @@ test("el escaneo encuentra rutas con dueño propio: un cero aca es el banco roto
   );
 });
 
-test("cada ruta que CODEOWNERS saca del catch-all esta explicada en para-el-po.md", () => {
+test("cada ruta que CODEOWNERS saca del catch-all esta explicada en 06-para-el-po.md", () => {
   const doc = leer(PARA_EL_PO);
   const sinExplicar = [];
   for (const ruta of rutasConDuenioPropio()) {
@@ -115,7 +115,7 @@ test("el glosario no define un termino dos veces", () => {
 
 test("los documentos nuevos estan enlazados desde el indice de docs/", () => {
   const indice = leer("docs/README.md");
-  for (const doc of ["para-el-po.md", "glosario.md"]) {
+  for (const doc of ["06-para-el-po.md", "02-glosario.md"]) {
     assert.ok(
       indice.includes(doc),
       `docs/README.md no menciona ${doc}. El indice se vende como el mapa de la documentacion: ` +

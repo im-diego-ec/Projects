@@ -12,7 +12,7 @@ import { leer, terminosDelGlosario, terminosUsados } from "./lectura.mjs";
 // glosario". Esa regla no se puede aplicar a lo que VIAJA: el glosario vive en
 // `docs/` del marco y no se copia al proyecto nuevo —medido: de los 10 .md que
 // recibe un proyecto, ninguno es un glosario—, asi que un enlace a
-// `glosario.md` desde el andamio nace roto el dia uno.
+// `02-glosario.md` desde el andamio nace roto el dia uno.
 //
 // Y sin embargo estos son los documentos que MAS lee una persona que no es
 // tecnica: el README del repositorio donde aterriza, la plantilla que abre en

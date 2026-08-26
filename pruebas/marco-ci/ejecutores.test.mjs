@@ -259,7 +259,7 @@ test("corpus generado · el lector AVISA sobre cada permiso indeterminado, sin p
 // alfabeto compara por igualdad exacta y el token que sigue al gestor no es ninguno de
 // sus subcomandos. El caso afirma el AGUJERO a proposito, que es la unica forma de que
 // el dia que se cierre se vea en el diff. Si este test se cae, el residuo se cerro:
-// mover la clase a AVISOS y bajar la fila del backlog de docs/reglas-no-escritas.md.
+// mover la clase a AVISOS y bajar la fila del backlog de docs/07-reglas-no-escritas.md.
 test("corpus generado · el residuo A16 sigue MUDO, y queda fijado en vez de olvidado", () => {
   const { exit, salida } = correrLector(RESIDUOS);
   assert.equal(exit, 0, `el residuo no puede poner rojo nada:\n${salida.slice(0, 2000)}`);
@@ -272,7 +272,7 @@ test("corpus generado · el residuo A16 sigue MUDO, y queda fijado en vez de olv
   assert.deepEqual(
     vistas.map((entrada) => `${entrada.id} (${entrada.nota}): ${entrada.linea}`),
     [],
-    "el check EMPEZO a ver estas entradas, o sea que el residuo A16 se cerro. No es una falla: es la buena noticia. Arreglo: movelas de la clase \"residuo\" a \"aviso\" en generar.mjs y baja su fila del backlog en docs/reglas-no-escritas.md",
+    "el check EMPEZO a ver estas entradas, o sea que el residuo A16 se cerro. No es una falla: es la buena noticia. Arreglo: movelas de la clase \"residuo\" a \"aviso\" en generar.mjs y baja su fila del backlog en docs/07-reglas-no-escritas.md",
   );
 });
 

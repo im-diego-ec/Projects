@@ -128,7 +128,7 @@ mañana falla.
 
 **Impacto en un repositorio nuevo.** Su primer CI sale **rojo** en los huecos de
 infraestructura, exactamente igual que en los tres huecos que el andamio ya deja hoy, y
-`docs/arrancar-un-proyecto.md` ya documenta ese primer rojo como esperado. La guía suma
+`docs/05-arrancar-tecnico.md` ya documenta ese primer rojo como esperado. La guía suma
 esos huecos a su fase 5.1.
 
 **Projects mismo.** No es un repositorio desplegable, así que la verificación tiene que ser

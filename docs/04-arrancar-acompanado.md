@@ -2,28 +2,28 @@
 
 **Para quién es esta página.** Para quien no es técnico y tiene que **hacerlo
 igual**: copiar comandos, mirar la pantalla y saber si salió bien. Su hermana
-[empezar-sin-ser-tecnico.md](empezar-sin-ser-tecnico.md) contesta *qué es esto y
+[01-introduccion.md](01-introduccion.md) contesta *qué es esto y
 por qué existe*; ésta contesta *qué escribo, en qué orden, y cómo sé que
 funcionó*.
 
 **La regla de esta página** es la misma que la de su hermana: ninguna palabra
 técnica aparece sin explicarse acá mismo o sin enlazar al
-[glosario](glosario.md), donde cada palabra propia del marco tiene una línea.
+[glosario](02-glosario.md), donde cada palabra propia del marco tiene una línea.
 Hay una comprobación automática que lo mide en cada cambio.
 
 **Palabras del marco que vas a ver acá, cada una definida en una línea:**
-[andamio](glosario.md), [marcador](glosario.md), [ci-ok](glosario.md),
-[compuerta](glosario.md), [CODEOWNERS](glosario.md), [constitución](glosario.md),
-[change](glosario.md), [proposal](glosario.md), [spec](glosario.md),
-[PO](glosario.md), [builder](glosario.md), [pin](glosario.md),
-[bump](glosario.md), [censo](glosario.md), [ruleset](glosario.md),
-[scaffold](glosario.md), [guardrail](glosario.md),
-[veredicto agregado](glosario.md).
+[andamio](02-glosario.md), [marcador](02-glosario.md), [ci-ok](02-glosario.md),
+[compuerta](02-glosario.md), [CODEOWNERS](02-glosario.md), [constitución](02-glosario.md),
+[change](02-glosario.md), [proposal](02-glosario.md), [spec](02-glosario.md),
+[PO](02-glosario.md), [builder](02-glosario.md), [pin](02-glosario.md),
+[bump](02-glosario.md), [censo](02-glosario.md), [ruleset](02-glosario.md),
+[scaffold](02-glosario.md), [guardrail](02-glosario.md),
+[veredicto agregado](02-glosario.md).
 
 > **Esta página no es la única, y no es la más completa.** El paso a paso
 > **técnico**, con las variantes de Windows, los comandos de comprobación contra
 > GitHub y las trampas de cada fase, está en
-> [arrancar-un-proyecto.md](arrancar-un-proyecto.md). Si algo de acá y algo de
+> [05-arrancar-tecnico.md](05-arrancar-tecnico.md). Si algo de acá y algo de
 > allá se contradicen, **manda esa página**: es la que mantiene quien arranca
 > proyectos. Ésta es su versión acompañada, con lo que vas a ver en pantalla.
 
@@ -235,7 +235,7 @@ vas a encontrar esto, con valores de ejemplo ya puestos:
 
 **Qué vas a hacer.** Reemplazar cada valor de ejemplo por el de tu proyecto.
 **Éste es el paso largo**, y no por escribir: dos de las casillas dependen de
-otra persona —el nombre del equipo que revisa y el del [PO](glosario.md)— y ésas
+otra persona —el nombre del equipo que revisa y el del [PO](02-glosario.md)— y ésas
 se piden **el primer día**, no el último.
 
 **Dónde está escrito qué va en cada una.** En
@@ -265,8 +265,8 @@ que falta.
 ## Paso 5 — Armar el repositorio y dejarlo en verde, de un tirón · *25 segundos (medido)*
 
 **Qué vas a hacer.** Un solo comando que hace **dos cosas seguidas**: copia el
-[andamio](glosario.md) —el árbol de archivos con el que nace un proyecto—
-reemplazando cada [marcador](glosario.md) por tu valor, y después **arranca el
+[andamio](02-glosario.md) —el árbol de archivos con el que nace un proyecto—
+reemplazando cada [marcador](02-glosario.md) por tu valor, y después **arranca el
 proyecto**: baja las piezas, arma el cliente de la base de datos, ordena el texto
 y corre todas las verificaciones.
 
@@ -363,7 +363,7 @@ paso no cambia nada, te da el mapa.
 > aparecer un aviso enmarcado que dice `Update available 7.9.1 -> 8.0.0-rc.10`.
 > Es la herramienta de la base de datos avisando que hay versión nueva. **No la
 > subas a mano**: las versiones nuevas llegan solas como propuesta revisable —lo
-> que el marco llama un [bump](glosario.md)—.
+> que el marco llama un [bump](02-glosario.md)—.
 
 ---
 
@@ -427,12 +427,12 @@ vacía, y en la pestaña **Actions** aparece una corrida en curso.
 > **Por qué directo y no por el camino normal.** Por dos motivos medidos, y los
 > dos empujan igual:
 >
-> - La [compuerta](glosario.md) de cobertura mide **las líneas que una propuesta
+> - La [compuerta](02-glosario.md) de cobertura mide **las líneas que una propuesta
 >   agrega sin pruebas**. Este primer guardado agrega el esqueleto entero: por el
 >   camino normal saldría roja; enviada directo a la rama principal, contesta
 >   `NO APLICABLE`.
-> - El [veredicto agregado](glosario.md) —la única verificación que la rama
->   principal va a exigir, y que se llama [`ci-ok`](glosario.md)— **no aparece en
+> - El [veredicto agregado](02-glosario.md) —la única verificación que la rama
+>   principal va a exigir, y que se llama [`ci-ok`](02-glosario.md)— **no aparece en
 >   la lista de GitHub hasta que haya corrido una vez**. O sea que la protección
 >   del paso 10 no se puede encender antes de este envío.
 >
@@ -477,7 +477,7 @@ que esté mal escrito.
 
 **Cómo sabés que salió bien.** El archivo `.github/proteccion-main.md` de tu
 repositorio queda con su estado real escrito, y la verificación exigida es
-[`ci-ok`](glosario.md) — **ninguna otra**.
+[`ci-ok`](02-glosario.md) — **ninguna otra**.
 
 > **Encendé 4 de las 8 reglas, no las 8.** Exigir aprobación + revisión del
 > dueño de la ruta + nadie que pueda saltarse la regla, **con un equipo de una
@@ -517,11 +517,11 @@ gh label list
 
 | Qué | Dónde | Qué pasa si no lo hacés |
 |---|---|---|
-| **Las seis etiquetas `area:*`** | Se crean con los seis comandos que la herramienta te imprimió al final del paso 5 | La [constitución](glosario.md) las exige y un repositorio nuevo nace sin ninguna |
-| **Dependabot, en tu repositorio** | `Settings → Advanced Security` → *Dependency graph* y *Dependabot security updates* | Tu repositorio **no recibe las versiones nuevas del marco** y **no aparece en el [censo](glosario.md)** de quién lo usa |
+| **Las seis etiquetas `area:*`** | Se crean con los seis comandos que la herramienta te imprimió al final del paso 5 | La [constitución](02-glosario.md) las exige y un repositorio nuevo nace sin ninguna |
+| **Dependabot, en tu repositorio** | `Settings → Advanced Security` → *Dependency graph* y *Dependabot security updates* | Tu repositorio **no recibe las versiones nuevas del marco** y **no aparece en el [censo](02-glosario.md)** de quién lo usa |
 | **El permiso de Dependabot sobre el repositorio del marco** | Es un ajuste **de la organización**, no del repositorio | Lo mismo que arriba, y es el más fácil de confundir porque se busca en el lugar equivocado |
 | **Los dos secretos** | `Settings → Secrets and variables → Actions` | Ninguno frena las verificaciones. Sin el primero, el asistente no contesta en las propuestas; sin el segundo, la propuesta semanal del marco nace sin verificaciones y ella misma lo avisa |
-| **Los nombres de [CODEOWNERS](glosario.md)** | Se comprueban contra la organización | Hay **tres** formas de que la revisión cruzada no exista y nada lo diga: un nombre mal escrito, un equipo vacío y un equipo sin permiso de escritura. GitHub no asigna a nadie, sin avisar |
+| **Los nombres de [CODEOWNERS](02-glosario.md)** | Se comprueban contra la organización | Hay **tres** formas de que la revisión cruzada no exista y nada lo diga: un nombre mal escrito, un equipo vacío y un equipo sin permiso de escritura. GitHub no asigna a nadie, sin avisar |
 
 ---
 
@@ -567,7 +567,7 @@ Cinco casos reales. Ninguno es un defecto de tu repositorio.
 |---|---|---|---|
 | Paso 7, si te saltaste el `format` del paso 6 | `[warn] README.md` y `Code style issues found in the above file` | Al reemplazar los marcadores cambian los anchos del texto y las tablas quedan desalineadas | `corepack pnpm run format` y de nuevo. Pasa una sola vez |
 | Paso 9, primera corrida | Un solo trabajo en rojo: «Sin marcadores del scaffold sin resolver» | Los tres recuadros 🕳️ que un humano tiene que resolver. Y **no se pueden resolver todos antes** del primer envío: uno de ellos manda proteger la rama, y eso necesita que las verificaciones hayan corrido una vez | Paso 12 |
-| Si intentás enviar el esqueleto como propuesta en vez de directo | La [compuerta](glosario.md) de cobertura en rojo | Mide las líneas que una propuesta agrega sin pruebas, y el esqueleto entero son muchas | Enviar directo a la rama principal la primera vez, como dice el paso 8 |
+| Si intentás enviar el esqueleto como propuesta en vez de directo | La [compuerta](02-glosario.md) de cobertura en rojo | Mide las líneas que una propuesta agrega sin pruebas, y el esqueleto entero son muchas | Enviar directo a la rama principal la primera vez, como dice el paso 8 |
 | En el paso 7, un recuadro con `Update available` | No es rojo, pero parece un problema | Es la herramienta de la base de datos avisando que hay versión nueva | Nada. Las versiones nuevas llegan como propuesta revisable |
 | Semanas después, si elegiste Supabase y el proyecto estuvo quieto | Las pruebas fallan con un error **de conexión** que no dice «pausado» | El plan gratuito **pausa el proyecto tras una semana sin actividad** | Despertarlo desde su panel. Si el proyecto va a tener rachas, está escrito qué decidir en [`plantilla/infra/adaptadores.md`](../plantilla/infra/adaptadores.md) |
 
@@ -596,7 +596,7 @@ lo que primero se mueve es la lista de pendientes del paso 5, porque cada cosa
 que se automatiza sale de ahí.
 
 **La regla:** manda lo que la herramienta imprime, después
-[arrancar-un-proyecto.md](arrancar-un-proyecto.md), y al final esta página. Si
+[05-arrancar-tecnico.md](05-arrancar-tecnico.md), y al final esta página. Si
 encontrás una diferencia, **anotala** con la plantilla de
 [`plantillas/registro-de-friccion.md`](plantillas/registro-de-friccion.md): así
 es como esta guía se corrige, y no adivinando.
@@ -605,10 +605,10 @@ es como esta guía se corrige, y no adivinando.
 
 ## Si querés seguir
 
-- [empezar-sin-ser-tecnico.md](empezar-sin-ser-tecnico.md) — qué es esto y por
+- [01-introduccion.md](01-introduccion.md) — qué es esto y por
   qué existe, cuánto cuesta y qué decisiones te va a pedir.
-- [glosario.md](glosario.md) — cada palabra propia del marco en una línea.
-- [para-el-po.md](para-el-po.md) — si además vas a aprobar cambios: qué te toca
+- [02-glosario.md](02-glosario.md) — cada palabra propia del marco en una línea.
+- [06-para-el-po.md](06-para-el-po.md) — si además vas a aprobar cambios: qué te toca
   y con qué cuatro preguntas se devuelve uno.
-- [arrancar-un-proyecto.md](arrancar-un-proyecto.md) — la misma ruta, en versión
+- [05-arrancar-tecnico.md](05-arrancar-tecnico.md) — la misma ruta, en versión
   técnica y completa.
