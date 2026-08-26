@@ -41,6 +41,32 @@ mueve sobre un cambio incompatible.
 
 ## [No publicado]
 
+### Añadido
+
+- **La carta: las cuatro formas de construir, nombradas y explicadas, para que la persona
+  elija.** Hasta hoy el marco imponía una sola forma —una aplicación con servidor propio—
+  sin decir que era una decisión tomada por él. Ahora `docs/03-stack.md` abre con las
+  cuatro: **un sitio para leer** (Astro), **una aplicación detrás de una puerta**, **la
+  misma con servidor propio** (lo de hoy) y **una app de teléfono** (Expo). Cada una dice
+  por qué la elegirías, qué te cuesta y **el límite real que sorprende después** — el que
+  no aparece en Google, el gestor de contenido que te van a pedir a los dos meses, la
+  suscripción anual que no termina nunca.
+
+  Y declara las tres preguntas que el marco decidió **no** hacer, con el motivo: elegir
+  entre React, Svelte o Vue no cambia nada de lo que tu producto hace y cuesta rehacer el
+  revisor de estilo entero; la capa de datos **se deriva** de si hay servidor propio; y el
+  corredor de pruebas no tiene ninguna consecuencia observable. Un marco puede tener
+  opiniones — lo que no puede es tenerlas sin declararlas.
+
+- **`pruebas/docs/la-carta-no-miente.test.mjs`, para que no quede en papel.** La columna
+  «estado» de la carta dice la verdad y el banco la mide: una forma marcada **🕳️ falta
+  construirlo** no puede aparecer como opción del asistente, y una marcada **✅** tiene
+  que poder elegirse de verdad. Es el mismo defecto que este repositorio ya se comió con
+  Slack —una opción ofrecida que producía un archivo que el motor rechazaba— y esta vez
+  está vigilado desde antes. Cuando una forma se construya, su fila y su opción se mueven
+  **juntas** o el banco se pone rojo. El guard cazó de entrada un hueco real: `B+` estaba
+  en la tabla sin sección propia que la explicara.
+
 ### Corregido
 
 - **El primer comando del tramo de construir no existía, y era el primero.** `docs/09` decía
