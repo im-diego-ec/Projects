@@ -60,7 +60,14 @@ pipeline, y el diagnóstico local es varios minutos más barato.
 
 ## Ambientes
 
-| Ambiente   | Frontend           | Cuándo se despliega                                             |
+> # projects:solo-si-hay-infra
+> ⚠️ **Todavía no hay despliegue automático, y conviene decirlo antes que la tabla.**
+> Este repositorio se verifica solo, pero **nada lo publica**: no hay un paso que lleve
+> tu código a una dirección donde otra persona pueda entrar. Las direcciones de abajo son
+> donde va a vivir cuando eso exista, no donde vive hoy. Mientras tanto, se levanta en tu
+> máquina con `pnpm dev`.
+
+| Ambiente   | Dirección prevista | Cuándo se despliega                                             |
 | ---------- | ------------------ | --------------------------------------------------------------- |
 | Desarrollo | `{{DOMINIO_DEV}}`  | **RELLENAR** — qué lo dispara (¿cada merge a `main`?, ¿a mano?) |
 | Producción | `{{DOMINIO_PROD}}` | **RELLENAR** — qué lo dispara y quién lo autoriza               |
@@ -69,6 +76,7 @@ Los recursos de nube de este proyecto llevan el prefijo `{{PREFIJO_RECURSOS}}` y
 la región `{{REGION}}`. La configuración por ambiente **no** se escribe en el repositorio:
 va por `vars` y `secrets`, y los valores sensibles por el almacén de parámetros bajo
 `/{{PREFIJO_RECURSOS}}/<ambiente>/<NOMBRE>`.
+> # projects:fin-solo-si-hay-infra
 
 ## Cuando algo se rompe en producción
 

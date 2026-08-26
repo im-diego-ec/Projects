@@ -642,15 +642,24 @@ lo primero de su lista de pendientes.
 grep -n RELLENAR README.md
 ```
 
-**Qué vas a ver.** Una línea por hueco, con su número. Hoy son nueve, pero no te
-fíes de ese número: el comando te dice los que tenés vos.
+**Qué vas a ver.** Una línea por hueco, con su número. Hoy son nueve, y **no son
+nueve cosas para escribir**: seis son huecos de verdad y tres están adentro del
+recuadro de instrucciones que abre el archivo — ése no se rellena, **se borra
+entero**, y el propio recuadro te lo dice en su última línea.
 
-**Qué hacer.** Abrí el `README.md` y reemplazá cada `RELLENAR` por tu respuesta.
-No hace falta que sean largas —una o dos frases alcanzan— y se pueden mejorar
-después. Lo que no conviene es dejarlas: nada se pone en rojo por un `RELLENAR`
-sin llenar, así que si no lo hacés ahora, se queda ahí para siempre.
+**Qué hacer.** Abrí el `README.md` y:
 
-**Cómo sabés que salió bien.** El mismo comando **no imprime nada**.
+1. **Reemplazá cada `RELLENAR` por tu respuesta.** No hace falta que sean largas
+   —una o dos frases alcanzan— y se pueden mejorar después. Lo que no conviene es
+   dejarlas: nada se pone en rojo por un `RELLENAR` sin llenar, así que si no lo
+   hacés ahora, se queda ahí para siempre.
+2. **Borrá el recuadro de arriba**, el que empieza con «Este archivo lo genera la
+   herramienta que creó el repositorio». Ya cumplió su función y no es para quien
+   entre al repositorio.
+
+**Cómo sabés que salió bien.** El mismo comando **no imprime nada**. Si todavía
+imprime dos o tres líneas y todas empiezan con `>`, es que te faltó el punto 2:
+son las que viven adentro del recuadro.
 
 ### Después: el envío
 

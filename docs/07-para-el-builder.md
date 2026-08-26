@@ -99,6 +99,14 @@ elegido.**
 
 ### Los escenarios se escriben en ejemplos, no en adjetivos
 
+**Y hay una palabra que va en inglés aunque todo lo demás sea castellano:** la
+línea que declara qué tiene que hacer el sistema necesita **[`SHALL`](02-glosario.md)**
+o `MUST`,
+en mayúsculas. Es lo que el validador busca para reconocerla, y ese validador
+corre en las verificaciones automáticas. Con `DEBE` sale rojo, y el error **no
+menciona la palabra**. Está explicado con un ejemplo completo en
+[09-construir-con-openspec.md](09-construir-con-openspec.md).
+
 «El sistema debe ser rápido» no es un escenario: no hay forma de saber si se
 cumple. «**Cuando** el catálogo tiene 10.000 artículos, **entonces** la primera
 pantalla aparece en menos de dos segundos» sí. La prueba de que un escenario está

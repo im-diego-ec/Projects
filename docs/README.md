@@ -13,11 +13,18 @@ usan jerga de oficio que el glosario no define. Las tres reglas las mide
 en cada cambio, página por página, y ahí está escrito qué carril le toca a cada
 una y por qué.
 
-**Hasta dónde llega, dicho con números.** El estándar mide **14 páginas**: el
-`README.md` de la raíz del repositorio y las 13 de la raíz de esta carpeta. De
-las 22 páginas que hay bajo `docs/`, quedan **8 fuera**: 5 en [`adr/`](adr/), 3
-en `plantillas/` y 1 en `adopciones/`, cada una con su motivo escrito al lado de
-la comprobación. Ninguna se escapa en silencio —si aparece una subcarpeta nueva
+**Hasta dónde llega, y cómo contarlo hoy.** El estándar mide el `README.md` de la
+raíz del repositorio más **todas las páginas de la raíz de esta carpeta**. Lo que
+queda fuera son las de las tres subcarpetas —[`adr/`](adr/), `plantillas/` y
+`adopciones/`— cada una con su motivo escrito al lado de la comprobación.
+
+Los números no se escriben acá a propósito: envejecen con cada página que entra o
+sale, y este archivo no tiene cómo darse cuenta. Se cuentan así:
+
+```bash
+node -e 'import("./pruebas/docs/lectura.mjs").then(m=>console.log(m.paginasDelAlcance().length))'
+git ls-files "docs/**/*.md" "docs/*.md" | wc -l
+``` Ninguna se escapa en silencio —si aparece una subcarpeta nueva
 la comprobación se pone roja y obliga a decidir—, pero que una página quede
 fuera no significa que no importe:
 [`plantillas/registro-de-friccion.md`](plantillas/registro-de-friccion.md) es
