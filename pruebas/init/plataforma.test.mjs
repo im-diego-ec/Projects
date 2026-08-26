@@ -193,3 +193,30 @@ test("MUERDE: si la plataforma dejara de leerse, los dos proyectos saldrian igua
     "si los dos proyectos tienen la misma cantidad de archivos, la eleccion de plataforma volvio a no significar nada",
   );
 });
+
+test("el archivo de valores del PROYECTO declara la plataforma que se eligio, no la del andamio", () => {
+  // EL DEFECTO QUE ESTE CASO VIGILA, medido sobre un proyecto ya armado: en el
+  // andamio esta clave es un LITERAL —`"plataforma": "aws"`— y no un marcador
+  // `{{ASI}}`, asi que la sustitucion no la tocaba: el proyecto de alguien que
+  // eligio Supabase viajaba declarando `aws` en su propio archivo de valores.
+  //
+  // Y no es un archivo cualquiera. Es el que la action de la constitucion lee en
+  // CADA corrida del proyecto para renderizar su ley: un archivo que declara la
+  // eleccion y la contradice es la peor version del problema que este cambio
+  // vino a resolver.
+  const original = fs.readFileSync(path.join(ANDAMIO, ".projects-valores.json"), "utf-8");
+  for (const plataforma of ["supabase", "gcp", "ninguna", "aws"]) {
+    const escrito = JSON.parse(podarPorPlataforma(original, ".projects-valores.json", plataforma));
+    assert.equal(escrito.plataforma, plataforma, `eligiendo "${plataforma}", el archivo del proyecto tiene que declarar eso`);
+  }
+});
+
+test("y se escribe TAMBIEN cuando la plataforma es aws", () => {
+  // Si solo se escribiera en el caso raro, el literal del andamio seguiria
+  // siendo la unica fuente para el caso comun y volveria a poder mentir el dia
+  // que ese literal cambie. La clave se escribe siempre, venga de donde venga.
+  const inventado = JSON.stringify({ plataforma: "lo-que-sea", PROYECTO: "x" }, null, 2);
+  const escrito = JSON.parse(podarPorPlataforma(inventado, ".projects-valores.json", "aws"));
+  assert.equal(escrito.plataforma, "aws", "el valor del andamio no manda sobre la eleccion, ni siquiera cuando coinciden");
+  assert.equal(escrito.PROYECTO, "x", "y el resto del archivo se queda entero");
+});

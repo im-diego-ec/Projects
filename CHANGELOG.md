@@ -86,6 +86,15 @@ mueve sobre un cambio incompatible.
 
 ### Corregido
 
+- **El archivo que declara la plataforma la contradecía.** En el andamio,
+  `.projects-valores.json` trae `"plataforma": "aws"` como **literal** y no como marcador
+  `{{ASI}}`, así que la sustitución no lo tocaba: el proyecto de alguien que eligió
+  Supabase viajaba declarando `aws` en su propio archivo de valores. Y no es un archivo
+  cualquiera — es el que la action de la constitución lee en **cada** corrida del proyecto
+  para renderizar su ley. Ahora la clave se escribe con lo elegido, y **también cuando es
+  `aws`**: si solo se escribiera en el caso raro, el literal del andamio seguiría siendo la
+  única fuente para el caso común y podría volver a mentir el día que ese literal cambie.
+
 - **Dos archivos quedaban con referencias muertas que no se quejan, que es lo que las hace
   peligrosas.** `.github/dependabot.yml` seguía con dos entradas de Terraform apuntando a
   `/infra` y `/infra-prod`: Dependabot no encuentra manifiestos ahí y **simplemente no
