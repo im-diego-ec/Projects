@@ -373,6 +373,11 @@ export function derivar(r) {
     // que faltaba era que alguien la leyera.
     plataforma: r.plataforma,
     forma: r.forma,
+    // NO SE PREGUNTA. Es la cuenta donde vive el MARCO, no la del proyecto, y
+    // quien corre esta herramienta la tiene delante: sale del remoto del clon.
+    // Preguntarla seria pedirle a la persona un dato que el programa ya sabe —y
+    // que ademas no puede contestar, porque no es una decision suya.
+    ORG_MARCO: r.ORG_MARCO,
     PROYECTO: r.PROYECTO,
     ORG: r.ORG,
     PAQUETE_API: "api",
@@ -515,8 +520,8 @@ function envolver(texto, ancho) {
  *
  *  No imprime nada: devuelve las lineas para que quien llama las emita. Una
  *  funcion que decide y ademas escribe en la consola no se puede afirmar. */
-export async function correrAsistente(preguntar, previos = {}, formatos = {}, emitir = () => {}) {
-  const respuestas = { ...previos };
+export async function correrAsistente(preguntar, previos = {}, formatos = {}, emitir = () => {}, derivados = {}) {
+  const respuestas = { ...derivados, ...previos };
   const dicho = [];
 
   // SE EMITE EN EL MOMENTO Y ADEMAS SE GUARDA, y las dos mitades hacen falta.

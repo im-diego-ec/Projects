@@ -23,6 +23,11 @@ import { REQUERIDOS, FORMATOS, validarValores } from "../../herramientas/project
  *
  *  SE MANTIENE EL POSICIONAL porque hay casos que necesitan afirmar el ORDEN,
  *  pero para elegir respuestas concretas se usa `contestador` de abajo. */
+/** Lo que la herramienta DERIVA y no pregunta: la cuenta donde vive el marco,
+ *  que sale del remoto del clon. En el banco se fija a mano para que estos casos
+ *  no dependan de que la maquina donde corren tenga un remoto configurado. */
+const DERIVADOS = { ORG_MARCO: "im-diego-ec" };
+
 function guionista(respuestas) {
   const preguntado = [];
   let i = 0;
@@ -91,7 +96,7 @@ const AWS_DOS = {
 
 test("el caso mas simple son NUEVE preguntas, y solo dos hay que escribirlas", async () => {
   const { preguntar } = contestador({ ...TEXTO_VALIDO, ...PO_SOLO });
-  const { dicho, respuestas } = await correrAsistente(preguntar);
+  const { dicho, respuestas } = await correrAsistente(preguntar, {}, {}, () => {}, DERIVADOS);
   assert.equal(
     cuantasPreguntas(dicho),
     9,
@@ -109,7 +114,7 @@ test("el caso mas simple son NUEVE preguntas, y solo dos hay que escribirlas", a
 
 test("elegir AWS con dos ambientes hace DIECISEIS preguntas, y ninguna es de relleno", async () => {
   const { preguntar } = contestador({ ...TEXTO_VALIDO, ...AWS_DOS });
-  const { dicho, valores } = await correrAsistente(preguntar);
+  const { dicho, valores } = await correrAsistente(preguntar, {}, {}, () => {}, DERIVADOS);
   assert.equal(cuantasPreguntas(dicho), 16, "con AWS y dos ambientes se preguntan las cinco de AWS mas el dominio propio");
   // El defecto que este caso vigila: la primera version del asistente SALTEABA
   // las cinco preguntas de AWS junto con el relleno, asi que quien elegia AWS
@@ -133,7 +138,7 @@ test("con AWS y UN ambiente no se pregunta dos veces por el mismo dato", async (
     CANAL_ALERTAS: "#alertas",
     visibilidad: "2",
   });
-  const { valores, dicho } = await correrAsistente(preguntar);
+  const { valores, dicho } = await correrAsistente(preguntar, {}, {}, () => {}, DERIVADOS);
   assert.equal(cuantasPreguntas(dicho), 13, "con un solo ambiente se saltean la cuenta y el perfil de produccion");
   assert.equal(valores.CUENTA_PROD, valores.CUENTA_DEV, "con un ambiente, la cuenta de 'produccion' ES la misma");
   assert.equal(valores.PERFIL_PROD, valores.PERFIL_DEV, "y el perfil tambien");
@@ -151,7 +156,7 @@ test("LO QUE MAS IMPORTA: lo que produce el asistente pasa el validador de siemp
   const rotos = [];
   for (const [nombre, guion] of Object.entries(CASOS)) {
     const { preguntar } = contestador({ ...TEXTO_VALIDO, ...guion });
-    const { valores } = await correrAsistente(preguntar, {}, FORMATOS);
+    const { valores } = await correrAsistente(preguntar, {}, FORMATOS, () => {}, DERIVADOS);
     const faltan = REQUERIDOS.filter((k) => !(k in valores));
     const { problemas } = validarValores(valores);
     if (faltan.length || problemas.length) rotos.push(`${nombre}: faltan [${faltan}] problemas [${problemas.join(" | ")}]`);
@@ -165,7 +170,7 @@ test("LO QUE MAS IMPORTA: lo que produce el asistente pasa el validador de siemp
 
 test("las claves salen completas, ni una de mas ni una de menos", async () => {
   const { preguntar } = contestador({ ...TEXTO_VALIDO, ...PO_SOLO });
-  const { valores } = await correrAsistente(preguntar);
+  const { valores } = await correrAsistente(preguntar, {}, {}, () => {}, DERIVADOS);
   // `plataforma` va aparte y en minuscula: no es un marcador que el andamio
   // sustituya, es la decision de QUE archivos viajan. Por eso se saca antes de
   // comparar, y por eso se comprueba que este.
@@ -196,7 +201,7 @@ test("una respuesta con mala forma se vuelve a pedir en el momento, no veinte pr
     }
     return { ...TEXTO_VALIDO, PROYECTO: "no-vale-vacio", ORG: "im-diego-ec" }[id] ?? "";
   };
-  const { dicho, respuestas } = await correrAsistente(preguntar, {}, FORMATOS);
+  const { dicho, respuestas } = await correrAsistente(preguntar, {}, FORMATOS, () => {}, DERIVADOS);
   assert.ok(
     dicho.some((l) => l.includes("hay que contestarla")),
     "una respuesta vacia en una pregunta sin valor por defecto tiene que avisar y volver a preguntar",
@@ -207,7 +212,7 @@ test("una respuesta con mala forma se vuelve a pedir en el momento, no veinte pr
 
 test("los acentos y las mayusculas del nombre se arreglan solos, y se dice que se arreglaron", async () => {
   const { preguntar } = contestador({ ...TEXTO_VALIDO, PROYECTO: "Agenda De Añejos", ORG: "alguien" });
-  const { respuestas, dicho } = await correrAsistente(preguntar, {}, FORMATOS);
+  const { respuestas, dicho } = await correrAsistente(preguntar, {}, FORMATOS, () => {}, DERIVADOS);
   assert.equal(respuestas.PROYECTO, "agenda-de-anejos", "GitHub no acepta mayusculas ni acentos en un nombre de repo");
   assert.ok(
     dicho.some((l) => l.includes("se guardó como")),
@@ -220,7 +225,7 @@ test("volver a correrlo ofrece lo de antes, y Enter lo mantiene", async () => {
   // Contesta vacio a todo: lo que sostiene la corrida son los `previos`, que es
   // exactamente lo que se quiere afirmar.
   const { preguntar, textos } = contestador({});
-  const { respuestas } = await correrAsistente(preguntar, previos, FORMATOS);
+  const { respuestas } = await correrAsistente(preguntar, previos, FORMATOS, () => {}, DERIVADOS);
   assert.equal(respuestas.PROYECTO, "lo-de-antes", "Enter sobre una respuesta previa tiene que mantenerla");
   assert.ok(
     textos.some((t) => t.includes("Enter mantiene: lo-de-antes")),
@@ -321,7 +326,7 @@ test("MUERDE: si una pregunta deja de saltarse, el conteo del caso simple lo caz
 
 test("el resumen nombra las ocho decisiones, para poder arrepentirse antes de escribir nada", async () => {
   const { preguntar } = contestador({ ...TEXTO_VALIDO, ...PO_SOLO });
-  const { respuestas, desvios: d } = await correrAsistente(preguntar);
+  const { respuestas, desvios: d } = await correrAsistente(preguntar, {}, {}, () => {}, DERIVADOS);
   const texto = lineasDeResumen(respuestas, d).join("\n");
   for (const esperado of ["agenda-de-personas", "@im-diego-ec", "trabajás solo", "Supabase", "una sola", "pages.dev", "correo de GitHub", "público"]) {
     assert.ok(texto.includes(esperado), `el resumen tiene que nombrar "${esperado}": es lo que la persona lee antes de confirmar`);
@@ -393,7 +398,7 @@ test("CADA opcion de CADA pregunta produce un archivo que el validador acepta", 
       // Todo lo demas en su recomendada; solo esta pregunta se fuerza.
       const mapa = { ...TEXTO_VALIDO, [pregunta.id]: String(pregunta.opciones.indexOf(opcion) + 1) };
       const { preguntar, preguntado } = contestador(mapa);
-      const { valores, respuestas } = await correrAsistente(preguntar, {}, FORMATOS);
+      const { valores, respuestas } = await correrAsistente(preguntar, {}, FORMATOS, () => {}, DERIVADOS);
 
       if (respuestas[pregunta.id] !== opcion.valor) {
         rotos.push(`${pregunta.id}="${opcion.valor}": se contesto por id y quedo "${respuestas[pregunta.id]}"`);
@@ -421,7 +426,7 @@ test("elegir Slack deja las DOS claves de Slack, no una", async () => {
   // El defecto exacto, con nombre: `RELLENO_SLACK` se aplicaba ENTERO solo
   // cuando NO se elegia Slack, asi que elegirlo dejaba `ID_MCP_SLACK` sin valor.
   const { preguntar } = contestador({ ...TEXTO_VALIDO, avisos: "2" });
-  const { valores, respuestas } = await correrAsistente(preguntar, {}, FORMATOS);
+  const { valores, respuestas } = await correrAsistente(preguntar, {}, FORMATOS, () => {}, DERIVADOS);
   assert.equal(respuestas.avisos, "slack", "el caso tiene que llegar de verdad a Slack, no decir que llega");
   assert.equal(valores.CANAL_ALERTAS, "#alertas", "el canal sale de la respuesta");
   assert.ok(valores.ID_MCP_SLACK, "y el id de MCP NO puede quedar sin valor: sin el, projects init aborta con exit 1");
@@ -438,7 +443,7 @@ test("MUERDE: si una opcion dejara una clave sin valor, el caso de arriba lo ve"
 });
 
 async function correlacionSinUna(preguntar) {
-  const { valores } = await correrAsistente(preguntar, {}, FORMATOS);
+  const { valores } = await correrAsistente(preguntar, {}, FORMATOS, () => {}, DERIVADOS);
   const mutado = { ...valores };
   delete mutado.ID_MCP_SLACK;
   return { valores: mutado };

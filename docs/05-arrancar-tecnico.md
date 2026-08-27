@@ -277,7 +277,7 @@ el arranque.
 |---|---|---|
 | 0 | Verificar lo que ya está hecho a nivel organización | **[vos]**, 4 comandos |
 | 1 | Arrancar lo que depende de otra persona | **[otro]** |
-| 2 | Juntar los 21 valores — a mano, o contestando las preguntas del asistente | **[vos]** |
+| 2 | Juntar los valores — a mano, o contestando las preguntas del asistente | **[vos]** |
 | 3 | Crear el repo y correr `projects init` | **[vos]**, 2 comandos |
 | 4 | `pnpm install` y comprobar en local | **[vos]**, 1 comando |
 | 5 | El primer push, directo a `main` | **[vos]** + **[auto]** |
@@ -356,14 +356,19 @@ gh project list --owner po
 
 ---
 
-## Fase 2 — Los 21 valores · **[vos]** + un dato de **[otro]**
+## Fase 2 — Los valores · **[vos]** + un dato de **[otro]**
 
-`projects init` pide **21 valores** (el 22.º, `PAQUETES`, se deriva y no se pregunta).
+`projects init` pide **23 valores**. Uno más, `PAQUETES`, se deriva de los otros y
+no se pregunta: una lista escrita aparte de sus elementos se desincroniza sola.
+
+> Esa cifra la mide el banco contra la lista `REQUERIDOS` de la herramienta, así
+> que si envejece se pone roja acá y no en tu proyecto. Crece sólo cuando se
+> agrega una **decisión** —no al agregar un archivo—, y eso pasa con un PR.
 
 > **Hay dos formas de producir ese archivo, y las dos terminan en el mismo lugar.**
 > Ésta —`--ejemplo` y editar— es la del builder: la explícita, la que no pregunta
-> nada, la que sirve en una tubería. La otra es `--asistente`, que hace entre 8 y
-> 16 preguntas en castellano y **deriva las 21 claves de las respuestas**: no
+> nada, la que sirve en una tubería. La otra es `--asistente`, que hace entre 9 y
+> 17 preguntas en castellano y **deriva las 23 claves de las respuestas**: no
 > pide un id de cuenta de AWS a quien no eligió AWS, ni un canal de Slack a quien
 > avisa por correo. Genera este mismo archivo y lo valida con el mismo
 > `validarValores`, así que no hay dos caminos que puedan divergir: hay un
@@ -470,7 +475,7 @@ se parece a un problema de banderas.
 | Bandera | Cuándo |
 |---|---|
 | `--ejemplo` | Fase 2: imprime el esqueleto de `valores.json` |
-| `--asistente` | Fase 2 por preguntas: deriva los 21 valores de 8 a 16 respuestas en castellano. Exige terminal; sin TTY imprime las preguntas y sale 2 |
+| `--asistente` | Fase 2 por preguntas: deriva los 23 valores de 9 a 17 respuestas en castellano. Exige terminal; sin TTY imprime las preguntas y sale 2 |
 | `--solo-valores <ruta>` | Con `--asistente`: escribe el archivo y no arma nada. Gemelo interactivo de `--ejemplo` |
 | `--forzar` | Sobrescribe un destino que **ya tiene** archivos del andamio. Es la bandera que apaga la protección contra pisar trabajo: se usa para reintentar un arranque que se cortó a la mitad, no para «probar otra vez» |
 | `--sin-herramientas` | No corre `openspec init` ni el render de la constitución. Te deja el andamio copiado y nada más — el repo queda **sin** `openspec/` y sin `.projects/`, o sea sin las dos piezas de la la página 08 |

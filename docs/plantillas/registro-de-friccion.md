@@ -46,7 +46,7 @@ por 10× es un defecto de la guía, no del que la corrió.
 |---|---|---|---|---|
 | 0 · Verificar, no hacer | 30 s | | sí / no | sí / no · qué |
 | 1 · Arrancar lo asíncrono | — | | | |
-| 2 · Los 21 valores | — | | | |
+| 2 · Los valores | — | | | |
 | 3 · El repo | 2 comandos | | | |
 | 3.1 · Qué quedó en el repo | — | | | |
 | 3.2 · Escritura de los equipos | — | | | |

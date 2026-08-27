@@ -178,18 +178,18 @@ resultado.
 > bajo *ESOS CUATRO NUMEROS SE MIDEN*. Y una corrida real lo dice sola en su primera
 > línea, con la forma `escritos N archivos, M ocurrencias sustituidas`.
 >
-> Lo que sí está fijo y sí se escribe es **21 marcadores**: es el largo de la lista
+> Lo que sí está fijo y sí se escribe es **23 marcadores**: es el largo de la lista
 > `REQUERIDOS` de la herramienta, y esa lista no crece al agregar un archivo — crece
 > sólo cuando se agrega una **decisión**, que es un acto deliberado y con PR. Quien la
 > sostiene es un banco del marco, `pruebas/andamio/tabla-de-valores.test.mjs`: se pone
-> rojo si `plantilla/.projects-valores.json` deja de declarar uno de los 21, y rojo si
+> rojo si `plantilla/.projects-valores.json` deja de declarar uno de ellos, y rojo si
 > la tabla de `plantilla/README.md` se queda sin la fila de uno. Medido borrando
 > `ID_MCP_SLACK` del registro del andamio: el caso `registro · el andamio declara los
 > valores en su .projects-valores.json` falla nombrando la clave.
 >
 > **Y conviene saber qué NO hace `projects init` con esa cifra, porque es fácil
 > suponerlo de más.** El desfase del andamio no lo mira: sobre el destino ya escrito lo
-> reporta como `::warning::` y sale **0** (medido: `guarda 20 de los 21 valores`,
+> reporta como `::warning::` y sale **0** (medido, con la forma `guarda N de los M valores`,
 > `EXIT=0`, el andamio entero copiado igual). Lo que sí lo pone rojo es el otro lado
 > —un marcador del andamio que el archivo de valores no declara— y ahí es `::error::`
 > con `EXIT=1`, pero **después** de la copia, no antes: esa corrida igual arranca
@@ -223,14 +223,14 @@ Lo que **no** hace, porque no es transcripción:
    proponerlos. En los dos casos el repo simplemente **no recibe versiones nuevas
    y no aparece en el censo de consumidores**, sin avisar.
 
-> **La tabla de los 21 valores**, con qué poner, ejemplo y caso borde de cada uno,
+> **La tabla de valores**, con qué poner, ejemplo y caso borde de cada uno,
 > vive en **[`plantilla/README.md`](plantilla/README.md)** sección 2. Ese archivo es
 > la fuente de verdad de los valores y manda sobre este resumen; también documenta
 > el camino **manual**, que sigue siendo válido y es el fallback si `projects init`
 > falla.
 >
-> **Y no hace falta llenarla a mano.** `projects init --asistente` hace entre 8 y 16
-> preguntas en castellano —depende de lo que contestes— y deriva los 21 valores de
+> **Y no hace falta llenarla a mano.** `projects init --asistente` hace entre 9 y 17
+> preguntas en castellano —depende de lo que contestes— y deriva los 23 valores de
 > las respuestas: no pide un id de cuenta de AWS a quien no eligió AWS. Produce este
 > mismo archivo y lo valida con el mismo `validarValores`, así que no son dos caminos
 > que puedan divergir: es un generador y una puerta. El paso a paso está en
@@ -416,7 +416,7 @@ diff.
 │                          #   con su propio README como guía del bootstrap y un
 │                          #   .github/workflows/ci.yml que ya llama al marco por versión exacta
 ├── herramientas/          # projects-init.mjs: instancia el andamio en un repo nuevo en un comando
-│                          #   (copia + 21 marcadores + openspec init + render de la constitucion)
+│                          #   (copia + marcadores + openspec init + render de la constitucion)
 ├── pruebas/                # el banco de los pasos INLINE de marco-ci.yml y del pinado del andamio:
 │                          #   ese código no puede salir de su bloque `run:` (cuando un consumidor
 │                          #   llama al reusable, el árbol checkouteado es el DEL CONSUMIDOR), así

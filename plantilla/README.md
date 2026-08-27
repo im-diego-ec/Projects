@@ -7,7 +7,7 @@ Projects. Eso lo distingue de las otras piezas del marco:
 | Pieza | Cómo evoluciona |
 |---|---|
 | **Scaffold** (esto) | Se copia una vez. Después es del proyecto. Un cambio acá NO llega a los repos ya creados. |
-| **Referenciado** (workflows reusables, composite actions) | Se consume por `uses: {{ORG}}/Projects/...@v1.7.0`, **por versión exacta**. Una versión nueva llega como PR de Dependabot, no empujada. |
+| **Referenciado** (workflows reusables, composite actions) | Se consume por `uses: {{ORG_MARCO}}/Projects/...@v1.7.0`, **por versión exacta**. Una versión nueva llega como PR de Dependabot, no empujada. |
 | **Canónico** (specs del marco) | Viven solo en Projects. Nadie los copia. |
 | **Regenerado** (skills y comandos de OpenSpec, y la porción del marco de la constitución) | No se vendoran: el marco pina la herramienta o publica el texto, y cada repo lo regenera. |
 
@@ -34,7 +34,7 @@ node <clon-del-marco>/herramientas/projects-init.mjs --ejemplo > valores.json
 node <clon-del-marco>/herramientas/projects-init.mjs --valores valores.json --destino .
 ```
 
-Hace el copiado (sección 1), la sustitución de los 21 marcadores (sección 2), el
+Hace el copiado (sección 1), la sustitución de los marcadores (sección 2), el
 `openspec init` con el pin del marco (sección 4) y el render de la constitución
 (sección 2.5). Falla cerrado y verifica releyendo el árbol.
 
@@ -48,7 +48,7 @@ fallback. Lo que la herramienta no hace está en la sección 5.
 
 ```bash
 # Git Bash / macOS / Linux
-git clone --depth 1 https://github.com/{{ORG}}/Projects /tmp/projects
+git clone --depth 1 https://github.com/{{ORG_MARCO}}/Projects /tmp/projects
 cp -r /tmp/projects/plantilla/. .        # el "/." final copia TAMBIEN los dotfiles
 rm README.md                             # este archivo es la guia del scaffold, no el del proyecto
 mv README-del-proyecto.md README.md      # y ESTE si es el del proyecto: aterriza con su nombre
@@ -56,7 +56,7 @@ mv README-del-proyecto.md README.md      # y ESTE si es el del proyecto: aterriz
 
 ```powershell
 # Windows (robocopy no se traga los dotfiles ni deja archivos atras)
-git clone --depth 1 https://github.com/{{ORG}}/Projects $env:TEMP\projects
+git clone --depth 1 https://github.com/{{ORG_MARCO}}/Projects $env:TEMP\projects
 robocopy "$env:TEMP\projects\plantilla" . /E /XF README.md
 Rename-Item README-del-proyecto.md README.md
 # robocopy devuelve exit code 1 cuando copio archivos: es exito, no error
@@ -81,7 +81,7 @@ y parecidos— es la firma de esa forma de fijarlo, y no exige nada, porque ya e
 por construcción en el momento en que se anota.
 
 Lo que llega en `.github/workflows/ci.yml` es un **llamador delgado**: hereda del marco el
-carril de docs y la validación de OpenSpec con `uses: {{ORG}}/Projects/...@v1.7.0`, y deja el
+carril de docs y la validación de OpenSpec con `uses: {{ORG_MARCO}}/Projects/...@v1.7.0`, y deja el
 `build-test` del producto para que este repo lo llene. La mecánica del marco NO se copia:
 si se copiara, un arreglo en Projects dejaría de llegar acá.
 
@@ -119,7 +119,8 @@ vez**, al crear el repo, con un buscar-y-reemplazar sobre todo el árbol.
 | Placeholder | Qué poner | Ejemplo |
 |---|---|---|
 | `{{PROYECTO}}` | Nombre del repo, kebab-case | `people-agenda` |
-| `{{ORG}}` | Org de GitHub: el handle de la organización, no un equipo dentro de ella. Se interpola en `uses: {{ORG}}/Projects/...`, o sea en la coordenada con la que GitHub resuelve el marco | `Ejemplo-Org` |
+| `{{ORG}}` | Org de GitHub: el handle de la organización, no un equipo dentro de ella. Se interpola en `uses: {{ORG_MARCO}}/Projects/...`, o sea en la coordenada con la que GitHub resuelve el marco | `Ejemplo-Org` |
+| `{{ORG_MARCO}}` | La cuenta de GitHub donde vive **el marco**, que NO es la de tu proyecto. La herramienta la deriva sola del clon desde el que corre, así que un fork del marco produce proyectos que apuntan al fork | `im-diego-ec` | Nada: no se contesta a mano |
 | `{{PAQUETES}}` | Paquetes del monorepo, lista legible | `web, api, e2e` |
 
 ### Paquetes (derivados de `{{PAQUETES}}`, uno por rol)

@@ -533,7 +533,12 @@ test("andamio · la comprobacion de procedencia MUERDE", () => {
 // del sistema de archivos (`/tmp/projects`) no lleva prefijo de cuenta y por eso
 // queda fuera sin necesidad de una excepcion.
 // ---------------------------------------------------------------------------
-const CUENTA = String.raw`(?:\{\{ORG\}\}|<org>|im-diego-ec)`;
+// `ORG_MARCO` entra a la lista porque es el marcador que HOY sustituye la cuenta
+// donde vive el marco. Antes esa coordenada usaba `{{ORG}}` —el mismo marcador
+// que la cuenta del proyecto—, y esa ambiguedad hacia que el pipeline de un
+// proyecto nuevo apuntara a un repositorio que no existe. `{{ORG}}` se queda en
+// la lista: sigue apareciendo como duenio de repositorio en `{{ORG}}/{{PROYECTO}}`.
+const CUENTA = String.raw`(?:\{\{ORG_MARCO\}\}|\{\{ORG\}\}|<org>|im-diego-ec)`;
 const SLUG = new RegExp(`${CUENTA}/([A-Za-z][A-Za-z0-9_.-]*)(?=[/@\`'"\\s)])`, "g");
 
 /** Las referencias al repositorio del marco mal escritas, con su ubicacion. */

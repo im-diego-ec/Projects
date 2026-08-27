@@ -8,6 +8,11 @@ import { fileURLToPath } from "node:url";
 import { noViajanPorForma, formaDe, podarPorForma, seExcluyeDelCopiado, archivosDelAndamio, instanciar, TODAS } from "../../herramientas/projects-init.mjs";
 import { PREGUNTAS, correrAsistente } from "../../herramientas/projects-asistente.mjs";
 
+/** Lo que la herramienta DERIVA y no pregunta: la cuenta donde vive el marco,
+ *  que sale del remoto del clon. En el banco se fija a mano para que estos casos
+ *  no dependan de que la maquina donde corren tenga un remoto configurado. */
+const DERIVADOS = { ORG_MARCO: "im-diego-ec" };
+
 const RAIZ = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 const ANDAMIO = path.join(RAIZ, "plantilla");
 
@@ -86,7 +91,13 @@ test("el `verificar` de un sitio no encadena el paso que necesita un servidor", 
 async function armar(forma) {
   const destino = fs.mkdtempSync(path.join(os.tmpdir(), `forma-${forma}-`));
   const opcion = forma === "sitio" ? "2" : "1";
-  const { valores } = await correrAsistente(async (_t, id) => ({ PROYECTO: "mi-proyecto", ORG: "alguien", forma: opcion })[id] ?? "");
+  const { valores } = await correrAsistente(
+    async (_t, id) => ({ PROYECTO: "mi-proyecto", ORG: "alguien", forma: opcion })[id] ?? "",
+    {},
+    {},
+    () => {},
+    DERIVADOS,
+  );
   const r = instanciar({ raizAndamio: ANDAMIO, destino, valores });
   return { destino, r, valores };
 }
@@ -138,7 +149,13 @@ test("toda opcion de la pregunta de forma produce un proyecto que se puede armar
   for (const o of pregunta.opciones) {
     const destino = fs.mkdtempSync(path.join(os.tmpdir(), `opcion-${o.valor}-`));
     const idx = String(pregunta.opciones.indexOf(o) + 1);
-    const { valores, respuestas } = await correrAsistente(async (_t, id) => ({ PROYECTO: "p", ORG: "o", forma: idx })[id] ?? "");
+    const { valores, respuestas } = await correrAsistente(
+      async (_t, id) => ({ PROYECTO: "p", ORG: "o", forma: idx })[id] ?? "",
+      {},
+      {},
+      () => {},
+      DERIVADOS,
+    );
     if (respuestas.forma !== o.valor) {
       rotas.push(`${o.valor}: se contesto por id y quedo "${respuestas.forma}"`);
       continue;

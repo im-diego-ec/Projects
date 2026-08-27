@@ -51,6 +51,7 @@ const VALORES = {
   PAQUETE_WEB: "web",
   PAQUETE_E2E: "e2e",
   PAQUETE_SITIO: "sitio",
+  ORG_MARCO: "im-diego-ec",
   EQUIPO_BUILDERS: "builders",
   EQUIPO_PO: "po",
   BUILDER_1: "@uno",

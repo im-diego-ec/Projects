@@ -122,7 +122,7 @@ para siempre una respuesta que no va a llegar. `ci-ok` sí responde en los dos c
 cambio de código y el de solo documentación—, y por eso es el único que se exige.
 
 Parte del pipeline llega por referencia al marco de ingeniería
-(`{{ORG}}/Projects`), pinado por versión exacta: una versión nueva entra como PR y se
+(`{{ORG_MARCO}}/Projects`), pinado por versión exacta: una versión nueva entra como PR y se
 revisa, nunca empujada. Las reglas comunes que leen los agentes se regeneran desde ahí, así
 que no se editan a mano en este repositorio; lo propio del proyecto sí vive acá y es tuyo.
 

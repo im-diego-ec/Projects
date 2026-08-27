@@ -62,7 +62,7 @@ fase 7, cuando el primer change de OpenSpec necesita al PO.
 |---|---|---|---|---|
 | 0 · Verificar, no hacer | 30 s | | | |
 | 1 · Arrancar lo asíncrono | — | | | |
-| 2 · Los 21 valores | — | | | |
+| 2 · Los valores | — | | | |
 | 3 · El repo | 2 comandos | | | |
 | 3.1 · Qué quedó en el repo | — | | | |
 | 3.2 · Escritura de los equipos | — | | | |

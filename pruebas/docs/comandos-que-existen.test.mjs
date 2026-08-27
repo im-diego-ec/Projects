@@ -37,11 +37,37 @@ export const COMANDOS_DEL_PROYECTO = ["apply", "archive", "explore", "propose", 
  *  que no es suya, y fue el error que reemplazo al «doce» anterior. */
 export const CUANTAS_SKILLS = 6;
 
-const docs = () =>
-  execFileSync("git", ["ls-files", "docs/*.md", "*.md"], { cwd: RAIZ, encoding: "utf-8" })
+const listar = (...args) =>
+  execFileSync("git", ["ls-files", ...args], { cwd: RAIZ, encoding: "utf-8" })
     .trim()
     .split("\n")
-    .filter((f) => f && f !== "CHANGELOG.md");
+    .filter(Boolean);
+
+const docs = () => listar("docs/*.md", "*.md").filter((f) => f !== "CHANGELOG.md");
+
+/** DONDE PUEDE VIVIR UNA CIFRA QUE HABLA DEL PROPIO REPOSITORIO, y por que el
+ *  alcance es mas ancho que `docs/`.
+ *
+ *  La cuarta repeticion del defecto —«los 21 valores» cuando ya eran 23— no
+ *  estaba solo en las guias: estaba en el README del andamio, en los
+ *  comentarios de la herramienta y en los nombres de los casos de este mismo
+ *  banco. Un comentario que miente le cuesta a quien lo lee exactamente lo
+ *  mismo que una guia que miente, y el que se escribe al lado del codigo
+ *  envejece mas rapido porque nadie lo relee. `CHANGELOG.md` queda fuera a
+ *  proposito: registra lo que cada version PUBLICADA dijo, y corregirlo seria
+ *  reescribir el pasado. */
+const textosQueAfirman = () =>
+  [...docs(), ...listar("plantilla/**/*.md"), ...listar("herramientas/*.mjs"), ...listar("pruebas/**/*.mjs")].filter(
+    (f) =>
+      // Un change registra lo que se MIDIO el dia que se hizo. «Un repositorio
+      // nuevo pasaba de 3 marcadores a 21» era cierto entonces y corregirlo
+      // seria reescribir la medicion, que es justo lo contrario de medir.
+      !f.startsWith("openspec/changes/") &&
+      // Y este archivo guarda contraejemplos a proposito —«999 paginas», y la
+      // cita de «los 21 valores» que explica el defecto—. Mirarse a si mismo lo
+      // haria rojo por hacer bien su trabajo.
+      f !== "pruebas/docs/comandos-que-existen.test.mjs",
+  );
 
 test("hay comandos declarados: un cero aca es este banco roto", () => {
   assert.equal(COMANDOS_DEL_PROYECTO.length, 6, "se midieron seis; si cambia, hay que volver a medirlo contra un proyecto real");
@@ -132,17 +158,81 @@ const CIFRAS_SOBRE_SI_MISMA = [
         .split("\n")
         .filter((f) => /\/\d\d-/.test(f)).length,
   },
+  {
+    // LA CUARTA VEZ, y la que hizo ensanchar el alcance. `REQUERIDOS` paso de 21
+    // a 23 al aparecer PAQUETE_SITIO y ORG_MARCO, y el «21» quedo escrito en
+    // veinte lugares —guias, el README del andamio, los comentarios de la
+    // herramienta y hasta los nombres de los casos de este banco—. Ninguno era
+    // falso el dia que se escribio, y ninguno tenia como enterarse.
+    nombre: "valores que la herramienta exige (REQUERIDOS)",
+    patron: /(?:los|las|de los|\*\*)\s*(\d+)\s+(?:valores|marcadores|claves)\b/gi,
+    grupo: 1,
+    medir: async () => (await import("../../herramientas/projects-init.mjs")).REQUERIDOS.length,
+  },
+  {
+    // LA QUINTA, y estaba vieja por la misma razon que la cuarta: el asistente
+    // gano preguntas —`forma` y `visibilidad`— y el rango escrito al lado se
+    // quedo donde estaba. Se mide recorriendo el arbol de decision entero, no
+    // eligiendo un camino a mano: elegir a mano es como se llego al numero viejo.
+    nombre: "preguntas que hace el asistente, del camino mas corto al mas largo",
+    patron: /(?:entre|de)\s+(\d+)\s+(?:y|a)\s+(\d+)\s+(?:preguntas|respuestas)/gi,
+    grupo: [1, 2],
+    medir: rangoDePreguntas,
+  },
 ];
+
+/** CUANTAS PREGUNTAS HACE EL ASISTENTE, del camino mas corto al mas largo.
+ *
+ *  Se recorre el arbol COMPLETO —el producto de todas las opciones de las
+ *  preguntas de eleccion, que hoy son menos de doscientas combinaciones— porque
+ *  el rango depende de que otras preguntas se saltan, y eso solo se sabe
+ *  contestando. Medir un camino elegido a mano es exactamente como envejecio el
+ *  numero anterior. */
+async function rangoDePreguntas() {
+  const { PREGUNTAS, correrAsistente } = await import("../../herramientas/projects-asistente.mjs");
+  const conOpciones = PREGUNTAS.filter((q) => q.opciones);
+  const libres = { PROYECTO: "p", ORG: "o", BUILDER_2: "b", CUENTA_DEV: "1".repeat(12), CUENTA_PROD: "2".repeat(12) };
+  const combinaciones = conOpciones.reduce((acc, q) => acc * q.opciones.length, 1);
+  let min = Infinity;
+  let max = 0;
+  for (let i = 0; i < combinaciones; i++) {
+    let resto = i;
+    const eleccion = {};
+    for (const q of conOpciones) {
+      eleccion[q.id] = String((resto % q.opciones.length) + 1);
+      resto = Math.floor(resto / q.opciones.length);
+    }
+    let vistas = 0;
+    await correrAsistente(
+      async (_t, id) => {
+        vistas++;
+        return eleccion[id] ?? libres[id] ?? "x";
+      },
+      {},
+      {},
+      () => {},
+      { ORG_MARCO: "im-diego-ec" },
+    );
+    min = Math.min(min, vistas);
+    max = Math.max(max, vistas);
+  }
+  return [min, max];
+}
 
 test("ninguna cifra que la documentacion afirma sobre si misma esta vieja", async () => {
   const mal = [];
-  for (const f of docs()) {
+  for (const f of textosQueAfirman()) {
     const texto = fs.readFileSync(path.join(RAIZ, f), "utf-8");
     for (const cifra of CIFRAS_SOBRE_SI_MISMA) {
       for (const m of texto.matchAll(cifra.patron)) {
-        const dice = Number(m[cifra.grupo]);
-        const real = await cifra.medir();
-        if (dice !== real) mal.push(`${f} → dice ${dice} y son ${real} (${cifra.nombre})`);
+        // Una cifra sola o un par —«entre 9 y 17»—: las dos se comparan igual,
+        // y un par mal por una punta es tan viejo como uno mal por las dos.
+        const grupos = Array.isArray(cifra.grupo) ? cifra.grupo : [cifra.grupo];
+        const dice = grupos.map((g) => Number(m[g]));
+        const real = [await cifra.medir()].flat();
+        if (dice.join("-") !== real.join("-")) {
+          mal.push(`${f} → dice ${dice.join(" y ")} y son ${real.join(" y ")} (${cifra.nombre})`);
+        }
       }
     }
   }
@@ -155,10 +245,49 @@ test("ninguna cifra que la documentacion afirma sobre si misma esta vieja", asyn
   );
 });
 
-test("MUERDE: una cifra vieja se caza", async () => {
-  const inventado = "El estándar mide **999 páginas**: el README y las demás.";
-  const cifra = CIFRAS_SOBRE_SI_MISMA[0];
-  const encontradas = [...inventado.matchAll(cifra.patron)].map((m) => Number(m[cifra.grupo]));
-  assert.deepEqual(encontradas, [999], "el detector tiene que ver la cifra");
-  assert.notEqual(await cifra.medir(), 999, "y 999 no puede ser el numero real, o este caso no mide nada");
+/** Una frase que AFIRMA la cifra, con un numero que no puede ser el correcto.
+ *
+ *  Se escribe una por entrada y el caso de abajo exige que no falte ninguna: sin
+ *  eso, agregar una cifra al registro con un patron que no caza nada la deja
+ *  verde para siempre, que es la forma exacta en que este banco podria mentir. */
+const CEBOS = {
+  "paginas de la raiz de docs/ mas el README": "El estándar mide **999 páginas**: el README y las demás.",
+  "paginas numeradas del camino": "Ésta es la primera de 999 páginas numeradas del camino.",
+  "valores que la herramienta exige (REQUERIDOS)": "`projects init` pide **999 valores** y ni uno más.",
+  "preguntas que hace el asistente, del camino mas corto al mas largo": "El asistente hace entre 998 y 999 preguntas.",
+};
+
+test("MUERDE: toda cifra del registro se caza cuando envejece", async () => {
+  // No alcanza con probar la primera: el registro crece, y una entrada nueva con
+  // un patron que no caza nada pasaria verde sin mirar nada. Se recorren todas.
+  const sordas = [];
+  for (const cifra of CIFRAS_SOBRE_SI_MISMA) {
+    const cebo = CEBOS[cifra.nombre];
+    if (!cebo) {
+      sordas.push(`${cifra.nombre}: no tiene cebo, asi que nadie comprobo que su patron cace algo`);
+      continue;
+    }
+    const grupos = Array.isArray(cifra.grupo) ? cifra.grupo : [cifra.grupo];
+    const vistas = [...cebo.matchAll(cifra.patron)].map((m) => grupos.map((g) => Number(m[g])));
+    if (!vistas.length) {
+      sordas.push(`${cifra.nombre}: su patron no caza ni su propio cebo`);
+      continue;
+    }
+    const real = [await cifra.medir()].flat();
+    if (vistas[0].join("-") === real.join("-")) {
+      sordas.push(`${cifra.nombre}: el cebo (${vistas[0].join(", ")}) coincide con lo real, asi que no prueba nada`);
+    }
+  }
+  assert.deepEqual(sordas, [], `una cifra que no se puede cazar es una cifra sin vigilancia:\n  ${sordas.join("\n  ")}`);
+});
+
+test("MUERDE: el registro no puede quedarse sin cebos al crecer", () => {
+  // La otra mitad: un cebo hulla —de una entrada que ya no existe— es una regla
+  // sin fuente, y es como empiezan las divergencias.
+  const nombres = CIFRAS_SOBRE_SI_MISMA.map((c) => c.nombre);
+  assert.deepEqual(
+    Object.keys(CEBOS).filter((n) => !nombres.includes(n)),
+    [],
+    "hay un cebo que ya no corresponde a ninguna cifra del registro",
+  );
 });

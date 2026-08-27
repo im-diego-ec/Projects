@@ -5,7 +5,8 @@
 // POR QUE EXISTE. Adoptar Projects eran ~30 actos manuales: copiar 76 archivos con
 // robocopy o cp (y acordarse del `/.` final, o los dotfiles no viajan; y de
 // renombrar el README del proyecto, que viaja con otro nombre), sustituir
-// 192 ocurrencias de 21 marcadores en 39 archivos, inicializar OpenSpec y
+// cientos de ocurrencias de todos los marcadores en decenas de archivos —cuantos,
+// lo dice cada corrida en su primera linea—, inicializar OpenSpec y
 // renderizar la constitucion. Nada de eso es una decision: es transcripcion. Y la
 // transcripcion a mano falla de la peor manera —un marcador mal sustituido es
 // sintacticamente valido, asi que el check de marcadores lo deja pasar: "se
@@ -453,6 +454,41 @@ export function noPisaLoQueYaEsta(rel) {
   return LO_QUE_ESCRIBE_EL_ASISTENTE.has(rel);
 }
 
+/** La cuenta donde vive EL MARCO, que no es la misma que la del proyecto.
+ *
+ *  EL DEFECTO QUE ESTO CIERRA ERA UN BLOQUEO DEL DIA UNO, y estaba escondido a
+ *  plena vista: el andamio usaba `{{ORG}}` para DOS cosas distintas. En
+ *  `{{ORG}}/{{PROYECTO}}` y en `@{{ORG}}/equipo` significa «la cuenta de tu
+ *  proyecto», que es lo que el asistente pregunta. Pero en `{{ORG}}/Projects`
+ *  —dieciseis veces, incluidas las cuatro del `uses:` de su pipeline— significa
+ *  «la cuenta donde vive el marco», que es otra.
+ *
+ *  Consecuencia medida: alguien que crea su proyecto bajo su propia cuenta
+ *  recibia un pipeline que dice `uses: su-cuenta/Projects/...`, un repositorio
+ *  que no existe. El CI del proyecto nacia ROJO el dia uno, con un error de
+ *  GitHub sobre un workflow que no encuentra — que no habla de esto por ningun
+ *  lado.
+ *
+ *  SE DERIVA Y NO SE PREGUNTA, y eso es lo que lo hace correcto tambien para un
+ *  fork: sale del remoto del clon del marco desde el que se esta ejecutando esta
+ *  herramienta. Quien forkee el marco a su cuenta y arranque proyectos desde ahi
+ *  recibe proyectos que apuntan a SU fork, sin configurar nada. Preguntarlo
+ *  seria pedirle a la persona un dato que la herramienta ya tiene delante. */
+export function orgDelMarco(raizDelMarco, correr = leerRemoto) {
+  const url = correr(raizDelMarco);
+  // Las dos formas en las que git escribe un remoto de GitHub.
+  const m = /github\.com[:/]([^/]+)\/[^/]+?(?:\.git)?\s*$/.exec(url ?? "");
+  return m ? m[1] : null;
+}
+
+function leerRemoto(raizDelMarco) {
+  try {
+    return execFileSync("git", ["remote", "get-url", "origin"], { cwd: raizDelMarco, encoding: "utf-8", stdio: ["ignore", "pipe", "ignore"] }).trim();
+  } catch {
+    return null;
+  }
+}
+
 /** La plataforma declarada en el archivo de valores.
  *
  *  Va en minuscula y FUERA de los 21, porque no es un marcador que el andamio
@@ -491,14 +527,14 @@ export function destinoDe(rel, plataforma = "aws") {
   return renombresPorPlataforma(plataforma)[rel] ?? RENOMBRES.get(rel) ?? rel;
 }
 
-/** Los 21 valores que un humano tiene que decidir —hoy, uno por cada marcador
+/** Los valores que un humano tiene que decidir —hoy, uno por cada marcador
  *  que plantilla/ usa—, con su fuente de verdad en
  *  plantilla/README.md seccion 2. `PAQUETES` no esta: se DERIVA de los tres
  *  paquetes, porque una lista que se escribe aparte de sus elementos es una
  *  segunda declaracion que puede divergir. */
 export const REQUERIDOS = [
   "PROYECTO", "ORG",
-  "PAQUETE_API", "PAQUETE_WEB", "PAQUETE_E2E", "PAQUETE_SITIO",
+  "PAQUETE_API", "PAQUETE_WEB", "PAQUETE_E2E", "PAQUETE_SITIO", "ORG_MARCO",
   "GENERAR_CLIENTE_DATOS",
   "EQUIPO_BUILDERS", "EQUIPO_PO", "BUILDER_1", "BUILDER_2", "PO",
   "CUENTA_DEV", "CUENTA_PROD", "REGION", "PERFIL_DEV", "PERFIL_PROD",
@@ -555,6 +591,7 @@ export const FORMATOS = {
   // Handle de organizacion o de persona: la regla de GitHub (alfanumerico, guiones
   // simples, ni al principio ni al final, hasta 39).
   ORG: { patron: /^[A-Za-z0-9](?:-?[A-Za-z0-9]){0,38}$/, que: "un handle de organizacion de GitHub" },
+  ORG_MARCO: { patron: /^[A-Za-z0-9][A-Za-z0-9-]*$/, que: "la cuenta de GitHub donde vive el MARCO, que no es la de tu proyecto: se deriva sola del clon", espera: "un handle de GitHub" },
   BUILDER_1: { patron: /^[A-Za-z0-9](?:-?[A-Za-z0-9]){0,38}$/, que: "un handle de GitHub (sin la arroba: el andamio la pone donde va)" },
   BUILDER_2: { patron: /^[A-Za-z0-9](?:-?[A-Za-z0-9]){0,38}$/, que: "un handle de GitHub (sin la arroba: el andamio la pone donde va)" },
   PO: { patron: /^[A-Za-z0-9](?:-?[A-Za-z0-9]){0,38}$/, que: "un handle de GitHub (sin la arroba: el andamio la pone donde va)" },
@@ -1797,6 +1834,7 @@ const EJEMPLO = {
   PAQUETE_API: "api",
   PAQUETE_WEB: "web",
   PAQUETE_SITIO: "sitio",
+  ORG_MARCO: "im-diego-ec",
   PAQUETE_E2E: "e2e",
   GENERAR_CLIENTE_DATOS: "prisma generate",
   EQUIPO_BUILDERS: "builders",
@@ -2071,7 +2109,16 @@ async function main(argv) {
 
     let resultado;
     try {
-      resultado = await asis.correrAsistente(preguntarPorTeclado, previos, FORMATOS, (linea) => process.stdout.write(`${linea}\n`));
+      // La cuenta del marco se DERIVA del clon desde el que corre esta
+      // herramienta y entra como respuesta ya dada, no como pregunta.
+      const marco = orgDelMarco(path.dirname(path.dirname(fileURLToPath(import.meta.url))));
+      if (!marco) {
+        console.error("::error::no pude averiguar de que cuenta de GitHub viene este clon del marco (`git remote get-url origin` no contesto).");
+        console.error("Sin eso, el pipeline del proyecto nuevo apuntaria a un repositorio que no existe y naceria en rojo.");
+        console.error("Se destraba corriendo esta herramienta desde un clon con remoto, o pasando ORG_MARCO en el archivo de valores.");
+        return 1;
+      }
+      resultado = await asis.correrAsistente(preguntarPorTeclado, previos, FORMATOS, (linea) => process.stdout.write(`${linea}\n`), { ORG_MARCO: marco });
     } catch (e) {
       console.error("");
       console.error(`::error::${e.message}. NO se escribio nada.`);
@@ -2113,7 +2160,7 @@ async function main(argv) {
     return 2;
   }
 
-  // Los 21 valores tienen que tener una forma declarada, y se comprueba ANTES de
+  // Todos los requeridos tienen que tener una forma declarada, y se comprueba ANTES de
   // leer el archivo de la persona: un desfase entre REQUERIDOS y FORMATOS es un
   // defecto de esta herramienta, no de quien la corre, y el diagnostico tiene
   // que decir eso.

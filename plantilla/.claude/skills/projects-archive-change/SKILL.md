@@ -100,7 +100,7 @@ repetirlo — por eso una subida del pin llega sola y no hay nada que sincroniza
 Se lee del marco sin clonarlo:
 
 ```bash
-gh api repos/{{ORG}}/Projects/contents/.github/workflows/marco-ci.yml \
+gh api repos/{{ORG_MARCO}}/Projects/contents/.github/workflows/marco-ci.yml \
   -H "Accept: application/vnd.github.raw" \
   | node .claude/skills/projects-archive-change/aplicar-deltas.mjs --pin-openspec -
 ```
