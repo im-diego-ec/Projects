@@ -41,6 +41,37 @@ mueve sobre un cambio incompatible.
 
 ## [No publicado]
 
+### Añadido
+
+- **La segunda forma de proyecto existe, y ahora la carta ofrece una elección de verdad.**
+  «Un sitio para leer» —Astro— pasa de 🕳️ a **✅ construida y probada**. Elegirla en el
+  asistente produce un proyecto de 34 archivos, sin servidor, sin base de datos y sin
+  pantallas con sesión, que **instala, formatea, verifica y compila en verde**. Medido
+  sobre un sitio recién generado: la página compilada pesa **512 bytes** y trae **cero**
+  etiquetas de programa y **cero** archivos de JavaScript — que es lo que quiere decir
+  «manda cero JavaScript por defecto», y ahora está medido y no citado.
+
+- **Un hueco declarado en voz alta, y no escondido:** los archivos `.astro` **no se
+  verifican por tipos**. `astro check` declara `typescript: ^5 || ^6` y este marco fija la
+  7 — medido contra `@astrojs/check` 0.9.10, la última publicada. Peor: `astro build`
+  **compila igual** con un error de tipos adentro de una página, comprobado. El `README`
+  del paquete trae la tabla de qué cubre cada comando y empuja a sacar la lógica a
+  `src/lib/`, donde sí está cubierta.
+
+### Cambiado
+
+- **La costura que bloqueaba cualquier forma nueva, cortada.** El `package.json` de la
+  raíz nombraba `-C api`, `-C web` y `-C e2e` a mano, y `pnpm-workspace.yaml` listaba los
+  tres: cualquier proyecto sin exactamente esos tres paquetes rompía la puerta de calidad
+  del marco. Ahora **enumeran en vez de nombrar** —`pnpm -r` y un glob—, y arreglarlo una
+  vez habilita todas las formas futuras. La exclusión de la suite de extremo a extremo sale
+  del **mismo marcador** que el pipeline ya usa para su excepción, así que no hay dos
+  listas que puedan divergir.
+
+- **Y la lección se propagó a los bancos**: la mutación que borraba «todos los
+  manifiestos» borraba **cuatro por nombre**, así que el día que el andamio sumó un
+  paquete el caso que existe para probar que la comprobación muerde **dejó de morder**.
+
 ### Corregido
 
 - **La señal de éxito del Paso 9 era inalcanzable como estaba escrita.** De los nueve

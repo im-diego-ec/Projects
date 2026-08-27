@@ -46,26 +46,57 @@ function guionista(respuestas) {
  *  y se contesta lo que se quiso, o no se hace y no aparece en `preguntado`. */
 function contestador(mapa) {
   const preguntado = [];
-  const preguntar = async (_texto, id) => {
+  const textos = [];
+  const preguntar = async (texto, id) => {
     preguntado.push(id);
+    textos.push(texto);
     return mapa[id] ?? "";
   };
-  return { preguntar, preguntado };
+  return { preguntar, preguntado, textos };
 }
+
+/** Un valor valido para cada pregunta de texto libre, por id. */
+const TEXTO_VALIDO = {
+  PROYECTO: "un-proyecto",
+  ORG: "una-cuenta",
+  BUILDER_2: "la-otra-persona",
+  CUENTA_DEV: "111111111111",
+  CUENTA_PROD: "222222222222",
+  REGION: "us-east-1",
+  PERFIL_DEV: "perfil-dev",
+  PERFIL_PROD: "perfil-prod",
+  DOMINIO_PROD: "midominio.com",
+  CANAL_ALERTAS: "#alertas",
+};
 
 /** Cuenta las preguntas de verdad: cada una imprime una linea `[n/total]`. */
 const cuantasPreguntas = (dicho) => dicho.filter((l) => l.startsWith("\n[")).length;
 
-const PO_SOLO = ["agenda-de-personas", "im-diego-ec", "", "", "", "", "", "", ""];
-const AWS_DOS = ["tienda-online", "mi-org", "2", "otra-persona", "2", "2", "111111111111", "222222222222", "us-east-1", "td-dev", "td-prod", "2", "tienda.com", "1", "1"];
+const PO_SOLO = { PROYECTO: "agenda-de-personas", ORG: "im-diego-ec" };
+const AWS_DOS = {
+  PROYECTO: "tienda-online",
+  ORG: "mi-org",
+  equipo: "2",
+  BUILDER_2: "otra-persona",
+  plataforma: "2",
+  ambientes: "2",
+  CUENTA_DEV: "111111111111",
+  CUENTA_PROD: "222222222222",
+  REGION: "us-east-1",
+  PERFIL_DEV: "td-dev",
+  PERFIL_PROD: "td-prod",
+  dominio: "2",
+  DOMINIO_PROD: "tienda.com",
+};
 
-test("el caso mas simple son OCHO preguntas, y solo dos hay que escribirlas", async () => {
-  const { preguntar } = guionista(PO_SOLO);
+test("el caso mas simple son NUEVE preguntas, y solo dos hay que escribirlas", async () => {
+  const { preguntar } = contestador({ ...TEXTO_VALIDO, ...PO_SOLO });
   const { dicho, respuestas } = await correrAsistente(preguntar);
   assert.equal(
     cuantasPreguntas(dicho),
-    8,
-    "el numero de preguntas del caso simple es la promesa central de esta herramienta: 8 en vez de 21 casillas. " +
+    9,
+    "el numero de preguntas del caso simple es la promesa central de esta herramienta: nueve en vez de veintiuna " +
+      "casillas a mano. " +
       "Si sube, o se agrego una pregunta que no hacia falta, o se rompio un `salta`",
   );
   // Las seis restantes se contestaron con Enter, o sea con la recomendada.
@@ -76,10 +107,10 @@ test("el caso mas simple son OCHO preguntas, y solo dos hay que escribirlas", as
   );
 });
 
-test("elegir AWS con dos ambientes hace QUINCE preguntas, y ninguna es de relleno", async () => {
-  const { preguntar } = guionista(AWS_DOS);
+test("elegir AWS con dos ambientes hace DIECISEIS preguntas, y ninguna es de relleno", async () => {
+  const { preguntar } = contestador({ ...TEXTO_VALIDO, ...AWS_DOS });
   const { dicho, valores } = await correrAsistente(preguntar);
-  assert.equal(cuantasPreguntas(dicho), 15, "con AWS y dos ambientes se preguntan las cinco de AWS mas el dominio propio");
+  assert.equal(cuantasPreguntas(dicho), 16, "con AWS y dos ambientes se preguntan las cinco de AWS mas el dominio propio");
   // El defecto que este caso vigila: la primera version del asistente SALTEABA
   // las cinco preguntas de AWS junto con el relleno, asi que quien elegia AWS
   // se quedaba sin sus propios datos y el archivo salia invalido.
@@ -90,10 +121,20 @@ test("elegir AWS con dos ambientes hace QUINCE preguntas, y ninguna es de rellen
 });
 
 test("con AWS y UN ambiente no se pregunta dos veces por el mismo dato", async () => {
-  const guion = ["api-interna", "alguien", "", "2", "", "111111111111", "sa-east-1", "mi-perfil", "", "", "2", "#alertas", "2"];
-  const { preguntar } = guionista(guion);
+  const { preguntar } = contestador({
+    ...TEXTO_VALIDO,
+    PROYECTO: "api-interna",
+    ORG: "alguien",
+    plataforma: "2",
+    CUENTA_DEV: "111111111111",
+    REGION: "sa-east-1",
+    PERFIL_DEV: "mi-perfil",
+    avisos: "2",
+    CANAL_ALERTAS: "#alertas",
+    visibilidad: "2",
+  });
   const { valores, dicho } = await correrAsistente(preguntar);
-  assert.equal(cuantasPreguntas(dicho), 11, "con un solo ambiente se saltean la cuenta y el perfil de produccion");
+  assert.equal(cuantasPreguntas(dicho), 13, "con un solo ambiente se saltean la cuenta y el perfil de produccion");
   assert.equal(valores.CUENTA_PROD, valores.CUENTA_DEV, "con un ambiente, la cuenta de 'produccion' ES la misma");
   assert.equal(valores.PERFIL_PROD, valores.PERFIL_DEV, "y el perfil tambien");
 });
@@ -102,14 +143,15 @@ test("LO QUE MAS IMPORTA: lo que produce el asistente pasa el validador de siemp
   const CASOS = {
     "PO solo, supabase, publico": PO_SOLO,
     "equipo, AWS, dos ambientes": AWS_DOS,
-    "solo, AWS, un ambiente": ["api-interna", "alguien", "", "2", "", "111111111111", "sa-east-1", "mi-perfil", "", "", "2", "#alertas", "2"],
-
-    "equipo, gcp, dominio propio": ["otra-cosa", "org2", "2", "revisor", "3", "", "2", "midominio.com", "", "", ""],
+    "solo, AWS, un ambiente": { PROYECTO: "api-interna", ORG: "alguien", plataforma: "2", CUENTA_DEV: "111111111111", REGION: "sa-east-1", PERFIL_DEV: "mi-perfil" },
+    "solo, sin plataforma, slack, privado": { PROYECTO: "idea-nueva", ORG: "alguien", plataforma: "3", avisos: "2", visibilidad: "2" },
+    "un sitio para leer": { PROYECTO: "mi-blog", ORG: "alguien", forma: "2" },
+    "un sitio, con dominio propio": { PROYECTO: "mi-blog", ORG: "alguien", forma: "2", dominio: "2", DOMINIO_PROD: "miblog.com" },
   };
   const rotos = [];
   for (const [nombre, guion] of Object.entries(CASOS)) {
-    const { preguntar } = guionista(guion);
-    const { valores } = await correrAsistente(preguntar);
+    const { preguntar } = contestador({ ...TEXTO_VALIDO, ...guion });
+    const { valores } = await correrAsistente(preguntar, {}, FORMATOS);
     const faltan = REQUERIDOS.filter((k) => !(k in valores));
     const { problemas } = validarValores(valores);
     if (faltan.length || problemas.length) rotos.push(`${nombre}: faltan [${faltan}] problemas [${problemas.join(" | ")}]`);
@@ -121,14 +163,15 @@ test("LO QUE MAS IMPORTA: lo que produce el asistente pasa el validador de siemp
   );
 });
 
-test("las 21 claves salen completas, ni una de mas ni una de menos", async () => {
-  const { preguntar } = guionista(PO_SOLO);
+test("las claves salen completas, ni una de mas ni una de menos", async () => {
+  const { preguntar } = contestador({ ...TEXTO_VALIDO, ...PO_SOLO });
   const { valores } = await correrAsistente(preguntar);
   // `plataforma` va aparte y en minuscula: no es un marcador que el andamio
   // sustituya, es la decision de QUE archivos viajan. Por eso se saca antes de
   // comparar, y por eso se comprueba que este.
-  const { plataforma, ...marcadores } = valores;
+  const { plataforma, forma, ...marcadores } = valores;
   assert.equal(plataforma, "supabase", "la plataforma elegida tiene que quedar escrita en el archivo de valores");
+  assert.equal(forma, "aplicacion", "y la forma tambien: las dos deciden QUE archivos viajan, no que texto se sustituye");
   assert.deepEqual(
     Object.keys(marcadores).sort(),
     [...REQUERIDOS].sort(),
@@ -141,18 +184,29 @@ test("una respuesta con mala forma se vuelve a pedir en el momento, no veinte pr
   // "Agenda De Personas" con mayusculas y espacios no pasa el patron de PROYECTO.
   // La normalizacion lo arregla sola; lo que este caso vigila es que un valor
   // que NI ASI pasa se rechace ahi mismo.
-  const { preguntar, preguntado } = guionista(["", "no-vale-vacio", "im-diego-ec", "", "", "", "", "", "", ""]);
+  // Un preguntador que contesta VACIO la primera vez que le preguntan por el
+  // nombre, y despues bien. Es el unico que ejercita el reintento de verdad.
+  const yaPreguntado = new Set();
+  const preguntado = [];
+  const preguntar = async (_texto, id) => {
+    preguntado.push(id);
+    if (id === "PROYECTO" && !yaPreguntado.has(id)) {
+      yaPreguntado.add(id);
+      return "";
+    }
+    return { ...TEXTO_VALIDO, PROYECTO: "no-vale-vacio", ORG: "im-diego-ec" }[id] ?? "";
+  };
   const { dicho, respuestas } = await correrAsistente(preguntar, {}, FORMATOS);
   assert.ok(
     dicho.some((l) => l.includes("hay que contestarla")),
     "una respuesta vacia en una pregunta sin valor por defecto tiene que avisar y volver a preguntar",
   );
   assert.equal(respuestas.PROYECTO, "no-vale-vacio", "y despues tiene que aceptar la buena");
-  assert.ok(preguntado.length > 8, "volver a preguntar significa una interaccion mas, no seguir de largo");
+  assert.ok(preguntado.length >= 9, "volver a preguntar significa una interaccion mas, no seguir de largo");
 });
 
 test("los acentos y las mayusculas del nombre se arreglan solos, y se dice que se arreglaron", async () => {
-  const { preguntar } = guionista(["Agenda De Añejos", "alguien", "", "", "", "", "", "", ""]);
+  const { preguntar } = contestador({ ...TEXTO_VALIDO, PROYECTO: "Agenda De Añejos", ORG: "alguien" });
   const { respuestas, dicho } = await correrAsistente(preguntar, {}, FORMATOS);
   assert.equal(respuestas.PROYECTO, "agenda-de-anejos", "GitHub no acepta mayusculas ni acentos en un nombre de repo");
   assert.ok(
@@ -163,11 +217,13 @@ test("los acentos y las mayusculas del nombre se arreglan solos, y se dice que s
 
 test("volver a correrlo ofrece lo de antes, y Enter lo mantiene", async () => {
   const previos = { PROYECTO: "lo-de-antes", ORG: "alguien" };
-  const { preguntar, preguntado } = guionista(["", "", "", "", "", "", "", ""]);
+  // Contesta vacio a todo: lo que sostiene la corrida son los `previos`, que es
+  // exactamente lo que se quiere afirmar.
+  const { preguntar, textos } = contestador({});
   const { respuestas } = await correrAsistente(preguntar, previos, FORMATOS);
   assert.equal(respuestas.PROYECTO, "lo-de-antes", "Enter sobre una respuesta previa tiene que mantenerla");
   assert.ok(
-    preguntado.some((t) => t.includes("Enter mantiene: lo-de-antes")),
+    textos.some((t) => t.includes("Enter mantiene: lo-de-antes")),
     "y el ofrecimiento tiene que verse: si no, la persona no sabe que puede apretar Enter",
   );
 });
@@ -260,11 +316,11 @@ test("MUERDE: si una pregunta deja de saltarse, el conteo del caso simple lo caz
     `el camino de AWS tiene que preguntar MAS que el de Supabase; midio ${conAws.length} contra ${conSupabase.length}. ` +
       "Si son iguales, los `salta` dejaron de filtrar y el 'caso simple' de 8 preguntas es una coincidencia",
   );
-  assert.equal(conSupabase.length, 8, "y el camino simple son exactamente ocho");
+  assert.equal(conSupabase.length, 9, "y el camino simple son exactamente nueve");
 });
 
 test("el resumen nombra las ocho decisiones, para poder arrepentirse antes de escribir nada", async () => {
-  const { preguntar } = guionista(PO_SOLO);
+  const { preguntar } = contestador({ ...TEXTO_VALIDO, ...PO_SOLO });
   const { respuestas, desvios: d } = await correrAsistente(preguntar);
   const texto = lineasDeResumen(respuestas, d).join("\n");
   for (const esperado of ["agenda-de-personas", "@im-diego-ec", "trabajás solo", "Supabase", "una sola", "pages.dev", "correo de GitHub", "público"]) {
@@ -281,10 +337,10 @@ test("las preguntas se EMITEN mientras se pregunta, no al final", async () => {
   const emitido = [];
   const vistoAlPreguntar = [];
   let i = 0;
-  const preguntar = async () => {
+  const preguntar = async (_texto, id) => {
     // En el momento de pedir la respuesta, la pregunta ya tiene que haber salido.
     vistoAlPreguntar.push(emitido.length);
-    return PO_SOLO[i++] ?? "";
+    return { ...TEXTO_VALIDO, ...PO_SOLO }[id] ?? "";
   };
   await correrAsistente(preguntar, {}, FORMATOS, (l) => emitido.push(l));
   assert.ok(emitido.length > 0, "sin emision, la persona no ve nada mientras contesta");
@@ -325,19 +381,6 @@ test("si la entrada se corta a mitad, el asistente NO devuelve valores a medias"
 //     posicional desalineado, asi que nadie lo media.
 // ---------------------------------------------------------------------------
 
-/** Un valor valido para cada pregunta de texto libre, por id. */
-const TEXTO_VALIDO = {
-  PROYECTO: "un-proyecto",
-  ORG: "una-cuenta",
-  BUILDER_2: "la-otra-persona",
-  CUENTA_DEV: "111111111111",
-  CUENTA_PROD: "222222222222",
-  REGION: "us-east-1",
-  PERFIL_DEV: "perfil-dev",
-  PERFIL_PROD: "perfil-prod",
-  DOMINIO_PROD: "midominio.com",
-  CANAL_ALERTAS: "#alertas",
-};
 
 test("CADA opcion de CADA pregunta produce un archivo que el validador acepta", async () => {
   const rotos = [];

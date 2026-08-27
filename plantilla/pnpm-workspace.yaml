@@ -14,19 +14,27 @@
 # {{PAQUETE_WEB}}: `projects init` copia las rutas tal cual y solo sustituye el
 # contenido de los archivos. Los marcadores nombran el PAQUETE (el campo "name"
 # de su package.json), que es lo que matchea `pnpm --filter`.
+# EL GLOB EN VEZ DE LOS NOMBRES, y no es un detalle de estilo.
+#
+# Con los paquetes escritos a mano, cualquier forma de proyecto que no tuviera
+# exactamente esos nombres rompia la puerta de calidad del marco: un sitio de
+# contenido sin `api/` dejaba una entrada apuntando a un paquete que no existe.
+# El asterisco enumera lo que HAY, que es lo unico que sigue siendo cierto
+# cuando el andamio reparte formas distintas.
 packages:
-  - "web"
-  - "api"
+  - "*"
   # SUITE E2E: Playwright contra un ambiente YA DESPLEGADO, no contra localhost.
   # Esta declarada porque .github/workflows/ci.yml trae dos entradas de
   # EXCEPCIONES para este paquete ({{PAQUETE_E2E}}:test y {{PAQUETE_E2E}}:build)
   # y una excepcion que no corresponde a ningun paquete del workspace es ROJA a
   # proposito. O sea: el andamio no puede traer esas excepciones y NO traer el
   # paquete — el repo nuevo naceria en rojo por algo que el andamio escribio.
-  # Si un proyecto de verdad no tiene suite E2E, son cuatro cosas en el mismo PR:
-  # borrar e2e/, borrar esta linea, borrar esas dos entradas de ci.yml y borrar
-  # el glob "{{PAQUETE_E2E}}/**/*.mjs" del entorno Node de eslint.config.mjs.
-  - "e2e"
+  # Si un proyecto de verdad no tiene suite E2E, son tres cosas en el mismo PR:
+  # borrar e2e/, borrar esas dos entradas de ci.yml y borrar el glob
+  # "{{PAQUETE_E2E}}/**/*.mjs" del entorno Node de eslint.config.mjs. Ya no hay
+  # una linea que borrar aca: el glob de arriba lo enumera si esta y lo ignora si
+  # no, que es exactamente lo que hacia falta para que el andamio pueda repartir
+  # formas distintas de proyecto.
 
 # LA LISTA DE APROBACION DE SCRIPTS DE INSTALACION, Y POR QUE VIVE ACA. Desde su
 # mayor 10, pnpm NO ejecuta los scripts de instalacion de las dependencias salvo

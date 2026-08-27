@@ -89,10 +89,37 @@ function preguntaDeLasFormas() {
   return PREGUNTAS.find((p) => p.id === ID_DE_LA_PREGUNTA) ?? null;
 }
 
+/** El puente entre la letra de la carta y el valor que usa el asistente.
+ *
+ *  La carta habla en letras porque asi se leen sus secciones («la forma A»), y
+ *  el asistente en palabras porque asi se guardan en el archivo de valores. Sin
+ *  este mapa, el cruce compara "A" contra "APLICACION" y nunca coincide: el
+ *  banco quedaria rojo con todo bien, o —peor, si el aserto fuera al reves—
+ *  verde con todo mal.
+ *
+ *  Va escrito y no derivado a proposito: es la unica linea donde las dos
+ *  nomenclaturas se tocan, y tenerla en un solo lugar es lo que hace que agregar
+ *  una forma sea un cambio y no una arqueologia. */
+const LETRA_DE_LA_OPCION = { aplicacion: "B+", sitio: "A" };
+
 function formasQueElAsistenteOfrece() {
   const p = preguntaDeLasFormas();
-  return p ? p.opciones.map((o) => o.valor.toUpperCase()) : [];
+  if (!p) return [];
+  return p.opciones.map((o) => LETRA_DE_LA_OPCION[o.valor] ?? o.valor.toUpperCase());
 }
+
+test("toda opcion del asistente corresponde a una forma de la carta", () => {
+  const p = preguntaDeLasFormas();
+  if (!p) return;
+  const claves = new Set(FORMAS.map((f) => f.clave));
+  const huerfanas = p.opciones.map((o) => o.valor).filter((v) => !claves.has(LETRA_DE_LA_OPCION[v] ?? v.toUpperCase()));
+  assert.deepEqual(
+    huerfanas,
+    [],
+    "el asistente ofrece una forma que la carta ni siquiera nombra. Quien la elija no tiene donde leer que eligio: " +
+      `agregala a la tabla con su seccion, o sacala del asistente.\n  ${huerfanas.join(", ")}`,
+  );
+});
 
 test("NINGUNA forma marcada como pendiente se ofrece en el asistente", () => {
   const pendientes = FORMAS.filter((f) => f.estado.includes(FALTA)).map((f) => f.clave);

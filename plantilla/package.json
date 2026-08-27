@@ -7,12 +7,12 @@
     "lint": "eslint . --max-warnings=0",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "typecheck": "pnpm -C api run typecheck && pnpm -C web run typecheck && pnpm -C e2e run typecheck",
-    "test": "pnpm -C api run test && pnpm -C web run test",
-    "build": "pnpm -C api run build && pnpm -C web run build",
+    "typecheck": "pnpm -r run typecheck",
+    "test": "pnpm -r --filter '!{{PAQUETE_E2E}}' run test",
+    "build": "pnpm -r run build",
     "datos": "pnpm --filter {{PAQUETE_API}} --fail-if-no-match exec {{GENERAR_CLIENTE_DATOS}}",
     "verificar": "pnpm datos && pnpm lint && pnpm format:check && pnpm typecheck && pnpm test && pnpm build",
-    "e2e": "pnpm -C e2e run test"
+    "e2e": "pnpm -r --filter e2e run test"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

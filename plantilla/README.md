@@ -131,6 +131,7 @@ cuál paquete corre en Node y cuál en el navegador.
 |---|---|---|---|
 | `{{PAQUETE_API}}` | Carpeta del backend | `api` | — |
 | `{{PAQUETE_WEB}}` | Carpeta del frontend | `web` | Borrar los bloques `[FRONT]` de `eslint.config.mjs` y sus imports |
+| `{{PAQUETE_SITIO}}` | Carpeta del sitio de contenido | `sitio` | Solo viaja cuando la forma elegida es «un sitio para leer». En las demás formas la carpeta no llega al proyecto, y este valor queda sin usar |
 | `{{PAQUETE_E2E}}` | Carpeta de la suite E2E | `e2e` | Borrar esa entrada del glob de Node **y las dos entradas `EXCEPCIONES` de `ci.yml`** (una excepción que no corresponde a ningún paquete es roja, a propósito) |
 
 ### Generación de código previa a la verificación
