@@ -1,0 +1,22 @@
+---
+// El molde que comparten todas las paginas. El titulo entra por propiedad para
+// que cada pagina ponga el suyo y el navegador muestre algo util en la pestaña.
+interface Props {
+  titulo: string;
+}
+const { titulo } = Astro.props;
+---
+
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{titulo}</title>
+  </head>
+  <body>
+    <main>
+      <slot />
+    </main>
+  </body>
+</html>

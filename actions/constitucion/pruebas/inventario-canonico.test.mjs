@@ -50,6 +50,7 @@ const VALORES = {
   PAQUETE_API: "api",
   PAQUETE_WEB: "web",
   PAQUETE_E2E: "e2e",
+  PAQUETE_SITIO: "sitio",
   EQUIPO_BUILDERS: "builders",
   EQUIPO_PO: "po",
   BUILDER_1: "@uno",

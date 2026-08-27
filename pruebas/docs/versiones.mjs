@@ -19,7 +19,7 @@
 // TODO LO QUE MIRA ES PURO SOBRE TEXTO a proposito: asi el banco puede correr
 // cada comprobacion contra una copia MUTADA y verla fallar. Una guarda que nadie
 // vio fallar no es una guarda.
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -341,8 +341,26 @@ export function digitosFueraDeBloques(texto) {
 /** Los paquetes del monorepo, derivados de la unica declaracion que existe. Se
  *  lee a mano y no con un parser de YAML porque el marco corre sin dependencias:
  *  el archivo es una lista de escalares citados y nada mas. */
-export function paquetesDelWorkspace(texto) {
-  return [...texto.matchAll(/^\s*-\s*"([^"]+)"\s*$/gm)].map((m) => m[1]);
+export function paquetesDelWorkspace(texto, raizAndamio = null) {
+  const declarados = [...texto.matchAll(/^\s*-\s*"([^"]+)"\s*$/gm)].map((m) => m[1]);
+  if (!declarados.includes("*")) return declarados;
+
+  // EL GLOB ENUMERA LO QUE HAY, y esta funcion tiene que hacer lo mismo.
+  //
+  // El workspace dejo de listar `web`, `api` y `e2e` a mano porque esa lista
+  // rompia cualquier forma de proyecto que no tuviera exactamente esos tres: un
+  // sitio de contenido sin `api/` dejaba una entrada apuntando a un paquete que
+  // no existe. Con el asterisco, la unica fuente de verdad es el disco.
+  //
+  // Sin raiz no se puede resolver, y devolver el asterisco crudo seria peor que
+  // fallar: quien llame va a comparar "*" contra nombres de paquete y no va a
+  // entender por que no coinciden.
+  if (!raizAndamio) throw new Error("el workspace usa un glob: hace falta la raiz del andamio para enumerar los paquetes");
+  const otros = declarados.filter((d) => d !== "*");
+  const enDisco = readdirSync(raizAndamio, { withFileTypes: true })
+    .filter((e) => e.isDirectory() && existsSync(join(raizAndamio, e.name, "package.json")))
+    .map((e) => e.name);
+  return [...new Set([...enDisco, ...otros])].sort();
 }
 
 function imprimir() {

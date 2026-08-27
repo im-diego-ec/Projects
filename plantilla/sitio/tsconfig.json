@@ -1,0 +1,9 @@
+{
+  // Extiende la base ESTRICTA de Astro, que es la que sabe de `.astro`, y deja
+  // fuera del programa los archivos de configuracion: `astro.config.mjs` y
+  // `vitest.config.ts` los ejecutan sus propias herramientas y quedan afuera a
+  // proposito, igual que en los demas paquetes del andamio.
+  "extends": "astro/tsconfigs/strict",
+  "include": ["src", ".astro/types.d.ts"],
+  "exclude": ["dist", "node_modules"]
+}

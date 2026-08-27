@@ -97,6 +97,34 @@ export const PREGUNTAS = [
     normaliza: (t) => t.trim().replace(/^@/, ""),
   },
   {
+    id: "forma",
+    texto: "¿Qué vas a construir? Es la decisión que más cuesta si se toma tarde.",
+    opciones: [
+      {
+        valor: "aplicacion",
+        etiqueta: "Una aplicación detrás de una puerta",
+        detalle:
+          "La gente entra con usuario y contraseña y trabaja adentro un rato largo: un panel de gestión, " +
+          "un inventario, una herramienta de trabajo. Se siente como un programa y no como un sitio — entrás " +
+          "una vez y las pantallas cambian al instante. LO QUE TE CUESTA: ninguna de tus pantallas va a " +
+          "aparecer en Google ni se va a previsualizar al compartir el enlace, y eso NO se arregla con un " +
+          "ajuste. Si nadie de afuera entra por un enlace, este límite no te toca nunca.",
+        recomendada: true,
+      },
+      {
+        valor: "sitio",
+        etiqueta: "Un sitio para leer",
+        detalle:
+          "Páginas que alguien abre y lee: un blog, un manual, la web de un producto, un catálogo. Nadie se " +
+          "registra y nadie guarda nada. Es la más barata de todas: sin base de datos, sin servidor, sin " +
+          "contraseñas que proteger, y las páginas abren al instante porque no mandan ni un programa al " +
+          "navegador. Es lo único que aparece bien en Google. LO QUE TE CUESTA: no hay botón de publicar — " +
+          "cada corrección de un texto es un cambio en el repositorio. Y el día que dos o tres personas " +
+          "quieran escribir sin tocar código, vas a necesitar otra herramienta.",
+      },
+    ],
+  },
+  {
     id: "equipo",
     texto: "¿Trabajás solo en este proyecto, o hay más gente que va a revisar el código?",
     opciones: [
@@ -203,7 +231,7 @@ export const PREGUNTAS = [
   {
     id: "CUENTA_DEV",
     libre: true,
-    salta: (r) => r.plataforma !== "aws",
+    salta: (r) => r.forma === "sitio" || r.plataforma !== "aws",
     texto: (r) =>
       r.ambientes === "dos"
         ? "¿Cuál es el número de cuenta de AWS donde vas a PROBAR? Son doce dígitos."
@@ -214,7 +242,7 @@ export const PREGUNTAS = [
   {
     id: "CUENTA_PROD",
     libre: true,
-    salta: (r) => r.plataforma !== "aws" || r.ambientes !== "dos",
+    salta: (r) => r.forma === "sitio" || r.plataforma !== "aws" || r.ambientes !== "dos",
     texto: "¿Y el número de cuenta de AWS donde va lo que ve la gente de verdad?",
     ayuda: "Conviene que sea una cuenta DISTINTA de la de pruebas: es lo que impide que un error de prueba toque lo real.",
     normaliza: (t) => t.replace(/[\s-]/g, ""),
@@ -222,7 +250,7 @@ export const PREGUNTAS = [
   {
     id: "REGION",
     libre: true,
-    salta: (r) => r.plataforma !== "aws",
+    salta: (r) => r.forma === "sitio" || r.plataforma !== "aws",
     texto: "¿En qué región de AWS? Es en qué parte del mundo viven tus datos.",
     ayuda: "Ejemplo: us-east-1 (Virginia) · sa-east-1 (São Paulo). Elegí la más cercana a tu gente.",
     normaliza: (t) => t.trim().toLowerCase(),
@@ -230,7 +258,7 @@ export const PREGUNTAS = [
   {
     id: "PERFIL_DEV",
     libre: true,
-    salta: (r) => r.plataforma !== "aws",
+    salta: (r) => r.forma === "sitio" || r.plataforma !== "aws",
     texto: (r) =>
       r.ambientes === "dos"
         ? "¿Cómo se llama tu perfil de AWS en esta computadora, el de pruebas?"
@@ -241,7 +269,7 @@ export const PREGUNTAS = [
   {
     id: "PERFIL_PROD",
     libre: true,
-    salta: (r) => r.plataforma !== "aws" || r.ambientes !== "dos",
+    salta: (r) => r.forma === "sitio" || r.plataforma !== "aws" || r.ambientes !== "dos",
     texto: "¿Y el perfil de AWS de lo que ve la gente de verdad?",
     ayuda: "Los ves con: aws configure list-profiles",
     normaliza: (t) => t.trim(),
@@ -344,11 +372,13 @@ export function derivar(r) {
     // viajan. La clave ya existia en plantilla/.projects-valores.json; lo unico
     // que faltaba era que alguien la leyera.
     plataforma: r.plataforma,
+    forma: r.forma,
     PROYECTO: r.PROYECTO,
     ORG: r.ORG,
     PAQUETE_API: "api",
     PAQUETE_WEB: "web",
     PAQUETE_E2E: "e2e",
+    PAQUETE_SITIO: "sitio",
     GENERAR_CLIENTE_DATOS: "prisma generate",
     // Los equipos de GitHub NO EXISTEN en una cuenta personal, y GitHub no lo
     // rechaza: simplemente no le asigna la revision a nadie. Los slugs se
@@ -519,7 +549,22 @@ export async function correrAsistente(preguntar, previos = {}, formatos = {}, em
     n += 1;
     const previo = previos[p.id];
 
+    // EL TECHO DE REINTENTOS, y no es paranoia: es un modo de falla medido.
+    //
+    // Una pregunta sin valor por defecto vuelve a preguntar mientras la
+    // respuesta sea vacia. Frente a una persona eso es correcto —contesta o
+    // insiste—, pero frente a algo que devuelve vacio para siempre —un guion de
+    // prueba que se quedo corto, una tuberia agotada— el bucle no termina
+    // NUNCA: el banco entero se colgo 41 segundos hasta que el corredor lo
+    // mato, y un banco colgado no dice que esta mal, solo que no termina.
+    let intentos = 0;
     for (;;) {
+      if (++intentos > 50) {
+        throw new Error(
+          `la pregunta "${p.id}" se repitio 50 veces sin una respuesta valida. Si esto salio en un banco, el ` +
+            "preguntador se quedo sin respuestas; si salio en una terminal, es un defecto de esta herramienta.",
+        );
+      }
       for (const linea of lineasDePregunta(p, n, cuantasQuedan(), respuestas)) decir(linea);
 
       if (p.opciones) {

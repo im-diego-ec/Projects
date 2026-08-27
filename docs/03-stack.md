@@ -40,8 +40,8 @@ mantener piezas que tu proyecto no usa.
 
 | | Forma | Quién entra | Estado |
 | --- | --- | --- | --- |
-| **A** | Un sitio para leer | cualquiera, sin cuenta | 🕳️ falta construirlo |
-| **B** | Una aplicación detrás de una puerta | quien tiene usuario | 🕳️ falta construirlo |
+| **A** | Un sitio para leer | cualquiera, sin cuenta | ✅ **construida y probada** |
+| **B** | Una aplicación detrás de una puerta | quien tiene usuario | 🕳️ falta construirlo — hoy te toca **B+** |
 | **B+** | Lo mismo, con servidor propio | quien tiene usuario | ✅ **es lo que hay hoy** |
 | **C** | Las dos cosas a la vez | ambos | → cae en A o en B, ver abajo |
 | **D** | Una app que se instala en el teléfono | quien la baja de la tienda | 🕳️ falta construirlo |
@@ -58,6 +58,21 @@ mantener piezas que tu proyecto no usa.
 
 Páginas que alguien abre y lee: un blog, un manual, la web de un producto, un
 catálogo. **Nadie se registra, nadie inicia sesión, nadie guarda nada.**
+
+**Con qué se construye, y qué se midió.** Con **Astro**. Lo que sigue no es una
+promesa del folleto: son las tres cifras que salieron de compilar un sitio recién
+generado con esta forma.
+
+```text
+medido el 2026-08-26 sobre un proyecto recien generado
+
+  la pagina compilada pesa       512 bytes
+  etiquetas de programa            0
+  archivos de JavaScript           0
+```
+
+Eso es lo que quiere decir «manda cero JavaScript por defecto», y por eso estas
+páginas abren al instante.
 
 **Por qué la elegirías.** Es la más barata de todas, en todo sentido: no hay base
 de datos que mantener, no hay servidor que se caiga, no hay contraseñas que
@@ -378,8 +393,15 @@ que declara dónde vive cada forma.
 | Zod | `plantilla/api/package.json` → `zod` | Scaffold |
 | Vitest | `plantilla/api/package.json` → `vitest` | Scaffold |
 | Playwright | `plantilla/e2e/package.json` → `@playwright/test` | Scaffold |
+| Astro | `plantilla/sitio/package.json` → `astro` | Scaffold |
 | ESLint | `plantilla/package.json` → `eslint` | Scaffold |
 | Prettier | `plantilla/package.json` → `prettier` | Scaffold |
+
+> **Astro solo viaja con una de las formas.** Su fila dice `Scaffold` como las demás
+> porque así es como se distribuye —el andamio lo copia al proyecto—, pero el andamio
+> lo copia **únicamente** cuando la forma elegida es «un sitio para leer». En las otras
+> formas la carpeta `sitio/` no llega, igual que `infra/` no llega cuando la plataforma
+> no es AWS.
 
 **Lo que esta tabla no cubre, declarado.** Terraform aparece en el andamio como
 infraestructura como código —con su piso de versión en el `main.tf` de cada

@@ -67,6 +67,7 @@ const VALORES_OK = {
   PAQUETE_API: "api",
   PAQUETE_WEB: "web",
   PAQUETE_E2E: "e2e",
+  PAQUETE_SITIO: "sitio",
   GENERAR_CLIENTE_DATOS: "prisma generate",
   EQUIPO_BUILDERS: "builders",
   EQUIPO_PO: "po",
@@ -322,7 +323,7 @@ test("un marcador del andamio que REQUERIDOS no declara sale por nombre", () => 
 
 test("PAQUETES se DERIVA de los tres paquetes, no se pide aparte", () => {
   assert.equal(REQUERIDOS.includes("PAQUETES"), false, "PAQUETES no se pide: se deriva");
-  assert.equal(derivar(VALORES_OK).PAQUETES, "web, api, e2e");
+  assert.equal(derivar(VALORES_OK).PAQUETES, "web, api, e2e, sitio");
 });
 
 test("un PAQUETES explicito manda sobre el derivado", () => {
@@ -344,14 +345,10 @@ test("REQUERIDOS cubre TODOS los marcadores que el andamio usa de verdad", () =>
   );
 });
 
-test("los tres marcadores con limpieza manual siguen nombrados en la salida", () => {
+test("los marcadores con limpieza manual siguen nombrados en la salida", () => {
   // Si alguien automatiza uno de estos borrados, tiene que sacarlo de acá; y si
   // aparece un cuarto camino "si no existe", esta lista es donde se declara.
-  assert.deepEqual(Object.keys(CON_LIMPIEZA_MANUAL).sort(), [
-    "GENERAR_CLIENTE_DATOS",
-    "PAQUETE_E2E",
-    "PAQUETE_WEB",
-  ]);
+  assert.deepEqual(Object.keys(CON_LIMPIEZA_MANUAL).sort(), ["GENERAR_CLIENTE_DATOS", "PAQUETE_E2E", "PAQUETE_SITIO", "PAQUETE_WEB"]);
 });
 
 // ══════════════════ El pin de OpenSpec: una sola declaracion ══════════════════
@@ -482,7 +479,7 @@ test("el pin que se lee del reusable pasa la misma regla que el de la bandera", 
 // ══════════════════ Los paquetes son carpetas, no texto libre ══════════════════
 
 test("los nombres de paquete se DERIVAN del andamio, no de una lista escrita aparte", () => {
-  assert.deepEqual(paquetesDelAndamio(ANDAMIO), { PAQUETE_API: "api", PAQUETE_WEB: "web", PAQUETE_E2E: "e2e" });
+  assert.deepEqual(paquetesDelAndamio(ANDAMIO), { PAQUETE_API: "api", PAQUETE_WEB: "web", PAQUETE_E2E: "e2e", PAQUETE_SITIO: "sitio" });
 });
 
 test("un nombre de paquete que no es el de la carpeta es ERROR, con los dos nombres", () => {
