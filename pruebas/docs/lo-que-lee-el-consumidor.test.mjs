@@ -41,6 +41,7 @@ const PAGINAS = {
   "plantilla/infra/README.md": "-> lo abre quien monta la infraestructura",
   "plantilla/infra-prod/README.md": "-> idem, para el ambiente de produccion",
   "plantilla/infra/adaptadores.md": "-> lo abre quien elige plataforma",
+  "plantilla/sitio/README.md": "-> lo abre quien eligio la forma «un sitio para leer», y es donde se declara que los .astro no se verifican por tipos",
 };
 
 /** Termino -> el texto que TIENE que estar en esa misma pagina explicandolo.
