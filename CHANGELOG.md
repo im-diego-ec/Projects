@@ -43,6 +43,41 @@ mueve sobre un cambio incompatible.
 
 ### Añadido
 
+- **El despliegue existe, y por primera vez el marco publica algo.** Un proyecto con la
+  forma «un sitio para leer» viene con la configuración de **Cloudflare Workers** y un paso
+  automático que sube el sitio **solo cuando las verificaciones terminan en verde** sobre
+  la rama principal. Cuatro decisiones, todas con su motivo escrito:
+  - **No publica con el CI en rojo.** `workflow_run` dispara **también** cuando el workflow
+    anterior falló: sin la condición explícita, un CI rojo publicaría igual — o sea que el
+    marco que existe para que nada entre sin verificar dejaría salir sin verificar.
+  - **No se pone rojo por una credencial que todavía no existe.** Sale con un aviso
+    amarillo diciendo qué falta y dónde está el paso a paso. Un rojo permanente por algo
+    que la persona no configuró todavía **enseña a ignorar los rojos**, y a partir de ahí
+    la compuerta que sí importa tampoco se mira.
+  - **Un directorio compilado vacío es rojo**, no un despliegue limpio: publicar nada deja
+    el dominio sirviendo nada, sin ningún error.
+  - **Una dirección que no existe devuelve un error, no la portada.** La otra opción
+    —devolver siempre el `index.html`— es lo correcto para una aplicación y es esconder el
+    problema para un sitio de páginas.
+
+- **El paso a paso de lo que ninguna herramienta puede hacer**, adentro del proyecto:
+  abrir la cuenta (gratis, sin tarjeta), crear la credencial con la plantilla que ya trae
+  el permiso justo, y guardarla como secreto — con la advertencia de por qué **no** va en
+  un archivo del repositorio. Y un ensayo, `desplegar:prueba`, que hace todo **menos
+  subir**: lee la configuración, encuentra los archivos y dice cuánto pesaría, sin cuenta
+  ni credencial. Es lo que se usó para verificar todo esto: `wrangler deploy --dry-run`
+  leyó la configuración y calculó **0.34 KiB** de subida.
+
+### Corregido
+
+- **`workerd` faltaba en la lista de scripts de instalación permitidos.** Es el motor con
+  el que Cloudflare corre lo que se publica, y lo trae wrangler. Sin esa línea,
+  `pnpm install` lo deja a medias y **cualquier** comando posterior del paquete —no solo
+  el despliegue: también el `build`— muere con una traza del gestor de paquetes que no
+  menciona Cloudflare por ningún lado.
+
+### Añadido
+
 - **La segunda forma de proyecto existe, y ahora la carta ofrece una elección de verdad.**
   «Un sitio para leer» —Astro— pasa de 🕳️ a **✅ construida y probada**. Elegirla en el
   asistente produce un proyecto de 34 archivos, sin servidor, sin base de datos y sin

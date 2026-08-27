@@ -293,9 +293,12 @@ export function noViajanPorForma(forma) {
   // repartirselos seria darle instrucciones para arrancar algo que no usa. Y
   // `.dockerignore` existe por el unico Dockerfile del arbol, que vive en la
   // carpeta del servidor y tampoco viaja.
+  // Y AL REVES, el workflow de despliegue: hoy solo sabe publicar un sitio, y
+  // su texto nombra el paquete del sitio. Repartirselo a una aplicacion le
+  // dejaria un workflow que apunta a una carpeta que ese proyecto no tiene.
   return forma === "sitio"
     ? ["web", "api", "e2e", "docker-compose.yml", "comandos-levantar-servicios.txt", ".dockerignore"]
-    : ["sitio"];
+    : ["sitio", ".github/workflows/desplegar.yml"];
 }
 
 /** La forma declarada en el archivo de valores. Minuscula y fuera de los

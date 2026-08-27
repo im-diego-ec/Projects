@@ -75,6 +75,9 @@ const EXPLICADOS = {
   "plantilla/infra/adaptadores.md": {
     compuerta: "ninguna comprobación bloquea el merge por esto",
   },
+  "plantilla/sitio/README.md": {
+    compuerta: "enseña a ignorar los rojos, que es peor que no tener",
+  },
 };
 
 /** Termino -> por que NO necesita definicion en esa pagina. */

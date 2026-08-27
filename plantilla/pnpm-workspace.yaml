@@ -69,3 +69,9 @@ allowBuilds:
   "@prisma/engines": true
   esbuild: true
   prisma: true
+  # `workerd` es el motor con el que Cloudflare corre lo que se publica, y lo
+  # trae wrangler. Sin esta linea, `pnpm install` lo deja a medias y CUALQUIER
+  # comando posterior del paquete muere con ERR_PNPM_IGNORED_BUILDS —no el
+  # despliegue: tambien el `build`—, con una traza del gestor de paquetes que no
+  # habla de Cloudflare por ningun lado. Medido el 2026-08-26.
+  workerd: true
