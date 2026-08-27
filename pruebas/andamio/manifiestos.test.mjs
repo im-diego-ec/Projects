@@ -64,11 +64,23 @@ function paqueteDeExcepcion(lado) {
   return m ? m[1].toLowerCase() : lado;
 }
 
-/** Los paquetes declarados en el workspace, en orden de aparicion. */
+/** Los paquetes del workspace.
+ *
+ *  RESUELVE EL GLOB, y esa es la mitad que faltaba. El workspace dejo de listar
+ *  `web`, `api` y `e2e` a mano —esa lista rompia cualquier forma de proyecto que
+ *  no tuviera exactamente esos tres— y pasa a enumerar con `*`. Leer solo los
+ *  literales devolvia `["*"]`, o sea un paquete llamado asterisco que no existe
+ *  en ninguna parte, y todo lo que comparaba contra esta lista se caia. */
 function paquetesDeclarados(raiz) {
   const f = path.join(raiz, "pnpm-workspace.yaml");
   if (!fs.existsSync(f)) return [];
-  return [...fs.readFileSync(f, "utf8").matchAll(/^\s*-\s*"([^"]+)"\s*$/gm)].map((m) => m[1]);
+  const declarados = [...fs.readFileSync(f, "utf8").matchAll(/^\s*-\s*"([^"]+)"\s*$/gm)].map((m) => m[1]);
+  if (!declarados.includes("*")) return declarados;
+  const enDisco = fs
+    .readdirSync(raiz, { withFileTypes: true })
+    .filter((e) => e.isDirectory() && fs.existsSync(path.join(raiz, e.name, "package.json")))
+    .map((e) => e.name);
+  return [...new Set([...enDisco, ...declarados.filter((d) => d !== "*")])].sort();
 }
 
 /** Lo que el ci.yml del andamio exige: los scripts por paquete, las excepciones
@@ -409,10 +421,20 @@ const MUTACIONES = [
     nombre: "el andamio se queda sin manifiestos",
     rompe: "el andamio trae manifiestos, y estan donde el workspace dice",
     mutar: (raiz) => {
-      for (const rel of ["package.json", "api/package.json", "web/package.json", "e2e/package.json"]) {
-        const p = path.join(raiz, rel);
-        if (fs.existsSync(p)) fs.unlinkSync(p);
-      }
+      // SE ENUMERAN, no se listan. Con los cuatro nombres escritos a mano, el
+      // dia que el andamio sumo un paquete —`sitio/`, de la forma «un sitio
+      // para leer»— la mutacion borraba cuatro manifiestos, sobrevivia el
+      // quinto, y la comprobacion seguia encontrando manifiestos: o sea que el
+      // caso que existe para probar que la comprobacion muerde dejo de morder.
+      // Es la misma leccion que el workspace y los scripts de la raiz.
+      const borrar = (dir) => {
+        for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
+          const abs = path.join(dir, e.name);
+          if (e.isDirectory() && e.name !== "node_modules") borrar(abs);
+          else if (e.isFile() && e.name === "package.json") fs.unlinkSync(abs);
+        }
+      };
+      borrar(raiz);
     },
   },
 ];

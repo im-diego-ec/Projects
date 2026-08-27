@@ -222,7 +222,7 @@ test("stack · 'Lo que elige el proyecto' no ofrece como elegible una pieza que 
 });
 
 test("stack · los paquetes que toca la tabla son los que declara el workspace", () => {
-  const delWorkspace = paquetesDelWorkspace(leer(WORKSPACE)).sort();
+  const delWorkspace = paquetesDelWorkspace(leer(WORKSPACE), "plantilla").sort();
   assert.ok(
     delWorkspace.length >= 2,
     `${WORKSPACE} declaro ${delWorkspace.length} paquete(s): o el archivo cambio de forma, o el parseo dejo de ` +
@@ -557,7 +557,7 @@ test("refutacion · un proveedor en minuscula se ve igual que en mayuscula", () 
 });
 
 test("refutacion · un paquete del workspace sin fila se ve", () => {
-  const delWorkspace = paquetesDelWorkspace(leer(WORKSPACE)).sort();
+  const delWorkspace = paquetesDelWorkspace(leer(WORKSPACE), "plantilla").sort();
   const paquete = paquetesDeLasFilas(FILAS)[0];
   const mutadas = FILAS.filter((f) => !f.ruta.startsWith(`plantilla/${paquete}/`));
   assert.notDeepEqual(

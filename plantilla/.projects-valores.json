@@ -1,10 +1,14 @@
 {
-  "superficies": ["claude-code", "cursor"],
+  "superficies": [
+    "claude-code",
+    "cursor"
+  ],
   "plataforma": "aws",
   "PROYECTO": "{{PROYECTO}}",
   "ORG": "{{ORG}}",
   "PAQUETE_API": "{{PAQUETE_API}}",
   "PAQUETE_WEB": "{{PAQUETE_WEB}}",
+  "PAQUETE_SITIO": "{{PAQUETE_SITIO}}",
   "PAQUETE_E2E": "{{PAQUETE_E2E}}",
   "GENERAR_CLIENTE_DATOS": "{{GENERAR_CLIENTE_DATOS}}",
   "EQUIPO_BUILDERS": "{{EQUIPO_BUILDERS}}",

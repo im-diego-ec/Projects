@@ -226,9 +226,10 @@ export const NO_SE_COPIA = new Set(["README.md"]);
  *  "el andamio usa marcadores que el archivo de valores no declara:
  *  DOBLE_LLAVE", que manda a agregar a REQUERIDOS algo que no existe. Se deriva
  *  de NO_SE_COPIA para que la lista siga siendo una sola declaracion. */
-export function seExcluyeDelCopiado(rel, plataforma = "aws") {
+export function seExcluyeDelCopiado(rel, plataforma = "aws", forma = "aplicacion") {
   const bajo = rel.toLowerCase();
   for (const n of NO_SE_COPIA) if (n.toLowerCase() === bajo) return true;
+  for (const n of noViajanPorForma(forma)) if (bajo === n || bajo.startsWith(`${n}/`)) return true;
   // EL ORDEN IMPORTA, y este `if` es la razon. Un archivo que se MUDA no se
   // excluye por vivir donde vivia: `infra/adaptadores.md` empieza con `infra/`,
   // que es justo lo que no viaja, y sin esta linea se lo comia la exclusion
@@ -264,6 +265,47 @@ export function noViajanPorPlataforma(plataforma) {
   return plataforma === "aws" ? [] : ["infra", "infra-prod"];
 }
 
+/** Lo que NO viaja segun la FORMA de proyecto que se eligio.
+ *
+ *  Es el mismo mecanismo que la plataforma y por la misma razon: la carta de
+ *  `docs/03-stack.md` explica cuatro formas de construir, y una carta que invita
+ *  a elegir mientras la herramienta reparte siempre lo mismo promete algo que no
+ *  cumple. Con la plataforma ese defecto ya se pago una vez.
+ *
+ *  UN SITIO PARA LEER NO ES UNA APLICACION CON PARTES DE MENOS. No tiene
+ *  pantallas con sesion, no tiene servidor, y no tiene base de datos: las tres
+ *  carpetas que sostienen eso —`web/`, `api/` y `e2e/`— no le sirven, y dejarlas
+ *  no seria generoso sino confuso. La suite de extremo a extremo tampoco viaja:
+ *  su unica prueba busca un `#root` que un sitio no monta.
+ *
+ *  Y AL REVES: `sitio/` no viaja a una aplicacion. El default es `aplicacion`
+ *  —lo que el andamio siempre reparti— para que un archivo de valores viejo, de
+ *  antes de que esta clave existiera, siga describiendo lo mismo que describia. */
+/** La forma que no filtra nada. La usan las funciones que preguntan «que TIENE el
+ *  andamio» en vez de «que se copia», y existe con nombre para que ese uso sea
+ *  explicito en la llamada y no un valor magico. */
+export const TODAS = "__todas__";
+
+export function noViajanPorForma(forma) {
+  if (forma === TODAS) return [];
+  // `docker-compose.yml` y su hoja de comandos levantan UNA sola cosa: el
+  // Postgres del proyecto. Un sitio para leer no tiene base de datos, asi que
+  // repartirselos seria darle instrucciones para arrancar algo que no usa. Y
+  // `.dockerignore` existe por el unico Dockerfile del arbol, que vive en la
+  // carpeta del servidor y tampoco viaja.
+  return forma === "sitio"
+    ? ["web", "api", "e2e", "docker-compose.yml", "comandos-levantar-servicios.txt", ".dockerignore"]
+    : ["sitio"];
+}
+
+/** La forma declarada en el archivo de valores. Minuscula y fuera de los
+ *  marcadores, igual que la plataforma: no se sustituye en ningun archivo, decide
+ *  cuales viajan. */
+export function formaDe(valores) {
+  const v = valores?.forma;
+  return typeof v === "string" && v.trim() ? v.trim().toLowerCase() : "aplicacion";
+}
+
 /** El catalogo de plataformas vive DENTRO de `infra/`, que es justo el directorio
  *  que no viaja cuando la plataforma no es AWS. Es el unico documento que explica
  *  las cinco opciones y donde estan escritos los adaptadores, asi que perderlo es
@@ -291,6 +333,38 @@ export function renombresPorPlataforma(plataforma) {
  *  propio archivo con `# projects:solo-si-hay-infra`, asi que quien edite el
  *  dependabot ve por que esas lineas estan marcadas. Una lista de numeros de
  *  linea escrita en esta herramienta envejeceria al primer cambio del andamio. */
+/** Saca del texto lo que solo tiene sentido con la forma que NO se eligio.
+ *
+ *  EL DEFECTO QUE ESTO CIERRA, medido sobre un sitio recien generado: el
+ *  `verificar` de la raiz encadena `pnpm datos`, que corre el generador del
+ *  cliente de la capa de datos filtrando el paquete del servidor. Un sitio para
+ *  leer no tiene servidor ni base, asi que pnpm contestaba «No projects matched
+ *  the filters» y la verificacion entera moria en el primer eslabon — o sea que
+ *  la forma nueva nacia ROJA el dia uno, que es exactamente lo que el marco
+ *  existe para no hacer.
+ *
+ *  No alcanza con borrar el script suelto: hay que sacarlo TAMBIEN de la cadena
+ *  de `verificar`, porque esa cadena lo nombra. Los dos se mueven juntos. */
+export function podarPorForma(texto, rel, forma) {
+  if (forma !== "sitio" || rel !== "package.json") return texto;
+  try {
+    const j = JSON.parse(texto);
+    if (j.scripts) {
+      for (const s of ["datos", "e2e"]) delete j.scripts[s];
+      if (typeof j.scripts.verificar === "string") {
+        j.scripts.verificar = j.scripts.verificar
+          .split("&&")
+          .map((t) => t.trim())
+          .filter((t) => t !== "pnpm datos" && t !== "pnpm e2e")
+          .join(" && ");
+      }
+    }
+    return `${JSON.stringify(j, null, 2)}\n`;
+  } catch {
+    return texto;
+  }
+}
+
 export function podarPorPlataforma(texto, rel, plataforma) {
   // Esta va ANTES del corte de abajo: la plataforma se declara en el archivo de
   // valores del proyecto SIEMPRE, tambien cuando es `aws`. Si solo se escribiera
@@ -421,7 +495,7 @@ export function destinoDe(rel, plataforma = "aws") {
  *  segunda declaracion que puede divergir. */
 export const REQUERIDOS = [
   "PROYECTO", "ORG",
-  "PAQUETE_API", "PAQUETE_WEB", "PAQUETE_E2E",
+  "PAQUETE_API", "PAQUETE_WEB", "PAQUETE_E2E", "PAQUETE_SITIO",
   "GENERAR_CLIENTE_DATOS",
   "EQUIPO_BUILDERS", "EQUIPO_PO", "BUILDER_1", "BUILDER_2", "PO",
   "CUENTA_DEV", "CUENTA_PROD", "REGION", "PERFIL_DEV", "PERFIL_PROD",
@@ -433,13 +507,14 @@ export const REQUERIDOS = [
 export function derivar(v) {
   return {
     ...v,
-    PAQUETES: v.PAQUETES ?? [v.PAQUETE_WEB, v.PAQUETE_API, v.PAQUETE_E2E].filter(Boolean).join(", "),
+    PAQUETES: v.PAQUETES ?? [v.PAQUETE_WEB, v.PAQUETE_API, v.PAQUETE_E2E, v.PAQUETE_SITIO].filter(Boolean).join(", "),
   };
 }
 
 /** Los tres marcadores cuyo camino "si no existe" exige borrar bloques a mano. */
 export const CON_LIMPIEZA_MANUAL = {
   PAQUETE_WEB: "si el proyecto no tiene frontend: borrar los bloques [FRONT] de eslint.config.mjs y sus imports",
+  PAQUETE_SITIO: "si el proyecto no es un sitio de contenido: borrar la carpeta sitio/ del andamio",
   PAQUETE_E2E: "si el proyecto no tiene suite E2E: borrar esa entrada del glob de Node Y las dos entradas EXCEPCIONES de ci.yml (una excepcion que no corresponde a ningun paquete es roja, a proposito)",
   GENERAR_CLIENTE_DATOS: "si el proyecto no genera cliente de datos: borrar el paso \"Generar el cliente de la capa de datos\" de .github/workflows/ci.yml",
 };
@@ -488,6 +563,7 @@ export const FORMATOS = {
   // a las carpetas que el andamio reparte de verdad; esto es la forma.
   PAQUETE_API: { patron: /^[a-z0-9][a-z0-9._-]*$/, que: "un nombre de carpeta (minusculas, sin barras ni espacios)" },
   PAQUETE_WEB: { patron: /^[a-z0-9][a-z0-9._-]*$/, que: "un nombre de carpeta (minusculas, sin barras ni espacios)" },
+  PAQUETE_SITIO: { patron: /^[a-z0-9][a-z0-9._-]*$/, que: "un nombre de carpeta (minusculas, sin barras ni espacios)", espera: "un nombre de carpeta en minusculas, sin barras ni espacios" },
   PAQUETE_E2E: { patron: /^[a-z0-9][a-z0-9._-]*$/, que: "un nombre de carpeta (minusculas, sin barras ni espacios)" },
   // Un comando. Ver el parrafo de arriba: aca no hay forma que exigir.
   GENERAR_CLIENTE_DATOS: { patron: null, que: "un comando de UNA sola linea, tal como se invoca dentro del paquete de backend" },
@@ -588,13 +664,13 @@ export function marcadoresSinFormato() {
 }
 
 /** Los archivos del andamio, relativos a plantilla/, sin el que no se copia. */
-export function archivosDelAndamio(raizAndamio, plataforma = "aws") {
+export function archivosDelAndamio(raizAndamio, plataforma = "aws", forma = "aplicacion") {
   const salida = [];
   for (const e of fs.readdirSync(raizAndamio, { withFileTypes: true, recursive: true })) {
     if (!e.isFile()) continue;
     const abs = path.join(e.parentPath ?? e.path, e.name);
     const rel = path.relative(raizAndamio, abs).split(path.sep).join("/");
-    if (seExcluyeDelCopiado(rel, plataforma)) continue;
+    if (seExcluyeDelCopiado(rel, plataforma, forma)) continue;
     salida.push(rel);
   }
   return salida.sort();
@@ -628,8 +704,8 @@ function recorrer(raiz, omitir = new Set()) {
  *  sea ROJA aunque el piso de Node no la haya atajado (main() compara los dos
  *  numeros). La gracia esta en que no comparten la llamada que se rompe: si
  *  manana las dos se escriben igual, esta defensa deja de existir. */
-export function archivosDelAndamioAMano(raizAndamio, plataforma = "aws") {
-  return recorrer(raizAndamio).filter((rel) => !seExcluyeDelCopiado(rel, plataforma));
+export function archivosDelAndamioAMano(raizAndamio, plataforma = "aws", forma = "aplicacion") {
+  return recorrer(raizAndamio).filter((rel) => !seExcluyeDelCopiado(rel, plataforma, forma));
 }
 
 /** Que archivos del andamio NO llegaron al destino. Se le pasan las dos
@@ -647,7 +723,15 @@ export function faltantesDeCopia(escritos, esperados) {
  *  andamio, que es el defecto que este marco ya cazo dos veces. */
 export function paquetesDelAndamio(raizAndamio) {
   const mapa = {};
-  for (const rel of archivosDelAndamio(raizAndamio)) {
+  // SE ENUMERA LO QUE EL ANDAMIO TIENE, no lo que viaja.
+  //
+  // Desde que la forma elegida decide que carpetas se copian, `archivosDelAndamio`
+  // filtra: pedirle la lista con los valores por defecto devolvia los paquetes de
+  // UNA forma y escondia los de la otra. Y esta funcion no contesta «que se
+  // copia» sino «que paquetes declara el andamio», que es lo que sostiene la
+  // validacion de que ningun nombre de paquete sea texto libre. La constante
+  // `TODAS` desactiva los dos filtros a proposito.
+  for (const rel of archivosDelAndamio(raizAndamio, "aws", TODAS)) {
     const m = /^([^/]+)\/package\.json$/.exec(rel);
     if (!m) continue;
     const texto = fs.readFileSync(path.join(raizAndamio, ...rel.split("/")), "utf8");
@@ -722,7 +806,8 @@ export function instanciar({ raizAndamio, destino, valores }) {
   // La plataforma sale de los propios valores: `instanciar` no necesita un
   // parametro mas, y asi no hay dos lugares donde declararla.
   const plataforma = plataformaDe(valores);
-  const rels = archivosDelAndamio(raizAndamio, plataforma);
+  const forma = formaDe(valores);
+  const rels = archivosDelAndamio(raizAndamio, plataforma, forma);
   if (rels.length === 0) throw new Error(`el andamio esta vacio: ${raizAndamio}`);
 
   let total = 0;
@@ -755,7 +840,7 @@ export function instanciar({ raizAndamio, destino, valores }) {
       // Se poda ANTES de sustituir: lo que se saca puede tener marcadores
       // adentro —`{{PERFIL_DEV}}` vivia en el bloque de permisos de AWS— y
       // sustituirlos primero solo escribiria un relleno que despues se borra.
-      const texto = podarPorPlataforma(fs.readFileSync(origen, "utf8"), rel, plataforma);
+      const texto = podarPorForma(podarPorPlataforma(fs.readFileSync(origen, "utf8"), rel, plataforma), rel, forma);
       const r = sustituir(texto, valores);
       total += r.cuenta;
       for (const f of r.faltantes) faltantes.add(f);
@@ -1708,6 +1793,7 @@ const EJEMPLO = {
   ORG: "Ejemplo-Org",
   PAQUETE_API: "api",
   PAQUETE_WEB: "web",
+  PAQUETE_SITIO: "sitio",
   PAQUETE_E2E: "e2e",
   GENERAR_CLIENTE_DATOS: "prisma generate",
   EQUIPO_BUILDERS: "builders",
@@ -2123,13 +2209,14 @@ async function main(argv) {
     return 1;
   }
   const plataforma = plataformaDe(valores);
+  const forma = formaDe(valores);
 
   // La pregunta se hace por el nombre de DESTINO: lo que decide si se pisa
   // trabajo ajeno es como se va a llamar el archivo en el repo nuevo, no como
   // se llama en el andamio. Escrita con el nombre de origen, el README del
   // proyecto —que aterriza como README.md— no aparecia en este censo y se
   // pisaba sin --forzar el README que ese repo ya tuviera.
-  const yaTiene = archivosDelAndamio(raizAndamio, plataforma)
+  const yaTiene = archivosDelAndamio(raizAndamio, plataforma, forma)
     .map((rel) => destinoDe(rel, plataforma))
     .filter((r) => !LO_QUE_ESCRIBE_EL_ASISTENTE.has(r))
     .filter((r) => fs.existsSync(path.join(o.destino, ...r.split("/"))));
@@ -2202,7 +2289,7 @@ async function main(argv) {
   // piso de Node: si el recorrido con `recursive: true` se ignorara —o si un dia
   // vuelve a fallar por otro motivo— aca los dos numeros no coinciden y la
   // corrida es roja, en vez de declarar exito sobre 16 de 75 archivos.
-  const esperados = archivosDelAndamioAMano(raizAndamio, plataforma);
+  const esperados = archivosDelAndamioAMano(raizAndamio, plataforma, forma);
   const faltanEnDestino = faltantesDeCopia(r.escritos, esperados);
   if (faltanEnDestino.length) {
     console.error(
