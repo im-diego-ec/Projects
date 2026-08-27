@@ -26,3 +26,74 @@ solo cuando `astro check` soporte TypeScript 7. Mientras tanto, la lógica que
 importe conviene sacarla de la página y ponerla en `src/lib/`, donde sí está
 cubierta — y eso además es mejor diseño, así que la restricción empuja en la
 dirección correcta.
+
+---
+
+## Publicarlo: lo único que este repositorio no puede hacer solo
+
+El proyecto ya trae todo lo necesario para publicarse en **Cloudflare Workers**:
+la configuración (`wrangler.jsonc`) y el paso automático
+(`.github/workflows/desplegar.yml`), que corre **solo cuando las verificaciones
+terminan en verde** sobre la rama principal.
+
+Lo que falta son **dos cosas que solo una persona puede hacer**, y por eso están
+acá y no automatizadas: abrir una cuenta y crear una credencial. Se hacen **una
+sola vez**.
+
+> **Mientras no las hagas, nada se pone en rojo.** El paso de publicación sale
+> con un aviso amarillo diciendo qué falta. Un rojo permanente por algo que
+> todavía no configuraste enseña a ignorar los rojos, que es peor que no tener
+> la compuerta.
+
+### 1 · La cuenta · *3 minutos, sin tarjeta*
+
+Entrá a [`dash.cloudflare.com/sign-up`](https://dash.cloudflare.com/sign-up) y
+creá la cuenta. El plan gratuito alcanza de sobra para un sitio: los archivos de
+tu sitio **no tienen límite de visitas** en ese plan.
+
+Después copiá tu **Account ID**: está en el panel, en la barra lateral derecha
+de la sección Workers, y es una tira de letras y números.
+
+### 2 · La credencial · *2 minutos*
+
+En [`dash.cloudflare.com/profile/api-tokens`](https://dash.cloudflare.com/profile/api-tokens):
+
+1. **Create Token**.
+2. Elegí la plantilla **«Edit Cloudflare Workers»**. No armes uno a medida: esa
+   plantilla ya tiene el permiso justo y nada más.
+3. Creálo y **copiá el valor ahora**: Cloudflare no lo vuelve a mostrar.
+
+### 3 · Guardar las dos cosas en GitHub · *2 minutos*
+
+En tu repositorio, **Settings → Secrets and variables → Actions → New repository
+secret**, dos veces:
+
+| Nombre | Valor |
+| --- | --- |
+| `CLOUDFLARE_API_TOKEN` | el que acabás de copiar |
+| `CLOUDFLARE_ACCOUNT_ID` | el identificador de tu cuenta |
+
+**No los pegues en ningún archivo del repositorio.** Un secreto en el código es
+un secreto público: cualquiera que clone el proyecto se lo lleva, y cambiarlo
+después no borra el que ya se vio.
+
+### 4 · Publicar por primera vez · *1 minuto*
+
+En la pestaña **Actions** de tu repositorio, elegí el workflow **desplegar** y
+apretá **Run workflow**. La primera vez conviene a mano; de ahí en adelante corre
+solo cada vez que las verificaciones quedan en verde sobre la rama principal.
+
+**Cómo sabés que salió bien.** El paso de publicación imprime la dirección, y la
+primera vez tiene la forma `https://{{PROYECTO}}.<tu-subdominio>.workers.dev`.
+Abrila: tiene que verse tu sitio.
+
+### Antes de todo eso, podés ensayar sin publicar nada
+
+```bash
+pnpm -C {{PAQUETE_SITIO}} run build
+pnpm -C {{PAQUETE_SITIO}} run desplegar:prueba
+```
+
+El segundo comando hace todo **menos subir**: lee la configuración, encuentra los
+archivos y te dice cuánto pesaría la subida. No necesita cuenta ni credencial, y
+sirve para saber que la configuración está bien antes de tener nada creado.

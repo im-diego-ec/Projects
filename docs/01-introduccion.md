@@ -263,12 +263,14 @@ abrir una línea de código.
 - **No se aplica solo a la fuerza.** Un proyecto puede apartarse de casi
   cualquier pieza; lo que el marco exige es que apartarse sea una **decisión
   declarada, con su motivo**, y no algo que se descubre después.
-- **No publica tu aplicación, todavía.** Es el hueco más grande y está medido:
-  en la guía paso a paso no aparece ni una vez la palabra «desplegar». Al
-  terminar el recorrido tenés el proyecto verificado, en GitHub y **andando en
-  tu computadora** —eso sí lo vas a ver, en el paso 7—; lo que falta es que
-  alguien más pueda entrar desde internet. Se dice acá, y no escondido en una
-  página técnica, porque enterarse al final es peor que saberlo al principio.
+- **Publica una de las dos formas, y la otra todavía no.** Si elegís **un sitio
+  para leer**, el proyecto viene con todo lo necesario para publicarse en
+  internet: falta que abras una cuenta gratuita y crees una credencial, cinco
+  minutos y una sola vez, con el paso a paso adentro del proyecto. Si elegís
+  **una aplicación**, eso todavía no existe: vas a poder verla andando en tu
+  computadora —en el paso 7— pero no darle una dirección a otra persona. Se dice
+  acá, y no escondido en una página técnica, porque enterarse al final es peor
+  que saberlo al principio.
 
 ---
 

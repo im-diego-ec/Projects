@@ -82,6 +82,13 @@ por defecto y solo agrega lo justo donde de verdad hace falta interactividad—.
 Además es lo único que aparece bien en Google y se previsualiza al compartir un
 enlace.
 
+**Y ésta es la única forma que hoy se PUBLICA sola.** Trae la configuración y el
+paso automático para subirse a Cloudflare, que corre cuando las verificaciones
+quedan en verde. Falta una cosa que ninguna herramienta puede hacer por vos:
+abrir la cuenta y crear la credencial. Son cinco minutos, una sola vez, y el paso
+a paso viene adentro del proyecto. Mientras no lo hagas **nada se pone en rojo**:
+el paso avisa en amarillo qué falta.
+
 **Qué te cuesta.** No hay botón de publicar. Cada corrección de un texto es un
 cambio en el repositorio, no una edición en una pantalla de administración.
 

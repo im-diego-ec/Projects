@@ -1,0 +1,115 @@
+# Publica el sitio en Cloudflare Workers.
+#
+# CUÁNDO CORRE, y por qué no en cada push. Solo cuando `ci-ok` termina en verde
+# sobre `main`: publicar algo que no pasó las verificaciones es exactamente lo
+# que este marco existe para impedir. Un push a una rama no publica nada.
+#
+# QUÉ NECESITA PARA FUNCIONAR, y son dos cosas que solo una persona puede hacer:
+#   1. Una cuenta de Cloudflare (gratis, sin tarjeta).
+#   2. Dos secretos en Settings -> Secrets and variables -> Actions:
+#        CLOUDFLARE_API_TOKEN    con permiso "Edit Cloudflare Workers"
+#        CLOUDFLARE_ACCOUNT_ID   el identificador de tu cuenta
+#
+# EL PASO A PASO ESTÁ EN `{{PAQUETE_SITIO}}/README.md`. Mientras los secretos no
+# existan, este workflow NO se pone rojo: sale con un aviso diciendo qué falta.
+# Un rojo permanente por algo que todavía no se configuró enseña a ignorar los
+# rojos, que es peor que no tener la compuerta.
+name: desplegar
+
+on:
+  workflow_run:
+    workflows: ["ci"]
+    types: [completed]
+    branches: [main]
+  # A mano, para la primera vez y para volver atrás.
+  workflow_dispatch:
+
+# El mínimo: leer el árbol. Publicar lo hace la credencial, no el permiso del
+# workflow.
+permissions:
+  contents: read
+
+concurrency:
+  # Dos publicaciones a la vez sobre el mismo destino es una carrera con
+  # ganador impredecible. La última gana, y las anteriores se cancelan.
+  group: desplegar-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  desplegar:
+    # `workflow_run` dispara TAMBIÉN cuando el workflow anterior falló: sin este
+    # `if`, un CI rojo publicaría igual.
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    # Los permisos van tambien EN EL JOB, no solo arriba: el marco lo exige en
+    # los dos arboles porque un job sin permisos propios hereda los del
+    # repositorio, que pueden ser mas amplios de lo que este job necesita.
+    permissions:
+      contents: read
+    steps:
+      - name: Traer el arbol
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Comprobar que la credencial existe, y NO fallar si no
+        id: credencial
+        shell: bash
+        env:
+          TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CUENTA: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          set -euo pipefail
+          if [ -z "${TOKEN}" ] || [ -z "${CUENTA}" ]; then
+            echo "hay=no" >> "${GITHUB_OUTPUT}"
+            echo "::warning::todavia no se puede publicar: faltan los secretos CLOUDFLARE_API_TOKEN y/o CLOUDFLARE_ACCOUNT_ID. El paso a paso para crearlos esta en {{PAQUETE_SITIO}}/README.md. Esto NO es un fallo del proyecto: es una tarea humana pendiente, y se dice en amarillo a proposito"
+            exit 0
+          fi
+          echo "hay=si" >> "${GITHUB_OUTPUT}"
+
+      - name: Node y el gestor de paquetes
+        if: steps.credencial.outputs.hay == 'si'
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        with:
+          node-version: "24"
+
+      - name: Instalar
+        if: steps.credencial.outputs.hay == 'si'
+        shell: bash
+        run: |
+          set -euo pipefail
+          corepack enable
+          corepack pnpm install --frozen-lockfile
+
+      - name: Compilar el sitio
+        if: steps.credencial.outputs.hay == 'si'
+        shell: bash
+        run: |
+          set -euo pipefail
+          corepack pnpm -C {{PAQUETE_SITIO}} run build
+          # UN CERO ACA ES EL DESPLIEGUE ROTO, no un sitio limpio: publicar un
+          # directorio vacio deja el dominio sirviendo nada y sin ningun error.
+          CUANTOS="$(find {{PAQUETE_SITIO}}/dist -type f | wc -l | tr -d ' ')"
+          if [ "${CUANTOS}" -eq 0 ]; then
+            echo "::error::la compilacion no dejo un solo archivo en {{PAQUETE_SITIO}}/dist. No se publica nada"
+            exit 1
+          fi
+          echo "a publicar: ${CUANTOS} archivo(s)"
+
+      - name: Publicar
+        if: steps.credencial.outputs.hay == 'si'
+        shell: bash
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          set -euo pipefail
+          corepack pnpm -C {{PAQUETE_SITIO}} exec wrangler deploy
+
+      - name: Decir donde quedo
+        if: steps.credencial.outputs.hay == 'si'
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "::notice::publicado. La direccion la imprime el paso anterior, y la primera vez es https://{{PROYECTO}}.<tu-subdominio>.workers.dev"

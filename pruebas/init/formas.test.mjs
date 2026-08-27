@@ -45,7 +45,10 @@ test("un sitio para leer NO recibe servidor, ni pantallas con sesion, ni base de
 });
 
 test("y al reves: una aplicacion no recibe el sitio", () => {
-  assert.deepEqual(noViajanPorForma("aplicacion"), ["sitio"]);
+  assert.deepEqual(noViajanPorForma("aplicacion"), ["sitio", ".github/workflows/desplegar.yml"]);
+  // El workflow de despliegue hoy solo sabe publicar un sitio y su texto nombra
+  // el paquete del sitio: repartirselo a una aplicacion le dejaria un workflow
+  // apuntando a una carpeta que ese proyecto no tiene.
   assert.equal(seExcluyeDelCopiado("sitio/package.json", "supabase", "aplicacion"), true);
   assert.equal(seExcluyeDelCopiado("api/src/app.ts", "supabase", "aplicacion"), false);
 });

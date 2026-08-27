@@ -1,0 +1,42 @@
+{
+  // CÓMO SE PUBLICA ESTE SITIO, y por qué así.
+  //
+  // Se publica en Cloudflare Workers sirviendo archivos estáticos. NO en
+  // Cloudflare Pages, que es el nombre que casi todo el mundo tiene en la
+  // cabeza: la propia documentación de Cloudflare dice hoy, en la portada de
+  // Pages, «Workers supports most Pages use cases... Start new projects with
+  // Workers». Leído el 2026-08-26.
+  //
+  // NO HAY CÓDIGO DE SERVIDOR, y por eso no hay `main`. Un sitio para leer se
+  // compila a HTML y se sirve tal cual; el día que necesite algo del lado del
+  // servidor, se agrega un `main` acá y ese archivo pasa a existir.
+  //
+  // LO QUE ESTE ARCHIVO NO PUEDE HACER SOLO: publicar. Hace falta una cuenta de
+  // Cloudflare y una credencial, y las dos son actos humanos. El paso a paso
+  // está en el README de este paquete.
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "{{PROYECTO}}",
+
+  // La fecha de compatibilidad congela el comportamiento de la plataforma. Sin
+  // ella, Cloudflare puede cambiar algo por debajo y el sitio se comporta
+  // distinto sin que nadie haya tocado una línea. Se sube a propósito, en un
+  // cambio propio, no sola.
+  "compatibility_date": "2026-08-26",
+
+  "assets": {
+    "directory": "./dist",
+
+    // QUÉ PASA CON UNA DIRECCIÓN QUE NO EXISTE. `404-page` sirve el `404.html`
+    // del sitio, que es lo correcto para páginas: cada dirección es un archivo
+    // de verdad y una que no está es un error de verdad.
+    //
+    // Ojo con la alternativa: `single-page-application` devuelve siempre el
+    // `index.html`, y eso hace que un enlace mal escrito muestre la portada en
+    // vez de un error — que es lo que una aplicación necesita y un sitio no.
+    "not_found_handling": "404-page"
+  },
+
+  "observability": {
+    "enabled": true
+  }
+}
