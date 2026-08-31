@@ -575,3 +575,77 @@ test("toda referencia en prosa a «la pagina NN, paso X» apunta a un paso que e
     `una referencia en prosa a una seccion que no existe cae justo donde la persona va cuando ya se trabo:\n  ${rotas.join("\n  ")}`,
   );
 });
+
+// ---------------------------------------------------------------------------
+// UNA CERCA MAL CERRADA SE TRAGA LA PAGINA ENTERA.
+//
+// EL DEFECTO QUE ESTE BANCO CIERRA, medido con tres renderizadores
+// independientes (marked, markdown-it y la implementacion de referencia
+// commonmark): docs/README.md tenia una linea `` ``` Ninguna se escapa... ``,
+// o sea texto pegado a la cerca de cierre. CommonMark 4.5 solo admite espacios
+// o tabs detras de una cerca de cierre, asi que el bloque abierto doce lineas
+// antes NO CERRABA y se comia el resto del archivo: el indice —la pagina que
+// mas gente abre— renderizaba como un bloque de codigo, con 0 tablas y 59 de
+// sus 62 enlaces muertos.
+//
+// En el editor se ve perfecto. Solo se nota en GitHub, que es donde se lee.
+// ---------------------------------------------------------------------------
+
+test("ninguna pagina deja una cerca de codigo sin cerrar", () => {
+  const rotas = [];
+  for (const f of paginasDelAlcance()) {
+    const lineas = leer(f).split("\n");
+    let abierta = null; // { linea, marca }
+    lineas.forEach((l, i) => {
+      const m = l.match(/^(\s{0,3})(`{3,}|~{3,})(.*)$/);
+      if (!m) return;
+      const [, , marca, resto] = m;
+      if (abierta === null) {
+        // Apertura: el resto es el lenguaje, y puede ser cualquier cosa.
+        abierta = { linea: i + 1, marca: marca[0], largo: marca.length };
+        return;
+      }
+      // Cierre: tiene que ser del mismo caracter, al menos igual de largo, y
+      // NO puede llevar nada detras salvo espacios.
+      if (marca[0] !== abierta.marca || marca.length < abierta.largo) return;
+      if (resto.trim() !== "") {
+        rotas.push(
+          `${f}:${i + 1}  la cerca de cierre lleva texto detras ("${resto.trim().slice(0, 40)}"), asi que NO cierra: ` +
+            `el bloque abierto en la linea ${abierta.linea} se traga el resto de la pagina`,
+        );
+        abierta = null;
+        return;
+      }
+      abierta = null;
+    });
+    if (abierta) rotas.push(`${f}: la cerca abierta en la linea ${abierta.linea} no se cierra nunca`);
+  }
+  assert.deepEqual(
+    rotas,
+    [],
+    `una cerca que no cierra convierte la pagina en un bloque de codigo: en el editor se ve bien y en GitHub, que es ` +
+      `donde se lee, no queda ni un enlace vivo.\n  ${rotas.join("\n  ")}`,
+  );
+});
+
+test("MUERDE: una cerca con texto detras se caza", () => {
+  // El caso que prueba que el de arriba no pasa por vacuidad: se corre la misma
+  // deteccion sobre un texto que SI trae el defecto.
+  const conDefecto = ["texto", "```bash", "echo hola", "``` y sigue la prosa", "mas texto"];
+  let abierta = null;
+  let cazada = false;
+  conDefecto.forEach((l) => {
+    const m = l.match(/^(\s{0,3})(`{3,}|~{3,})(.*)$/);
+    if (!m) return;
+    if (abierta === null) {
+      abierta = true;
+      return;
+    }
+    if (m[3].trim() !== "") cazada = true;
+    abierta = null;
+  });
+  assert.equal(cazada, true, "la deteccion tiene que ver la cerca sucia");
+
+  // Y el control: una cerca limpia no se caza.
+  assert.equal(/^(\s{0,3})(`{3,})(.*)$/.exec("```")[3].trim(), "", "una cerca limpia no lleva nada detras");
+});

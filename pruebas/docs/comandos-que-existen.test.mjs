@@ -373,6 +373,19 @@ test("MUERDE: el registro no puede quedarse sin cebos al crecer", () => {
 // recibe `command not found` sin una linea de recuperacion.
 // ---------------------------------------------------------------------------
 
+/** Las paginas que escriben `X.Y.Z` en vez de una version, y por que cada una.
+ *
+ *  No es una lista para esquivar el control: las dos LEEN el pin del checkout en
+ *  el paso inmediatamente anterior y despues lo usan. Exigirles una version
+ *  concreta las volveria una receta para la version vieja, que es justo lo
+ *  contrario de lo que hacen. */
+const ESCRIBEN_EL_PIN_A_PROPOSITO = [
+  "docs/12-upgrade-openspec.md", // su tema ES cambiar el pin
+  ".claude/skills/projects-adoptar/SKILL.md", // lee el pin del repo que adopta y lo sustituye
+  ".claude/skills/projects-archive-change/SKILL.md", // lo mismo: lee el pin del marco-ci.yml del repo y despues lo usa
+  "plantilla/.claude/skills/projects-archive-change/SKILL.md", // la copia que viaja: pide el pin por `gh api` al marco
+];
+
 /** El pin de OpenSpec, LEIDO del allowlist que viaja al proyecto.
  *
  *  Se deriva y no se escribe: el pin ya vive ahi, y una segunda copia en este
@@ -390,20 +403,47 @@ const bloquesBash = (texto) => [...texto.matchAll(/```(?:bash|sh|shell)\n([\s\S]
 test("ningun bloque para copiar invoca `openspec` de una forma que no existe en la maquina", () => {
   const pin = pinDeOpenspec();
   const malas = [];
+  // ANTI-VACUIDAD, y es lo que faltaba: la version anterior de este caso tenia un
+  // regex que no podia matchear NUNCA, evaluaba 0 de 658 lineas y pasaba verde.
+  // Contar lo que se miro es la unica forma de que un cero se lea como el control
+  // roto y no como el arbol limpio.
+  let vistas = 0;
   for (const f of docs()) {
-    // docs/11 es la pagina del UPGRADE: su tema es cambiar el pin, asi que
-    // escribe `X.Y.Z` a proposito. Exigirle una version concreta la volveria
-    // una receta para la version vieja, que es lo contrario de lo que hace.
-    if (f === "docs/12-upgrade-openspec.md") continue;
+    if (ESCRIBEN_EL_PIN_A_PROPOSITO.includes(f)) continue;
     for (const bloque of bloquesBash(fs.readFileSync(path.join(RAIZ, f), "utf-8"))) {
       for (const linea of bloque.split("\n")) {
         const t = linea.trim();
-        if (!/(^|[|&;(]\s*)openspec\s/.test(` ${t}`)) continue;
+        // LA VERSION ANTERIOR DE ESTA LINEA NO MIRABA NADA. Era
+        // `/(^|[|&;(]\s*)openspec\s/.test(\` ${t}\`)`: el template literal le
+        // antepone un espacio, asi que el ancla `^` cae SIEMPRE sobre ese
+        // espacio y esa rama no puede matchear nunca. Medido: sobre 658 lineas
+        // de bloque, cero evaluaciones verdaderas — ni siquiera vio la linea
+        // que el propio caso decia estar cuidando. Un guard escrito y muerto es
+        // peor que ninguno, porque ademas convence de que el area esta cubierta.
+        // Se cuenta TODA invocacion de openspec —la buena y la mala—, porque lo
+        // que este caso vigila es que no haya de las malas, y un cero solo
+        // significa algo si se sabe cuantas se miraron.
+        const esInvocacion = /(?:^|[|&;(]\s*)openspec\s/.test(t) || t.includes("/openspec@");
+        if (!esInvocacion) continue;
+        vistas++;
         if (t.includes(`@fission-ai/openspec@${pin}`)) continue;
         malas.push(`${f} → ${t}`);
       }
     }
   }
+  // ANTI-VACUIDAD DE LA EXCEPCION: cada archivo de la lista tiene que existir y
+  // traer de verdad un `X.Y.Z`. Una exencion para un archivo que ya no la
+  // necesita es una puerta abierta que nadie recuerda haber dejado.
+  for (const f of ESCRIBEN_EL_PIN_A_PROPOSITO) {
+    assert.ok(fs.existsSync(path.join(RAIZ, f)), `la exencion nombra ${f}, que no existe`);
+    assert.match(fs.readFileSync(path.join(RAIZ, f), "utf-8"), /X\.Y\.Z/, `${f} ya no escribe X.Y.Z: su exencion sobra`);
+  }
+  assert.ok(
+    vistas >= 3,
+    `este caso solo vio ${vistas} invocacion(es) de openspec en bloques para copiar. La documentacion tiene mas: si ` +
+      `el numero cayo, lo primero que hay que mirar es si el detector dejo de reconocer la forma, no si las paginas ` +
+      `dejaron de nombrarlas. (Es exactamente como este caso estuvo muerto: su regex evaluaba cero lineas.)`,
+  );
   assert.deepEqual(
     malas,
     [],
@@ -424,7 +464,7 @@ test("todo subcomando de openspec que la documentacion manda copiar esta en el a
 
   const usados = new Set();
   for (const f of docs()) {
-    if (f === "docs/12-upgrade-openspec.md") continue;
+    if (ESCRIBEN_EL_PIN_A_PROPOSITO.includes(f)) continue;
     for (const bloque of bloquesBash(fs.readFileSync(path.join(RAIZ, f), "utf-8"))) {
       for (const m of bloque.matchAll(new RegExp(`@fission-ai/openspec@${pin.replace(/\./g, "\\.")}\\s+([a-z]+)(?:\\s+([a-z]+))?`, "g"))) {
         usados.add(m[1] === "new" && m[2] ? `${m[1]} ${m[2]}` : m[1]);

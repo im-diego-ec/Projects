@@ -24,9 +24,11 @@ sale, y este archivo no tiene cómo darse cuenta. Se cuentan así:
 ```bash
 node -e 'import("./pruebas/docs/lectura.mjs").then(m=>console.log(m.paginasDelAlcance().length))'
 git ls-files "docs/**/*.md" "docs/*.md" | wc -l
-``` Ninguna se escapa en silencio —si aparece una subcarpeta nueva
-la comprobación se pone roja y obliga a decidir—, pero que una página quede
-fuera no significa que no importe:
+```
+
+Ninguna se escapa en silencio —si aparece una subcarpeta nueva la comprobación
+se pone roja y obliga a decidir—, pero que una página quede fuera no significa
+que no importe:
 [`plantillas/registro-de-friccion.md`](plantillas/registro-de-friccion.md) es
 **canónico** y es justamente la otra mitad de este estándar, la única que puede
 decir si una página **se entiende**. Medido el 2026-08-25.
