@@ -1,6 +1,7 @@
 {
   "permissions": {
     "allow": [
+      "Bash(npx --yes @fission-ai/openspec@1.9.0 new change *)",
       "Bash(npx --yes @fission-ai/openspec@1.9.0 validate *)",
       "Bash(npx --yes @fission-ai/openspec@1.9.0 list)",
       "Bash(npx --yes @fission-ai/openspec@1.9.0 list *)",

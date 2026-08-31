@@ -291,3 +291,90 @@ test("MUERDE: el registro no puede quedarse sin cebos al crecer", () => {
     "hay un cebo que ya no corresponde a ninguna cifra del registro",
   );
 });
+
+// ---------------------------------------------------------------------------
+// TODO `openspec` DE UN BLOQUE PARA COPIAR TIENE QUE PODER CORRERSE.
+//
+// EL DEFECTO QUE ESTE BANCO CIERRA, medido en un proyecto recien generado:
+// docs/09 entregaba `openspec new change <nombre>` como bloque bash para copiar
+// —el PRIMER comando del tramo de construir— y ese programa NO EXISTE en la
+// maquina de la persona: `which openspec` no lo encuentra, no esta en
+// devDependencies ni en node_modules/.bin. La forma invocable
+// (`npx --yes @fission-ai/openspec@<pin> …`) no aparecia una sola vez en la
+// pagina; vivia en docs/11, que el indice marca «se abre el dia que hace
+// falta», y ahi escrita con `X.Y.Z` de relleno, asi que ni copiarla se podia.
+//
+// La persona no tecnica copia el bloque como copio los quince anteriores y
+// recibe `command not found` sin una linea de recuperacion.
+// ---------------------------------------------------------------------------
+
+/** El pin de OpenSpec, LEIDO del allowlist que viaja al proyecto.
+ *
+ *  Se deriva y no se escribe: el pin ya vive ahi, y una segunda copia en este
+ *  banco seria otra cifra a mano de las que este archivo existe para perseguir. */
+function pinDeOpenspec() {
+  const settings = fs.readFileSync(path.join(RAIZ, "plantilla/.claude/settings.json"), "utf-8");
+  const m = settings.match(/@fission-ai\/openspec@(\d+\.\d+\.\d+)/);
+  assert.ok(m, "el allowlist del andamio no declara un pin de openspec: sin eso este banco no sabe contra que medir");
+  return m[1];
+}
+
+/** Los bloques ```bash de una pagina, ya sin las cercas. */
+const bloquesBash = (texto) => [...texto.matchAll(/```(?:bash|sh|shell)\n([\s\S]*?)```/g)].map((m) => m[1]);
+
+test("ningun bloque para copiar invoca `openspec` de una forma que no existe en la maquina", () => {
+  const pin = pinDeOpenspec();
+  const malas = [];
+  for (const f of docs()) {
+    // docs/11 es la pagina del UPGRADE: su tema es cambiar el pin, asi que
+    // escribe `X.Y.Z` a proposito. Exigirle una version concreta la volveria
+    // una receta para la version vieja, que es lo contrario de lo que hace.
+    if (f === "docs/11-upgrade-openspec.md") continue;
+    for (const bloque of bloquesBash(fs.readFileSync(path.join(RAIZ, f), "utf-8"))) {
+      for (const linea of bloque.split("\n")) {
+        const t = linea.trim();
+        if (!/(^|[|&;(]\s*)openspec\s/.test(` ${t}`)) continue;
+        if (t.includes(`@fission-ai/openspec@${pin}`)) continue;
+        malas.push(`${f} → ${t}`);
+      }
+    }
+  }
+  assert.deepEqual(
+    malas,
+    [],
+    "`openspec` no es un programa instalado: escrito asi, la persona recibe `command not found` en el primer " +
+      `comando del tramo. La forma invocable es \`npx --yes @fission-ai/openspec@${pin} …\`:\n  ${malas.join("\n  ")}`,
+  );
+});
+
+test("todo subcomando de openspec que la documentacion manda copiar esta en el allowlist del proyecto", () => {
+  // La otra mitad, y es la que traba al agente en vez de a la persona: un
+  // comando correcto que el allowlist no cubre para la sesion en cada corrida.
+  const pin = pinDeOpenspec();
+  const settings = fs.readFileSync(path.join(RAIZ, "plantilla/.claude/settings.json"), "utf-8");
+  const permitidos = [...settings.matchAll(new RegExp(`openspec@${pin.replace(/\./g, "\\.")} ([a-z]+(?: [a-z]+)?)`, "g"))].map(
+    (m) => m[1],
+  );
+  assert.ok(permitidos.length >= 4, `el allowlist solo declara ${permitidos.length} comandos: se rompio la lectura`);
+
+  const usados = new Set();
+  for (const f of docs()) {
+    if (f === "docs/11-upgrade-openspec.md") continue;
+    for (const bloque of bloquesBash(fs.readFileSync(path.join(RAIZ, f), "utf-8"))) {
+      for (const m of bloque.matchAll(new RegExp(`@fission-ai/openspec@${pin.replace(/\./g, "\\.")}\\s+([a-z]+)(?:\\s+([a-z]+))?`, "g"))) {
+        usados.add(m[1] === "new" && m[2] ? `${m[1]} ${m[2]}` : m[1]);
+      }
+    }
+  }
+  assert.ok(usados.size >= 1, "ninguna pagina invoca openspec en un bloque: este control dejo de mirar lo que cree");
+
+  // `init` queda fuera a proposito: lo corre `projects init`, no la persona, y
+  // no tiene por que estar en el allowlist de la sesion del proyecto.
+  const fuera = [...usados].filter((c) => c !== "init" && !permitidos.some((p) => c === p || c.startsWith(`${p} `)));
+  assert.deepEqual(
+    fuera,
+    [],
+    `la documentacion manda correr estos comandos y el allowlist del proyecto no los cubre, asi que la sesion del ` +
+      `agente pide permiso —o se traba— en cada corrida: ${fuera.join(", ")}`,
+  );
+});
