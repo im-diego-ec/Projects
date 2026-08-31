@@ -140,12 +140,19 @@ Las cuatro formas están explicadas —con por qué elegirías cada una, qué te
 y su límite real— en **[la carta de 03-stack.md](03-stack.md#la-carta-qué-vas-a-construir)**.
 Son cinco minutos de lectura y te ahorran mantener piezas que tu proyecto no usa.
 
-> **Lo que te va a tocar hoy, dicho de frente.** De las cuatro formas hay **una
-> construida**: una aplicación detrás de una puerta, con servidor propio. Las
-> otras tres están explicadas en la carta pero todavía no se pueden elegir, y
-> esta guía te va a armar la que existe. Si tu proyecto es claramente un sitio
-> para leer o una app de teléfono, leer la carta te va a decir qué te falta —y es
-> mejor saberlo ahora que a mitad de camino.
+> **Lo que podés elegir hoy, dicho de frente.** De las formas de la carta hay
+> **dos construidas**, y el asistente te las va a ofrecer: **un sitio para leer**
+> y **una aplicación con servidor propio**. Las otras están explicadas en la
+> carta pero todavía no se pueden elegir; la carta lo marca con 🕳️ en su columna
+> de estado.
+>
+> **La diferencia que más te va a importar** no es técnica: el sitio **se publica
+> solo** —falta que abras una cuenta gratuita y crees una credencial, una sola
+> vez— y la aplicación **todavía no**, porque el marco no reparte ese paso.
+> Está explicado en [10-publicar.md](10-publicar.md). Si tu proyecto tiene que
+> estar en internet pronto, eso pesa más que cualquier otra cosa de esta página.
+>
+> Esta guía te lleva por cualquiera de las dos.
 
 ---
 
@@ -344,9 +351,9 @@ te dice por qué la elegirías, qué te cuesta y qué límite tiene. Así:
 
 | Si elegís | Son |
 | --- | --- |
-| Supabase, trabajando solo, sin dominio propio | **8 preguntas**, y solo dos hay que escribirlas |
-| AWS con dos copias del proyecto | **13**, porque ahí los datos de la nube existen de verdad |
-| Todo lo que suma: AWS, dos copias, otra persona, dominio propio y Slack | **16**, el máximo |
+| Supabase, trabajando solo, sin dominio propio | **9 preguntas**, y solo dos hay que escribirlas |
+| AWS con dos copias del proyecto | **14**, porque ahí los datos de la nube existen de verdad |
+| Todo lo que suma: AWS, dos copias, otra persona, dominio propio y Slack | **17**, el máximo |
 
 Las que no escribís se contestan con **Enter**, que elige la opción recomendada.
 Nunca te va a pedir un dato de AWS si no elegiste AWS.
@@ -389,8 +396,8 @@ No para corregirlo —ya está validado— sino para saber qué hay adentro.
 cat valores.json
 ```
 
-**Qué vas a ver.** Las 21 casillas que el programa necesita, llenas con lo que
-derivó de tus 8 respuestas. Por ejemplo, si dijiste que no tenés dominio propio,
+**Qué vas a ver.** Las 23 casillas que el programa necesita, llenas con lo que
+derivó de tus 9 respuestas. Por ejemplo, si dijiste que no tenés dominio propio,
 vas a encontrar la dirección gratuita de Cloudflare ya puesta:
 
 ```json
@@ -410,7 +417,7 @@ habías contestado, y reescribe el archivo.
 `RELLENAR` ni tiene dobles llaves `{{así}}`.
 
 > **Si preferís llenarlo a mano.** El camino de antes sigue existiendo y es
-> idéntico: `--ejemplo > valores.json` te da la hoja con las 21 casillas y sus
+> idéntico: `--ejemplo > valores.json` te da la hoja con las 23 casillas y sus
 > valores de ejemplo, y qué va en cada una está en la sección 2 de
 > [`plantilla/README.md`](../plantilla/README.md). Es el camino de quien ya sabe
 > lo que quiere; el asistente es el mismo destino por otra puerta.

@@ -165,7 +165,7 @@ const CIFRAS_SOBRE_SI_MISMA = [
     // herramienta y hasta los nombres de los casos de este banco—. Ninguno era
     // falso el dia que se escribio, y ninguno tenia como enterarse.
     nombre: "valores que la herramienta exige (REQUERIDOS)",
-    patron: /(?:los|las|de los|\*\*)\s*(\d+)\s+(?:valores|marcadores|claves)\b/gi,
+    patron: /(?:los|las|de los|\*\*)\s*(\d+)\s+(?:valores|marcadores|claves|casillas)\b/gi,
     grupo: 1,
     medir: async () => (await import("../../herramientas/projects-init.mjs")).REQUERIDOS.length,
   },
@@ -179,7 +179,68 @@ const CIFRAS_SOBRE_SI_MISMA = [
     grupo: [1, 2],
     medir: rangoDePreguntas,
   },
+  {
+    // LA TABLA DE CONTEOS FIJOS de docs/04, que ninguna forma anterior cazaba:
+    // «**9 preguntas**, y solo dos hay que escribirlas». El patron de arriba
+    // pide un rango; este mira la cifra suelta. Estaba vieja en tres filas.
+    nombre: "preguntas del camino mas corto (la primera fila de la tabla de docs/04)",
+    patron: /\*\*(\d+) preguntas\*\*/g,
+    grupo: 1,
+    medir: async () => (await rangoDePreguntas())[0],
+  },
+  {
+    // Y la que dice cuantas respuestas hicieron falta, en la misma pagina.
+    nombre: "respuestas del camino mas corto",
+    patron: /derivó de tus (\d+) respuestas/gi,
+    grupo: 1,
+    medir: async () => (await rangoDePreguntas())[0],
+  },
+  {
+    // LAS DOS FILAS DEL MEDIO de esa misma tabla. No alcanzaba con el rango: el
+    // minimo y el maximo estaban guardados y estas dos —los caminos de en
+    // medio— no, y las dos estaban viejas. Se anclan al TEXTO DE LA FILA, que es
+    // lo unico que las distingue de cualquier otro numero en negrita.
+    nombre: "preguntas del camino de AWS con dos copias",
+    patron: /\| AWS con dos copias del proyecto \| \*\*(\d+)\*\*/g,
+    grupo: 1,
+    medir: () => cuantasPregunta({ forma: "1", equipo: "1", plataforma: "2", ambientes: "2", dominio: "1", avisos: "1", visibilidad: "1" }),
+  },
+  {
+    nombre: "preguntas del camino que suma todo",
+    patron: /dominio propio y Slack \| \*\*(\d+)\*\*/g,
+    grupo: 1,
+    medir: () => cuantasPregunta({ forma: "1", equipo: "2", plataforma: "2", ambientes: "2", dominio: "2", avisos: "2", visibilidad: "1" }),
+  },
 ];
+
+/** Cuantas preguntas hace el asistente para UN camino concreto. */
+async function cuantasPregunta(eleccion) {
+  const { correrAsistente } = await import("../../herramientas/projects-asistente.mjs");
+  const libres = {
+    PROYECTO: "p",
+    ORG: "o",
+    BUILDER_2: "b",
+    CUENTA_DEV: "1".repeat(12),
+    CUENTA_PROD: "2".repeat(12),
+    REGION: "us-east-1",
+    PERFIL_DEV: "d",
+    PERFIL_PROD: "e",
+    DOMINIO_PROD: "x.com",
+    CANAL_ALERTAS: "#a",
+  };
+  let vistas = 0;
+  await correrAsistente(
+    async (_t, id) => {
+      vistas++;
+      return eleccion[id] ?? libres[id] ?? "1";
+    },
+    {},
+    {},
+    () => {},
+    { ORG_MARCO: "im-diego-ec" },
+  );
+  return vistas;
+}
 
 /** CUANTAS PREGUNTAS HACE EL ASISTENTE, del camino mas corto al mas largo.
  *
@@ -255,6 +316,10 @@ const CEBOS = {
   "paginas numeradas del camino": "Ésta es la primera de 999 páginas numeradas del camino.",
   "valores que la herramienta exige (REQUERIDOS)": "`projects init` pide **999 valores** y ni uno más.",
   "preguntas que hace el asistente, del camino mas corto al mas largo": "El asistente hace entre 998 y 999 preguntas.",
+  "preguntas del camino mas corto (la primera fila de la tabla de docs/04)": "Son **999 preguntas**, y solo dos hay que escribirlas.",
+  "respuestas del camino mas corto": "Las casillas, llenas con lo que derivó de tus 999 respuestas.",
+  "preguntas del camino de AWS con dos copias": "| AWS con dos copias del proyecto | **999**, porque ahí los datos existen |",
+  "preguntas del camino que suma todo": "| Todo lo que suma: AWS, dos copias, otra persona, dominio propio y Slack | **999**, el máximo |",
 };
 
 test("MUERDE: toda cifra del registro se caza cuando envejece", async () => {

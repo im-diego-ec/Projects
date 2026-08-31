@@ -256,3 +256,81 @@ test("MUERDE: una fila con una letra que no estaba tambien se vigila", () => {
   assert.equal(vistas.length, 1, "el detector tiene que ver una fila con una letra que no estaba en la tabla original");
   assert.equal(vistas[0].clave, "Z");
 });
+
+// ---------------------------------------------------------------------------
+// «CONSTRUIDA Y PROBADA» TIENE QUE SIGNIFICAR QUE SE PUEDE CONSTRUIR.
+//
+// EL DEFECTO QUE ESTE BANCO CIERRA, medido: la fila A decia «✅ construida y
+// probada» y generar esa forma salia 1 —el arranque moria en el paso 2/4 con
+// `Missing script: datos`—. Los controles de arriba cruzan la carta contra el
+// MENU del asistente: que la forma este ofrecida. Ninguno cruzaba la carta
+// contra el RESULTADO de elegirla, y en ese hueco vivio el peor hallazgo de la
+// auditoria: la persona lee «probada», elige, y camina derecho al muro.
+//
+// El propio repositorio escribe la vara: «una fila marcada como funcionando que
+// no funciona es el peor defecto posible de este repo».
+// ---------------------------------------------------------------------------
+
+test("toda forma que la carta declara construida se genera Y arranca de verdad", async () => {
+  const { instanciar, pasosQueCorren, archivosDelAndamio, TODAS } = await import("../../herramientas/projects-init.mjs");
+  const { PREGUNTAS, correrAsistente } = await import("../../herramientas/projects-asistente.mjs");
+  const os = await import("node:os");
+  const ANDAMIO = path.join(RAIZ, "plantilla");
+
+  const disponibles = FORMAS.filter((f) => f.estado.includes(DISPONIBLE)).map((f) => f.clave);
+  const pregunta = PREGUNTAS.find((p) => p.id === ID_DE_LA_PREGUNTA);
+  assert.ok(pregunta, "sin la pregunta de forma este control no puede elegir nada");
+  assert.ok(disponibles.length >= 1, "un cero aca es este banco roto, no una carta vacia");
+
+  const rotas = [];
+  for (const clave of disponibles) {
+    const opcion = pregunta.opciones.find((o) => LETRA_DE_LA_OPCION[o.valor] === clave);
+    if (!opcion) {
+      rotas.push(`${clave}: la carta la declara construida y el asistente no la ofrece`);
+      continue;
+    }
+    const idx = String(pregunta.opciones.indexOf(opcion) + 1);
+    const destino = fs.mkdtempSync(path.join(os.tmpdir(), `carta-${opcion.valor}-`));
+    const { valores } = await correrAsistente(
+      async (_t, id) => ({ PROYECTO: "p", ORG: "o", forma: idx })[id] ?? "",
+      {},
+      {},
+      () => {},
+      { ORG_MARCO: "im-diego-ec" },
+    );
+    let r;
+    try {
+      r = instanciar({ raizAndamio: ANDAMIO, destino, valores });
+    } catch (e) {
+      rotas.push(`${clave}: instanciar tiro "${e.message}"`);
+      continue;
+    }
+    if (r.faltantes.length) rotas.push(`${clave}: marcadores sin valor -> ${r.faltantes.join(", ")}`);
+
+    // LA PARTE QUE FALTABA: los pasos del arranque, cruzados contra los scripts
+    // que ESA forma declara. Es donde se caia y donde nadie miraba.
+    const scripts = JSON.parse(fs.readFileSync(path.join(destino, "package.json"), "utf-8")).scripts ?? {};
+    const { corren } = pasosQueCorren(destino);
+    for (const paso of corren) {
+      const script = paso.args[0] === "run" ? paso.args[1] : null;
+      if (script && !(script in scripts)) rotas.push(`${clave}: el arranque correria \`${script}\`, que esta forma no declara`);
+    }
+    if (!corren.length) rotas.push(`${clave}: no correria ningun paso de arranque`);
+
+    // Y su pipeline, que es lo que decide si nace en verde.
+    const ci = fs.readFileSync(path.join(destino, ".github/workflows/ci.yml"), "utf-8");
+    const paquetes = new Set(
+      fs.readdirSync(destino, { withFileTypes: true }).filter((e) => e.isDirectory() && fs.existsSync(path.join(destino, e.name, "package.json"))).map((e) => e.name),
+    );
+    for (const m of ci.split("\n").filter((l) => !/^\s*#/.test(l)).join("\n").matchAll(/--filter\s+([A-Za-z@][\w@/.-]*)/g)) {
+      if (!paquetes.has(m[1])) rotas.push(`${clave}: su CI filtra por "${m[1]}", que esta forma no reparte`);
+    }
+  }
+
+  assert.deepEqual(
+    rotas,
+    [],
+    "la carta declara CONSTRUIDA una forma que no llega a un proyecto sano. Es el peor defecto posible de este " +
+      `repositorio, porque la persona lee «probada», elige, y se estrella:\n  ${rotas.join("\n  ")}`,
+  );
+});
