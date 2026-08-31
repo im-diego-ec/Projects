@@ -42,6 +42,24 @@
  *  claves dejen de existir cuando la plataforma no es AWS, y eso exige editar la
  *  constitucion canonica —usa ocho de ellas en trece lugares— en el mismo acto.
  *  Mientras tanto el asistente escribe el desvio para que quede firmado. */
+/** SI ESTE PROYECTO USA AWS DE VERDAD, y por que es una funcion y no una
+ *  comparacion suelta repetida en siete lugares.
+ *
+ *  EL DEFECTO QUE CIERRA, medido barriendo las 192 combinaciones de las
+ *  preguntas de eleccion: las cinco preguntas de AWS se saltaban cuando la forma
+ *  era un sitio O la plataforma no era AWS, y `derivar` ramificaba mirando SOLO
+ *  la plataforma. Las dos mitades decidian distinto, asi que sitio+AWS —32 de
+ *  las 192— no preguntaba nada y despues escribia cinco `undefined`. El
+ *  asistente imprimia «Cuenta de AWS undefined», SALIA 0, y el paso siguiente
+ *  abortaba con los cinco «falta». Volver a correrlo reproducia el mismo archivo
+ *  roto: un callejon sin salida, y ningun mensaje nombraba la combinacion
+ *  culpable.
+ *
+ *  Que la herramienta afirme exito sobre un archivo que ella misma rechaza dos
+ *  segundos despues es peor que un rojo. Con un solo predicado, las dos mitades
+ *  no pueden volver a discrepar. */
+export const usaAws = (r) => r.plataforma === "aws" && r.forma !== "sitio";
+
 export const RELLENO_AWS = {
   CUENTA_DEV: "111111111111",
   CUENTA_PROD: "222222222222",
@@ -231,7 +249,7 @@ export const PREGUNTAS = [
   {
     id: "CUENTA_DEV",
     libre: true,
-    salta: (r) => r.forma === "sitio" || r.plataforma !== "aws",
+    salta: (r) => !usaAws(r),
     texto: (r) =>
       r.ambientes === "dos"
         ? "¿Cuál es el número de cuenta de AWS donde vas a PROBAR? Son doce dígitos."
@@ -242,7 +260,7 @@ export const PREGUNTAS = [
   {
     id: "CUENTA_PROD",
     libre: true,
-    salta: (r) => r.forma === "sitio" || r.plataforma !== "aws" || r.ambientes !== "dos",
+    salta: (r) => !usaAws(r) || r.ambientes !== "dos",
     texto: "¿Y el número de cuenta de AWS donde va lo que ve la gente de verdad?",
     ayuda: "Conviene que sea una cuenta DISTINTA de la de pruebas: es lo que impide que un error de prueba toque lo real.",
     normaliza: (t) => t.replace(/[\s-]/g, ""),
@@ -250,7 +268,7 @@ export const PREGUNTAS = [
   {
     id: "REGION",
     libre: true,
-    salta: (r) => r.forma === "sitio" || r.plataforma !== "aws",
+    salta: (r) => !usaAws(r),
     texto: "¿En qué región de AWS? Es en qué parte del mundo viven tus datos.",
     ayuda: "Ejemplo: us-east-1 (Virginia) · sa-east-1 (São Paulo). Elegí la más cercana a tu gente.",
     normaliza: (t) => t.trim().toLowerCase(),
@@ -258,7 +276,7 @@ export const PREGUNTAS = [
   {
     id: "PERFIL_DEV",
     libre: true,
-    salta: (r) => r.forma === "sitio" || r.plataforma !== "aws",
+    salta: (r) => !usaAws(r),
     texto: (r) =>
       r.ambientes === "dos"
         ? "¿Cómo se llama tu perfil de AWS en esta computadora, el de pruebas?"
@@ -269,7 +287,7 @@ export const PREGUNTAS = [
   {
     id: "PERFIL_PROD",
     libre: true,
-    salta: (r) => r.forma === "sitio" || r.plataforma !== "aws" || r.ambientes !== "dos",
+    salta: (r) => !usaAws(r) || r.ambientes !== "dos",
     texto: "¿Y el perfil de AWS de lo que ve la gente de verdad?",
     ayuda: "Los ves con: aws configure list-profiles",
     normaliza: (t) => t.trim(),
@@ -394,7 +412,7 @@ export function derivar(r) {
     BUILDER_1: r.ORG,
     BUILDER_2: solo ? r.ORG : r.BUILDER_2,
     PO: r.ORG,
-    ...(r.plataforma === "aws"
+    ...(usaAws(r)
       ? {
           CUENTA_DEV: r.CUENTA_DEV,
           // Con UN ambiente no se pregunta dos veces por lo mismo: la cuenta y
@@ -438,11 +456,15 @@ export function desvios(r) {
       revisar: "cuando entre la segunda persona al proyecto",
     });
   }
-  if (r.plataforma !== "aws") {
+  if (!usaAws(r)) {
     lista.push({
       regla: "infraestructura-declarada-en-terraform",
       motivo:
-        `La plataforma elegida es "${r.plataforma}" y el andamio solo trae Terraform de AWS. Las cinco ` +
+        (r.plataforma === "aws"
+          ? "La plataforma elegida es AWS pero la forma es un sitio para leer: se publica en Cloudflare y no tiene " +
+            "servidor propio que desplegar, asi que las cinco preguntas de AWS no se hicieron. "
+          : `La plataforma elegida es "${r.plataforma}" y el andamio solo trae Terraform de AWS. `) +
+        "Las cinco " +
         "claves de AWS del archivo de valores llevan relleno porque una clave vacia se lee como marcador " +
         "sin resolver y pondria el proyecto en rojo el dia uno. No describen ninguna cuenta real.",
       revisar: "cuando el andamio reparta infraestructura segun la plataforma elegida",
@@ -631,7 +653,7 @@ export function lineasDeResumen(r, desviosDeR) {
   // Las de AWS son las UNICAS que la persona tuvo que ir a buscar a otro lado, y
   // la primera version del resumen no las mostraba: se llamaba "todo lo que
   // elegiste" y se comia justo las cinco que mas cuesta verificar.
-  if (r.plataforma === "aws") {
+  if (usaAws(r)) {
     filas.push(["Cuenta de AWS", r.ambientes === "dos" ? `${r.CUENTA_DEV} (pruebas) y ${r.CUENTA_PROD} (de verdad)` : r.CUENTA_DEV]);
     filas.push(["Región", r.REGION]);
     filas.push(["Perfil de AWS", r.ambientes === "dos" ? `${r.PERFIL_DEV} y ${r.PERFIL_PROD}` : r.PERFIL_DEV]);

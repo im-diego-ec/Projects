@@ -1,7 +1,16 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import { PREGUNTAS, correrAsistente, derivar, desvios, lineasDeResumen, RELLENO_AWS, RELLENO_SLACK } from "../../herramientas/projects-asistente.mjs";
+import {
+  PREGUNTAS,
+  correrAsistente,
+  derivar,
+  desvios,
+  lineasDeResumen,
+  usaAws,
+  RELLENO_AWS,
+  RELLENO_SLACK,
+} from "../../herramientas/projects-asistente.mjs";
 import { REQUERIDOS, FORMATOS, validarValores } from "../../herramientas/projects-init.mjs";
 
 // ---------------------------------------------------------------------------
@@ -448,3 +457,108 @@ async function correlacionSinUna(preguntar) {
   delete mutado.ID_MCP_SLACK;
   return { valores: mutado };
 }
+
+// ---------------------------------------------------------------------------
+// EL PRODUCTO CARTESIANO, y por que un factor por vez no alcanzaba.
+//
+// EL DEFECTO QUE ESTE BANCO CIERRA, medido: las cinco preguntas de AWS se
+// saltaban cuando la forma era un sitio O la plataforma no era AWS, y `derivar`
+// ramificaba mirando SOLO la plataforma. Ninguna de las dos mitades esta mal
+// sola; el defecto vive en el CRUCE. Barriendo las 192 combinaciones, 32
+// —todas sitio+AWS— escribian cinco `undefined`, el asistente imprimia «Cuenta
+// de AWS undefined» y SALIA 0, y el paso siguiente abortaba con los cinco
+// «falta». Reintentar reproducia el mismo archivo: callejon sin salida.
+//
+// El banco de este archivo cubria las opciones de a una. Por eso paso verde.
+// ---------------------------------------------------------------------------
+
+/** Toda combinacion de respuestas a las preguntas de eleccion, en orden estable. */
+function combinaciones() {
+  const conOpciones = PREGUNTAS.filter((q) => q.opciones);
+  const total = conOpciones.reduce((a, q) => a * q.opciones.length, 1);
+  const todas = [];
+  for (let i = 0; i < total; i++) {
+    let resto = i;
+    const eleccion = {};
+    for (const q of conOpciones) {
+      eleccion[q.id] = String((resto % q.opciones.length) + 1);
+      resto = Math.floor(resto / q.opciones.length);
+    }
+    todas.push(eleccion);
+  }
+  return todas;
+}
+
+const LIBRES = {
+  PROYECTO: "mi-proyecto",
+  ORG: "alguien",
+  BUILDER_2: "la-otra",
+  CUENTA_DEV: "111111111111",
+  CUENTA_PROD: "222222222222",
+  REGION: "us-east-1",
+  PERFIL_DEV: "dev",
+  PERFIL_PROD: "prod",
+  DOMINIO_PROD: "ejemplo.com",
+  CANAL_ALERTAS: "#alertas",
+};
+
+test("TODA combinacion de respuestas produce un archivo que el validador acepta", async () => {
+  const todas = combinaciones();
+  assert.ok(todas.length >= 8, `con ${todas.length} combinaciones esto no barre nada: se rompio el generador`);
+
+  const rotas = [];
+  for (const eleccion of todas) {
+    const { valores, respuestas, dicho } = await correrAsistente(
+      async (_t, id) => eleccion[id] ?? LIBRES[id] ?? "x",
+      {},
+      {},
+      () => {},
+      { ORG_MARCO: "im-diego-ec" },
+    );
+    const quien = `${respuestas.forma}+${respuestas.plataforma}+${respuestas.ambientes}+${respuestas.dominio}+${respuestas.avisos}`;
+    const { problemas } = validarValores(valores);
+    if (problemas.length) rotas.push(`${quien}: ${problemas.join(", ")}`);
+    // Y la otra mitad, que es la que la persona VE: `undefined` en pantalla es
+    // el sintoma que precede al archivo roto, y salir 0 con eso escrito es lo
+    // que convierte un rojo en un callejon sin salida.
+    if (dicho.join("\n").includes("undefined")) rotas.push(`${quien}: se imprimio "undefined" en pantalla`);
+  }
+  assert.deepEqual(
+    rotas,
+    [],
+    "el asistente ofrecio una combinacion y despues escribio un archivo que la propia herramienta rechaza. Es el " +
+      `mismo defecto que ya se pago con Slack y con GCP:\n  ${rotas.slice(0, 12).join("\n  ")}`,
+  );
+});
+
+test("un sitio nunca queda con valores de AWS a medias, y el desvio lo dice", async () => {
+  const { valores, respuestas } = await correrAsistente(
+    // Lo que no se fija a mano se contesta con la primera opcion: lo que este
+    // caso mide es el CRUCE sitio+AWS, no el resto del cuestionario.
+    async (_t, id) => ({ PROYECTO: "p", ORG: "o", forma: "2", plataforma: "2" })[id] ?? LIBRES[id] ?? "1",
+    {},
+    {},
+    () => {},
+    { ORG_MARCO: "im-diego-ec" },
+  );
+  assert.equal(respuestas.forma, "sitio");
+  assert.equal(respuestas.plataforma, "aws", "el guion tiene que haber elegido AWS, o este caso no mide el cruce");
+  assert.equal(usaAws(respuestas), false, "un sitio no despliega servidor propio: no usa AWS aunque se elija AWS");
+  for (const k of Object.keys(RELLENO_AWS)) {
+    assert.equal(valores[k], RELLENO_AWS[k], `${k} tiene que llevar el relleno declarado, no undefined`);
+  }
+  const d = desvios(respuestas).find((x) => x.regla === "infraestructura-declarada-en-terraform");
+  assert.ok(d, "el desvio tiene que quedar anotado: un relleno sin declarar es una mentira con formato de dato");
+  assert.match(d.motivo, /sitio para leer/, "y su motivo tiene que nombrar la combinacion, no repetir el caso generico");
+});
+
+test("MUERDE: si las dos mitades volvieran a decidir distinto, el barrido lo ve", async () => {
+  // El caso que prueba que el barrido no pasa por vacuidad. `usaAws` es el
+  // predicado unico; si alguien lo reemplaza por la comparacion vieja —mirar
+  // solo la plataforma— sitio+AWS vuelve a quedar sin valores.
+  const viejo = (r) => r.plataforma === "aws";
+  const sitioConAws = { forma: "sitio", plataforma: "aws" };
+  assert.equal(viejo(sitioConAws), true, "el predicado viejo decia que si");
+  assert.equal(usaAws(sitioConAws), false, "y el nuevo dice que no: en esa diferencia vivia el defecto");
+  assert.equal(usaAws({ forma: "aplicacion", plataforma: "aws" }), true, "y una aplicacion en AWS sigue usando AWS");
+});
