@@ -1,5 +1,8 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import fs from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 
 import {
   PREGUNTAS,
@@ -12,6 +15,8 @@ import {
   RELLENO_SLACK,
 } from "../../herramientas/projects-asistente.mjs";
 import { REQUERIDOS, FORMATOS, validarValores } from "../../herramientas/projects-init.mjs";
+
+const ANDAMIO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../plantilla");
 
 // ---------------------------------------------------------------------------
 // EL CAMINO DEL PO, PROBADO SIN UNA TERMINAL.
@@ -337,10 +342,14 @@ test("el resumen nombra las ocho decisiones, para poder arrepentirse antes de es
   const { preguntar } = contestador({ ...TEXTO_VALIDO, ...PO_SOLO });
   const { respuestas, desvios: d } = await correrAsistente(preguntar, {}, {}, () => {}, DERIVADOS);
   const texto = lineasDeResumen(respuestas, d).join("\n");
-  for (const esperado of ["agenda-de-personas", "@im-diego-ec", "trabajás solo", "Supabase", "una sola", "pages.dev", "correo de GitHub", "público"]) {
+  for (const esperado of ["agenda-de-personas", "@im-diego-ec", "trabajás solo", "Supabase", "una sola", "workers.dev", "correo de GitHub", "público"]) {
     assert.ok(texto.includes(esperado), `el resumen tiene que nombrar "${esperado}": es lo que la persona lee antes de confirmar`);
   }
-  assert.ok(texto.includes("3"), "y tiene que decir cuantos desvios quedaron declarados");
+  // La cantidad se DERIVA de los desvios que se anotaron, no se escribe: cuando
+  // se agrego el desvio de la direccion publica, el numero escrito a mano quedo
+  // viejo y este caso se puso rojo por la razon equivocada.
+  assert.ok(d.length >= 1, "sin desvios anotados este control no mira nada");
+  assert.ok(texto.includes(String(d.length)), "y el resumen tiene que decir cuantos desvios quedaron declarados");
 });
 
 test("las preguntas se EMITEN mientras se pregunta, no al final", async () => {
@@ -561,4 +570,44 @@ test("MUERDE: si las dos mitades volvieran a decidir distinto, el barrido lo ve"
   assert.equal(viejo(sitioConAws), true, "el predicado viejo decia que si");
   assert.equal(usaAws(sitioConAws), false, "y el nuevo dice que no: en esa diferencia vivia el defecto");
   assert.equal(usaAws({ forma: "aplicacion", plataforma: "aws" }), true, "y una aplicacion en AWS sigue usando AWS");
+});
+
+// ---------------------------------------------------------------------------
+// LA DIRECCION QUE SE ESCRIBE TIENE QUE SER LA DEL PRODUCTO QUE PUBLICA.
+//
+// EL DEFECTO QUE ESTE BANCO CIERRA: el asistente derivaba
+// `<proyecto>.pages.dev` para quien no tiene dominio propio —la opcion
+// recomendada, o sea la mayoria—, y este andamio NO publica en Cloudflare
+// Pages: publica en Cloudflare Workers con `wrangler deploy`, decision
+// argumentada en sitio/wrangler.jsonc citando a la propia Cloudflare. Un
+// `.pages.dev` solo existe si alguien crea un proyecto de Pages, y aca eso no
+// pasa nunca. Ese valor aterrizaba en el `site:` de Astro, de donde salen los
+// enlaces canonicos del sitio publicado.
+// ---------------------------------------------------------------------------
+
+test("la direccion gratuita nombra el producto que de verdad publica el andamio", async () => {
+  const { valores, respuestas } = await correrAsistente(
+    async (_t, id) => ({ PROYECTO: "mi-sitio", ORG: "o", forma: "2", dominio: "1" })[id] ?? LIBRES[id] ?? "1",
+    {},
+    {},
+    () => {},
+    { ORG_MARCO: "im-diego-ec" },
+  );
+  assert.equal(respuestas.dominio, "gratuito", "el guion tiene que elegir la gratuita, o esto no mide nada");
+  assert.match(valores.DOMINIO_PROD, /\.workers\.dev$/, "la gratuita de este andamio es de Workers");
+  assert.equal(/pages\.dev/.test(valores.DOMINIO_PROD), false, "Pages es otro producto y aca no se crea ninguno");
+
+  // Y lo que NO se puede saber queda declarado: el subdominio de la cuenta.
+  const d = desvios(respuestas).find((x) => x.regla === "direccion-publica-declarada");
+  assert.ok(d, "una direccion incompleta sin desvio anotado es una mentira con formato de dato");
+  assert.match(d.motivo, /subdominio/i, "el desvio tiene que decir QUE le falta");
+  assert.match(d.revisar, /primera publicacion/i, "y CUANDO se sabe");
+});
+
+test("el andamio no nombra Pages en ningun lado donde publica con Workers", () => {
+  // ANTI-VACUIDAD por el otro lado: si manana el andamio publicara en Pages,
+  // este caso tiene que caerse para que alguien lo mire, no quedarse verde.
+  const wrangler = fs.readFileSync(path.join(ANDAMIO, "sitio/wrangler.jsonc"), "utf-8");
+  assert.equal(/"pages_build_output_dir"/.test(wrangler), false, "una configuracion de Pages cambiaria toda esta regla");
+  assert.match(wrangler, /"assets"/, "el andamio tiene que seguir publicando assets de Workers");
 });

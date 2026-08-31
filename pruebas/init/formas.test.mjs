@@ -349,3 +349,63 @@ test("MUERDE: sin la poda del pipeline, el sitio vuelve a nacer rojo", () => {
   assert.equal(/EXCEPCIONES: "/.test(podado), false, "ni la linea de excepciones");
   assert.equal(podarPorForma(crudo, ".github/workflows/ci.yml", "aplicacion"), crudo, "y una aplicacion no se toca");
 });
+
+// ---------------------------------------------------------------------------
+// LA PORTADA NO PUEDE DECIR LO CONTRARIO DE LO QUE EL ARBOL TRAE.
+//
+// EL DEFECTO QUE ESTE BANCO CIERRA, medido en un sitio recien generado: el
+// README afirmaba «nada lo publica: no hay un paso que lleve tu codigo a una
+// direccion donde otra persona pueda entrar» dentro de un arbol que traia
+// `.github/workflows/desplegar.yml` y `sitio/wrangler.jsonc`. Es la PRIMERA
+// pantalla que ve cualquiera que entre al repositorio, y negaba el cuarto tramo
+// justo para la unica forma donde ese tramo existe.
+// ---------------------------------------------------------------------------
+
+test("lo que la portada dice sobre publicar coincide con lo que el arbol trae", async () => {
+  const pregunta = PREGUNTAS.find((p) => p.id === "forma");
+  const rotos = [];
+  for (const o of pregunta.opciones) {
+    const destino = fs.mkdtempSync(path.join(os.tmpdir(), `portada-${o.valor}-`));
+    const idx = String(pregunta.opciones.indexOf(o) + 1);
+    const { valores } = await correrAsistente(
+      async (_t, id) => ({ PROYECTO: "p", ORG: "o", forma: idx })[id] ?? "",
+      {},
+      {},
+      () => {},
+      DERIVADOS,
+    );
+    instanciar({ raizAndamio: ANDAMIO, destino, valores });
+    const readme = fs.readFileSync(path.join(destino, "README.md"), "utf-8");
+    const publica = fs.existsSync(path.join(destino, ".github/workflows/desplegar.yml"));
+
+    const niega = /nada lo publica/i.test(readme);
+    const promete = /S(Í|I) se publica/i.test(readme);
+    if (publica && niega) rotos.push(`${o.valor}: trae desplegar.yml y la portada dice que nada lo publica`);
+    if (publica && !promete) rotos.push(`${o.valor}: trae desplegar.yml y la portada no lo cuenta`);
+    if (!publica && promete) rotos.push(`${o.valor}: la portada promete publicacion automatica y no trae desplegar.yml`);
+    if (!publica && !niega) rotos.push(`${o.valor}: no publica y la portada no lo advierte`);
+    // Y el puntero al paso a paso humano tiene que existir de verdad.
+    for (const m of readme.matchAll(/\]\((?!https?:)([^)#]+)\)/g)) {
+      const destinoEnlace = path.join(destino, ...m[1].split("/"));
+      if (!fs.existsSync(destinoEnlace)) rotos.push(`${o.valor}: la portada enlaza "${m[1]}", que el proyecto no tiene`);
+    }
+  }
+  assert.deepEqual(
+    rotos,
+    [],
+    "la primera pantalla del repositorio nuevo tiene que decir la verdad sobre si eso se publica o no:\n  " +
+      rotos.join("\n  "),
+  );
+});
+
+test("MUERDE: sin la variante por forma, la portada de un sitio vuelve a negarse a si misma", () => {
+  const crudo = fs.readFileSync(path.join(ANDAMIO, "README-del-proyecto.md"), "utf-8");
+  assert.match(crudo, /nada lo publica/i, "el andamio tiene que seguir trayendo el aviso de que no se publica");
+  assert.match(crudo, /projects:solo-si-es-sitio/, "y el bloque de la variante del sitio");
+
+  const paraSitio = podarPorForma(crudo, "README-del-proyecto.md", "sitio");
+  const paraApp = podarPorForma(crudo, "README-del-proyecto.md", "aplicacion");
+  assert.equal(/nada lo publica/i.test(paraSitio), false, "podado para un sitio, la negacion no puede quedar");
+  assert.match(paraApp, /nada lo publica/i, "y para una aplicacion tiene que quedarse");
+  assert.equal(/projects:solo-si-es-sitio/.test(paraApp), false, "y la promesa del sitio no puede viajar a una aplicacion");
+});

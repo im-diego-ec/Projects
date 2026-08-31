@@ -116,14 +116,36 @@ test("hay enlaces que revisar: un cero aca es este banco roto, no un repositorio
   );
 });
 
+/** Un enlace con marcador no es una ruta TODAVIA.
+ *
+ *  `{{PAQUETE_SITIO}}/README.md` no existe en el arbol del marco y no tiene por
+ *  que: se vuelve una ruta recien cuando `projects init` sustituye el marcador.
+ *  Comprobarlo aca daria un rojo permanente por un enlace correcto.
+ *
+ *  DONDE SI SE COMPRUEBA, para que esta excepcion no sea un agujero: el caso
+ *  «lo que la portada dice sobre publicar coincide con lo que el arbol trae» de
+ *  pruebas/init/formas.test.mjs genera el proyecto de cada forma y exige que
+ *  todo enlace de su README apunte a algo que ESE proyecto tiene. O sea que el
+ *  enlace se verifica ya sustituido, que es la unica forma de verificarlo. */
+const tieneMarcador = (ruta) => /\{\{[A-Z_]+\}\}/.test(ruta);
+
 test("todo enlace apunta a un archivo o carpeta que EXISTE", () => {
   const rotos = [];
+  let conMarcador = 0;
   for (const { pagina, destinos } of censo) {
     for (const d of destinos) {
+      if (tieneMarcador(d.ruta)) {
+        conMarcador++;
+        continue;
+      }
       const absoluta = path.resolve(RAIZ, path.dirname(pagina), d.ruta);
       if (!fs.existsSync(absoluta)) rotos.push(`${pagina} -> ${d.crudo}`);
     }
   }
+  // ANTI-VACUIDAD DE LA EXCEPCION: si un dia no queda ningun enlace con
+  // marcador, la excepcion sobra y conviene saberlo; si quedan demasiados, es
+  // que alguien la esta usando para esquivar el control.
+  assert.ok(conMarcador <= 5, `${conMarcador} enlaces con marcador es demasiado para una excepcion: revisala`);
   assert.deepEqual(
     rotos,
     [],

@@ -350,7 +350,15 @@ export function renombresPorPlataforma(plataforma) {
  *  No alcanza con borrar el script suelto: hay que sacarlo TAMBIEN de la cadena
  *  de `verificar`, porque esa cadena lo nombra. Los dos se mueven juntos. */
 export function podarPorForma(texto, rel, forma) {
-  if (forma !== "sitio") return texto;
+  // El bloque del sitio se saca SIEMPRE que la forma no sea un sitio: si no,
+  // una aplicacion se queda con una portada que le promete una publicacion
+  // automatica que su arbol no trae, que es el mismo defecto al reves.
+  if (forma !== "sitio") {
+    if (rel === "README-del-proyecto.md") {
+      return texto.replace(/> # projects:solo-si-es-sitio\n[\s\S]*?> # projects:fin-solo-si-es-sitio\n\n?/g, "");
+    }
+    return texto;
+  }
 
   // EL PIPELINE TAMBIEN SE PODA, y no hacerlo costo un bloqueante entero.
   //
@@ -370,6 +378,19 @@ export function podarPorForma(texto, rel, forma) {
     return texto
       .replace(/[ \t]*# projects:solo-si-hay-datos\n[\s\S]*?# projects:fin-solo-si-hay-datos\n/g, "")
       .replace(/[ \t]*# projects:solo-si-hay-e2e\n[\s\S]*?# projects:fin-solo-si-hay-e2e\n/g, "");
+  }
+
+  // LA PORTADA DEL PROYECTO, que decia lo contrario de lo que el arbol traia.
+  //
+  // EL DEFECTO, medido en un sitio recien generado: el README afirmaba «nada lo
+  // publica: no hay un paso que lleve tu codigo a una direccion donde otra
+  // persona pueda entrar» dentro de un proyecto que trae `desplegar.yml` y
+  // `sitio/wrangler.jsonc`. Es la PRIMERA pantalla que ve cualquiera que entre
+  // al repositorio, y afirmaba que el cuarto tramo no existe justo para la unica
+  // forma donde si existe. Ademas describia prefijos de recursos y regiones de
+  // una nube que un sitio no usa.
+  if (rel === "README-del-proyecto.md") {
+    return texto.replace(/> # projects:solo-si-no-es-sitio\n[\s\S]*?> # projects:fin-solo-si-no-es-sitio\n/g, "");
   }
 
   if (rel !== "package.json") return texto;
@@ -405,7 +426,7 @@ export function podarPorForma(texto, rel, forma) {
  *  Se borra la linea entera, con su sangria y su salto: un comentario suelto en
  *  medio de un YAML se lee como basura aunque sea valido. */
 export function sacarCentinelas(texto) {
-  return texto.replace(/^[ \t]*(?:>[ \t]*)?# projects:(?:fin-)?solo-si-hay-[a-z0-9-]+[ \t]*\r?\n/gm, "");
+  return texto.replace(/^[ \t]*(?:>[ \t]*)?# projects:(?:fin-)?solo-si-[a-z0-9-]+[ \t]*\r?\n/gm, "");
 }
 
 export function podarPorPlataforma(texto, rel, plataforma) {

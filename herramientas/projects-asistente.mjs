@@ -300,9 +300,10 @@ export const PREGUNTAS = [
         valor: "gratuito",
         etiqueta: "Todavía no tengo",
         detalle:
-          "Se usa la dirección gratuita que da Cloudflare, del tipo tu-proyecto.pages.dev. Funciona " +
-          "desde el primer día y sirve para mostrarle el proyecto a alguien. Cuando compres uno propio, " +
-          "se cambia y listo.",
+          "Se usa la dirección gratuita que da Cloudflare, del tipo tu-proyecto.tu-cuenta.workers.dev. " +
+          "Funciona desde el primer día y sirve para mostrarle el proyecto a alguien. La parte del medio la " +
+          "elegís vos al abrir la cuenta y Cloudflare te la imprime la primera vez que publicás; hasta " +
+          "entonces queda anotada como pendiente. Cuando compres un dominio propio, se cambia y listo.",
         recomendada: true,
       },
       {
@@ -378,7 +379,20 @@ export const PREGUNTAS = [
 /** Las claves de las 21 que salen de una respuesta y no de un relleno. */
 export function derivar(r) {
   const solo = r.equipo !== "equipo";
-  const unDominio = r.dominio === "propio" ? r.DOMINIO_PROD : `${r.PROYECTO}.pages.dev`;
+  // LA DIRECCION GRATUITA ES DE WORKERS, NO DE PAGES, y la diferencia no es de
+  // nombre: este andamio publica con `wrangler deploy` sobre Cloudflare Workers
+  // —argumentado en sitio/wrangler.jsonc citando a la propia Cloudflare— y un
+  // `.pages.dev` solo existe si alguien crea un proyecto de Pages, cosa que aca
+  // no ocurre nunca. Escrito asi, el `site:` de Astro apuntaba a una direccion
+  // que no iba a resolver jamas, y de ahi salen los enlaces canonicos del sitio
+  // publicado.
+  //
+  // LO QUE NO SE PUEDE DERIVAR, y por eso queda anotado como desvio: la direccion
+  // real lleva el subdominio de la cuenta en el medio
+  // (`<proyecto>.<subdominio>.workers.dev`), y ese subdominio lo elige la persona
+  // al abrir la cuenta —que no existe todavia cuando se contesta esta pregunta—.
+  // Cloudflare lo imprime en la primera publicacion.
+  const unDominio = r.dominio === "propio" ? r.DOMINIO_PROD : `${r.PROYECTO}.workers.dev`;
   // Con UN ambiente los dos dominios son el mismo a proposito: el andamio
   // todavia sustituye los dos marcadores, y escribir dos direcciones distintas
   // para una sola copia seria inventar una que no existe.
@@ -477,6 +491,19 @@ export function desvios(r) {
         "Los avisos van al correo de GitHub. Las dos claves de Slack llevan relleno por el mismo motivo " +
         "que las de AWS: vacias se leerian como marcador sin resolver.",
       revisar: "cuando haya equipo y un canal donde avisarle",
+    });
+  }
+  if (r.dominio !== "propio") {
+    lista.push({
+      regla: "direccion-publica-declarada",
+      motivo:
+        "No hay dominio propio, asi que se anoto la direccion gratuita de Cloudflare Workers " +
+        "`<proyecto>.workers.dev`. LE FALTA EL SUBDOMINIO DE LA CUENTA en el medio " +
+        "(`<proyecto>.<subdominio>.workers.dev`): lo elige la persona al abrir la cuenta y no existe todavia " +
+        "cuando se contesta esta pregunta. Cloudflare imprime la direccion completa en la primera publicacion; " +
+        "hasta entonces el `site:` de Astro apunta a un nombre que no resuelve, lo que afecta los enlaces " +
+        "canonicos del HTML publicado y nada mas.",
+      revisar: "despues de la primera publicacion, con la direccion que imprime Cloudflare",
     });
   }
   if (r.visibilidad === "privado") {
@@ -646,7 +673,13 @@ export function lineasDeResumen(r, desviosDeR) {
     ["Equipo", r.equipo === "solo" ? "trabajás solo" : `vos y @${r.BUILDER_2}`],
     ["Dónde vive", { supabase: "Supabase + Cloudflare", aws: "AWS", gcp: "GCP", ninguna: "todavía sin decidir" }[r.plataforma]],
     ["Copias", r.ambientes === "uno" ? "una sola" : "una de prueba y una de verdad"],
-    ["Dirección", r.dominio === "propio" ? r.DOMINIO_PROD : `${r.PROYECTO}.pages.dev  (la gratuita de Cloudflare)`],
+    [
+      "Dirección",
+      r.dominio === "propio"
+        ? r.DOMINIO_PROD
+        : `${r.PROYECTO}.workers.dev  (la gratuita de Cloudflare; le falta el subdominio de tu cuenta en el medio, ` +
+          `y sale en la primera publicación)`,
+    ],
     ["Avisos", r.avisos === "slack" ? r.CANAL_ALERTAS : "al correo de GitHub"],
     ["Repositorio", r.visibilidad === "publico" ? "público" : "privado"],
   ];

@@ -60,12 +60,37 @@ pipeline, y el diagnóstico local es varios minutos más barato.
 
 ## Ambientes
 
-> # projects:solo-si-hay-infra
-> ⚠️ **Todavía no hay despliegue automático, y conviene decirlo antes que la tabla.**
+> # projects:solo-si-es-sitio
+> ✅ **Este proyecto SÍ se publica, y se publica solo.** Cada vez que las
+> verificaciones terminan en verde sobre `main`, el sitio sale a
+> `{{DOMINIO_PROD}}`. No hay que apretar nada.
+>
+> **Falta una sola cosa, y es humana: la cuenta de Cloudflare y su credencial.**
+> Mientras no existan, la publicación **no se pone en rojo**: sale con un aviso
+> amarillo diciendo qué falta. El paso a paso —tres minutos, sin tarjeta— está
+> en [`{{PAQUETE_SITIO}}/README.md`]({{PAQUETE_SITIO}}/README.md).
+>
+> La primera vez, Cloudflare imprime la dirección completa. Si no tenés dominio
+> propio, esa dirección lleva **el subdominio de tu cuenta en el medio**
+> (`{{PROYECTO}}.<tu-subdominio>.workers.dev`), que acá todavía no se puede
+> saber: cuando la veas, cambiala arriba y en `{{PAQUETE_SITIO}}/astro.config.mjs`.
+>
+> Mientras tanto, se levanta en tu máquina con `pnpm dev`.
+> # projects:fin-solo-si-es-sitio
+
+> # projects:solo-si-no-es-sitio
+> ⚠️ **Todavía no hay despliegue automático, y conviene decirlo antes que nada.**
 > Este repositorio se verifica solo, pero **nada lo publica**: no hay un paso que lleve
-> tu código a una dirección donde otra persona pueda entrar. Las direcciones de abajo son
-> donde va a vivir cuando eso exista, no donde vive hoy. Mientras tanto, se levanta en tu
-> máquina con `pnpm dev`.
+> tu código a una dirección donde otra persona pueda entrar. Mientras tanto, se levanta
+> en tu máquina con `pnpm dev`.
+>
+> Este aviso NO depende de la nube que hayas elegido —depende de que este proyecto no
+> tenga todavía un paso que publique—, y por eso va fuera del bloque de infraestructura:
+> puesto adentro, un proyecto sin Terraform se quedaba con un `## Ambientes` vacío y sin
+> una sola línea que dijera qué pasa con el despliegue.
+
+> # projects:solo-si-hay-infra
+> Las direcciones de abajo son donde va a vivir cuando ese paso exista, no dónde vive hoy.
 
 | Ambiente   | Dirección prevista | Cuándo se despliega                                             |
 | ---------- | ------------------ | --------------------------------------------------------------- |
@@ -77,6 +102,7 @@ la región `{{REGION}}`. La configuración por ambiente **no** se escribe en el 
 va por `vars` y `secrets`, y los valores sensibles por el almacén de parámetros bajo
 `/{{PREFIJO_RECURSOS}}/<ambiente>/<NOMBRE>`.
 > # projects:fin-solo-si-hay-infra
+> # projects:fin-solo-si-no-es-sitio
 
 ## Cuando algo se rompe en producción
 

@@ -397,7 +397,7 @@ vas a encontrar la dirección gratuita de Cloudflare ya puesta:
 {
   "PROYECTO": "agenda-de-personas",
   "ORG": "tu-usuario",
-  "DOMINIO_PROD": "agenda-de-personas.pages.dev",
+  "DOMINIO_PROD": "agenda-de-personas.workers.dev",
   ...
 }
 ```
