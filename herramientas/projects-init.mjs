@@ -1944,6 +1944,22 @@ export function escribirProteccionMedida(destino, medido) {
 // ─────────────────────────── El programa ───────────────────────────
 
 const EJEMPLO = {
+  // LAS DOS DECISIONES QUE NO SON MARCADORES van primero, y van a proposito.
+  //
+  // `forma` y `plataforma` no se sustituyen en ningun archivo: deciden QUE
+  // archivos viajan. Por eso estaban fuera de REQUERIDOS... y por eso tambien
+  // faltaban aca, que es lo que las volvia INELEGIBLES por el camino de archivo:
+  // `--ejemplo > valores.json` y editar es el camino que documentan el README y
+  // docs/05, y por ahi no habia forma de pedir un sitio. La decision que la carta
+  // llama «la que mas cuesta si se toma tarde» solo se podia tomar contestando
+  // el asistente.
+  //
+  // Y tenia una segunda consecuencia, mas silenciosa: el paso de actionlint del
+  // CI instancia el andamio con estos valores, asi que linteaba SIEMPRE una
+  // aplicacion — y `desplegar.yml`, que solo viaja a un sitio, no pasaba por
+  // ningun validador de sintaxis en ninguna parte.
+  forma: "aplicacion",
+  plataforma: "aws",
   PROYECTO: "people-agenda",
   // ORG es la ORG de GitHub, no un equipo dentro de ella: se interpola en
   // `uses: {{ORG}}/Projects/...`, o sea en la coordenada con la que GitHub
