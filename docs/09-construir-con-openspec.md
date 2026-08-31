@@ -305,6 +305,18 @@ Cada tarea tiene que **poder marcarse**. «Mejorar el rendimiento» no se marca;
 comandos de Claude Code: en una terminal, `/opsx:apply` da
 `No such file or directory`. Por eso el recuadro de acá arriba no dice `bash`.
 
+> **Y una cosa que conviene saber antes de que pase.** Esos comandos, por dentro,
+> mandan correr `openspec …` **a secas** — y ese programa **no está instalado**:
+> ni en tu sistema, ni en `node_modules/.bin`, ni en las dependencias de tu
+> proyecto. Los archivos que lo dicen los escribe `openspec init` y son de la
+> herramienta, no de este marco; editarlos sería mantener un fork ajeno, y el
+> siguiente `openspec update` los devolvería igual.
+>
+> **Tu proyecto ya se lo dice al agente**: el `AGENTS.md` que trae declara que la
+> forma invocable es `npx --yes @fission-ai/openspec@1.9.0 <subcomando>`, con esa
+> versión exacta, y el allowlist la cubre. Si aun así ves `command not found`,
+> ése es el motivo y ésa es la forma.
+
 Toma las tareas de `tasks.md` y las ejecuta en orden. Es el único comando de la
 familia que escribe código, y por eso va **después** de las dos aprobaciones y no
 antes.

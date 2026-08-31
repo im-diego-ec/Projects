@@ -68,6 +68,15 @@ mueve sobre un cambio incompatible.
   [...] }`, sus cinco `regla` no existían en el canónico, y le faltaban
   `aprobado_por` y `fecha`. Los tres se arreglan juntos: arreglar uno solo
   cambiaba un silencio por cinco rojos.
+- **Los comandos `/opsx:*` no se podían correr.** Por dentro mandan `openspec …`
+  a secas, y ese programa no está instalado —ni en el sistema, ni en
+  `node_modules/.bin`, ni en las dependencias del proyecto—, así que el tramo de
+  construir se trababa en el primer paso. Los archivos que lo dicen los escribe
+  `openspec init` y son de la herramienta: editarlos sería un fork ajeno y
+  `openspec update` los devolvería igual. Ahora el `AGENTS.md` del proyecto
+  declara la forma invocable con el pin exacto, y el allowlist cubre los cuatro
+  subcomandos que le faltaban (`instructions`, `context`, `schemas`, `store`).
+  `archive` sigue afuera a propósito: lo reemplaza la skill del marco.
 - **El `verificar` de un sitio salía verde una vez y rojo la siguiente**, por los
   tipos que `astro build` genera y el linter leía.
 

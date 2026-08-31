@@ -37,6 +37,38 @@ export const COMANDOS_DEL_PROYECTO = ["apply", "archive", "explore", "propose", 
  *  que no es suya, y fue el error que reemplazo al «doce» anterior. */
 export const CUANTAS_SKILLS = 6;
 
+/** Los subcomandos que los archivos de `openspec init` mandan correr al agente.
+ *
+ *  MEDIDO EL 2026-08-31 sobre un proyecto recien generado, contando las
+ *  invocaciones de `.claude/commands/opsx/` y `.claude/skills/openspec-*`. Se
+ *  escribe a mano por el mismo motivo que COMANDOS_DEL_PROYECTO: derivarlo
+ *  exigiria correr `openspec init` —que baja un paquete de la red— en cada
+ *  corrida, y este repositorio corre sus pruebas sin red.
+ *
+ *  EL DEFECTO QUE ESTA LISTA CIERRA: esos archivos invocan `openspec` A SECAS, y
+ *  ese programa no existe en la maquina de la persona —medido: no esta en el
+ *  sistema, ni en node_modules/.bin, ni en las dependencias del proyecto—. Y
+ *  aunque se use la forma con `npx`, CUATRO de estos subcomandos no estaban en
+ *  el allowlist del proyecto, asi que la sesion del agente pedia permiso o se
+ *  trababa justo en el tramo de construir. */
+export const SUBCOMANDOS_QUE_USA_OPSX = [
+  "archive",
+  "context",
+  "instructions",
+  "list",
+  "new change",
+  "schemas",
+  "status",
+  "store",
+  "validate",
+];
+
+/** Los que NO van al allowlist, con el motivo de cada uno.
+ *
+ *  `archive` no es una omision: cerrar un change usa la skill del marco, que
+ *  ademas deja el rastro de que se aprobo y cuando. El CLI no lo hace. */
+export const FUERA_DEL_ALLOWLIST = { archive: "lo reemplaza la skill projects-archive-change del marco" };
+
 const listar = (...args) =>
   execFileSync("git", ["ls-files", ...args], { cwd: RAIZ, encoding: "utf-8" })
     .trim()
@@ -516,4 +548,60 @@ test("ningun `/opsx:` viaja dentro de una cerca de terminal", () => {
       `linea que diga que es de la sesion del agente:\n  ${malas.join("\n  ")}`,
   );
   assert.equal(vistos, 0);
+});
+
+// ---------------------------------------------------------------------------
+// LO QUE EL AGENTE NECESITA CORRER, CONTRA LO QUE EL PROYECTO LE PERMITE.
+//
+// EL DEFECTO QUE ESTE BANCO CIERRA, medido en un proyecto recien generado: los
+// seis comandos `/opsx:*` mandan correr `openspec …` A SECAS, y ese programa no
+// existe —ni en el sistema, ni en node_modules/.bin, ni en las dependencias—.
+// docs/09 manda usar `/opsx:apply` para implementar, asi que el tramo de
+// construir se trababa ahi.
+//
+// Y habia una segunda mitad: aun con la forma correcta, `instructions`,
+// `context`, `schemas` y `store` no estaban en el allowlist del proyecto.
+// ---------------------------------------------------------------------------
+
+test("el allowlist del proyecto cubre todo lo que los comandos /opsx: mandan correr", () => {
+  const pin = pinDeOpenspec();
+  const settings = fs.readFileSync(path.join(RAIZ, "plantilla/.claude/settings.json"), "utf-8");
+
+  const faltan = SUBCOMANDOS_QUE_USA_OPSX.filter((c) => {
+    if (c in FUERA_DEL_ALLOWLIST) return false;
+    const raiz = c.split(" ")[0];
+    return !settings.includes(`openspec@${pin} ${raiz}`);
+  });
+  assert.deepEqual(
+    faltan,
+    [],
+    `los comandos /opsx: mandan correr estos subcomandos y el allowlist del proyecto no los cubre, asi que la sesion ` +
+      `del agente pide permiso —o se traba— justo en el tramo de construir: ${faltan.join(", ")}`,
+  );
+
+  // Y AL REVES: lo que se excluye a proposito no puede estar. Un `archive`
+  // permitido dejaria al agente cerrando changes sin el rastro que el marco pide.
+  for (const [c, motivo] of Object.entries(FUERA_DEL_ALLOWLIST)) {
+    assert.equal(
+      settings.includes(`openspec@${pin} ${c}`),
+      false,
+      `\`${c}\` esta en el allowlist y tenia que quedar afuera: ${motivo}`,
+    );
+  }
+});
+
+test("el proyecto le DICE al agente que `openspec` pelado no existe", () => {
+  // Los archivos de `.claude/commands/opsx/` son de la herramienta y `openspec
+  // update` los reescribe: editarlos seria mantener un fork ajeno. La
+  // sustitucion se declara en el AGENTS.md del proyecto, que es donde este
+  // repositorio habla y lo que el agente lee primero.
+  const agents = fs.readFileSync(path.join(RAIZ, "plantilla/AGENTS.md"), "utf-8");
+  const pin = pinDeOpenspec();
+
+  assert.match(agents, /openspec` no está instalado|no está instalado en esta máquina/i, "tiene que decirlo con todas las letras");
+  assert.ok(
+    agents.includes(`@fission-ai/openspec@${pin}`),
+    `y dar la forma invocable con el pin ${pin}, que es la misma que usa el pipeline`,
+  );
+  assert.match(agents, /archive/, "y nombrar la excepcion: cerrar un change usa la skill del marco");
 });
