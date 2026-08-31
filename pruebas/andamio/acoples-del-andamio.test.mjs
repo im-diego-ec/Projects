@@ -635,3 +635,83 @@ test("andamio · la comprobacion de la organizacion MUERDE", () => {
     assert.notDeepEqual(problemasDeOrganizacion(copia), [], "una organizacion escrita a mano en la portada no fue detectada");
   });
 });
+
+// ---------------------------------------------------------------------------
+// LOS TRES IGNORES TIENEN QUE COINCIDIR SOBRE LO QUE OTRA HERRAMIENTA ESCRIBE.
+//
+// EL DEFECTO QUE ESTE BANCO CIERRA, medido en un sitio recien generado:
+// `astro build` escribe `sitio/.astro/{content,types}.d.ts`, y eso no estaba en
+// ningun ignore. Consecuencia: `pnpm verificar` salia 0 la PRIMERA vez y 1 la
+// SEGUNDA, sin tocar una linea, con seis errores de eslint sobre archivos que
+// la persona no escribio. Y el `git add -A` del Paso 9 de docs/04 los subia al
+// primer commit, dejando el CI rojo por lo mismo.
+//
+// LO QUE ESTE BANCO NO PUEDE AFIRMAR, dicho primero: no corre `pnpm verificar`
+// dos veces —eso pide un install con red y varios minutos—. Lo que se midio a
+// mano, el 2026-08-31, sobre un sitio recien generado: con estas lineas las
+// tres corridas seguidas salen 0, y sin ellas la segunda sale 1.
+//
+// LO QUE SI PUEDE, y es lo que sostiene: que los tres ignores no discrepen. Un
+// directorio que otra herramienta reescribe y que git ignora tiene que estar
+// tambien fuera del linter y del formateador; si no, el rojo aparece la segunda
+// vez que alguien corre la verificacion y no habla de lo que pasa.
+// ---------------------------------------------------------------------------
+
+/** Directorios que OTRA herramienta escribe y este repo no policia.
+ *
+ *  Cada uno con quien lo escribe, porque la lista solo tiene sentido si se sabe
+ *  por que esta cada linea. */
+const GENERADOS = [
+  { dir: "coverage", quien: "el reporte HTML que escribe `pnpm test`" },
+  { dir: ".astro", quien: "los tipos de colecciones que escribe `astro build`" },
+];
+
+/** Si un texto de ignores nombra ese directorio como un segmento de ruta.
+ *
+ *  Se compara por SEGMENTOS y no por subcadena: `.astro` aparece tambien en
+ *  `index.astro`, que es un archivo fuente del proyecto y no un generado. */
+function ignoraElDirectorio(texto, dir) {
+  return texto
+    .split("\n")
+    .filter((l) => !l.trim().startsWith("#"))
+    .some((l) => l.split(/[\s,"'[\]]+/).some((t) => t.split("/").includes(dir)));
+}
+
+test("lo que otra herramienta escribe esta fuera de git y del linter", () => {
+  // LOS DOS QUE SE EXIGEN SON LOS DOS QUE SE MIDIERON EN ROJO. El formateador
+  // NO esta en la lista, y no por olvido: medido el 2026-08-31 sobre una
+  // aplicacion recien generada, con `coverage/` presente y SIN declararlo en
+  // .prettierignore, `pnpm format:check` sale 0. Exigirlo seria pedir una linea
+  // que no arregla nada, y una regla que no corresponde a un rojo real es como
+  // empiezan los ignores que nadie sabe por que estan.
+  const donde = {
+    ".gitignore": ["un `git add -A` lo commitea y el CI nace rojo"],
+    "eslint.config.mjs": ["la SEGUNDA verificacion sale roja sobre archivos que nadie escribio"],
+  };
+  const faltan = [];
+  for (const [archivo, [consecuencia]] of Object.entries(donde)) {
+    const texto = fs.readFileSync(path.join(ANDAMIO, archivo), "utf-8");
+    for (const { dir, quien } of GENERADOS) {
+      if (!ignoraElDirectorio(texto, dir)) faltan.push(`${dir} (${quien}) falta en ${archivo}: ${consecuencia}`);
+    }
+  }
+  assert.deepEqual(
+    faltan,
+    [],
+    "un directorio que otra herramienta reescribe tiene que estar fuera de los TRES. Si falta en uno solo, el rojo " +
+      `aparece la segunda vez que alguien verifica y no habla de lo que pasa:\n  ${faltan.join("\n  ")}`,
+  );
+});
+
+test("MUERDE: sacar la linea de uno de los tres se caza, y un archivo fuente no la simula", () => {
+  const gitignore = fs.readFileSync(path.join(ANDAMIO, ".gitignore"), "utf-8");
+  assert.equal(ignoraElDirectorio(gitignore, ".astro"), true, "tiene que ver la linea que si esta");
+  assert.equal(
+    ignoraElDirectorio(gitignore.split("\n").filter((l) => !l.includes(".astro")).join("\n"), ".astro"),
+    false,
+    "y no verla cuando se la saca",
+  );
+  // Y la otra mitad: `src/pages/index.astro` NO puede hacer pasar el control.
+  // Comparar por subcadena lo haria, y ese es el error facil.
+  assert.equal(ignoraElDirectorio("sitio/src/pages/index.astro\n", ".astro"), false, "un archivo fuente no es el directorio");
+});
