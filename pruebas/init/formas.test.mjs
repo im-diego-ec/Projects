@@ -733,12 +733,32 @@ test("un sitio no recibe infraestructura de nube aunque se elija AWS", () => {
 
 test("la portada de cada forma no nombra una sola ruta que ese proyecto no tenga", async () => {
   const pregunta = PREGUNTAS.find((p) => p.id === "forma");
+  const plataformas = PREGUNTAS.find((p) => p.id === "plataforma").opciones;
   const rotos = [];
-  for (const o of pregunta.opciones) {
+  // SE CRUZAN LAS DOS PREGUNTAS, y no es exceso: el defecto que motivo este caso
+  // vivia justo en un cruce —sitio + AWS—, donde una poda mira la forma y la
+  // otra miraba solo la plataforma. Probar un factor por vez lo dejaba pasar.
+  const combos = pregunta.opciones.flatMap((o, i) =>
+    plataformas.map((pl, j) => ({ o, forma: String(i + 1), plataforma: String(j + 1), etiqueta: `${o.valor}+${pl.valor}` })),
+  );
+  for (const { o, forma, plataforma, etiqueta } of combos) {
     const destino = fs.mkdtempSync(path.join(os.tmpdir(), `rutas-${o.valor}-`));
-    const idx = String(pregunta.opciones.indexOf(o) + 1);
     const { valores } = await correrAsistente(
-      async (_t, id) => ({ PROYECTO: "p", ORG: "o", forma: idx })[id] ?? "",
+      // Elegir AWS abre cinco preguntas de texto libre; sin contestarlas el
+      // asistente se queda esperando y corta a los 50 reintentos, que es su
+      // techo. Lo que este caso mide es la portada, no el cuestionario.
+      async (_t, id) =>
+        ({
+          PROYECTO: "p",
+          ORG: "o",
+          forma,
+          plataforma,
+          CUENTA_DEV: "111111111111",
+          CUENTA_PROD: "222222222222",
+          REGION: "us-east-1",
+          PERFIL_DEV: "dev",
+          PERFIL_PROD: "prod",
+        })[id] ?? "",
       {},
       {},
       () => {},
@@ -758,22 +778,22 @@ test("la portada de cada forma no nombra una sola ruta que ese proyecto no tenga
       const r = m[1];
       if (LOS_ESCRIBE_UN_PASO_POSTERIOR.includes(r)) continue;
       if (r.endsWith("/") && !fs.existsSync(path.join(destino, r.slice(0, -1)))) {
-        rotos.push(`${o.valor}: la portada nombra "${r}" y ese proyecto no lo tiene`);
+        rotos.push(`${etiqueta}: la portada nombra "${r}" y ese proyecto no lo tiene`);
       }
       if (!r.endsWith("/") && !fs.existsSync(path.join(destino, r))) {
-        rotos.push(`${o.valor}: la portada nombra "${r}" y ese proyecto no lo tiene`);
+        rotos.push(`${etiqueta}: la portada nombra "${r}" y ese proyecto no lo tiene`);
       }
     }
 
     // Y al reves: el paquete que SI trae tiene que estar en la tabla.
     const paquetes = paquetesDe(destino);
     for (const p of paquetes) {
-      if (!readme.includes(`\`${p}/\``)) rotos.push(`${o.valor}: "${p}/" es un paquete del proyecto y la portada no lo nombra`);
+      if (!readme.includes(`\`${p}/\``)) rotos.push(`${etiqueta}: "${p}/" es un paquete del proyecto y la portada no lo nombra`);
     }
 
     // Y el aviso sobre publicar aparece UNA vez, no dos.
     const avisos = (readme.match(/⚠️ \*\*(Todavía no hay despliegue|Este proyecto todavía no se publica)/g) ?? []).length;
-    if (avisos > 1) rotos.push(`${o.valor}: la portada repite el aviso de que no se publica ${avisos} veces`);
+    if (avisos > 1) rotos.push(`${etiqueta}: la portada repite el aviso de que no se publica ${avisos} veces`);
   }
   assert.deepEqual(
     rotos,
