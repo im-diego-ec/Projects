@@ -204,7 +204,7 @@ resultado.
 Lo que **no** hace, porque no es transcripción:
 
 1. **Crear el repo vacío** en la organización.
-2. **Decidir los valores.** Los 21 que la herramienta pide salen de la tabla de
+2. **Decidir los valores.** Los que la herramienta pide salen de la tabla de
    `plantilla/README.md` sección 2, con ejemplo y caso borde cada uno (el 22.º,
    `{{PAQUETES}}`, **no se pregunta**: se deriva de los tres paquetes). Tres tienen
    un camino "si no existe" que exige borrar bloques a mano: la herramienta los
@@ -337,27 +337,31 @@ Los ejemplos de la tabla son **inventados a propósito**: en el marco no se
 escriben handles, cuentas ni dominios reales de ningún proyecto. Es una frontera
 🛑 de [AGENTS.md](AGENTS.md) y un ítem del checklist de PR.
 
-**La tabla es la lista COMPLETA de los 21, y eso es una frontera 🛑 de
+**La tabla es la lista COMPLETA de los marcadores, y eso es una frontera 🛑 de
 [AGENTS.md](AGENTS.md)** («Dejar `{{PLACEHOLDER}}` sin documentar en el README»).
-Que esté completa se comprueba con un comando, y hasta que un caso de banco lo corra
-solo, la única defensa es correrlo:
+Que esté completa **ya lo comprueba un caso del banco** —el que falta abajo era
+justamente lo que faltaba, y la tabla se había quedado en 21 de 23 sin que nada lo
+dijera—. Para verlo a mano:
 
 ```bash
 diff <(grep -rhoE '\{\{[A-Z0-9_]+\}\}' plantilla --exclude=README.md | sort -u) \
      <(grep -oE '^\| `\{\{[A-Z0-9_]+\}\}`' README.md | grep -oE '\{\{[A-Z0-9_]+\}\}' | sort -u)
 ```
 
-Hoy no imprime nada. El caso que falta vive en `pruebas/andamio/manifiestos.test.mjs`
-y compara `REQUERIDOS` de `herramientas/projects-init.mjs` contra esta tabla **y** la
-de `plantilla/README.md`.
+No imprime nada cuando la tabla está completa. El caso que lo sostiene vive en
+`pruebas/andamio/manifiestos.test.mjs` y compara `REQUERIDOS` de
+`herramientas/projects-init.mjs` contra esta tabla **y** la de `plantilla/README.md`,
+en las dos direcciones: una fila de menos y una fila de más son los dos un error.
 
 | Placeholder | Qué es | Ejemplo |
 |---|---|---|
 | `{{PROYECTO}}` | Nombre del proyecto y del repo | `people-agenda` |
-| `{{ORG}}` | Organización de GitHub: el handle de la org, no un equipo dentro de ella. Se interpola en `uses: {{ORG}}/Projects/...` | `Ejemplo-Org` |
+| `{{ORG}}` | Cuenta de GitHub **del proyecto**: el handle, no un equipo dentro de ella. Se interpola en `{{ORG}}/{{PROYECTO}}` y en `@{{ORG}}/<equipo>` | `Ejemplo-Org` |
+| `{{ORG_MARCO}}` | Cuenta de GitHub **donde vive el marco**, que puede no ser la del proyecto. Es la que resuelven los `uses:` del pipeline. **No se pregunta: se deriva** del remoto del clon | `im-diego-ec` |
 | `{{PAQUETE_API}}` | Carpeta del paquete de backend en el monorepo | `api` |
 | `{{PAQUETE_WEB}}` | Carpeta del paquete de frontend. Si el proyecto no tiene frontend, el valor se pide igual y quedan los bloques `[FRONT]` de `eslint.config.mjs` **y sus imports**, que hay que borrar a mano | `web` |
 | `{{PAQUETE_E2E}}` | Carpeta de la suite end-to-end. Sin suite E2E, hay que borrar esa entrada del glob de Node **y** las dos excepciones de `ci.yml` | `e2e` |
+| `{{PAQUETE_SITIO}}` | Carpeta del sitio, cuando la forma elegida es «un sitio para leer». En la forma «aplicación» esa carpeta no viaja | `sitio` |
 | `{{GENERAR_CLIENTE_DATOS}}` | El comando que genera el cliente de la capa de datos, que el CI corre antes de compilar. Si el proyecto no genera ninguno, borrar el paso de `.github/workflows/ci.yml` **no alcanza**: el mismo valor viaja al script `datos` de `package.json` y al `build` de `api/package.json`, donde sin comando queda un `&&` colgando. `grep -rn GENERAR_CLIENTE_DATOS plantilla/` los enumera todos | `prisma generate` |
 | `{{EQUIPO_BUILDERS}}` | Slug del equipo de builders en la org (va en `CODEOWNERS`) | `builders` |
 | `{{EQUIPO_PO}}` | Slug del equipo del PO (va en `CODEOWNERS`) | `po` |
