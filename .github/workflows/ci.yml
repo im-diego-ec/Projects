@@ -850,7 +850,7 @@ jobs:
   # el veredicto lo cuenta como exito SOLO si la deteccion dijo solo-docs.
   # EL CHANGELOG ES OBLIGATORIO EN EL PR QUE INTRODUCE EL CAMBIO, y hasta hoy la
   # regla estaba enunciada y sin check (fila 20 del backlog de
-  # docs/10-reglas-no-escritas.md).
+  # docs/11-reglas-no-escritas.md).
   #
   # POR QUE IMPORTA MAS QUE UNA FORMALIDAD. El CHANGELOG es la UNICA superficie por
   # la que un consumidor se entera de que el marco se movio bajo sus pies: pina una

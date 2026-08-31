@@ -49,7 +49,7 @@ Lo bueno y lo caro. Si la decisión tiene fecha de vencimiento o un
 
 Qué check falla solo cuando alguien se aparta. Si la respuesta es "nadie
 lo revisa", el ADR está incompleto: o se automatiza, o entra al backlog de
-[reglas no escritas](../10-reglas-no-escritas.md).
+[reglas no escritas](../11-reglas-no-escritas.md).
 ```
 
 La última sección es propia de Projects y no es decorativa: **una decisión

@@ -290,7 +290,7 @@ adelante se abren el día que hace falta y no antes.
 | **07** | [07-para-el-builder.md](07-para-el-builder.md) | La otra mitad del reparto: qué le toca a quien construye. Aunque hagas los dos roles, vale leer la que no estás ocupando |
 | **08** | [08-descubrimiento.md](08-descubrimiento.md) | De los documentos del negocio a saber **qué** hay que construir. Es el tramo que más tiempo lleva y el único que no puede hacer una herramienta sola |
 | **09** | [09-construir-con-openspec.md](09-construir-con-openspec.md) | De eso a un cambio que otra persona pueda revisar y aprobar. Es el **cómo** |
-| **10** | [10-reglas-no-escritas.md](10-reglas-no-escritas.md) | Cómo se trabaja adentro una vez que todo anda |
+| **10** | [11-reglas-no-escritas.md](11-reglas-no-escritas.md) | Cómo se trabaja adentro una vez que todo anda |
 
 Y el [`README.md`](../README.md) del repositorio, que es la puerta de entrada
 para el equipo entero, empezando por la tabla de incidentes: cada verificación

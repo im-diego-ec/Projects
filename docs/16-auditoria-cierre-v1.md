@@ -4,7 +4,7 @@
 > imperativo («no mergear», «no mover `v1`») sobre PRs que estaban abiertos ese día
 > y sobre un canal de distribución que ya no existe: **el tag móvil `v1` dejó de ser
 > el canal el 2026-08-21**, el día siguiente a esta corrida (`AGENTS.md`, sección
-> del tag móvil). Un `git log --oneline docs/15-auditoria-cierre-v1.md` da la fecha de
+> del tag móvil). Un `git log --oneline docs/16-auditoria-cierre-v1.md` da la fecha de
 > la foto; el `CHANGELOG.md` da todo lo que pasó después.
 >
 > **Para qué sirve entonces:** es el registro de método —veinte afirmaciones puestas
@@ -12,7 +12,7 @@
 > lista de hallazgos que se citan por número desde otros documentos. Se lee para
 > saber **qué se midió y cómo**, nunca para saber qué hacer ahora. Si un hallazgo de
 > acá sigue vivo, lo que manda es la fila que le corresponda en
-> [10-reglas-no-escritas.md](10-reglas-no-escritas.md), no este archivo.
+> [11-reglas-no-escritas.md](11-reglas-no-escritas.md), no este archivo.
 >
 > Su categoría en el [índice](README.md) es **Histórico**: no se edita para ponerlo
 > al día. Corregirlo borraría el dato que lo hace valioso, que es qué se sabía el
@@ -665,7 +665,7 @@ interaccion.
     `actions/setup-node@v7` 6 veces), contra su propia frontera que exige SHA. Y no hay Dependabot
     en Projects que las suba: `git cat-file -e <rama>:.github/dependabot.yml` falla en las 6 ramas
     revisadas, mientras el scaffold reparte uno con ecosistema `github-actions` semanal y
-    `docs/10-reglas-no-escritas.md` cuenta "Dependabot semanal" entre lo que YA es automatico. La
+    `docs/11-reglas-no-escritas.md` cuenta "Dependabot semanal" entre lo que YA es automatico. La
     asimetria es visible: `anthropics/claude-code-action` si esta pinada por SHA, `actions/*` no,
     sin motivo escrito. Tampoco hay check de pines de `uses:`.
 12. `aviso-version` esta construido y no puede entregar nada: `gh secret list` y
@@ -674,7 +674,7 @@ interaccion.
     avisarle a ningun consumidor, y el aviso de eso es un `::warning::` dentro del resumen de una
     corrida que nadie abre, mientras la constitucion que reciben los proyectos dice que estar en
     el canal de avisos es requisito del proyecto.
-13. `docs/10-reglas-no-escritas.md` esta desactualizado en las dos direcciones a la vez. La fila 10
+13. `docs/11-reglas-no-escritas.md` esta desactualizado en las dos direcciones a la vez. La fila 10
     ("Cobertura por diff") sigue en rojo aunque `actions/cobertura-diff/action.yml` esta en main
     (`git cat-file -e main:...` da exit 0), y PR 12, que es el PR que archiva el change que la
     construyo, EDITA ese archivo para agregar la fila 14 sin cerrar la 10. En el otro sentido, la

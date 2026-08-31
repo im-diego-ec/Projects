@@ -329,7 +329,7 @@ test("ningun bloque para copiar invoca `openspec` de una forma que no existe en 
     // docs/11 es la pagina del UPGRADE: su tema es cambiar el pin, asi que
     // escribe `X.Y.Z` a proposito. Exigirle una version concreta la volveria
     // una receta para la version vieja, que es lo contrario de lo que hace.
-    if (f === "docs/11-upgrade-openspec.md") continue;
+    if (f === "docs/12-upgrade-openspec.md") continue;
     for (const bloque of bloquesBash(fs.readFileSync(path.join(RAIZ, f), "utf-8"))) {
       for (const linea of bloque.split("\n")) {
         const t = linea.trim();
@@ -359,7 +359,7 @@ test("todo subcomando de openspec que la documentacion manda copiar esta en el a
 
   const usados = new Set();
   for (const f of docs()) {
-    if (f === "docs/11-upgrade-openspec.md") continue;
+    if (f === "docs/12-upgrade-openspec.md") continue;
     for (const bloque of bloquesBash(fs.readFileSync(path.join(RAIZ, f), "utf-8"))) {
       for (const m of bloque.matchAll(new RegExp(`@fission-ai/openspec@${pin.replace(/\./g, "\\.")}\\s+([a-z]+)(?:\\s+([a-z]+))?`, "g"))) {
         usados.add(m[1] === "new" && m[2] ? `${m[1]} ${m[2]}` : m[1]);

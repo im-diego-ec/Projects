@@ -66,7 +66,7 @@ adentro de WSL tu verificación y la del pipeline corren sobre el mismo sistema 
 las rutas. Las cuatro filas de sistema de archivos de la tabla de fallos silenciosos del final
 **desaparecen** en WSL; ninguna desaparece en PowerShell. Y hay una quinta, medida en este
 repo: `openspec archive` sobre Windows nativo imprime **`Specs updated successfully`** y no
-aplica nada ([11-upgrade-openspec.md, trampa 3](11-upgrade-openspec.md)).
+aplica nada ([12-upgrade-openspec.md, trampa 3](12-upgrade-openspec.md)).
 
 PowerShell nativo **sigue soportado** —hay quien no puede instalar WSL— y por eso los pares
 existen. Lo que **no** está soportado es `cmd.exe`, ni **Windows PowerShell 5.1**: la consola
@@ -107,12 +107,12 @@ un 29 porque la sección 3.1 sumó un bloque `node --input-type=module`, que **s
 en las dos shells — pero eso lo decidió una lectura, no el conteo. Distinguir un caso del otro a máquina pide adivinar qué comando
 corre igual en las dos shells, y adivinar es exactamente lo que un check no debe hacer; así
 que eso hoy lo ve una persona leyendo el diff, y por eso es otra fila del mismo
-[backlog de automatización](10-reglas-no-escritas.md#backlog-de-automatización) que la
+[backlog de automatización](11-reglas-no-escritas.md#backlog-de-automatización) que la
 comprobación de prerrequisitos del punto 3. Ojo con esa ancla si la vas a buscar con `grep`:
 lleva tilde, y `grep -i` pliega mayúsculas pero **no** acentos, así que escrita sin tilde la
 búsqueda devuelve **cero** coincidencias y sale **1** — que se lee como que el enlace está
 roto, cuando no lo está. Lo que sí lo demuestra es buscar el encabezado del otro lado:
-` grep -n '^## Backlog de automatización' docs/10-reglas-no-escritas.md ` contesta con una sola
+` grep -n '^## Backlog de automatización' docs/11-reglas-no-escritas.md ` contesta con una sola
 línea, la 475.
 
 ⚠️ **Ninguno de los nueve gemelos se ejecutó, y en CI no corre ninguno.** El
@@ -257,7 +257,7 @@ marco dice que eso no cuenta. Lo que la convertiría en algo que falla solo es u
 de arriba, imprima cuál falló y salga distinto de 0. No se implementa acá — esta guía es la
 **especificación de qué tiene que comprobar**, no el lugar donde vive. Mientras no exista,
 el ítem es una fila del
-[backlog de automatización](10-reglas-no-escritas.md#backlog-de-automatización).
+[backlog de automatización](11-reglas-no-escritas.md#backlog-de-automatización).
 
 ### 4. Los documentos del negocio, si ya existen
 
@@ -499,7 +499,7 @@ las dos herramientas, --sin-herramientas tampoco lo pide.
 
 Las dos salidas son literales: o corrés desde un clon completo —que es lo normal y lo que
 dice la sección 2 de esta guía— o pasás el pin a mano. Para saber qué número pasar, el
-comando está en [11-upgrade-openspec.md](11-upgrade-openspec.md); si no tenés el archivo, tampoco
+comando está en [12-upgrade-openspec.md](12-upgrade-openspec.md); si no tenés el archivo, tampoco
 tenés de dónde leerlo, así que sale del repo del marco en GitHub.
 
 **Espera una versión EXACTA**, no un rango ni `latest`, y lo comprueba **antes** de tocar
@@ -884,7 +884,7 @@ Bash, que corren sobre NTFS igual. La postura completa está en «Antes de empez
 | **Fin de línea (CRLF)** | `pnpm verificar` sale rojo en el paso de formato sobre archivos que **nadie tocó**, y `git diff` no muestra nada: `[warn] Code style issues found in the above file(s). Run Prettier with --write to fix.` Está medido en este marco, el 2026-08-19: con `core.autocrlf=true` —el default de Git para Windows— los fixtures llegaban en CRLF, las pruebas los escribían en LF, y el diff veía el archivo entero reescrito: el caso «un cambio que solo **borra** líneas» pasaba a tener **2 líneas agregadas** y salía con **EXIT 1**. Quedaban 90 de 91 pruebas verdes, y la única roja lo era por el fin de línea del disco, no por el código | El andamio trae `.gitattributes` con `* text=auto eol=lf`, y por eso no es cosmético. Pero solo gobierna **desde** la fase 3: un checkout hecho antes ya está en CRLF en disco. `git config --global core.autocrlf false` y después `git add --renormalize .` |
 | **Mayúsculas del sistema de archivos** | Verde en tu máquina, rojo en el CI y solo ahí: `error TS2307: Cannot find module './Boton'`. macOS y Windows no distinguen `boton.tsx` de `Boton.tsx`; Linux sí. Su hermano peor es el renombre: `git mv boton.tsx Boton.tsx` en macOS o Windows **no hace nada y no dice nada**, así que el repo se queda con el nombre viejo y vos ves el nuevo | `git config core.ignorecase false` en el repo, y renombrar con `git mv -f`. El typecheck ya ayuda —`forceConsistentCasingInFileNames` está prendido en el `tsconfig.base.json` del andamio— pero solo sobre lo que pasa por el compilador: la ruta de una imagen, un nombre dentro de un glob o un archivo nombrado en el YAML del CI no los mira nadie hasta el runner |
 | **Windows PowerShell 5.1 en vez de `pwsh` 7** | Dos cortes exactos: `The token '&&' is not a valid statement separator in this version.` en las fases 4 y 5, y un `valores.json` en **UTF-16** que la fase 3 rechaza como JSON inválido en el primer carácter — lo que se lee como que llenaste mal el archivo | Instalar `pwsh` 7, que es un paquete aparte y convive con el 5.1. `$PSVersionTable.PSVersion.Major` tiene que decir 7 |
-| **`openspec archive` sobre Windows nativo** | Imprime **`Specs updated successfully`** y hace rollback de todo, specs incluidos. Verificado el 2026-08-14, reproducido dos veces | No mirar el mensaje: mirar `git status --short`. El procedimiento y los tres rodeos están en [11-upgrade-openspec.md, trampa 3](11-upgrade-openspec.md) |
+| **`openspec archive` sobre Windows nativo** | Imprime **`Specs updated successfully`** y hace rollback de todo, specs incluidos. Verificado el 2026-08-14, reproducido dos veces | No mirar el mensaje: mirar `git status --short`. El procedimiento y los tres rodeos están en [12-upgrade-openspec.md, trampa 3](12-upgrade-openspec.md) |
 
 ---
 
@@ -902,4 +902,4 @@ Sus dos reglas de uso, acá también porque son las que se rompen: **no arregles
 guía mientras la corrés** —arreglar sobre la marcha te deja un documento que
 funciona para vos y para nadie más, y borra el dato que vinimos a buscar— y **un
 tropiezo cuyo arreglo empieza con «hay que recordar que…» no va a la guía**: va como
-fila al backlog de [reglas no escritas](10-reglas-no-escritas.md#backlog-de-automatización).
+fila al backlog de [reglas no escritas](11-reglas-no-escritas.md#backlog-de-automatización).

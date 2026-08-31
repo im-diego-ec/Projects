@@ -864,11 +864,63 @@ es como esta guía se corrige, y no adivinando.
 
 ---
 
+## Paso 14 — Averiguar cómo sale de tu máquina · *2 minutos*
+
+**Qué vas a hacer.** Llegaste hasta acá con un repositorio en verde, y falta la
+pregunta que motivó todo: **¿cómo lo ve otra persona?** La respuesta depende de
+qué elegiste construir en el Paso 3, y conviene saberla ahora y no después de
+buscar un botón que no está. Este paso no publica nada: te dice cuál de los dos
+caminos te tocó.
+
+**Qué copiar** (en la carpeta de tu proyecto):
+
+```bash
+grep '"forma"' .projects-valores.json
+```
+
+**Qué vas a ver.** Una sola línea, con una de estas dos palabras:
+
+```
+  "forma": "sitio",
+```
+
+```
+  "forma": "aplicacion",
+```
+
+Qué significa cada una:
+
+| Si dice | Qué pasa |
+| --- | --- |
+| `"sitio"` | Ya trae todo lo necesario para publicarse. Faltan **dos actos humanos de una sola vez**: abrir una cuenta de Cloudflare (gratis, sin tarjeta) y crear una credencial |
+| `"aplicacion"` | El marco **todavía no reparte un paso que publique**. Se levanta en tu máquina con `pnpm dev`, y el día que ese paso exista llega solo, subiendo la versión del marco |
+
+**Cómo sabés que salió bien.** Sabés cuál de las dos te tocó, y por lo tanto si
+te queda trabajo por hacer o no. Las dos respuestas son buenas: ninguna de las
+dos es un error de tu proyecto.
+
+**Y ahora sí, el paso a paso: [10-publicar.md](10-publicar.md)**, la última
+página del camino. Ahí está lo que más fácil se hace mal —hay dos tipos de
+credencial de Cloudflare y la equivocada falla por permisos, con un error que no
+dice cuál era la correcta— y cómo **ensayar la publicación sin tener cuenta
+todavía**.
+
+> **Una cosa que conviene saber desde hoy**, aunque no publiques nunca: el paso
+> de publicación corre **sólo cuando las verificaciones terminan en verde** sobre
+> `main`. Si algún día publicaste y después dejaste de ver tus cambios, lo
+> primero que hay que mirar no es Cloudflare: es la pestaña **Actions**.
+
+---
+
 ## Si querés seguir
 
 - [01-introduccion.md](01-introduccion.md) — qué es esto y por
   qué existe, cuánto cuesta y qué decisiones te va a pedir.
 - [02-glosario.md](02-glosario.md) — cada palabra propia del marco en una línea.
+- [08-descubrimiento.md](08-descubrimiento.md) — el tramo siguiente: de una idea
+  a un documento que dice qué hay que construir.
+- [10-publicar.md](10-publicar.md) — el último tramo: cómo sale a una dirección
+  donde entra la gente.
 - [06-para-el-po.md](06-para-el-po.md) — si además vas a aprobar cambios: qué te toca
   y con qué cuatro preguntas se devuelve uno.
 - [05-arrancar-tecnico.md](05-arrancar-tecnico.md) — la misma ruta, en versión

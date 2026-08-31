@@ -14,7 +14,7 @@ escribió.
 
 **2. Un tropiezo cuyo arreglo es «acordate» no es un arreglo.** Si la corrección
 que se te ocurre empieza con *hay que recordar que…*, no va a la guía: va como fila
-al [backlog](../10-reglas-no-escritas.md#backlog-de-automatización). La premisa del
+al [backlog](../11-reglas-no-escritas.md#backlog-de-automatización). La premisa del
 marco es que un ritual que alguien debe recordar no cuenta como enforcement, y eso
 vale también para la documentación.
 
