@@ -118,13 +118,74 @@ test("el paso a paso humano esta escrito, y dice que es humano", () => {
   );
 });
 
-test("MUERDE: sacar la condicion del verde se caza", () => {
-  // El caso que prueba que el de arriba no pasa por vacuidad. Se muta el texto
-  // en memoria, sin tocar el arbol.
-  const mutado = workflow().replace(/github\.event\.workflow_run\.conclusion == 'success'/, "true");
-  assert.equal(
-    /github\.event\.workflow_run\.conclusion == 'success'/.test(mutado),
-    false,
-    "con la condicion sacada, la deteccion tiene que ver que no esta",
+test("dos publicaciones a la vez HACEN COLA: ninguna cancela a la otra", () => {
+  // EL DEFECTO QUE ESTE CASO VIGILA: el workflow traia `cancel-in-progress:
+  // true` y un comentario que defendia lo contrario de lo que el marco exige.
+  //
+  // `openspec/specs/despliegue-ci/spec.md` lo escribe con su motivo: una corrida
+  // de VERIFICACION interrumpida no deja nada —cancelarla es correcto—, pero una
+  // de DESPLIEGUE si deja estado, y entonces el destino queda en una combinacion
+  // que ninguna de las dos corridas describe mientras las dos reportan exito.
+  // Se miran las lineas EJECUTABLES: el comentario de al lado nombra el valor
+  // viejo para explicar por que se cambio, y buscar en el texto entero haria
+  // que documentar la decision rompiera el control que la sostiene.
+  const t = workflow();
+  const ejecutable = t
+    .split("\n")
+    .filter((l) => !/^\s*#/.test(l))
+    .join("\n");
+  assert.match(t, /concurrency:/, "sin grupo de concurrencia, dos publicaciones corren a la vez");
+  assert.match(ejecutable, /cancel-in-progress:\s*false/, "un despliegue interrumpido deja el destino a medias con las dos en verde");
+  assert.equal(/cancel-in-progress:\s*true/.test(ejecutable), false);
+});
+
+test("el workflow que espera existe de verdad, con ese nombre exacto", () => {
+  // Un `workflows: ["ci"]` que no corresponde al `name:` de ningun workflow del
+  // arbol no falla: simplemente NUNCA dispara. Es la forma mas silenciosa de
+  // quedarse sin despliegue, y ningun rojo la anuncia.
+  const sinComentarios = workflow()
+    .split("\n")
+    .filter((l) => !/^\s*#/.test(l))
+    .join("\n");
+  const esperados = [...sinComentarios.matchAll(/workflows:\s*\[([^\]]+)\]/g)].flatMap((m) =>
+    m[1].split(",").map((x) => x.trim().replace(/^["']|["']$/g, "")),
   );
+  assert.ok(esperados.length >= 1, "el workflow tiene que esperar a alguno, o este control no mira nada");
+
+  const dir = path.join(ANDAMIO, ".github/workflows");
+  const nombres = fs
+    .readdirSync(dir)
+    .filter((f) => f.endsWith(".yml"))
+    .map((f) => (fs.readFileSync(path.join(dir, f), "utf-8").match(/^name:\s*(.+)$/m) ?? [])[1]?.trim())
+    .filter(Boolean);
+  for (const e of esperados) {
+    assert.ok(nombres.includes(e), `desplegar.yml espera al workflow "${e}" y ninguno del andamio se llama asi: ${nombres.join(", ")}`);
+  }
+});
+
+test("cada `-C <paquete>` del despliegue apunta a una carpeta que la forma reparte", () => {
+  // El despliegue solo viaja a la forma `sitio`. Si nombrara un paquete que esa
+  // forma no trae, el paso moriria en la publicacion —despues de que el CI ya
+  // dijo verde—, que es el peor momento para descubrirlo.
+  const paquetes = [...workflow().matchAll(/-C\s+\{\{(\w+)\}\}/g)].map((m) => m[1]);
+  assert.ok(paquetes.length >= 1, "el workflow tiene que compilar algun paquete, o este control mide aire");
+  for (const marcador of paquetes) {
+    assert.equal(marcador, "PAQUETE_SITIO", `el despliegue nombra {{${marcador}}}, que la forma sitio no reparte`);
+  }
+});
+
+test("MUERDE: sacar la condicion del verde se caza DE VERDAD", () => {
+  // LA VERSION ANTERIOR DE ESTE CASO ERA TAUTOLOGICA. Hacia
+  // `workflow().replace(/…success'/, "true")` y despues afirmaba que el regex ya
+  // no matcheaba. Con un regex sin `g`, si la cadena NO esta, `replace` es un
+  // no-op y el aserto pasa igual: no podia fallar NUNCA contra un archivo que
+  // hubiera perdido la condicion. Era el unico anti-vacuidad del banco y no
+  // media nada.
+  //
+  // Ahora se afirma primero que la condicion ESTA, que es lo que lo vuelve una
+  // mutacion y no un deseo.
+  const CONDICION = /github\.event\.workflow_run\.conclusion == 'success'/;
+  const t = workflow();
+  assert.match(t, CONDICION, "el archivo real tiene que traer la condicion: sin eso, mutarla no prueba nada");
+  assert.equal(CONDICION.test(t.replace(CONDICION, "true")), false, "y sacada, la deteccion tiene que ver que no esta");
 });

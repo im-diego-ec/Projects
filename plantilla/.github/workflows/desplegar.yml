@@ -18,7 +18,11 @@ name: desplegar
 
 on:
   workflow_run:
-    workflows: ["ci"]
+    # EL NOMBRE VA EXACTO, y este decía "ci" mientras el workflow se llama "CI".
+    # `workflow_run` resuelve por el `name:` del otro archivo: si no coincide, no
+    # falla nada — simplemente NO DISPARA NUNCA. Es la forma más silenciosa que
+    # hay de quedarse sin despliegue, porque no deja ni un rojo que mirar.
+    workflows: ["CI"]
     types: [completed]
     branches: [main]
   # A mano, para la primera vez y para volver atrás.
@@ -30,10 +34,21 @@ permissions:
   contents: read
 
 concurrency:
-  # Dos publicaciones a la vez sobre el mismo destino es una carrera con
-  # ganador impredecible. La última gana, y las anteriores se cancelan.
+  # Dos publicaciones a la vez sobre el mismo destino es una carrera con ganador
+  # impredecible, así que se serializan. Pero HACEN COLA: NO se cancelan.
+  #
+  # Es lo que exige `openspec/specs/despliegue-ci/spec.md` del marco, y la
+  # distinción que gobierna la regla está escrita ahí: una corrida de
+  # VERIFICACIÓN interrumpida no deja nada, así que cancelarla es correcto y
+  # ahorra recursos; una corrida de DESPLIEGUE interrumpida sí deja estado —el
+  # ambiente queda en una combinación que ninguna de las dos corridas describe, y
+  # las dos pueden reportar éxito—.
+  #
+  # Ese desenlace, dos corridas en verde y el destino a medias, es exactamente lo
+  # que este archivo existe para impedir. Este workflow decía
+  # `cancel-in-progress: true` y defendía lo contrario en un comentario.
   group: desplegar-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
   desplegar:
