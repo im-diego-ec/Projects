@@ -99,3 +99,18 @@ test("MUERDE: una cita inventada vuelve a caerse", () => {
   assert.ok(conCita.includes("Neither skill requires the other"), "el detector tiene que ver la cita");
   assert.equal(pagina().includes("Neither skill requires the other"), false, "y la pagina real no puede traerla");
 });
+
+test("el pin de BMAD esta declarado donde el repositorio declara sus versiones", () => {
+  // La regla del marco es que toda version pineada tenga UN lugar donde se
+  // declara, y ese lugar es la tabla de docs/03-stack.md. BMAD no estaba: su
+  // version vivia suelta en la prosa de docs/08, o sea en ningun lado desde el
+  // punto de vista de quien va a subirla.
+  const stack = fs.readFileSync(path.join(RAIZ, "docs/03-stack.md"), "utf-8");
+  assert.match(stack, /BMAD/, "la pagina que declara las versiones tiene que nombrar BMAD");
+
+  // Y el comando de la pagina tiene que traer una version EXACTA, que es la
+  // regla del marco para todo lo que descarga.
+  const m = pagina().match(/bmad-method@(\S+)\b/);
+  assert.ok(m, "docs/08 tiene que instalar BMAD con una version pineada, no con el nombre pelado");
+  assert.match(m[1], /^\d+\.\d+\.\d+$/, `la version tiene que ser exacta y es "${m[1]}"`);
+});

@@ -2377,8 +2377,24 @@ async function main(argv) {
     console.error(`::error::el archivo de valores tiene ${problemas.length} problema(s). No se escribio nada:`);
     for (const p of problemas) console.error(`  - ${p}`);
     console.error("");
-    console.error("Que poner en cada uno esta en plantilla/README.md seccion 2, con ejemplo y caso borde.");
-    console.error("Un esqueleto con todas las claves: node herramientas/projects-init.mjs --ejemplo");
+    // LA RUTA VA ABSOLUTA, y el motivo es que quien lee esto NO esta parado en el
+    // clon del marco: esta parado en el destino, que es lo que la propia
+    // herramienta manda hacer. Un `plantilla/README.md` relativo apunta desde ahi
+    // a un archivo que no existe, y la persona termina buscandolo dentro de su
+    // proyecto nuevo. El dato ya estaba a mano y no se usaba.
+    const raizDelMarco = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+    console.error(`Que poner en cada uno esta en ${path.join(raizDelMarco, "plantilla", "README.md")},`);
+    console.error("seccion 2, con ejemplo y caso borde para cada clave.");
+    // Y SI EL ARCHIVO LO ESCRIBIO EL ASISTENTE, el arreglo no es editarlo a mano:
+    // es volver a contestar. Sin esto, alguien corrige un JSON que la proxima
+    // corrida del asistente va a reescribir encima.
+    if (fs.existsSync(path.join(path.dirname(path.resolve(o.valores)), ".projects-respuestas.json"))) {
+      console.error("");
+      console.error("Al lado de ese archivo hay un .projects-respuestas.json, asi que lo escribio el asistente.");
+      console.error("Volve a correr con --asistente: retoma tus respuestas y no te hace contestar todo de nuevo.");
+    }
+    console.error("");
+    console.error(`Un esqueleto con todas las claves: node ${path.join(raizDelMarco, "herramientas", "projects-init.mjs")} --ejemplo`);
     return 1;
   }
 

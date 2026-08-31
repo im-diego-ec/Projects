@@ -51,6 +51,12 @@ test("ningun caso esta apagado sin decir por que", () => {
   const APAGADOS = /\b(?:test|it|describe)\.(?:skip|todo)\b|\{\s*(?:skip|todo)\s*:\s*true\s*\}/;
   const apagados = [];
   for (const b of BANCOS) {
+    // ESTE ARCHIVO QUEDA FUERA, y con el mismo motivo que ya se declaro para el
+    // registro de cifras: guarda contraejemplos A PROPOSITO —las formas de
+    // apagar un caso, escritas para probar que el detector las ve—. Mirarse a si
+    // mismo lo pondria rojo por hacer bien su trabajo. Lo cazo su propia regla,
+    // dos minutos despues de escribirla.
+    if (b === "pruebas/banco/integridad.test.mjs") continue;
     const texto = fs.readFileSync(path.join(RAIZ, b), "utf-8");
     texto.split("\n").forEach((linea, i) => {
       // Una linea de comentario que NOMBRA la forma no la usa: este mismo
@@ -65,6 +71,13 @@ test("ningun caso esta apagado sin decir por que", () => {
       if (!/APAGADO A PROPOSITO:/.test(arriba)) apagados.push(`${b}:${i + 1}  ${linea.trim().slice(0, 80)}`);
     });
   }
+  // ANTI-VACUIDAD DE LA EXCEPCION: si este archivo dejara de tener sus
+  // contraejemplos, la exencion sobraria y conviene saberlo.
+  assert.match(
+    fs.readFileSync(path.join(RAIZ, "pruebas/banco/integridad.test.mjs"), "utf-8"),
+    /test\.skip\("no corre"/,
+    "este archivo tiene que seguir trayendo el contraejemplo que justifica su propia exencion",
+  );
   assert.deepEqual(
     apagados,
     [],

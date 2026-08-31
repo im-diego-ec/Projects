@@ -63,6 +63,13 @@ En [`dash.cloudflare.com/profile/api-tokens`](https://dash.cloudflare.com/profil
    plantilla ya tiene el permiso justo y nada más.
 3. Creálo y **copiá el valor ahora**: Cloudflare no lo vuelve a mostrar.
 
+> ⚠️ **Ojo con el token equivocado, que es el error más común.** Cloudflare
+> ofrece varios tipos y el de **R2** —su almacenamiento de archivos— se parece
+> bastante. Si la pantalla donde lo creaste te muestra además una *Access Key ID*
+> y una *Secret Access Key*, ése es de R2 y **no sirve para publicar**: el
+> despliegue va a fallar por permisos, con un error que no dice cuál era el
+> correcto.
+
 ### 3 · Guardar las dos cosas en GitHub · *2 minutos*
 
 En tu repositorio, **Settings → Secrets and variables → Actions → New repository
@@ -86,6 +93,24 @@ solo cada vez que las verificaciones quedan en verde sobre la rama principal.
 **Cómo sabés que salió bien.** El paso de publicación imprime la dirección, y la
 primera vez tiene la forma `https://{{PROYECTO}}.<tu-subdominio>.workers.dev`.
 Abrila: tiene que verse tu sitio.
+
+### 5 · Si sale rojo: los tres errores que vas a ver
+
+Vienen de Cloudflare tal cual, sin traducir, y ninguno dice qué hacer. Esto sí:
+
+| Lo que dice | Qué pasó | Cómo se arregla |
+| --- | --- | --- |
+| `Authentication failed (status: 400) [code: 9106]` | el token no vale: mal pegado, vencido, o revocado | creá otro con la plantilla «Edit Cloudflare Workers» y volvé a guardarlo en Secrets |
+| `Invalid format for Authorization header [code: 6111]` | al pegarlo entró un espacio, un salto de línea o comillas | pegalo de nuevo, sin nada alrededor |
+| `you need to register a workers.dev subdomain` | tu cuenta todavía no tiene subdominio | elegí uno en el panel, en **Workers & Pages → Subdomain**. Es una vez y es gratis |
+
+Los dos primeros son del **token**; el tercero es de la **cuenta** y no tiene nada
+que ver con este repositorio.
+
+> **El tercero es el acto humano que falta en la lista de arriba**, y aparece
+> recién en la primera publicación: hasta que no publicás, Cloudflare no te lo
+> pide. Es el mismo subdominio que después va en tu dirección
+> `{{PROYECTO}}.<tu-subdominio>.workers.dev`.
 
 ### Antes de todo eso, podés ensayar sin publicar nada
 
