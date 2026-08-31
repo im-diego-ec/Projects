@@ -109,8 +109,8 @@ git init
 BMAD dentro del repo del proyecto, dos de sus archivos traen marcadores entre dobles llaves
 y el check «Sin marcadores del scaffold sin resolver» da **rojo** para siempre, sobre
 archivos que nadie escribió ni puede arreglar. Y en Windows nativo `git add` falla con
-`Filename too long` en los `__pycache__` de la herramienta — ver la tabla de fallos por
-sistema operativo del final.
+`Filename too long` en los `__pycache__` de la herramienta — está en la tabla de fallos por
+sistema operativo de [05-arrancar-tecnico.md](05-arrancar-tecnico.md), que es donde vive.
 
 El `git init` de acá **no** versiona nada del proyecto: es para poder volver atrás si BMAD
 sobrescribe algo (paso 6). En Windows nativo, dejale además un `.gitignore` con

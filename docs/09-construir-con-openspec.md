@@ -92,7 +92,7 @@ sección 3 dice qué contesta cada archivo del change y en qué orden.
 `Change name cannot contain spaces`. Usá guiones, en minúscula: es el nombre de una
 carpeta.
 
-##### 7.c ¿Y ahora qué escribo?
+##### 7.b.1 ¿Y ahora qué escribo?
 
 Ese comando termina diciéndote el siguiente, y conviene hacerle caso:
 

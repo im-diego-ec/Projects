@@ -573,9 +573,11 @@ marco queda sin cumplir si no se hace. Están ahí para que no haga falta haber 
 infraestructura del área para poder resolverlos.
 
 ⚠️ **Y no gatean todavía**, así que no confundas: el primer CI rojo de la fase 5.1 **no**
-viene de acá. La compuerta llega con el trabajo de despliegue, porque hoy «este repositorio
-se despliega» no es verificable — el andamio no reparte pipeline de despliegue. Hasta
-entonces son disciplina, y se ven de un tirón:
+viene de acá. La compuerta llega cuando «este repositorio se despliega» sea verificable
+para la forma que tengas delante: hoy el andamio reparte pipeline de despliegue **sólo
+para la forma `sitio`** —que publica en Cloudflare Workers y no usa esta infraestructura—
+y para una aplicación todavía no hay ninguno. El tramo entero está en
+[10-publicar.md](10-publicar.md). Hasta entonces son disciplina, y se ven de un tirón:
 
 ```bash
 grep -rn PENDIENTE-INFRA infra infra-prod
@@ -864,10 +866,10 @@ o apuntan al lugar equivocado.
 | **Esperar que BMAD genere los specs de OpenSpec** | No los genera, y no hay comando que convierta el PRD en deltas. El paso 7 es a mano, y es así a propósito | La página 08 |
 | **Pedirle a BMAD un cambio sin commitear antes** | No hay deshacer: `.memlog.md` es bitácora de decisiones, no historial de versiones, y la skill no menciona backup | La página 08, paso 6 |
 | **Armar la lista de cobertura leyendo el PRD** | Deja de servir para lo único que sirve: detectar lo que el PRD perdió. Sale de los documentos originales | La página 08, paso 4 |
-| **Pasarle a la sesión el PRD y no los documentos** | Puede citar el PRD pero no la fuente: la lista de cobertura queda apuntando al intermediario | La página 08, paso 7 |
-| **Pedir los cuatro artefactos de OpenSpec de una** | El PO gatea proposal y specs; si el design ya está escrito, su aprobación es un trámite | La página 08, paso 7 |
+| **Pasarle a la sesión el PRD y no los documentos** | Puede citar el PRD pero no la fuente: la lista de cobertura queda apuntando al intermediario | La página 09, paso 7 |
+| **Pedir los cuatro artefactos de OpenSpec de una** | El PO gatea proposal y specs; si el design ya está escrito, su aprobación es un trámite | La página 09, paso 7 |
 | **Empezar el change con `/opsx:propose`** | Genera los cuatro artefactos de un solo golpe —proposal, deltas, `design.md` y `tasks.md`—, así que el PO termina aprobando un proposal cuyo diseño ya está escrito. El comando que crea el change y **para ahí** es `openspec new change <nombre>`. Ver [09-construir-con-openspec.md](09-construir-con-openspec.md) |
-| **Nombrar el change como el proyecto** | Un change se propone, se aprueba y se archiva; si su nombre abarca todo el sistema no puede cerrarse nunca. El nombre es la rebanada | La página 08, paso 7.a |
+| **Nombrar el change como el proyecto** | Un change se propone, se aprueba y se archiva; si su nombre abarca todo el sistema no puede cerrarse nunca. El nombre es la rebanada | La página 09, paso 7.a |
 | **Editar el prompt de una skill de BMAD** | Dejás de usar una herramienta y empezás a mantener un fork ajeno. Si no entiende los documentos, ESO es el resultado: se anota y se sigue a mano | La página 08 |
 
 ### Y los que dependen de tu sistema operativo

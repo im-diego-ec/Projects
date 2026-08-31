@@ -499,3 +499,79 @@ test("refutacion · control · una pagina historica no arrastra al estandar a la
     "el lector del indice esta clasificando como historica una pagina canonica: la exencion se volvio un agujero",
   );
 });
+
+// ---------------------------------------------------------------------------
+// LOS PUNTEROS INTERNOS: DOS DEFECTOS QUE NADIE MEDIA.
+//
+// EL PRIMERO, medido: tres filas de la tabla de fallos de docs/05 mandaban a
+// «La página 08, paso 7». docs/08 termina en el paso 6; los pasos 7.x viven en
+// docs/09. Y esas tres filas son justo las del tramo de construir, o sea que
+// caian donde la persona va CUANDO YA SE TRABO. El banco de enlaces mira
+// enlaces markdown; una referencia en prosa no la miraba nadie.
+//
+// EL SEGUNDO lo cometi escribiendo el arreglo del primero: agregue un `##### 7.c`
+// a docs/09 que ya tenia otro `##### 7.c`. Dos secciones con el mismo numero en
+// la misma pagina hacen que «paso 7.c» deje de significar una sola cosa.
+// ---------------------------------------------------------------------------
+
+/** Los encabezados de una pagina, con su nivel. */
+const encabezadosDe = (texto) =>
+  [...texto.replace(/```[\s\S]*?```/g, "").matchAll(/^(#{1,6})\s+(.+?)\s*$/gm)].map((m) => ({
+    nivel: m[1].length,
+    titulo: m[2].trim(),
+  }));
+
+test("ninguna pagina numera dos secciones con el mismo numero", () => {
+  const chocan = [];
+  for (const f of paginasDelAlcance()) {
+    const vistos = new Map();
+    for (const { titulo } of encabezadosDe(leer(f))) {
+      // Solo se juzgan los encabezados que EMPIEZAN con un numero de seccion:
+      // «7.c El prompt», «12 · Los ajustes». Un titulo en prosa no numera nada.
+      const m = titulo.match(/^(\d+(?:\.\w+)*)\b/);
+      if (!m) continue;
+      const n = m[1];
+      if (vistos.has(n)) chocan.push(`${f} → "${n}" numera dos secciones: "${vistos.get(n)}" y "${titulo}"`);
+      else vistos.set(n, titulo);
+    }
+  }
+  assert.deepEqual(
+    chocan,
+    [],
+    `dos secciones con el mismo numero hacen que citar "el paso N" deje de significar una sola cosa:\n  ${chocan.join("\n  ")}`,
+  );
+});
+
+test("toda referencia en prosa a «la pagina NN, paso X» apunta a un paso que esa pagina tiene", () => {
+  // El banco de enlaces mira enlaces markdown. Esto mira la OTRA forma de
+  // referirse a una seccion, que es la que se rompio: prosa.
+  const paginas = paginasDelAlcance();
+  const numeroDe = (f) => (f.match(/(?:^|\/)(\d\d)-/) ?? [])[1];
+  const porNumero = new Map(paginas.map((f) => [numeroDe(f), f]).filter(([n]) => n));
+  assert.ok(porNumero.size >= 5, "un cero aca es este control roto, no un repositorio sin paginas numeradas");
+
+  const rotas = [];
+  let miradas = 0;
+  for (const f of paginas) {
+    const texto = leer(f);
+    for (const m of texto.matchAll(/[Ll]a p(?:á|a)gina (\d\d)(?:,\s*paso\s+([\w.]+))?/g)) {
+      const [, numero, paso] = m;
+      const destino = porNumero.get(numero);
+      if (!destino) {
+        rotas.push(`${f} → nombra "la pagina ${numero}" y no hay ninguna con ese numero`);
+        continue;
+      }
+      if (!paso) continue;
+      miradas++;
+      const titulos = encabezadosDe(leer(destino)).map((h) => h.titulo);
+      const existe = titulos.some((t) => new RegExp(`(^|\\s)${paso.replace(/\./g, "\\.")}(\\b|\\s)`).test(t));
+      if (!existe) rotas.push(`${f} → manda a "la pagina ${numero}, paso ${paso}" y ${destino} no tiene ese paso`);
+    }
+  }
+  assert.ok(miradas >= 1, "ninguna pagina cita un paso de otra: este control dejo de mirar lo que cree");
+  assert.deepEqual(
+    rotas,
+    [],
+    `una referencia en prosa a una seccion que no existe cae justo donde la persona va cuando ya se trabo:\n  ${rotas.join("\n  ")}`,
+  );
+});
