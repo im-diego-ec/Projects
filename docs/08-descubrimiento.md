@@ -194,10 +194,11 @@ Es trabajo mecánico y le sale bien a un agente. En la sesión del descubrimient
 
 ```
 Leé todos los archivos de documentos/ y armá la lista de cobertura en
-lista-de-cobertura.md, con este formato exacto:
+lista-de-cobertura.md, con este formato exacto (las rayas alineadas importan: el
+proyecto corre un formateador y una tabla mal alineada le pone el CI en rojo):
 
-| id | de dónde | qué dice | destino |
-|---|---|---|---|
+| id  | de dónde | qué dice | destino |
+| --- | -------- | -------- | ------- |
 
 Reglas:
 - Una fila por AFIRMACIÓN, no por documento ni por párrafo. Si un pasaje dice dos
@@ -228,11 +229,11 @@ el PRD, deja de servir para lo único que sirve: detectar lo que el PRD perdió.
 
 Lo que tiene que salir, con las tres primeras filas de ejemplo:
 
-| id | de dónde | qué dice | destino |
-|---|---|---|---|
-| `I001` | `D01-3.2` | «No se recibe mercadería sin la orden de compra firmada.» | |
-| `I002` | `D01-3.2` | «La firma la da [jefe de bodega] o su suplente.» | |
-| `I003` | `DEDUCIDO` desde `D01-3.2` | el documento no dice qué pasa si la orden llega después de la mercadería | |
+| id     | de dónde                    | qué dice                                                                              | destino |
+| ------ | --------------------------- | ------------------------------------------------------------------------------------- | ------- |
+| `I001` | `D01-3.2`                   | «No se recibe mercadería sin la orden de compra firmada.»                               |         |
+| `I002` | `D01-3.2`                   | «La firma la da [jefe de bodega] o su suplente.»                                        |         |
+| `I003` | `DEDUCIDO` desde `D01-3.2`  | el documento no dice qué pasa si la orden llega después de la mercadería                |         |
 
 Fijate en tres cosas del ejemplo, porque son las que se rompen: el **mismo ancla** `D01-3.2`
 sostiene dos filas —el pasaje decía dos cosas—; el corchete de `[jefe de bodega]` deja ver

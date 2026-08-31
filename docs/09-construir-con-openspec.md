@@ -270,6 +270,64 @@ mala idea, y la lista la va a rastrear con toda fidelidad hasta su origen.
 
 ---
 
+### 9 · Lo que viene después de que el PO aprueba
+
+Hasta acá está escrito **qué** hay que construir y el PO lo aprobó. Faltan las dos
+mitades que aprueba el otro builder, y después construir.
+
+**El orden importa y no es estético.** Si el `design.md` ya está escrito cuando el
+PO aprueba el proposal, su aprobación es un trámite: está decidiendo el *qué*
+cuando el *cómo* ya está decidido. Por eso se escribe ahora y no antes.
+
+#### 9.a `design.md` — cómo, y qué se descartó
+
+Lo aprueba **el otro builder**, no el PO. La sección que justifica el archivo es
+**qué se descartó y por qué**: dentro de seis meses alguien va a proponer
+exactamente eso, y sin el motivo escrito no hay forma de saber si el contexto
+cambió o si es la misma idea otra vez.
+
+#### 9.b `tasks.md` — los pasos, en orden
+
+Cada tarea tiene que **poder marcarse**. «Mejorar el rendimiento» no se marca;
+«bajar la consulta de N+1 a una sola, medido con el script X» sí.
+
+> **El esqueleto de los cuatro archivos, con qué contesta cada uno, viaja dentro
+> de tu proyecto**: `docs/plantillas/change.md`. Está ahí y no acá a propósito —
+> lo tenés a mano cuando lo necesitás, sin salir del repositorio.
+
+#### 9.c Implementar
+
+```bash
+/opsx:apply
+```
+
+Toma las tareas de `tasks.md` y las ejecuta en orden. Es el único comando de la
+familia que escribe código, y por eso va **después** de las dos aprobaciones y no
+antes.
+
+#### 9.d Cerrar el change
+
+Cuando el PR está mergeado y el comportamiento existe, el change **se archiva**:
+pasa a `openspec/changes/archive/YYYY-MM-DD-<nombre>/` y los deltas se incorporan
+a `openspec/specs/`, que es la foto de cómo se comporta el sistema hoy.
+
+Tu proyecto trae una skill para eso —`projects-archive-change`— y **se usa ésa, no
+el `archive` del CLI**: el archivado tiene que dejar también el rastro de qué se
+aprobó y cuándo, y eso el CLI no lo hace.
+
+Para ver en qué estado quedó todo:
+
+```bash
+npx --yes @fission-ai/openspec@1.9.0 list
+```
+
+> **Una pregunta abierta impide archivar.** Es la regla del marco que ya se nombró
+> arriba, y acá es donde muerde: un change con una pregunta abierta sin resolver no
+> se cierra, porque cerrarlo convertiría la duda en contrato sin que nadie la haya
+> decidido.
+
+---
+
 ### Lo primero que hacés, y lleva media hora
 
 **No está medido que BMAD sepa leer documentos como los del PO.** La documentación del

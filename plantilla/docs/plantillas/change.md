@@ -1,15 +1,21 @@
 # El esqueleto de un change de OpenSpec
 
-**Todo cambio de este proyecto entra por acá.** Un change son cuatro archivos que
-contestan cuatro preguntas distintas, y el orden en que se escriben no es
-estético: cada uno se aprueba antes de que empiece el siguiente.
+**Todo cambio de este proyecto entra por acá.** Un **change** es la carpeta donde
+queda escrito, ANTES de programar, qué se va a cambiar y por qué. Son cuatro
+archivos que contestan cuatro preguntas distintas, y el orden en que se escriben
+no es estético: cada uno se aprueba antes de que empiece el siguiente.
+
+**Dos palabras, antes de la tabla.** El **PO** es quien decide qué se construye —
+el dueño del producto, no del código. El **builder** es quien lo construye. En un
+equipo de una sola persona son la misma, y entonces las dos aprobaciones son dos
+lecturas distintas del mismo texto, hechas en momentos distintos.
 
 ## Los cuatro archivos, y quién aprueba cada uno
 
 | Archivo | Qué contesta | Quién lo aprueba |
 | --- | --- | --- |
-| `proposal.md` | **por qué**, y qué cambia | el PO |
-| `specs/<capacidad>/spec.md` | **cómo se comporta**, en escenarios | el PO |
+| `proposal.md` — el **proposal**, o sea el planteo: por qué vale la pena | **por qué**, y qué cambia | el PO |
+| `specs/<capacidad>/spec.md` — una **spec**: cómo se comporta el sistema, en escenarios | **cómo se comporta** | el PO |
 | `design.md` | **cómo se hace**, y qué se descartó | el otro builder |
 | `tasks.md` | **los pasos**, en orden | el otro builder |
 
@@ -61,10 +67,14 @@ negocio. No cómo se implementa.>
 Acá va **el comportamiento**, en escenarios. Es lo que el PO aprueba y lo que
 después se puede verificar.
 
-> ⚠️ **Los requirements van en inglés y con `SHALL` o `MUST`.** No es una
-> preferencia de estilo: el validador de OpenSpec los busca literalmente, y un
-> requirement escrito con «DEBE» **no valida** — medido: sale 1. La prosa
-> alrededor puede estar en castellano; la línea del requirement, no.
+Un **requirement** es una afirmación sobre lo que el sistema tiene que hacer,
+escrita de forma que se pueda comprobar.
+
+> ⚠️ **Los requirements van en inglés y con `SHALL` o `MUST`.** **SHALL** es la
+> palabra que el validador de OpenSpec busca **literalmente** para reconocer una
+> línea como requerimiento. No es una preferencia de estilo: un requirement
+> escrito con «DEBE» **no valida** — medido: sale 1. La prosa alrededor puede
+> estar en castellano; la línea del requirement, no.
 
 ```markdown
 ## ADDED Requirements
@@ -126,7 +136,7 @@ de saber si el contexto cambió o si es la misma idea otra vez.>
 
 ## Cuando está hecho
 
-El change se archiva: pasa a `openspec/changes/archive/YYYY-MM-DD-<nombre>/` y
-queda como historia inmutable. Este proyecto trae una skill para eso
-(`projects-archive-change`), porque el archivado tiene que dejar también el rastro
-de qué se aprobó y cuándo.
+El change se **archiva** —o sea que se cierra y se guarda como historia
+inmutable—: pasa a `openspec/changes/archive/YYYY-MM-DD-<nombre>/`. Este proyecto
+trae una skill para eso (`projects-archive-change`), porque el archivado tiene que
+dejar también el rastro de qué se aprobó y cuándo.

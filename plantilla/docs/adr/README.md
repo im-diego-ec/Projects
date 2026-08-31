@@ -1,7 +1,7 @@
 # Decisiones estructurales (ADR)
 
-Un ADR es **una decisión que cambia la forma del sistema, escrita con lo que se
-descartó**. Lo que lo hace útil no es la decisión: es el descarte. Dentro de seis
+Un **ADR** (*Architecture Decision Record*) es **una decisión que cambia la forma
+del sistema, escrita con lo que se descartó**. Lo que lo hace útil no es la decisión: es el descarte. Dentro de seis
 meses, alguien va a proponer exactamente lo que ya se descartó, y sin el motivo
 escrito no hay forma de saber si el contexto cambió o si es la misma idea otra vez.
 
