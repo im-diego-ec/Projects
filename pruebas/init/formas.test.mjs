@@ -280,6 +280,18 @@ test("MUERDE: si los pasos volvieran a ser una lista fija, el sitio se rompe otr
 // un silencio.
 // ---------------------------------------------------------------------------
 
+/** Las rutas que RENDERIZA la accion de constitucion, leidas de su propia fuente.
+ *
+ *  Se derivan y no se escriben: la accion ya las declara, y una segunda copia
+ *  aca seria otra lista que mantener al lado de la primera. */
+const RUTAS_QUE_RENDERIZA_LA_CONSTITUCION = [
+  ...new Set(
+    [...fs.readFileSync(path.join(RAIZ, "actions/constitucion/constitucion.mjs"), "utf-8").matchAll(/"(\.projects\/[\w.-]+)"/g)].map(
+      (m) => m[1],
+    ),
+  ),
+];
+
 /** Los directorios de primer nivel que son paquetes en el destino. */
 function paquetesDe(destino) {
   return fs
@@ -385,10 +397,41 @@ test("lo que la portada dice sobre publicar coincide con lo que el arbol trae", 
     if (publica && !promete) rotos.push(`${o.valor}: trae desplegar.yml y la portada no lo cuenta`);
     if (!publica && promete) rotos.push(`${o.valor}: la portada promete publicacion automatica y no trae desplegar.yml`);
     if (!publica && !niega) rotos.push(`${o.valor}: no publica y la portada no lo advierte`);
-    // Y el puntero al paso a paso humano tiene que existir de verdad.
-    for (const m of readme.matchAll(/\]\((?!https?:)([^)#]+)\)/g)) {
-      const destinoEnlace = path.join(destino, ...m[1].split("/"));
-      if (!fs.existsSync(destinoEnlace)) rotos.push(`${o.valor}: la portada enlaza "${m[1]}", que el proyecto no tiene`);
+    // TODO ENLACE DE TODO ARCHIVO QUE VIAJA tiene que resolver DENTRO del
+    // proyecto. Es donde se verifican los que el banco de enlaces no puede
+    // mirar en el arbol del marco: los que llevan marcador y los que apuntan a
+    // `.projects/`, que la herramienta renderiza despues de copiar.
+    const md = [];
+    const recorrer = (dir) => {
+      for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
+        const f = path.join(dir, e.name);
+        if (e.isDirectory()) {
+          if (!["node_modules", ".git"].includes(e.name)) recorrer(f);
+        } else if (e.name.endsWith(".md")) md.push(f);
+      }
+    };
+    recorrer(destino);
+    assert.ok(md.length >= 5, `un proyecto ${o.valor} con ${md.length} archivos .md: se rompio el recorrido`);
+    for (const f of md) {
+      for (const m of fs.readFileSync(f, "utf-8").matchAll(/\]\((?!https?:|mailto:|#)([^)\s#]+)\)/g)) {
+        const abs = path.resolve(path.dirname(f), m[1]);
+        if (!abs.startsWith(destino)) continue; // sale del proyecto: no opina
+        const rel = path.relative(destino, abs).split(path.sep).join("/");
+        // `.projects/` lo RENDERIZA un paso posterior de la herramienta, no
+        // `instanciar`. Que exista en el proyecto terminado lo sostiene el banco
+        // de la accion de constitucion, que declara esa ruta; aca se comprueba
+        // que la ruta enlazada sea EXACTAMENTE la que esa accion publica, y no
+        // una parecida.
+        if (rel.startsWith(".projects/")) {
+          if (!RUTAS_QUE_RENDERIZA_LA_CONSTITUCION.includes(rel)) {
+            rotos.push(`${o.valor}: ${path.relative(destino, f)} enlaza "${m[1]}", que ningun paso de la herramienta escribe`);
+          }
+          continue;
+        }
+        if (!fs.existsSync(abs)) {
+          rotos.push(`${o.valor}: ${path.relative(destino, f)} enlaza "${m[1]}", que el proyecto no tiene`);
+        }
+      }
     }
   }
   assert.deepEqual(
@@ -512,4 +555,76 @@ test("todo `grep` que la guia manda correr sobre un archivo del proyecto encuent
     [],
     `la guia manda correr un comando que no contesta nada. Es la version ejecutable de una pagina que miente:\n  ${mudos.join("\n  ")}`,
   );
+});
+
+// ---------------------------------------------------------------------------
+// LO QUE LA CONSTITUCION MANDA USAR TIENE QUE EXISTIR EN EL PROYECTO.
+//
+// EL DEFECTO QUE ESTE BANCO CIERRA, medido en un proyecto recien generado: la
+// constitucion que SI viaja (`.projects/AGENTS-marco.md`) manda dejar las
+// decisiones estructurales en `docs/adr/`, los incidentes en
+// `docs/postmortems/` y lo operativo en `docs/runbooks/`. El proyecto no tenia
+// `docs/` en absoluto —`ls docs` daba «No such file or directory»—, asi que la
+// primera vez que hacia falta una de las tres habia que inventar donde ponerla.
+//
+// Y el mismo hueco por el otro lado: `openspec/` llegaba con `specs/` y
+// `changes/` VACIOS, o sea que la persona abria la carpeta donde tiene que
+// escribir su primer change y no habia ni una plantilla que imitar.
+// ---------------------------------------------------------------------------
+
+test("toda carpeta que la constitucion del proyecto manda usar existe en el proyecto", async () => {
+  const destino = fs.mkdtempSync(path.join(os.tmpdir(), "constitucion-"));
+  const { valores } = await correrAsistente(
+    async (_t, id) => ({ PROYECTO: "p", ORG: "o", forma: "1" })[id] ?? "",
+    {},
+    {},
+    () => {},
+    DERIVADOS,
+  );
+  instanciar({ raizAndamio: ANDAMIO, destino, valores });
+
+  // La constitucion se lee de su FUENTE CANONICA y no del destino: `instanciar`
+  // copia el andamio, y el render de la constitucion lo hace un paso posterior
+  // de la herramienta. La fuente es la misma que ese paso publica.
+  const constitucion = fs.readFileSync(path.join(RAIZ, "actions/constitucion/canonico/10-openspec.md"), "utf-8");
+  // Las rutas se LEEN de la constitucion, no se escriben aca: una segunda lista
+  // al lado de la primera es como empiezan las divergencias.
+  const mandadas = [...new Set([...constitucion.matchAll(/`(docs\/[a-z-]+)\/`/g)].map((m) => m[1]))];
+  assert.ok(mandadas.length >= 2, `la constitucion nombra ${mandadas.length} carpetas de docs/: se rompio la lectura`);
+
+  const faltan = mandadas.filter((d) => !fs.existsSync(path.join(destino, ...d.split("/"))));
+  assert.deepEqual(
+    faltan,
+    [],
+    "la constitucion que viaja al proyecto manda escribir en carpetas que el proyecto no tiene, asi que la primera " +
+      `vez que hace falta una hay que inventar donde ponerla: ${faltan.join(", ")}`,
+  );
+
+  // Y cada una tiene que decir QUE va adentro: una carpeta vacia con un .gitkeep
+  // no es mejor que ninguna carpeta.
+  const mudas = mandadas.filter((d) => !fs.existsSync(path.join(destino, ...d.split("/"), "README.md")));
+  assert.deepEqual(mudas, [], `estas carpetas existen y no dicen que va adentro: ${mudas.join(", ")}`);
+});
+
+test("el proyecto trae un esqueleto de change para imitar el dia uno", async () => {
+  const destino = fs.mkdtempSync(path.join(os.tmpdir(), "esqueleto-"));
+  const { valores } = await correrAsistente(
+    async (_t, id) => ({ PROYECTO: "p", ORG: "o", forma: "1" })[id] ?? "",
+    {},
+    {},
+    () => {},
+    DERIVADOS,
+  );
+  instanciar({ raizAndamio: ANDAMIO, destino, valores });
+
+  const plantilla = path.join(destino, "docs/plantillas/change.md");
+  assert.ok(fs.existsSync(plantilla), "sin un esqueleto, la persona abre openspec/changes/ y no tiene nada que imitar");
+  const t = fs.readFileSync(plantilla, "utf-8");
+  for (const artefacto of ["proposal.md", "spec.md", "design.md", "tasks.md"]) {
+    assert.ok(t.includes(artefacto), `el esqueleto tiene que nombrar ${artefacto}: son los cuatro y se escriben en orden`);
+  }
+  // La trampa que mas cuesta: el validador exige SHALL/MUST en ingles, y una
+  // plantilla en castellano que no lo diga manda derecho a un rojo.
+  assert.match(t, /SHALL/, "el esqueleto tiene que usar SHALL: es lo que el validador busca literalmente");
+  assert.match(t, /no valida|sale 1/i, "y tiene que decir que un requirement en castellano NO valida");
 });

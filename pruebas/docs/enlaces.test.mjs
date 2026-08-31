@@ -129,12 +129,25 @@ test("hay enlaces que revisar: un cero aca es este banco roto, no un repositorio
  *  enlace se verifica ya sustituido, que es la unica forma de verificarlo. */
 const tieneMarcador = (ruta) => /\{\{[A-Z_]+\}\}/.test(ruta);
 
+/** Lo que el andamio enlaza y NO existe en el andamio, porque lo escribe la
+ *  herramienta al generar el proyecto.
+ *
+ *  `.projects/` es la porcion del marco: la RENDERIZA `projects init` en un paso
+ *  posterior al copiado, asi que en el arbol del marco no esta y en el proyecto
+ *  si. Comprobarlo aca daria un rojo permanente por un enlace correcto.
+ *
+ *  DONDE SI SE COMPRUEBA, para que esto no sea un agujero: el caso «todo enlace
+ *  de un archivo que viaja al proyecto resuelve DENTRO del proyecto» de
+ *  pruebas/init/formas.test.mjs genera el proyecto y los resuelve ahi. */
+const loEscribeLaHerramienta = (pagina, ruta) =>
+  pagina.startsWith("plantilla/") && /(^|\/)\.projects\//.test(path.posix.normalize(path.posix.join(path.posix.dirname(pagina), ruta)));
+
 test("todo enlace apunta a un archivo o carpeta que EXISTE", () => {
   const rotos = [];
   let conMarcador = 0;
   for (const { pagina, destinos } of censo) {
     for (const d of destinos) {
-      if (tieneMarcador(d.ruta)) {
+      if (tieneMarcador(d.ruta) || loEscribeLaHerramienta(pagina, d.ruta)) {
         conMarcador++;
         continue;
       }
@@ -145,7 +158,7 @@ test("todo enlace apunta a un archivo o carpeta que EXISTE", () => {
   // ANTI-VACUIDAD DE LA EXCEPCION: si un dia no queda ningun enlace con
   // marcador, la excepcion sobra y conviene saberlo; si quedan demasiados, es
   // que alguien la esta usando para esquivar el control.
-  assert.ok(conMarcador <= 5, `${conMarcador} enlaces con marcador es demasiado para una excepcion: revisala`);
+  assert.ok(conMarcador <= 8, `${conMarcador} enlaces exceptuados es demasiado para una excepcion: revisala`);
   assert.deepEqual(
     rotos,
     [],
