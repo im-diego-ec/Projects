@@ -5,7 +5,17 @@ import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { noViajanPorForma, formaDe, podarPorForma, seExcluyeDelCopiado, archivosDelAndamio, instanciar, TODAS } from "../../herramientas/projects-init.mjs";
+import {
+  noViajanPorForma,
+  formaDe,
+  podarPorForma,
+  seExcluyeDelCopiado,
+  archivosDelAndamio,
+  instanciar,
+  TODAS,
+  PASOS_DEL_ARRANQUE,
+  pasosQueCorren,
+} from "../../herramientas/projects-init.mjs";
 import { PREGUNTAS, correrAsistente } from "../../herramientas/projects-asistente.mjs";
 
 /** Lo que la herramienta DERIVA y no pregunta: la cuenta donde vive el marco,
@@ -174,4 +184,168 @@ test("toda opcion de la pregunta de forma produce un proyecto que se puede armar
     "una forma que el asistente ofrece y que despues no se puede armar es el mismo defecto que ya se pago con Slack " +
       `y con GCP: la persona elige bien y el error no habla de lo que eligio.\n  ${rotas.join("\n  ")}`,
   );
+});
+
+// ---------------------------------------------------------------------------
+// EL ARRANQUE CONTRA EL MANIFIESTO, y por que este caso no existia.
+//
+// El caso de mas arriba se llama "toda opcion de la pregunta de forma produce un
+// proyecto que se puede armar" y para en `instanciar()`, que solo ESCRIBE
+// archivos. El nombre promete arrancar; la medicion mide copiar, y en el hueco
+// entre las dos cosas vivio el defecto: `podarPorForma` borraba `datos` del
+// package.json de un sitio y dos lineas despues el arranque mandaba correr
+// `pnpm run datos`. Medido antes del arreglo: `[ERR_PNPM_NO_SCRIPT] Missing
+// script: datos`, salida 1, en la mitad de las combinaciones que el asistente
+// ofrece. El banco entero estaba en verde mientras eso pasaba.
+// ---------------------------------------------------------------------------
+
+test("cada paso del arranque nombra un script que la forma elegida declara de verdad", async () => {
+  const pregunta = PREGUNTAS.find((p) => p.id === "forma");
+  const rotos = [];
+  for (const o of pregunta.opciones) {
+    const destino = fs.mkdtempSync(path.join(os.tmpdir(), `arranque-${o.valor}-`));
+    const idx = String(pregunta.opciones.indexOf(o) + 1);
+    const { valores } = await correrAsistente(
+      async (_t, id) => ({ PROYECTO: "p", ORG: "o", forma: idx })[id] ?? "",
+      {},
+      {},
+      () => {},
+      DERIVADOS,
+    );
+    instanciar({ raizAndamio: ANDAMIO, destino, valores });
+    const scripts = JSON.parse(fs.readFileSync(path.join(destino, "package.json"), "utf-8")).scripts ?? {};
+    const { corren, salteados } = pasosQueCorren(destino);
+
+    for (const paso of corren) {
+      const script = paso.args[0] === "run" ? paso.args[1] : null;
+      if (script && !(script in scripts)) {
+        rotos.push(`${o.valor}: el arranque correria \`pnpm run ${script}\` y esta forma no declara ese script`);
+      }
+    }
+    // Y la otra mitad, que es la que evita que el arreglo se pase de largo: un
+    // paso salteado tiene que ser uno que DE VERDAD no esta, no uno que el
+    // filtro se comio por error.
+    for (const s of salteados) {
+      if (s.script in scripts) rotos.push(`${o.valor}: saltea "${s.script}" y el manifiesto SI lo declara`);
+    }
+    if (!corren.length) rotos.push(`${o.valor}: no corre ningun paso, asi que el arranque no verifica nada`);
+  }
+  assert.deepEqual(
+    rotos,
+    [],
+    "un paso del arranque que nombra un script inexistente mata a la persona en mitad de la generacion, con un repo " +
+      `ya escrito y un arreglo imposible:\n  ${rotos.join("\n  ")}`,
+  );
+});
+
+test("MUERDE: si los pasos volvieran a ser una lista fija, el sitio se rompe otra vez", () => {
+  // El caso que prueba que el de arriba no pasa por vacuidad. Se simula un
+  // destino con el package.json podado —el de un sitio— y se exige que la lista
+  // FIJA choque y la derivada no. Si algun dia las dos coinciden, es que el
+  // andamio dejo de podar y este control dejo de mirar lo que cree.
+  const destino = fs.mkdtempSync(path.join(os.tmpdir(), "arranque-muerde-"));
+  const podado = JSON.parse(podarPorForma(fs.readFileSync(path.join(ANDAMIO, "package.json"), "utf-8"), "package.json", "sitio"));
+  fs.writeFileSync(path.join(destino, "package.json"), JSON.stringify(podado));
+
+  const fijos = PASOS_DEL_ARRANQUE.filter((p) => p.args[0] === "run").map((p) => p.args[1]);
+  const inexistentes = fijos.filter((x) => !(x in podado.scripts));
+  assert.ok(
+    inexistentes.length >= 1,
+    "la lista fija ya no nombra ningun script que un sitio no tenga: si el andamio dejo de podar, este caso mide aire",
+  );
+
+  const { corren, salteados } = pasosQueCorren(destino);
+  assert.deepEqual(
+    salteados.map((s) => s.script),
+    inexistentes,
+    "la derivacion tiene que saltear exactamente los que faltan, ni uno mas ni uno menos",
+  );
+  assert.ok(corren.length < PASOS_DEL_ARRANQUE.length, "y correr menos pasos que la lista fija");
+});
+
+// ---------------------------------------------------------------------------
+// EL PIPELINE CONTRA LOS PAQUETES QUE LA FORMA REPARTE.
+//
+// EL DEFECTO QUE ESTE BANCO CIERRA, medido: `podarPorForma` podaba el
+// package.json y nada mas, asi que el ci.yml de un sitio conservaba
+// `--filter <api> --fail-if-no-match exec prisma generate` sobre un workspace
+// sin paquete de API —«No projects matched the filters», salida 1, que es
+// exactamente lo que `--fail-if-no-match` existe para provocar— y las
+// EXCEPCIONES de un paquete E2E que la forma no reparte.
+//
+// Y LO QUE HACIA QUE FUERA PEOR QUE UN ROJO: `desplegar.yml` solo publica con
+// `workflow_run.conclusion == 'success'`. Con el CI rojo, el despliegue no se
+// dispara nunca. Arreglar solo el arranque habria cambiado un rojo ruidoso por
+// un silencio.
+// ---------------------------------------------------------------------------
+
+/** Los directorios de primer nivel que son paquetes en el destino. */
+function paquetesDe(destino) {
+  return fs
+    .readdirSync(destino, { withFileTypes: true })
+    .filter((e) => e.isDirectory() && fs.existsSync(path.join(destino, e.name, "package.json")))
+    .map((e) => e.name)
+    .sort();
+}
+
+test("el pipeline de cada forma solo nombra paquetes que esa forma reparte", async () => {
+  const pregunta = PREGUNTAS.find((p) => p.id === "forma");
+  const rotos = [];
+  for (const o of pregunta.opciones) {
+    const destino = fs.mkdtempSync(path.join(os.tmpdir(), `ci-${o.valor}-`));
+    const idx = String(pregunta.opciones.indexOf(o) + 1);
+    const { valores } = await correrAsistente(
+      async (_t, id) => ({ PROYECTO: "p", ORG: "o", forma: idx })[id] ?? "",
+      {},
+      {},
+      () => {},
+      DERIVADOS,
+    );
+    instanciar({ raizAndamio: ANDAMIO, destino, valores });
+    const ci = fs.readFileSync(path.join(destino, ".github/workflows/ci.yml"), "utf-8");
+    const hay = new Set(paquetesDe(destino));
+
+    // Todo `--filter <x>` del pipeline tiene que apuntar a un paquete que exista.
+    // Con `--fail-if-no-match`, uno que no existe no es un salteo: es rojo.
+    const ejecutables = ci.split("\n").filter((l) => !/^\s*#/.test(l)).join("\n");
+    for (const m of ejecutables.matchAll(/--filter\s+([A-Za-z@][\w@/.-]*)/g)) {
+      if (!hay.has(m[1])) rotos.push(`${o.valor}: el ci filtra por "${m[1]}" y esta forma no reparte ese paquete`);
+    }
+    // Y toda EXCEPCION nombra una carpeta que tiene que existir: una excepcion
+    // muerta tambien es rojo, por el otro lado.
+    for (const m of ci.matchAll(/EXCEPCIONES:\s*"([^"]*)"/g)) {
+      for (const par of m[1].trim().split(/\s+/).filter(Boolean)) {
+        const carpeta = par.split(":")[0];
+        if (!hay.has(carpeta)) rotos.push(`${o.valor}: el ci excluye "${carpeta}" y esta forma no reparte esa carpeta`);
+      }
+    }
+    // Y ningun centinela puede sobrevivir a la instanciacion: si viaja, la
+    // persona lee un comentario que habla de un gateo que ya ocurrio.
+    for (const rel of ["\u002egithub/workflows/ci.yml", "README.md", "\u002egithub/dependabot.yml"]) {
+      const f = path.join(destino, ...rel.split("/"));
+      if (fs.existsSync(f) && /# projects:(fin-)?solo-si-hay-/.test(fs.readFileSync(f, "utf-8"))) {
+        rotos.push(`${o.valor}: quedo un centinela del marco en ${rel}, que al proyecto no le dice nada`);
+      }
+    }
+  }
+  assert.deepEqual(
+    rotos,
+    [],
+    "un pipeline que nombra un paquete que la forma no reparte nace ROJO, y como el despliegue solo corre con el CI " +
+      `en verde, ese rojo se lleva tambien la publicacion:\n  ${rotos.join("\n  ")}`,
+  );
+});
+
+test("MUERDE: sin la poda del pipeline, el sitio vuelve a nacer rojo", () => {
+  // Prueba que el caso de arriba no pasa por vacuidad: sobre el ci.yml SIN
+  // podar, las dos reglas tienen que encontrar algo. Si no lo encuentran es que
+  // el andamio dejo de exigir esos paquetes y el control mide aire.
+  const crudo = fs.readFileSync(path.join(ANDAMIO, ".github/workflows/ci.yml"), "utf-8");
+  const podado = podarPorForma(crudo, ".github/workflows/ci.yml", "sitio");
+
+  assert.match(crudo, /--filter \{\{PAQUETE_API\}\}/, "el andamio tiene que seguir filtrando por el paquete de API");
+  assert.match(crudo, /EXCEPCIONES: "\{\{PAQUETE_E2E\}\}/, "y declarando excepciones del paquete E2E");
+  assert.equal(/--filter \{\{PAQUETE_API\}\}/.test(podado), false, "podado, el filtro del API no puede quedar");
+  assert.equal(/EXCEPCIONES: "/.test(podado), false, "ni la linea de excepciones");
+  assert.equal(podarPorForma(crudo, ".github/workflows/ci.yml", "aplicacion"), crudo, "y una aplicacion no se toca");
 });

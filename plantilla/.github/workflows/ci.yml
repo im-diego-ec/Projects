@@ -186,9 +186,16 @@ jobs:
       # y sale 0 — la generacion no ocurre y el fail-open aparece disfrazado de
       # lint verde. Comprobado en pnpm 9.15 y 11.18: el exit 0 es el mismo.
       #
-      # Si el proyecto no genera ningun cliente de datos, borra este paso.
+      # Este paso VIAJA SOLO SI la forma elegida tiene capa de datos, y los
+      # centinelas no son decoracion: `--fail-if-no-match` esta puesto a proposito
+      # para que un filtro que no matchea sea ROJO, asi que dejarle este paso a un
+      # proyecto sin paquete de API le da un CI rojo el dia uno. Y como el
+      # despliegue solo corre con el CI en verde, ese rojo se lleva tambien la
+      # publicacion, en silencio. Medido antes de gatearlo.
+      # projects:solo-si-hay-datos
       - name: Generar el cliente de la capa de datos
         run: pnpm --filter {{PAQUETE_API}} --fail-if-no-match exec {{GENERAR_CLIENTE_DATOS}}
+      # projects:fin-solo-si-hay-datos
 
       # Lint y formato corren UNA vez desde la raiz sobre todo el arbol
       # (eslint . / prettier --check .), no por paquete: asi los archivos que
@@ -351,6 +358,10 @@ jobs:
           # del pipeline, no una lista de paquetes: incorporar un paquete no
           # obliga a tocar esta linea.
           SCRIPTS: "typecheck test build"
+          # projects:solo-si-hay-e2e
+          # Estas EXCEPCIONES viajan SOLO SI la forma reparte el paquete E2E:
+          # nombrar una carpeta que el proyecto no tiene falla por excepcion
+          # muerta, que es rojo igual que la que falta.
           # Las EXCEPCIONES, "<carpeta>:<script>", con su motivo escrito. La
           # carpeta es la del paquete relativa a la raiz del repo.
           #   {{PAQUETE_E2E}}:test  -> la suite E2E corre con navegadores
@@ -364,6 +375,7 @@ jobs:
           # produce un verde falso. Si el proyecto no tiene suite E2E, borra
           # las dos entradas.
           EXCEPCIONES: "{{PAQUETE_E2E}}:test {{PAQUETE_E2E}}:build"
+          # projects:fin-solo-si-hay-e2e
         run: |
           set -euo pipefail
 

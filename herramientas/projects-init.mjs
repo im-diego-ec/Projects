@@ -350,7 +350,29 @@ export function renombresPorPlataforma(plataforma) {
  *  No alcanza con borrar el script suelto: hay que sacarlo TAMBIEN de la cadena
  *  de `verificar`, porque esa cadena lo nombra. Los dos se mueven juntos. */
 export function podarPorForma(texto, rel, forma) {
-  if (forma !== "sitio" || rel !== "package.json") return texto;
+  if (forma !== "sitio") return texto;
+
+  // EL PIPELINE TAMBIEN SE PODA, y no hacerlo costo un bloqueante entero.
+  //
+  // Hasta este arreglo esta funcion podaba el package.json Y NADA MAS, asi que
+  // el ci.yml que le viajaba a un sitio conservaba dos exigencias de una forma
+  // que no es la suya: `pnpm --filter {{PAQUETE_API}} --fail-if-no-match exec
+  // prisma generate` sobre un workspace sin paquete de API —medido: «No projects
+  // matched the filters» y salida 1, que es justo lo que `--fail-if-no-match`
+  // existe para provocar— y las EXCEPCIONES de un paquete E2E que la forma no
+  // reparte. El CI nacia rojo el dia uno.
+  //
+  // Y lo peor no era el rojo. `desplegar.yml` solo publica con
+  // `workflow_run.conclusion == 'success'`, asi que con el CI rojo el despliegue
+  // NUNCA se disparaba: arreglar solo el arranque habria cambiado un rojo
+  // ruidoso por un silencio, que es estrictamente peor.
+  if (rel === ".github/workflows/ci.yml") {
+    return texto
+      .replace(/[ \t]*# projects:solo-si-hay-datos\n[\s\S]*?# projects:fin-solo-si-hay-datos\n/g, "")
+      .replace(/[ \t]*# projects:solo-si-hay-e2e\n[\s\S]*?# projects:fin-solo-si-hay-e2e\n/g, "");
+  }
+
+  if (rel !== "package.json") return texto;
   try {
     const j = JSON.parse(texto);
     if (j.scripts) {
@@ -367,6 +389,23 @@ export function podarPorForma(texto, rel, forma) {
   } catch {
     return texto;
   }
+}
+
+/** SACA LOS CENTINELAS DE PODA, y por que va DESPUES de todas las podas.
+ *
+ *  Los `# projects:solo-si-hay-…` son contabilidad de ESTE marco: le dicen a la
+ *  herramienta que bloque gatear. Al proyecto que nace no le dicen nada, y
+ *  dejarselos es hacerle leer una nota escrita para otra persona.
+ *
+ *  EL DEFECTO QUE CIERRA, medido en una aplicacion recien generada: ocho lineas
+ *  de centinela sobrevivian —en el README, en dependabot.yml y en el ci.yml—
+ *  porque cada poda vuelve temprano cuando el bloque SI corresponde y en ese
+ *  camino nadie los limpiaba. Se veian en la portada del repositorio nuevo.
+ *
+ *  Se borra la linea entera, con su sangria y su salto: un comentario suelto en
+ *  medio de un YAML se lee como basura aunque sea valido. */
+export function sacarCentinelas(texto) {
+  return texto.replace(/^[ \t]*(?:>[ \t]*)?# projects:(?:fin-)?solo-si-hay-[a-z0-9-]+[ \t]*\r?\n/gm, "");
 }
 
 export function podarPorPlataforma(texto, rel, plataforma) {
@@ -880,7 +919,7 @@ export function instanciar({ raizAndamio, destino, valores }) {
       // Se poda ANTES de sustituir: lo que se saca puede tener marcadores
       // adentro —`{{PERFIL_DEV}}` vivia en el bloque de permisos de AWS— y
       // sustituirlos primero solo escribiria un relleno que despues se borra.
-      const texto = podarPorForma(podarPorPlataforma(fs.readFileSync(origen, "utf8"), rel, plataforma), rel, forma);
+      const texto = sacarCentinelas(podarPorForma(podarPorPlataforma(fs.readFileSync(origen, "utf8"), rel, plataforma), rel, forma));
       const r = sustituir(texto, valores);
       total += r.cuenta;
       for (const f of r.faltantes) faltantes.add(f);
@@ -1119,6 +1158,48 @@ export const PASOS_DEL_ARRANQUE = [
   },
 ];
 
+/** LOS PASOS QUE DE VERDAD CORREN EN ESTE DESTINO, y por que no son siempre los
+ *  mismos cuatro.
+ *
+ *  EL DEFECTO QUE ESTA FUNCION CIERRA, medido: la lista de arriba estaba fija en
+ *  cuatro y `podarPorForma` borra `datos` del package.json de un sitio —un sitio
+ *  para leer no tiene capa de datos que generar—. O sea que LA MISMA CORRIDA
+ *  escribia un manifiesto sin `datos` y dos lineas despues mandaba correr
+ *  `pnpm run datos`: `[ERR_PNPM_NO_SCRIPT] Missing script: datos` y salida 1, en
+ *  la mitad de las combinaciones que el asistente ofrece. Y el arreglo que se
+ *  imprimia —«corre `pnpm datos` en el destino»— era imposible por la misma
+ *  razon, asi que la persona quedaba con un repo escrito, un rojo y un consejo
+ *  que no podia funcionar.
+ *
+ *  LA FUENTE DE VERDAD PASA A SER EL MANIFIESTO QUE ESTA HERRAMIENTA ACABA DE
+ *  ESCRIBIR. No la forma, ni una segunda lista que habria que acordarse de
+ *  mantener al lado de la primera: el package.json del destino es el unico lugar
+ *  donde ese dato ya esta, y derivarlo de ahi hace que agregar una forma nueva
+ *  no pueda volver a romper el arranque.
+ *
+ *  Y EL SALTO SE DICE EN VOZ ALTA. Un paso que desaparece en silencio es como se
+ *  llega a creer que se verifico algo que nadie corrio, que es exactamente el
+ *  falso verde que este repositorio persigue en todos lados. */
+export function pasosQueCorren(destino, pasos = PASOS_DEL_ARRANQUE) {
+  let scripts;
+  try {
+    scripts = JSON.parse(fs.readFileSync(path.join(destino, "package.json"), "utf-8")).scripts ?? {};
+  } catch {
+    // Sin manifiesto legible no se poda NADA. Correr de mas da un error honesto
+    // del gestor de paquetes; correr de menos esconde un paso, y de las dos
+    // formas de equivocarse esta es la unica que se nota.
+    return { corren: pasos, salteados: [] };
+  }
+  const corren = [];
+  const salteados = [];
+  for (const paso of pasos) {
+    const script = paso.args[0] === "run" ? paso.args[1] : null;
+    if (script !== null && !(script in scripts)) salteados.push({ paso, script });
+    else corren.push(paso);
+  }
+  return { corren, salteados };
+}
+
 /** Con que se corren los scripts del proyecto.
  *
  *  `corepack` primero y `pnpm` despues, y no al reves: corepack VIENE CON NODE, y
@@ -1290,7 +1371,7 @@ async function moduloDelRegistro() {
 /** El resumen del arranque, en las palabras del encargo: instalado, formateado,
  *  verificado — o exactamente que fallo y como se arregla. Puro sobre lo que
  *  paso, para que el banco lo pueda afirmar sin correr un install. */
-export function lineasDelResumen(hechos, destino) {
+export function lineasDelResumen(hechos, destino, cuantosIban = PASOS_DEL_ARRANQUE.length) {
   const hechas = hechos.filter((h) => h.ok).map((h) => h.paso.clave);
   const fallo = hechos.find((h) => !h.ok);
   const l = [];
@@ -1307,7 +1388,7 @@ export function lineasDelResumen(hechos, destino) {
   l.push(`  Como se arregla: ${fallo.arregloConcreto ?? fallo.paso.arreglo}.`);
   l.push(`  La salida del programa que fallo esta arriba, tal cual: este arranque no la parafrasea.`);
   l.push(
-    `  Los ${PASOS_DEL_ARRANQUE.length - hechas.length - 1} paso(s) que venian despues NO se corrieron, para que ` +
+    `  Los ${cuantosIban - hechas.length - 1} paso(s) que venian despues NO se corrieron, para que ` +
       `el rojo que se lee sea el primero y no una cascada.`,
   );
   l.push(`  El repo YA quedo escrito en ${destino}: esto no hay que volver a instanciarlo, solo destrabar ese paso.`);
@@ -2588,11 +2669,20 @@ async function main(argv) {
   //     mismo que daria el CI en el primer push, adelantado a la maquina donde
   //     se arregla en un minuto.
   let arranque = null;
+  // Los pasos salen del manifiesto que se acaba de escribir, no de una lista
+  // fija: un sitio no tiene `datos` que generar y mandarselo lo mataba en 2/4.
+  const { corren: pasosDeEsteDestino, salteados } = pasosQueCorren(o.destino);
+  for (const s of salteados) {
+    console.log(
+      `(se saltea el paso "${s.paso.titulo}": este proyecto no declara el script \`${s.script}\`, ` +
+        `asi que correrlo moriria con "Missing script")`,
+    );
+  }
   if (!o.arranque) {
     console.error("");
     console.error("::warning::se pidio --sin-arranque: el repo quedo ESCRITO pero sin instalar, sin formatear y sin verificar.");
     console.error("Antes del primer push hay que correr, en la raiz del destino:");
-    for (const paso of PASOS_DEL_ARRANQUE) console.error(`  pnpm ${paso.args.join(" ")}`);
+    for (const paso of pasosDeEsteDestino) console.error(`  pnpm ${paso.args.join(" ")}`);
     console.error("Sin el install no hay lockfile, y el CI corre con --frozen-lockfile: el primer push moriria ahi.");
   } else {
     const ejecutor = ejecutorDeScripts();
@@ -2608,8 +2698,8 @@ async function main(argv) {
     if (!ejecutor) {
       console.error("");
       console.error("::warning::no encontre ni `corepack` (que viene con Node) ni `pnpm` en el PATH, asi que el arranque");
-      console.error("no se pudo intentar. El repo quedo ESCRITO y completo; lo que falta son cuatro comandos en su raiz:");
-      for (const paso of PASOS_DEL_ARRANQUE) console.error(`  pnpm ${paso.args.join(" ")}`);
+      console.error(`no se pudo intentar. El repo quedo ESCRITO y completo; lo que falta son ${pasosDeEsteDestino.length} comandos en su raiz:`);
+      for (const paso of pasosDeEsteDestino) console.error(`  pnpm ${paso.args.join(" ")}`);
       console.error("Corepack se habilita con `corepack enable`; pnpm tambien se instala suelto (npm i -g pnpm).");
     } else if (!red.ok) {
       // Preguntar primero cuesta medio segundo y evita el peor diagnostico que
@@ -2620,10 +2710,10 @@ async function main(argv) {
       console.error(`::warning::no llego a ${red.registro} (${red.error}), asi que el arranque no se intenta: sin registro`);
       console.error("alcanzable el install no falla rapido, falla tarde y con un mensaje que no habla de la red.");
       console.error("El repo quedo ESCRITO y completo. Cuando tengas red, en su raiz:");
-      for (const paso of PASOS_DEL_ARRANQUE) console.error(`  pnpm ${paso.args.join(" ")}`);
+      for (const paso of pasosDeEsteDestino) console.error(`  pnpm ${paso.args.join(" ")}`);
     } else {
       console.log("");
-      console.log(`ARRANQUE con ${ejecutor.nombre} en ${o.destino} — ${PASOS_DEL_ARRANQUE.length} pasos, la salida de cada uno tal cual sale:`);
+      console.log(`ARRANQUE con ${ejecutor.nombre} en ${o.destino} — ${pasosDeEsteDestino.length} pasos, la salida de cada uno tal cual sale:`);
       // Los scripts del andamio se llaman entre si con `pnpm` pelado. Sin un
       // pnpm global —la maquina limpia que corepack existe para cubrir— el paso
       // 1 pasa y el 2 muere con "pnpm: not found". Ver necesitaShimDePnpm.
@@ -2634,9 +2724,9 @@ async function main(argv) {
         else console.error("::warning::no se pudo materializar el shim de pnpm. Si un paso muere con \"pnpm: not found\", es esto: corre `corepack enable` una vez y volve a intentar");
       }
       const hechos = [];
-      for (const paso of PASOS_DEL_ARRANQUE) {
+      for (const paso of pasosDeEsteDestino) {
         console.log("");
-        console.log(`── ${hechos.length + 1}/${PASOS_DEL_ARRANQUE.length}  ${paso.titulo}  (${ejecutor.nombre} ${paso.args.join(" ")})`);
+        console.log(`── ${hechos.length + 1}/${pasosDeEsteDestino.length}  ${paso.titulo}  (${ejecutor.nombre} ${paso.args.join(" ")})`);
         const r = correrPaso(ejecutor, paso, o.destino, process.env, dirDeShims);
         hechos.push({ paso, ...r });
         // Se corta en el primero que falla: los que vienen despues dependen de
@@ -2646,7 +2736,7 @@ async function main(argv) {
       }
       arranque = hechos;
       console.log("");
-      const resumen = lineasDelResumen(hechos, o.destino);
+      const resumen = lineasDelResumen(hechos, o.destino, pasosDeEsteDestino.length);
       const rojo = hechos.some((h) => !h.ok);
       for (const linea of resumen) {
         if (rojo) console.error(linea);
