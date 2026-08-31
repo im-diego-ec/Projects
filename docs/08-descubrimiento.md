@@ -138,20 +138,32 @@ descarga. Ensayado el 2026-08-20: **termina bien**, escribe unas 49 skills y ~2,
 ### 2.b Dejarlo en castellano · *30 segundos, y ahorra rehacer el PRD*
 
 **El instalador deja BMAD en inglés**, y las skills lo obedecen: saludan y
-escriben **el documento** en el idioma que dice la configuración. Medido contra
-`bmad-method@6.11.0`: los valores por defecto son `communication_language:
-'English'` y `document_output_language: 'English'`.
+escriben **el documento** en el idioma que dice la configuración. Medido sobre una
+instalación de `bmad-method@6.11.0`: `communication_language: English` y
+`document_output_language: English`.
 
 O sea que, sin este paso, el PRD —el entregable del tramo, el que después lee una
 persona no técnica— **sale en inglés**.
 
+**El archivo que hay que tocar es uno solo**, y es el que la skill lee:
+
 ```bash
-grep -n "language" _bmad/bmm/config.yaml
+grep -n language _bmad/bmm/config.yaml
 ```
 
-Cambiá los dos valores a `Spanish` (o al idioma que uses). Están en
-`_bmad/bmm/config.yaml`; si tu instalación también dejó un `_bmad/config.toml`,
-el mismo par va ahí.
+Contesta dos líneas. Cambiá las dos a `Spanish` (o al idioma que uses).
+
+> **No toques los `.toml`.** La instalación deja además `_bmad/config.toml` y
+> `_bmad/config.user.toml` con el mismo par repartido entre los dos, y los dos
+> abren con «Installer-managed. Regenerated on every install — treat as
+> read-only». Editarlos es trabajo que la próxima instalación borra, y además no
+> es de donde la skill lee: su primer paso carga `_bmad/bmm/config.yaml`.
+
+> **Dónde te los va a dejar.** No en la carpeta donde estás parado: BMAD escribe
+> en `_bmad-output/planning-artifacts/prds/prd-<nombre-de-la-carpeta>-<fecha>/`.
+> Medido sobre una instalación de 6.11.0, leyendo `planning_artifacts` de
+> `_bmad/bmm/config.yaml` y `prd_output_path` / `run_folder_pattern` de la propia
+> skill. Si buscás `prd.md` en la raíz no lo vas a encontrar.
 
 ### 3 · Poner los documentos del PO, numerados
 

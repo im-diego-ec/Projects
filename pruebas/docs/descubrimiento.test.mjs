@@ -86,6 +86,27 @@ test("el paso del idioma esta, y va ANTES de generar el PRD", () => {
   assert.ok(idioma < t.lastIndexOf("bmad-prd"), "el paso del idioma tiene que estar antes del ultimo uso de bmad-prd");
 });
 
+test("el archivo del idioma es el que la skill lee, y no manda tocar los que se regeneran", () => {
+  // EL DEFECTO QUE ESTE CASO VIGILA, y lo cometi yo escribiendo el arreglo del
+  // idioma: la pagina decia «si tu instalacion tambien dejo un
+  // `_bmad/config.toml`, el mismo par va ahi». Medido sobre una instalacion real
+  // de 6.11.0: ese archivo SIEMPRE existe, el par esta REPARTIDO entre el y
+  // `config.user.toml`, los dos abren con «Installer-managed. Regenerated on
+  // every install — treat as read-only», y la skill no lee ninguno de los dos:
+  // su primer paso carga `_bmad/bmm/config.yaml`.
+  //
+  // Mandar editar un archivo que la proxima instalacion regenera es trabajo que
+  // se pierde, y encima no arregla nada.
+  const t = pagina();
+  assert.match(t, /_bmad\/bmm\/config\.yaml/, "la pagina tiene que nombrar el archivo que la skill lee");
+  assert.match(t, /No toques los `\.toml`|read-only/i, "y advertir que los .toml se regeneran");
+  assert.equal(
+    /el mismo par va ah(í|i)|tambi(é|e)n dej(ó|o) un `_bmad\/config\.toml`/.test(t),
+    false,
+    "la pagina no puede volver a mandar el par a un archivo que el instalador regenera",
+  );
+});
+
 test("`uv` se declara como lo que es: algo que hay que instalar aparte", () => {
   const t = pagina();
   assert.match(t, /\buv\b/, "la pagina tiene que nombrar uv: sin el, las skills fallan en su primer paso");
