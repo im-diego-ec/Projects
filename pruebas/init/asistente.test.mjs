@@ -254,7 +254,7 @@ test("volver a correrlo ofrece lo de antes, y Enter lo mantiene", async () => {
 
 test("trabajar solo APAGA la aprobacion ajena y lo deja firmado", () => {
   const d = desvios({ equipo: "solo", plataforma: "aws", avisos: "slack", visibilidad: "publico" });
-  const regla = d.find((x) => x.regla === "revision-cruzada-obligatoria");
+  const regla = d.find((x) => x.regla === "github-review-cruzado-automatizado");
   assert.ok(regla, "con una sola persona, exigir la aprobacion de otra bloquea TODO merge sin salida: eso se declara");
   assert.match(regla.motivo, /bloquearia todo merge|excepto al autor/i);
   assert.ok(regla.revisar, "un desvio sin cuando-se-revisa es un desvio que nadie va a revisar nunca");
@@ -263,12 +263,12 @@ test("trabajar solo APAGA la aprobacion ajena y lo deja firmado", () => {
 test("no elegir AWS declara por que las cinco claves llevan relleno", () => {
   for (const plataforma of ["supabase", "gcp", "ninguna"]) {
     const d = desvios({ equipo: "equipo", plataforma, avisos: "slack", visibilidad: "publico" });
-    const regla = d.find((x) => x.regla === "infraestructura-declarada-en-terraform");
+    const regla = d.find((x) => x.regla === "iac-es-terraform");
     assert.ok(regla, `con plataforma "${plataforma}" el relleno de AWS tiene que quedar declarado`);
     assert.match(regla.motivo, /no describen ninguna cuenta real/i, "tiene que decir que los numeros no son de verdad");
   }
   assert.equal(
-    desvios({ equipo: "equipo", plataforma: "aws", avisos: "slack", visibilidad: "publico" }).find((x) => x.regla === "infraestructura-declarada-en-terraform"),
+    desvios({ equipo: "equipo", plataforma: "aws", avisos: "slack", visibilidad: "publico" }).find((x) => x.regla === "iac-es-terraform"),
     undefined,
     "eligiendo AWS no hay nada de que apartarse: los valores son de verdad",
   );
@@ -276,7 +276,7 @@ test("no elegir AWS declara por que las cinco claves llevan relleno", () => {
 
 test("elegir privado declara que la proteccion de rama NO existe", () => {
   const d = desvios({ equipo: "equipo", plataforma: "aws", avisos: "slack", visibilidad: "privado" });
-  const regla = d.find((x) => x.regla === "proteccion-de-la-rama-principal");
+  const regla = d.find((x) => x.regla === "git-check-requerido-es-el-veredicto-agregado");
   assert.ok(regla, "es la consecuencia medida de elegir privado en el plan gratuito, y la persona tiene que verla escrita");
   assert.match(regla.motivo, /403/, "el 403 es la medicion, y sin ella esto seria una opinion");
 });
@@ -568,7 +568,7 @@ test("un sitio nunca queda con valores de AWS a medias, y el desvio lo dice", as
   for (const k of Object.keys(RELLENO_AWS)) {
     assert.equal(valores[k], RELLENO_AWS[k], `${k} tiene que llevar el relleno declarado, no undefined`);
   }
-  const d = desvios(respuestas).find((x) => x.regla === "infraestructura-declarada-en-terraform");
+  const d = desvios(respuestas).find((x) => x.regla === "iac-es-terraform");
   assert.ok(d, "el desvio tiene que quedar anotado: un relleno sin declarar es una mentira con formato de dato");
   assert.match(d.motivo, /sitio para leer/, "y su motivo tiene que nombrar la combinacion, no repetir el caso generico");
 });
@@ -610,7 +610,7 @@ test("la direccion gratuita nombra el producto que de verdad publica el andamio"
   assert.equal(/pages\.dev/.test(valores.DOMINIO_PROD), false, "Pages es otro producto y aca no se crea ninguno");
 
   // Y lo que NO se puede saber queda declarado: el subdominio de la cuenta.
-  const d = desvios(respuestas).find((x) => x.regla === "direccion-publica-declarada");
+  const d = desvios(respuestas).find((x) => x.regla === "urls-canonicas-por-cors");
   assert.ok(d, "una direccion incompleta sin desvio anotado es una mentira con formato de dato");
   assert.match(d.motivo, /subdominio/i, "el desvio tiene que decir QUE le falta");
   assert.match(d.revisar, /primera publicacion/i, "y CUANDO se sabe");
@@ -622,4 +622,106 @@ test("el andamio no nombra Pages en ningun lado donde publica con Workers", () =
   const wrangler = fs.readFileSync(path.join(ANDAMIO, "sitio/wrangler.jsonc"), "utf-8");
   assert.equal(/"pages_build_output_dir"/.test(wrangler), false, "una configuracion de Pages cambiaria toda esta regla");
   assert.match(wrangler, /"assets"/, "el andamio tiene que seguir publicando assets de Workers");
+});
+
+// ---------------------------------------------------------------------------
+// LOS DESVIOS: LA FORMA QUE SU LECTOR ESPERA, Y REGLAS QUE EXISTEN.
+//
+// DOS DEFECTOS ENCADENADOS, los dos medidos:
+//
+//   1. LA FORMA. El asistente escribia `.projects-desvios.json` como una LISTA
+//      pelada y la accion de constitucion lee `datos.desvios`, o sea un objeto
+//      con esa clave. `Array.isArray(datos?.desvios)` sobre una lista da false,
+//      asi que veia CERO desvios y no decia nada. La persona declaraba cuatro
+//      apartamientos de las reglas del marco y la constitucion de su proyecto
+//      salia como si no hubiera ninguno.
+//
+//   2. LOS IDS. Los cinco `regla` que el asistente escribia NO EXISTIAN en el
+//      canonico. Ninguno. Y la accion caza «desvios muertos» —una regla que ya
+//      no existe—, asi que arreglar SOLO la forma habria cambiado un silencio
+//      por cinco rojos el dia uno.
+//
+// Por eso los dos se arreglan juntos y este banco los mide juntos.
+// ---------------------------------------------------------------------------
+
+test("todo desvio declara una regla que EXISTE en el canonico del marco", async () => {
+  const canonico = path.resolve(ANDAMIO, "../actions/constitucion/canonico");
+  const idsDelCanonico = new Set(
+    fs
+      .readdirSync(canonico)
+      .filter((f) => f.endsWith(".md"))
+      .flatMap((f) => [...fs.readFileSync(path.join(canonico, f), "utf-8").matchAll(/projects:regla id=([a-z0-9-]+)/g)].map((m) => m[1])),
+  );
+  assert.ok(idsDelCanonico.size >= 20, `el canonico declara ${idsDelCanonico.size} reglas: se rompio la lectura`);
+
+  // Se recorren TODAS las combinaciones que producen desvios, no una: cada rama
+  // de `desvios()` escribe un id distinto y probar una sola deja las otras sin
+  // mirar, que es como los cinco llegaron a estar mal a la vez.
+  const vistos = new Set();
+  for (const eleccion of combinaciones()) {
+    const { respuestas } = await correrAsistente(
+      async (_t, id) => eleccion[id] ?? LIBRES[id] ?? "x",
+      {},
+      {},
+      () => {},
+      { ORG_MARCO: "im-diego-ec" },
+    );
+    for (const d of desvios(respuestas)) vistos.add(d.regla);
+  }
+  assert.ok(vistos.size >= 4, `solo se vieron ${vistos.size} reglas distintas: el barrido dejo ramas sin recorrer`);
+
+  const inventadas = [...vistos].filter((r) => !idsDelCanonico.has(r));
+  assert.deepEqual(
+    inventadas,
+    [],
+    "un desvio con una regla que el canonico no declara es un «desvio muerto»: la accion de constitucion lo caza y " +
+      `pone el proyecto en rojo, y mientras tanto el desvio no se muestra al lado de la regla de la que se aparta. ` +
+      `Inventadas: ${inventadas.join(", ")}`,
+  );
+});
+
+test("el archivo de desvios tiene la forma que su lector espera", () => {
+  // La accion lee `datos.desvios`. Se comprueba contra ESA lectura, escrita
+  // igual que en actions/constitucion/constitucion.mjs, y no contra una idea de
+  // como deberia ser.
+  const comoLoLeeLaAccion = (datos) => (Array.isArray(datos?.desvios) ? datos.desvios : []);
+  const lista = [{ regla: "iac-es-terraform", motivo: "x", revisar: "y" }];
+
+  assert.deepEqual(comoLoLeeLaAccion(lista), [], "una lista pelada se descarta ENTERA, y en silencio: era el defecto");
+  assert.deepEqual(comoLoLeeLaAccion({ desvios: lista }), lista, "envuelta en `desvios`, la accion la ve");
+});
+
+test("todo desvio trae los cuatro campos que la accion de constitucion exige", async () => {
+  // EL DEFECTO QUE ESTE CASO VIGILA, medido corriendo la accion de verdad contra
+  // un par de archivos recien generados: el asistente escribia `regla` y
+  // `motivo` y nada mas. La accion exige ademas `aprobado_por` y `fecha`, y pone
+  // un `::error::` por cada desvio al que le falte alguno: cuatro rojos el dia
+  // uno, sobre decisiones que la persona habia tomado bien.
+  //
+  // Los cuatro nombres se leen del contrato escrito en actions/README.md, no se
+  // copian aca: si el contrato cambia, este caso lo sigue.
+  const contrato = fs.readFileSync(path.resolve(ANDAMIO, "../actions/README.md"), "utf-8");
+  const linea = contrato.match(/`\.projects-desvios\.json`:[^.]*/)?.[0] ?? "";
+  const exigidos = [...linea.matchAll(/`([a-z_]+)`/g)].map((m) => m[1]).filter((c) => c !== "json");
+  assert.ok(exigidos.length >= 3, `se leyeron ${exigidos.length} campos del contrato: se rompio la lectura`);
+
+  const faltan = [];
+  for (const eleccion of combinaciones()) {
+    const { respuestas } = await correrAsistente(
+      async (_t, id) => eleccion[id] ?? LIBRES[id] ?? "x",
+      {},
+      {},
+      () => {},
+      { ORG_MARCO: "im-diego-ec" },
+    );
+    for (const d of desvios(respuestas, "2026-01-01")) {
+      for (const campo of exigidos) if (!d[campo]) faltan.push(`${d.regla}: le falta \`${campo}\``);
+    }
+  }
+  assert.deepEqual([...new Set(faltan)], [], `la accion pone un ::error:: por cada uno:\n  ${[...new Set(faltan)].join("\n  ")}`);
+
+  // Y la fecha tiene forma de fecha: la accion la valida con `esFecha`.
+  const uno = desvios({ equipo: "solo", ORG: "alguien" }, "2026-01-01")[0];
+  assert.match(uno.fecha, /^\d{4}-\d{2}-\d{2}$/);
+  assert.equal(uno.aprobado_por, "alguien", "quien aprueba es quien contesto, con nombre y no con un «alguien»");
 });

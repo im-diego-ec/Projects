@@ -2354,7 +2354,12 @@ async function main(argv) {
     process.stdout.write(`Escrito: ${rutaDeRespuestas}  (para que volver a correrlo no te haga contestar todo de nuevo)\n`);
     if (resultado.desvios.length) {
       const rutaDesvios = path.join(path.dirname(salida), ".projects-desvios.json");
-      fs.writeFileSync(rutaDesvios, `${JSON.stringify(resultado.desvios, null, 2)}\n`);
+      // LA FORMA ES `{ "desvios": [...] }`, NO UNA LISTA PELADA. La accion de
+      // constitucion lee `datos.desvios` y descarta lo que no sea eso: medido,
+      // con una lista pelada veia CERO desvios y no decia nada. La persona
+      // declaraba cuatro apartamientos de las reglas del marco y la constitucion
+      // de su proyecto salia como si no hubiera ninguno.
+      fs.writeFileSync(rutaDesvios, `${JSON.stringify({ desvios: resultado.desvios }, null, 2)}\n`);
       process.stdout.write(`Escrito: ${rutaDesvios}  (${resultado.desvios.length} desvio(s) declarado(s))\n`);
     }
 

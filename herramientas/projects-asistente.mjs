@@ -479,11 +479,38 @@ export function derivar(r) {
  *  NO ES DECORACION. El marco permite apartarse de casi cualquier pieza; lo que
  *  no permite es que apartarse sea algo que se descubre despues. Cada linea de
  *  aca nace de una respuesta y dice que regla queda sin cumplir y por que. */
-export function desvios(r) {
+/** LOS DESVIOS DECLARADOS, y por que su `regla` no es texto libre.
+ *
+ *  EL DEFECTO QUE CIERRA, medido: los cinco ids que esta funcion escribia
+ *  —`revision-cruzada-obligatoria`, `infraestructura-declarada-en-terraform`,
+ *  `alertas-a-un-canal-del-equipo`, `proteccion-de-la-rama-principal` y
+ *  `direccion-publica-declarada`— NO EXISTIAN EN EL CANONICO. Ninguno.
+ *
+ *  El campo `regla` es el id de la regla del canonico de la que el proyecto se
+ *  aparta, y la accion de constitucion lo usa para dos cosas: mostrar el desvio
+ *  al lado de su regla, y cazar «desvios muertos» (una regla que ya no existe).
+ *  Con ids inventados, lo primero no ocurria y lo segundo habria puesto rojo el
+ *  proyecto entero el dia que el otro defecto —la forma del archivo— se
+ *  arreglara. Los dos se arreglan juntos a proposito: arreglar uno solo cambia
+ *  un silencio por cinco rojos. */
+export function desvios(r, hoy = new Date().toISOString().slice(0, 10)) {
+  // LOS CUATRO CAMPOS DEL CONTRATO, y faltaban dos.
+  //
+  // `actions/constitucion` exige `regla`, `motivo`, `aprobado_por` y `fecha`, y
+  // pone ROJO el proyecto por cada desvio al que le falte alguno. El asistente
+  // escribia solo los dos primeros: medido corriendo la accion contra un par de
+  // archivos recien generados, cuatro `::error::` de «no dice quien lo aprobo».
+  //
+  // QUIEN APRUEBA es la persona que contesto el cuestionario, que es la duenia
+  // de la cuenta donde va el proyecto: la decision fue suya y el archivo tiene
+  // que decirlo con un nombre, no con un «alguien». LA FECHA entra por parametro
+  // para que el banco pueda afirmar sobre ella sin depender del dia que corra.
+  const comun = { aprobado_por: r.ORG, fecha: hoy };
   const lista = [];
   if (r.equipo !== "equipo") {
     lista.push({
-      regla: "revision-cruzada-obligatoria",
+      ...comun,
+      regla: "github-review-cruzado-automatizado",
       motivo:
         "El equipo es una sola persona. GitHub pide revision a los duenos del codigo excepto al autor, " +
         "asi que exigir una aprobacion ajena bloquearia todo merge sin salida. El pull request y la " +
@@ -493,7 +520,8 @@ export function desvios(r) {
   }
   if (!usaAws(r)) {
     lista.push({
-      regla: "infraestructura-declarada-en-terraform",
+      ...comun,
+      regla: "iac-es-terraform",
       motivo:
         (r.plataforma === "aws"
           ? "La plataforma elegida es AWS pero la forma es un sitio para leer: se publica en Cloudflare y no tiene " +
@@ -507,7 +535,8 @@ export function desvios(r) {
   }
   if (r.avisos !== "slack") {
     lista.push({
-      regla: "alertas-a-un-canal-del-equipo",
+      ...comun,
+      regla: "alertar-con-origen-preciso",
       motivo:
         "Los avisos van al correo de GitHub. Las dos claves de Slack llevan relleno por el mismo motivo " +
         "que las de AWS: vacias se leerian como marcador sin resolver.",
@@ -516,7 +545,8 @@ export function desvios(r) {
   }
   if (r.dominio !== "propio") {
     lista.push({
-      regla: "direccion-publica-declarada",
+      ...comun,
+      regla: "urls-canonicas-por-cors",
       motivo:
         "No hay dominio propio, asi que se anoto la direccion gratuita de Cloudflare Workers " +
         "`<proyecto>.workers.dev`. LE FALTA EL SUBDOMINIO DE LA CUENTA en el medio " +
@@ -529,7 +559,8 @@ export function desvios(r) {
   }
   if (r.visibilidad === "privado") {
     lista.push({
-      regla: "proteccion-de-la-rama-principal",
+      ...comun,
+      regla: "git-check-requerido-es-el-veredicto-agregado",
       motivo:
         "El repositorio es privado en el plan gratuito de GitHub, donde la proteccion de rama no existe " +
         "y la API responde 403. Las reglas del marco quedan escritas sin nada que las haga cumplir.",
