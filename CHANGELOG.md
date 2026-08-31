@@ -41,7 +41,56 @@ mueve sobre un cambio incompatible.
 
 ## [No publicado]
 
+### Corregido
+
+- **La forma `sitio` no llegaba a un proyecto sano, y la carta la declaraba
+  construida.** Los pasos del arranque estaban fijos en cuatro y `podarPorForma`
+  borra `datos` del manifiesto de un sitio: la misma corrida escribía un
+  `package.json` sin ese script y dos líneas después mandaba correr `pnpm run
+  datos`. Y su `ci.yml` conservaba `--filter <api> --fail-if-no-match`, que nace
+  rojo sobre un workspace sin paquete de API. **Qué tiene que hacer un
+  consumidor: nada**, salvo que hubiera generado un sitio, en cuyo caso conviene
+  regenerarlo.
+- **`sitio` + AWS escribía cinco valores `undefined` y salía 0.** Las preguntas
+  de AWS y la derivación decidían con predicados distintos. Ahora hay uno solo,
+  y la infraestructura tampoco viaja a un sitio.
+- **El `uses:` del pipeline de un proyecto nuevo apuntaba a un repositorio
+  inexistente.** `{{ORG}}` significaba a la vez la cuenta del proyecto y la del
+  marco. La segunda pasa a ser `{{ORG_MARCO}}`, derivada del remoto del clon.
+  **Consumidor: nada** — es un marcador nuevo del andamio, no de los proyectos
+  ya creados.
+- **`desplegar.yml` esperaba un workflow llamado `ci` y el workflow se llama
+  `CI`.** `workflow_run` resuelve por el `name:` exacto: no fallaba, no
+  disparaba nunca. Y publicaba la punta de `main` en vez del commit que pasó el
+  CI; ahora pide `head_sha`.
+- **Los desvíos declarados no llegaban a la constitución del proyecto.** El
+  archivo se escribía como lista pelada donde el lector espera `{ "desvios":
+  [...] }`, sus cinco `regla` no existían en el canónico, y le faltaban
+  `aprobado_por` y `fecha`. Los tres se arreglan juntos: arreglar uno solo
+  cambiaba un silencio por cinco rojos.
+- **El `verificar` de un sitio salía verde una vez y rojo la siguiente**, por los
+  tipos que `astro build` genera y el linter leía.
+
 ### Añadido
+
+- **`docs/10-publicar.md`**, el cuarto tramo del camino, que no tenía página. Las
+  páginas siguientes corren un número: `10-reglas-no-escritas` pasa a `11`, y así
+  hasta `16`.
+- **El andamio reparte `docs/`** con `adr/`, `postmortems/` y `runbooks/` —las
+  tres carpetas que la constitución ya mandaba usar y que el proyecto no tenía— y
+  un esqueleto de change para el primer día.
+- **`docs/09` cubre la segunda mitad del ciclo**: `design.md`, `tasks.md`,
+  implementar y archivar.
+- **La forma y la plataforma se validan**, con las opciones y una sugerencia
+  cuando el valor se parece a una: escribir `"sitios"` entregaba un proyecto
+  distinto con salida 0.
+
+### Seguridad
+
+- **El historial se reescribió** para sacar dos identificadores de cuenta de AWS
+  y el correo personal del autor de 51 commits. Los once tags conservan su SHA:
+  los commits afectados eran todos posteriores a `v1.7.0`, así que **ningún
+  consumidor que pine una versión exacta recibe contenido distinto**.
 
 - **El despliegue existe, y por primera vez el marco publica algo.** Un proyecto con la
   forma «un sitio para leer» viene con la configuración de **Cloudflare Workers** y un paso

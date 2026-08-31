@@ -663,7 +663,7 @@ jobs:
           for F in plantilla/.github/workflows/*.yml; do
             N="$(basename "${F}")"
             if ! find "${TMP}" -path "*/repo-*/.github/workflows/${N}" | grep -q .; then
-              echo "::error::${N} vive en el andamio y ninguna de las formas que este paso instancia lo reparte, asi que ningun validador de sintaxis lo mira. Agrega la forma que lo reparte al `for FORMA in ...` de este paso"
+              echo "::error::${N} vive en el andamio y ninguna de las formas que este paso instancia lo reparte, asi que ningun validador de sintaxis lo mira. Agrega la forma que lo reparte al bucle 'for FORMA in ...' de este paso"
               exit 1
             fi
           done
