@@ -439,7 +439,9 @@ export function podarPorForma(texto, rel, forma) {
   // automatica que su arbol no trae, que es el mismo defecto al reves.
   if (forma !== "sitio") {
     if (rel === "README-del-proyecto.md") {
-      return texto.replace(/> # projects:solo-si-es-sitio\n[\s\S]*?> # projects:fin-solo-si-es-sitio\n\n?/g, "");
+      return texto
+        .replace(/> # projects:solo-si-es-sitio\n[\s\S]*?> # projects:fin-solo-si-es-sitio\n\n?/g, "")
+        .replace(/<!-- projects:solo-si-es-sitio -->\n[\s\S]*?<!-- projects:fin-solo-si-es-sitio -->\n/g, "");
     }
     return texto;
   }
@@ -474,7 +476,9 @@ export function podarPorForma(texto, rel, forma) {
   // forma donde si existe. Ademas describia prefijos de recursos y regiones de
   // una nube que un sitio no usa.
   if (rel === "README-del-proyecto.md") {
-    return texto.replace(/> # projects:solo-si-no-es-sitio\n[\s\S]*?> # projects:fin-solo-si-no-es-sitio\n/g, "");
+    return texto
+      .replace(/> # projects:solo-si-no-es-sitio\n[\s\S]*?> # projects:fin-solo-si-no-es-sitio\n/g, "")
+      .replace(/<!-- projects:solo-si-no-es-sitio -->\n[\s\S]*?<!-- projects:fin-solo-si-no-es-sitio -->\n/g, "");
   }
 
   if (rel !== "package.json") return texto;
@@ -510,10 +514,12 @@ export function podarPorForma(texto, rel, forma) {
  *  Se borra la linea entera, con su sangria y su salto: un comentario suelto en
  *  medio de un YAML se lee como basura aunque sea valido. */
 export function sacarCentinelas(texto) {
-  return texto.replace(/^[ \t]*(?:>[ \t]*)?# projects:(?:fin-)?solo-si-[a-z0-9-]+[ \t]*\r?\n/gm, "");
+  return texto
+    .replace(/^[ \t]*(?:>[ \t]*)?# projects:(?:fin-)?solo-si-[a-z0-9-]+[ \t]*\r?\n/gm, "")
+    .replace(/^[ \t]*<!-- projects:(?:fin-)?solo-si-[a-z0-9-]+ -->[ \t]*\r?\n/gm, "");
 }
 
-export function podarPorPlataforma(texto, rel, plataforma) {
+export function podarPorPlataforma(texto, rel, plataforma, forma = "aplicacion") {
   // Esta va ANTES del corte de abajo: la plataforma se declara en el archivo de
   // valores del proyecto SIEMPRE, tambien cuando es `aws`. Si solo se escribiera
   // en el caso raro, el literal del andamio seguiria siendo la unica fuente y
@@ -527,7 +533,12 @@ export function podarPorPlataforma(texto, rel, plataforma) {
       return texto;
     }
   }
-  if (plataforma === "aws") return texto;
+  // LA MISMA REGLA QUE EL REPARTO DE ARCHIVOS, y no mirarla dejaba la portada
+  // describiendo carpetas que el proyecto no recibe: un sitio con AWS elegido no
+  // recibe `infra/` —no tiene servidor propio que desplegar— pero su README
+  // seguia trayendo la fila que las describe, porque esta poda miraba solo la
+  // plataforma. Es el mismo predicado de `noViajanPorPlataforma`.
+  if (plataforma === "aws" && forma !== "sitio") return texto;
   if (rel === ".github/dependabot.yml") {
     return texto.replace(/[ \t]*# projects:solo-si-hay-infra\n[\s\S]*?# projects:fin-solo-si-hay-infra\n/g, "");
   }
@@ -538,10 +549,14 @@ export function podarPorPlataforma(texto, rel, plataforma) {
     // primera pantalla que ve cualquiera que entre al repositorio afirmaba un
     // despliegue que no existe. El centinela va en el propio andamio, con la
     // forma de cita de markdown para que el bloque se lea igual mientras esta.
-    return texto.replace(/> # projects:solo-si-hay-infra\n[\s\S]*?> # projects:fin-solo-si-hay-infra\n/g,
-      "> ⚠️ **Este proyecto todavía no se publica en ningún lado.** Se verifica solo, pero nada\n" +
-      "> lo lleva a una dirección donde otra persona pueda entrar. Mientras tanto se levanta en\n" +
-      "> tu máquina con `pnpm dev`.\n");
+      // SE BORRA Y NO SE REEMPLAZA. Este bloque ponia en su lugar un aviso de
+      // «todavia no se publica». Desde que ese aviso vive FUERA del gateo de
+      // infraestructura —depende de la FORMA, no de la nube— la persona leia el
+      // mismo parrafo DOS VECES seguidas en la portada de su proyecto. Medido en
+      // el camino recomendado (aplicacion + Supabase), que es el que hace la mayoria.
+      return texto
+        .replace(/> # projects:solo-si-hay-infra\n[\s\S]*?> # projects:fin-solo-si-hay-infra\n/g, "")
+        .replace(/<!-- projects:solo-si-hay-infra -->\n[\s\S]*?<!-- projects:fin-solo-si-hay-infra -->\n/g, "");
   }
   if (rel === ".claude/settings.json") {
     // JSON no admite comentarios, asi que el centinela no sirve: se filtran las
@@ -1024,7 +1039,7 @@ export function instanciar({ raizAndamio, destino, valores }) {
       // Se poda ANTES de sustituir: lo que se saca puede tener marcadores
       // adentro —`{{PERFIL_DEV}}` vivia en el bloque de permisos de AWS— y
       // sustituirlos primero solo escribiria un relleno que despues se borra.
-      const texto = sacarCentinelas(podarPorForma(podarPorPlataforma(fs.readFileSync(origen, "utf8"), rel, plataforma), rel, forma));
+      const texto = sacarCentinelas(podarPorForma(podarPorPlataforma(fs.readFileSync(origen, "utf8"), rel, plataforma, forma), rel, forma));
       const r = sustituir(texto, valores);
       total += r.cuenta;
       for (const f of r.faltantes) faltantes.add(f);

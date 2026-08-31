@@ -711,3 +711,73 @@ test("un sitio no recibe infraestructura de nube aunque se elija AWS", () => {
   assert.equal(seExcluyeDelCopiado("infra/main.tf", "aws", "sitio"), true);
   assert.equal(seExcluyeDelCopiado("infra/main.tf", "aws", "aplicacion"), false);
 });
+
+// ---------------------------------------------------------------------------
+// LA PORTADA DESCRIBE EL PROYECTO QUE LA PERSONA TIENE, NO OTRO.
+//
+// EL DEFECTO QUE ESTE BANCO CIERRA, medido sobre un sitio recien generado: su
+// README nombraba SIETE rutas que ese proyecto no tiene —`api/`, `web/`, `e2e/`,
+// `infra/`, `infra-prod/`, `comandos-levantar-servicios.txt` y los dos
+// `.env.example`— y su tabla «Estructura» no tenia fila para `sitio/`, que es el
+// unico paquete que si trae. Y la seccion «Levantarlo en tu maquina» le mandaba
+// copiar dos `.env.example` que no existen.
+//
+// Es la PRIMERA pantalla del repositorio nuevo. Describir otro proyecto ahi no
+// es un detalle de redaccion: es la persona buscando carpetas que no estan.
+//
+// Y EL AVISO DUPLICADO, del mismo arreglo: la portada del camino recomendado
+// —aplicacion + Supabase, las dos marcadas como recomendadas— traia el mismo
+// parrafo de «todavia no se publica» DOS VECES seguidas, porque uno lo pone la
+// poda por forma y el otro lo ponia la poda por plataforma.
+// ---------------------------------------------------------------------------
+
+test("la portada de cada forma no nombra una sola ruta que ese proyecto no tenga", async () => {
+  const pregunta = PREGUNTAS.find((p) => p.id === "forma");
+  const rotos = [];
+  for (const o of pregunta.opciones) {
+    const destino = fs.mkdtempSync(path.join(os.tmpdir(), `rutas-${o.valor}-`));
+    const idx = String(pregunta.opciones.indexOf(o) + 1);
+    const { valores } = await correrAsistente(
+      async (_t, id) => ({ PROYECTO: "p", ORG: "o", forma: idx })[id] ?? "",
+      {},
+      {},
+      () => {},
+      DERIVADOS,
+    );
+    instanciar({ raizAndamio: ANDAMIO, destino, valores });
+    const readme = fs.readFileSync(path.join(destino, "README.md"), "utf-8");
+
+    // Solo se juzga lo que TIENE FORMA DE RUTA DEL PROYECTO: un directorio de
+    // primer nivel con barra, o un archivo suelto con extension conocida. Un
+    // `src/pages/` de adentro de un paquete, o un `owner/repo`, no son eso.
+    // Lo que un PASO POSTERIOR de la herramienta crea. `instanciar` copia el
+    // andamio; `openspec/` lo escribe `openspec init` y `.projects/` el render
+    // de la constitucion, los dos despues. Nombrarlos en la portada es correcto.
+    const LOS_ESCRIBE_UN_PASO_POSTERIOR = ["openspec/", ".projects/"];
+    for (const m of readme.matchAll(/`([a-z][\w-]*\/|[\w-]+\.(?:txt|example|yml|json))`/g)) {
+      const r = m[1];
+      if (LOS_ESCRIBE_UN_PASO_POSTERIOR.includes(r)) continue;
+      if (r.endsWith("/") && !fs.existsSync(path.join(destino, r.slice(0, -1)))) {
+        rotos.push(`${o.valor}: la portada nombra "${r}" y ese proyecto no lo tiene`);
+      }
+      if (!r.endsWith("/") && !fs.existsSync(path.join(destino, r))) {
+        rotos.push(`${o.valor}: la portada nombra "${r}" y ese proyecto no lo tiene`);
+      }
+    }
+
+    // Y al reves: el paquete que SI trae tiene que estar en la tabla.
+    const paquetes = paquetesDe(destino);
+    for (const p of paquetes) {
+      if (!readme.includes(`\`${p}/\``)) rotos.push(`${o.valor}: "${p}/" es un paquete del proyecto y la portada no lo nombra`);
+    }
+
+    // Y el aviso sobre publicar aparece UNA vez, no dos.
+    const avisos = (readme.match(/⚠️ \*\*(Todavía no hay despliegue|Este proyecto todavía no se publica)/g) ?? []).length;
+    if (avisos > 1) rotos.push(`${o.valor}: la portada repite el aviso de que no se publica ${avisos} veces`);
+  }
+  assert.deepEqual(
+    rotos,
+    [],
+    `la primera pantalla del repositorio nuevo tiene que describir ESE proyecto:\n  ${rotos.join("\n  ")}`,
+  );
+});

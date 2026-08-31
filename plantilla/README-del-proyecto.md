@@ -34,15 +34,34 @@ Lo que se decide de verdad no vive en este archivo: las propuestas y los contrat
 
 | Directorio              | Qué hay                                                                                                                                          |
 | ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
+<!-- projects:solo-si-es-sitio -->
+| `{{PAQUETE_SITIO}}/`    | El sitio. Las páginas viven en `src/pages/` y cada archivo es una dirección; el código propio va en `src/lib/`, que es donde van las pruebas.     |
+<!-- projects:fin-solo-si-es-sitio -->
+<!-- projects:solo-si-no-es-sitio -->
 | `{{PAQUETE_API}}/`      | Backend. Expone la API y es la autoridad de autorización: la identidad sale siempre de los claims firmados, nunca del cuerpo de la petición.     |
 | `{{PAQUETE_WEB}}/`      | Frontend. Consume la API del backend; no habla con la base de datos ni con la nube.                                                              |
 | `{{PAQUETE_E2E}}/`      | Suite end-to-end, que ejercita el sistema entero contra un ambiente levantado.                                                                   |
+<!-- projects:fin-solo-si-no-es-sitio -->
+<!-- projects:solo-si-hay-infra -->
 | `infra/`, `infra-prod/` | Infraestructura como código, un root por ambiente. Los pendientes de decisión que quedan abiertos están escritos en `pendientes.tf` de cada uno. |
+<!-- projects:fin-solo-si-hay-infra -->
 | `openspec/`             | Propuestas y contratos: lo que se va a construir y qué garantiza.                                                                                |
+| `docs/`                 | Lo que este proyecto deja escrito: decisiones estructurales, post-mortems, runbooks y las plantillas para empezar cada uno.                      |
 | `.github/workflows/`    | El pipeline. Lo común llega por referencia al marco; lo del proyecto vive acá.                                                                   |
 
 ## Levantarlo en tu máquina
 
+<!-- projects:solo-si-es-sitio -->
+Un solo comando, y no hace falta configurar nada antes:
+
+```bash
+pnpm dev
+```
+
+Abrilo en la dirección que imprime. La verificación completa —la misma secuencia que corre
+el pipeline— es:
+<!-- projects:fin-solo-si-es-sitio -->
+<!-- projects:solo-si-no-es-sitio -->
 Los comandos exactos, con sus dos variantes por sistema operativo, están en
 **`comandos-levantar-servicios.txt`**. No se repiten acá a propósito: una segunda copia de
 una lista de comandos se desactualiza, y la que se pudre es siempre la que nadie corre.
@@ -50,6 +69,7 @@ una lista de comandos se desactualiza, y la que se pudre es siempre la que nadie
 El resumen, para saber qué esperar: `pnpm install` una vez, copiar los dos `.env.example` a
 `.env` y llenarlos, y `pnpm dev`. La verificación completa —la misma secuencia que corre el
 pipeline— es un solo comando:
+<!-- projects:fin-solo-si-no-es-sitio -->
 
 ```bash
 pnpm verificar
@@ -83,11 +103,6 @@ pipeline, y el diagnóstico local es varios minutos más barato.
 > Este repositorio se verifica solo, pero **nada lo publica**: no hay un paso que lleve
 > tu código a una dirección donde otra persona pueda entrar. Mientras tanto, se levanta
 > en tu máquina con `pnpm dev`.
->
-> Este aviso NO depende de la nube que hayas elegido —depende de que este proyecto no
-> tenga todavía un paso que publique—, y por eso va fuera del bloque de infraestructura:
-> puesto adentro, un proyecto sin Terraform se quedaba con un `## Ambientes` vacío y sin
-> una sola línea que dijera qué pasa con el despliegue.
 
 > # projects:solo-si-hay-infra
 > Las direcciones de abajo son donde va a vivir cuando ese paso exista, no dónde vive hoy.
