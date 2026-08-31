@@ -312,10 +312,17 @@ const GUIA = "docs/04-arrancar-acompanado.md";
  *  exactamente el momento en que alguien que no es tecnico se traba. */
 const PROMESAS_DE_LA_GUIA = ["**Qué vas a hacer.**", "**Qué copiar", "**Qué vas a ver", "**Cómo sabés que salió bien.**"];
 
-/** Cuantos pasos tiene la guia hoy. MEDIDO el 2026-08-25 sobre el archivo, no
+/** Cuantos pasos tiene la guia hoy. MEDIDO el 2026-08-31 sobre el archivo, no
  *  recordado. Es un piso y no una igualdad porque agregar un paso es una mejora;
- *  bajarlo es una edicion que alguien tiene que justificar en el mismo cambio. */
-const PASOS_DE_LA_GUIA = 13;
+ *  bajarlo es una edicion que alguien tiene que justificar en el mismo cambio.
+ *
+ *  QUEDO VIEJO UNA VEZ Y COSTO CARO: decia 13 mientras la guia tenia 15, o sea
+ *  que cualquier PAR de pasos contiguos se podia borrar con el banco entero en
+ *  verde. Medido: borrando los pasos 3 y 4 —124 lineas, incluido el paso del
+ *  asistente, que es la pata por la que entra una persona no tecnica— el banco
+ *  seguia 1073/1073. Un piso que se queda atras es un piso que no toca el suelo,
+ *  y por eso hay abajo un caso que lo exige AJUSTADO. */
+const PASOS_DE_LA_GUIA = 15;
 
 /** Los pasos de la guia, cada uno con su cuerpo. Por SECCION y no por conteo
  *  global: el conteo global tenia holgura de la mala —al borrar un paso entero se
@@ -648,4 +655,23 @@ test("MUERDE: una cerca con texto detras se caza", () => {
 
   // Y el control: una cerca limpia no se caza.
   assert.equal(/^(\s{0,3})(`{3,})(.*)$/.exec("```")[3].trim(), "", "una cerca limpia no lleva nada detras");
+});
+
+test("el piso de pasos de la guia esta ajustado, no dos pasos por debajo", () => {
+  // EL DEFECTO QUE ESTE CASO CIERRA: el piso decia 13 y la guia tenia 15. Un
+  // piso holgado no protege nada — deja borrar exactamente la holgura sin que
+  // nada se ponga rojo—, y este ya se habia quedado atras dos veces por la via
+  // normal: se agregan pasos y nadie sube el numero.
+  //
+  // Exigirlo AJUSTADO invierte quien tiene que acordarse: agregar un paso ahora
+  // pone el banco rojo con un mensaje que dice exactamente que numero poner.
+  const pasos = (leer(GUIA).match(/^## Paso /gm) ?? []).length;
+  assert.ok(pasos >= 1, "un cero aca es este control roto, no una guia sin pasos");
+  assert.equal(
+    PASOS_DE_LA_GUIA,
+    pasos,
+    `${GUIA} tiene ${pasos} pasos y el piso de este banco dice ${PASOS_DE_LA_GUIA}. Si agregaste un paso, subi el ` +
+      `piso a ${pasos} en la misma edicion: un piso que se queda atras deja borrar la diferencia sin que nada avise, ` +
+      `y ya paso —con 13 contra 15 se podian borrar dos pasos contiguos con el banco entero en verde—.`,
+  );
 });
