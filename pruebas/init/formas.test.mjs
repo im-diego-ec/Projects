@@ -4,6 +4,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { execFileSync } from "node:child_process";
 
 import {
   noViajanPorForma,
@@ -408,4 +409,107 @@ test("MUERDE: sin la variante por forma, la portada de un sitio vuelve a negarse
   assert.equal(/nada lo publica/i.test(paraSitio), false, "podado para un sitio, la negacion no puede quedar");
   assert.match(paraApp, /nada lo publica/i, "y para una aplicacion tiene que quedarse");
   assert.equal(/projects:solo-si-es-sitio/.test(paraApp), false, "y la promesa del sitio no puede viajar a una aplicacion");
+});
+
+// ---------------------------------------------------------------------------
+// TODO COMANDO QUE LA GUIA MANDA CORRER SOBRE EL PROYECTO TIENE QUE CONTESTAR.
+//
+// EL DEFECTO QUE ESTE BANCO CIERRA, medido: el Paso 14 de docs/04 manda
+// `grep '"forma"' .projects-valores.json` para saber si el proyecto se publica
+// solo, y ese archivo traia `plataforma` pero NO `forma`. El comando devolvia
+// vacio y salia 1. O sea que el proyecto no registraba en ningun lado la
+// decision que la carta llama «la que mas cuesta si se toma tarde», y la
+// pregunta que abre el cuarto tramo no se podia contestar mirando el proyecto.
+//
+// La guia daba un comando que no contesta, que es la version ejecutable de una
+// pagina que miente.
+// ---------------------------------------------------------------------------
+
+test("el proyecto registra su propia forma, que es lo que la guia manda consultar", async () => {
+  const pregunta = PREGUNTAS.find((p) => p.id === "forma");
+  const rotos = [];
+  for (const o of pregunta.opciones) {
+    const destino = fs.mkdtempSync(path.join(os.tmpdir(), `registro-${o.valor}-`));
+    const idx = String(pregunta.opciones.indexOf(o) + 1);
+    const { valores } = await correrAsistente(
+      async (_t, id) => ({ PROYECTO: "p", ORG: "o", forma: idx })[id] ?? "",
+      {},
+      {},
+      () => {},
+      DERIVADOS,
+    );
+    instanciar({ raizAndamio: ANDAMIO, destino, valores });
+    const registro = JSON.parse(fs.readFileSync(path.join(destino, ".projects-valores.json"), "utf-8"));
+    if (registro.forma !== o.valor) rotos.push(`${o.valor}: el proyecto quedo registrado como "${registro.forma}"`);
+    if (!registro.plataforma) rotos.push(`${o.valor}: y tampoco registro su plataforma`);
+  }
+  assert.deepEqual(
+    rotos,
+    [],
+    `el proyecto tiene que poder contestar solo que forma es: es lo que decide si se publica:\n  ${rotos.join("\n  ")}`,
+  );
+});
+
+// ---------------------------------------------------------------------------
+// UN `grep` DE LA GUIA QUE NO ENCUENTRA NADA ES UNA PAGINA QUE MIENTE.
+//
+// EL DEFECTO QUE ESTE BANCO CIERRA, y se cometio escribiendo el arreglo del
+// hallazgo de al lado: el Paso 14 de docs/04 manda
+// `grep '"forma"' .projects-valores.json` para que la persona sepa si su
+// proyecto se publica solo. El archivo existia, la clave no, y el comando
+// devolvia vacio con salida 1. La guia se leia bien y no contestaba nada.
+//
+// La regla es decidible y no necesita correr un shell: si la guia grepea un
+// archivo que un proyecto generado TIENE, el patron tiene que encontrar algo
+// ahi. Si el archivo no viaja al proyecto —`valores.json`, que lo escribe la
+// persona— el caso no opina.
+// ---------------------------------------------------------------------------
+
+test("todo `grep` que la guia manda correr sobre un archivo del proyecto encuentra algo", async () => {
+  const proyectos = {};
+  for (const forma of ["aplicacion", "sitio"]) {
+    const destino = fs.mkdtempSync(path.join(os.tmpdir(), `grep-${forma}-`));
+    const idx = String(PREGUNTAS.find((p) => p.id === "forma").opciones.findIndex((o) => o.valor === forma) + 1);
+    const { valores } = await correrAsistente(
+      async (_t, id) => ({ PROYECTO: "p", ORG: "o", forma: idx })[id] ?? "",
+      {},
+      {},
+      () => {},
+      DERIVADOS,
+    );
+    instanciar({ raizAndamio: ANDAMIO, destino, valores });
+    proyectos[forma] = destino;
+  }
+
+  const paginas = execFileSync("git", ["ls-files", "docs/*.md", "*.md"], { cwd: RAIZ, encoding: "utf-8" })
+    .trim()
+    .split("\n")
+    .filter(Boolean);
+
+  const mudos = [];
+  let mirados = 0;
+  for (const pagina of paginas) {
+    const texto = fs.readFileSync(path.join(RAIZ, pagina), "utf-8");
+    for (const bloque of [...texto.matchAll(/```(?:bash|sh|shell)\n([\s\S]*?)```/g)].map((m) => m[1])) {
+      for (const m of bloque.matchAll(/^\s*grep(?:\s+-\w+)*\s+'([^']+)'\s+([\w./-]+)\s*$/gm)) {
+        const [, patron, archivo] = m;
+        for (const [forma, destino] of Object.entries(proyectos)) {
+          const f = path.join(destino, ...archivo.split("/"));
+          // Que exista no alcanza: un `grep -r` sobre un directorio tambien
+          // "existe", y leerlo como archivo revienta.
+          if (!fs.existsSync(f) || !fs.statSync(f).isFile()) continue; // no viaja: el caso no opina
+          mirados++;
+          if (!new RegExp(patron.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).test(fs.readFileSync(f, "utf-8"))) {
+            mudos.push(`${pagina} → grep '${patron}' ${archivo} no encuentra nada en un proyecto "${forma}"`);
+          }
+        }
+      }
+    }
+  }
+  assert.ok(mirados >= 1, "ninguna pagina grepea un archivo que el proyecto tenga: este control dejo de mirar lo que cree");
+  assert.deepEqual(
+    mudos,
+    [],
+    `la guia manda correr un comando que no contesta nada. Es la version ejecutable de una pagina que miente:\n  ${mudos.join("\n  ")}`,
+  );
 });

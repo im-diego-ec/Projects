@@ -350,6 +350,25 @@ export function renombresPorPlataforma(plataforma) {
  *  No alcanza con borrar el script suelto: hay que sacarlo TAMBIEN de la cadena
  *  de `verificar`, porque esa cadena lo nombra. Los dos se mueven juntos. */
 export function podarPorForma(texto, rel, forma) {
+  // LA FORMA SE ESCRIBE SIEMPRE, igual que la plataforma y por el mismo motivo:
+  // si solo se escribiera en el caso raro, el literal del andamio seguiria
+  // siendo la unica fuente y volveria a poder mentir el dia que cambie.
+  //
+  // EL DEFECTO QUE CIERRA, medido: el proyecto generado NO registraba su propia
+  // forma en ningun lado. `.projects-valores.json` traia `plataforma` y no
+  // `forma`, asi que la pregunta «¿esto se publica solo?» —la que abre el cuarto
+  // tramo— no se podia contestar mirando el proyecto. El comando que la guia
+  // manda correr en su Paso 14 devolvia vacio y salia 1.
+  if (rel === ".projects-valores.json") {
+    try {
+      const j = JSON.parse(texto);
+      j.forma = forma;
+      return `${JSON.stringify(j, null, 2)}\n`;
+    } catch {
+      return texto;
+    }
+  }
+
   // El bloque del sitio se saca SIEMPRE que la forma no sea un sitio: si no,
   // una aplicacion se queda con una portada que le promete una publicacion
   // automatica que su arbol no trae, que es el mismo defecto al reves.
