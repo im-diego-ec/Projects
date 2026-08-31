@@ -563,7 +563,11 @@ primera vez en todo el camino que vas a ver algo que se parece a una aplicación
 vale la pena: hasta acá tenés un repositorio sano, que no es lo mismo que un
 proyecto que hace algo.
 
-**Qué copiar** (en la carpeta de tu proyecto, las tres líneas):
+**Qué copiar.** Depende de tu forma, y es la única vez en toda la página que
+cambia. La sabés con el comando del Paso 14, o mirando si tu proyecto tiene una
+carpeta `api/`.
+
+**Si tu forma es «una aplicación»** (en la carpeta de tu proyecto, las tres líneas):
 
 ```bash
 cp api/.env.example api/.env
@@ -575,8 +579,26 @@ Las dos primeras copian los archivos de configuración de ejemplo. Traen valores
 que sirven para tu computadora y **para nada más**: no hay ninguna contraseña de
 verdad adentro.
 
-**Qué vas a ver.** Texto de las dos partes arrancando, y en algún momento estas
-dos líneas, que son las que importan:
+**Si tu forma es «un sitio para leer»**, una sola línea y nada que copiar antes:
+
+```bash
+corepack pnpm dev
+```
+
+Un sitio no tiene servidor ni base de datos, así que no hay configuración que
+llenar. Por eso tampoco trae los `.env.example`: pedírtelos sería mandarte a
+buscar dos archivos que ese proyecto no tiene.
+
+**Qué vas a ver.** En **un sitio**, una línea con la dirección (medido el
+2026-08-31 sobre un proyecto recién generado):
+
+```
+sitio dev$ astro dev
+sitio dev: Dev server running at http://localhost:4321
+```
+
+En **una aplicación**, texto de las dos partes arrancando, y en algún momento
+estas dos líneas, que son las que importan:
 
 ```
 web dev:   VITE v8.2.2  ready in 104 ms
@@ -584,8 +606,9 @@ web dev:   ➜  Local:   http://localhost:5173/
 api dev: {"puerto":3000,"nivel":"info","msg":"tu-proyecto-api escuchando"}
 ```
 
-Abrí `http://localhost:5173` en el navegador. Vas a ver una página con el
-nombre de tu proyecto. Es fea a propósito: es el punto de partida, no un diseño.
+Abrí en el navegador **la dirección que imprima tu caso** —`4321` para un sitio,
+`5173` para una aplicación—. Vas a ver una página con el nombre de tu proyecto.
+Es fea a propósito: es el punto de partida, no un diseño.
 
 > **Si la línea dice otro número, usá ése.** Cuando el 5173 ya está ocupado por
 > otra cosa, la herramienta no falla: avisa `Port 5173 is in use, trying another
@@ -594,7 +617,9 @@ nombre de tu proyecto. Es fea a propósito: es el punto de partida, no un diseñ
 > de este paso: abrir el 5173 y ver la página de otro programa, o nada.
 
 **Cómo sabés que salió bien.** La página abre y el título de la pestaña dice el
-nombre de tu proyecto. Si querés comprobar la otra mitad, abrí
+nombre de tu proyecto. **Para un sitio, con eso ya está.**
+
+En **una aplicación**, si querés comprobar la otra mitad, abrí
 `http://localhost:3000/api/health`: tiene que contestar algo así:
 
 ```json

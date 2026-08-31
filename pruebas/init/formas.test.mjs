@@ -801,3 +801,50 @@ test("la portada de cada forma no nombra una sola ruta que ese proyecto no tenga
     `la primera pantalla del repositorio nuevo tiene que describir ESE proyecto:\n  ${rotos.join("\n  ")}`,
   );
 });
+
+// ---------------------------------------------------------------------------
+// LOS COMANDOS DE LA GUIA DEL NO TECNICO, CONTRA EL ARBOL DE CADA FORMA.
+//
+// EL DEFECTO QUE ESTE BANCO CIERRA, medido: el Paso 7 de docs/04 —«Ver tu
+// proyecto andando», el primero que le muestra algo a la persona— mandaba copiar
+// `api/.env.example` y `web/.env.example` sin mirar la forma. Sobre un sitio los
+// dos comandos salen 1 («No such file or directory») y las dos direcciones que
+// la pagina promete no contestan.
+//
+// Ese paso es donde una persona no tecnica ve por primera vez que lo que hizo
+// sirve para algo. Fallar ahi no es una molestia: es el punto donde se abandona.
+// ---------------------------------------------------------------------------
+
+test("todo `cp` que la guia manda correr tiene su archivo de origen en alguna forma", async () => {
+  const proyectos = {};
+  for (const forma of ["aplicacion", "sitio"]) {
+    const destino = fs.mkdtempSync(path.join(os.tmpdir(), `cp-${forma}-`));
+    const idx = String(PREGUNTAS.find((p) => p.id === "forma").opciones.findIndex((o) => o.valor === forma) + 1);
+    const { valores } = await correrAsistente(
+      async (_t, id) => ({ PROYECTO: "p", ORG: "o", forma: idx })[id] ?? "",
+      {},
+      {},
+      () => {},
+      DERIVADOS,
+    );
+    instanciar({ raizAndamio: ANDAMIO, destino, valores });
+    proyectos[forma] = destino;
+  }
+
+  const guia = fs.readFileSync(path.join(RAIZ, "docs/04-arrancar-acompanado.md"), "utf-8");
+  const bloques = [...guia.matchAll(/```(?:bash|sh|shell)\n([\s\S]*?)```/g)].map((m) => m[1]);
+  const copias = bloques.flatMap((b) => [...b.matchAll(/^\s*cp\s+([\w./-]+)\s/gm)].map((m) => m[1]));
+  assert.ok(copias.length >= 1, "la guia tiene que seguir mandando copiar algo: si no, este control no mira nada");
+
+  const rotos = [];
+  for (const origen of copias) {
+    const donde = Object.entries(proyectos).filter(([, d]) => fs.existsSync(path.join(d, ...origen.split("/"))));
+    if (!donde.length) rotos.push(`la guia manda copiar "${origen}" y NINGUNA forma lo trae`);
+    // Y si solo lo trae una, la guia tiene que decir para cual es. Sin eso, la
+    // otra mitad de las personas copia un comando que sale 1.
+    else if (donde.length < Object.keys(proyectos).length && !/Si tu forma es/.test(guia)) {
+      rotos.push(`"${origen}" solo existe en ${donde.map(([f]) => f).join(", ")} y la guia no distingue por forma`);
+    }
+  }
+  assert.deepEqual(rotos, [], `el Paso donde la persona ve por primera vez su proyecto no puede salir 1:\n  ${rotos.join("\n  ")}`);
+});
