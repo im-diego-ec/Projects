@@ -461,7 +461,10 @@ LISTO, y el proyecto quedo arrancado y en verde. Lo que sigue NO lo puede hacer 
 ...
 ```
 
-Entre una línea `── n/4` y la siguiente va **la salida cruda de esa herramienta,
+Ese ejemplo es el de **una aplicación**, que corre cuatro pasos; un sitio corre
+tres y lo dice en la misma línea `ARRANQUE con …`.
+
+Entre una línea `── n/N` y la siguiente va **la salida cruda de esa herramienta,
 tal cual sale**: listas de piezas, nombres de archivo, resúmenes de pruebas. No
 hace falta que la entiendas; hace falta que llegues a la línea siguiente.
 
@@ -469,9 +472,15 @@ hace falta que la entiendas; hace falta que llegues a la línea siguiente.
 
 1. La segunda línea dice **`cero marcadores sobrevivientes`**. Si dijera otra
    cosa, quedaron huecos sin rellenar y están nombrados uno por uno.
-2. Aparecieron los **cuatro** encabezados `── n/4`, del 1 al 4.
-3. En ninguna parte aparece **`[ELIFECYCLE] Command failed`**. Ésa es la palabra
-   a buscar cuando algo se corta.
+2. Aparecieron **todos** los encabezados `── n/N`, del 1 hasta el último. Cuántos
+   son depende de tu forma —una aplicación corre cuatro pasos y un sitio tres,
+   porque no tiene capa de datos que generar— y **el programa lo dice antes de
+   empezar**: la línea `ARRANQUE con … — N pasos`. Si saltea alguno, también lo
+   dice, con el motivo.
+3. En ninguna parte aparece **`::error::`**. Ésa es la palabra a buscar cuando
+   algo se corta: la escribe esta herramienta, no el gestor de paquetes, y por eso
+   es la señal fiable. Si aparece, la línea siguiente dice qué paso falló, por qué
+   existe ese paso y cómo se destraba.
 4. La última sección empieza con **`LISTO, y el proyecto quedo arrancado y en
    verde.`**
 
@@ -491,18 +500,31 @@ andamio. Lo que importa es que la línea exista.
 > La herramienta la imprime porque **no puede hacerla ella**: son decisiones y
 > actos humanos, no transcripción.
 
-**Si algo sale mal**, la herramienta **no deja el repositorio a medias en
-silencio**: aborta antes de escribir y dice qué falta. Los tres avisos que vas a
-ver, si los ves, son claros: falta un valor, sobra un valor, o la carpeta ya
-tenía archivos del andamio (y entonces te dice cuáles).
+**Si algo sale mal, hay dos momentos distintos y conviene no confundirlos.**
+
+**Antes de escribir nada.** Si falta un valor, sobra un valor o la carpeta ya
+tenía archivos del andamio, la herramienta **aborta sin tocar tu carpeta** y te
+dice cuál es el problema. No hay nada que limpiar.
+
+**Después de escribir, durante el arranque.** Acá el repositorio **ya quedó
+escrito**, y la herramienta te lo dice con esas palabras. No hay que volver a
+instanciar nada: hay que destrabar el paso que falló, y el `::error::` dice cuál
+es y cómo. Si de todas formas querés empezar de cero sobre la misma carpeta, hace
+falta agregar `--forzar` al comando, porque encontrarla con archivos del andamio
+adentro es justamente una de las cosas que la hace abortar.
 
 ---
 
-## Paso 6 — Los cuatro pasos del arranque, uno por uno · *5 minutos de lectura*
+## Paso 6 — Los pasos del arranque, uno por uno · *5 minutos de lectura*
 
-**Qué vas a hacer.** Entender qué hizo cada uno de los cuatro. No es curiosidad:
-son los mismos cuatro que vas a volver a correr cada vez que toques algo, y los
-mismos que GitHub va a correr sobre tu cambio.
+**Qué vas a hacer.** Entender qué hizo cada uno. No es curiosidad: son los
+mismos que vas a volver a correr cada vez que toques algo, y los mismos que
+GitHub va a correr sobre tu cambio.
+
+> **Son cuatro para una aplicación y tres para un sitio.** El de la capa de datos
+> no corre en un sitio, porque un sitio para leer no tiene base de datos que
+> generar — y el programa lo dice en voz alta cuando lo saltea, en vez de
+> desaparecerlo.
 
 **Qué copiar.** Nada ahora. Éstos son, por si más adelante querés correr uno
 suelto:

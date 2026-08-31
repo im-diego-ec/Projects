@@ -125,7 +125,33 @@ npx --yes bmad-method@6.11.0 install --yes --modules bmm --tools claude-code --d
 
 Versión exacta, nunca el nombre pelado: es la regla del marco para todo comando que
 descarga. Ensayado el 2026-08-20: **termina bien**, escribe unas 49 skills y ~2,9 MB.
-Necesita `uv` (lo verificaste en «Antes de empezar»).
+
+> **Necesita `uv`, y probablemente no lo tengas.** Es un gestor de paquetes de
+> Python; las skills de BMAD arrancan con `uv run …` y sin él fallan en su primer
+> paso. No está en la lista de programas de [04-arrancar-acompanado.md](04-arrancar-acompanado.md),
+> porque hasta acá no hacía falta. Comprobalo y, si no está, instalalo:
+>
+> ```bash
+> uv --version || curl -LsSf https://astral.sh/uv/install.sh | sh
+> ```
+
+### 2.b Dejarlo en castellano · *30 segundos, y ahorra rehacer el PRD*
+
+**El instalador deja BMAD en inglés**, y las skills lo obedecen: saludan y
+escriben **el documento** en el idioma que dice la configuración. Medido contra
+`bmad-method@6.11.0`: los valores por defecto son `communication_language:
+'English'` y `document_output_language: 'English'`.
+
+O sea que, sin este paso, el PRD —el entregable del tramo, el que después lee una
+persona no técnica— **sale en inglés**.
+
+```bash
+grep -n "language" _bmad/bmm/config.yaml
+```
+
+Cambiá los dos valores a `Spanish` (o al idioma que uses). Están en
+`_bmad/bmm/config.yaml`; si tu instalación también dejó un `_bmad/config.toml`,
+el mismo par va ahí.
 
 ### 3 · Poner los documentos del PO, numerados
 
@@ -290,12 +316,13 @@ afuera», y ahí se pierde justo el hallazgo.
 
 Las rebanadas que siguen son otro `bmad-prd` con otro alcance, u otro corte del mismo PRD.
 
-⚠️ **BMAD tiene una fase 1 (Analysis) y no la vas a usar.** Sirve para *elicitar*, o sea
-para sacarle la información a alguien preguntándole, y ese trabajo ya está hecho. El
-proveedor la marca «Optional» y dice textual:
+⚠️ **Hay skills de análisis y no las vas a usar.** Sirven para *elicitar*, o sea para
+sacarle la información a alguien preguntándole, y ese trabajo ya está hecho: los
+documentos del PO ya están sobre la mesa.
 
-> *«Neither skill requires the other — start with `bmad-prd` directly if you already know
-> what you're building.»*
+**`bmad-prd` no depende de ellas**: se invoca directo y arranca con los documentos que
+le pongas delante. Verificado contra el paquete `bmad-method@6.11.0`, cuya organización
+es por *skills* y no por fases numeradas.
 
 **`bmad-prd` es una skill de Claude Code, no un comando de terminal.** Se invoca por su
 nombre. Lo que va a pasar, en orden:
