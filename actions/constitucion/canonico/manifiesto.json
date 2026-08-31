@@ -49,6 +49,12 @@
       "version": "1.6.0",
       "publicada": "2026-08-22",
       "exigible_desde": "2026-08-22"
+    },
+    {
+      "version": "1.7.0",
+      "publicada": "2026-08-31",
+      "exigible_desde": "2026-08-31",
+      "huella_canonico": "3180d942a463f4a8db5db9ae118b9cfc3b0ffa25527d570acde49e9d14a53c28"
     }
   ]
 }

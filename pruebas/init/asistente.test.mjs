@@ -291,11 +291,23 @@ test("el relleno de AWS y el de Slack pasan sus propios patrones", () => {
   }
 });
 
-test("los dos numeros de cuenta del relleno son los que el guard reconoce como NO reales", () => {
-  // Es la razon de que sean esos y no otros: el guard de seguridad del
-  // repositorio caza un id de doce digitos que no este en su lista de ejemplos.
-  assert.equal(RELLENO_AWS.CUENTA_DEV, "111111111111");
-  assert.equal(RELLENO_AWS.CUENTA_PROD, "222222222222");
+test("los numeros de cuenta del relleno NO PUEDEN ser una cuenta de AWS", () => {
+  // EL DEFECTO QUE ESTE CASO VIGILA, medido en un proyecto recien generado: el
+  // relleno era `111111111111` y `222222222222`, y esos valores NO se quedaban
+  // en el archivo de valores. La constitucion del proyecto los IMPRIME en su
+  // tabla de ambientes —«| Cuenta AWS | 111111111111 | 222222222222 |»— donde ya
+  // no se leen como relleno sino como el dato de la persona. Y le pasa a la
+  // mayoria, no a un caso raro: cualquiera que no elija AWS.
+  //
+  // La restriccion es que FORMATOS exige doce digitos, asi que no se puede
+  // escribir «sin-aws» como en los perfiles. Doce ceros si se puede, y no es una
+  // cuenta de AWS ni puede serlo. Es el mismo criterio que el UUID nulo de
+  // ID_MCP_SLACK, que ya estaba resuelto asi.
+  for (const clave of ["CUENTA_DEV", "CUENTA_PROD"]) {
+    const v = RELLENO_AWS[clave];
+    assert.match(v, /^\d{12}$/, `${clave} tiene que seguir teniendo forma de cuenta o el validador lo rechaza`);
+    assert.equal(v, "0".repeat(12), `${clave} vale "${v}", que se lee como una cuenta de verdad en la tabla de la constitucion`);
+  }
 });
 
 // ---------------------------------------------------------------------------

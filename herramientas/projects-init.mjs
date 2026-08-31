@@ -238,7 +238,7 @@ export function seExcluyeDelCopiado(rel, plataforma = "aws", forma = "aplicacion
   // infra/ —correcto— y tambien sin PLATAFORMAS.md, o sea sin la unica pagina
   // que explica las cinco plataformas.
   if (renombresPorPlataforma(plataforma)[rel]) return false;
-  for (const n of noViajanPorPlataforma(plataforma)) if (bajo === n || bajo.startsWith(`${n}/`)) return true;
+  for (const n of noViajanPorPlataforma(plataforma, forma)) if (bajo === n || bajo.startsWith(`${n}/`)) return true;
   return false;
 }
 
@@ -262,8 +262,26 @@ export function seExcluyeDelCopiado(rel, plataforma = "aws", forma = "aplicacion
  *  `aws` es el valor por defecto A PROPOSITO: un archivo de valores viejo, escrito
  *  antes de que esta clave se leyera, describe un proyecto de AWS. Cambiar eso en
  *  silencio le sacaria la infraestructura a un proyecto que la tiene. */
-export function noViajanPorPlataforma(plataforma) {
-  return plataforma === "aws" ? [] : ["infra", "infra-prod"];
+export function noViajanPorPlataforma(plataforma, forma = "aplicacion") {
+  // LA FORMA TAMBIEN DECIDE ESTO, y no mirarla dejaba el arreglo a medias.
+  //
+  // El asistente ya no PREGUNTA por AWS cuando la forma es un sitio —un sitio
+  // para leer se publica en Cloudflare y no tiene servidor propio que
+  // desplegar—, asi que sus cinco valores llevan el relleno declarado. Pero esta
+  // funcion seguia mirando solo la plataforma, asi que a sitio+AWS le repartia
+  // igual `infra/` e `infra-prod/`: dos raices de Terraform apuntando a la
+  // cuenta 111111111111 y al perfil `sin-aws-dev`, que son el relleno.
+  //
+  // Y no quedaba en Terraform. La constitucion del proyecto nuevo IMPRIME esos
+  // valores en una tabla —«| Cuenta AWS | 111111111111 | 222222222222 |»— como
+  // si fueran datos de la persona. El rojo se habia ido; el arbol equivocado
+  // quedaba, que es peor, porque nada lo dice.
+  //
+  // El predicado es el mismo que usa el asistente (`usaAws`), escrito aca sin
+  // importarlo para no atar la herramienta a su modulo: si las dos definiciones
+  // se separan, el banco lo caza —hay un caso que las compara—.
+  const usaAws = plataforma === "aws" && forma !== "sitio";
+  return usaAws ? [] : ["infra", "infra-prod"];
 }
 
 /** Lo que NO viaja segun la FORMA de proyecto que se eligio.
@@ -308,6 +326,53 @@ export function noViajanPorForma(forma) {
 export function formaDe(valores) {
   const v = valores?.forma;
   return typeof v === "string" && v.trim() ? v.trim().toLowerCase() : "aplicacion";
+}
+
+/** Las formas que la herramienta sabe repartir, y las plataformas.
+ *
+ *  SE DERIVAN de lo que las funciones de poda ya saben, no se escriben aparte:
+ *  una segunda lista al lado de la primera es como empiezan las divergencias, y
+ *  este archivo ya pago esa cuenta con el predicado de AWS. */
+export const FORMAS = ["aplicacion", "sitio"];
+export const PLATAFORMAS = ["aws", "supabase", "ninguna"];
+
+/** LO QUE NO SE VALIDABA, y era justo lo que mas cuesta si se toma mal.
+ *
+ *  `forma` y `plataforma` eran los DOS UNICOS valores sin ninguna comprobacion,
+ *  y son los que deciden QUE ARCHIVOS VIAJAN. Medido: escribir `"sitios"` en vez
+ *  de `"sitio"` en el archivo de valores entrega, con SALIDA 0 y sin una sola
+ *  linea de aviso, un proyecto completamente distinto —api/, web/, e2e/,
+ *  docker-compose—, porque `formaDe` cae en su valor por defecto ante cualquier
+ *  cosa que no reconozca.
+ *
+ *  Para una persona no tecnica, sola, ese es el modo de falla mas caro que puede
+ *  existir en este tramo: pidio una cosa, recibio otra, y nada le dijo nada. El
+ *  default sigue existiendo —protege a un archivo viejo que no traia la clave—
+ *  pero ahora distingue AUSENTE de MAL ESCRITO, que no son lo mismo. */
+export function problemasDeEleccion(valores) {
+  const problemas = [];
+  for (const [clave, validas] of [
+    ["forma", FORMAS],
+    ["plataforma", PLATAFORMAS],
+  ]) {
+    const crudo = valores?.[clave];
+    if (crudo === undefined || crudo === null || crudo === "") continue; // ausente: vale el default
+    if (typeof crudo !== "string") {
+      problemas.push(`${clave} tiene que ser texto y es ${typeof crudo}`);
+      continue;
+    }
+    const v = crudo.trim().toLowerCase();
+    if (!validas.includes(v)) {
+      const cerca = validas.find((x) => x.startsWith(v.slice(0, 4)) || v.startsWith(x.slice(0, 4)));
+      problemas.push(
+        `${clave} = ${JSON.stringify(crudo)} no es una opcion. Las que hay: ${validas.join(", ")}` +
+          (cerca ? `. ¿Quisiste decir "${cerca}"?` : "") +
+          `. Esta clave decide QUE ARCHIVOS recibe tu proyecto, asi que un valor que no se reconoce no se puede ` +
+          `asumir: te daria un proyecto distinto del que pediste sin avisarte`,
+      );
+    }
+  }
+  return problemas;
 }
 
 /** El catalogo de plataformas vive DENTRO de `infra/`, que es justo el directorio
@@ -2372,7 +2437,10 @@ async function main(argv) {
     console.error(`::error::no pude leer ${o.valores}: ${e.message}`);
     return 1;
   }
-  const { problemas, valores } = validarValores(crudos);
+  // Las dos claves de eleccion se comprueban JUNTO con los marcadores, para que
+  // un archivo con dos cosas mal las liste las dos en vez de pedir dos corridas.
+  const { problemas: problemasDeMarcadores, valores } = validarValores(crudos);
+  const problemas = [...problemasDeMarcadores, ...problemasDeEleccion(crudos)];
   if (problemas.length) {
     console.error(`::error::el archivo de valores tiene ${problemas.length} problema(s). No se escribio nada:`);
     for (const p of problemas) console.error(`  - ${p}`);

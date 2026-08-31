@@ -56,13 +56,34 @@
  *  culpable.
  *
  *  Que la herramienta afirme exito sobre un archivo que ella misma rechaza dos
- *  segundos despues es peor que un rojo. Con un solo predicado, las dos mitades
- *  no pueden volver a discrepar. */
+ *  segundos despues es peor que un rojo.
+ *
+ *  Y HABIA UNA TERCERA MITAD, que la primera version de este comentario nego:
+ *  decia «con un solo predicado, las dos mitades no pueden volver a discrepar» y
+ *  eran TRES los lugares que deciden. El que faltaba es `noViajanPorPlataforma`
+ *  de projects-init.mjs, o sea el que decide QUE ARCHIVOS VIAJAN: seguia mirando
+ *  solo la plataforma, asi que sitio+AWS recibia igual `infra/` e `infra-prod/`
+ *  con dos raices de Terraform apuntando a la cuenta del relleno. El rojo se
+ *  habia ido y el arbol equivocado quedaba, que es peor porque nada lo dice.
+ *
+ *  Hoy las tres deciden por lo mismo, y hay un caso del banco que las cruza. */
 export const usaAws = (r) => r.plataforma === "aws" && r.forma !== "sitio";
 
 export const RELLENO_AWS = {
-  CUENTA_DEV: "111111111111",
-  CUENTA_PROD: "222222222222",
+  // LOS CEROS NO SON DECORACION: son la unica forma que tiene una clave con
+  // formato de cuenta de AWS de decir «acá no hay ninguna».
+  //
+  // El relleno anterior era `111111111111` y `222222222222`. La restriccion es
+  // que FORMATOS exige doce digitos, asi que no se puede escribir «sin-aws»
+  // como en los perfiles. Y esos valores no se quedaban en el archivo: la
+  // constitucion del proyecto los IMPRIME en su tabla de ambientes —«| Cuenta
+  // AWS | 111111111111 | 222222222222 |»— y ahi ya no se leen como relleno,
+  // se leen como el dato de la persona.
+  //
+  // Doce ceros no es una cuenta de AWS y no puede serlo. Es el mismo criterio
+  // que el UUID nulo de ID_MCP_SLACK, que ya estaba resuelto asi.
+  CUENTA_DEV: "000000000000",
+  CUENTA_PROD: "000000000000",
   REGION: "us-east-1",
   PERFIL_DEV: "sin-aws-dev",
   PERFIL_PROD: "sin-aws-prod",

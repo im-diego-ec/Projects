@@ -16,6 +16,10 @@ import {
   TODAS,
   PASOS_DEL_ARRANQUE,
   pasosQueCorren,
+  problemasDeEleccion,
+  FORMAS,
+  PLATAFORMAS,
+  noViajanPorPlataforma,
 } from "../../herramientas/projects-init.mjs";
 import { PREGUNTAS, correrAsistente } from "../../herramientas/projects-asistente.mjs";
 
@@ -627,4 +631,83 @@ test("el proyecto trae un esqueleto de change para imitar el dia uno", async () 
   // plantilla en castellano que no lo diga manda derecho a un rojo.
   assert.match(t, /SHALL/, "el esqueleto tiene que usar SHALL: es lo que el validador busca literalmente");
   assert.match(t, /no valida|sale 1/i, "y tiene que decir que un requirement en castellano NO valida");
+});
+
+// ---------------------------------------------------------------------------
+// LAS DOS CLAVES QUE DECIDEN QUE ARCHIVOS VIAJAN, y no se validaban.
+//
+// EL DEFECTO QUE ESTE BANCO CIERRA, medido: `forma` y `plataforma` eran los DOS
+// UNICOS valores sin ninguna comprobacion. Escribir `"sitios"` en vez de
+// `"sitio"` en el archivo de valores entregaba, con SALIDA 0 y sin una linea de
+// aviso, un proyecto completamente distinto —api/, web/, e2e/, docker-compose—,
+// porque el lector cae en su valor por defecto ante cualquier cosa que no
+// reconoce. Para una persona no tecnica, sola, es el modo de falla mas caro que
+// puede existir en este tramo: pidio una cosa, recibio otra, y nadie le aviso.
+// ---------------------------------------------------------------------------
+
+test("una eleccion mal escrita es un error, y el mensaje sugiere la correcta", () => {
+  assert.deepEqual(problemasDeEleccion({}), [], "ausente vale el default: protege a un archivo de valores viejo");
+  assert.deepEqual(problemasDeEleccion({ forma: "sitio", plataforma: "supabase" }), []);
+  assert.deepEqual(problemasDeEleccion({ forma: "  SITIO  " }), [], "la mayuscula y el espacio no son un error");
+
+  const p = problemasDeEleccion({ forma: "sitios" });
+  assert.equal(p.length, 1, "un valor que no existe tiene que ser UN problema, nombrado");
+  assert.match(p[0], /no es una opcion/);
+  assert.match(p[0], /aplicacion, sitio/, "y tiene que listar las que hay");
+  assert.match(p[0], /Quisiste decir "sitio"/, "y sugerir la cercana, que es lo que destraba en un segundo");
+
+  assert.equal(problemasDeEleccion({ plataforma: "gcp" }).length, 1, "una plataforma que el andamio no reparte es error");
+  assert.equal(problemasDeEleccion({ forma: 7 }).length, 1, "y un tipo que no es texto tambien");
+});
+
+test("las opciones declaradas son exactamente las que el asistente ofrece", () => {
+  // Dos listas que describen lo mismo se separan. Esta las cruza: si el asistente
+  // gana una forma y la validacion no se entera, esa forma se vuelve un error.
+  for (const [clave, declaradas] of [
+    ["forma", FORMAS],
+    ["plataforma", PLATAFORMAS],
+  ]) {
+    const pregunta = PREGUNTAS.find((q) => q.id === clave);
+    assert.ok(pregunta, `el asistente tiene que seguir preguntando por ${clave}`);
+    assert.deepEqual(
+      pregunta.opciones.map((o) => o.valor).sort(),
+      [...declaradas].sort(),
+      `las opciones de "${clave}" que ofrece el asistente y las que acepta el validador tienen que ser las mismas`,
+    );
+  }
+});
+
+test("el esqueleto de --ejemplo trae las dos elecciones, o no se pueden tomar por archivo", () => {
+  // EL DEFECTO QUE ESTE CASO VIGILA: `--ejemplo > valores.json` y editar es el
+  // camino que documentan el README y docs/05. Si el esqueleto no trae `forma`,
+  // por ese camino NO SE PUEDE pedir un sitio: hay que adivinar que la clave
+  // existe. El arreglo se hizo y quedo SIN GUARDA —borrarla del ejemplo dejaba
+  // el banco entero en verde—, asi que por la doctrina del propio repositorio no
+  // estaba cerrado.
+  const ejemplo = JSON.parse(
+    execFileSync("node", [path.join(RAIZ, "herramientas/projects-init.mjs"), "--ejemplo"], { cwd: RAIZ, encoding: "utf-8" }),
+  );
+  for (const [clave, validas] of [
+    ["forma", FORMAS],
+    ["plataforma", PLATAFORMAS],
+  ]) {
+    assert.ok(clave in ejemplo, `--ejemplo no emite "${clave}": por el camino de archivo esa decision no se puede tomar`);
+    assert.ok(validas.includes(ejemplo[clave]), `--ejemplo emite ${clave} = ${JSON.stringify(ejemplo[clave])}, que no es una opcion`);
+  }
+  assert.deepEqual(problemasDeEleccion(ejemplo), [], "el propio ejemplo tiene que pasar la validacion que la herramienta aplica");
+});
+
+test("un sitio no recibe infraestructura de nube aunque se elija AWS", () => {
+  // EL DEFECTO QUE ESTE CASO VIGILA, y es la mitad que el arreglo anterior dejo
+  // abierta: el asistente ya no PREGUNTA por AWS cuando la forma es un sitio, y
+  // `derivar` usa el mismo predicado — pero `noViajanPorPlataforma` seguia
+  // mirando SOLO la plataforma. Resultado medido: sitio+AWS recibia `infra/` e
+  // `infra-prod/` con dos raices de Terraform apuntando a la cuenta del relleno.
+  // El rojo se habia ido; el arbol equivocado quedaba, que es peor porque nada
+  // lo dice.
+  assert.deepEqual(noViajanPorPlataforma("aws", "aplicacion"), [], "una aplicacion en AWS si recibe infraestructura");
+  assert.deepEqual(noViajanPorPlataforma("aws", "sitio"), ["infra", "infra-prod"], "un sitio no, aunque se elija AWS");
+  assert.deepEqual(noViajanPorPlataforma("supabase", "aplicacion"), ["infra", "infra-prod"]);
+  assert.equal(seExcluyeDelCopiado("infra/main.tf", "aws", "sitio"), true);
+  assert.equal(seExcluyeDelCopiado("infra/main.tf", "aws", "aplicacion"), false);
 });
