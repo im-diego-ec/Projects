@@ -297,9 +297,13 @@ Cada tarea tiene que **poder marcarse**. «Mejorar el rendimiento» no se marca;
 
 #### 9.c Implementar
 
-```bash
+```
 /opsx:apply
 ```
+
+**Eso se escribe en la sesión del agente, no en la terminal.** Los `/opsx:…` son
+comandos de Claude Code: en una terminal, `/opsx:apply` da
+`No such file or directory`. Por eso el recuadro de acá arriba no dice `bash`.
 
 Toma las tareas de `tasks.md` y las ejecuta en orden. Es el único comando de la
 familia que escribe código, y por eso va **después** de las dos aprobaciones y no

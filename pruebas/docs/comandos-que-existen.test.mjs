@@ -483,3 +483,37 @@ test("todo subcomando de openspec que la documentacion manda copiar esta en el a
       `agente pide permiso —o se traba— en cada corrida: ${fuera.join(", ")}`,
   );
 });
+
+test("ningun `/opsx:` viaja dentro de una cerca de terminal", () => {
+  // EL DEFECTO QUE ESTE CASO VIGILA: los `/opsx:…` son comandos de la sesion del
+  // agente, no del shell. Escritos en un bloque ```bash le dicen a la persona
+  // «esto se pega en la terminal», y ahi dan `No such file or directory` con
+  // salida 127. La pagina tiene quince bloques bash antes de ese: quien copio
+  // los quince no tiene por que sospechar del dieciseis.
+  //
+  // La cerca sin lenguaje —``` a secas— es la correcta para un comando que no es
+  // del shell, y es la que este caso exige.
+  const malas = [];
+  let vistos = 0;
+  for (const f of docs()) {
+    for (const bloque of bloquesBash(fs.readFileSync(path.join(RAIZ, f), "utf-8"))) {
+      for (const linea of bloque.split("\n")) {
+        const t = linea.trim();
+        if (!t.startsWith("/opsx:")) continue;
+        vistos++;
+        malas.push(`${f} → ${t}`);
+      }
+    }
+  }
+  // ANTI-VACUIDAD por el otro lado: la documentacion tiene que seguir nombrando
+  // comandos `/opsx:`, o este control dejo de tener sujeto.
+  const nombrados = docs().reduce((n, f) => n + (fs.readFileSync(path.join(RAIZ, f), "utf-8").match(/\/opsx:/g) ?? []).length, 0);
+  assert.ok(nombrados >= 5, `la documentacion nombra ${nombrados} comandos /opsx:: si cayo, este control mide aire`);
+  assert.deepEqual(
+    malas,
+    [],
+    `un \`/opsx:\` en una cerca de terminal se pega en la terminal y sale 127. Va en una cerca sin lenguaje, con una ` +
+      `linea que diga que es de la sesion del agente:\n  ${malas.join("\n  ")}`,
+  );
+  assert.equal(vistos, 0);
+});

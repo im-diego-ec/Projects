@@ -189,3 +189,18 @@ test("MUERDE: sacar la condicion del verde se caza DE VERDAD", () => {
   assert.match(t, CONDICION, "el archivo real tiene que traer la condicion: sin eso, mutarla no prueba nada");
   assert.equal(CONDICION.test(t.replace(CONDICION, "true")), false, "y sacada, la deteccion tiene que ver que no esta");
 });
+
+test("se publica el commit que paso el CI, no la punta de main", () => {
+  // EL DEFECTO QUE ESTE CASO VIGILA: un `actions/checkout` pelado bajo
+  // `workflow_run` trae lo que `main` apunte EN ESE MOMENTO, no lo que verifico
+  // la corrida que disparo el workflow. Entre que el CI termina y el despliegue
+  // arranca puede entrar otro merge, y entonces se publica codigo que ningun CI
+  // aprobo — en silencio, porque las dos corridas reportan exito.
+  const t = workflow();
+  assert.match(t, /uses: actions\/checkout@/, "sin checkout no hay nada que publicar");
+  assert.match(
+    t,
+    /ref:\s*\$\{\{\s*github\.event\.workflow_run\.head_sha\s*\}\}/,
+    "el checkout tiene que pedir el commit que el CI midio (`head_sha`), no la rama",
+  );
+});

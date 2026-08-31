@@ -121,10 +121,20 @@ test("toda opcion del asistente corresponde a una forma de la carta", () => {
   );
 });
 
+/** LA DETECCION, EXTRAIDA A PROPOSITO, y el motivo es el caso de abajo.
+ *
+ *  La refutacion de esta regla tiene que correr LA MISMA funcion que la regla, o
+ *  no refuta nada. La version anterior armaba una lista falsa y despues afirmaba
+ *  que la forma pendiente estaba en la lista donde ella misma acababa de
+ *  meterla: no podia fallar. Era el unico anti-vacuidad de este archivo. */
+export function formasPendientesQueSeOfrecen(pendientes, ofrecidas) {
+  return pendientes.filter((c) => ofrecidas.includes(c));
+}
+
 test("NINGUNA forma marcada como pendiente se ofrece en el asistente", () => {
   const pendientes = FORMAS.filter((f) => f.estado.includes(FALTA)).map((f) => f.clave);
   const ofrecidas = formasQueElAsistenteOfrece();
-  const mentira = pendientes.filter((c) => ofrecidas.includes(c));
+  const mentira = formasPendientesQueSeOfrecen(pendientes, ofrecidas);
   assert.deepEqual(
     mentira,
     [],
@@ -179,14 +189,27 @@ test("cada forma explica su beneficio Y su limite, no solo su nombre", () => {
   );
 });
 
-test("MUERDE: una forma pendiente ofrecida en el asistente se caza", () => {
-  // El caso que prueba que lo de arriba no pasa por vacuidad.
+test("MUERDE: una forma pendiente ofrecida en el asistente se caza DE VERDAD", () => {
+  // LA VERSION ANTERIOR DE ESTE CASO ERA TAUTOLOGICA. Armaba
+  // `[...ofrecidas, pendientes[0]]` y despues afirmaba que alguna pendiente
+  // estaba en esa lista — la misma en la que ella acababa de meterla. No podia
+  // fallar contra ninguna implementacion, ni siquiera contra una que devolviera
+  // siempre lista vacia. Y era el UNICO anti-vacuidad de este archivo.
+  //
+  // Ahora corre LA MISMA funcion que la regla, que es lo unico que convierte una
+  // mutacion en una prueba.
   const pendientes = FORMAS.filter((f) => f.estado.includes(FALTA)).map((f) => f.clave);
-  assert.ok(pendientes.length > 0, "hoy tiene que haber al menos una forma pendiente para que el caso signifique algo");
-  const ofrecidasFalsas = [...formasQueElAsistenteOfrece(), pendientes[0]];
-  assert.ok(
-    pendientes.some((c) => ofrecidasFalsas.includes(c)),
-    "con la forma pendiente agregada a la lista de ofrecidas, la deteccion tiene que verla",
+  const ofrecidas = formasQueElAsistenteOfrece();
+  assert.ok(pendientes.length > 0, "hoy tiene que haber al menos una forma pendiente, o este caso no significa nada");
+  assert.ok(ofrecidas.length > 0, "y el asistente tiene que ofrecer alguna, o tampoco");
+
+  // Sobre el estado real: cero. Es la regla, y tiene que estar cumpliendose.
+  assert.deepEqual(formasPendientesQueSeOfrecen(pendientes, ofrecidas), []);
+  // Y con UNA pendiente agregada a lo ofrecido: la deteccion tiene que nombrarla.
+  assert.deepEqual(
+    formasPendientesQueSeOfrecen(pendientes, [...ofrecidas, pendientes[0]]),
+    [pendientes[0]],
+    "con una forma pendiente en lo ofrecido, la deteccion tiene que devolver exactamente esa",
   );
 });
 

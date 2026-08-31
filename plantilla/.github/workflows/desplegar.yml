@@ -67,6 +67,20 @@ jobs:
     steps:
       - name: Traer el arbol
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          # SE PUBLICA EL COMMIT QUE PASO EL CI, NO LA PUNTA DE main.
+          #
+          # Un checkout pelado bajo `workflow_run` trae lo que `main` apunte EN
+          # ESTE MOMENTO, que no es necesariamente lo que verifico la corrida que
+          # disparo este workflow: entre que el CI termina y esto arranca puede
+          # entrar otro merge. Publicar codigo que ningun CI aprobo es
+          # exactamente lo que este marco existe para impedir, y ademas seria
+          # silencioso: las dos corridas reportarian exito.
+          #
+          # `head_sha` es el commit que el CI midio. En un disparo a mano
+          # (`workflow_dispatch`) ese campo no existe y queda vacio, que es como
+          # se le pide a checkout el comportamiento por defecto.
+          ref: ${{ github.event.workflow_run.head_sha }}
 
       - name: Comprobar que la credencial existe, y NO fallar si no
         id: credencial

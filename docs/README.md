@@ -60,7 +60,7 @@ línea: [ADR](02-glosario.md), [andamio](02-glosario.md), [bump](02-glosario.md)
 > de lectura, y `pruebas/docs/documentacion.test.mjs` sigue exigiendo que
 > `06-para-el-po.md` y `02-glosario.md` estén enlazados acá.
 
-## El camino, del 01 al 10
+## El camino, en orden
 
 Se leen **en orden**. El número dice en qué lugar del camino va cada una, no
 cuánto importa.
@@ -79,7 +79,7 @@ cuánto importa.
 | [10-publicar.md](10-publicar.md) | De `main` en verde a una dirección donde entra la gente: qué publica solo y qué no, la regla de que no se publica lo que no está verde, y el cierre del círculo. **Es el cuarto tramo del camino** | **Canónica** — la fuente del tramo de publicar |
 | [11-reglas-no-escritas.md](11-reglas-no-escritas.md) | Las reglas que el equipo practica y ningún archivo declaraba, con su estado de enforcement y el backlog de automatización | **Canónico** — se actualiza cuando un post-mortem compra una regla o cuando una verificación nueva la vuelve automática |
 
-## Lo que se abre el día que hace falta, del 11 al 15
+## Lo que se abre el día que hace falta
 
 Ninguna hace falta para arrancar. Se abren cuando aparece su problema.
 
