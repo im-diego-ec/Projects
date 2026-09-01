@@ -82,6 +82,25 @@ mueve sobre un cambio incompatible.
 
 ### Añadido
 
+- **La skill que cierra el primer change de todo proyecto tenía tres defectos.**
+  Su verificación de escenarios decía «sin diferencias» sobre un archive real
+  —contaba con `git grep` sin `--untracked` y el spec recién escrito no estaba
+  registrado, así que comparaba cero contra cero—; varios de sus `grep` miraban
+  sólo el índice y leían el vacío como éxito; y el paso que pide «los tres
+  verdes» sale rojo garantizado en el primer change de cualquier proyecto, porque
+  el paso anterior escribe `Purpose: TBD` y el arreglo está recién en el paso
+  siguiente. Los tres cerrados, con la advertencia donde la persona ve el rojo.
+- **El asistente preguntaba «¿una copia o dos?» a quien hace un sitio**, y la
+  respuesta no cambiaba una sola pieza que despliegue. Ya no se pregunta.
+- **Las dos opciones de «qué vas a construir» abren con su estado de
+  publicación.** La recomendada no decía que hoy no existe un paso que la
+  publique, y es la decisión que más cuesta si se toma tarde.
+- **El `site:` de Astro no producía los enlaces canónicos que la página
+  prometía.** Ahora el molde los emite —verificado compilando— y no inventa nada
+  cuando `site` no está.
+- **El conteo de actos humanos son tres, no dos**, y el marco lo decía de tres
+  maneras distintas. El tercero, registrar el subdominio, llega tarde: Cloudflare
+  no lo pide hasta la primera publicación.
 - **El paso a producción está escrito.** Era la pregunta peor contestada del
   camino: cero menciones en las diez páginas. `docs/10-publicar.md` gana una
   sección 5 que dice lo que hoy hay —un solo destino, no dos—, que la respuesta

@@ -222,8 +222,26 @@ if (args.includes("--pin-openspec")) {
 // descarte un stash ajeno.
 if (args.includes("--escenarios")) {
   const PATRON = "^#### Scenario:";
+  // EL "DESPUES" TIENE QUE VER LO NO RASTREADO, y no verlo era un falso verde.
+  //
+  // EL DEFECTO, medido: cuando el change crea una capability NUEVA —o sea en el
+  // primer change de todo proyecto, porque su openspec/specs/ empieza vacio— el
+  // archive escribe un spec que git todavia no registro. `git grep` sin
+  // `--untracked` no lo ve, el "despues" cuenta cero escenarios para esa
+  // capability, y la comparacion contra el "antes" —que tambien es cero, porque el
+  // archivo no existia— da "sin diferencias". O sea que la verificacion declaraba
+  // correcto un archive del que no habia mirado una sola linea.
+  //
+  // `--untracked` va SOLO en el "despues": el "antes" se lee de una revision, y
+  // ahi no hay nada sin rastrear por definicion.
+  //
+  // Y LA BANDERA VA ANTES DEL PATRON. Puesta despues, git la lee como el nombre de
+  // una revision y sale 128 con «unable to resolve revision: --untracked» —
+  // medido, y por eso este orden esta escrito y no es casual.
   const contar = (revision) => {
-    const argumentos = ["grep", "-c", "-E", PATRON];
+    const argumentos = ["grep"];
+    if (!revision) argumentos.push("--untracked");
+    argumentos.push("-c", "-E", PATRON);
     if (revision) argumentos.push(revision);
     argumentos.push("--", SPECS);
     const { rc, salida } = git(...argumentos);
