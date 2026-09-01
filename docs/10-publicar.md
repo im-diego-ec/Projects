@@ -19,8 +19,9 @@ con un [change](02-glosario.md) aplicado, un pull request cerrado y `main` en ve
 
 **Palabras del marco que vas a ver acá**, cada una definida en una línea en el
 [glosario](02-glosario.md): [andamio](02-glosario.md), [canónico](02-glosario.md),
-[change](02-glosario.md), [compuerta](02-glosario.md), [fail-open](02-glosario.md),
-[marcador](02-glosario.md), [pin](02-glosario.md), [ruleset](02-glosario.md).
+[change](02-glosario.md), [compuerta](02-glosario.md), [constitución](02-glosario.md),
+[fail-open](02-glosario.md), [marcador](02-glosario.md), [pin](02-glosario.md),
+[ruleset](02-glosario.md).
 
 ---
 
@@ -169,6 +170,61 @@ la vía de siempre: subís la versión del marco y aparece.
 
 ---
 
+## 5 · El paso a producción, dicho como está hoy
+
+**Ésta es la pregunta que más se hace y la que peor contestada estaba: cero
+menciones en todo el camino.** Va acá, aunque la respuesta no sea la que se
+espera.
+
+### Lo que hoy hay, y es una sola cosa
+
+**Un destino, no dos.** Cuando un sitio se publica, se publica **en un solo
+lugar**, y ése es el que ve la gente. No hay una copia de prueba desplegada por un
+lado y una de verdad por el otro: hay tu máquina, y hay lo publicado.
+
+Eso vale aunque en el Paso 3 hayas contestado **«dos copias»**. Esa respuesta
+cambia lo que tu proyecto **declara** —las direcciones, los nombres de recursos—
+pero **hoy no hay nada que despliegue dos ambientes**. Está anotado en el archivo
+`.projects-desvios.json` de tu proyecto, con esas palabras.
+
+### Lo que la [constitución](02-glosario.md) de tu proyecto promete, y todavía no cumple
+
+Si abrís `.projects/AGENTS-marco.md` vas a leer una regla que dice:
+
+> Promoción por ambientes: merge → deploy a DEV → smoke API → E2E → deploy a PROD
+> → verificar-prod.
+
+**Eso es el destino, no lo que tu proyecto hace hoy.** El andamio no reparte
+ninguno de esos pasos. Lo decimos acá y además queda declarado como **desvío** en
+tu proyecto, porque una regla que describe algo que no existe es peor que una
+regla ausente: los agentes que trabajan en tu repositorio la leen como si fuera
+la práctica de todos los días.
+
+### Entonces, ¿cómo llega un cambio a la gente?
+
+Con lo que hay hoy, así:
+
+| Paso | Qué pasa |
+| --- | --- |
+| 1 | Escribís el cambio en una rama |
+| 2 | Abrís un pull request y las verificaciones corren sobre él |
+| 3 | Con todo en verde, entra a `main` |
+| 4 | El sitio se publica solo, al destino único |
+
+**La compuerta que te protege es la del paso 3**, no un ambiente intermedio: nada
+llega a la gente sin haber pasado las verificaciones. Es menos de lo que la regla
+promete, y es lo que hay.
+
+### Y si tu proyecto necesita de verdad dos ambientes
+
+Es una decisión tuya y el marco todavía no te la resuelve. Lo honesto es decirte
+las dos cosas que vas a tener que hacer vos: **un segundo destino** donde publicar
+y **un paso que promueva** de uno al otro, con su propia condición de verde. El
+día que el marco lo reparta, llega como cualquier otra mejora —subiendo la versión
+del marco— y el desvío de tu proyecto se cierra.
+
+---
+
 ## Y con esto se cierra el camino
 
 | Tramo | Página |
@@ -177,6 +233,7 @@ la vía de siempre: subís la versión del marco y aparece.
 | Descubrir | [08-descubrimiento.md](08-descubrimiento.md) |
 | Construir | [09-construir-con-openspec.md](09-construir-con-openspec.md) |
 | **Publicar** | **esta página** |
+| **Producción** | **esta página, sección 5** — con lo que hoy no hay, dicho de frente |
 
 De acá en adelante el ciclo se repite: un change, un pull request, `main` en
 verde, y lo que publica publica solo.
