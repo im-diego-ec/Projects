@@ -29,7 +29,7 @@ con un [change](02-glosario.md) aplicado, un pull request cerrado y `main` en ve
 
 | Tu forma | ¿Se publica solo? | Dónde | Qué falta |
 | --- | --- | --- | --- |
-| **Un sitio para leer** | **Sí** | Cloudflare Workers | una cuenta y una credencial, las dos humanas y de una sola vez |
+| **Un sitio para leer** | **Sí** | Cloudflare Workers | tres actos humanos de una sola vez: la cuenta, la credencial y el subdominio |
 | **Una aplicación** | **No** | — | el paso de publicación no existe todavía en el andamio |
 
 Cómo saber cuál tenés, sin acordarte de nada:
@@ -63,8 +63,15 @@ silenciosa de quedarse sin despliegue:
 El proyecto ya trae la configuración (`sitio/wrangler.jsonc`) y el paso
 automático (`.github/workflows/desplegar.yml`).
 
-**Lo que falta son dos cosas que sólo una persona puede hacer**, y por eso están
-acá y no automatizadas: abrir una cuenta y crear una credencial.
+**Lo que falta son tres actos humanos**, y por eso están acá y no automatizados:
+**abrir la cuenta**, **crear la credencial** y **registrar el subdominio de tu
+cuenta**. Los tres se hacen una sola vez.
+
+> **El tercero cuesta contarlo porque llega tarde.** Cloudflare no te pide el
+> subdominio hasta la primera publicación, así que aparece cuando ya creías haber
+> terminado con lo humano. Contarlos como dos deja a esa persona sin saber que le
+> falta un paso — y ésa es exactamente la sorpresa que esta página existe para
+> evitar.
 
 **El paso a paso completo, con las pantallas y los nombres exactos de cada
 botón, está en el README del paquete del sitio de tu proyecto** —
@@ -129,8 +136,10 @@ El paso de publicación **imprime la dirección**. La primera vez tiene la forma
 https://<tu-proyecto>.<tu-subdominio>.workers.dev
 ```
 
-Ese `<tu-subdominio>` del medio lo elegís vos al abrir la cuenta, y **el marco
-no puede saberlo cuando genera el proyecto**. Por eso, si contestaste que
+Ese `<tu-subdominio>` del medio **lo registrás vos en el panel de Cloudflare**
+—en **Workers & Pages → Subdomain**— y Cloudflare te lo pide recién en la primera
+publicación, no al abrir la cuenta. **El marco no puede saberlo cuando genera el
+proyecto**. Por eso, si contestaste que
 todavía no tenés dominio propio, el proyecto quedó anotado con
 `<tu-proyecto>.workers.dev` —sin la parte del medio— y eso está declarado como
 pendiente en `.projects-desvios.json`.

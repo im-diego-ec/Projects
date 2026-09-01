@@ -376,7 +376,7 @@ no se pregunta: una lista escrita aparte de sus elementos se desincroniza sola.
 
 > **Hay dos formas de producir ese archivo, y las dos terminan en el mismo lugar.**
 > Ésta —`--ejemplo` y editar— es la del builder: la explícita, la que no pregunta
-> nada, la que sirve en una tubería. La otra es `--asistente`, que hace entre 9 y
+> nada, la que sirve en una tubería. La otra es `--asistente`, que hace entre 8 y
 > 17 preguntas en castellano y **deriva las 23 claves de las respuestas**: no
 > pide un id de cuenta de AWS a quien no eligió AWS, ni un canal de Slack a quien
 > avisa por correo. Genera este mismo archivo y lo valida con el mismo
@@ -484,7 +484,7 @@ se parece a un problema de banderas.
 | Bandera | Cuándo |
 |---|---|
 | `--ejemplo` | Fase 2: imprime el esqueleto de `valores.json` |
-| `--asistente` | Fase 2 por preguntas: deriva los 23 valores de 9 a 17 respuestas en castellano. Exige terminal; sin TTY imprime las preguntas y sale 2 |
+| `--asistente` | Fase 2 por preguntas: deriva los 23 valores de 8 a 17 respuestas en castellano. Exige terminal; sin TTY imprime las preguntas y sale 2 |
 | `--solo-valores <ruta>` | Con `--asistente`: escribe el archivo y no arma nada. Gemelo interactivo de `--ejemplo` |
 | `--forzar` | Sobrescribe un destino que **ya tiene** archivos del andamio. Es la bandera que apaga la protección contra pisar trabajo: se usa para reintentar un arranque que se cortó a la mitad, no para «probar otra vez» |
 | `--sin-herramientas` | No corre `openspec init` ni el render de la constitución. Te deja el andamio copiado y nada más — el repo queda **sin** `openspec/` y sin `.projects/`, o sea sin las dos piezas de la la página 08 |

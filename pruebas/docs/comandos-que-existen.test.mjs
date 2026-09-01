@@ -256,17 +256,25 @@ const CIFRAS_SOBRE_SI_MISMA = [
     // LA TABLA DE CONTEOS FIJOS de docs/04, que ninguna forma anterior cazaba:
     // «**9 preguntas**, y solo dos hay que escribirlas». El patron de arriba
     // pide un rango; este mira la cifra suelta. Estaba vieja en tres filas.
-    nombre: "preguntas del camino mas corto (la primera fila de la tabla de docs/04)",
+    // LA FILA DESCRIBE UN CAMINO CONCRETO, no el minimo global, y confundirlos
+    // costo un rojo: cuando la pregunta `ambientes` paso a saltarse para la forma
+    // «sitio», el minimo global bajo a 8 mientras la fila —que habla de una
+    // APLICACION en Supabase— seguia siendo 9 y era correcta. Se mide el camino
+    // que la fila nombra, igual que las dos de abajo.
+    nombre: "preguntas del camino de la primera fila de docs/04 (aplicacion + Supabase, solo, sin dominio)",
     patron: /\*\*(\d+) preguntas\*\*/g,
     grupo: 1,
-    medir: async () => (await rangoDePreguntas())[0],
+    medir: () =>
+      cuantasPregunta({ forma: "1", equipo: "1", plataforma: "1", ambientes: "1", dominio: "1", avisos: "1", visibilidad: "1" }),
   },
   {
     // Y la que dice cuantas respuestas hicieron falta, en la misma pagina.
-    nombre: "respuestas del camino mas corto",
+    // Misma correccion: el parrafo describe la corrida de la fila de arriba.
+    nombre: "respuestas del camino de la primera fila de docs/04",
     patron: /derivó de tus (\d+) respuestas/gi,
     grupo: 1,
-    medir: async () => (await rangoDePreguntas())[0],
+    medir: () =>
+      cuantasPregunta({ forma: "1", equipo: "1", plataforma: "1", ambientes: "1", dominio: "1", avisos: "1", visibilidad: "1" }),
   },
   {
     // LAS DOS FILAS DEL MEDIO de esa misma tabla. No alcanzaba con el rango: el
@@ -509,8 +517,8 @@ const CEBOS = {
   "paginas numeradas del camino": "Ésta es la primera de 999 páginas numeradas del camino.",
   "valores que la herramienta exige (REQUERIDOS)": "`projects init` pide **999 valores** y ni uno más.",
   "preguntas que hace el asistente, del camino mas corto al mas largo": "El asistente hace entre 998 y 999 preguntas.",
-  "preguntas del camino mas corto (la primera fila de la tabla de docs/04)": "Son **999 preguntas**, y solo dos hay que escribirlas.",
-  "respuestas del camino mas corto": "Las casillas, llenas con lo que derivó de tus 999 respuestas.",
+  "preguntas del camino de la primera fila de docs/04 (aplicacion + Supabase, solo, sin dominio)": "Son **999 preguntas**, y solo dos hay que escribirlas.",
+  "respuestas del camino de la primera fila de docs/04": "Las casillas, llenas con lo que derivó de tus 999 respuestas.",
   "preguntas del camino de AWS con dos copias": "| AWS con dos copias del proyecto | **999**, porque ahí los datos existen |",
   "preguntas del camino que suma todo": "| Todo lo que suma: AWS, dos copias, otra persona, dominio propio y Slack | **999**, el máximo |",
   "bloques ```powershell de docs/05 (los gemelos)": "El archivo tiene **999**\ngemelos y ni uno más.",

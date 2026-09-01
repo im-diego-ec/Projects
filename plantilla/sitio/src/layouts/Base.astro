@@ -5,6 +5,24 @@ interface Props {
   titulo: string;
 }
 const { titulo } = Astro.props;
+
+// LA DIRECCION CANONICA DE ESTA PAGINA, y por que hace falta.
+//
+// EL DEFECTO QUE ESTO CIERRA, medido: `docs/10-publicar.md` prometia que del
+// `site:` de astro.config.mjs «salen los enlaces canonicos del HTML», y el build
+// NO emitia ninguno — `sitio/dist/index.html` no tenia un solo `rel="canonical"`.
+// La clave `site` sola no hace nada de eso: Astro la usa para el sitemap y para
+// las URL absolutas que uno pide a mano, y nada mas.
+//
+// POR QUE IMPORTA EN UN SITIO PUBLICO: la misma pagina se alcanza por mas de una
+// direccion —con y sin barra final, por el subdominio de workers.dev y por el
+// dominio propio el dia que exista— y sin esta etiqueta cada una cuenta como una
+// pagina distinta para quien la indexa.
+//
+// SI `site` NO ESTA, NO SE INVENTA NADA. Una canonica relativa, o apuntando a la
+// maquina que compilo, es peor que no tenerla: manda a quien indexa a una
+// direccion que no existe. Sin `site`, esta etiqueta simplemente no sale.
+const canonica = Astro.site ? new URL(Astro.url.pathname, Astro.site) : null;
 ---
 
 <!doctype html>
@@ -13,6 +31,7 @@ const { titulo } = Astro.props;
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>{titulo}</title>
+    {canonica && <link rel="canonical" href={canonica.href} />}
   </head>
   <body>
     <main>
