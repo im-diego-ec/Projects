@@ -378,15 +378,23 @@ jobs:
           # El `if` alrededor del banco es lo unico que apaga el `-e` para esta linea:
           # sin el, un banco en rojo mataria el script antes de que el modo se pueda
           # leer, y la pata en aviso avisaria... poniendose roja.
-          # UN TECHO DE TIEMPO POR ARCHIVO, y no es prolijidad: sin el, un banco que
-          # se cuelga en una plataforma se lleva el job entero al timeout y el error
-          # que queda es «cancelled» a los 15 minutos, sin nombrar el archivo. Paso
-          # exactamente eso en macOS, dos corridas seguidas, y el log del runner no
-          # llego a subirse — o sea que la unica evidencia era la duracion.
+          # UN TECHO DE TIEMPO POR ARCHIVO. Sin el, un banco que se cuelga en una
+          # plataforma se lleva el job entero al timeout y el error que queda es
+          # «cancelled» a los quince minutos, sin nombrar el archivo ni el caso.
+          # 120000 ms es dos ordenes de magnitud mas de lo que el banco entero tarda
+          # en local (11 s), asi que no puede confundir «lento» con «colgado».
           #
-          # Con esto, un cuelgue sale como el fallo de UN caso, con su nombre y su
-          # archivo, que es lo que hace falta para arreglarlo. 120000 ms es dos
-          # ordenes de magnitud mas de lo que el banco entero tarda en local (11 s).
+          # POR QUE SE AGREGO, Y LA CORRECCION DE ESE MOTIVO. Se puso creyendo que
+          # explicaba un corte de la pata `macos-latest` a los 15m01s. NO ERA ESO: la
+          # API del job devuelve `steps: []` con `conclusion: cancelled`, o sea que la
+          # pata NUNCA EJECUTO UN PASO — no consiguio runner. Las otras cuatro patas
+          # de la misma corrida (windows y los tres ubuntu) salieron con sus siete
+          # pasos en verde. Era infraestructura, no el banco.
+          #
+          # Se deja igual porque lo que hace sigue siendo cierto y util el dia que un
+          # cuelgue de verdad ocurra. Lo que se corrige es el motivo escrito: un
+          # comentario que atribuye un arreglo a una causa que despues se midio falsa
+          # es peor que no tenerlo, porque el que venga lo va a creer.
           if node --test --test-timeout=120000 "${PRUEBAS[@]}"; then
             echo "el banco de init pasa entero en $(uname -s) con node $(node --version)"
             exit 0
