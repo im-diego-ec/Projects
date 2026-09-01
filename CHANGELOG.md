@@ -41,6 +41,8 @@ mueve sobre un cambio incompatible.
 
 ## [No publicado]
 
+## [1.8.0] — 2026-09-01
+
 ### Corregido
 
 - **La forma `sitio` no llegaba a un proyecto sano, y la carta la declaraba
