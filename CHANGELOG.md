@@ -82,6 +82,11 @@ mueve sobre un cambio incompatible.
 
 ### Añadido
 
+- **Claude Code se declara como requisito.** Los tramos 2 y 3 ocurren dentro de
+  una sesión de agente y ninguna página del carril no técnico lo decía: quien
+  seguía la guía llegaba al descubrimiento sin saber que le faltaba una
+  herramienta —y que tiene costo—. Ahora está en la tabla de programas del Paso 0,
+  con qué pasa si no lo tenés.
 - **`docs/10-publicar.md`**, el cuarto tramo del camino, que no tenía página. Las
   páginas siguientes corren un número: `10-reglas-no-escritas` pasa a `11`, y así
   hasta `16`.

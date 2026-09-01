@@ -725,3 +725,50 @@ test("todo desvio trae los cuatro campos que la accion de constitucion exige", a
   assert.match(uno.fecha, /^\d{4}-\d{2}-\d{2}$/);
   assert.equal(uno.aprobado_por, "alguien", "quien aprueba es quien contesto, con nombre y no con un «alguien»");
 });
+
+test("lo que la constitucion promete y el andamio no reparte queda declarado como desvio", async () => {
+  // EL DEFECTO QUE ESTE CASO VIGILA, medido en un proyecto recien generado: la
+  // constitucion que aterriza en TODO proyecto declara «Promocion por ambientes:
+  // merge → deploy a DEV → smoke API → E2E → deploy a PROD → verificar-prod» como
+  // la practica de ese proyecto, y el andamio no trae un solo workflow que haga
+  // nada de eso. Los que viajan son ci.yml, claude.yml, actualizar-marco.yml y
+  // —solo para un sitio— desplegar.yml, que publica en UN destino.
+  //
+  // Una regla que describe maquinaria inexistente es peor que una regla ausente:
+  // los agentes del proyecto la leen como practica vigente y planifican contra
+  // ella. El marco tiene un mecanismo para esto —el desvio declarado— y no lo
+  // estaba usando aca.
+  //
+  // VA PARA TODA COMBINACION, y por eso se barre: no depende de la forma ni de la
+  // plataforma. Ninguna reparte promocion.
+  const sinDeclarar = [];
+  for (const eleccion of combinaciones()) {
+    const { respuestas } = await correrAsistente(
+      async (_t, id) => eleccion[id] ?? LIBRES[id] ?? "x",
+      {},
+      {},
+      () => {},
+      { ORG_MARCO: "im-diego-ec" },
+    );
+    const d = desvios(respuestas).find((x) => x.regla === "promocion-por-ambientes");
+    if (!d) sinDeclarar.push(`${respuestas.forma}+${respuestas.plataforma}`);
+  }
+  assert.deepEqual(
+    [...new Set(sinDeclarar)],
+    [],
+    `estas combinaciones no declaran el desvio de promocion, asi que su constitucion afirma una maquinaria que su ` +
+      `arbol no tiene: ${[...new Set(sinDeclarar)].join(", ")}`,
+  );
+
+  // Y ANTI-VACUIDAD POR EL OTRO LADO: si el andamio empezara a repartir un
+  // workflow de promocion, este desvio sobraria y conviene que el banco lo diga
+  // en vez de dejarlo declarando algo que ya no es cierto.
+  const workflows = fs.readdirSync(path.join(ANDAMIO, ".github/workflows"));
+  const promueve = workflows.filter((f) => /promo|promocion|promote/i.test(f));
+  assert.deepEqual(
+    promueve,
+    [],
+    `el andamio ya reparte ${promueve.join(", ")}: si eso promueve de dev a prod, el desvio de ` +
+      "`promocion-por-ambientes` dejo de corresponder y hay que sacarlo",
+  );
+});

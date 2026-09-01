@@ -27,11 +27,21 @@ on:
     branches: [main]
   # A mano, para la primera vez y para volver atrás.
   workflow_dispatch:
+    inputs:
+      sin_esperar_ci:
+        description: >-
+          Publicar aunque las verificaciones de este commit no estén en verde.
+          Apartarse se puede; apartarse en silencio no: queda escrito en la corrida.
+        type: boolean
+        default: false
 
 # El mínimo: leer el árbol. Publicar lo hace la credencial, no el permiso del
 # workflow.
 permissions:
   contents: read
+  # Para preguntar por el estado de `ci-ok` sobre el commit que se va a publicar,
+  # cuando la corrida se dispara a mano.
+  checks: read
 
 concurrency:
   # Dos publicaciones a la vez sobre el mismo destino es una carrera con ganador
@@ -64,7 +74,37 @@ jobs:
     # repositorio, que pueden ser mas amplios de lo que este job necesita.
     permissions:
       contents: read
+      checks: read
     steps:
+      # UNA CORRIDA A MANO NO SE SALTEA LA COMPUERTA, y hasta este cambio si lo
+      # hacia: el `if` del job acepta `workflow_dispatch` sin mirar nada, y el
+      # unico camino que la guia da para la PRIMERA publicacion es apretar «Run
+      # workflow». O sea que la promesa en negrita —«solo se publica lo que esta
+      # en verde»— no valia justo para el unico camino documentado.
+      #
+      # Ahora la corrida a mano PREGUNTA por el estado de este commit. Y el
+      # apartamiento existe, con un nombre y una casilla: queda escrito en la
+      # corrida en vez de ocurrir en silencio.
+      - name: Comprobar que este commit paso las verificaciones
+        if: github.event_name == 'workflow_dispatch'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SIN_ESPERAR: ${{ inputs.sin_esperar_ci }}
+          SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          if [ "${SIN_ESPERAR}" = "true" ]; then
+            echo "::warning::se pidio publicar SIN esperar a las verificaciones. Queda escrito acá: el commit ${SHA} se publica sin que este workflow haya comprobado que su CI esta en verde"
+            exit 0
+          fi
+          ESTADO="$(gh api "repos/${GITHUB_REPOSITORY}/commits/${SHA}/check-runs" --jq '[.check_runs[] | select(.name == "ci-ok")] | first | .conclusion // "sin-corrida"' 2>/dev/null || echo "no-se-pudo-leer")"
+          echo "ci-ok sobre ${SHA}: ${ESTADO}"
+          if [ "${ESTADO}" != "success" ]; then
+            echo "::error::este commit no tiene ci-ok en verde (esta en \"${ESTADO}\"), asi que no se publica. Es la misma regla que aplica a las publicaciones automaticas, y vale igual cuando la corrida se dispara a mano. Si de verdad hace falta publicar igual, volve a disparar el workflow marcando la casilla \"sin_esperar_ci\": el apartamiento queda escrito en la corrida"
+            exit 1
+          fi
+
       - name: Traer el arbol
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:

@@ -557,6 +557,29 @@ export function desvios(r, hoy = new Date().toISOString().slice(0, 10)) {
       revisar: "despues de la primera publicacion, con la direccion que imprime Cloudflare",
     });
   }
+  // LA PROMOCION POR AMBIENTES, que la constitucion declara y el andamio no
+  // reparte. Va SIEMPRE, para las dos formas, y por eso no lleva condicion.
+  //
+  // EL DEFECTO QUE CIERRA, medido en un proyecto recien generado: la constitucion
+  // que aterriza en TODO proyecto declara «merge → deploy a DEV → smoke API → E2E
+  // → deploy a PROD → verificar-prod» como la practica de ese proyecto, y el
+  // andamio no trae un solo workflow que haga nada de eso: los que viajan son
+  // ci.yml, claude.yml, actualizar-marco.yml y —solo para un sitio—
+  // desplegar.yml, que publica en UN destino y no promueve.
+  //
+  // Una regla que describe maquinaria inexistente es peor que una regla ausente:
+  // los agentes del proyecto la leen como practica vigente y planifican contra
+  // ella. El marco ya tiene el mecanismo para esto y es este: declararlo.
+  lista.push({
+    ...comun,
+    regla: "promocion-por-ambientes",
+    motivo:
+      "El andamio no reparte pipeline de promocion: no hay deploy a dev, ni smoke, ni promocion a prod. Lo que " +
+      "viaja hoy es la verificacion (ci.yml) y, solo para la forma «un sitio para leer», una publicacion a UN " +
+      "destino (desplegar.yml). La regla queda escrita como el destino, no como lo que este proyecto hace hoy. " +
+      "Lo mismo vale para `dev-es-staging-compartido`, que describe la misma maquinaria.",
+    revisar: "cuando el marco reparta el pipeline de promocion, o cuando este proyecto escriba el suyo",
+  });
   if (r.visibilidad === "privado") {
     lista.push({
       ...comun,

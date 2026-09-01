@@ -204,3 +204,23 @@ test("se publica el commit que paso el CI, no la punta de main", () => {
     "el checkout tiene que pedir el commit que el CI midio (`head_sha`), no la rama",
   );
 });
+
+test("una corrida a mano tampoco publica sin el verde, y apartarse tiene nombre", () => {
+  // EL DEFECTO QUE ESTE CASO VIGILA: el `if` del job acepta `workflow_dispatch`
+  // sin mirar nada, y el unico camino que la guia da para la PRIMERA publicacion
+  // es apretar «Run workflow». O sea que la promesa en negrita —«solo se publica
+  // lo que esta en verde»— no valia justo para el unico camino documentado.
+  const t = workflow();
+  assert.match(t, /if: github\.event_name == 'workflow_dispatch'/, "tiene que haber un paso solo para la corrida a mano");
+  assert.match(t, /check-runs/, "tiene que consultar los check-runs del commit que va a publicar");
+  assert.match(t, /\.name == "ci-ok"/, "y filtrar por ci-ok, que es el veredicto agregado y no un job suelto");
+  assert.match(t, /::error::este commit no tiene ci-ok en verde/, "y frenar si no esta en verde");
+
+  // Y EL APARTAMIENTO EXISTE Y TIENE NOMBRE: la doctrina del repo es que
+  // apartarse se puede y apartarse en silencio no.
+  assert.match(t, /sin_esperar_ci:/, "tiene que haber una casilla declarada para publicar igual");
+  assert.match(t, /::warning::se pidio publicar SIN esperar/, "y usarla tiene que dejar rastro en la corrida");
+
+  // El permiso que eso necesita, en los DOS niveles, como el marco exige.
+  assert.equal((t.match(/checks: read/g) ?? []).length, 2, "`checks: read` va arriba Y en el job");
+});
