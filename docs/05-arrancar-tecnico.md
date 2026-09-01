@@ -552,10 +552,17 @@ console.log(archivosDelAndamio("plantilla").length);
 '
 ```
 
-⚠️ **El artefacto de la constitución va a declarar `version=1.6.0` y no 1.7.0, y está bien.**
-Versiona el **canónico**, no el release: como el texto del canónico no cambió en la 1.7.0, el
-artefacto sigue siendo el correcto. Verificado — el check da exit 0 y dice «la porción del
+⚠️ **El artefacto de la constitución declara `version=1.7.0` mientras el marco va por la
+1.8.0, y está bien.** Versiona el **canónico**, no el release: son dos números distintos
+que se mueven por motivos distintos. El canónico sube cuando su texto cambia; el release,
+cada vez que se publica el marco. Verificado — el check da exit 0 y dice «la porción del
 marco está al día en 2 superficies».
+
+> **Y esos dos números tienen que moverse juntos con su texto**, que es lo que un banco
+> del marco exige desde la 1.8.0: el manifiesto lleva la huella del canónico que publica,
+> y si el texto cambia sin declarar versión nueva, el banco se pone rojo. Antes no lo
+> hacía, y dos textos distintos llegaron a llamarse «1.6.0» — con la consecuencia de que
+> el job `constitucion` de todo proyecto nuevo nacía en rojo.
 
 | Directorio | Qué hay |
 |---|---|
