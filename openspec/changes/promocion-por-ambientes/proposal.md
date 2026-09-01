@@ -69,23 +69,48 @@ Estas preguntas **no las contesta un técnico**: la respuesta correcta depende d
 cuánto se quiere gastar, cuánto riesgo se acepta y para quién es el proyecto. Van
 acá y no en el `design.md` a propósito.
 
-1. **¿Cuánto puede costar por mes un proyecto nuevo?** Hoy el camino recomendado
-   es gratis de punta a punta. Si el despliegue de una aplicación exige pagar,
-   deja de serlo — y eso cambia quién puede usar este marco.
-2. **¿Qué significa «ambiente de prueba» acá?** Un destino desplegado y separado,
-   o una dirección temporal por cada cambio propuesto. Las dos son defendibles y
-   cuestan distinto.
-3. **¿Quién autoriza el pase a producción cuando hay una sola persona?** GitHub
-   ofrece revisores obligatorios y esperas temporizadas, y el marco ya midió que
-   varias de esas piezas **no existen** en un repositorio privado del plan
-   gratuito.
-4. **¿Se rediseña la pregunta de plataforma en este mismo trabajo, o se declara
-   su límite y se deja para otro?** Rediseñarla toca el asistente, la carta y el
-   reparto de archivos.
+**La investigación de `alternativas.md` estrechó dos de estas cuatro y dejó las
+otras dos igual de abiertas.** Se declara cuál es cuál para que no se pierda
+tiempo discutiendo lo que ya tiene respuesta.
 
-**Los datos para decidir cada una —costos reales, límites de los planes gratuitos
-y actos humanos de cada opción— se investigaron y viven en `alternativas.md`, al
-lado de este archivo.** Este proposal no elige por vos: pone los números delante.
+### Lo que la investigación ya contestó
+
+**Qué significa «ambiente de prueba» acá.** Cloudflare ofrece tres formas y gana
+una con claridad: **versiones con dirección de vista previa**. Es la única que
+promueve **el artefacto que ya se verificó** — las otras dos vuelven a compilar
+para producción, y entonces lo que salió publicado no es exactamente lo que se
+miró. Y no cuesta **un solo acto humano nuevo**: la credencial que la persona ya
+carga hoy alcanza.
+
+**Cuánto cuesta.** Las primeras cuatro rebanadas —la promoción del sitio, la de la
+parte web de una aplicación, y la compuerta— salen **cero dólares y cero actos
+humanos nuevos**. El costo aparece recién cuando se despliega el `api/`, y ahí
+depende de una medición que todavía no se hizo.
+
+### Lo que sigue siendo tuyo
+
+1. **¿El repositorio del proyecto es público o privado?** Es la decisión que más
+   arrastra y no es técnica. En un repositorio **privado del plan gratuito no
+   existe ninguna compuerta de environment** —ni revisores, ni temporizador, ni
+   política de rama— y tenerlas cuesta **21 USD por persona al mes**. En uno
+   público son gratis. El marco ya se comió este mismo muro con la protección de
+   rama.
+
+2. **¿Cuánto puede costar por mes desplegar el `api/`?** Hay una medición de una
+   tarde que decide entre **~5 USD sin agregar ningún proveedor** (Cloudflare
+   Containers, si sus containers pueden hablar con Postgres — su documentación no
+   lo afirma) y **13 USD con un proveedor nuevo** (Render, que sí resuelve las
+   migraciones dentro del despliegue). **Se puede decidir después**: no bloquea
+   nada de lo anterior.
+
+3. **¿Se rediseña la pregunta de plataforma en este mismo trabajo?** La
+   investigación dice que hoy son **dos preguntas colapsadas en una** —dónde viven
+   los datos y dónde corre la aplicación—, y que para un sitio directamente no
+   corresponde. Separarlas toca el asistente, la carta y el reparto de archivos.
+
+**Los números, sus fuentes y lo que no se pudo verificar están en
+`alternativas.md`, al lado de este archivo.** Este proposal no elige por vos: pone
+los datos delante y separa lo que ya tiene respuesta de lo que no.
 
 ## Cómo se construye
 
