@@ -143,6 +143,8 @@ export const PREGUNTAS = [
         valor: "aplicacion",
         etiqueta: "Una aplicación detrás de una puerta",
         detalle:
+          "HOY NO SE PUBLICA SOLO: el marco todavía no reparte un paso que la lleve a internet, así que por " +
+          "ahora se levanta en tu máquina. " +
           "La gente entra con usuario y contraseña y trabaja adentro un rato largo: un panel de gestión, " +
           "un inventario, una herramienta de trabajo. Se siente como un programa y no como un sitio — entrás " +
           "una vez y las pantallas cambian al instante. LO QUE TE CUESTA: ninguna de tus pantallas va a " +
@@ -154,6 +156,7 @@ export const PREGUNTAS = [
         valor: "sitio",
         etiqueta: "Un sitio para leer",
         detalle:
+          "SE PUBLICA SOLO: cada vez que las verificaciones quedan en verde, sale a internet. " +
           "Páginas que alguien abre y lee: un blog, un manual, la web de un producto, un catálogo. Nadie se " +
           "registra y nadie guarda nada. Es la más barata de todas: sin base de datos, sin servidor, sin " +
           "contraseñas que proteger, y las páginas abren al instante porque no mandan ni un programa al " +
@@ -241,6 +244,16 @@ export const PREGUNTAS = [
   },
   {
     id: "ambientes",
+    // NO SE PREGUNTA PARA UN SITIO, y el motivo es que la respuesta no cambiaba
+    // nada. Medido: contestar «dos» sobre forma=sitio produce los MISMOS 42
+    // archivos que contestar «una», y lo unico que se mueve es el valor declarado
+    // `DOMINIO_DEV`. No hay un segundo destino que desplegar: un sitio publica en
+    // uno solo, y ese es el publico.
+    //
+    // Preguntar algo cuya respuesta no cambia nada es peor que no preguntarlo: le
+    // hace creer a la persona que eligio una arquitectura cuando eligio un texto.
+    // Es el mismo criterio con el que las cinco preguntas de AWS ya se saltan.
+    salta: (r) => r.forma === "sitio",
     texto: "¿Cuántas copias del proyecto querés? Una para probar sin miedo, otra para lo que ve la gente de verdad.",
     opciones: [
       {

@@ -224,3 +224,60 @@ test("una corrida a mano tampoco publica sin el verde, y apartarse tiene nombre"
   // El permiso que eso necesita, en los DOS niveles, como el marco exige.
   assert.equal((t.match(/checks: read/g) ?? []).length, 2, "`checks: read` va arriba Y en el job");
 });
+
+// ---------------------------------------------------------------------------
+// LO QUE `docs/10` PROMETE DEL `site:` TIENE QUE SALIR EN EL HTML.
+//
+// EL DEFECTO QUE ESTE BANCO CIERRA, medido compilando: la pagina decia que del
+// `site:` de astro.config.mjs «salen los enlaces canonicos del HTML», y
+// `sitio/dist/index.html` no traia UN SOLO `rel="canonical"`. La clave `site`
+// sola no hace eso: Astro la usa para el sitemap y para las URL absolutas que
+// uno pide a mano.
+//
+// LO QUE ESTE BANCO NO PUEDE AFIRMAR, dicho primero: no compila el sitio —eso
+// pide un install con red y decenas de segundos—. Lo verificado a mano el
+// 2026-09-01 sobre un sitio recien generado: `dist/index.html` trae
+// `<link rel="canonical" href="https://agenda.ejemplo.com/">`.
+//
+// LO QUE SI SOSTIENE, y es lo que se rompe con una edicion: que el molde EMITA
+// la etiqueta, que la derive de `Astro.site` y no de otra cosa, y que NO la
+// emita cuando `site` no esta — una canonica relativa manda a quien indexa a una
+// direccion que no existe, que es peor que no tenerla.
+// ---------------------------------------------------------------------------
+
+const molde = () => fs.readFileSync(path.join(ANDAMIO, "sitio/src/layouts/Base.astro"), "utf-8");
+
+test("el molde del sitio emite la direccion canonica, y la deriva de `site`", () => {
+  const t = molde();
+  assert.match(t, /rel="canonical"/, "sin esta etiqueta, docs/10 promete algo que el HTML no trae");
+  assert.match(t, /Astro\.site/, "tiene que salir del `site:` de la configuracion, que es lo que la pagina dice");
+  assert.match(t, /Astro\.url\.pathname/, "y de la direccion de ESTA pagina, no de una fija");
+
+  // LA MITAD QUE MAS IMPORTA: sin `site` no se inventa nada.
+  assert.match(t, /Astro\.site \?|Astro\.site\s*&&/, "tiene que haber una guarda: sin `site`, la etiqueta no sale");
+  assert.match(t, /canonica &&|canonical.*&&/, "y la emision tiene que colgar de esa guarda");
+});
+
+test("la pagina que lo promete y el molde que lo cumple no pueden separarse", () => {
+  // ANTI-VACUIDAD Y ANCLA: este caso existe porque docs/10 hace la promesa. Si
+  // la promesa se borrara, el control quedaria vigilando algo que ya nadie dijo.
+  const pagina = fs.readFileSync(path.join(RAIZ, "docs/10-publicar.md"), "utf-8");
+  assert.match(
+    pagina,
+    /enlaces can(ó|o)nicos/i,
+    "docs/10 dejo de prometer los enlaces canonicos: si fue a proposito, este control sobra y hay que sacarlo",
+  );
+});
+
+test("MUERDE: sacar la canonica del molde se caza, y sacar la guarda tambien", () => {
+  const t = molde();
+  assert.equal(/rel="canonical"/.test(t.replace(/rel="canonical"/g, "")), false, "la deteccion tiene que ver que no esta");
+  // Y la guarda: un molde que emite la canonica SIN preguntar por `site` pasa el
+  // primer aserto y falla este, que es el que protege contra la canonica falsa.
+  const sinGuarda = t.replace(/const canonica = [^\n]*\n/, "const canonica = new URL(Astro.url.pathname, Astro.site);\n");
+  assert.equal(
+    /Astro\.site \?|Astro\.site\s*&&/.test(sinGuarda),
+    false,
+    "sin la guarda, la deteccion tiene que ver que se perdio",
+  );
+});

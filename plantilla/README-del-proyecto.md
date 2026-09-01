@@ -85,7 +85,8 @@ pipeline, y el diagnóstico local es varios minutos más barato.
 > verificaciones terminan en verde sobre `main`, el sitio sale a
 > `{{DOMINIO_PROD}}`. No hay que apretar nada.
 >
-> **Falta una sola cosa, y es humana: la cuenta de Cloudflare y su credencial.**
+> **Faltan tres cosas, y las tres son humanas: la cuenta de Cloudflare, su
+> credencial y el subdominio de tu cuenta.**
 > Mientras no existan, la publicación **no se pone en rojo**: sale con un aviso
 > amarillo diciendo qué falta. El paso a paso —tres minutos, sin tarjeta— está
 > en [`{{PAQUETE_SITIO}}/README.md`]({{PAQUETE_SITIO}}/README.md).
