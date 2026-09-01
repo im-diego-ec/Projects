@@ -1,31 +1,31 @@
 # Publica el sitio en Cloudflare Workers.
 #
-# CUÁNDO CORRE, y por qué no en cada push. Solo cuando `ci-ok` termina en verde
-# sobre `main`: publicar algo que no pasó las verificaciones es exactamente lo
+# CUANDO CORRE, y por que no en cada push. Solo cuando `ci-ok` termina en verde
+# sobre `main`: publicar algo que no paso las verificaciones es exactamente lo
 # que este marco existe para impedir. Un push a una rama no publica nada.
 #
-# QUÉ NECESITA PARA FUNCIONAR, y son dos cosas que solo una persona puede hacer:
+# QUE NECESITA PARA FUNCIONAR, y son dos cosas que solo una persona puede hacer:
 #   1. Una cuenta de Cloudflare (gratis, sin tarjeta).
 #   2. Dos secretos en Settings -> Secrets and variables -> Actions:
 #        CLOUDFLARE_API_TOKEN    con permiso "Edit Cloudflare Workers"
 #        CLOUDFLARE_ACCOUNT_ID   el identificador de tu cuenta
 #
-# EL PASO A PASO ESTÁ EN `{{PAQUETE_SITIO}}/README.md`. Mientras los secretos no
-# existan, este workflow NO se pone rojo: sale con un aviso diciendo qué falta.
-# Un rojo permanente por algo que todavía no se configuró enseña a ignorar los
+# EL PASO A PASO ESTA EN `{{PAQUETE_SITIO}}/README.md`. Mientras los secretos no
+# existan, este workflow NO se pone rojo: sale con un aviso diciendo que falta.
+# Un rojo permanente por algo que todavia no se configuro ensena a ignorar los
 # rojos, que es peor que no tener la compuerta.
 name: desplegar
 
 on:
   workflow_run:
-    # EL NOMBRE VA EXACTO, y este decía "ci" mientras el workflow se llama "CI".
+    # EL NOMBRE VA EXACTO, y este decia "ci" mientras el workflow se llama "CI".
     # `workflow_run` resuelve por el `name:` del otro archivo: si no coincide, no
-    # falla nada — simplemente NO DISPARA NUNCA. Es la forma más silenciosa que
+    # falla nada — simplemente NO DISPARA NUNCA. Es la forma mas silenciosa que
     # hay de quedarse sin despliegue, porque no deja ni un rojo que mirar.
     workflows: ["CI"]
     types: [completed]
     branches: [main]
-  # A mano, para la primera vez y para volver atrás.
+  # A mano, para la primera vez y para volver atras.
   workflow_dispatch:
     inputs:
       sin_esperar_ci:
@@ -35,7 +35,7 @@ on:
         type: boolean
         default: false
 
-# El mínimo: leer el árbol. Publicar lo hace la credencial, no el permiso del
+# El minimo: leer el arbol. Publicar lo hace la credencial, no el permiso del
 # workflow.
 permissions:
   contents: read
@@ -45,25 +45,25 @@ permissions:
 
 concurrency:
   # Dos publicaciones a la vez sobre el mismo destino es una carrera con ganador
-  # impredecible, así que se serializan. Pero HACEN COLA: NO se cancelan.
+  # impredecible, asi que se serializan. Pero HACEN COLA: NO se cancelan.
   #
   # Es lo que exige `openspec/specs/despliegue-ci/spec.md` del marco, y la
-  # distinción que gobierna la regla está escrita ahí: una corrida de
-  # VERIFICACIÓN interrumpida no deja nada, así que cancelarla es correcto y
-  # ahorra recursos; una corrida de DESPLIEGUE interrumpida sí deja estado —el
-  # ambiente queda en una combinación que ninguna de las dos corridas describe, y
-  # las dos pueden reportar éxito—.
+  # distincion que gobierna la regla esta escrita ahi: una corrida de
+  # VERIFICACION interrumpida no deja nada, asi que cancelarla es correcto y
+  # ahorra recursos; una corrida de DESPLIEGUE interrumpida si deja estado —el
+  # ambiente queda en una combinacion que ninguna de las dos corridas describe, y
+  # las dos pueden reportar exito—.
   #
   # Ese desenlace, dos corridas en verde y el destino a medias, es exactamente lo
-  # que este archivo existe para impedir. Este workflow decía
-  # `cancel-in-progress: true` y defendía lo contrario en un comentario.
+  # que este archivo existe para impedir. Este workflow decia
+  # `cancel-in-progress: true` y defendia lo contrario en un comentario.
   group: desplegar-${{ github.ref }}
   cancel-in-progress: false
 
 jobs:
   desplegar:
-    # `workflow_run` dispara TAMBIÉN cuando el workflow anterior falló: sin este
-    # `if`, un CI rojo publicaría igual.
+    # `workflow_run` dispara TAMBIEN cuando el workflow anterior fallo: sin este
+    # `if`, un CI rojo publicaria igual.
     if: >-
       github.event_name == 'workflow_dispatch' ||
       github.event.workflow_run.conclusion == 'success'

@@ -281,3 +281,53 @@ test("MUERDE: sacar la canonica del molde se caza, y sacar la guarda tambien", (
     "sin la guarda, la deteccion tiene que ver que se perdio",
   );
 });
+
+test("el conteo de actos humanos es el mismo en todos lados, y son TRES", () => {
+  // EL DEFECTO QUE ESTE CASO VIGILA, medido: el marco decia el numero de tres
+  // maneras distintas —«una sola cosa», «dos cosas», «dos actos humanos»— y en
+  // ninguna decia tres, que es lo que son. El tercero, registrar el subdominio,
+  // cuesta contarlo porque LLEGA TARDE: Cloudflare no lo pide hasta la primera
+  // publicacion, asi que aparece cuando la persona ya creia haber terminado.
+  //
+  // Contarlos mal no es un detalle de redaccion: es la unica lista que le dice a
+  // alguien cuanto trabajo humano le queda.
+  const donde = {
+    "plantilla/sitio/README.md": fs.readFileSync(path.join(ANDAMIO, "sitio/README.md"), "utf-8"),
+    "docs/10-publicar.md": fs.readFileSync(path.join(RAIZ, "docs/10-publicar.md"), "utf-8"),
+    "docs/04-arrancar-acompanado.md": fs.readFileSync(path.join(RAIZ, "docs/04-arrancar-acompanado.md"), "utf-8"),
+    "plantilla/README-del-proyecto.md": fs.readFileSync(path.join(ANDAMIO, "README-del-proyecto.md"), "utf-8"),
+  };
+  // EL PATRON ES ESTRECHO A PROPOSITO, y las dos exclusiones estan medidas: en
+  // este mismo arbol hay un «Guardar las dos cosas en GitHub» —los dos secretos,
+  // que SON dos— y un «Lo que hoy hay, y es una sola cosa» —el destino de
+  // publicacion, que ES uno—. Las dos frases son correctas. Un control que caza
+  // lo correcto ensenia a ignorarlo, asi que solo se mira lo que de verdad cuenta
+  // actos humanos.
+  const VIEJAS = /\b(dos|una sola) (actos? humanos?|cosas? que (s(ó|o)lo )?una persona)/i;
+  const malos = [];
+  let conteos = 0;
+  for (const [f, t] of Object.entries(donde)) {
+    if (/tres (actos humanos|cosas)/i.test(t)) conteos++;
+    const m = t.match(VIEJAS);
+    if (m) malos.push(`${f}: dice "${m[0]}"`);
+  }
+  assert.ok(conteos >= 3, `solo ${conteos} de los cuatro lugares dicen el numero: si cayo, la lista se disperso otra vez`);
+  assert.deepEqual(
+    malos,
+    [],
+    "el conteo de actos humanos volvio a decirse de mas de una manera. Son TRES —la cuenta, el subdominio y la " +
+      `credencial— y el tercero es el que llega tarde:\n  ${malos.join("\n  ")}`,
+  );
+});
+
+test("el subdominio se pide donde la persona esta, no donde le explota", () => {
+  // Estaba solo en la tabla de errores del ultimo paso: la persona se enteraba
+  // cuando el despliegue fallaba. Ahora se pide en el paso de la cuenta, que es
+  // donde se puede hacer sin perder nada.
+  const t = fs.readFileSync(path.join(ANDAMIO, "sitio/README.md"), "utf-8");
+  const paso1 = t.slice(t.indexOf("### 1 ·"), t.indexOf("### 2 ·"));
+  assert.ok(paso1.length > 100, "no se pudo aislar el paso 1: cambio la forma de los encabezados");
+  assert.match(paso1, /Subdomain/, "el paso de la cuenta tiene que nombrar donde se registra el subdominio");
+  assert.match(paso1, /no se puede cambiar|una vez/i, "y avisar que se elige una sola vez");
+  assert.match(paso1, /primera publicaci(ó|o)n/i, "y por que si se saltea explota mas tarde");
+});
