@@ -4,6 +4,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { execFileSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
+import { evolucionSegunElIndice } from "./lectura.mjs";
 
 const RAIZ = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 
@@ -77,6 +78,25 @@ const listar = (...args) =>
 
 const docs = () => listar("docs/*.md", "*.md").filter((f) => f !== "CHANGELOG.md");
 
+/** Una pagina que EL INDICE declara historica: una foto fechada de una corrida,
+ *  que el propio docs/README.md dice que «no se edita después». Corregirle una
+ *  cifra es reescribir lo que se midio ese dia, que es el mismo motivo por el
+ *  que quedan afuera los changes de openspec.
+ *
+ *  NO ES UNA LISTA A MANO, y ese es el punto: lo decide la tercera columna del
+ *  indice, leida con la misma funcion que usa el estandar de lectura. El dia que
+ *  una pagina deje de ser historica entra a este control sola. Y si el indice
+ *  dejara de parsearse, esta funcion contesta que no para todo: el control se
+ *  vuelve MAS exigente y se pone rojo, que es el lado seguro para fallar. */
+const EVOLUCION_DE_DOCS = evolucionSegunElIndice();
+const esHistorica = (f) => {
+  if (!f.startsWith("docs/")) return false;
+  const rel = f.slice("docs/".length);
+  // El indice clasifica `adopciones/` como CARPETA —una fila para todos sus
+  // archivos—, asi que preguntar solo por el nombre del archivo no la encuentra.
+  return EVOLUCION_DE_DOCS.get(rel) === "Histórico" || EVOLUCION_DE_DOCS.get(rel.replace(/\/.*/, "/")) === "Histórico";
+};
+
 /** DONDE PUEDE VIVIR UNA CIFRA QUE HABLA DEL PROPIO REPOSITORIO, y por que el
  *  alcance es mas ancho que `docs/`.
  *
@@ -95,6 +115,12 @@ const textosQueAfirman = () =>
       // nuevo pasaba de 3 marcadores a 21» era cierto entonces y corregirlo
       // seria reescribir la medicion, que es justo lo contrario de medir.
       !f.startsWith("openspec/changes/") &&
+      // Y por el mismo motivo, las paginas que el indice declara historicas:
+      // `docs/adopciones/` guarda un archivo por adopcion con lo que se midio
+      // ese dia. Medido: sin esta linea, el registro sale rojo pidiendo corregir
+      // «tres recuadros 🕳️» en el acta del 2026-08-24, o sea pidiendo falsear un
+      // acta. `git ls-files docs/*.md` las trae porque el `*` de git cruza `/`.
+      !esHistorica(f) &&
       // Y este archivo guarda contraejemplos a proposito —«999 paginas», y la
       // cita de «los 21 valores» que explica el defecto—. Mirarse a si mismo lo
       // haria rojo por hacer bien su trabajo.
@@ -168,11 +194,26 @@ test("MUERDE: un conteo equivocado se caza", () => {
 // regla a las cifras que hablan de la propia documentacion.
 // ---------------------------------------------------------------------------
 
+/** Los numeros chicos escritos con letras, que es como los escribe el carril sin
+ *  jerga —docs/01, 04, 06 y docs/README—. Llega hasta diez porque son las cifras
+ *  que esas paginas escriben con palabras; de ahi para arriba ya usan digitos.
+ *
+ *  Va ANTES del registro y no despues: el registro arma su patron con estas
+ *  claves al construirse, y un `const` declarado mas abajo lo dejaria leyendo
+ *  una variable en zona muerta — el archivo entero no cargaria. */
+const EN_PALABRAS = { un: 1, uno: 1, dos: 2, tres: 3, cuatro: 4, cinco: 5, seis: 6, siete: 7, ocho: 8, nueve: 9, diez: 10 };
+
+/** Lee la cifra que cazo un patron, venga en digitos o en letras. */
+const enNumero = (s) => (/^\d+$/.test(s) ? Number(s) : EN_PALABRAS[String(s).toLowerCase()]);
+
 /** Cifras que la documentacion afirma sobre si misma, con como se miden.
  *
  *  Cada entrada es un patron que caza la afirmacion y una funcion que devuelve
  *  el numero de verdad. Si el patron no aparece en ningun lado, no pasa nada: la
- *  pagina dejo de afirmarlo, que es justamente lo que se prefiere. */
+ *  pagina dejo de afirmarlo, que es justamente lo que se prefiere.
+ *
+ *  `leer` es opcional y por defecto es `Number`: solo lo declara la entrada cuya
+ *  cifra puede venir escrita con letras. */
 const CIFRAS_SOBRE_SI_MISMA = [
   {
     nombre: "paginas de la raiz de docs/ mas el README",
@@ -243,7 +284,110 @@ const CIFRAS_SOBRE_SI_MISMA = [
     grupo: 1,
     medir: () => cuantasPregunta({ forma: "1", equipo: "2", plataforma: "2", ambientes: "2", dominio: "2", avisos: "2", visibilidad: "1" }),
   },
+  {
+    // LA SEXTA VEZ, y la primera en que la cifra hablaba del ARCHIVO QUE LA
+    // ESCRIBE. docs/05 promete un par ` ```powershell ` por cada bloque de bash
+    // que no sea portable, y para que esa promesa no encoja publica el
+    // inventario: decia 9 gemelos y 29 bloques bash cuando eran 8 y 25. La
+    // pagina ademas EXPLICA el comando que los cuenta, asi que el numero viejo
+    // venia con instrucciones para desmentirlo — y nadie las corrio.
+    nombre: "bloques ```powershell de docs/05 (los gemelos)",
+    // TODOS los espacios de estos dos patrones son \s+, y no por prolijidad: la
+    // frase vive partida en dos lineas y el salto se mueve con cualquier reflow
+    // del parrafo. Un \s+ en UNA sola junta no alcanza — medido: con el salto
+    // entre «tiene» y «**8**» (la unica junta que quedaba con espacio literal),
+    // la pagina decia 9 gemelos, eran 8, y el banco daba pass 13 / fail 0. Una
+    // cifra sin vigilancia con el guard en verde es peor que sin guard, porque
+    // el verde se lee como que alguien la esta mirando.
+    patron: /tiene\s+\*\*(\d+)\*\*\s+gemelos/g,
+    grupo: 1,
+    medir: () => bloquesDeDocs05("powershell"),
+  },
+  {
+    nombre: "bloques ```bash de docs/05",
+    patron: /gemelos\s+y\s+\*\*(\d+)\*\*\s+bloques/g,
+    grupo: 1,
+    medir: () => bloquesDeDocs05("bash"),
+  },
+  {
+    // LA SEPTIMA, y la unica que NO se puede contar sobre el andamio tal cual
+    // esta: el andamio guarda TRES recuadros 🕳️ y al proyecto le llegan DOS,
+    // porque `projects init` reemplaza el de .github/proteccion-main.md por el
+    // bloque con el estado medido de la proteccion de rama. docs/05 decia 3
+    // —contando uno que el proyecto nunca ve— y encima colgaba de el la razon
+    // de por que el primer CI sale rojo. Contar sobre plantilla/ a secas daria
+    // otra vez 3: por eso la medicion CORRE la misma cirugia que corre `init`.
+    // Y EL PATRON LEE LA CIFRA EN PALABRAS, no solo en digitos, porque el
+    // defecto seguia vivo justo ahi: docs/04 —la pagina que le cuenta el mismo
+    // paso a quien no es tecnico— decia «los **tres recuadros 🕳️**» y «Los tres
+    // recuadros 🕳️ que un humano tiene que resolver». Con el patron solo-digitos
+    // eso daba pass 13 / fail 0: el guard nacio ciego del lado donde el numero
+    // todavia estaba mal. Las paginas del carril sin jerga escriben los numeros
+    // chicos con letras, asi que un patron que solo mira digitos no las vigila.
+    nombre: "recuadros 🕳️ que recibe un repo recien generado",
+    // El \b de adelante no es adorno: sin el, «todos recuadros» cazaria el «dos»
+    // de adentro de «todos» y el registro compararia un 2 que nadie escribio.
+    patron: new RegExp(`\\b(\\d+|${Object.keys(EN_PALABRAS).join("|")})\\s+recuadros\\s+🕳`, "gi"),
+    grupo: 1,
+    leer: enNumero,
+    medir: recuadrosDeHueco,
+  },
 ];
+
+/** Cuantas cercas de apertura de un lenguaje tiene docs/05.
+ *
+ *  TIENE QUE DAR LO MISMO QUE EL COMANDO QUE LA PAGINA PUBLICA, porque la cifra
+ *  que vigila es la que el lector va a comprobar con ese comando y no con otro.
+ *  `grep -c '^```bash'` cuenta LINEAS QUE EMPIEZAN con la cerca, asi que aca se
+ *  usa `startsWith` y no igualdad exacta. La diferencia no es teorica: con
+ *  igualdad exacta, agregar un bloque con titulo en la cerca —` ```bash
+ *  title="ejemplo" `, la forma normal de ponerle nombre— dejaba el grep de la
+ *  pagina en 26 y este conteo en 25. O sea el lector veia rojo justo en el caso
+ *  del que habla el parrafo —un bloque de bash nuevo— y el guard seguia verde. */
+function bloquesDeDocs05(lenguaje) {
+  const texto = fs.readFileSync(path.join(RAIZ, "docs/05-arrancar-tecnico.md"), "utf-8");
+  return texto.split("\n").filter((l) => l.startsWith("```" + lenguaje)).length;
+}
+
+/** Cuantos recuadros 🕳️ tiene un repo recien salido de `projects init`.
+ *
+ *  DOS COSAS QUE NO SE PUEDEN SALTEAR, y que son la diferencia entre 3 y 2:
+ *
+ *   1. `plantilla/README.md` es la guia del bootstrap y NO viaja al proyecto
+ *      (`NO_SE_COPIA`), asi que sus menciones al simbolo no son recuadros de
+ *      nadie. Se descarta por la MISMA constante que usa la herramienta, no por
+ *      una lista escrita a mano aca.
+ *   2. `projects init` REEMPLAZA el recuadro de `.github/proteccion-main.md` por
+ *      el bloque con el estado medido de la proteccion. Aca se corre
+ *      `insertarProteccionMedida` —la misma funcion que corre la herramienta,
+ *      no una imitacion— sobre el documento real del andamio. Sin ese paso la
+ *      cuenta da 3, que es justo el numero viejo que este registro caza.
+ *
+ *  El simbolo se arma por codepoint (U+1F573) en vez de pegarse, para que
+ *  matchee lleve o no el selector de variacion: es la misma precaucion que toma
+ *  el paso «Sin marcadores del scaffold sin resolver» de .github/workflows/marco-ci.yml,
+ *  que es el check del que esta cifra habla. */
+async function recuadrosDeHueco() {
+  const init = await import("../../herramientas/projects-init.mjs");
+  const HUECO = "\u{1F573}";
+  const contexto = { org: "una-org", proyecto: "un-repo", fecha: "2026-01-01" };
+  let n = 0;
+  // Los DOS patrones hacen falta: `plantilla/**/*.md` exige un directorio en el
+  // medio, asi que por si solo se saltea plantilla/AGENTS.md —que es justo donde
+  // viven los dos recuadros que cuentan—. El Set es porque dos patrones que se
+  // solapen no pueden contar el mismo archivo dos veces.
+  for (const f of new Set(listar("plantilla/*.md", "plantilla/**/*.md"))) {
+    const rel = f.slice("plantilla/".length);
+    if (init.NO_SE_COPIA.has(rel)) continue;
+    let texto = fs.readFileSync(path.join(RAIZ, f), "utf-8");
+    if (rel === init.RUTA_PROTECCION) {
+      const bloque = init.bloqueDeProteccion({ estado: "sin-compuertas", detalle: "d", ...contexto });
+      texto = init.insertarProteccionMedida(texto, bloque).texto;
+    }
+    n += texto.split("\n").filter((l) => l.includes(HUECO)).length;
+  }
+  return n;
+}
 
 /** Cuantas preguntas hace el asistente para UN camino concreto. */
 async function cuantasPregunta(eleccion) {
@@ -312,16 +456,26 @@ async function rangoDePreguntas() {
   return [min, max];
 }
 
-test("ninguna cifra que la documentacion afirma sobre si misma esta vieja", async () => {
+test("ninguna cifra que la documentacion afirma sobre si misma esta vieja", async (t) => {
   const mal = [];
+  // ANTI-VACUIDAD. Sin este contador, el dia que todos los patrones dejen de
+  // cazar —un reflow, una reescritura, un `textosQueAfirman()` que se queda sin
+  // archivos— este caso pasa verde sin haber comparado UNA sola cifra, y el
+  // verde se lee como que las cifras estan vigiladas. Un cero aca es este banco
+  // roto, no la documentacion limpia. Por entrada suelta el cero SI es legitimo
+  // —la pagina dejo de afirmar esa cifra, que es lo que se prefiere—; lo que no
+  // puede ser cero es el total.
+  let comparadas = 0;
   for (const f of textosQueAfirman()) {
     const texto = fs.readFileSync(path.join(RAIZ, f), "utf-8");
     for (const cifra of CIFRAS_SOBRE_SI_MISMA) {
       for (const m of texto.matchAll(cifra.patron)) {
+        comparadas++;
         // Una cifra sola o un par —«entre 9 y 17»—: las dos se comparan igual,
         // y un par mal por una punta es tan viejo como uno mal por las dos.
         const grupos = Array.isArray(cifra.grupo) ? cifra.grupo : [cifra.grupo];
-        const dice = grupos.map((g) => Number(m[g]));
+        const leer = cifra.leer ?? Number;
+        const dice = grupos.map((g) => leer(m[g]));
         const real = [await cifra.medir()].flat();
         if (dice.join("-") !== real.join("-")) {
           mal.push(`${f} → dice ${dice.join(" y ")} y son ${real.join(" y ")} (${cifra.nombre})`);
@@ -329,6 +483,13 @@ test("ninguna cifra que la documentacion afirma sobre si misma esta vieja", asyn
       }
     }
   }
+  t.diagnostic(`cifras afirmadas que se compararon contra su medicion: ${comparadas}`);
+  assert.ok(
+    comparadas > 0,
+    "este caso no comparo NI UNA cifra, asi que su verde no dice nada. O los patrones dejaron de cazar —un reflow, " +
+      "una reescritura de las paginas— o `textosQueAfirman()` se quedo sin archivos. Las dos son este banco roto, " +
+      "no la documentacion limpia.",
+  );
   assert.deepEqual(
     mal,
     [],
@@ -352,6 +513,9 @@ const CEBOS = {
   "respuestas del camino mas corto": "Las casillas, llenas con lo que derivó de tus 999 respuestas.",
   "preguntas del camino de AWS con dos copias": "| AWS con dos copias del proyecto | **999**, porque ahí los datos existen |",
   "preguntas del camino que suma todo": "| Todo lo que suma: AWS, dos copias, otra persona, dominio propio y Slack | **999**, el máximo |",
+  "bloques ```powershell de docs/05 (los gemelos)": "El archivo tiene **999**\ngemelos y ni uno más.",
+  "bloques ```bash de docs/05": "El archivo tiene sus gemelos y **999** bloques ` ```bash `, y eso lo dice un grep.",
+  "recuadros 🕳️ que recibe un repo recien generado": "El andamio reparte **999 recuadros 🕳️** que un humano tiene que resolver.",
 };
 
 test("MUERDE: toda cifra del registro se caza cuando envejece", async () => {
@@ -365,7 +529,8 @@ test("MUERDE: toda cifra del registro se caza cuando envejece", async () => {
       continue;
     }
     const grupos = Array.isArray(cifra.grupo) ? cifra.grupo : [cifra.grupo];
-    const vistas = [...cebo.matchAll(cifra.patron)].map((m) => grupos.map((g) => Number(m[g])));
+    const leer = cifra.leer ?? Number;
+    const vistas = [...cebo.matchAll(cifra.patron)].map((m) => grupos.map((g) => leer(m[g])));
     if (!vistas.length) {
       sordas.push(`${cifra.nombre}: su patron no caza ni su propio cebo`);
       continue;

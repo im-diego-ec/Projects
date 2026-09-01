@@ -364,9 +364,21 @@ jobs:
           # muerta, que es rojo igual que la que falta.
           # Las EXCEPCIONES, "<carpeta>:<script>", con su motivo escrito. La
           # carpeta es la del paquete relativa a la raiz del repo.
-          #   {{PAQUETE_E2E}}:test  -> la suite E2E corre con navegadores
-          #     contra un ambiente ya desplegado; su workflow es el de
-          #     promocion, no el CI del PR.
+          #   {{PAQUETE_E2E}}:test  -> la suite corre con navegadores contra un
+          #     ambiente YA DESPLEGADO, y este proyecto no tiene ninguno contra
+          #     el cual correrla. Medido el 2026-08-31 generando las dos formas
+          #     con projects-init: la forma "aplicacion" —la unica que recibe el
+          #     paquete E2E— recibe actualizar-marco.yml, ci.yml y claude.yml, y
+          #     ninguno de ellos publica nada en ningun lado. Esa enumeracion no
+          #     lleva un numero escrito al lado a proposito: un numero envejece
+          #     en silencio y la lista no, porque un banco la exige COMPLETA.
+          #     ESTE MOTIVO DECIA OTRA COSA, y era falso: mandaba la suite a una
+          #     corrida de promocion que no es ningun archivo de este andamio ni
+          #     de ninguna de sus dos formas. Una excepcion justificada por una
+          #     pieza que no existe no se cae nunca —el motivo suena razonable y
+          #     nadie va a abrir la carpeta a comprobarlo—, y el motivo escrito
+          #     al lado de una excepcion es lo unico que impide que la excepcion
+          #     sobreviva a lo que la justificaba.
           #   {{PAQUETE_E2E}}:build -> una suite de pruebas no produce
           #     artefacto que servir.
           # Es la unica lista del paso, y solo puede equivocarse hacia el
