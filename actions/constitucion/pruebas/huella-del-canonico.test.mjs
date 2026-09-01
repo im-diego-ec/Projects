@@ -18,8 +18,8 @@ const MANIFIESTO = path.join(CANONICO, "manifiesto.json");
 // y le cambio el texto, y la version declarada en el manifiesto se quedo donde
 // estaba. O sea que DOS textos distintos se llamaban «1.6.0».
 //
-// LO QUE ESO PROVOCA, medido de punta a punta: `plantilla/.github/workflows/ci.yml`
-// pina `actions/constitucion@v1.7.0`. Un proyecto recien generado renderiza su
+// LO QUE ESO PROVOCA, medido de punta a punta ANTES DE LA 1.8.0, cuando el
+// andamio pinaba `actions/constitucion@v1.7.0`. Un proyecto recien generado renderiza su
 // constitucion con la accion DEL ARBOL, y despues su CI la verifica con la
 // accion DEL TAG. Extraida la accion del tag con `git archive v1.7.0` y corrida
 // contra un proyecto recien generado: EXIT=1 y dos `::error::` diciendo que
