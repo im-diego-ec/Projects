@@ -378,7 +378,16 @@ jobs:
           # El `if` alrededor del banco es lo unico que apaga el `-e` para esta linea:
           # sin el, un banco en rojo mataria el script antes de que el modo se pueda
           # leer, y la pata en aviso avisaria... poniendose roja.
-          if node --test "${PRUEBAS[@]}"; then
+          # UN TECHO DE TIEMPO POR ARCHIVO, y no es prolijidad: sin el, un banco que
+          # se cuelga en una plataforma se lleva el job entero al timeout y el error
+          # que queda es «cancelled» a los 15 minutos, sin nombrar el archivo. Paso
+          # exactamente eso en macOS, dos corridas seguidas, y el log del runner no
+          # llego a subirse — o sea que la unica evidencia era la duracion.
+          #
+          # Con esto, un cuelgue sale como el fallo de UN caso, con su nombre y su
+          # archivo, que es lo que hace falta para arreglarlo. 120000 ms es dos
+          # ordenes de magnitud mas de lo que el banco entero tarda en local (11 s).
+          if node --test --test-timeout=120000 "${PRUEBAS[@]}"; then
             echo "el banco de init pasa entero en $(uname -s) con node $(node --version)"
             exit 0
           fi
