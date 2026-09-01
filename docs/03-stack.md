@@ -384,6 +384,8 @@ que declara dónde vive cada forma.
 | Node — los jobs del marco | `.github/workflows/marco-ci.yml` → `version_node` | Referenciado |
 | Node — piso de la herramienta de arranque | `herramientas/projects-init.mjs` → `NODE_MINIMO` | No viaja |
 | CLI de OpenSpec | `.github/workflows/marco-ci.yml` → `version_openspec` | Referenciado |
+| CLI de OpenSpec — el que corre la persona | `plantilla/.claude/settings.json` → el allowlist | Scaffold |
+| BMAD — la herramienta del descubrimiento | `docs/08-descubrimiento.md` → el comando de instalación | No viaja |
 | actionlint — validador de los pipelines | `.github/workflows/marco-ci.yml` → `version_actionlint` | Referenciado |
 | gitleaks — detector de secretos | `.github/workflows/marco-ci.yml` → `version_gitleaks` | Referenciado |
 | Node — imagen del API | `plantilla/api/Dockerfile` → `node:` | Scaffold |

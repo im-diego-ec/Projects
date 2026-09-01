@@ -41,7 +41,95 @@ mueve sobre un cambio incompatible.
 
 ## [No publicado]
 
+### Corregido
+
+- **La forma `sitio` no llegaba a un proyecto sano, y la carta la declaraba
+  construida.** Los pasos del arranque estaban fijos en cuatro y `podarPorForma`
+  borra `datos` del manifiesto de un sitio: la misma corrida escribía un
+  `package.json` sin ese script y dos líneas después mandaba correr `pnpm run
+  datos`. Y su `ci.yml` conservaba `--filter <api> --fail-if-no-match`, que nace
+  rojo sobre un workspace sin paquete de API. **Qué tiene que hacer un
+  consumidor: nada**, salvo que hubiera generado un sitio, en cuyo caso conviene
+  regenerarlo.
+- **`sitio` + AWS escribía cinco valores `undefined` y salía 0.** Las preguntas
+  de AWS y la derivación decidían con predicados distintos. Ahora hay uno solo,
+  y la infraestructura tampoco viaja a un sitio.
+- **El `uses:` del pipeline de un proyecto nuevo apuntaba a un repositorio
+  inexistente.** `{{ORG}}` significaba a la vez la cuenta del proyecto y la del
+  marco. La segunda pasa a ser `{{ORG_MARCO}}`, derivada del remoto del clon.
+  **Consumidor: nada** — es un marcador nuevo del andamio, no de los proyectos
+  ya creados.
+- **`desplegar.yml` esperaba un workflow llamado `ci` y el workflow se llama
+  `CI`.** `workflow_run` resuelve por el `name:` exacto: no fallaba, no
+  disparaba nunca. Y publicaba la punta de `main` en vez del commit que pasó el
+  CI; ahora pide `head_sha`.
+- **Los desvíos declarados no llegaban a la constitución del proyecto.** El
+  archivo se escribía como lista pelada donde el lector espera `{ "desvios":
+  [...] }`, sus cinco `regla` no existían en el canónico, y le faltaban
+  `aprobado_por` y `fecha`. Los tres se arreglan juntos: arreglar uno solo
+  cambiaba un silencio por cinco rojos.
+- **Los comandos `/opsx:*` no se podían correr.** Por dentro mandan `openspec …`
+  a secas, y ese programa no está instalado —ni en el sistema, ni en
+  `node_modules/.bin`, ni en las dependencias del proyecto—, así que el tramo de
+  construir se trababa en el primer paso. Los archivos que lo dicen los escribe
+  `openspec init` y son de la herramienta: editarlos sería un fork ajeno y
+  `openspec update` los devolvería igual. Ahora el `AGENTS.md` del proyecto
+  declara la forma invocable con el pin exacto, y el allowlist cubre los cuatro
+  subcomandos que le faltaban (`instructions`, `context`, `schemas`, `store`).
+  `archive` sigue afuera a propósito: lo reemplaza la skill del marco.
+- **El `verificar` de un sitio salía verde una vez y rojo la siguiente**, por los
+  tipos que `astro build` genera y el linter leía.
+
 ### Añadido
+
+- **La skill que cierra el primer change de todo proyecto tenía tres defectos.**
+  Su verificación de escenarios decía «sin diferencias» sobre un archive real
+  —contaba con `git grep` sin `--untracked` y el spec recién escrito no estaba
+  registrado, así que comparaba cero contra cero—; varios de sus `grep` miraban
+  sólo el índice y leían el vacío como éxito; y el paso que pide «los tres
+  verdes» sale rojo garantizado en el primer change de cualquier proyecto, porque
+  el paso anterior escribe `Purpose: TBD` y el arreglo está recién en el paso
+  siguiente. Los tres cerrados, con la advertencia donde la persona ve el rojo.
+- **El asistente preguntaba «¿una copia o dos?» a quien hace un sitio**, y la
+  respuesta no cambiaba una sola pieza que despliegue. Ya no se pregunta.
+- **Las dos opciones de «qué vas a construir» abren con su estado de
+  publicación.** La recomendada no decía que hoy no existe un paso que la
+  publique, y es la decisión que más cuesta si se toma tarde.
+- **El `site:` de Astro no producía los enlaces canónicos que la página
+  prometía.** Ahora el molde los emite —verificado compilando— y no inventa nada
+  cuando `site` no está.
+- **El conteo de actos humanos son tres, no dos**, y el marco lo decía de tres
+  maneras distintas. El tercero, registrar el subdominio, llega tarde: Cloudflare
+  no lo pide hasta la primera publicación.
+- **El paso a producción está escrito.** Era la pregunta peor contestada del
+  camino: cero menciones en las diez páginas. `docs/10-publicar.md` gana una
+  sección 5 que dice lo que hoy hay —un solo destino, no dos—, que la respuesta
+  «dos copias» del asistente no despliega dos ambientes, que la constitución
+  promete una promoción que el andamio no reparte, y cómo llega un cambio a la
+  gente con lo que existe.
+- **Claude Code se declara como requisito.** Los tramos 2 y 3 ocurren dentro de
+  una sesión de agente y ninguna página del carril no técnico lo decía: quien
+  seguía la guía llegaba al descubrimiento sin saber que le faltaba una
+  herramienta —y que tiene costo—. Ahora está en la tabla de programas del Paso 0,
+  con qué pasa si no lo tenés.
+- **`docs/10-publicar.md`**, el cuarto tramo del camino, que no tenía página. Las
+  páginas siguientes corren un número: `10-reglas-no-escritas` pasa a `11`, y así
+  hasta `16`.
+- **El andamio reparte `docs/`** con `adr/`, `postmortems/` y `runbooks/` —las
+  tres carpetas que la constitución ya mandaba usar y que el proyecto no tenía— y
+  un esqueleto de change para el primer día.
+- **`docs/09` cubre la segunda mitad del ciclo**: `design.md`, `tasks.md`,
+  implementar y archivar.
+- **La forma y la plataforma se validan**, con las opciones y una sugerencia
+  cuando el valor se parece a una: escribir `"sitios"` entregaba un proyecto
+  distinto con salida 0.
+
+### Seguridad
+
+- **El historial se reescribió** para sacar dos identificadores de cuenta de AWS
+  y el correo personal del autor de 51 commits. Los once tags conservan su SHA:
+  los commits afectados eran todos posteriores a `v1.7.0`, así que **ningún
+  consumidor que pine una versión exacta recibe contenido distinto**.
 
 - **El despliegue existe, y por primera vez el marco publica algo.** Un proyecto con la
   forma «un sitio para leer» viene con la configuración de **Cloudflare Workers** y un paso

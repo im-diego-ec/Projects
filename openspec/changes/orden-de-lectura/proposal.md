@@ -49,7 +49,7 @@ prácticamente verde.
 
 ## Impacto en los proyectos consumidores
 
-**Ninguno.** Medido: `docs/13-consumidores.md` tiene la tabla del registro vacía,
+**Ninguno.** Medido: `docs/14-consumidores.md` tiene la tabla del registro vacía,
 y el único destino de adopción en curso no consume el marco. Nada de `docs/`
 viaja al andamio, así que ningún repositorio nacido de `plantilla/` referencia
 estas rutas. El costo del renombrado es enteramente interno.

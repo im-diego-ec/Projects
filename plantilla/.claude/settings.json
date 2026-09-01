@@ -1,11 +1,16 @@
 {
   "permissions": {
     "allow": [
+      "Bash(npx --yes @fission-ai/openspec@1.9.0 new change *)",
       "Bash(npx --yes @fission-ai/openspec@1.9.0 validate *)",
       "Bash(npx --yes @fission-ai/openspec@1.9.0 list)",
       "Bash(npx --yes @fission-ai/openspec@1.9.0 list *)",
       "Bash(npx --yes @fission-ai/openspec@1.9.0 status *)",
       "Bash(npx --yes @fission-ai/openspec@1.9.0 show *)",
+      "Bash(npx --yes @fission-ai/openspec@1.9.0 instructions *)",
+      "Bash(npx --yes @fission-ai/openspec@1.9.0 context *)",
+      "Bash(npx --yes @fission-ai/openspec@1.9.0 schemas *)",
+      "Bash(npx --yes @fission-ai/openspec@1.9.0 store *)",
       "Bash(pnpm lint)",
       "Bash(pnpm format:check)",
       "Bash(pnpm --filter {{PAQUETE_API}} lint)",

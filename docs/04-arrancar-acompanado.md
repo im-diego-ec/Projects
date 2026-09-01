@@ -100,16 +100,29 @@ vale es dejar una pieza sin dueño escrito.
 
 ---
 
-## Antes de empezar (2): los cuatro programas
+## Antes de empezar (2): los programas
 
 Se instalan una vez en tu computadora y sirven para todos los proyectos.
 
 | Programa | Para qué | Cómo se instala |
 |---|---|---|
+| **Claude Code** | **Donde ocurren los tramos 2 y 3**: el descubrimiento y la construcción se hacen conversando con un agente, no escribiendo código. Sin esto, esas dos páginas no se pueden seguir | [`claude.com/code`](https://claude.com/code) — tiene costo, y conviene saberlo ahora |
 | **Git** | Guardar y enviar los cambios | [`git-scm.com`](https://git-scm.com) |
 | **Node** | El intérprete con el que corre todo lo del marco | [`nodejs.org`](https://nodejs.org) — la versión con soporte de largo plazo |
 | **corepack** | Lo que trae el instalador de las piezas del proyecto (`pnpm`) sin que tengas que instalarlo aparte | **No lo instalás.** Viene con Node, y el Paso 0 lo comprueba. Todos los comandos de esta página lo llaman con el prefijo `corepack pnpm` |
 | **gh** | Hablar con GitHub desde la consola | [`cli.github.com`](https://cli.github.com) |
+
+> **Lo de Claude Code merece una línea aparte, porque cambia lo que este camino
+> es.** Los pasos 0 a 14 de esta página se hacen **con comandos**: los copiás y
+> los pegás. Pero el descubrimiento —[08](08-descubrimiento.md)— y la
+> construcción —[09](09-construir-con-openspec.md)— se hacen **conversando con un
+> agente**, y ese agente es Claude Code. No es una preferencia del marco: las
+> herramientas de esos dos tramos (BMAD y OpenSpec) llegan como *skills* y
+> *comandos* de Claude Code, y fuera de una sesión suya no existen.
+>
+> Si no lo vas a tener, **esta página igual te sirve entera** y terminás con un
+> repositorio sano y andando. Lo que no vas a poder hacer es el ciclo de cambios
+> tal como el marco lo describe.
 
 ### Y una cosa más, que no es un programa
 
@@ -140,12 +153,19 @@ Las cuatro formas están explicadas —con por qué elegirías cada una, qué te
 y su límite real— en **[la carta de 03-stack.md](03-stack.md#la-carta-qué-vas-a-construir)**.
 Son cinco minutos de lectura y te ahorran mantener piezas que tu proyecto no usa.
 
-> **Lo que te va a tocar hoy, dicho de frente.** De las cuatro formas hay **una
-> construida**: una aplicación detrás de una puerta, con servidor propio. Las
-> otras tres están explicadas en la carta pero todavía no se pueden elegir, y
-> esta guía te va a armar la que existe. Si tu proyecto es claramente un sitio
-> para leer o una app de teléfono, leer la carta te va a decir qué te falta —y es
-> mejor saberlo ahora que a mitad de camino.
+> **Lo que podés elegir hoy, dicho de frente.** De las formas de la carta hay
+> **dos construidas**, y el asistente te las va a ofrecer: **un sitio para leer**
+> y **una aplicación con servidor propio**. Las otras están explicadas en la
+> carta pero todavía no se pueden elegir; la carta lo marca con 🕳️ en su columna
+> de estado.
+>
+> **La diferencia que más te va a importar** no es técnica: el sitio **se publica
+> solo** —falta que abras una cuenta gratuita y crees una credencial, una sola
+> vez— y la aplicación **todavía no**, porque el marco no reparte ese paso.
+> Está explicado en [10-publicar.md](10-publicar.md). Si tu proyecto tiene que
+> estar en internet pronto, eso pesa más que cualquier otra cosa de esta página.
+>
+> Esta guía te lleva por cualquiera de las dos.
 
 ---
 
@@ -344,9 +364,9 @@ te dice por qué la elegirías, qué te cuesta y qué límite tiene. Así:
 
 | Si elegís | Son |
 | --- | --- |
-| Supabase, trabajando solo, sin dominio propio | **8 preguntas**, y solo dos hay que escribirlas |
-| AWS con dos copias del proyecto | **13**, porque ahí los datos de la nube existen de verdad |
-| Todo lo que suma: AWS, dos copias, otra persona, dominio propio y Slack | **16**, el máximo |
+| Supabase, trabajando solo, sin dominio propio | **9 preguntas**, y solo dos hay que escribirlas |
+| AWS con dos copias del proyecto | **14**, porque ahí los datos de la nube existen de verdad |
+| Todo lo que suma: AWS, dos copias, otra persona, dominio propio y Slack | **17**, el máximo |
 
 Las que no escribís se contestan con **Enter**, que elige la opción recomendada.
 Nunca te va a pedir un dato de AWS si no elegiste AWS.
@@ -389,15 +409,15 @@ No para corregirlo —ya está validado— sino para saber qué hay adentro.
 cat valores.json
 ```
 
-**Qué vas a ver.** Las 21 casillas que el programa necesita, llenas con lo que
-derivó de tus 8 respuestas. Por ejemplo, si dijiste que no tenés dominio propio,
+**Qué vas a ver.** Las 23 casillas que el programa necesita, llenas con lo que
+derivó de tus 9 respuestas. Por ejemplo, si dijiste que no tenés dominio propio,
 vas a encontrar la dirección gratuita de Cloudflare ya puesta:
 
 ```json
 {
   "PROYECTO": "agenda-de-personas",
   "ORG": "tu-usuario",
-  "DOMINIO_PROD": "agenda-de-personas.pages.dev",
+  "DOMINIO_PROD": "agenda-de-personas.workers.dev",
   ...
 }
 ```
@@ -410,7 +430,7 @@ habías contestado, y reescribe el archivo.
 `RELLENAR` ni tiene dobles llaves `{{así}}`.
 
 > **Si preferís llenarlo a mano.** El camino de antes sigue existiendo y es
-> idéntico: `--ejemplo > valores.json` te da la hoja con las 21 casillas y sus
+> idéntico: `--ejemplo > valores.json` te da la hoja con las 23 casillas y sus
 > valores de ejemplo, y qué va en cada una está en la sección 2 de
 > [`plantilla/README.md`](../plantilla/README.md). Es el camino de quien ya sabe
 > lo que quiere; el asistente es el mismo destino por otra puerta.
@@ -454,7 +474,10 @@ LISTO, y el proyecto quedo arrancado y en verde. Lo que sigue NO lo puede hacer 
 ...
 ```
 
-Entre una línea `── n/4` y la siguiente va **la salida cruda de esa herramienta,
+Ese ejemplo es el de **una aplicación**, que corre cuatro pasos; un sitio corre
+tres y lo dice en la misma línea `ARRANQUE con …`.
+
+Entre una línea `── n/N` y la siguiente va **la salida cruda de esa herramienta,
 tal cual sale**: listas de piezas, nombres de archivo, resúmenes de pruebas. No
 hace falta que la entiendas; hace falta que llegues a la línea siguiente.
 
@@ -462,9 +485,15 @@ hace falta que la entiendas; hace falta que llegues a la línea siguiente.
 
 1. La segunda línea dice **`cero marcadores sobrevivientes`**. Si dijera otra
    cosa, quedaron huecos sin rellenar y están nombrados uno por uno.
-2. Aparecieron los **cuatro** encabezados `── n/4`, del 1 al 4.
-3. En ninguna parte aparece **`[ELIFECYCLE] Command failed`**. Ésa es la palabra
-   a buscar cuando algo se corta.
+2. Aparecieron **todos** los encabezados `── n/N`, del 1 hasta el último. Cuántos
+   son depende de tu forma —una aplicación corre cuatro pasos y un sitio tres,
+   porque no tiene capa de datos que generar— y **el programa lo dice antes de
+   empezar**: la línea `ARRANQUE con … — N pasos`. Si saltea alguno, también lo
+   dice, con el motivo.
+3. En ninguna parte aparece **`::error::`**. Ésa es la palabra a buscar cuando
+   algo se corta: la escribe esta herramienta, no el gestor de paquetes, y por eso
+   es la señal fiable. Si aparece, la línea siguiente dice qué paso falló, por qué
+   existe ese paso y cómo se destraba.
 4. La última sección empieza con **`LISTO, y el proyecto quedo arrancado y en
    verde.`**
 
@@ -484,18 +513,31 @@ andamio. Lo que importa es que la línea exista.
 > La herramienta la imprime porque **no puede hacerla ella**: son decisiones y
 > actos humanos, no transcripción.
 
-**Si algo sale mal**, la herramienta **no deja el repositorio a medias en
-silencio**: aborta antes de escribir y dice qué falta. Los tres avisos que vas a
-ver, si los ves, son claros: falta un valor, sobra un valor, o la carpeta ya
-tenía archivos del andamio (y entonces te dice cuáles).
+**Si algo sale mal, hay dos momentos distintos y conviene no confundirlos.**
+
+**Antes de escribir nada.** Si falta un valor, sobra un valor o la carpeta ya
+tenía archivos del andamio, la herramienta **aborta sin tocar tu carpeta** y te
+dice cuál es el problema. No hay nada que limpiar.
+
+**Después de escribir, durante el arranque.** Acá el repositorio **ya quedó
+escrito**, y la herramienta te lo dice con esas palabras. No hay que volver a
+instanciar nada: hay que destrabar el paso que falló, y el `::error::` dice cuál
+es y cómo. Si de todas formas querés empezar de cero sobre la misma carpeta, hace
+falta agregar `--forzar` al comando, porque encontrarla con archivos del andamio
+adentro es justamente una de las cosas que la hace abortar.
 
 ---
 
-## Paso 6 — Los cuatro pasos del arranque, uno por uno · *5 minutos de lectura*
+## Paso 6 — Los pasos del arranque, uno por uno · *5 minutos de lectura*
 
-**Qué vas a hacer.** Entender qué hizo cada uno de los cuatro. No es curiosidad:
-son los mismos cuatro que vas a volver a correr cada vez que toques algo, y los
-mismos que GitHub va a correr sobre tu cambio.
+**Qué vas a hacer.** Entender qué hizo cada uno. No es curiosidad: son los
+mismos que vas a volver a correr cada vez que toques algo, y los mismos que
+GitHub va a correr sobre tu cambio.
+
+> **Son cuatro para una aplicación y tres para un sitio.** El de la capa de datos
+> no corre en un sitio, porque un sitio para leer no tiene base de datos que
+> generar — y el programa lo dice en voz alta cuando lo saltea, en vez de
+> desaparecerlo.
 
 **Qué copiar.** Nada ahora. Éstos son, por si más adelante querés correr uno
 suelto:
@@ -534,7 +576,11 @@ primera vez en todo el camino que vas a ver algo que se parece a una aplicación
 vale la pena: hasta acá tenés un repositorio sano, que no es lo mismo que un
 proyecto que hace algo.
 
-**Qué copiar** (en la carpeta de tu proyecto, las tres líneas):
+**Qué copiar.** Depende de tu forma, y es la única vez en toda la página que
+cambia. La sabés con el comando del Paso 14, o mirando si tu proyecto tiene una
+carpeta `api/`.
+
+**Si tu forma es «una aplicación»** (en la carpeta de tu proyecto, las tres líneas):
 
 ```bash
 cp api/.env.example api/.env
@@ -546,8 +592,26 @@ Las dos primeras copian los archivos de configuración de ejemplo. Traen valores
 que sirven para tu computadora y **para nada más**: no hay ninguna contraseña de
 verdad adentro.
 
-**Qué vas a ver.** Texto de las dos partes arrancando, y en algún momento estas
-dos líneas, que son las que importan:
+**Si tu forma es «un sitio para leer»**, una sola línea y nada que copiar antes:
+
+```bash
+corepack pnpm dev
+```
+
+Un sitio no tiene servidor ni base de datos, así que no hay configuración que
+llenar. Por eso tampoco trae los `.env.example`: pedírtelos sería mandarte a
+buscar dos archivos que ese proyecto no tiene.
+
+**Qué vas a ver.** En **un sitio**, una línea con la dirección (medido el
+2026-08-31 sobre un proyecto recién generado):
+
+```
+sitio dev$ astro dev
+sitio dev: Dev server running at http://localhost:4321
+```
+
+En **una aplicación**, texto de las dos partes arrancando, y en algún momento
+estas dos líneas, que son las que importan:
 
 ```
 web dev:   VITE v8.2.2  ready in 104 ms
@@ -555,8 +619,9 @@ web dev:   ➜  Local:   http://localhost:5173/
 api dev: {"puerto":3000,"nivel":"info","msg":"tu-proyecto-api escuchando"}
 ```
 
-Abrí `http://localhost:5173` en el navegador. Vas a ver una página con el
-nombre de tu proyecto. Es fea a propósito: es el punto de partida, no un diseño.
+Abrí en el navegador **la dirección que imprima tu caso** —`4321` para un sitio,
+`5173` para una aplicación—. Vas a ver una página con el nombre de tu proyecto.
+Es fea a propósito: es el punto de partida, no un diseño.
 
 > **Si la línea dice otro número, usá ése.** Cuando el 5173 ya está ocupado por
 > otra cosa, la herramienta no falla: avisa `Port 5173 is in use, trying another
@@ -565,7 +630,9 @@ nombre de tu proyecto. Es fea a propósito: es el punto de partida, no un diseñ
 > de este paso: abrir el 5173 y ver la página de otro programa, o nada.
 
 **Cómo sabés que salió bien.** La página abre y el título de la pestaña dice el
-nombre de tu proyecto. Si querés comprobar la otra mitad, abrí
+nombre de tu proyecto. **Para un sitio, con eso ya está.**
+
+En **una aplicación**, si querés comprobar la otra mitad, abrí
 `http://localhost:3000/api/health`: tiene que contestar algo así:
 
 ```json
@@ -708,12 +775,45 @@ gh run watch
 **Qué vas a ver.** Una lista de trabajos con su tilde o su cruz. Todos en verde
 menos uno: **«Sin marcadores del scaffold sin resolver»**.
 
-**Cómo sabés que salió bien.** Que el único rojo sea ése. Cualquier otro rojo sí
-es un problema, y el paso 13 te dice adónde ir.
+**Cómo sabés que salió bien.** Que el rojo de los marcadores esté, y que el paso
+13 lo apague.
+
+> **Puede haber más de un rojo, y conviene saber cuáles son tuyos.** Además del
+> de los marcadores, hoy hay uno que **no es tuyo y no lo podés arreglar**: el
+> trabajo **`constitucion`**, que compara la constitución de tu proyecto contra la
+> versión del marco que tus verificaciones usan. Cuando el marco publicó una versión y su
+> texto ya cambió, esas dos no coinciden y el trabajo sale rojo. **Se arregla del
+> lado del marco, publicando la versión siguiente** — no del tuyo.
+>
+> Cómo distinguirlos, sin saber nada de esto: los rojos que **sí** son tuyos
+> nombran un archivo de tu proyecto. El de `constitucion` habla de versiones del
+> marco.
 
 ---
 
 ## Paso 11 — Proteger la rama principal · *10 minutos*
+
+> 🛑 **Leé este recuadro antes de encender nada, porque este paso no se deshace
+> solo.**
+>
+> Vas a exigir que `ci-ok` esté en verde para que un cambio pueda entrar a la rama
+> principal. Si en este momento
+> `ci-ok` está **rojo por algo que no es tuyo** —el trabajo `constitucion` de
+> arriba es el caso—, quedás en un repositorio **donde no va a poder entrar
+> ningún cambio**, ni siquiera el que arregla eso.
+>
+> **Antes de encenderlo, comprobá que `ci-ok` está en verde:**
+>
+> ```bash
+> gh run list --limit 1
+> ```
+>
+> **Si `ci-ok` no está en verde, no hagas este paso todavía.** No es urgente:
+> tu proyecto funciona igual. Encendelo el día que la corrida quede limpia.
+>
+> **Y si ya lo encendiste y quedaste trabado**, la salida existe y son dos
+> líneas: en `Settings → Rules → Rulesets`, poné la regla en **Disabled**, dejá
+> entrar lo que necesites, y volvé a activarla. No hay que borrar nada.
 
 **Qué vas a hacer.** Encender la regla que hace que, de ahora en adelante,
 **nada entre sin pasar por revisión y sin las verificaciones en verde**. Es un
@@ -785,7 +885,7 @@ gh label list
 
 ## Paso 13 — Apagar el rojo esperado y quedar en verde · *20 minutos de trabajo real*
 
-**Qué vas a hacer.** Resolver los **tres recuadros 🕳️** que el andamio dejó a
+**Qué vas a hacer.** Resolver los **dos recuadros 🕳️** que el andamio dejó a
 propósito, borrarlos, y enviar de nuevo.
 
 **Qué copiar** (para ver cuáles quedan):
@@ -794,7 +894,7 @@ propósito, borrarlos, y enviar de nuevo.
 grep -rn "🕳" --include="*.md" .
 ```
 
-**Qué vas a ver.** **Dos** resultados, los dos en `AGENTS.md`.
+**Qué vas a ver.** Los **dos recuadros 🕳️** que quedan, los dos en `AGENTS.md`.
 
 Antes había un tercero en `.github/proteccion-main.md`, y ya no está porque la
 herramienta del Paso 5 **reescribió ese archivo con lo que midió** de tu
@@ -825,7 +925,7 @@ Cinco casos reales. Ninguno es un defecto de tu repositorio.
 | Cuándo | Qué vas a ver | Por qué pasa | Qué hacer |
 |---|---|---|---|
 | Paso 8, si algo quedó sin formatear | `[warn] README.md` y `Code style issues found in the above file` | Al reemplazar los marcadores cambian los anchos del texto y las tablas quedan desalineadas | `corepack pnpm run format` y de nuevo. Pasa una sola vez |
-| Paso 9, primera corrida | Un solo trabajo en rojo: «Sin marcadores del scaffold sin resolver» | Los tres recuadros 🕳️ que un humano tiene que resolver. Y **no se pueden resolver todos antes** del primer envío: uno de ellos manda proteger la rama, y eso necesita que las verificaciones hayan corrido una vez | Paso 13 |
+| Paso 9, primera corrida | Un solo trabajo en rojo: «Sin marcadores del scaffold sin resolver» | Los dos recuadros 🕳️ que un humano tiene que resolver. Y **no se pueden resolver antes** del primer envío: uno de ellos manda pedirle al marco que genere su archivo, y para eso la receta que lo genera tiene que estar ya en la rama principal | Paso 13 |
 | Si intentás enviar el esqueleto como propuesta en vez de directo | La [compuerta](02-glosario.md) de cobertura en rojo | Mide las líneas que una propuesta agrega sin pruebas, y el esqueleto entero son muchas | Enviar directo a la rama principal la primera vez, como dice el paso 9 |
 | En el paso 5, un recuadro con `Update available` | No es rojo, pero parece un problema | Es la herramienta de la base de datos avisando que hay versión nueva | Nada. Las versiones nuevas llegan como propuesta revisable |
 | Semanas después, si elegiste Supabase y el proyecto estuvo quieto | Las pruebas fallan con un error **de conexión** que no dice «pausado» | El plan gratuito **pausa el proyecto tras una semana sin actividad** | Despertarlo desde su panel. Si el proyecto va a tener rachas, está escrito qué decidir en [`plantilla/infra/adaptadores.md`](../plantilla/infra/adaptadores.md) |
@@ -864,11 +964,63 @@ es como esta guía se corrige, y no adivinando.
 
 ---
 
+## Paso 14 — Averiguar cómo sale de tu máquina · *2 minutos*
+
+**Qué vas a hacer.** Llegaste hasta acá con un repositorio en verde, y falta la
+pregunta que motivó todo: **¿cómo lo ve otra persona?** La respuesta depende de
+qué elegiste construir en el Paso 3, y conviene saberla ahora y no después de
+buscar un botón que no está. Este paso no publica nada: te dice cuál de los dos
+caminos te tocó.
+
+**Qué copiar** (en la carpeta de tu proyecto):
+
+```bash
+grep '"forma"' .projects-valores.json
+```
+
+**Qué vas a ver.** Una sola línea, con una de estas dos palabras:
+
+```
+  "forma": "sitio",
+```
+
+```
+  "forma": "aplicacion",
+```
+
+Qué significa cada una:
+
+| Si dice | Qué pasa |
+| --- | --- |
+| `"sitio"` | Ya trae todo lo necesario para publicarse. Faltan **tres actos humanos de una sola vez**: abrir una cuenta de Cloudflare (gratis, sin tarjeta), crear una credencial y registrar el subdominio |
+| `"aplicacion"` | El marco **todavía no reparte un paso que publique**. Se levanta en tu máquina con `pnpm dev`, y el día que ese paso exista llega solo, subiendo la versión del marco |
+
+**Cómo sabés que salió bien.** Sabés cuál de las dos te tocó, y por lo tanto si
+te queda trabajo por hacer o no. Las dos respuestas son buenas: ninguna de las
+dos es un error de tu proyecto.
+
+**Y ahora sí, el paso a paso: [10-publicar.md](10-publicar.md)**, la última
+página del camino. Ahí está lo que más fácil se hace mal —hay dos tipos de
+credencial de Cloudflare y la equivocada falla por permisos, con un error que no
+dice cuál era la correcta— y cómo **ensayar la publicación sin tener cuenta
+todavía**.
+
+> **Una cosa que conviene saber desde hoy**, aunque no publiques nunca: el paso
+> de publicación corre **sólo cuando las verificaciones terminan en verde** sobre
+> `main`. Si algún día publicaste y después dejaste de ver tus cambios, lo
+> primero que hay que mirar no es Cloudflare: es la pestaña **Actions**.
+
+---
+
 ## Si querés seguir
 
 - [01-introduccion.md](01-introduccion.md) — qué es esto y por
   qué existe, cuánto cuesta y qué decisiones te va a pedir.
 - [02-glosario.md](02-glosario.md) — cada palabra propia del marco en una línea.
+- [08-descubrimiento.md](08-descubrimiento.md) — el tramo siguiente: de una idea
+  a un documento que dice qué hay que construir.
+- [10-publicar.md](10-publicar.md) — el último tramo: cómo sale a una dirección
+  donde entra la gente.
 - [06-para-el-po.md](06-para-el-po.md) — si además vas a aprobar cambios: qué te toca
   y con qué cuatro preguntas se devuelve uno.
 - [05-arrancar-tecnico.md](05-arrancar-tecnico.md) — la misma ruta, en versión

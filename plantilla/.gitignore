@@ -5,6 +5,17 @@ build
 *.tsbuildinfo
 coverage
 
+# LO QUE GENERA ASTRO AL COMPILAR. `astro build` escribe `<paquete>/.astro/` con
+# los tipos de las colecciones de contenido. Son de la herramienta, no del
+# proyecto, y se regeneran en cada compilacion.
+#
+# MEDIDO en un sitio recien generado: sin esta linea, `pnpm verificar` sale 0 la
+# PRIMERA vez y 1 la SEGUNDA sin tocar una linea de codigo —seis errores de
+# eslint sobre archivos que la persona no escribio—, y el `git add -A` del Paso 9
+# de docs/04 los sube al primer commit, dejando el CI rojo. Es el mismo caso que
+# `coverage/`, que ya esta declarado abajo y en los ignores del linter.
+**/.astro/
+
 # Entorno local y ruido del sistema.
 #
 # EL PATRON ES `.env.*`, NO UNA LISTA DE NOMBRES. Hasta el 2026-08-24 estas tres

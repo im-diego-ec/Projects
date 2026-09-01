@@ -66,7 +66,7 @@ adentro de WSL tu verificación y la del pipeline corren sobre el mismo sistema 
 las rutas. Las cuatro filas de sistema de archivos de la tabla de fallos silenciosos del final
 **desaparecen** en WSL; ninguna desaparece en PowerShell. Y hay una quinta, medida en este
 repo: `openspec archive` sobre Windows nativo imprime **`Specs updated successfully`** y no
-aplica nada ([11-upgrade-openspec.md, trampa 3](11-upgrade-openspec.md)).
+aplica nada ([12-upgrade-openspec.md, trampa 3](12-upgrade-openspec.md)).
 
 PowerShell nativo **sigue soportado** —hay quien no puede instalar WSL— y por eso los pares
 existen. Lo que **no** está soportado es `cmd.exe`, ni **Windows PowerShell 5.1**: la consola
@@ -91,31 +91,40 @@ como en Windows. Sirve para no traducir comandos; no te saca de ninguna fila de 
 #### Qué de esta promesa se comprueba con un comando, y qué no
 
 Los pares son una promesa, y una promesa que nadie mide se rompe sola. Hoy hay **una sola**
-cosa comprobable de un comando, y es que el inventario **no encoja**: el archivo tiene **9**
-gemelos y **29** bloques ` ```bash `, y eso lo dicen
+cosa comprobable de un comando, y es que el inventario **no encoja**: el archivo tiene **8**
+gemelos y **25** bloques ` ```bash `, y eso lo dicen
 ` grep -c '^```powershell' docs/05-arrancar-tecnico.md ` y ` grep -c '^```bash' ` sobre el
 mismo archivo. Está probado a la mala, que es la única forma de saber que un check sirve:
-borrando los nueve gemelos, uno por uno, sobre una copia. Los **nueve** bajan el conteo a 8 y
-ponen la comprobación en rojo — ninguno se escapa.
+borrando cada gemelo, uno por uno, sobre una copia. Todos bajan el conteo y ponen la
+comprobación en rojo — ninguno se escapa.
 
-Lo que ese conteo **no** ve, y conviene decirlo antes de que alguien se confíe: que un bloque
-` ```bash ` **nuevo** que no sea portable entre sin su gemelo. El lado bash sube a 30 y la
-comprobación se pone roja, sí, pero roja **porque el inventario cambió**, no porque falte un
-gemelo: quien la vea puede apagarla cambiando el 29 por 30 sin haberse preguntado si el
-bloque nuevo era portable. Ya pasó una vez: el 28 de la versión anterior de esta línea es hoy
-un 29 porque la sección 3.1 sumó un bloque `node --input-type=module`, que **sí** corre igual
-en las dos shells — pero eso lo decidió una lectura, no el conteo. Distinguir un caso del otro a máquina pide adivinar qué comando
-corre igual en las dos shells, y adivinar es exactamente lo que un check no debe hacer; así
-que eso hoy lo ve una persona leyendo el diff, y por eso es otra fila del mismo
-[backlog de automatización](10-reglas-no-escritas.md#backlog-de-automatización) que la
+Esos dos números tampoco quedan librados a que alguien se acuerde de recontarlos: están en el
+registro de cifras de `pruebas/docs/comandos-que-existen.test.mjs`, que los mide sobre este
+mismo archivo y se pone rojo el día que la prosa se queda atrás. Hizo falta: estuvieron
+escritos de más durante varias versiones, y nadie se enteró hasta que alguien volvió a contar
+a mano.
+
+Lo que ese conteo **no** ve, y conviene decirlo antes de que alguien se confíe: que entre un
+bloque ` ```bash ` **nuevo** que no sea portable, y que entre sin su gemelo. El lado bash sube
+en uno y la comprobación se pone roja, sí, pero roja **porque el inventario cambió**, no
+porque falte un gemelo: quien la vea puede apagarla subiendo el número escrito sin haberse
+preguntado si el bloque nuevo era portable. Ya pasó: el lado bash creció el día que la sección
+3.1 sumó un bloque `node --input-type=module`, que **sí** corre igual en las dos shells — pero
+eso lo decidió una lectura, no el conteo. Distinguir un caso del otro a máquina pide adivinar
+qué comando corre igual en las dos shells, y adivinar es exactamente lo que un check no debe
+hacer; así que eso hoy lo ve una persona leyendo el diff, y por eso es otra fila del mismo
+[backlog de automatización](11-reglas-no-escritas.md#backlog-de-automatización) que la
 comprobación de prerrequisitos del punto 3. Ojo con esa ancla si la vas a buscar con `grep`:
 lleva tilde, y `grep -i` pliega mayúsculas pero **no** acentos, así que escrita sin tilde la
 búsqueda devuelve **cero** coincidencias y sale **1** — que se lee como que el enlace está
 roto, cuando no lo está. Lo que sí lo demuestra es buscar el encabezado del otro lado:
-` grep -n '^## Backlog de automatización' docs/10-reglas-no-escritas.md ` contesta con una sola
-línea, la 475.
+` grep -n '^## Backlog de automatización' docs/11-reglas-no-escritas.md ` contesta con una sola
+línea. Cuál es esa línea no se escribe acá, y no es descuido: el número se corre solo con cada
+párrafo que alguien agregue más arriba en esa página, y quien lo lea viejo va a creer que el
+enlace se rompió — que es exactamente el susto que este párrafo existe para evitar. Lo que
+importa es que la respuesta sea **una sola** línea, y eso el comando lo imprime.
 
-⚠️ **Ninguno de los nueve gemelos se ejecutó, y en CI no corre ninguno.** El
+⚠️ **Ninguno de los gemelos se ejecutó, y en CI no corre ninguno.** El
 pipeline corre sobre `ubuntu-latest`, donde no hay `pwsh`; en la máquina donde se midió esta
 guía, ` which pwsh powershell ` contesta *not found* y sale 1. Lo único que se les hizo fue
 leerlos contra la sintaxis de PowerShell. Validarlos de verdad son dos escalones bien
@@ -257,7 +266,7 @@ marco dice que eso no cuenta. Lo que la convertiría en algo que falla solo es u
 de arriba, imprima cuál falló y salga distinto de 0. No se implementa acá — esta guía es la
 **especificación de qué tiene que comprobar**, no el lugar donde vive. Mientras no exista,
 el ítem es una fila del
-[backlog de automatización](10-reglas-no-escritas.md#backlog-de-automatización).
+[backlog de automatización](11-reglas-no-escritas.md#backlog-de-automatización).
 
 ### 4. Los documentos del negocio, si ya existen
 
@@ -277,7 +286,7 @@ el arranque.
 |---|---|---|
 | 0 | Verificar lo que ya está hecho a nivel organización | **[vos]**, 4 comandos |
 | 1 | Arrancar lo que depende de otra persona | **[otro]** |
-| 2 | Juntar los 21 valores — a mano, o contestando las preguntas del asistente | **[vos]** |
+| 2 | Juntar los valores — a mano, o contestando las preguntas del asistente | **[vos]** |
 | 3 | Crear el repo y correr `projects init` | **[vos]**, 2 comandos |
 | 4 | `pnpm install` y comprobar en local | **[vos]**, 1 comando |
 | 5 | El primer push, directo a `main` | **[vos]** + **[auto]** |
@@ -356,14 +365,19 @@ gh project list --owner po
 
 ---
 
-## Fase 2 — Los 21 valores · **[vos]** + un dato de **[otro]**
+## Fase 2 — Los valores · **[vos]** + un dato de **[otro]**
 
-`projects init` pide **21 valores** (el 22.º, `PAQUETES`, se deriva y no se pregunta).
+`projects init` pide **23 valores**. Uno más, `PAQUETES`, se deriva de los otros y
+no se pregunta: una lista escrita aparte de sus elementos se desincroniza sola.
+
+> Esa cifra la mide el banco contra la lista `REQUERIDOS` de la herramienta, así
+> que si envejece se pone roja acá y no en tu proyecto. Crece sólo cuando se
+> agrega una **decisión** —no al agregar un archivo—, y eso pasa con un PR.
 
 > **Hay dos formas de producir ese archivo, y las dos terminan en el mismo lugar.**
 > Ésta —`--ejemplo` y editar— es la del builder: la explícita, la que no pregunta
 > nada, la que sirve en una tubería. La otra es `--asistente`, que hace entre 8 y
-> 16 preguntas en castellano y **deriva las 21 claves de las respuestas**: no
+> 17 preguntas en castellano y **deriva las 23 claves de las respuestas**: no
 > pide un id de cuenta de AWS a quien no eligió AWS, ni un canal de Slack a quien
 > avisa por correo. Genera este mismo archivo y lo valida con el mismo
 > `validarValores`, así que no hay dos caminos que puedan divergir: hay un
@@ -433,14 +447,14 @@ sobrevivan marcadores `{{...}}`, y un UUID de ceros no es un marcador.
 ## Fase 3 — El repo · **[vos]** · dos comandos
 
 ```bash
-gh repo create po/<proyecto> --private --clone
+gh repo create <org>/<proyecto> --private --clone
 cd <proyecto>
 node <ruta-al-clon-de-projects>/herramientas/projects-init.mjs \
   --valores <ruta>/valores.json --destino .
 ```
 
 ```powershell
-gh repo create po/<proyecto> --private --clone
+gh repo create <org>/<proyecto> --private --clone
 cd <proyecto>
 node <ruta-al-clon-de-projects>/herramientas/projects-init.mjs --valores <ruta>/valores.json --destino .
 ```
@@ -470,7 +484,7 @@ se parece a un problema de banderas.
 | Bandera | Cuándo |
 |---|---|
 | `--ejemplo` | Fase 2: imprime el esqueleto de `valores.json` |
-| `--asistente` | Fase 2 por preguntas: deriva los 21 valores de 8 a 16 respuestas en castellano. Exige terminal; sin TTY imprime las preguntas y sale 2 |
+| `--asistente` | Fase 2 por preguntas: deriva los 23 valores de 8 a 17 respuestas en castellano. Exige terminal; sin TTY imprime las preguntas y sale 2 |
 | `--solo-valores <ruta>` | Con `--asistente`: escribe el archivo y no arma nada. Gemelo interactivo de `--ejemplo` |
 | `--forzar` | Sobrescribe un destino que **ya tiene** archivos del andamio. Es la bandera que apaga la protección contra pisar trabajo: se usa para reintentar un arranque que se cortó a la mitad, no para «probar otra vez» |
 | `--sin-herramientas` | No corre `openspec init` ni el render de la constitución. Te deja el andamio copiado y nada más — el repo queda **sin** `openspec/` y sin `.projects/`, o sea sin las dos piezas de la la página 08 |
@@ -494,7 +508,7 @@ las dos herramientas, --sin-herramientas tampoco lo pide.
 
 Las dos salidas son literales: o corrés desde un clon completo —que es lo normal y lo que
 dice la sección 2 de esta guía— o pasás el pin a mano. Para saber qué número pasar, el
-comando está en [11-upgrade-openspec.md](11-upgrade-openspec.md); si no tenés el archivo, tampoco
+comando está en [12-upgrade-openspec.md](12-upgrade-openspec.md); si no tenés el archivo, tampoco
 tenés de dónde leerlo, así que sale del repo del marco en GitHub.
 
 **Espera una versión EXACTA**, no un rango ni `latest`, y lo comprueba **antes** de tocar
@@ -568,9 +582,11 @@ marco queda sin cumplir si no se hace. Están ahí para que no haga falta haber 
 infraestructura del área para poder resolverlos.
 
 ⚠️ **Y no gatean todavía**, así que no confundas: el primer CI rojo de la fase 5.1 **no**
-viene de acá. La compuerta llega con el trabajo de despliegue, porque hoy «este repositorio
-se despliega» no es verificable — el andamio no reparte pipeline de despliegue. Hasta
-entonces son disciplina, y se ven de un tirón:
+viene de acá. La compuerta llega cuando «este repositorio se despliega» sea verificable
+para la forma que tengas delante: hoy el andamio reparte pipeline de despliegue **sólo
+para la forma `sitio`** —que publica en Cloudflare Workers y no usa esta infraestructura—
+y para una aplicación todavía no hay ninguno. El tramo entero está en
+[10-publicar.md](10-publicar.md). Hasta entonces son disciplina, y se ven de un tirón:
 
 ```bash
 grep -rn PENDIENTE-INFRA infra infra-prod
@@ -717,27 +733,33 @@ lleva un diff chico donde la compuerta de cobertura mide lo que tiene que medir.
 
 ### 5.1 Tu primer CI va a salir ROJO en un job, y es esperado
 
-⚠️ **El job «Sin marcadores del scaffold sin resolver» falla, y está bien.** El andamio
-reparte **3 recuadros 🕳️** —2 en `AGENTS.md`, 1 en `.github/proteccion-main.md`— que un
-humano tiene que resolver y borrar. El marco los cuenta y los lee como bootstrap a medias:
-mientras existan, ese job es rojo. **No es un defecto de tu repo ni del andamio.**
+⚠️ **El job «Sin marcadores del scaffold sin resolver» falla, y está bien.** Tu repo nace con
+**2 recuadros 🕳️**, los dos en `AGENTS.md`, que un humano tiene que resolver y borrar. El
+andamio guarda un tercero, en `.github/proteccion-main.md`, pero ése no te llega: `projects
+init` lo reemplaza por el bloque con el estado **medido** de la protección de rama, que es lo
+que vas a leer en la fase 6.1. El marco cuenta los que quedan y los lee como bootstrap a
+medias: mientras existan, ese job es rojo. **No es un defecto de tu repo ni del andamio.**
 
-Y hay una razón por la que **no se pueden borrar todos antes del primer push**: el recuadro
-de `proteccion-main.md` te manda aplicar la protección de rama, y eso **no se puede hacer
-hasta que el CI haya corrido una vez** — el check `ci-ok` no existe en la lista del ruleset
-hasta que alguna corrida lo haya reportado. El primer rojo es estructural.
+Y hay una razón por la que **no se pueden borrar antes del primer push**: la sección «Antes
+del primer commit» de `AGENTS.md` se borra recién cuando sus pasos están hechos, y uno de
+ellos manda generar el artefacto del marco con `gh workflow run actualizar-marco.yml` — un
+workflow que para GitHub **no existe hasta que el push lo puso en `main`**. La protección de
+rama de la fase 6.1 arrastra la misma condición: el check `ci-ok` no aparece en la lista del
+ruleset hasta que alguna corrida lo haya reportado. El primer rojo es estructural.
 
 **La secuencia que lo apaga:**
 
 1. **Push a `main`** → el CI corre. Rojo en «Sin marcadores», verde en el resto.
 2. **Aplicá la protección** (fase 6.1, las 4 reglas). Ahora `ci-ok` existe en el ruleset.
-3. **Resolvé y borrá los 3 recuadros**, que es trabajo real:
+3. **Resolvé y borrá los 2 recuadros 🕳️**, que es trabajo real:
    - `AGENTS.md`, «Antes del primer commit»: revisá la tabla del stack y **borrá la fila**
-     de lo que este proyecto no vaya a tener.
+     de lo que este proyecto no vaya a tener, y hacé los demás pasos que esa sección lista
+     antes de borrarla entera.
    - `AGENTS.md`, «reglas de este repo»: escribí las propias, o borrá el recuadro si
      todavía no hay ninguna.
-   - `.github/proteccion-main.md`: pasá los 🔴 a 🟢 con la fecha, y escribí el motivo de
-     las diferidas.
+   - Y en `.github/proteccion-main.md`, donde ya **no** queda recuadro que borrar: pasá los
+     🔴 a 🟢 con la fecha, y escribí el motivo de las diferidas. Ese archivo no pone rojo a
+     este job, pero es el mismo trabajo y se hace en el mismo viaje.
 4. **Push de nuevo** → verde.
 
 Antes del segundo push, comprobá que no quedó ninguno. Sin salida es lo que buscás:
@@ -852,17 +874,17 @@ o apuntan al lugar equivocado.
 | `@v1` en vez de versión exacta | No falla: el repo simplemente **no recibe versiones nuevas** ni aparece en el censo | Fase 6.3 |
 | Dependabot apagado | Igual que arriba, y no hay aviso | Fase 6.3 |
 | Labels `area:*` ausentes | La constitución las exige y nadie las crea | Fase 6.2 |
-| Los 3 recuadros 🕳️ del andamio | El primer CI sale **rojo** en «Sin marcadores del scaffold sin resolver», y uno de los tres no se puede borrar antes de que el CI corra | Fase 5.1 |
+| Los 2 recuadros 🕳️ del andamio | El primer CI sale **rojo** en «Sin marcadores del scaffold sin resolver», y no se pueden borrar antes de que el CI corra | Fase 5.1 |
 | Primer PR con el bootstrap adentro | Rojo en cobertura: el diff agrega el esqueleto entero | Fase 5 |
 | **BMAD instalado DENTRO del repo** | El check de marcadores del scaffold da **rojo** por 2 archivos de BMAD, y `git add` falla con `Filename too long` en sus `__pycache__`. Se instala en un directorio aparte | La página 08 |
 | **Entrar por la fase 1 de BMAD** | Sirve para sacarle información a alguien preguntándole, y el trabajo ya está hecho. Se entra por `bmad-prd`, que pide los documentos por nombre | La página 08 |
 | **Esperar que BMAD genere los specs de OpenSpec** | No los genera, y no hay comando que convierta el PRD en deltas. El paso 7 es a mano, y es así a propósito | La página 08 |
 | **Pedirle a BMAD un cambio sin commitear antes** | No hay deshacer: `.memlog.md` es bitácora de decisiones, no historial de versiones, y la skill no menciona backup | La página 08, paso 6 |
 | **Armar la lista de cobertura leyendo el PRD** | Deja de servir para lo único que sirve: detectar lo que el PRD perdió. Sale de los documentos originales | La página 08, paso 4 |
-| **Pasarle a la sesión el PRD y no los documentos** | Puede citar el PRD pero no la fuente: la lista de cobertura queda apuntando al intermediario | La página 08, paso 7 |
-| **Pedir los cuatro artefactos de OpenSpec de una** | El PO gatea proposal y specs; si el design ya está escrito, su aprobación es un trámite | La página 08, paso 7 |
+| **Pasarle a la sesión el PRD y no los documentos** | Puede citar el PRD pero no la fuente: la lista de cobertura queda apuntando al intermediario | La página 09, paso 7 |
+| **Pedir los cuatro artefactos de OpenSpec de una** | El PO gatea proposal y specs; si el design ya está escrito, su aprobación es un trámite | La página 09, paso 7 |
 | **Empezar el change con `/opsx:propose`** | Genera los cuatro artefactos de un solo golpe —proposal, deltas, `design.md` y `tasks.md`—, así que el PO termina aprobando un proposal cuyo diseño ya está escrito. El comando que crea el change y **para ahí** es `openspec new change <nombre>`. Ver [09-construir-con-openspec.md](09-construir-con-openspec.md) |
-| **Nombrar el change como el proyecto** | Un change se propone, se aprueba y se archiva; si su nombre abarca todo el sistema no puede cerrarse nunca. El nombre es la rebanada | La página 08, paso 7.a |
+| **Nombrar el change como el proyecto** | Un change se propone, se aprueba y se archiva; si su nombre abarca todo el sistema no puede cerrarse nunca. El nombre es la rebanada | La página 09, paso 7.a |
 | **Editar el prompt de una skill de BMAD** | Dejás de usar una herramienta y empezás a mantener un fork ajeno. Si no entiende los documentos, ESO es el resultado: se anota y se sigue a mano | La página 08 |
 
 ### Y los que dependen de tu sistema operativo
@@ -879,7 +901,7 @@ Bash, que corren sobre NTFS igual. La postura completa está en «Antes de empez
 | **Fin de línea (CRLF)** | `pnpm verificar` sale rojo en el paso de formato sobre archivos que **nadie tocó**, y `git diff` no muestra nada: `[warn] Code style issues found in the above file(s). Run Prettier with --write to fix.` Está medido en este marco, el 2026-08-19: con `core.autocrlf=true` —el default de Git para Windows— los fixtures llegaban en CRLF, las pruebas los escribían en LF, y el diff veía el archivo entero reescrito: el caso «un cambio que solo **borra** líneas» pasaba a tener **2 líneas agregadas** y salía con **EXIT 1**. Quedaban 90 de 91 pruebas verdes, y la única roja lo era por el fin de línea del disco, no por el código | El andamio trae `.gitattributes` con `* text=auto eol=lf`, y por eso no es cosmético. Pero solo gobierna **desde** la fase 3: un checkout hecho antes ya está en CRLF en disco. `git config --global core.autocrlf false` y después `git add --renormalize .` |
 | **Mayúsculas del sistema de archivos** | Verde en tu máquina, rojo en el CI y solo ahí: `error TS2307: Cannot find module './Boton'`. macOS y Windows no distinguen `boton.tsx` de `Boton.tsx`; Linux sí. Su hermano peor es el renombre: `git mv boton.tsx Boton.tsx` en macOS o Windows **no hace nada y no dice nada**, así que el repo se queda con el nombre viejo y vos ves el nuevo | `git config core.ignorecase false` en el repo, y renombrar con `git mv -f`. El typecheck ya ayuda —`forceConsistentCasingInFileNames` está prendido en el `tsconfig.base.json` del andamio— pero solo sobre lo que pasa por el compilador: la ruta de una imagen, un nombre dentro de un glob o un archivo nombrado en el YAML del CI no los mira nadie hasta el runner |
 | **Windows PowerShell 5.1 en vez de `pwsh` 7** | Dos cortes exactos: `The token '&&' is not a valid statement separator in this version.` en las fases 4 y 5, y un `valores.json` en **UTF-16** que la fase 3 rechaza como JSON inválido en el primer carácter — lo que se lee como que llenaste mal el archivo | Instalar `pwsh` 7, que es un paquete aparte y convive con el 5.1. `$PSVersionTable.PSVersion.Major` tiene que decir 7 |
-| **`openspec archive` sobre Windows nativo** | Imprime **`Specs updated successfully`** y hace rollback de todo, specs incluidos. Verificado el 2026-08-14, reproducido dos veces | No mirar el mensaje: mirar `git status --short`. El procedimiento y los tres rodeos están en [11-upgrade-openspec.md, trampa 3](11-upgrade-openspec.md) |
+| **`openspec archive` sobre Windows nativo** | Imprime **`Specs updated successfully`** y hace rollback de todo, specs incluidos. Verificado el 2026-08-14, reproducido dos veces | No mirar el mensaje: mirar `git status --short`. El procedimiento y los tres rodeos están en [12-upgrade-openspec.md, trampa 3](12-upgrade-openspec.md) |
 
 ---
 
@@ -897,4 +919,4 @@ Sus dos reglas de uso, acá también porque son las que se rompen: **no arregles
 guía mientras la corrés** —arreglar sobre la marcha te deja un documento que
 funciona para vos y para nadie más, y borra el dato que vinimos a buscar— y **un
 tropiezo cuyo arreglo empieza con «hay que recordar que…» no va a la guía**: va como
-fila al backlog de [reglas no escritas](10-reglas-no-escritas.md#backlog-de-automatización).
+fila al backlog de [reglas no escritas](11-reglas-no-escritas.md#backlog-de-automatización).

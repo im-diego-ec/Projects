@@ -9,7 +9,7 @@
 // alcance.
 //
 // LOS DOS CARRILES, Y POR QUE NO SON UNO SOLO. Hay paginas inevitablemente
-// tecnicas —11-upgrade-openspec.md, 14-forkear-el-marco.md, 05-arrancar-tecnico.md—.
+// tecnicas —12-upgrade-openspec.md, 15-forkear-el-marco.md, 05-arrancar-tecnico.md—.
 // Convertirlas en folleto las arruinaria: un runbook se corre, no se hojea. Para
 // esas el estandar no es "sin jerga" sino NAVEGABLE: una frase al principio que
 // diga para quien es, y todo el vocabulario del marco enlazado al glosario. El
@@ -312,10 +312,17 @@ const GUIA = "docs/04-arrancar-acompanado.md";
  *  exactamente el momento en que alguien que no es tecnico se traba. */
 const PROMESAS_DE_LA_GUIA = ["**Qué vas a hacer.**", "**Qué copiar", "**Qué vas a ver", "**Cómo sabés que salió bien.**"];
 
-/** Cuantos pasos tiene la guia hoy. MEDIDO el 2026-08-25 sobre el archivo, no
+/** Cuantos pasos tiene la guia hoy. MEDIDO el 2026-08-31 sobre el archivo, no
  *  recordado. Es un piso y no una igualdad porque agregar un paso es una mejora;
- *  bajarlo es una edicion que alguien tiene que justificar en el mismo cambio. */
-const PASOS_DE_LA_GUIA = 13;
+ *  bajarlo es una edicion que alguien tiene que justificar en el mismo cambio.
+ *
+ *  QUEDO VIEJO UNA VEZ Y COSTO CARO: decia 13 mientras la guia tenia 15, o sea
+ *  que cualquier PAR de pasos contiguos se podia borrar con el banco entero en
+ *  verde. Medido: borrando los pasos 3 y 4 —124 lineas, incluido el paso del
+ *  asistente, que es la pata por la que entra una persona no tecnica— el banco
+ *  seguia 1073/1073. Un piso que se queda atras es un piso que no toca el suelo,
+ *  y por eso hay abajo un caso que lo exige AJUSTADO. */
+const PASOS_DE_LA_GUIA = 15;
 
 /** Los pasos de la guia, cada uno con su cuerpo. Por SECCION y no por conteo
  *  global: el conteo global tenia holgura de la mala —al borrar un paso entero se
@@ -437,7 +444,7 @@ test("refutacion · una frase de audiencia que llega tarde no cuenta", () => {
 });
 
 test("refutacion · una palabra del glosario metida sin enlace se ve, en cualquier pagina", () => {
-  const texto = leer("docs/11-upgrade-openspec.md");
+  const texto = leer("docs/12-upgrade-openspec.md");
   const termino = TERMINOS.find((t) => !terminosUsados(texto, TERMINOS).includes(t));
   assert.ok(termino, "esa pagina ya usa todas las palabras del glosario: no queda ninguna con que mutar");
   const mutada = `${texto}\n\nY entonces el equipo revisa el ${termino} antes de integrar.\n`;
@@ -472,11 +479,11 @@ test("refutacion · una palabra de oficio metida en una pagina del carril duro s
 
 test("refutacion · una pagina de docs/ que el indice no enumera se ve", () => {
   const indice = leer(INDICE);
-  const mutado = indice.replace("](13-consumidores.md)", "](otra-cosa.md)");
-  assert.notEqual(mutado, indice, "el indice ya no enlaza 13-consumidores.md con esa forma: actualiza esta refutacion");
+  const mutado = indice.replace("](14-consumidores.md)", "](otra-cosa.md)");
+  assert.notEqual(mutado, indice, "el indice ya no enlaza 14-consumidores.md con esa forma: actualiza esta refutacion");
   assert.deepEqual(
     sinIndexar(ALCANCE, mutado),
-    ["docs/13-consumidores.md"],
+    ["docs/14-consumidores.md"],
     "saque una pagina del indice y la comprobacion no lo vio. Este caso cubria ademas el falso verde de la " +
       "subcadena, que los numeros mataron: hasta el renombrado 'consumidores.md' vivia dentro de " +
       "'censo-de-consumidores.md' y una busqueda floja daba la pagina por indexada gracias a la mencion de otra. " +
@@ -490,12 +497,181 @@ test("refutacion · control · una pagina historica no arrastra al estandar a la
   // de declararla historica, la pagina entra al estandar — y este control es el
   // que avisa de que la exencion hoy esta puesta y de quien depende.
   assert.ok(
-    esHistorica("docs/15-auditoria-cierre-v1.md"),
-    `${INDICE} dejo de declarar 15-auditoria-cierre-v1.md como **Histórico**. Entonces esa pagina entra al ` +
+    esHistorica("docs/16-auditoria-cierre-v1.md"),
+    `${INDICE} dejo de declarar 16-auditoria-cierre-v1.md como **Histórico**. Entonces esa pagina entra al ` +
       "estandar: o se le agrega la frase de audiencia y el vocabulario enlazado, o se le devuelve la etiqueta.",
   );
   assert.ok(
     !esHistorica("docs/03-stack.md"),
     "el lector del indice esta clasificando como historica una pagina canonica: la exencion se volvio un agujero",
+  );
+});
+
+// ---------------------------------------------------------------------------
+// LOS PUNTEROS INTERNOS: DOS DEFECTOS QUE NADIE MEDIA.
+//
+// EL PRIMERO, medido: tres filas de la tabla de fallos de docs/05 mandaban a
+// «La página 08, paso 7». docs/08 termina en el paso 6; los pasos 7.x viven en
+// docs/09. Y esas tres filas son justo las del tramo de construir, o sea que
+// caian donde la persona va CUANDO YA SE TRABO. El banco de enlaces mira
+// enlaces markdown; una referencia en prosa no la miraba nadie.
+//
+// EL SEGUNDO lo cometi escribiendo el arreglo del primero: agregue un `##### 7.c`
+// a docs/09 que ya tenia otro `##### 7.c`. Dos secciones con el mismo numero en
+// la misma pagina hacen que «paso 7.c» deje de significar una sola cosa.
+// ---------------------------------------------------------------------------
+
+/** Los encabezados de una pagina, con su nivel. */
+const encabezadosDe = (texto) =>
+  [...texto.replace(/```[\s\S]*?```/g, "").matchAll(/^(#{1,6})\s+(.+?)\s*$/gm)].map((m) => ({
+    nivel: m[1].length,
+    titulo: m[2].trim(),
+  }));
+
+test("ninguna pagina numera dos secciones con el mismo numero", () => {
+  const chocan = [];
+  for (const f of paginasDelAlcance()) {
+    const vistos = new Map();
+    for (const { titulo } of encabezadosDe(leer(f))) {
+      // Solo se juzgan los encabezados que EMPIEZAN con un numero de seccion:
+      // «7.c El prompt», «12 · Los ajustes». Un titulo en prosa no numera nada.
+      const m = titulo.match(/^(\d+(?:\.\w+)*)\b/);
+      if (!m) continue;
+      const n = m[1];
+      if (vistos.has(n)) chocan.push(`${f} → "${n}" numera dos secciones: "${vistos.get(n)}" y "${titulo}"`);
+      else vistos.set(n, titulo);
+    }
+  }
+  assert.deepEqual(
+    chocan,
+    [],
+    `dos secciones con el mismo numero hacen que citar "el paso N" deje de significar una sola cosa:\n  ${chocan.join("\n  ")}`,
+  );
+});
+
+test("toda referencia en prosa a «la pagina NN, paso X» apunta a un paso que esa pagina tiene", () => {
+  // El banco de enlaces mira enlaces markdown. Esto mira la OTRA forma de
+  // referirse a una seccion, que es la que se rompio: prosa.
+  const paginas = paginasDelAlcance();
+  const numeroDe = (f) => (f.match(/(?:^|\/)(\d\d)-/) ?? [])[1];
+  const porNumero = new Map(paginas.map((f) => [numeroDe(f), f]).filter(([n]) => n));
+  assert.ok(porNumero.size >= 5, "un cero aca es este control roto, no un repositorio sin paginas numeradas");
+
+  const rotas = [];
+  let miradas = 0;
+  for (const f of paginas) {
+    const texto = leer(f);
+    for (const m of texto.matchAll(/[Ll]a p(?:á|a)gina (\d\d)(?:,\s*paso\s+([\w.]+))?/g)) {
+      const [, numero, paso] = m;
+      const destino = porNumero.get(numero);
+      if (!destino) {
+        rotas.push(`${f} → nombra "la pagina ${numero}" y no hay ninguna con ese numero`);
+        continue;
+      }
+      if (!paso) continue;
+      miradas++;
+      const titulos = encabezadosDe(leer(destino)).map((h) => h.titulo);
+      const existe = titulos.some((t) => new RegExp(`(^|\\s)${paso.replace(/\./g, "\\.")}(\\b|\\s)`).test(t));
+      if (!existe) rotas.push(`${f} → manda a "la pagina ${numero}, paso ${paso}" y ${destino} no tiene ese paso`);
+    }
+  }
+  assert.ok(miradas >= 1, "ninguna pagina cita un paso de otra: este control dejo de mirar lo que cree");
+  assert.deepEqual(
+    rotas,
+    [],
+    `una referencia en prosa a una seccion que no existe cae justo donde la persona va cuando ya se trabo:\n  ${rotas.join("\n  ")}`,
+  );
+});
+
+// ---------------------------------------------------------------------------
+// UNA CERCA MAL CERRADA SE TRAGA LA PAGINA ENTERA.
+//
+// EL DEFECTO QUE ESTE BANCO CIERRA, medido con tres renderizadores
+// independientes (marked, markdown-it y la implementacion de referencia
+// commonmark): docs/README.md tenia una linea `` ``` Ninguna se escapa... ``,
+// o sea texto pegado a la cerca de cierre. CommonMark 4.5 solo admite espacios
+// o tabs detras de una cerca de cierre, asi que el bloque abierto doce lineas
+// antes NO CERRABA y se comia el resto del archivo: el indice —la pagina que
+// mas gente abre— renderizaba como un bloque de codigo, con 0 tablas y 59 de
+// sus 62 enlaces muertos.
+//
+// En el editor se ve perfecto. Solo se nota en GitHub, que es donde se lee.
+// ---------------------------------------------------------------------------
+
+test("ninguna pagina deja una cerca de codigo sin cerrar", () => {
+  const rotas = [];
+  for (const f of paginasDelAlcance()) {
+    const lineas = leer(f).split("\n");
+    let abierta = null; // { linea, marca }
+    lineas.forEach((l, i) => {
+      const m = l.match(/^(\s{0,3})(`{3,}|~{3,})(.*)$/);
+      if (!m) return;
+      const [, , marca, resto] = m;
+      if (abierta === null) {
+        // Apertura: el resto es el lenguaje, y puede ser cualquier cosa.
+        abierta = { linea: i + 1, marca: marca[0], largo: marca.length };
+        return;
+      }
+      // Cierre: tiene que ser del mismo caracter, al menos igual de largo, y
+      // NO puede llevar nada detras salvo espacios.
+      if (marca[0] !== abierta.marca || marca.length < abierta.largo) return;
+      if (resto.trim() !== "") {
+        rotas.push(
+          `${f}:${i + 1}  la cerca de cierre lleva texto detras ("${resto.trim().slice(0, 40)}"), asi que NO cierra: ` +
+            `el bloque abierto en la linea ${abierta.linea} se traga el resto de la pagina`,
+        );
+        abierta = null;
+        return;
+      }
+      abierta = null;
+    });
+    if (abierta) rotas.push(`${f}: la cerca abierta en la linea ${abierta.linea} no se cierra nunca`);
+  }
+  assert.deepEqual(
+    rotas,
+    [],
+    `una cerca que no cierra convierte la pagina en un bloque de codigo: en el editor se ve bien y en GitHub, que es ` +
+      `donde se lee, no queda ni un enlace vivo.\n  ${rotas.join("\n  ")}`,
+  );
+});
+
+test("MUERDE: una cerca con texto detras se caza", () => {
+  // El caso que prueba que el de arriba no pasa por vacuidad: se corre la misma
+  // deteccion sobre un texto que SI trae el defecto.
+  const conDefecto = ["texto", "```bash", "echo hola", "``` y sigue la prosa", "mas texto"];
+  let abierta = null;
+  let cazada = false;
+  conDefecto.forEach((l) => {
+    const m = l.match(/^(\s{0,3})(`{3,}|~{3,})(.*)$/);
+    if (!m) return;
+    if (abierta === null) {
+      abierta = true;
+      return;
+    }
+    if (m[3].trim() !== "") cazada = true;
+    abierta = null;
+  });
+  assert.equal(cazada, true, "la deteccion tiene que ver la cerca sucia");
+
+  // Y el control: una cerca limpia no se caza.
+  assert.equal(/^(\s{0,3})(`{3,})(.*)$/.exec("```")[3].trim(), "", "una cerca limpia no lleva nada detras");
+});
+
+test("el piso de pasos de la guia esta ajustado, no dos pasos por debajo", () => {
+  // EL DEFECTO QUE ESTE CASO CIERRA: el piso decia 13 y la guia tenia 15. Un
+  // piso holgado no protege nada — deja borrar exactamente la holgura sin que
+  // nada se ponga rojo—, y este ya se habia quedado atras dos veces por la via
+  // normal: se agregan pasos y nadie sube el numero.
+  //
+  // Exigirlo AJUSTADO invierte quien tiene que acordarse: agregar un paso ahora
+  // pone el banco rojo con un mensaje que dice exactamente que numero poner.
+  const pasos = (leer(GUIA).match(/^## Paso /gm) ?? []).length;
+  assert.ok(pasos >= 1, "un cero aca es este control roto, no una guia sin pasos");
+  assert.equal(
+    PASOS_DE_LA_GUIA,
+    pasos,
+    `${GUIA} tiene ${pasos} pasos y el piso de este banco dice ${PASOS_DE_LA_GUIA}. Si agregaste un paso, subi el ` +
+      `piso a ${pasos} en la misma edicion: un piso que se queda atras deja borrar la diferencia sin que nada avise, ` +
+      `y ya paso —con 13 contra 15 se podian borrar dos pasos contiguos con el banco entero en verde—.`,
   );
 });

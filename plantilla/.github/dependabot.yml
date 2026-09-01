@@ -54,7 +54,7 @@ updates:
     # `<org>/Projects` y `<org>/Projects/.github/workflows/marco-ci.yml`.
     cooldown:
       exclude:
-        - "{{ORG}}/Projects*"
+        - "{{ORG_MARCO}}/Projects*"
     # DOS GRUPOS, y el marco va SOLO en el suyo. Con un unico grupo `*`,
     # Dependabot no abre un segundo PR mientras el del grupo siga abierto: da las
     # demas dependencias por «manejadas» y espera actualizar el PR existente.
@@ -68,10 +68,10 @@ updates:
     # consume. Agruparla con el resto la vuelve rehen del PR mas trabado.
     groups:
       marco:
-        patterns: ["{{ORG}}/Projects*"]
+        patterns: ["{{ORG_MARCO}}/Projects*"]
       actions:
         patterns: ["*"]
-        exclude-patterns: ["{{ORG}}/Projects*"]
+        exclude-patterns: ["{{ORG_MARCO}}/Projects*"]
   - package-ecosystem: "docker"
     directory: "/{{PAQUETE_API}}"
     schedule:
