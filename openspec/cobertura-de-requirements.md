@@ -79,9 +79,10 @@ equivocado. El re-conteo del 2026-08-31 es el que sigue.
 **Medido el 2026-08-31: 41 requirements vivos en 8 capabilities**
 (12 `calidad-codigo` + 4 `despliegue-ci` + 2 `gestion-secretos` +
 3 `gobierno-contribucion` + 5 `observabilidad` + 6 `operacion-infra` +
-4 `pipeline-entrega` + 5 `verificacion-desplegada`). Hay además **2 capabilities en
-vuelo** —`base-tecnologica`, que nace en el change `stack-estandar`, y
-`documentacion-del-marco`, que nace en `orden-de-lectura`—: ninguna existe todavía en
+4 `pipeline-entrega` + 5 `verificacion-desplegada`). Hay además **3 capabilities en
+vuelo** —`base-tecnologica`, que nace en el change `stack-estandar`,
+`documentacion-del-marco`, que nace en `orden-de-lectura`, y
+`promocion-por-ambientes`, que nace en el change del mismo nombre—: ninguna existe todavía en
 `openspec/specs/`, y sus secciones van al final, porque una capability que nace en un
 change y no en los specs vivos es la asimetría que hay que ver antes de que se
 consolide, no después.
@@ -302,6 +303,30 @@ hueco: no faltaba deuda, faltaba cobertura que ya estaba pagada.
 | Ningún enlace del repositorio apunta a algo que no existe | El banco de enlaces entero: cada enlace relativo tiene que resolver a un archivo que exista y cada ancla a un encabezado que exista, con el piso declarado que el propio requirement pide —un cero ahí es el detector roto, no un repositorio sin navegación— y con sus dos mutaciones al lado | `pruebas/docs/enlaces.test.mjs:145` (el archivo) y `:170` (el ancla); el piso en `:109`; las mutaciones en `:184` y `:196` |
 
 ---
+
+## promocion-por-ambientes — capability EN VUELO, 5 requirements, 2 con compuerta
+
+Tampoco existe en `openspec/specs/`: nace en
+`openspec/changes/promocion-por-ambientes/specs/`. Es la capability **con más
+requirements sin compuerta de toda esta página**, y eso es correcto y esperable: el
+change está en su fase de proposal, o sea que todavía no se construyó nada.
+
+**Las dos filas que sí tienen compuerta no son un adelanto del trabajo**: son bancos que
+ya existían por otro motivo y que resultan cubrir parte de estos requirements. Se
+declaran como `parcial` para que nadie lea esa cobertura como completa.
+
+**Lo que esta capability viene a resolver es, justamente, una regla sin compuerta que ya
+existe.** `promocion-por-ambientes` está declarada en el canónico de la constitución
+desde antes de este change, la reciben todos los proyectos, y el andamio no reparte un
+solo paso que la cumpla. Hasta que exista, cada proyecto la anota como desvío declarado.
+
+| Requirement | Lo que lo hace fallar solo | Ruta y ancla (2026-09-01) |
+|---|---|---|
+| Un cambio llega a producción pasando por un ambiente de prueba | **ninguno** — el change está en proposal | — |
+| La promoción a producción es un acto deliberado con rastro | **ninguno** — el change está en proposal | — |
+| El proyecto declara qué puede publicar y qué no | **parcial**: el desvío declarado y la portada por forma ya tienen banco | `pruebas/init/asistente.test.mjs`, `pruebas/init/formas.test.mjs` |
+| Lo que la persona elige decide dónde se despliega | **parcial**: que una opción ofrecida se pueda armar ya tiene banco | `pruebas/docs/la-carta-no-miente.test.mjs` |
+| El costo de publicar está dicho antes de elegir | **ninguno** — el change está en proposal | — |
 
 ## Qué NO dice esta tabla
 
