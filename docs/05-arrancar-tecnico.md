@@ -438,14 +438,14 @@ sobrevivan marcadores `{{...}}`, y un UUID de ceros no es un marcador.
 ## Fase 3 — El repo · **[vos]** · dos comandos
 
 ```bash
-gh repo create po/<proyecto> --private --clone
+gh repo create <org>/<proyecto> --private --clone
 cd <proyecto>
 node <ruta-al-clon-de-projects>/herramientas/projects-init.mjs \
   --valores <ruta>/valores.json --destino .
 ```
 
 ```powershell
-gh repo create po/<proyecto> --private --clone
+gh repo create <org>/<proyecto> --private --clone
 cd <proyecto>
 node <ruta-al-clon-de-projects>/herramientas/projects-init.mjs --valores <ruta>/valores.json --destino .
 ```

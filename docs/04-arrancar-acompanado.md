@@ -100,16 +100,29 @@ vale es dejar una pieza sin dueño escrito.
 
 ---
 
-## Antes de empezar (2): los cuatro programas
+## Antes de empezar (2): los programas
 
 Se instalan una vez en tu computadora y sirven para todos los proyectos.
 
 | Programa | Para qué | Cómo se instala |
 |---|---|---|
+| **Claude Code** | **Donde ocurren los tramos 2 y 3**: el descubrimiento y la construcción se hacen conversando con un agente, no escribiendo código. Sin esto, esas dos páginas no se pueden seguir | [`claude.com/code`](https://claude.com/code) — tiene costo, y conviene saberlo ahora |
 | **Git** | Guardar y enviar los cambios | [`git-scm.com`](https://git-scm.com) |
 | **Node** | El intérprete con el que corre todo lo del marco | [`nodejs.org`](https://nodejs.org) — la versión con soporte de largo plazo |
 | **corepack** | Lo que trae el instalador de las piezas del proyecto (`pnpm`) sin que tengas que instalarlo aparte | **No lo instalás.** Viene con Node, y el Paso 0 lo comprueba. Todos los comandos de esta página lo llaman con el prefijo `corepack pnpm` |
 | **gh** | Hablar con GitHub desde la consola | [`cli.github.com`](https://cli.github.com) |
+
+> **Lo de Claude Code merece una línea aparte, porque cambia lo que este camino
+> es.** Los pasos 0 a 14 de esta página se hacen **con comandos**: los copiás y
+> los pegás. Pero el descubrimiento —[08](08-descubrimiento.md)— y la
+> construcción —[09](09-construir-con-openspec.md)— se hacen **conversando con un
+> agente**, y ese agente es Claude Code. No es una preferencia del marco: las
+> herramientas de esos dos tramos (BMAD y OpenSpec) llegan como *skills* y
+> *comandos* de Claude Code, y fuera de una sesión suya no existen.
+>
+> Si no lo vas a tener, **esta página igual te sirve entera** y terminás con un
+> repositorio sano y andando. Lo que no vas a poder hacer es el ciclo de cambios
+> tal como el marco lo describe.
 
 ### Y una cosa más, que no es un programa
 
@@ -762,12 +775,45 @@ gh run watch
 **Qué vas a ver.** Una lista de trabajos con su tilde o su cruz. Todos en verde
 menos uno: **«Sin marcadores del scaffold sin resolver»**.
 
-**Cómo sabés que salió bien.** Que el único rojo sea ése. Cualquier otro rojo sí
-es un problema, y el paso 13 te dice adónde ir.
+**Cómo sabés que salió bien.** Que el rojo de los marcadores esté, y que el paso
+13 lo apague.
+
+> **Puede haber más de un rojo, y conviene saber cuáles son tuyos.** Además del
+> de los marcadores, hoy hay uno que **no es tuyo y no lo podés arreglar**: el
+> trabajo **`constitucion`**, que compara la constitución de tu proyecto contra la
+> versión del marco que tus verificaciones usan. Cuando el marco publicó una versión y su
+> texto ya cambió, esas dos no coinciden y el trabajo sale rojo. **Se arregla del
+> lado del marco, publicando la versión siguiente** — no del tuyo.
+>
+> Cómo distinguirlos, sin saber nada de esto: los rojos que **sí** son tuyos
+> nombran un archivo de tu proyecto. El de `constitucion` habla de versiones del
+> marco.
 
 ---
 
 ## Paso 11 — Proteger la rama principal · *10 minutos*
+
+> 🛑 **Leé este recuadro antes de encender nada, porque este paso no se deshace
+> solo.**
+>
+> Vas a exigir que `ci-ok` esté en verde para que un cambio pueda entrar a la rama
+> principal. Si en este momento
+> `ci-ok` está **rojo por algo que no es tuyo** —el trabajo `constitucion` de
+> arriba es el caso—, quedás en un repositorio **donde no va a poder entrar
+> ningún cambio**, ni siquiera el que arregla eso.
+>
+> **Antes de encenderlo, comprobá que `ci-ok` está en verde:**
+>
+> ```bash
+> gh run list --limit 1
+> ```
+>
+> **Si `ci-ok` no está en verde, no hagas este paso todavía.** No es urgente:
+> tu proyecto funciona igual. Encendelo el día que la corrida quede limpia.
+>
+> **Y si ya lo encendiste y quedaste trabado**, la salida existe y son dos
+> líneas: en `Settings → Rules → Rulesets`, poné la regla en **Disabled**, dejá
+> entrar lo que necesites, y volvé a activarla. No hay que borrar nada.
 
 **Qué vas a hacer.** Encender la regla que hace que, de ahora en adelante,
 **nada entre sin pasar por revisión y sin las verificaciones en verde**. Es un

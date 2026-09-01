@@ -106,9 +106,14 @@ Cloudflare y crear otro — toma dos minutos y no rompe nada.
 ### Podés ensayar antes de tener cuenta
 
 ```bash
-pnpm -C sitio run build
-pnpm -C sitio run desplegar:prueba
+corepack pnpm -C sitio run build
+corepack pnpm -C sitio run desplegar:prueba
 ```
+
+> **Va `corepack pnpm` y no `pnpm` a secas.** La máquina que armaste en
+> [04](04-arrancar-acompanado.md) tiene **corepack**, que es lo que trae `pnpm`
+> cuando hace falta; `pnpm` suelto sólo funciona si además lo instalaste aparte.
+> Es la misma forma que usás desde el Paso 5.
 
 El segundo comando hace todo **menos subir**: lee la configuración, encuentra
 los archivos y te dice cuánto pesaría la subida. No necesita cuenta ni
@@ -158,7 +163,7 @@ el marco todavía no las tomó. Inventar el paso antes de tomarlas sería adivin
 la forma de una pieza que no está diseñada — y este repositorio ya pagó una
 semana de un ruleset pidiendo el check equivocado por hacer exactamente eso.
 
-**Mientras tanto**, la aplicación se levanta en tu máquina con `pnpm dev`, y eso
+**Mientras tanto**, la aplicación se levanta en tu máquina con `corepack pnpm dev`, y eso
 alcanza para construirla y mostrarla. El día que el paso exista, va a llegar por
 la vía de siempre: subís la versión del marco y aparece.
 
