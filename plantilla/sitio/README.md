@@ -36,7 +36,8 @@ la configuración (`wrangler.jsonc`) y el paso automático
 (`.github/workflows/desplegar.yml`), que corre **solo cuando las verificaciones
 terminan en verde** sobre la rama principal.
 
-Lo que falta son **dos cosas que solo una persona puede hacer**, y por eso están
+Lo que falta son **tres actos humanos** —abrir la cuenta, registrar el subdominio
+y crear la credencial—, y por eso están
 acá y no automatizadas: abrir una cuenta y crear una credencial. Se hacen **una
 sola vez**.
 
@@ -53,6 +54,17 @@ tu sitio **no tienen límite de visitas** en ese plan.
 
 Después copiá tu **Account ID**: está en el panel, en la barra lateral derecha
 de la sección Workers, y es una tira de letras y números.
+
+**Y aprovechá para registrar el subdominio ahora**, en **Workers & Pages →
+Subdomain**: es el nombre que va en el medio de tu dirección
+(`{{PROYECTO}}.<tu-subdominio>.workers.dev`), se elige una vez y no se puede
+cambiar después.
+
+> **Cloudflare no te lo va a pedir hasta la primera publicación**, así que si lo
+> salteás acá, el paso 4 va a fallar con
+> `you need to register a workers.dev subdomain` cuando ya creías haber terminado
+> con lo humano. Es el tercero de los tres actos humanos de esta página, y el
+> único que llega tarde.
 
 ### 2 · La credencial · *2 minutos*
 
@@ -107,10 +119,8 @@ Vienen de Cloudflare tal cual, sin traducir, y ninguno dice qué hacer. Esto sí
 Los dos primeros son del **token**; el tercero es de la **cuenta** y no tiene nada
 que ver con este repositorio.
 
-> **El tercero es el acto humano que falta en la lista de arriba**, y aparece
-> recién en la primera publicación: hasta que no publicás, Cloudflare no te lo
-> pide. Es el mismo subdominio que después va en tu dirección
-> `{{PROYECTO}}.<tu-subdominio>.workers.dev`.
+> **El tercero le pasa a quien salteó el subdominio en el paso 1.** Se arregla
+> ahí mismo y se vuelve a publicar: no hay que rehacer nada.
 
 ### Antes de todo eso, podés ensayar sin publicar nada
 
