@@ -91,31 +91,40 @@ como en Windows. Sirve para no traducir comandos; no te saca de ninguna fila de 
 #### Qué de esta promesa se comprueba con un comando, y qué no
 
 Los pares son una promesa, y una promesa que nadie mide se rompe sola. Hoy hay **una sola**
-cosa comprobable de un comando, y es que el inventario **no encoja**: el archivo tiene **9**
-gemelos y **29** bloques ` ```bash `, y eso lo dicen
+cosa comprobable de un comando, y es que el inventario **no encoja**: el archivo tiene **8**
+gemelos y **25** bloques ` ```bash `, y eso lo dicen
 ` grep -c '^```powershell' docs/05-arrancar-tecnico.md ` y ` grep -c '^```bash' ` sobre el
 mismo archivo. Está probado a la mala, que es la única forma de saber que un check sirve:
-borrando los nueve gemelos, uno por uno, sobre una copia. Los **nueve** bajan el conteo a 8 y
-ponen la comprobación en rojo — ninguno se escapa.
+borrando cada gemelo, uno por uno, sobre una copia. Todos bajan el conteo y ponen la
+comprobación en rojo — ninguno se escapa.
 
-Lo que ese conteo **no** ve, y conviene decirlo antes de que alguien se confíe: que un bloque
-` ```bash ` **nuevo** que no sea portable entre sin su gemelo. El lado bash sube a 30 y la
-comprobación se pone roja, sí, pero roja **porque el inventario cambió**, no porque falte un
-gemelo: quien la vea puede apagarla cambiando el 29 por 30 sin haberse preguntado si el
-bloque nuevo era portable. Ya pasó una vez: el 28 de la versión anterior de esta línea es hoy
-un 29 porque la sección 3.1 sumó un bloque `node --input-type=module`, que **sí** corre igual
-en las dos shells — pero eso lo decidió una lectura, no el conteo. Distinguir un caso del otro a máquina pide adivinar qué comando
-corre igual en las dos shells, y adivinar es exactamente lo que un check no debe hacer; así
-que eso hoy lo ve una persona leyendo el diff, y por eso es otra fila del mismo
+Esos dos números tampoco quedan librados a que alguien se acuerde de recontarlos: están en el
+registro de cifras de `pruebas/docs/comandos-que-existen.test.mjs`, que los mide sobre este
+mismo archivo y se pone rojo el día que la prosa se queda atrás. Hizo falta: estuvieron
+escritos de más durante varias versiones, y nadie se enteró hasta que alguien volvió a contar
+a mano.
+
+Lo que ese conteo **no** ve, y conviene decirlo antes de que alguien se confíe: que entre un
+bloque ` ```bash ` **nuevo** que no sea portable, y que entre sin su gemelo. El lado bash sube
+en uno y la comprobación se pone roja, sí, pero roja **porque el inventario cambió**, no
+porque falte un gemelo: quien la vea puede apagarla subiendo el número escrito sin haberse
+preguntado si el bloque nuevo era portable. Ya pasó: el lado bash creció el día que la sección
+3.1 sumó un bloque `node --input-type=module`, que **sí** corre igual en las dos shells — pero
+eso lo decidió una lectura, no el conteo. Distinguir un caso del otro a máquina pide adivinar
+qué comando corre igual en las dos shells, y adivinar es exactamente lo que un check no debe
+hacer; así que eso hoy lo ve una persona leyendo el diff, y por eso es otra fila del mismo
 [backlog de automatización](11-reglas-no-escritas.md#backlog-de-automatización) que la
 comprobación de prerrequisitos del punto 3. Ojo con esa ancla si la vas a buscar con `grep`:
 lleva tilde, y `grep -i` pliega mayúsculas pero **no** acentos, así que escrita sin tilde la
 búsqueda devuelve **cero** coincidencias y sale **1** — que se lee como que el enlace está
 roto, cuando no lo está. Lo que sí lo demuestra es buscar el encabezado del otro lado:
 ` grep -n '^## Backlog de automatización' docs/11-reglas-no-escritas.md ` contesta con una sola
-línea, la 475.
+línea. Cuál es esa línea no se escribe acá, y no es descuido: el número se corre solo con cada
+párrafo que alguien agregue más arriba en esa página, y quien lo lea viejo va a creer que el
+enlace se rompió — que es exactamente el susto que este párrafo existe para evitar. Lo que
+importa es que la respuesta sea **una sola** línea, y eso el comando lo imprime.
 
-⚠️ **Ninguno de los nueve gemelos se ejecutó, y en CI no corre ninguno.** El
+⚠️ **Ninguno de los gemelos se ejecutó, y en CI no corre ninguno.** El
 pipeline corre sobre `ubuntu-latest`, donde no hay `pwsh`; en la máquina donde se midió esta
 guía, ` which pwsh powershell ` contesta *not found* y sale 1. Lo único que se les hizo fue
 leerlos contra la sintaxis de PowerShell. Validarlos de verdad son dos escalones bien
@@ -724,27 +733,33 @@ lleva un diff chico donde la compuerta de cobertura mide lo que tiene que medir.
 
 ### 5.1 Tu primer CI va a salir ROJO en un job, y es esperado
 
-⚠️ **El job «Sin marcadores del scaffold sin resolver» falla, y está bien.** El andamio
-reparte **3 recuadros 🕳️** —2 en `AGENTS.md`, 1 en `.github/proteccion-main.md`— que un
-humano tiene que resolver y borrar. El marco los cuenta y los lee como bootstrap a medias:
-mientras existan, ese job es rojo. **No es un defecto de tu repo ni del andamio.**
+⚠️ **El job «Sin marcadores del scaffold sin resolver» falla, y está bien.** Tu repo nace con
+**2 recuadros 🕳️**, los dos en `AGENTS.md`, que un humano tiene que resolver y borrar. El
+andamio guarda un tercero, en `.github/proteccion-main.md`, pero ése no te llega: `projects
+init` lo reemplaza por el bloque con el estado **medido** de la protección de rama, que es lo
+que vas a leer en la fase 6.1. El marco cuenta los que quedan y los lee como bootstrap a
+medias: mientras existan, ese job es rojo. **No es un defecto de tu repo ni del andamio.**
 
-Y hay una razón por la que **no se pueden borrar todos antes del primer push**: el recuadro
-de `proteccion-main.md` te manda aplicar la protección de rama, y eso **no se puede hacer
-hasta que el CI haya corrido una vez** — el check `ci-ok` no existe en la lista del ruleset
-hasta que alguna corrida lo haya reportado. El primer rojo es estructural.
+Y hay una razón por la que **no se pueden borrar antes del primer push**: la sección «Antes
+del primer commit» de `AGENTS.md` se borra recién cuando sus pasos están hechos, y uno de
+ellos manda generar el artefacto del marco con `gh workflow run actualizar-marco.yml` — un
+workflow que para GitHub **no existe hasta que el push lo puso en `main`**. La protección de
+rama de la fase 6.1 arrastra la misma condición: el check `ci-ok` no aparece en la lista del
+ruleset hasta que alguna corrida lo haya reportado. El primer rojo es estructural.
 
 **La secuencia que lo apaga:**
 
 1. **Push a `main`** → el CI corre. Rojo en «Sin marcadores», verde en el resto.
 2. **Aplicá la protección** (fase 6.1, las 4 reglas). Ahora `ci-ok` existe en el ruleset.
-3. **Resolvé y borrá los 3 recuadros**, que es trabajo real:
+3. **Resolvé y borrá los 2 recuadros 🕳️**, que es trabajo real:
    - `AGENTS.md`, «Antes del primer commit»: revisá la tabla del stack y **borrá la fila**
-     de lo que este proyecto no vaya a tener.
+     de lo que este proyecto no vaya a tener, y hacé los demás pasos que esa sección lista
+     antes de borrarla entera.
    - `AGENTS.md`, «reglas de este repo»: escribí las propias, o borrá el recuadro si
      todavía no hay ninguna.
-   - `.github/proteccion-main.md`: pasá los 🔴 a 🟢 con la fecha, y escribí el motivo de
-     las diferidas.
+   - Y en `.github/proteccion-main.md`, donde ya **no** queda recuadro que borrar: pasá los
+     🔴 a 🟢 con la fecha, y escribí el motivo de las diferidas. Ese archivo no pone rojo a
+     este job, pero es el mismo trabajo y se hace en el mismo viaje.
 4. **Push de nuevo** → verde.
 
 Antes del segundo push, comprobá que no quedó ninguno. Sin salida es lo que buscás:
@@ -859,7 +874,7 @@ o apuntan al lugar equivocado.
 | `@v1` en vez de versión exacta | No falla: el repo simplemente **no recibe versiones nuevas** ni aparece en el censo | Fase 6.3 |
 | Dependabot apagado | Igual que arriba, y no hay aviso | Fase 6.3 |
 | Labels `area:*` ausentes | La constitución las exige y nadie las crea | Fase 6.2 |
-| Los 3 recuadros 🕳️ del andamio | El primer CI sale **rojo** en «Sin marcadores del scaffold sin resolver», y uno de los tres no se puede borrar antes de que el CI corra | Fase 5.1 |
+| Los 2 recuadros 🕳️ del andamio | El primer CI sale **rojo** en «Sin marcadores del scaffold sin resolver», y no se pueden borrar antes de que el CI corra | Fase 5.1 |
 | Primer PR con el bootstrap adentro | Rojo en cobertura: el diff agrega el esqueleto entero | Fase 5 |
 | **BMAD instalado DENTRO del repo** | El check de marcadores del scaffold da **rojo** por 2 archivos de BMAD, y `git add` falla con `Filename too long` en sus `__pycache__`. Se instala en un directorio aparte | La página 08 |
 | **Entrar por la fase 1 de BMAD** | Sirve para sacarle información a alguien preguntándole, y el trabajo ya está hecho. Se entra por `bmad-prd`, que pide los documentos por nombre | La página 08 |

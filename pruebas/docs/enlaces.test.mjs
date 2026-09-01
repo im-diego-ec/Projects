@@ -200,6 +200,88 @@ test("MUERDE: un ancla inventada sobre una pagina real se caza", () => {
   assert.equal(anclas.has("ancla-que-nadie-escribio-abc123"), false, "el ancla inventada no puede existir en la pagina real");
 });
 
+// ---------------------------------------------------------------------------
+// EL OTRO LADO DEL MISMO DEFECTO: UN DOCUMENTO AL QUE NO APUNTA NADIE.
+//
+// Los casos de arriba miran el enlace y preguntan si el destino existe. Este
+// mira el DESTINO y pregunta si alguien lo enlaza, que es el defecto simetrico
+// y el que no deja rastro: un enlace roto se ve al hacer click, un documento
+// huerfano no se ve nunca — nadie llega a el para descubrir que no llego.
+//
+// MEDIDO EL 2026-08-31: `openspec/cobertura-de-requirements.md` tenia CERO
+// enlaces en todo el repositorio (`grep -rn cobertura-de-requirements .` daba
+// una sola linea, y era una mencion dentro de `openspec/config.yaml`, no un
+// enlace). Es la pagina que contesta que parte del contrato del marco tiene
+// compuerta y cual no; estuvo una semana con tres filas equivocadas y nadie las
+// vio, que es lo que le pasa a un documento al que no se llega.
+//
+// EL ALCANCE ES LA RAIZ DE `openspec/`, y es una eleccion decidible: `specs/` y
+// `changes/` tienen su propio indice —lo lleva la herramienta de OpenSpec— y sus
+// archivos se leen desde ahi. Lo que queda suelto en la raiz no lo indexa nadie:
+// o esta en el mapa de la documentacion, o esta perdido. Un documento nuevo en
+// esa raiz entra a esta regla solo, sin que nadie toque este banco.
+// ---------------------------------------------------------------------------
+
+/** El mapa de la documentacion: la pagina que se vende como el indice de todo. */
+const MAPA = "docs/README.md";
+
+/** Los .md de la RAIZ de openspec/ (sin recursion: specs/ y changes/ se indexan
+ *  solos). Se lee del disco y no de una lista escrita: una lista escrita se
+ *  queda vieja justo cuando entra el documento que hay que vigilar. */
+export function documentosSueltosDeOpenspec() {
+  const dir = path.join(RAIZ, "openspec");
+  return fs
+    .readdirSync(dir, { withFileTypes: true })
+    .filter((e) => e.isFile() && e.name.endsWith(".md"))
+    .map((e) => `openspec/${e.name}`)
+    .sort();
+}
+
+test("hay documentos sueltos en openspec/ que vigilar: un cero aca es este control roto", () => {
+  // Si esta lista quedara vacia, el caso de abajo pasaria verde sin mirar nada
+  // — y el modo de falla seria el mismo que el defecto que persigue: silencio.
+  const sueltos = documentosSueltosDeOpenspec();
+  assert.ok(
+    sueltos.length >= 1,
+    "no se encontro ningun .md en la raiz de openspec/. O se movieron todos —y entonces esta regla ya no vigila " +
+      "nada y hay que decidir que la reemplaza— o el lector se rompio. Lo que no vale es que pase en verde.",
+  );
+  assert.ok(TODAS.includes(MAPA), `${MAPA} no esta entre las paginas rastreadas: sin el mapa, este control mide aire`);
+});
+
+test("ningun documento suelto de openspec/ queda sin un enlace desde el mapa de la documentacion", () => {
+  const destinos = destinosDe(fs.readFileSync(path.join(RAIZ, MAPA), "utf-8")).map((d) =>
+    path.posix.normalize(path.posix.join(path.posix.dirname(MAPA), d.ruta)),
+  );
+  const huerfanos = documentosSueltosDeOpenspec().filter((doc) => !destinos.includes(doc));
+  assert.deepEqual(
+    huerfanos,
+    [],
+    `${MAPA} se vende como el mapa de la documentacion y no enlaza esto: ${huerfanos.join(", ")}. Un documento sin ` +
+      "un solo enlace no esta guardado, esta perdido: nadie llega a el, asi que nadie descubre que quedo viejo. " +
+      "Arreglo: una fila en la tabla, con que es y como evoluciona.",
+  );
+});
+
+test("MUERDE: sacarle el enlace al mapa se caza DE VERDAD", () => {
+  // LA MUTACION CORRE LA MISMA FUNCION QUE LA REGLA: se le pasa a `destinosDe`
+  // el texto del mapa SIN la linea que enlaza el documento, y se exige que el
+  // documento aparezca como huerfano. No se comprueba que un regex deje de
+  // matchear — eso pasaria igual contra un mapa que nunca tuvo el enlace.
+  const objetivo = documentosSueltosDeOpenspec()[0];
+  const texto = fs.readFileSync(path.join(RAIZ, MAPA), "utf-8");
+  const resolver = (t) =>
+    destinosDe(t).map((d) => path.posix.normalize(path.posix.join(path.posix.dirname(MAPA), d.ruta)));
+
+  assert.ok(resolver(texto).includes(objetivo), `el mapa real tiene que enlazar ${objetivo}: sin eso, mutarlo no prueba nada`);
+
+  const sinLaFila = texto
+    .split("\n")
+    .filter((l) => !l.includes(path.posix.basename(objetivo)))
+    .join("\n");
+  assert.equal(resolver(sinLaFila).includes(objetivo), false, `sacada la fila, ${objetivo} tiene que quedar huerfano`);
+});
+
 test("el ancla se calcula como la calcula GitHub, acentos incluidos", () => {
   // Medido contra un ancla VIVA del repositorio: `#backlog-de-automatización`,
   // que aparece en seis lugares. Si esta traduccion se rompiera, el caso de

@@ -39,8 +39,9 @@ línea: [ADR](02-glosario.md), [andamio](02-glosario.md), [bump](02-glosario.md)
 [censo](02-glosario.md), [change](02-glosario.md), [ci-ok](02-glosario.md),
 [CODEOWNERS](02-glosario.md), [compuerta](02-glosario.md),
 [constitución](02-glosario.md), [delta](02-glosario.md), [fail-open](02-glosario.md),
-[PO](02-glosario.md), [pin](02-glosario.md), [scaffold](02-glosario.md),
-[spec](02-glosario.md), [veredicto agregado](02-glosario.md).
+[PO](02-glosario.md), [pin](02-glosario.md), [requirement](02-glosario.md),
+[scaffold](02-glosario.md), [spec](02-glosario.md),
+[veredicto agregado](02-glosario.md).
 
 > **Este índice tiene que enumerar TODO, y desde hoy sí lo comprueba una
 > verificación automática.** Un índice que se queda corto es peor que no tener
@@ -105,6 +106,18 @@ copian a otro repositorio cuando hacen falta.
 | [plantillas/postmortem.md](plantillas/postmortem.md) | Convención y plantilla de post-mortem | **Scaffold** — no viaja en `plantilla/`: se copia al proyecto cuando hace falta el primer post-mortem, y desde ahí es del proyecto |
 | [plantillas/runbook.md](plantillas/runbook.md) | Convención y plantilla de runbook | **Scaffold** — igual: se copia con el primer runbook, no al crear el repo |
 | [plantillas/registro-de-friccion.md](plantillas/registro-de-friccion.md) | Con qué se anota dónde se traba alguien que arranca un proyecto, mientras lo arranca; el resultado se guarda en `docs/adopciones/` de este repo | **Canónico** — la plantilla se queda acá (corrige la guía del marco, no el repo del proyecto); cada adopción deja su archivo fechado en `adopciones/` |
+
+## Lo que se lee acá y vive en otra carpeta
+
+Una sola, y está acá porque estuvo **huérfana**: ningún archivo del repositorio la
+enlazaba, así que solo la encontraba quien ya sabía que existía. Vive al lado de lo que
+mide y no se muda; lo que se arregla es el mapa. Que siga enumerada lo mide
+[`pruebas/docs/enlaces.test.mjs`](../pruebas/docs/enlaces.test.mjs), igual que el resto
+de esta tabla.
+
+| Documento | Qué es | Cómo evoluciona |
+|---|---|---|
+| [openspec/cobertura-de-requirements.md](../openspec/cobertura-de-requirements.md) | De todo lo que el marco promete por contrato, **qué parte tiene hoy algo que la pone en rojo sola**: una fila por cada [requirement](02-glosario.md) de los [specs](02-glosario.md), con el paso o el caso que lo hace fallar, o `ninguno` con el motivo. Es la página que contesta «¿esto se cumple porque alguien se acuerda, o porque hay una [compuerta](02-glosario.md)?» | **Medición fechada** — no es [canónica](02-glosario.md) y no manda sobre nada: se rehace con los comandos que ella misma publica. Su estructura sí se mantiene sola —`pruebas/docs/cobertura-de-requirements.test.mjs` exige que sus capabilities, sus filas y todos sus números salgan de medir el árbol—; lo único que sigue dependiendo de que alguien relea es si una fila que dice «ninguno» ya dejó de ser cierta, y la página lo declara en su última sección |
 
 ## Por dónde empezar
 
