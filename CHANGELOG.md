@@ -82,6 +82,12 @@ mueve sobre un cambio incompatible.
 
 ### Añadido
 
+- **El paso a producción está escrito.** Era la pregunta peor contestada del
+  camino: cero menciones en las diez páginas. `docs/10-publicar.md` gana una
+  sección 5 que dice lo que hoy hay —un solo destino, no dos—, que la respuesta
+  «dos copias» del asistente no despliega dos ambientes, que la constitución
+  promete una promoción que el andamio no reparte, y cómo llega un cambio a la
+  gente con lo que existe.
 - **Claude Code se declara como requisito.** Los tramos 2 y 3 ocurren dentro de
   una sesión de agente y ninguna página del carril no técnico lo decía: quien
   seguía la guía llegaba al descubrimiento sin saber que le faltaba una
