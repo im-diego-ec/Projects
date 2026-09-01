@@ -64,6 +64,34 @@ más al conteo.)
 
 ---
 
+## `openspec` no está instalado en esta máquina
+
+**Los comandos `/opsx:*` mandan correr `openspec …` a secas, y ese programa no
+existe acá.** No está en el sistema, ni en `node_modules/.bin`, ni en las
+dependencias de este proyecto. Escrito así devuelve `command not found`.
+
+**La forma que sí corre lleva el paquete completo y la versión exacta:**
+
+```bash
+npx --yes @fission-ai/openspec@1.9.0 <subcomando>
+```
+
+Es la misma versión que el pipeline de este repositorio usa, así que lo que ves
+en tu máquina y lo que ve el CI son el mismo programa. Un `npx` sin versión trae
+la última publicada y ahí los dos dejan de coincidir.
+
+**Por qué los archivos de `.claude/commands/opsx/` dicen otra cosa:** los escribe
+`openspec init` y son de la herramienta, no de este proyecto. Editarlos sería
+mantener un fork ajeno —y `openspec update` los reescribe—, así que la
+sustitución se declara acá, que es donde este repositorio habla.
+
+**`archive` es la excepción, y no por permisos:** para cerrar un change se usa la
+skill `projects-archive-change` de este repositorio, no el `archive` del CLI. El
+archivado tiene que dejar además el rastro de qué se aprobó y cuándo, y eso el
+CLI no lo hace.
+
+---
+
 ## Stack fijado
 
 > **ESTA TABLA LLEGA LLENA, y eso es nuevo.** El andamio ya no trae solo la mecánica:

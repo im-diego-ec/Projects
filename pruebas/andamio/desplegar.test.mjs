@@ -118,13 +118,216 @@ test("el paso a paso humano esta escrito, y dice que es humano", () => {
   );
 });
 
-test("MUERDE: sacar la condicion del verde se caza", () => {
-  // El caso que prueba que el de arriba no pasa por vacuidad. Se muta el texto
-  // en memoria, sin tocar el arbol.
-  const mutado = workflow().replace(/github\.event\.workflow_run\.conclusion == 'success'/, "true");
-  assert.equal(
-    /github\.event\.workflow_run\.conclusion == 'success'/.test(mutado),
-    false,
-    "con la condicion sacada, la deteccion tiene que ver que no esta",
+test("dos publicaciones a la vez HACEN COLA: ninguna cancela a la otra", () => {
+  // EL DEFECTO QUE ESTE CASO VIGILA: el workflow traia `cancel-in-progress:
+  // true` y un comentario que defendia lo contrario de lo que el marco exige.
+  //
+  // `openspec/specs/despliegue-ci/spec.md` lo escribe con su motivo: una corrida
+  // de VERIFICACION interrumpida no deja nada —cancelarla es correcto—, pero una
+  // de DESPLIEGUE si deja estado, y entonces el destino queda en una combinacion
+  // que ninguna de las dos corridas describe mientras las dos reportan exito.
+  // Se miran las lineas EJECUTABLES: el comentario de al lado nombra el valor
+  // viejo para explicar por que se cambio, y buscar en el texto entero haria
+  // que documentar la decision rompiera el control que la sostiene.
+  const t = workflow();
+  const ejecutable = t
+    .split("\n")
+    .filter((l) => !/^\s*#/.test(l))
+    .join("\n");
+  assert.match(t, /concurrency:/, "sin grupo de concurrencia, dos publicaciones corren a la vez");
+  assert.match(ejecutable, /cancel-in-progress:\s*false/, "un despliegue interrumpido deja el destino a medias con las dos en verde");
+  assert.equal(/cancel-in-progress:\s*true/.test(ejecutable), false);
+});
+
+test("el workflow que espera existe de verdad, con ese nombre exacto", () => {
+  // Un `workflows: ["ci"]` que no corresponde al `name:` de ningun workflow del
+  // arbol no falla: simplemente NUNCA dispara. Es la forma mas silenciosa de
+  // quedarse sin despliegue, y ningun rojo la anuncia.
+  const sinComentarios = workflow()
+    .split("\n")
+    .filter((l) => !/^\s*#/.test(l))
+    .join("\n");
+  const esperados = [...sinComentarios.matchAll(/workflows:\s*\[([^\]]+)\]/g)].flatMap((m) =>
+    m[1].split(",").map((x) => x.trim().replace(/^["']|["']$/g, "")),
   );
+  assert.ok(esperados.length >= 1, "el workflow tiene que esperar a alguno, o este control no mira nada");
+
+  const dir = path.join(ANDAMIO, ".github/workflows");
+  const nombres = fs
+    .readdirSync(dir)
+    .filter((f) => f.endsWith(".yml"))
+    .map((f) => (fs.readFileSync(path.join(dir, f), "utf-8").match(/^name:\s*(.+)$/m) ?? [])[1]?.trim())
+    .filter(Boolean);
+  for (const e of esperados) {
+    assert.ok(nombres.includes(e), `desplegar.yml espera al workflow "${e}" y ninguno del andamio se llama asi: ${nombres.join(", ")}`);
+  }
+});
+
+test("cada `-C <paquete>` del despliegue apunta a una carpeta que la forma reparte", () => {
+  // El despliegue solo viaja a la forma `sitio`. Si nombrara un paquete que esa
+  // forma no trae, el paso moriria en la publicacion —despues de que el CI ya
+  // dijo verde—, que es el peor momento para descubrirlo.
+  const paquetes = [...workflow().matchAll(/-C\s+\{\{(\w+)\}\}/g)].map((m) => m[1]);
+  assert.ok(paquetes.length >= 1, "el workflow tiene que compilar algun paquete, o este control mide aire");
+  for (const marcador of paquetes) {
+    assert.equal(marcador, "PAQUETE_SITIO", `el despliegue nombra {{${marcador}}}, que la forma sitio no reparte`);
+  }
+});
+
+test("MUERDE: sacar la condicion del verde se caza DE VERDAD", () => {
+  // LA VERSION ANTERIOR DE ESTE CASO ERA TAUTOLOGICA. Hacia
+  // `workflow().replace(/…success'/, "true")` y despues afirmaba que el regex ya
+  // no matcheaba. Con un regex sin `g`, si la cadena NO esta, `replace` es un
+  // no-op y el aserto pasa igual: no podia fallar NUNCA contra un archivo que
+  // hubiera perdido la condicion. Era el unico anti-vacuidad del banco y no
+  // media nada.
+  //
+  // Ahora se afirma primero que la condicion ESTA, que es lo que lo vuelve una
+  // mutacion y no un deseo.
+  const CONDICION = /github\.event\.workflow_run\.conclusion == 'success'/;
+  const t = workflow();
+  assert.match(t, CONDICION, "el archivo real tiene que traer la condicion: sin eso, mutarla no prueba nada");
+  assert.equal(CONDICION.test(t.replace(CONDICION, "true")), false, "y sacada, la deteccion tiene que ver que no esta");
+});
+
+test("se publica el commit que paso el CI, no la punta de main", () => {
+  // EL DEFECTO QUE ESTE CASO VIGILA: un `actions/checkout` pelado bajo
+  // `workflow_run` trae lo que `main` apunte EN ESE MOMENTO, no lo que verifico
+  // la corrida que disparo el workflow. Entre que el CI termina y el despliegue
+  // arranca puede entrar otro merge, y entonces se publica codigo que ningun CI
+  // aprobo — en silencio, porque las dos corridas reportan exito.
+  const t = workflow();
+  assert.match(t, /uses: actions\/checkout@/, "sin checkout no hay nada que publicar");
+  assert.match(
+    t,
+    /ref:\s*\$\{\{\s*github\.event\.workflow_run\.head_sha\s*\}\}/,
+    "el checkout tiene que pedir el commit que el CI midio (`head_sha`), no la rama",
+  );
+});
+
+test("una corrida a mano tampoco publica sin el verde, y apartarse tiene nombre", () => {
+  // EL DEFECTO QUE ESTE CASO VIGILA: el `if` del job acepta `workflow_dispatch`
+  // sin mirar nada, y el unico camino que la guia da para la PRIMERA publicacion
+  // es apretar «Run workflow». O sea que la promesa en negrita —«solo se publica
+  // lo que esta en verde»— no valia justo para el unico camino documentado.
+  const t = workflow();
+  assert.match(t, /if: github\.event_name == 'workflow_dispatch'/, "tiene que haber un paso solo para la corrida a mano");
+  assert.match(t, /check-runs/, "tiene que consultar los check-runs del commit que va a publicar");
+  assert.match(t, /\.name == "ci-ok"/, "y filtrar por ci-ok, que es el veredicto agregado y no un job suelto");
+  assert.match(t, /::error::este commit no tiene ci-ok en verde/, "y frenar si no esta en verde");
+
+  // Y EL APARTAMIENTO EXISTE Y TIENE NOMBRE: la doctrina del repo es que
+  // apartarse se puede y apartarse en silencio no.
+  assert.match(t, /sin_esperar_ci:/, "tiene que haber una casilla declarada para publicar igual");
+  assert.match(t, /::warning::se pidio publicar SIN esperar/, "y usarla tiene que dejar rastro en la corrida");
+
+  // El permiso que eso necesita, en los DOS niveles, como el marco exige.
+  assert.equal((t.match(/checks: read/g) ?? []).length, 2, "`checks: read` va arriba Y en el job");
+});
+
+// ---------------------------------------------------------------------------
+// LO QUE `docs/10` PROMETE DEL `site:` TIENE QUE SALIR EN EL HTML.
+//
+// EL DEFECTO QUE ESTE BANCO CIERRA, medido compilando: la pagina decia que del
+// `site:` de astro.config.mjs «salen los enlaces canonicos del HTML», y
+// `sitio/dist/index.html` no traia UN SOLO `rel="canonical"`. La clave `site`
+// sola no hace eso: Astro la usa para el sitemap y para las URL absolutas que
+// uno pide a mano.
+//
+// LO QUE ESTE BANCO NO PUEDE AFIRMAR, dicho primero: no compila el sitio —eso
+// pide un install con red y decenas de segundos—. Lo verificado a mano el
+// 2026-09-01 sobre un sitio recien generado: `dist/index.html` trae
+// `<link rel="canonical" href="https://agenda.ejemplo.com/">`.
+//
+// LO QUE SI SOSTIENE, y es lo que se rompe con una edicion: que el molde EMITA
+// la etiqueta, que la derive de `Astro.site` y no de otra cosa, y que NO la
+// emita cuando `site` no esta — una canonica relativa manda a quien indexa a una
+// direccion que no existe, que es peor que no tenerla.
+// ---------------------------------------------------------------------------
+
+const molde = () => fs.readFileSync(path.join(ANDAMIO, "sitio/src/layouts/Base.astro"), "utf-8");
+
+test("el molde del sitio emite la direccion canonica, y la deriva de `site`", () => {
+  const t = molde();
+  assert.match(t, /rel="canonical"/, "sin esta etiqueta, docs/10 promete algo que el HTML no trae");
+  assert.match(t, /Astro\.site/, "tiene que salir del `site:` de la configuracion, que es lo que la pagina dice");
+  assert.match(t, /Astro\.url\.pathname/, "y de la direccion de ESTA pagina, no de una fija");
+
+  // LA MITAD QUE MAS IMPORTA: sin `site` no se inventa nada.
+  assert.match(t, /Astro\.site \?|Astro\.site\s*&&/, "tiene que haber una guarda: sin `site`, la etiqueta no sale");
+  assert.match(t, /canonica &&|canonical.*&&/, "y la emision tiene que colgar de esa guarda");
+});
+
+test("la pagina que lo promete y el molde que lo cumple no pueden separarse", () => {
+  // ANTI-VACUIDAD Y ANCLA: este caso existe porque docs/10 hace la promesa. Si
+  // la promesa se borrara, el control quedaria vigilando algo que ya nadie dijo.
+  const pagina = fs.readFileSync(path.join(RAIZ, "docs/10-publicar.md"), "utf-8");
+  assert.match(
+    pagina,
+    /enlaces can(ó|o)nicos/i,
+    "docs/10 dejo de prometer los enlaces canonicos: si fue a proposito, este control sobra y hay que sacarlo",
+  );
+});
+
+test("MUERDE: sacar la canonica del molde se caza, y sacar la guarda tambien", () => {
+  const t = molde();
+  assert.equal(/rel="canonical"/.test(t.replace(/rel="canonical"/g, "")), false, "la deteccion tiene que ver que no esta");
+  // Y la guarda: un molde que emite la canonica SIN preguntar por `site` pasa el
+  // primer aserto y falla este, que es el que protege contra la canonica falsa.
+  const sinGuarda = t.replace(/const canonica = [^\n]*\n/, "const canonica = new URL(Astro.url.pathname, Astro.site);\n");
+  assert.equal(
+    /Astro\.site \?|Astro\.site\s*&&/.test(sinGuarda),
+    false,
+    "sin la guarda, la deteccion tiene que ver que se perdio",
+  );
+});
+
+test("el conteo de actos humanos es el mismo en todos lados, y son TRES", () => {
+  // EL DEFECTO QUE ESTE CASO VIGILA, medido: el marco decia el numero de tres
+  // maneras distintas —«una sola cosa», «dos cosas», «dos actos humanos»— y en
+  // ninguna decia tres, que es lo que son. El tercero, registrar el subdominio,
+  // cuesta contarlo porque LLEGA TARDE: Cloudflare no lo pide hasta la primera
+  // publicacion, asi que aparece cuando la persona ya creia haber terminado.
+  //
+  // Contarlos mal no es un detalle de redaccion: es la unica lista que le dice a
+  // alguien cuanto trabajo humano le queda.
+  const donde = {
+    "plantilla/sitio/README.md": fs.readFileSync(path.join(ANDAMIO, "sitio/README.md"), "utf-8"),
+    "docs/10-publicar.md": fs.readFileSync(path.join(RAIZ, "docs/10-publicar.md"), "utf-8"),
+    "docs/04-arrancar-acompanado.md": fs.readFileSync(path.join(RAIZ, "docs/04-arrancar-acompanado.md"), "utf-8"),
+    "plantilla/README-del-proyecto.md": fs.readFileSync(path.join(ANDAMIO, "README-del-proyecto.md"), "utf-8"),
+  };
+  // EL PATRON ES ESTRECHO A PROPOSITO, y las dos exclusiones estan medidas: en
+  // este mismo arbol hay un «Guardar las dos cosas en GitHub» —los dos secretos,
+  // que SON dos— y un «Lo que hoy hay, y es una sola cosa» —el destino de
+  // publicacion, que ES uno—. Las dos frases son correctas. Un control que caza
+  // lo correcto ensenia a ignorarlo, asi que solo se mira lo que de verdad cuenta
+  // actos humanos.
+  const VIEJAS = /\b(dos|una sola) (actos? humanos?|cosas? que (s(ó|o)lo )?una persona)/i;
+  const malos = [];
+  let conteos = 0;
+  for (const [f, t] of Object.entries(donde)) {
+    if (/tres (actos humanos|cosas)/i.test(t)) conteos++;
+    const m = t.match(VIEJAS);
+    if (m) malos.push(`${f}: dice "${m[0]}"`);
+  }
+  assert.ok(conteos >= 3, `solo ${conteos} de los cuatro lugares dicen el numero: si cayo, la lista se disperso otra vez`);
+  assert.deepEqual(
+    malos,
+    [],
+    "el conteo de actos humanos volvio a decirse de mas de una manera. Son TRES —la cuenta, el subdominio y la " +
+      `credencial— y el tercero es el que llega tarde:\n  ${malos.join("\n  ")}`,
+  );
+});
+
+test("el subdominio se pide donde la persona esta, no donde le explota", () => {
+  // Estaba solo en la tabla de errores del ultimo paso: la persona se enteraba
+  // cuando el despliegue fallaba. Ahora se pide en el paso de la cuenta, que es
+  // donde se puede hacer sin perder nada.
+  const t = fs.readFileSync(path.join(ANDAMIO, "sitio/README.md"), "utf-8");
+  const paso1 = t.slice(t.indexOf("### 1 ·"), t.indexOf("### 2 ·"));
+  assert.ok(paso1.length > 100, "no se pudo aislar el paso 1: cambio la forma de los encabezados");
+  assert.match(paso1, /Subdomain/, "el paso de la cuenta tiene que nombrar donde se registra el subdominio");
+  assert.match(paso1, /no se puede cambiar|una vez/i, "y avisar que se elige una sola vez");
+  assert.match(paso1, /primera publicaci(ó|o)n/i, "y por que si se saltea explota mas tarde");
 });

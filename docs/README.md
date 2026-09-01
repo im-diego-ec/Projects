@@ -24,9 +24,11 @@ sale, y este archivo no tiene cómo darse cuenta. Se cuentan así:
 ```bash
 node -e 'import("./pruebas/docs/lectura.mjs").then(m=>console.log(m.paginasDelAlcance().length))'
 git ls-files "docs/**/*.md" "docs/*.md" | wc -l
-``` Ninguna se escapa en silencio —si aparece una subcarpeta nueva
-la comprobación se pone roja y obliga a decidir—, pero que una página quede
-fuera no significa que no importe:
+```
+
+Ninguna se escapa en silencio —si aparece una subcarpeta nueva la comprobación
+se pone roja y obliga a decidir—, pero que una página quede fuera no significa
+que no importe:
 [`plantillas/registro-de-friccion.md`](plantillas/registro-de-friccion.md) es
 **canónico** y es justamente la otra mitad de este estándar, la única que puede
 decir si una página **se entiende**. Medido el 2026-08-25.
@@ -37,8 +39,9 @@ línea: [ADR](02-glosario.md), [andamio](02-glosario.md), [bump](02-glosario.md)
 [censo](02-glosario.md), [change](02-glosario.md), [ci-ok](02-glosario.md),
 [CODEOWNERS](02-glosario.md), [compuerta](02-glosario.md),
 [constitución](02-glosario.md), [delta](02-glosario.md), [fail-open](02-glosario.md),
-[PO](02-glosario.md), [pin](02-glosario.md), [scaffold](02-glosario.md),
-[spec](02-glosario.md), [veredicto agregado](02-glosario.md).
+[PO](02-glosario.md), [pin](02-glosario.md), [requirement](02-glosario.md),
+[scaffold](02-glosario.md), [spec](02-glosario.md),
+[veredicto agregado](02-glosario.md).
 
 > **Este índice tiene que enumerar TODO, y desde hoy sí lo comprueba una
 > verificación automática.** Un índice que se queda corto es peor que no tener
@@ -58,7 +61,7 @@ línea: [ADR](02-glosario.md), [andamio](02-glosario.md), [bump](02-glosario.md)
 > de lectura, y `pruebas/docs/documentacion.test.mjs` sigue exigiendo que
 > `06-para-el-po.md` y `02-glosario.md` estén enlazados acá.
 
-## El camino, del 01 al 10
+## El camino, en orden
 
 Se leen **en orden**. El número dice en qué lugar del camino va cada una, no
 cuánto importa.
@@ -74,19 +77,20 @@ cuánto importa.
 | [07-para-el-builder.md](07-para-el-builder.md) | La otra mitad del reparto: qué le toca al **[builder](02-glosario.md)**, o sea a quien construye —qué aprueba y qué no, cómo se escribe un change de verdad (no cómo se lee), qué verificación lo va a poner en rojo y qué hacer con cada una— y qué se apaga y qué NO cuando el equipo es una sola persona | **Canónico** — se actualiza cuando `.github/CODEOWNERS` cambia el reparto, o cuando las verificaciones automáticas ganan o pierden una [compuerta](02-glosario.md) |
 | [08-descubrimiento.md](08-descubrimiento.md) | De los documentos del negocio a un **[PRD](02-glosario.md)** que dice qué hay que construir: el directorio aparte, la lista de cobertura, el PRD y sus vueltas de pulido. Le habla al PO, y termina **antes** de los specs — no hay ningún comando que convierta un PRD en un [spec](02-glosario.md) | **Canónico** — se actualiza cuando cambia la herramienta de descubrimiento o el camino de la lista de cobertura |
 | [09-construir-con-openspec.md](09-construir-con-openspec.md) | De ese PRD a un change de OpenSpec y de ahí a un pull request: el [proposal](02-glosario.md), los deltas, la tercera columna de la lista. Le habla al [builder](02-glosario.md) | **Canónico** — se actualiza cuando cambia el flujo de OpenSpec o lo que `.github/CODEOWNERS` reparte |
-| [10-reglas-no-escritas.md](10-reglas-no-escritas.md) | Las reglas que el equipo practica y ningún archivo declaraba, con su estado de enforcement y el backlog de automatización | **Canónico** — se actualiza cuando un post-mortem compra una regla o cuando una verificación nueva la vuelve automática |
+| [10-publicar.md](10-publicar.md) | De `main` en verde a una dirección donde entra la gente: qué publica solo y qué no, la regla de que no se publica lo que no está verde, y el cierre del círculo. **Es el cuarto tramo del camino** | **Canónica** — la fuente del tramo de publicar |
+| [11-reglas-no-escritas.md](11-reglas-no-escritas.md) | Las reglas que el equipo practica y ningún archivo declaraba, con su estado de enforcement y el backlog de automatización | **Canónico** — se actualiza cuando un post-mortem compra una regla o cuando una verificación nueva la vuelve automática |
 
-## Lo que se abre el día que hace falta, del 11 al 15
+## Lo que se abre el día que hace falta
 
 Ninguna hace falta para arrancar. Se abren cuando aparece su problema.
 
 | Documento | Qué es | Cómo evoluciona |
 |---|---|---|
-| [11-upgrade-openspec.md](11-upgrade-openspec.md) | Cómo subir la versión pineada de la herramienta de línea de comandos de OpenSpec, con sus tres trampas conocidas | **Canónico** |
-| [12-censo-de-consumidores.md](12-censo-de-consumidores.md) | Quién consume el marco: el diseño vigente (los PRs de bump de Dependabot), lo que se midió de él, y el plan B con su decisión de credencial pendiente | **Canónico** — se actualiza cuando el mecanismo del censo cambia o cuando se mide otra vez |
-| [13-consumidores.md](13-consumidores.md) | El registro de quién consume el marco: una fila por repo, con la fecha de adopción y la versión con la que nació. **Hoy está vacío**, y ahí mismo se dice por qué eso no significa «cero consumidores» | **Canónico** — se agrega una fila en el PR de cada adopción. Mientras la fila la escriba una persona y no la herramienta, la mitad que falta está declarada en el propio archivo |
-| [14-forkear-el-marco.md](14-forkear-el-marco.md) | Qué hay que cambiar para que un fork del marco a otra cuenta deje de ejecutar las actions de la cuenta original, con el comando que enumera cada referencia | **Canónico** — se actualiza cuando aparece una referencia nueva a la cuenta del marco |
-| [15-auditoria-cierre-v1.md](15-auditoria-cierre-v1.md) | La auditoría del 2026-08-20: veinte afirmaciones que los PRs del cierre de la v1 hacían sobre sí mismos, puestas a prueba con fixtures y código de salida — trece refutadas, siete sostenidas | **Histórico** — es una foto fechada y **no se actualiza**: se cita y se cierra por sus hallazgos. Su primera línea dice de cuándo es y qué caducó desde entonces |
+| [12-upgrade-openspec.md](12-upgrade-openspec.md) | Cómo subir la versión pineada de la herramienta de línea de comandos de OpenSpec, con sus tres trampas conocidas | **Canónico** |
+| [13-censo-de-consumidores.md](13-censo-de-consumidores.md) | Quién consume el marco: el diseño vigente (los PRs de bump de Dependabot), lo que se midió de él, y el plan B con su decisión de credencial pendiente | **Canónico** — se actualiza cuando el mecanismo del censo cambia o cuando se mide otra vez |
+| [14-consumidores.md](14-consumidores.md) | El registro de quién consume el marco: una fila por repo, con la fecha de adopción y la versión con la que nació. **Hoy está vacío**, y ahí mismo se dice por qué eso no significa «cero consumidores» | **Canónico** — se agrega una fila en el PR de cada adopción. Mientras la fila la escriba una persona y no la herramienta, la mitad que falta está declarada en el propio archivo |
+| [15-forkear-el-marco.md](15-forkear-el-marco.md) | Qué hay que cambiar para que un fork del marco a otra cuenta deje de ejecutar las actions de la cuenta original, con el comando que enumera cada referencia | **Canónico** — se actualiza cuando aparece una referencia nueva a la cuenta del marco |
+| [16-auditoria-cierre-v1.md](16-auditoria-cierre-v1.md) | La auditoría del 2026-08-20: veinte afirmaciones que los PRs del cierre de la v1 hacían sobre sí mismos, puestas a prueba con fixtures y código de salida — trece refutadas, siete sostenidas | **Histórico** — es una foto fechada y **no se actualiza**: se cita y se cierra por sus hallazgos. Su primera línea dice de cuándo es y qué caducó desde entonces |
 
 ## Las carpetas, que no llevan número
 
@@ -103,6 +107,18 @@ copian a otro repositorio cuando hacen falta.
 | [plantillas/runbook.md](plantillas/runbook.md) | Convención y plantilla de runbook | **Scaffold** — igual: se copia con el primer runbook, no al crear el repo |
 | [plantillas/registro-de-friccion.md](plantillas/registro-de-friccion.md) | Con qué se anota dónde se traba alguien que arranca un proyecto, mientras lo arranca; el resultado se guarda en `docs/adopciones/` de este repo | **Canónico** — la plantilla se queda acá (corrige la guía del marco, no el repo del proyecto); cada adopción deja su archivo fechado en `adopciones/` |
 
+## Lo que se lee acá y vive en otra carpeta
+
+Una sola, y está acá porque estuvo **huérfana**: ningún archivo del repositorio la
+enlazaba, así que solo la encontraba quien ya sabía que existía. Vive al lado de lo que
+mide y no se muda; lo que se arregla es el mapa. Que siga enumerada lo mide
+[`pruebas/docs/enlaces.test.mjs`](../pruebas/docs/enlaces.test.mjs), igual que el resto
+de esta tabla.
+
+| Documento | Qué es | Cómo evoluciona |
+|---|---|---|
+| [openspec/cobertura-de-requirements.md](../openspec/cobertura-de-requirements.md) | De todo lo que el marco promete por contrato, **qué parte tiene hoy algo que la pone en rojo sola**: una fila por cada [requirement](02-glosario.md) de los [specs](02-glosario.md), con el paso o el caso que lo hace fallar, o `ninguno` con el motivo. Es la página que contesta «¿esto se cumple porque alguien se acuerda, o porque hay una [compuerta](02-glosario.md)?» | **Medición fechada** — no es [canónica](02-glosario.md) y no manda sobre nada: se rehace con los comandos que ella misma publica. Su estructura sí se mantiene sola —`pruebas/docs/cobertura-de-requirements.test.mjs` exige que sus capabilities, sus filas y todos sus números salgan de medir el árbol—; lo único que sigue dependiendo de que alguien relea es si una fila que dice «ninguno» ya dejó de ser cierta, y la página lo declara en su última sección |
+
 ## Por dónde empezar
 
 - **No sos técnico y querés entender qué es esto**:
@@ -117,7 +133,7 @@ copian a otro repositorio cuando hacen falta.
 - **Sos el PO**: [06-para-el-po.md](06-para-el-po.md), y nada más. Es una página, no
   supone que escribas código, y trae las rutas que aprobás y las preguntas con
   las que se rechaza un change. El resto de esta carpeta es de ingeniería.
-- **Entrando al equipo**: [10-reglas-no-escritas.md](10-reglas-no-escritas.md)
+- **Entrando al equipo**: [11-reglas-no-escritas.md](11-reglas-no-escritas.md)
   primero. Los ADRs explican el sistema; esa página explica cómo se
   trabaja dentro de él.
 - **Arrancando un proyecto**: [05-arrancar-tecnico.md](05-arrancar-tecnico.md),

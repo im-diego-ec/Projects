@@ -36,7 +36,8 @@ la configuración (`wrangler.jsonc`) y el paso automático
 (`.github/workflows/desplegar.yml`), que corre **solo cuando las verificaciones
 terminan en verde** sobre la rama principal.
 
-Lo que falta son **dos cosas que solo una persona puede hacer**, y por eso están
+Lo que falta son **tres actos humanos** —abrir la cuenta, registrar el subdominio
+y crear la credencial—, y por eso están
 acá y no automatizadas: abrir una cuenta y crear una credencial. Se hacen **una
 sola vez**.
 
@@ -54,6 +55,17 @@ tu sitio **no tienen límite de visitas** en ese plan.
 Después copiá tu **Account ID**: está en el panel, en la barra lateral derecha
 de la sección Workers, y es una tira de letras y números.
 
+**Y aprovechá para registrar el subdominio ahora**, en **Workers & Pages →
+Subdomain**: es el nombre que va en el medio de tu dirección
+(`{{PROYECTO}}.<tu-subdominio>.workers.dev`), se elige una vez y no se puede
+cambiar después.
+
+> **Cloudflare no te lo va a pedir hasta la primera publicación**, así que si lo
+> salteás acá, el paso 4 va a fallar con
+> `you need to register a workers.dev subdomain` cuando ya creías haber terminado
+> con lo humano. Es el tercero de los tres actos humanos de esta página, y el
+> único que llega tarde.
+
 ### 2 · La credencial · *2 minutos*
 
 En [`dash.cloudflare.com/profile/api-tokens`](https://dash.cloudflare.com/profile/api-tokens):
@@ -62,6 +74,13 @@ En [`dash.cloudflare.com/profile/api-tokens`](https://dash.cloudflare.com/profil
 2. Elegí la plantilla **«Edit Cloudflare Workers»**. No armes uno a medida: esa
    plantilla ya tiene el permiso justo y nada más.
 3. Creálo y **copiá el valor ahora**: Cloudflare no lo vuelve a mostrar.
+
+> ⚠️ **Ojo con el token equivocado, que es el error más común.** Cloudflare
+> ofrece varios tipos y el de **R2** —su almacenamiento de archivos— se parece
+> bastante. Si la pantalla donde lo creaste te muestra además una *Access Key ID*
+> y una *Secret Access Key*, ése es de R2 y **no sirve para publicar**: el
+> despliegue va a fallar por permisos, con un error que no dice cuál era el
+> correcto.
 
 ### 3 · Guardar las dos cosas en GitHub · *2 minutos*
 
@@ -86,6 +105,22 @@ solo cada vez que las verificaciones quedan en verde sobre la rama principal.
 **Cómo sabés que salió bien.** El paso de publicación imprime la dirección, y la
 primera vez tiene la forma `https://{{PROYECTO}}.<tu-subdominio>.workers.dev`.
 Abrila: tiene que verse tu sitio.
+
+### 5 · Si sale rojo: los tres errores que vas a ver
+
+Vienen de Cloudflare tal cual, sin traducir, y ninguno dice qué hacer. Esto sí:
+
+| Lo que dice | Qué pasó | Cómo se arregla |
+| --- | --- | --- |
+| `Authentication failed (status: 400) [code: 9106]` | el token no vale: mal pegado, vencido, o revocado | creá otro con la plantilla «Edit Cloudflare Workers» y volvé a guardarlo en Secrets |
+| `Invalid format for Authorization header [code: 6111]` | al pegarlo entró un espacio, un salto de línea o comillas | pegalo de nuevo, sin nada alrededor |
+| `you need to register a workers.dev subdomain` | tu cuenta todavía no tiene subdominio | elegí uno en el panel, en **Workers & Pages → Subdomain**. Es una vez y es gratis |
+
+Los dos primeros son del **token**; el tercero es de la **cuenta** y no tiene nada
+que ver con este repositorio.
+
+> **El tercero le pasa a quien salteó el subdominio en el paso 1.** Se arregla
+> ahí mismo y se vuelve a publicar: no hay que rehacer nada.
 
 ### Antes de todo eso, podés ensayar sin publicar nada
 

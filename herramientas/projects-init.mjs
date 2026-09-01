@@ -5,7 +5,8 @@
 // POR QUE EXISTE. Adoptar Projects eran ~30 actos manuales: copiar 76 archivos con
 // robocopy o cp (y acordarse del `/.` final, o los dotfiles no viajan; y de
 // renombrar el README del proyecto, que viaja con otro nombre), sustituir
-// 192 ocurrencias de 21 marcadores en 39 archivos, inicializar OpenSpec y
+// cientos de ocurrencias de todos los marcadores en decenas de archivos —cuantos,
+// lo dice cada corrida en su primera linea—, inicializar OpenSpec y
 // renderizar la constitucion. Nada de eso es una decision: es transcripcion. Y la
 // transcripcion a mano falla de la peor manera —un marcador mal sustituido es
 // sintacticamente valido, asi que el check de marcadores lo deja pasar: "se
@@ -237,7 +238,7 @@ export function seExcluyeDelCopiado(rel, plataforma = "aws", forma = "aplicacion
   // infra/ —correcto— y tambien sin PLATAFORMAS.md, o sea sin la unica pagina
   // que explica las cinco plataformas.
   if (renombresPorPlataforma(plataforma)[rel]) return false;
-  for (const n of noViajanPorPlataforma(plataforma)) if (bajo === n || bajo.startsWith(`${n}/`)) return true;
+  for (const n of noViajanPorPlataforma(plataforma, forma)) if (bajo === n || bajo.startsWith(`${n}/`)) return true;
   return false;
 }
 
@@ -261,8 +262,26 @@ export function seExcluyeDelCopiado(rel, plataforma = "aws", forma = "aplicacion
  *  `aws` es el valor por defecto A PROPOSITO: un archivo de valores viejo, escrito
  *  antes de que esta clave se leyera, describe un proyecto de AWS. Cambiar eso en
  *  silencio le sacaria la infraestructura a un proyecto que la tiene. */
-export function noViajanPorPlataforma(plataforma) {
-  return plataforma === "aws" ? [] : ["infra", "infra-prod"];
+export function noViajanPorPlataforma(plataforma, forma = "aplicacion") {
+  // LA FORMA TAMBIEN DECIDE ESTO, y no mirarla dejaba el arreglo a medias.
+  //
+  // El asistente ya no PREGUNTA por AWS cuando la forma es un sitio —un sitio
+  // para leer se publica en Cloudflare y no tiene servidor propio que
+  // desplegar—, asi que sus cinco valores llevan el relleno declarado. Pero esta
+  // funcion seguia mirando solo la plataforma, asi que a sitio+AWS le repartia
+  // igual `infra/` e `infra-prod/`: dos raices de Terraform apuntando a la
+  // cuenta 111111111111 y al perfil `sin-aws-dev`, que son el relleno.
+  //
+  // Y no quedaba en Terraform. La constitucion del proyecto nuevo IMPRIME esos
+  // valores en una tabla —«| Cuenta AWS | 111111111111 | 222222222222 |»— como
+  // si fueran datos de la persona. El rojo se habia ido; el arbol equivocado
+  // quedaba, que es peor, porque nada lo dice.
+  //
+  // El predicado es el mismo que usa el asistente (`usaAws`), escrito aca sin
+  // importarlo para no atar la herramienta a su modulo: si las dos definiciones
+  // se separan, el banco lo caza —hay un caso que las compara—.
+  const usaAws = plataforma === "aws" && forma !== "sitio";
+  return usaAws ? [] : ["infra", "infra-prod"];
 }
 
 /** Lo que NO viaja segun la FORMA de proyecto que se eligio.
@@ -309,6 +328,53 @@ export function formaDe(valores) {
   return typeof v === "string" && v.trim() ? v.trim().toLowerCase() : "aplicacion";
 }
 
+/** Las formas que la herramienta sabe repartir, y las plataformas.
+ *
+ *  SE DERIVAN de lo que las funciones de poda ya saben, no se escriben aparte:
+ *  una segunda lista al lado de la primera es como empiezan las divergencias, y
+ *  este archivo ya pago esa cuenta con el predicado de AWS. */
+export const FORMAS = ["aplicacion", "sitio"];
+export const PLATAFORMAS = ["aws", "supabase", "ninguna"];
+
+/** LO QUE NO SE VALIDABA, y era justo lo que mas cuesta si se toma mal.
+ *
+ *  `forma` y `plataforma` eran los DOS UNICOS valores sin ninguna comprobacion,
+ *  y son los que deciden QUE ARCHIVOS VIAJAN. Medido: escribir `"sitios"` en vez
+ *  de `"sitio"` en el archivo de valores entrega, con SALIDA 0 y sin una sola
+ *  linea de aviso, un proyecto completamente distinto —api/, web/, e2e/,
+ *  docker-compose—, porque `formaDe` cae en su valor por defecto ante cualquier
+ *  cosa que no reconozca.
+ *
+ *  Para una persona no tecnica, sola, ese es el modo de falla mas caro que puede
+ *  existir en este tramo: pidio una cosa, recibio otra, y nada le dijo nada. El
+ *  default sigue existiendo —protege a un archivo viejo que no traia la clave—
+ *  pero ahora distingue AUSENTE de MAL ESCRITO, que no son lo mismo. */
+export function problemasDeEleccion(valores) {
+  const problemas = [];
+  for (const [clave, validas] of [
+    ["forma", FORMAS],
+    ["plataforma", PLATAFORMAS],
+  ]) {
+    const crudo = valores?.[clave];
+    if (crudo === undefined || crudo === null || crudo === "") continue; // ausente: vale el default
+    if (typeof crudo !== "string") {
+      problemas.push(`${clave} tiene que ser texto y es ${typeof crudo}`);
+      continue;
+    }
+    const v = crudo.trim().toLowerCase();
+    if (!validas.includes(v)) {
+      const cerca = validas.find((x) => x.startsWith(v.slice(0, 4)) || v.startsWith(x.slice(0, 4)));
+      problemas.push(
+        `${clave} = ${JSON.stringify(crudo)} no es una opcion. Las que hay: ${validas.join(", ")}` +
+          (cerca ? `. ¿Quisiste decir "${cerca}"?` : "") +
+          `. Esta clave decide QUE ARCHIVOS recibe tu proyecto, asi que un valor que no se reconoce no se puede ` +
+          `asumir: te daria un proyecto distinto del que pediste sin avisarte`,
+      );
+    }
+  }
+  return problemas;
+}
+
 /** El catalogo de plataformas vive DENTRO de `infra/`, que es justo el directorio
  *  que no viaja cuando la plataforma no es AWS. Es el unico documento que explica
  *  las cinco opciones y donde estan escritos los adaptadores, asi que perderlo es
@@ -349,7 +415,73 @@ export function renombresPorPlataforma(plataforma) {
  *  No alcanza con borrar el script suelto: hay que sacarlo TAMBIEN de la cadena
  *  de `verificar`, porque esa cadena lo nombra. Los dos se mueven juntos. */
 export function podarPorForma(texto, rel, forma) {
-  if (forma !== "sitio" || rel !== "package.json") return texto;
+  // LA FORMA SE ESCRIBE SIEMPRE, igual que la plataforma y por el mismo motivo:
+  // si solo se escribiera en el caso raro, el literal del andamio seguiria
+  // siendo la unica fuente y volveria a poder mentir el dia que cambie.
+  //
+  // EL DEFECTO QUE CIERRA, medido: el proyecto generado NO registraba su propia
+  // forma en ningun lado. `.projects-valores.json` traia `plataforma` y no
+  // `forma`, asi que la pregunta «¿esto se publica solo?» —la que abre el cuarto
+  // tramo— no se podia contestar mirando el proyecto. El comando que la guia
+  // manda correr en su Paso 14 devolvia vacio y salia 1.
+  if (rel === ".projects-valores.json") {
+    try {
+      const j = JSON.parse(texto);
+      j.forma = forma;
+      return `${JSON.stringify(j, null, 2)}\n`;
+    } catch {
+      return texto;
+    }
+  }
+
+  // El bloque del sitio se saca SIEMPRE que la forma no sea un sitio: si no,
+  // una aplicacion se queda con una portada que le promete una publicacion
+  // automatica que su arbol no trae, que es el mismo defecto al reves.
+  if (forma !== "sitio") {
+    if (rel === "README-del-proyecto.md") {
+      return texto
+        .replace(/> # projects:solo-si-es-sitio\n[\s\S]*?> # projects:fin-solo-si-es-sitio\n\n?/g, "")
+        .replace(/<!-- projects:solo-si-es-sitio -->\n[\s\S]*?<!-- projects:fin-solo-si-es-sitio -->\n/g, "");
+    }
+    return texto;
+  }
+
+  // EL PIPELINE TAMBIEN SE PODA, y no hacerlo costo un bloqueante entero.
+  //
+  // Hasta este arreglo esta funcion podaba el package.json Y NADA MAS, asi que
+  // el ci.yml que le viajaba a un sitio conservaba dos exigencias de una forma
+  // que no es la suya: `pnpm --filter {{PAQUETE_API}} --fail-if-no-match exec
+  // prisma generate` sobre un workspace sin paquete de API —medido: «No projects
+  // matched the filters» y salida 1, que es justo lo que `--fail-if-no-match`
+  // existe para provocar— y las EXCEPCIONES de un paquete E2E que la forma no
+  // reparte. El CI nacia rojo el dia uno.
+  //
+  // Y lo peor no era el rojo. `desplegar.yml` solo publica con
+  // `workflow_run.conclusion == 'success'`, asi que con el CI rojo el despliegue
+  // NUNCA se disparaba: arreglar solo el arranque habria cambiado un rojo
+  // ruidoso por un silencio, que es estrictamente peor.
+  if (rel === ".github/workflows/ci.yml") {
+    return texto
+      .replace(/[ \t]*# projects:solo-si-hay-datos\n[\s\S]*?# projects:fin-solo-si-hay-datos\n/g, "")
+      .replace(/[ \t]*# projects:solo-si-hay-e2e\n[\s\S]*?# projects:fin-solo-si-hay-e2e\n/g, "");
+  }
+
+  // LA PORTADA DEL PROYECTO, que decia lo contrario de lo que el arbol traia.
+  //
+  // EL DEFECTO, medido en un sitio recien generado: el README afirmaba «nada lo
+  // publica: no hay un paso que lleve tu codigo a una direccion donde otra
+  // persona pueda entrar» dentro de un proyecto que trae `desplegar.yml` y
+  // `sitio/wrangler.jsonc`. Es la PRIMERA pantalla que ve cualquiera que entre
+  // al repositorio, y afirmaba que el cuarto tramo no existe justo para la unica
+  // forma donde si existe. Ademas describia prefijos de recursos y regiones de
+  // una nube que un sitio no usa.
+  if (rel === "README-del-proyecto.md") {
+    return texto
+      .replace(/> # projects:solo-si-no-es-sitio\n[\s\S]*?> # projects:fin-solo-si-no-es-sitio\n/g, "")
+      .replace(/<!-- projects:solo-si-no-es-sitio -->\n[\s\S]*?<!-- projects:fin-solo-si-no-es-sitio -->\n/g, "");
+  }
+
+  if (rel !== "package.json") return texto;
   try {
     const j = JSON.parse(texto);
     if (j.scripts) {
@@ -368,7 +500,26 @@ export function podarPorForma(texto, rel, forma) {
   }
 }
 
-export function podarPorPlataforma(texto, rel, plataforma) {
+/** SACA LOS CENTINELAS DE PODA, y por que va DESPUES de todas las podas.
+ *
+ *  Los `# projects:solo-si-hay-…` son contabilidad de ESTE marco: le dicen a la
+ *  herramienta que bloque gatear. Al proyecto que nace no le dicen nada, y
+ *  dejarselos es hacerle leer una nota escrita para otra persona.
+ *
+ *  EL DEFECTO QUE CIERRA, medido en una aplicacion recien generada: ocho lineas
+ *  de centinela sobrevivian —en el README, en dependabot.yml y en el ci.yml—
+ *  porque cada poda vuelve temprano cuando el bloque SI corresponde y en ese
+ *  camino nadie los limpiaba. Se veian en la portada del repositorio nuevo.
+ *
+ *  Se borra la linea entera, con su sangria y su salto: un comentario suelto en
+ *  medio de un YAML se lee como basura aunque sea valido. */
+export function sacarCentinelas(texto) {
+  return texto
+    .replace(/^[ \t]*(?:>[ \t]*)?# projects:(?:fin-)?solo-si-[a-z0-9-]+[ \t]*\r?\n/gm, "")
+    .replace(/^[ \t]*<!-- projects:(?:fin-)?solo-si-[a-z0-9-]+ -->[ \t]*\r?\n/gm, "");
+}
+
+export function podarPorPlataforma(texto, rel, plataforma, forma = "aplicacion") {
   // Esta va ANTES del corte de abajo: la plataforma se declara en el archivo de
   // valores del proyecto SIEMPRE, tambien cuando es `aws`. Si solo se escribiera
   // en el caso raro, el literal del andamio seguiria siendo la unica fuente y
@@ -382,7 +533,12 @@ export function podarPorPlataforma(texto, rel, plataforma) {
       return texto;
     }
   }
-  if (plataforma === "aws") return texto;
+  // LA MISMA REGLA QUE EL REPARTO DE ARCHIVOS, y no mirarla dejaba la portada
+  // describiendo carpetas que el proyecto no recibe: un sitio con AWS elegido no
+  // recibe `infra/` —no tiene servidor propio que desplegar— pero su README
+  // seguia trayendo la fila que las describe, porque esta poda miraba solo la
+  // plataforma. Es el mismo predicado de `noViajanPorPlataforma`.
+  if (plataforma === "aws" && forma !== "sitio") return texto;
   if (rel === ".github/dependabot.yml") {
     return texto.replace(/[ \t]*# projects:solo-si-hay-infra\n[\s\S]*?# projects:fin-solo-si-hay-infra\n/g, "");
   }
@@ -393,10 +549,14 @@ export function podarPorPlataforma(texto, rel, plataforma) {
     // primera pantalla que ve cualquiera que entre al repositorio afirmaba un
     // despliegue que no existe. El centinela va en el propio andamio, con la
     // forma de cita de markdown para que el bloque se lea igual mientras esta.
-    return texto.replace(/> # projects:solo-si-hay-infra\n[\s\S]*?> # projects:fin-solo-si-hay-infra\n/g,
-      "> ⚠️ **Este proyecto todavía no se publica en ningún lado.** Se verifica solo, pero nada\n" +
-      "> lo lleva a una dirección donde otra persona pueda entrar. Mientras tanto se levanta en\n" +
-      "> tu máquina con `pnpm dev`.\n");
+      // SE BORRA Y NO SE REEMPLAZA. Este bloque ponia en su lugar un aviso de
+      // «todavia no se publica». Desde que ese aviso vive FUERA del gateo de
+      // infraestructura —depende de la FORMA, no de la nube— la persona leia el
+      // mismo parrafo DOS VECES seguidas en la portada de su proyecto. Medido en
+      // el camino recomendado (aplicacion + Supabase), que es el que hace la mayoria.
+      return texto
+        .replace(/> # projects:solo-si-hay-infra\n[\s\S]*?> # projects:fin-solo-si-hay-infra\n/g, "")
+        .replace(/<!-- projects:solo-si-hay-infra -->\n[\s\S]*?<!-- projects:fin-solo-si-hay-infra -->\n/g, "");
   }
   if (rel === ".claude/settings.json") {
     // JSON no admite comentarios, asi que el centinela no sirve: se filtran las
@@ -453,6 +613,41 @@ export function noPisaLoQueYaEsta(rel) {
   return LO_QUE_ESCRIBE_EL_ASISTENTE.has(rel);
 }
 
+/** La cuenta donde vive EL MARCO, que no es la misma que la del proyecto.
+ *
+ *  EL DEFECTO QUE ESTO CIERRA ERA UN BLOQUEO DEL DIA UNO, y estaba escondido a
+ *  plena vista: el andamio usaba `{{ORG}}` para DOS cosas distintas. En
+ *  `{{ORG}}/{{PROYECTO}}` y en `@{{ORG}}/equipo` significa «la cuenta de tu
+ *  proyecto», que es lo que el asistente pregunta. Pero en `{{ORG}}/Projects`
+ *  —dieciseis veces, incluidas las cuatro del `uses:` de su pipeline— significa
+ *  «la cuenta donde vive el marco», que es otra.
+ *
+ *  Consecuencia medida: alguien que crea su proyecto bajo su propia cuenta
+ *  recibia un pipeline que dice `uses: su-cuenta/Projects/...`, un repositorio
+ *  que no existe. El CI del proyecto nacia ROJO el dia uno, con un error de
+ *  GitHub sobre un workflow que no encuentra — que no habla de esto por ningun
+ *  lado.
+ *
+ *  SE DERIVA Y NO SE PREGUNTA, y eso es lo que lo hace correcto tambien para un
+ *  fork: sale del remoto del clon del marco desde el que se esta ejecutando esta
+ *  herramienta. Quien forkee el marco a su cuenta y arranque proyectos desde ahi
+ *  recibe proyectos que apuntan a SU fork, sin configurar nada. Preguntarlo
+ *  seria pedirle a la persona un dato que la herramienta ya tiene delante. */
+export function orgDelMarco(raizDelMarco, correr = leerRemoto) {
+  const url = correr(raizDelMarco);
+  // Las dos formas en las que git escribe un remoto de GitHub.
+  const m = /github\.com[:/]([^/]+)\/[^/]+?(?:\.git)?\s*$/.exec(url ?? "");
+  return m ? m[1] : null;
+}
+
+function leerRemoto(raizDelMarco) {
+  try {
+    return execFileSync("git", ["remote", "get-url", "origin"], { cwd: raizDelMarco, encoding: "utf-8", stdio: ["ignore", "pipe", "ignore"] }).trim();
+  } catch {
+    return null;
+  }
+}
+
 /** La plataforma declarada en el archivo de valores.
  *
  *  Va en minuscula y FUERA de los 21, porque no es un marcador que el andamio
@@ -491,14 +686,14 @@ export function destinoDe(rel, plataforma = "aws") {
   return renombresPorPlataforma(plataforma)[rel] ?? RENOMBRES.get(rel) ?? rel;
 }
 
-/** Los 21 valores que un humano tiene que decidir —hoy, uno por cada marcador
+/** Los valores que un humano tiene que decidir —hoy, uno por cada marcador
  *  que plantilla/ usa—, con su fuente de verdad en
  *  plantilla/README.md seccion 2. `PAQUETES` no esta: se DERIVA de los tres
  *  paquetes, porque una lista que se escribe aparte de sus elementos es una
  *  segunda declaracion que puede divergir. */
 export const REQUERIDOS = [
   "PROYECTO", "ORG",
-  "PAQUETE_API", "PAQUETE_WEB", "PAQUETE_E2E", "PAQUETE_SITIO",
+  "PAQUETE_API", "PAQUETE_WEB", "PAQUETE_E2E", "PAQUETE_SITIO", "ORG_MARCO",
   "GENERAR_CLIENTE_DATOS",
   "EQUIPO_BUILDERS", "EQUIPO_PO", "BUILDER_1", "BUILDER_2", "PO",
   "CUENTA_DEV", "CUENTA_PROD", "REGION", "PERFIL_DEV", "PERFIL_PROD",
@@ -555,6 +750,7 @@ export const FORMATOS = {
   // Handle de organizacion o de persona: la regla de GitHub (alfanumerico, guiones
   // simples, ni al principio ni al final, hasta 39).
   ORG: { patron: /^[A-Za-z0-9](?:-?[A-Za-z0-9]){0,38}$/, que: "un handle de organizacion de GitHub" },
+  ORG_MARCO: { patron: /^[A-Za-z0-9][A-Za-z0-9-]*$/, que: "la cuenta de GitHub donde vive el MARCO, que no es la de tu proyecto: se deriva sola del clon", espera: "un handle de GitHub" },
   BUILDER_1: { patron: /^[A-Za-z0-9](?:-?[A-Za-z0-9]){0,38}$/, que: "un handle de GitHub (sin la arroba: el andamio la pone donde va)" },
   BUILDER_2: { patron: /^[A-Za-z0-9](?:-?[A-Za-z0-9]){0,38}$/, que: "un handle de GitHub (sin la arroba: el andamio la pone donde va)" },
   PO: { patron: /^[A-Za-z0-9](?:-?[A-Za-z0-9]){0,38}$/, que: "un handle de GitHub (sin la arroba: el andamio la pone donde va)" },
@@ -843,7 +1039,7 @@ export function instanciar({ raizAndamio, destino, valores }) {
       // Se poda ANTES de sustituir: lo que se saca puede tener marcadores
       // adentro —`{{PERFIL_DEV}}` vivia en el bloque de permisos de AWS— y
       // sustituirlos primero solo escribiria un relleno que despues se borra.
-      const texto = podarPorForma(podarPorPlataforma(fs.readFileSync(origen, "utf8"), rel, plataforma), rel, forma);
+      const texto = sacarCentinelas(podarPorForma(podarPorPlataforma(fs.readFileSync(origen, "utf8"), rel, plataforma, forma), rel, forma));
       const r = sustituir(texto, valores);
       total += r.cuenta;
       for (const f of r.faltantes) faltantes.add(f);
@@ -1082,6 +1278,48 @@ export const PASOS_DEL_ARRANQUE = [
   },
 ];
 
+/** LOS PASOS QUE DE VERDAD CORREN EN ESTE DESTINO, y por que no son siempre los
+ *  mismos cuatro.
+ *
+ *  EL DEFECTO QUE ESTA FUNCION CIERRA, medido: la lista de arriba estaba fija en
+ *  cuatro y `podarPorForma` borra `datos` del package.json de un sitio —un sitio
+ *  para leer no tiene capa de datos que generar—. O sea que LA MISMA CORRIDA
+ *  escribia un manifiesto sin `datos` y dos lineas despues mandaba correr
+ *  `pnpm run datos`: `[ERR_PNPM_NO_SCRIPT] Missing script: datos` y salida 1, en
+ *  la mitad de las combinaciones que el asistente ofrece. Y el arreglo que se
+ *  imprimia —«corre `pnpm datos` en el destino»— era imposible por la misma
+ *  razon, asi que la persona quedaba con un repo escrito, un rojo y un consejo
+ *  que no podia funcionar.
+ *
+ *  LA FUENTE DE VERDAD PASA A SER EL MANIFIESTO QUE ESTA HERRAMIENTA ACABA DE
+ *  ESCRIBIR. No la forma, ni una segunda lista que habria que acordarse de
+ *  mantener al lado de la primera: el package.json del destino es el unico lugar
+ *  donde ese dato ya esta, y derivarlo de ahi hace que agregar una forma nueva
+ *  no pueda volver a romper el arranque.
+ *
+ *  Y EL SALTO SE DICE EN VOZ ALTA. Un paso que desaparece en silencio es como se
+ *  llega a creer que se verifico algo que nadie corrio, que es exactamente el
+ *  falso verde que este repositorio persigue en todos lados. */
+export function pasosQueCorren(destino, pasos = PASOS_DEL_ARRANQUE) {
+  let scripts;
+  try {
+    scripts = JSON.parse(fs.readFileSync(path.join(destino, "package.json"), "utf-8")).scripts ?? {};
+  } catch {
+    // Sin manifiesto legible no se poda NADA. Correr de mas da un error honesto
+    // del gestor de paquetes; correr de menos esconde un paso, y de las dos
+    // formas de equivocarse esta es la unica que se nota.
+    return { corren: pasos, salteados: [] };
+  }
+  const corren = [];
+  const salteados = [];
+  for (const paso of pasos) {
+    const script = paso.args[0] === "run" ? paso.args[1] : null;
+    if (script !== null && !(script in scripts)) salteados.push({ paso, script });
+    else corren.push(paso);
+  }
+  return { corren, salteados };
+}
+
 /** Con que se corren los scripts del proyecto.
  *
  *  `corepack` primero y `pnpm` despues, y no al reves: corepack VIENE CON NODE, y
@@ -1253,7 +1491,7 @@ async function moduloDelRegistro() {
 /** El resumen del arranque, en las palabras del encargo: instalado, formateado,
  *  verificado — o exactamente que fallo y como se arregla. Puro sobre lo que
  *  paso, para que el banco lo pueda afirmar sin correr un install. */
-export function lineasDelResumen(hechos, destino) {
+export function lineasDelResumen(hechos, destino, cuantosIban = PASOS_DEL_ARRANQUE.length) {
   const hechas = hechos.filter((h) => h.ok).map((h) => h.paso.clave);
   const fallo = hechos.find((h) => !h.ok);
   const l = [];
@@ -1270,7 +1508,7 @@ export function lineasDelResumen(hechos, destino) {
   l.push(`  Como se arregla: ${fallo.arregloConcreto ?? fallo.paso.arreglo}.`);
   l.push(`  La salida del programa que fallo esta arriba, tal cual: este arranque no la parafrasea.`);
   l.push(
-    `  Los ${PASOS_DEL_ARRANQUE.length - hechas.length - 1} paso(s) que venian despues NO se corrieron, para que ` +
+    `  Los ${cuantosIban - hechas.length - 1} paso(s) que venian despues NO se corrieron, para que ` +
       `el rojo que se lee sea el primero y no una cascada.`,
   );
   l.push(`  El repo YA quedo escrito en ${destino}: esto no hay que volver a instanciarlo, solo destrabar ese paso.`);
@@ -1786,6 +2024,22 @@ export function escribirProteccionMedida(destino, medido) {
 // ─────────────────────────── El programa ───────────────────────────
 
 const EJEMPLO = {
+  // LAS DOS DECISIONES QUE NO SON MARCADORES van primero, y van a proposito.
+  //
+  // `forma` y `plataforma` no se sustituyen en ningun archivo: deciden QUE
+  // archivos viajan. Por eso estaban fuera de REQUERIDOS... y por eso tambien
+  // faltaban aca, que es lo que las volvia INELEGIBLES por el camino de archivo:
+  // `--ejemplo > valores.json` y editar es el camino que documentan el README y
+  // docs/05, y por ahi no habia forma de pedir un sitio. La decision que la carta
+  // llama «la que mas cuesta si se toma tarde» solo se podia tomar contestando
+  // el asistente.
+  //
+  // Y tenia una segunda consecuencia, mas silenciosa: el paso de actionlint del
+  // CI instancia el andamio con estos valores, asi que linteaba SIEMPRE una
+  // aplicacion — y `desplegar.yml`, que solo viaja a un sitio, no pasaba por
+  // ningun validador de sintaxis en ninguna parte.
+  forma: "aplicacion",
+  plataforma: "aws",
   PROYECTO: "people-agenda",
   // ORG es la ORG de GitHub, no un equipo dentro de ella: se interpola en
   // `uses: {{ORG}}/Projects/...`, o sea en la coordenada con la que GitHub
@@ -1797,6 +2051,7 @@ const EJEMPLO = {
   PAQUETE_API: "api",
   PAQUETE_WEB: "web",
   PAQUETE_SITIO: "sitio",
+  ORG_MARCO: "im-diego-ec",
   PAQUETE_E2E: "e2e",
   GENERAR_CLIENTE_DATOS: "prisma generate",
   EQUIPO_BUILDERS: "builders",
@@ -2071,7 +2326,16 @@ async function main(argv) {
 
     let resultado;
     try {
-      resultado = await asis.correrAsistente(preguntarPorTeclado, previos, FORMATOS, (linea) => process.stdout.write(`${linea}\n`));
+      // La cuenta del marco se DERIVA del clon desde el que corre esta
+      // herramienta y entra como respuesta ya dada, no como pregunta.
+      const marco = orgDelMarco(path.dirname(path.dirname(fileURLToPath(import.meta.url))));
+      if (!marco) {
+        console.error("::error::no pude averiguar de que cuenta de GitHub viene este clon del marco (`git remote get-url origin` no contesto).");
+        console.error("Sin eso, el pipeline del proyecto nuevo apuntaria a un repositorio que no existe y naceria en rojo.");
+        console.error("Se destraba corriendo esta herramienta desde un clon con remoto, o pasando ORG_MARCO en el archivo de valores.");
+        return 1;
+      }
+      resultado = await asis.correrAsistente(preguntarPorTeclado, previos, FORMATOS, (linea) => process.stdout.write(`${linea}\n`), { ORG_MARCO: marco });
     } catch (e) {
       console.error("");
       console.error(`::error::${e.message}. NO se escribio nada.`);
@@ -2090,7 +2354,12 @@ async function main(argv) {
     process.stdout.write(`Escrito: ${rutaDeRespuestas}  (para que volver a correrlo no te haga contestar todo de nuevo)\n`);
     if (resultado.desvios.length) {
       const rutaDesvios = path.join(path.dirname(salida), ".projects-desvios.json");
-      fs.writeFileSync(rutaDesvios, `${JSON.stringify(resultado.desvios, null, 2)}\n`);
+      // LA FORMA ES `{ "desvios": [...] }`, NO UNA LISTA PELADA. La accion de
+      // constitucion lee `datos.desvios` y descarta lo que no sea eso: medido,
+      // con una lista pelada veia CERO desvios y no decia nada. La persona
+      // declaraba cuatro apartamientos de las reglas del marco y la constitucion
+      // de su proyecto salia como si no hubiera ninguno.
+      fs.writeFileSync(rutaDesvios, `${JSON.stringify({ desvios: resultado.desvios }, null, 2)}\n`);
       process.stdout.write(`Escrito: ${rutaDesvios}  (${resultado.desvios.length} desvio(s) declarado(s))\n`);
     }
 
@@ -2113,7 +2382,7 @@ async function main(argv) {
     return 2;
   }
 
-  // Los 21 valores tienen que tener una forma declarada, y se comprueba ANTES de
+  // Todos los requeridos tienen que tener una forma declarada, y se comprueba ANTES de
   // leer el archivo de la persona: un desfase entre REQUERIDOS y FORMATOS es un
   // defecto de esta herramienta, no de quien la corre, y el diagnostico tiene
   // que decir eso.
@@ -2188,13 +2457,32 @@ async function main(argv) {
     console.error(`::error::no pude leer ${o.valores}: ${e.message}`);
     return 1;
   }
-  const { problemas, valores } = validarValores(crudos);
+  // Las dos claves de eleccion se comprueban JUNTO con los marcadores, para que
+  // un archivo con dos cosas mal las liste las dos en vez de pedir dos corridas.
+  const { problemas: problemasDeMarcadores, valores } = validarValores(crudos);
+  const problemas = [...problemasDeMarcadores, ...problemasDeEleccion(crudos)];
   if (problemas.length) {
     console.error(`::error::el archivo de valores tiene ${problemas.length} problema(s). No se escribio nada:`);
     for (const p of problemas) console.error(`  - ${p}`);
     console.error("");
-    console.error("Que poner en cada uno esta en plantilla/README.md seccion 2, con ejemplo y caso borde.");
-    console.error("Un esqueleto con todas las claves: node herramientas/projects-init.mjs --ejemplo");
+    // LA RUTA VA ABSOLUTA, y el motivo es que quien lee esto NO esta parado en el
+    // clon del marco: esta parado en el destino, que es lo que la propia
+    // herramienta manda hacer. Un `plantilla/README.md` relativo apunta desde ahi
+    // a un archivo que no existe, y la persona termina buscandolo dentro de su
+    // proyecto nuevo. El dato ya estaba a mano y no se usaba.
+    const raizDelMarco = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+    console.error(`Que poner en cada uno esta en ${path.join(raizDelMarco, "plantilla", "README.md")},`);
+    console.error("seccion 2, con ejemplo y caso borde para cada clave.");
+    // Y SI EL ARCHIVO LO ESCRIBIO EL ASISTENTE, el arreglo no es editarlo a mano:
+    // es volver a contestar. Sin esto, alguien corrige un JSON que la proxima
+    // corrida del asistente va a reescribir encima.
+    if (fs.existsSync(path.join(path.dirname(path.resolve(o.valores)), ".projects-respuestas.json"))) {
+      console.error("");
+      console.error("Al lado de ese archivo hay un .projects-respuestas.json, asi que lo escribio el asistente.");
+      console.error("Volve a correr con --asistente: retoma tus respuestas y no te hace contestar todo de nuevo.");
+    }
+    console.error("");
+    console.error(`Un esqueleto con todas las claves: node ${path.join(raizDelMarco, "herramientas", "projects-init.mjs")} --ejemplo`);
     return 1;
   }
 
@@ -2541,11 +2829,20 @@ async function main(argv) {
   //     mismo que daria el CI en el primer push, adelantado a la maquina donde
   //     se arregla en un minuto.
   let arranque = null;
+  // Los pasos salen del manifiesto que se acaba de escribir, no de una lista
+  // fija: un sitio no tiene `datos` que generar y mandarselo lo mataba en 2/4.
+  const { corren: pasosDeEsteDestino, salteados } = pasosQueCorren(o.destino);
+  for (const s of salteados) {
+    console.log(
+      `(se saltea el paso "${s.paso.titulo}": este proyecto no declara el script \`${s.script}\`, ` +
+        `asi que correrlo moriria con "Missing script")`,
+    );
+  }
   if (!o.arranque) {
     console.error("");
     console.error("::warning::se pidio --sin-arranque: el repo quedo ESCRITO pero sin instalar, sin formatear y sin verificar.");
     console.error("Antes del primer push hay que correr, en la raiz del destino:");
-    for (const paso of PASOS_DEL_ARRANQUE) console.error(`  pnpm ${paso.args.join(" ")}`);
+    for (const paso of pasosDeEsteDestino) console.error(`  pnpm ${paso.args.join(" ")}`);
     console.error("Sin el install no hay lockfile, y el CI corre con --frozen-lockfile: el primer push moriria ahi.");
   } else {
     const ejecutor = ejecutorDeScripts();
@@ -2561,8 +2858,8 @@ async function main(argv) {
     if (!ejecutor) {
       console.error("");
       console.error("::warning::no encontre ni `corepack` (que viene con Node) ni `pnpm` en el PATH, asi que el arranque");
-      console.error("no se pudo intentar. El repo quedo ESCRITO y completo; lo que falta son cuatro comandos en su raiz:");
-      for (const paso of PASOS_DEL_ARRANQUE) console.error(`  pnpm ${paso.args.join(" ")}`);
+      console.error(`no se pudo intentar. El repo quedo ESCRITO y completo; lo que falta son ${pasosDeEsteDestino.length} comandos en su raiz:`);
+      for (const paso of pasosDeEsteDestino) console.error(`  pnpm ${paso.args.join(" ")}`);
       console.error("Corepack se habilita con `corepack enable`; pnpm tambien se instala suelto (npm i -g pnpm).");
     } else if (!red.ok) {
       // Preguntar primero cuesta medio segundo y evita el peor diagnostico que
@@ -2573,10 +2870,10 @@ async function main(argv) {
       console.error(`::warning::no llego a ${red.registro} (${red.error}), asi que el arranque no se intenta: sin registro`);
       console.error("alcanzable el install no falla rapido, falla tarde y con un mensaje que no habla de la red.");
       console.error("El repo quedo ESCRITO y completo. Cuando tengas red, en su raiz:");
-      for (const paso of PASOS_DEL_ARRANQUE) console.error(`  pnpm ${paso.args.join(" ")}`);
+      for (const paso of pasosDeEsteDestino) console.error(`  pnpm ${paso.args.join(" ")}`);
     } else {
       console.log("");
-      console.log(`ARRANQUE con ${ejecutor.nombre} en ${o.destino} — ${PASOS_DEL_ARRANQUE.length} pasos, la salida de cada uno tal cual sale:`);
+      console.log(`ARRANQUE con ${ejecutor.nombre} en ${o.destino} — ${pasosDeEsteDestino.length} pasos, la salida de cada uno tal cual sale:`);
       // Los scripts del andamio se llaman entre si con `pnpm` pelado. Sin un
       // pnpm global —la maquina limpia que corepack existe para cubrir— el paso
       // 1 pasa y el 2 muere con "pnpm: not found". Ver necesitaShimDePnpm.
@@ -2587,9 +2884,9 @@ async function main(argv) {
         else console.error("::warning::no se pudo materializar el shim de pnpm. Si un paso muere con \"pnpm: not found\", es esto: corre `corepack enable` una vez y volve a intentar");
       }
       const hechos = [];
-      for (const paso of PASOS_DEL_ARRANQUE) {
+      for (const paso of pasosDeEsteDestino) {
         console.log("");
-        console.log(`── ${hechos.length + 1}/${PASOS_DEL_ARRANQUE.length}  ${paso.titulo}  (${ejecutor.nombre} ${paso.args.join(" ")})`);
+        console.log(`── ${hechos.length + 1}/${pasosDeEsteDestino.length}  ${paso.titulo}  (${ejecutor.nombre} ${paso.args.join(" ")})`);
         const r = correrPaso(ejecutor, paso, o.destino, process.env, dirDeShims);
         hechos.push({ paso, ...r });
         // Se corta en el primero que falla: los que vienen despues dependen de
@@ -2599,7 +2896,7 @@ async function main(argv) {
       }
       arranque = hechos;
       console.log("");
-      const resumen = lineasDelResumen(hechos, o.destino);
+      const resumen = lineasDelResumen(hechos, o.destino, pasosDeEsteDestino.length);
       const rojo = hechos.some((h) => !h.ok);
       for (const linea of resumen) {
         if (rojo) console.error(linea);

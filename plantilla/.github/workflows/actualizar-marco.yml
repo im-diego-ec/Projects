@@ -67,7 +67,7 @@ name: Actualizar el marco
 # ningun lado.
 #
 # CONTRATO QUE USA ESTE ARCHIVO, para que un cambio del marco no lo deje roto
-# en silencio: la action {{ORG}}/Projects/actions/constitucion, pinada arriba a la
+# en silencio: la action {{ORG_MARCO}}/Projects/actions/constitucion, pinada arriba a la
 # version exacta del marco, con
 # "modo: escribir" lee .projects-valores.json y .projects-desvios.json de la raiz y
 # escribe el artefacto de cada superficie que ese archivo declara. Escribe en
@@ -171,7 +171,7 @@ jobs:
           node-version: "24"
 
       - name: Regenerar la porcion del marco
-        uses: "{{ORG}}/Projects/actions/constitucion@v1.7.0"
+        uses: "{{ORG_MARCO}}/Projects/actions/constitucion@v1.7.0"
         with:
           modo: escribir
 

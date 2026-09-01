@@ -47,7 +47,7 @@ jobs:
     #
     # Entre comillas a proposito: sin ellas, el placeholder de doble llave hace
     # que YAML lea un mapa en flujo y el archivo no parsea antes de sustituirlo.
-    uses: "{{ORG}}/Projects/.github/workflows/marco-ci.yml@v1.7.0"
+    uses: "{{ORG_MARCO}}/Projects/.github/workflows/marco-ci.yml@v1.7.0"
     # EL TECHO QUE SE LE CONCEDE AL REUSABLE, y por eso no es una repeticion
     # decorativa del bloque de arriba: un workflow reusable no recibe NUNCA mas
     # permisos que los que le da quien lo llama, asi que esta es la linea que de
@@ -112,7 +112,7 @@ jobs:
         with:
           node-version: "24"
       - id: marco_constitucion
-        uses: "{{ORG}}/Projects/actions/constitucion@v1.7.0"
+        uses: "{{ORG_MARCO}}/Projects/actions/constitucion@v1.7.0"
         with:
           modo: verificar
       # El artefacto AL DIA se sube SIEMPRE, tambien cuando el veredicto es verde:
@@ -186,9 +186,16 @@ jobs:
       # y sale 0 — la generacion no ocurre y el fail-open aparece disfrazado de
       # lint verde. Comprobado en pnpm 9.15 y 11.18: el exit 0 es el mismo.
       #
-      # Si el proyecto no genera ningun cliente de datos, borra este paso.
+      # Este paso VIAJA SOLO SI la forma elegida tiene capa de datos, y los
+      # centinelas no son decoracion: `--fail-if-no-match` esta puesto a proposito
+      # para que un filtro que no matchea sea ROJO, asi que dejarle este paso a un
+      # proyecto sin paquete de API le da un CI rojo el dia uno. Y como el
+      # despliegue solo corre con el CI en verde, ese rojo se lleva tambien la
+      # publicacion, en silencio. Medido antes de gatearlo.
+      # projects:solo-si-hay-datos
       - name: Generar el cliente de la capa de datos
         run: pnpm --filter {{PAQUETE_API}} --fail-if-no-match exec {{GENERAR_CLIENTE_DATOS}}
+      # projects:fin-solo-si-hay-datos
 
       # Lint y formato corren UNA vez desde la raiz sobre todo el arbol
       # (eslint . / prettier --check .), no por paquete: asi los archivos que
@@ -351,11 +358,27 @@ jobs:
           # del pipeline, no una lista de paquetes: incorporar un paquete no
           # obliga a tocar esta linea.
           SCRIPTS: "typecheck test build"
+          # projects:solo-si-hay-e2e
+          # Estas EXCEPCIONES viajan SOLO SI la forma reparte el paquete E2E:
+          # nombrar una carpeta que el proyecto no tiene falla por excepcion
+          # muerta, que es rojo igual que la que falta.
           # Las EXCEPCIONES, "<carpeta>:<script>", con su motivo escrito. La
           # carpeta es la del paquete relativa a la raiz del repo.
-          #   {{PAQUETE_E2E}}:test  -> la suite E2E corre con navegadores
-          #     contra un ambiente ya desplegado; su workflow es el de
-          #     promocion, no el CI del PR.
+          #   {{PAQUETE_E2E}}:test  -> la suite corre con navegadores contra un
+          #     ambiente YA DESPLEGADO, y este proyecto no tiene ninguno contra
+          #     el cual correrla. Medido el 2026-08-31 generando las dos formas
+          #     con projects-init: la forma "aplicacion" —la unica que recibe el
+          #     paquete E2E— recibe actualizar-marco.yml, ci.yml y claude.yml, y
+          #     ninguno de ellos publica nada en ningun lado. Esa enumeracion no
+          #     lleva un numero escrito al lado a proposito: un numero envejece
+          #     en silencio y la lista no, porque un banco la exige COMPLETA.
+          #     ESTE MOTIVO DECIA OTRA COSA, y era falso: mandaba la suite a una
+          #     corrida de promocion que no es ningun archivo de este andamio ni
+          #     de ninguna de sus dos formas. Una excepcion justificada por una
+          #     pieza que no existe no se cae nunca —el motivo suena razonable y
+          #     nadie va a abrir la carpeta a comprobarlo—, y el motivo escrito
+          #     al lado de una excepcion es lo unico que impide que la excepcion
+          #     sobreviva a lo que la justificaba.
           #   {{PAQUETE_E2E}}:build -> una suite de pruebas no produce
           #     artefacto que servir.
           # Es la unica lista del paso, y solo puede equivocarse hacia el
@@ -364,6 +387,7 @@ jobs:
           # produce un verde falso. Si el proyecto no tiene suite E2E, borra
           # las dos entradas.
           EXCEPCIONES: "{{PAQUETE_E2E}}:test {{PAQUETE_E2E}}:build"
+          # projects:fin-solo-si-hay-e2e
         run: |
           set -euo pipefail
 
@@ -512,7 +536,7 @@ jobs:
       # de SU paquete, bajo projects.cobertura.excluidos, con su motivo escrito.
       # La exclusion no vuelve imposible la evasion: la vuelve visible, en un
       # diff, bajo review.
-      - uses: "{{ORG}}/Projects/actions/censo-fuentes@v1.7.0"
+      - uses: "{{ORG_MARCO}}/Projects/actions/censo-fuentes@v1.7.0"
 
       # Cobertura en los DOS planos, en un solo paso, porque los dos leen los
       # mismos lcov y los mismos manifiestos:
@@ -548,7 +572,7 @@ jobs:
       # reporter lcov en la raiz del monorepo. Las dos cosas vienen armadas en
       # `vitest.config.base.mjs` de la raiz: lo primero es su `include` — la
       # opcion `all` que lo pedia en vitest 2.x ya no existe.
-      - uses: "{{ORG}}/Projects/actions/cobertura-diff@v1.7.0"
+      - uses: "{{ORG_MARCO}}/Projects/actions/cobertura-diff@v1.7.0"
 
   # EL CHECK REQUERIDO POR EL RULESET DE main ES ESTE (nombre exacto: "ci-ok").
   #

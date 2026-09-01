@@ -1,8 +1,22 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import fs from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 
-import { PREGUNTAS, correrAsistente, derivar, desvios, lineasDeResumen, RELLENO_AWS, RELLENO_SLACK } from "../../herramientas/projects-asistente.mjs";
+import {
+  PREGUNTAS,
+  correrAsistente,
+  derivar,
+  desvios,
+  lineasDeResumen,
+  usaAws,
+  RELLENO_AWS,
+  RELLENO_SLACK,
+} from "../../herramientas/projects-asistente.mjs";
 import { REQUERIDOS, FORMATOS, validarValores } from "../../herramientas/projects-init.mjs";
+
+const ANDAMIO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../plantilla");
 
 // ---------------------------------------------------------------------------
 // EL CAMINO DEL PO, PROBADO SIN UNA TERMINAL.
@@ -23,6 +37,11 @@ import { REQUERIDOS, FORMATOS, validarValores } from "../../herramientas/project
  *
  *  SE MANTIENE EL POSICIONAL porque hay casos que necesitan afirmar el ORDEN,
  *  pero para elegir respuestas concretas se usa `contestador` de abajo. */
+/** Lo que la herramienta DERIVA y no pregunta: la cuenta donde vive el marco,
+ *  que sale del remoto del clon. En el banco se fija a mano para que estos casos
+ *  no dependan de que la maquina donde corren tenga un remoto configurado. */
+const DERIVADOS = { ORG_MARCO: "im-diego-ec" };
+
 function guionista(respuestas) {
   const preguntado = [];
   let i = 0;
@@ -91,7 +110,7 @@ const AWS_DOS = {
 
 test("el caso mas simple son NUEVE preguntas, y solo dos hay que escribirlas", async () => {
   const { preguntar } = contestador({ ...TEXTO_VALIDO, ...PO_SOLO });
-  const { dicho, respuestas } = await correrAsistente(preguntar);
+  const { dicho, respuestas } = await correrAsistente(preguntar, {}, {}, () => {}, DERIVADOS);
   assert.equal(
     cuantasPreguntas(dicho),
     9,
@@ -109,7 +128,7 @@ test("el caso mas simple son NUEVE preguntas, y solo dos hay que escribirlas", a
 
 test("elegir AWS con dos ambientes hace DIECISEIS preguntas, y ninguna es de relleno", async () => {
   const { preguntar } = contestador({ ...TEXTO_VALIDO, ...AWS_DOS });
-  const { dicho, valores } = await correrAsistente(preguntar);
+  const { dicho, valores } = await correrAsistente(preguntar, {}, {}, () => {}, DERIVADOS);
   assert.equal(cuantasPreguntas(dicho), 16, "con AWS y dos ambientes se preguntan las cinco de AWS mas el dominio propio");
   // El defecto que este caso vigila: la primera version del asistente SALTEABA
   // las cinco preguntas de AWS junto con el relleno, asi que quien elegia AWS
@@ -133,7 +152,7 @@ test("con AWS y UN ambiente no se pregunta dos veces por el mismo dato", async (
     CANAL_ALERTAS: "#alertas",
     visibilidad: "2",
   });
-  const { valores, dicho } = await correrAsistente(preguntar);
+  const { valores, dicho } = await correrAsistente(preguntar, {}, {}, () => {}, DERIVADOS);
   assert.equal(cuantasPreguntas(dicho), 13, "con un solo ambiente se saltean la cuenta y el perfil de produccion");
   assert.equal(valores.CUENTA_PROD, valores.CUENTA_DEV, "con un ambiente, la cuenta de 'produccion' ES la misma");
   assert.equal(valores.PERFIL_PROD, valores.PERFIL_DEV, "y el perfil tambien");
@@ -151,7 +170,7 @@ test("LO QUE MAS IMPORTA: lo que produce el asistente pasa el validador de siemp
   const rotos = [];
   for (const [nombre, guion] of Object.entries(CASOS)) {
     const { preguntar } = contestador({ ...TEXTO_VALIDO, ...guion });
-    const { valores } = await correrAsistente(preguntar, {}, FORMATOS);
+    const { valores } = await correrAsistente(preguntar, {}, FORMATOS, () => {}, DERIVADOS);
     const faltan = REQUERIDOS.filter((k) => !(k in valores));
     const { problemas } = validarValores(valores);
     if (faltan.length || problemas.length) rotos.push(`${nombre}: faltan [${faltan}] problemas [${problemas.join(" | ")}]`);
@@ -165,7 +184,7 @@ test("LO QUE MAS IMPORTA: lo que produce el asistente pasa el validador de siemp
 
 test("las claves salen completas, ni una de mas ni una de menos", async () => {
   const { preguntar } = contestador({ ...TEXTO_VALIDO, ...PO_SOLO });
-  const { valores } = await correrAsistente(preguntar);
+  const { valores } = await correrAsistente(preguntar, {}, {}, () => {}, DERIVADOS);
   // `plataforma` va aparte y en minuscula: no es un marcador que el andamio
   // sustituya, es la decision de QUE archivos viajan. Por eso se saca antes de
   // comparar, y por eso se comprueba que este.
@@ -196,7 +215,7 @@ test("una respuesta con mala forma se vuelve a pedir en el momento, no veinte pr
     }
     return { ...TEXTO_VALIDO, PROYECTO: "no-vale-vacio", ORG: "im-diego-ec" }[id] ?? "";
   };
-  const { dicho, respuestas } = await correrAsistente(preguntar, {}, FORMATOS);
+  const { dicho, respuestas } = await correrAsistente(preguntar, {}, FORMATOS, () => {}, DERIVADOS);
   assert.ok(
     dicho.some((l) => l.includes("hay que contestarla")),
     "una respuesta vacia en una pregunta sin valor por defecto tiene que avisar y volver a preguntar",
@@ -207,7 +226,7 @@ test("una respuesta con mala forma se vuelve a pedir en el momento, no veinte pr
 
 test("los acentos y las mayusculas del nombre se arreglan solos, y se dice que se arreglaron", async () => {
   const { preguntar } = contestador({ ...TEXTO_VALIDO, PROYECTO: "Agenda De Añejos", ORG: "alguien" });
-  const { respuestas, dicho } = await correrAsistente(preguntar, {}, FORMATOS);
+  const { respuestas, dicho } = await correrAsistente(preguntar, {}, FORMATOS, () => {}, DERIVADOS);
   assert.equal(respuestas.PROYECTO, "agenda-de-anejos", "GitHub no acepta mayusculas ni acentos en un nombre de repo");
   assert.ok(
     dicho.some((l) => l.includes("se guardó como")),
@@ -220,7 +239,7 @@ test("volver a correrlo ofrece lo de antes, y Enter lo mantiene", async () => {
   // Contesta vacio a todo: lo que sostiene la corrida son los `previos`, que es
   // exactamente lo que se quiere afirmar.
   const { preguntar, textos } = contestador({});
-  const { respuestas } = await correrAsistente(preguntar, previos, FORMATOS);
+  const { respuestas } = await correrAsistente(preguntar, previos, FORMATOS, () => {}, DERIVADOS);
   assert.equal(respuestas.PROYECTO, "lo-de-antes", "Enter sobre una respuesta previa tiene que mantenerla");
   assert.ok(
     textos.some((t) => t.includes("Enter mantiene: lo-de-antes")),
@@ -235,7 +254,7 @@ test("volver a correrlo ofrece lo de antes, y Enter lo mantiene", async () => {
 
 test("trabajar solo APAGA la aprobacion ajena y lo deja firmado", () => {
   const d = desvios({ equipo: "solo", plataforma: "aws", avisos: "slack", visibilidad: "publico" });
-  const regla = d.find((x) => x.regla === "revision-cruzada-obligatoria");
+  const regla = d.find((x) => x.regla === "github-review-cruzado-automatizado");
   assert.ok(regla, "con una sola persona, exigir la aprobacion de otra bloquea TODO merge sin salida: eso se declara");
   assert.match(regla.motivo, /bloquearia todo merge|excepto al autor/i);
   assert.ok(regla.revisar, "un desvio sin cuando-se-revisa es un desvio que nadie va a revisar nunca");
@@ -244,12 +263,12 @@ test("trabajar solo APAGA la aprobacion ajena y lo deja firmado", () => {
 test("no elegir AWS declara por que las cinco claves llevan relleno", () => {
   for (const plataforma of ["supabase", "gcp", "ninguna"]) {
     const d = desvios({ equipo: "equipo", plataforma, avisos: "slack", visibilidad: "publico" });
-    const regla = d.find((x) => x.regla === "infraestructura-declarada-en-terraform");
+    const regla = d.find((x) => x.regla === "iac-es-terraform");
     assert.ok(regla, `con plataforma "${plataforma}" el relleno de AWS tiene que quedar declarado`);
     assert.match(regla.motivo, /no describen ninguna cuenta real/i, "tiene que decir que los numeros no son de verdad");
   }
   assert.equal(
-    desvios({ equipo: "equipo", plataforma: "aws", avisos: "slack", visibilidad: "publico" }).find((x) => x.regla === "infraestructura-declarada-en-terraform"),
+    desvios({ equipo: "equipo", plataforma: "aws", avisos: "slack", visibilidad: "publico" }).find((x) => x.regla === "iac-es-terraform"),
     undefined,
     "eligiendo AWS no hay nada de que apartarse: los valores son de verdad",
   );
@@ -257,7 +276,7 @@ test("no elegir AWS declara por que las cinco claves llevan relleno", () => {
 
 test("elegir privado declara que la proteccion de rama NO existe", () => {
   const d = desvios({ equipo: "equipo", plataforma: "aws", avisos: "slack", visibilidad: "privado" });
-  const regla = d.find((x) => x.regla === "proteccion-de-la-rama-principal");
+  const regla = d.find((x) => x.regla === "git-check-requerido-es-el-veredicto-agregado");
   assert.ok(regla, "es la consecuencia medida de elegir privado en el plan gratuito, y la persona tiene que verla escrita");
   assert.match(regla.motivo, /403/, "el 403 es la medicion, y sin ella esto seria una opinion");
 });
@@ -272,11 +291,23 @@ test("el relleno de AWS y el de Slack pasan sus propios patrones", () => {
   }
 });
 
-test("los dos numeros de cuenta del relleno son los que el guard reconoce como NO reales", () => {
-  // Es la razon de que sean esos y no otros: el guard de seguridad del
-  // repositorio caza un id de doce digitos que no este en su lista de ejemplos.
-  assert.equal(RELLENO_AWS.CUENTA_DEV, "111111111111");
-  assert.equal(RELLENO_AWS.CUENTA_PROD, "222222222222");
+test("los numeros de cuenta del relleno NO PUEDEN ser una cuenta de AWS", () => {
+  // EL DEFECTO QUE ESTE CASO VIGILA, medido en un proyecto recien generado: el
+  // relleno era `111111111111` y `222222222222`, y esos valores NO se quedaban
+  // en el archivo de valores. La constitucion del proyecto los IMPRIME en su
+  // tabla de ambientes —«| Cuenta AWS | 111111111111 | 222222222222 |»— donde ya
+  // no se leen como relleno sino como el dato de la persona. Y le pasa a la
+  // mayoria, no a un caso raro: cualquiera que no elija AWS.
+  //
+  // La restriccion es que FORMATOS exige doce digitos, asi que no se puede
+  // escribir «sin-aws» como en los perfiles. Doce ceros si se puede, y no es una
+  // cuenta de AWS ni puede serlo. Es el mismo criterio que el UUID nulo de
+  // ID_MCP_SLACK, que ya estaba resuelto asi.
+  for (const clave of ["CUENTA_DEV", "CUENTA_PROD"]) {
+    const v = RELLENO_AWS[clave];
+    assert.match(v, /^\d{12}$/, `${clave} tiene que seguir teniendo forma de cuenta o el validador lo rechaza`);
+    assert.equal(v, "0".repeat(12), `${clave} vale "${v}", que se lee como una cuenta de verdad en la tabla de la constitucion`);
+  }
 });
 
 // ---------------------------------------------------------------------------
@@ -321,12 +352,16 @@ test("MUERDE: si una pregunta deja de saltarse, el conteo del caso simple lo caz
 
 test("el resumen nombra las ocho decisiones, para poder arrepentirse antes de escribir nada", async () => {
   const { preguntar } = contestador({ ...TEXTO_VALIDO, ...PO_SOLO });
-  const { respuestas, desvios: d } = await correrAsistente(preguntar);
+  const { respuestas, desvios: d } = await correrAsistente(preguntar, {}, {}, () => {}, DERIVADOS);
   const texto = lineasDeResumen(respuestas, d).join("\n");
-  for (const esperado of ["agenda-de-personas", "@im-diego-ec", "trabajás solo", "Supabase", "una sola", "pages.dev", "correo de GitHub", "público"]) {
+  for (const esperado of ["agenda-de-personas", "@im-diego-ec", "trabajás solo", "Supabase", "una sola", "workers.dev", "correo de GitHub", "público"]) {
     assert.ok(texto.includes(esperado), `el resumen tiene que nombrar "${esperado}": es lo que la persona lee antes de confirmar`);
   }
-  assert.ok(texto.includes("3"), "y tiene que decir cuantos desvios quedaron declarados");
+  // La cantidad se DERIVA de los desvios que se anotaron, no se escribe: cuando
+  // se agrego el desvio de la direccion publica, el numero escrito a mano quedo
+  // viejo y este caso se puso rojo por la razon equivocada.
+  assert.ok(d.length >= 1, "sin desvios anotados este control no mira nada");
+  assert.ok(texto.includes(String(d.length)), "y el resumen tiene que decir cuantos desvios quedaron declarados");
 });
 
 test("las preguntas se EMITEN mientras se pregunta, no al final", async () => {
@@ -393,7 +428,7 @@ test("CADA opcion de CADA pregunta produce un archivo que el validador acepta", 
       // Todo lo demas en su recomendada; solo esta pregunta se fuerza.
       const mapa = { ...TEXTO_VALIDO, [pregunta.id]: String(pregunta.opciones.indexOf(opcion) + 1) };
       const { preguntar, preguntado } = contestador(mapa);
-      const { valores, respuestas } = await correrAsistente(preguntar, {}, FORMATOS);
+      const { valores, respuestas } = await correrAsistente(preguntar, {}, FORMATOS, () => {}, DERIVADOS);
 
       if (respuestas[pregunta.id] !== opcion.valor) {
         rotos.push(`${pregunta.id}="${opcion.valor}": se contesto por id y quedo "${respuestas[pregunta.id]}"`);
@@ -421,7 +456,7 @@ test("elegir Slack deja las DOS claves de Slack, no una", async () => {
   // El defecto exacto, con nombre: `RELLENO_SLACK` se aplicaba ENTERO solo
   // cuando NO se elegia Slack, asi que elegirlo dejaba `ID_MCP_SLACK` sin valor.
   const { preguntar } = contestador({ ...TEXTO_VALIDO, avisos: "2" });
-  const { valores, respuestas } = await correrAsistente(preguntar, {}, FORMATOS);
+  const { valores, respuestas } = await correrAsistente(preguntar, {}, FORMATOS, () => {}, DERIVADOS);
   assert.equal(respuestas.avisos, "slack", "el caso tiene que llegar de verdad a Slack, no decir que llega");
   assert.equal(valores.CANAL_ALERTAS, "#alertas", "el canal sale de la respuesta");
   assert.ok(valores.ID_MCP_SLACK, "y el id de MCP NO puede quedar sin valor: sin el, projects init aborta con exit 1");
@@ -438,8 +473,302 @@ test("MUERDE: si una opcion dejara una clave sin valor, el caso de arriba lo ve"
 });
 
 async function correlacionSinUna(preguntar) {
-  const { valores } = await correrAsistente(preguntar, {}, FORMATOS);
+  const { valores } = await correrAsistente(preguntar, {}, FORMATOS, () => {}, DERIVADOS);
   const mutado = { ...valores };
   delete mutado.ID_MCP_SLACK;
   return { valores: mutado };
 }
+
+// ---------------------------------------------------------------------------
+// EL PRODUCTO CARTESIANO, y por que un factor por vez no alcanzaba.
+//
+// EL DEFECTO QUE ESTE BANCO CIERRA, medido: las cinco preguntas de AWS se
+// saltaban cuando la forma era un sitio O la plataforma no era AWS, y `derivar`
+// ramificaba mirando SOLO la plataforma. Ninguna de las dos mitades esta mal
+// sola; el defecto vive en el CRUCE. Barriendo las 192 combinaciones, 32
+// —todas sitio+AWS— escribian cinco `undefined`, el asistente imprimia «Cuenta
+// de AWS undefined» y SALIA 0, y el paso siguiente abortaba con los cinco
+// «falta». Reintentar reproducia el mismo archivo: callejon sin salida.
+//
+// El banco de este archivo cubria las opciones de a una. Por eso paso verde.
+// ---------------------------------------------------------------------------
+
+/** Toda combinacion de respuestas a las preguntas de eleccion, en orden estable. */
+function combinaciones() {
+  const conOpciones = PREGUNTAS.filter((q) => q.opciones);
+  const total = conOpciones.reduce((a, q) => a * q.opciones.length, 1);
+  const todas = [];
+  for (let i = 0; i < total; i++) {
+    let resto = i;
+    const eleccion = {};
+    for (const q of conOpciones) {
+      eleccion[q.id] = String((resto % q.opciones.length) + 1);
+      resto = Math.floor(resto / q.opciones.length);
+    }
+    todas.push(eleccion);
+  }
+  return todas;
+}
+
+const LIBRES = {
+  PROYECTO: "mi-proyecto",
+  ORG: "alguien",
+  BUILDER_2: "la-otra",
+  CUENTA_DEV: "111111111111",
+  CUENTA_PROD: "222222222222",
+  REGION: "us-east-1",
+  PERFIL_DEV: "dev",
+  PERFIL_PROD: "prod",
+  DOMINIO_PROD: "ejemplo.com",
+  CANAL_ALERTAS: "#alertas",
+};
+
+test("TODA combinacion de respuestas produce un archivo que el validador acepta", async () => {
+  const todas = combinaciones();
+  assert.ok(todas.length >= 8, `con ${todas.length} combinaciones esto no barre nada: se rompio el generador`);
+
+  const rotas = [];
+  for (const eleccion of todas) {
+    const { valores, respuestas, dicho } = await correrAsistente(
+      async (_t, id) => eleccion[id] ?? LIBRES[id] ?? "x",
+      {},
+      {},
+      () => {},
+      { ORG_MARCO: "im-diego-ec" },
+    );
+    const quien = `${respuestas.forma}+${respuestas.plataforma}+${respuestas.ambientes}+${respuestas.dominio}+${respuestas.avisos}`;
+    const { problemas } = validarValores(valores);
+    if (problemas.length) rotas.push(`${quien}: ${problemas.join(", ")}`);
+    // Y la otra mitad, que es la que la persona VE: `undefined` en pantalla es
+    // el sintoma que precede al archivo roto, y salir 0 con eso escrito es lo
+    // que convierte un rojo en un callejon sin salida.
+    if (dicho.join("\n").includes("undefined")) rotas.push(`${quien}: se imprimio "undefined" en pantalla`);
+  }
+  assert.deepEqual(
+    rotas,
+    [],
+    "el asistente ofrecio una combinacion y despues escribio un archivo que la propia herramienta rechaza. Es el " +
+      `mismo defecto que ya se pago con Slack y con GCP:\n  ${rotas.slice(0, 12).join("\n  ")}`,
+  );
+});
+
+test("un sitio nunca queda con valores de AWS a medias, y el desvio lo dice", async () => {
+  const { valores, respuestas } = await correrAsistente(
+    // Lo que no se fija a mano se contesta con la primera opcion: lo que este
+    // caso mide es el CRUCE sitio+AWS, no el resto del cuestionario.
+    async (_t, id) => ({ PROYECTO: "p", ORG: "o", forma: "2", plataforma: "2" })[id] ?? LIBRES[id] ?? "1",
+    {},
+    {},
+    () => {},
+    { ORG_MARCO: "im-diego-ec" },
+  );
+  assert.equal(respuestas.forma, "sitio");
+  assert.equal(respuestas.plataforma, "aws", "el guion tiene que haber elegido AWS, o este caso no mide el cruce");
+  assert.equal(usaAws(respuestas), false, "un sitio no despliega servidor propio: no usa AWS aunque se elija AWS");
+  for (const k of Object.keys(RELLENO_AWS)) {
+    assert.equal(valores[k], RELLENO_AWS[k], `${k} tiene que llevar el relleno declarado, no undefined`);
+  }
+  const d = desvios(respuestas).find((x) => x.regla === "iac-es-terraform");
+  assert.ok(d, "el desvio tiene que quedar anotado: un relleno sin declarar es una mentira con formato de dato");
+  assert.match(d.motivo, /sitio para leer/, "y su motivo tiene que nombrar la combinacion, no repetir el caso generico");
+});
+
+test("MUERDE: si las dos mitades volvieran a decidir distinto, el barrido lo ve", async () => {
+  // El caso que prueba que el barrido no pasa por vacuidad. `usaAws` es el
+  // predicado unico; si alguien lo reemplaza por la comparacion vieja —mirar
+  // solo la plataforma— sitio+AWS vuelve a quedar sin valores.
+  const viejo = (r) => r.plataforma === "aws";
+  const sitioConAws = { forma: "sitio", plataforma: "aws" };
+  assert.equal(viejo(sitioConAws), true, "el predicado viejo decia que si");
+  assert.equal(usaAws(sitioConAws), false, "y el nuevo dice que no: en esa diferencia vivia el defecto");
+  assert.equal(usaAws({ forma: "aplicacion", plataforma: "aws" }), true, "y una aplicacion en AWS sigue usando AWS");
+});
+
+// ---------------------------------------------------------------------------
+// LA DIRECCION QUE SE ESCRIBE TIENE QUE SER LA DEL PRODUCTO QUE PUBLICA.
+//
+// EL DEFECTO QUE ESTE BANCO CIERRA: el asistente derivaba
+// `<proyecto>.pages.dev` para quien no tiene dominio propio —la opcion
+// recomendada, o sea la mayoria—, y este andamio NO publica en Cloudflare
+// Pages: publica en Cloudflare Workers con `wrangler deploy`, decision
+// argumentada en sitio/wrangler.jsonc citando a la propia Cloudflare. Un
+// `.pages.dev` solo existe si alguien crea un proyecto de Pages, y aca eso no
+// pasa nunca. Ese valor aterrizaba en el `site:` de Astro, de donde salen los
+// enlaces canonicos del sitio publicado.
+// ---------------------------------------------------------------------------
+
+test("la direccion gratuita nombra el producto que de verdad publica el andamio", async () => {
+  const { valores, respuestas } = await correrAsistente(
+    async (_t, id) => ({ PROYECTO: "mi-sitio", ORG: "o", forma: "2", dominio: "1" })[id] ?? LIBRES[id] ?? "1",
+    {},
+    {},
+    () => {},
+    { ORG_MARCO: "im-diego-ec" },
+  );
+  assert.equal(respuestas.dominio, "gratuito", "el guion tiene que elegir la gratuita, o esto no mide nada");
+  assert.match(valores.DOMINIO_PROD, /\.workers\.dev$/, "la gratuita de este andamio es de Workers");
+  assert.equal(/pages\.dev/.test(valores.DOMINIO_PROD), false, "Pages es otro producto y aca no se crea ninguno");
+
+  // Y lo que NO se puede saber queda declarado: el subdominio de la cuenta.
+  const d = desvios(respuestas).find((x) => x.regla === "urls-canonicas-por-cors");
+  assert.ok(d, "una direccion incompleta sin desvio anotado es una mentira con formato de dato");
+  assert.match(d.motivo, /subdominio/i, "el desvio tiene que decir QUE le falta");
+  assert.match(d.revisar, /primera publicacion/i, "y CUANDO se sabe");
+});
+
+test("el andamio no nombra Pages en ningun lado donde publica con Workers", () => {
+  // ANTI-VACUIDAD por el otro lado: si manana el andamio publicara en Pages,
+  // este caso tiene que caerse para que alguien lo mire, no quedarse verde.
+  const wrangler = fs.readFileSync(path.join(ANDAMIO, "sitio/wrangler.jsonc"), "utf-8");
+  assert.equal(/"pages_build_output_dir"/.test(wrangler), false, "una configuracion de Pages cambiaria toda esta regla");
+  assert.match(wrangler, /"assets"/, "el andamio tiene que seguir publicando assets de Workers");
+});
+
+// ---------------------------------------------------------------------------
+// LOS DESVIOS: LA FORMA QUE SU LECTOR ESPERA, Y REGLAS QUE EXISTEN.
+//
+// DOS DEFECTOS ENCADENADOS, los dos medidos:
+//
+//   1. LA FORMA. El asistente escribia `.projects-desvios.json` como una LISTA
+//      pelada y la accion de constitucion lee `datos.desvios`, o sea un objeto
+//      con esa clave. `Array.isArray(datos?.desvios)` sobre una lista da false,
+//      asi que veia CERO desvios y no decia nada. La persona declaraba cuatro
+//      apartamientos de las reglas del marco y la constitucion de su proyecto
+//      salia como si no hubiera ninguno.
+//
+//   2. LOS IDS. Los cinco `regla` que el asistente escribia NO EXISTIAN en el
+//      canonico. Ninguno. Y la accion caza «desvios muertos» —una regla que ya
+//      no existe—, asi que arreglar SOLO la forma habria cambiado un silencio
+//      por cinco rojos el dia uno.
+//
+// Por eso los dos se arreglan juntos y este banco los mide juntos.
+// ---------------------------------------------------------------------------
+
+test("todo desvio declara una regla que EXISTE en el canonico del marco", async () => {
+  const canonico = path.resolve(ANDAMIO, "../actions/constitucion/canonico");
+  const idsDelCanonico = new Set(
+    fs
+      .readdirSync(canonico)
+      .filter((f) => f.endsWith(".md"))
+      .flatMap((f) => [...fs.readFileSync(path.join(canonico, f), "utf-8").matchAll(/projects:regla id=([a-z0-9-]+)/g)].map((m) => m[1])),
+  );
+  assert.ok(idsDelCanonico.size >= 20, `el canonico declara ${idsDelCanonico.size} reglas: se rompio la lectura`);
+
+  // Se recorren TODAS las combinaciones que producen desvios, no una: cada rama
+  // de `desvios()` escribe un id distinto y probar una sola deja las otras sin
+  // mirar, que es como los cinco llegaron a estar mal a la vez.
+  const vistos = new Set();
+  for (const eleccion of combinaciones()) {
+    const { respuestas } = await correrAsistente(
+      async (_t, id) => eleccion[id] ?? LIBRES[id] ?? "x",
+      {},
+      {},
+      () => {},
+      { ORG_MARCO: "im-diego-ec" },
+    );
+    for (const d of desvios(respuestas)) vistos.add(d.regla);
+  }
+  assert.ok(vistos.size >= 4, `solo se vieron ${vistos.size} reglas distintas: el barrido dejo ramas sin recorrer`);
+
+  const inventadas = [...vistos].filter((r) => !idsDelCanonico.has(r));
+  assert.deepEqual(
+    inventadas,
+    [],
+    "un desvio con una regla que el canonico no declara es un «desvio muerto»: la accion de constitucion lo caza y " +
+      `pone el proyecto en rojo, y mientras tanto el desvio no se muestra al lado de la regla de la que se aparta. ` +
+      `Inventadas: ${inventadas.join(", ")}`,
+  );
+});
+
+test("el archivo de desvios tiene la forma que su lector espera", () => {
+  // La accion lee `datos.desvios`. Se comprueba contra ESA lectura, escrita
+  // igual que en actions/constitucion/constitucion.mjs, y no contra una idea de
+  // como deberia ser.
+  const comoLoLeeLaAccion = (datos) => (Array.isArray(datos?.desvios) ? datos.desvios : []);
+  const lista = [{ regla: "iac-es-terraform", motivo: "x", revisar: "y" }];
+
+  assert.deepEqual(comoLoLeeLaAccion(lista), [], "una lista pelada se descarta ENTERA, y en silencio: era el defecto");
+  assert.deepEqual(comoLoLeeLaAccion({ desvios: lista }), lista, "envuelta en `desvios`, la accion la ve");
+});
+
+test("todo desvio trae los cuatro campos que la accion de constitucion exige", async () => {
+  // EL DEFECTO QUE ESTE CASO VIGILA, medido corriendo la accion de verdad contra
+  // un par de archivos recien generados: el asistente escribia `regla` y
+  // `motivo` y nada mas. La accion exige ademas `aprobado_por` y `fecha`, y pone
+  // un `::error::` por cada desvio al que le falte alguno: cuatro rojos el dia
+  // uno, sobre decisiones que la persona habia tomado bien.
+  //
+  // Los cuatro nombres se leen del contrato escrito en actions/README.md, no se
+  // copian aca: si el contrato cambia, este caso lo sigue.
+  const contrato = fs.readFileSync(path.resolve(ANDAMIO, "../actions/README.md"), "utf-8");
+  const linea = contrato.match(/`\.projects-desvios\.json`:[^.]*/)?.[0] ?? "";
+  const exigidos = [...linea.matchAll(/`([a-z_]+)`/g)].map((m) => m[1]).filter((c) => c !== "json");
+  assert.ok(exigidos.length >= 3, `se leyeron ${exigidos.length} campos del contrato: se rompio la lectura`);
+
+  const faltan = [];
+  for (const eleccion of combinaciones()) {
+    const { respuestas } = await correrAsistente(
+      async (_t, id) => eleccion[id] ?? LIBRES[id] ?? "x",
+      {},
+      {},
+      () => {},
+      { ORG_MARCO: "im-diego-ec" },
+    );
+    for (const d of desvios(respuestas, "2026-01-01")) {
+      for (const campo of exigidos) if (!d[campo]) faltan.push(`${d.regla}: le falta \`${campo}\``);
+    }
+  }
+  assert.deepEqual([...new Set(faltan)], [], `la accion pone un ::error:: por cada uno:\n  ${[...new Set(faltan)].join("\n  ")}`);
+
+  // Y la fecha tiene forma de fecha: la accion la valida con `esFecha`.
+  const uno = desvios({ equipo: "solo", ORG: "alguien" }, "2026-01-01")[0];
+  assert.match(uno.fecha, /^\d{4}-\d{2}-\d{2}$/);
+  assert.equal(uno.aprobado_por, "alguien", "quien aprueba es quien contesto, con nombre y no con un «alguien»");
+});
+
+test("lo que la constitucion promete y el andamio no reparte queda declarado como desvio", async () => {
+  // EL DEFECTO QUE ESTE CASO VIGILA, medido en un proyecto recien generado: la
+  // constitucion que aterriza en TODO proyecto declara «Promocion por ambientes:
+  // merge → deploy a DEV → smoke API → E2E → deploy a PROD → verificar-prod» como
+  // la practica de ese proyecto, y el andamio no trae un solo workflow que haga
+  // nada de eso. Los que viajan son ci.yml, claude.yml, actualizar-marco.yml y
+  // —solo para un sitio— desplegar.yml, que publica en UN destino.
+  //
+  // Una regla que describe maquinaria inexistente es peor que una regla ausente:
+  // los agentes del proyecto la leen como practica vigente y planifican contra
+  // ella. El marco tiene un mecanismo para esto —el desvio declarado— y no lo
+  // estaba usando aca.
+  //
+  // VA PARA TODA COMBINACION, y por eso se barre: no depende de la forma ni de la
+  // plataforma. Ninguna reparte promocion.
+  const sinDeclarar = [];
+  for (const eleccion of combinaciones()) {
+    const { respuestas } = await correrAsistente(
+      async (_t, id) => eleccion[id] ?? LIBRES[id] ?? "x",
+      {},
+      {},
+      () => {},
+      { ORG_MARCO: "im-diego-ec" },
+    );
+    const d = desvios(respuestas).find((x) => x.regla === "promocion-por-ambientes");
+    if (!d) sinDeclarar.push(`${respuestas.forma}+${respuestas.plataforma}`);
+  }
+  assert.deepEqual(
+    [...new Set(sinDeclarar)],
+    [],
+    `estas combinaciones no declaran el desvio de promocion, asi que su constitucion afirma una maquinaria que su ` +
+      `arbol no tiene: ${[...new Set(sinDeclarar)].join(", ")}`,
+  );
+
+  // Y ANTI-VACUIDAD POR EL OTRO LADO: si el andamio empezara a repartir un
+  // workflow de promocion, este desvio sobraria y conviene que el banco lo diga
+  // en vez de dejarlo declarando algo que ya no es cierto.
+  const workflows = fs.readdirSync(path.join(ANDAMIO, ".github/workflows"));
+  const promueve = workflows.filter((f) => /promo|promocion|promote/i.test(f));
+  assert.deepEqual(
+    promueve,
+    [],
+    `el andamio ya reparte ${promueve.join(", ")}: si eso promueve de dev a prod, el desvio de ` +
+      "`promocion-por-ambientes` dejo de corresponder y hay que sacarlo",
+  );
+});

@@ -38,6 +38,12 @@ export default tseslint.config(
       // (coverage/lcov-report/{block-navigation,prettify,sorter}.js por
       // paquete). Ya esta en .gitignore; el linter tambien tiene que saberlo.
       "**/coverage/**",
+      // MISMO CASO QUE coverage/, medido en un sitio recien generado: `astro
+      // build` escribe `<paquete>/.astro/{content,types}.d.ts` con los tipos de
+      // las colecciones de contenido, y sin esta linea `pnpm verificar` sale 0
+      // la primera vez y 1 la SEGUNDA —seis errores sobre archivos que la
+      // persona no escribio y que la herramienta reescribe en cada compilacion—.
+      "**/.astro/**",
       "**/*.config.js",
       "**/*.config.mjs",
       "**/*.config.ts",

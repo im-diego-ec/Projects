@@ -14,7 +14,7 @@ escribió.
 
 **2. Un tropiezo cuyo arreglo es «acordate» no es un arreglo.** Si la corrección
 que se te ocurre empieza con *hay que recordar que…*, no va a la guía: va como fila
-al [backlog](../10-reglas-no-escritas.md#backlog-de-automatización). La premisa del
+al [backlog](../11-reglas-no-escritas.md#backlog-de-automatización). La premisa del
 marco es que un ritual que alguien debe recordar no cuenta como enforcement, y eso
 vale también para la documentación.
 
@@ -46,7 +46,7 @@ por 10× es un defecto de la guía, no del que la corrió.
 |---|---|---|---|---|
 | 0 · Verificar, no hacer | 30 s | | sí / no | sí / no · qué |
 | 1 · Arrancar lo asíncrono | — | | | |
-| 2 · Los 21 valores | — | | | |
+| 2 · Los valores | — | | | |
 | 3 · El repo | 2 comandos | | | |
 | 3.1 · Qué quedó en el repo | — | | | |
 | 3.2 · Escritura de los equipos | — | | | |

@@ -9,7 +9,7 @@ description: Archivar un change de OpenSpec sin usar el CLI de archive — funde
 # Lo que ESCRIBE fuera del arbol —git checkout, git pull, git add, git commit, git push, gh pr create, el `gh api` que lee el pin del marco y los `npx` del CLI de OpenSpec (que descargan y ejecutan un paquete)— queda deliberadamente afuera: no es que la
 # skill no lo haga, es que cada una de esas corridas se PIDE en la sesion. Buscar en el
 # arbol va por las tools `Grep` y `Glob` en vez de por `Bash(grep:*)`.
-allowed-tools: Bash(git status:*), Bash(git diff:*), Bash(git log:*), Bash(git ls-files:*), Bash(git grep:*), Bash(git mv:*), Bash(node .claude/skills/projects-archive-change/aplicar-deltas.mjs:*), Read, Grep, Glob, Edit
+allowed-tools: Bash(git status:*), Bash(git diff:*), Bash(git log:*), Bash(git ls-files:*), Bash(git grep:*), Bash(grep:*), Bash(git mv:*), Bash(node .claude/skills/projects-archive-change/aplicar-deltas.mjs:*), Read, Grep, Glob, Edit
 metadata:
   version: "1.0"
 ---
@@ -100,7 +100,7 @@ repetirlo — por eso una subida del pin llega sola y no hay nada que sincroniza
 Se lee del marco sin clonarlo:
 
 ```bash
-gh api repos/{{ORG}}/Projects/contents/.github/workflows/marco-ci.yml \
+gh api repos/{{ORG_MARCO}}/Projects/contents/.github/workflows/marco-ci.yml \
   -H "Accept: application/vnd.github.raw" \
   | node .claude/skills/projects-archive-change/aplicar-deltas.mjs --pin-openspec -
 ```
@@ -134,21 +134,27 @@ que hoy todo valida:
 ```bash
 npx --yes @fission-ai/openspec@X.Y.Z list
 npx --yes @fission-ai/openspec@X.Y.Z validate --all --strict
-git grep -c "^- \[ \]" -- openspec/changes/<nombre-del-change>/tasks.md
+grep -c "^- \[ \]" openspec/changes/<nombre-del-change>/tasks.md
 ```
 
-`validate` tiene que estar en verde **antes** de tocar nada, y el conteo de
-tareas incompletas deberia ser 0 — `git grep -c` no imprime la linea cuando el
-conteo es cero y sale 1, asi que **sin salida es cero tareas abiertas**. Si quedan tareas abiertas, para y decilo: se
-archiva lo terminado, no lo que va quedando.
+`validate` tiene que estar en verde **antes** de tocar nada, y el conteo de tareas
+incompletas tiene que dar **`0`** — con `grep -c` la salida es el numero, no el
+vacio. Si da cualquier otra cosa, para y decilo: se archiva lo terminado, no lo
+que va quedando.
+
+> **Antes decia `git grep -c` y esa forma mentia dos veces.** No imprimia nada
+> cuando el conteo era cero, asi que la regla escrita era «sin salida es cero
+> tareas abiertas» — y un archivo que git todavia no registro produce EXACTAMENTE
+> la misma salida vacia. O sea que «todavia no lo agregaste» y «no queda ninguna
+> tarea» se leian igual. Con `grep -c` a secas, cero es `0` y se distingue.
 
 ---
 
 ## Paso 1 — Inventariar lo que el delta va a hacer
 
 ```bash
-git grep -n -E "^## .* Requirements" -- openspec/changes/<nombre-del-change>/specs/
-git grep -n "^### Requirement: " -- openspec/changes/<nombre-del-change>/specs/
+grep -rn -E "^## .* Requirements" openspec/changes/<nombre-del-change>/specs/
+grep -rn "^### Requirement: " openspec/changes/<nombre-del-change>/specs/
 ```
 
 Anota cuantas operaciones esperas por capability. Ese numero es con lo que vas a
@@ -162,7 +168,7 @@ requirement del delta no existe en el spec vivo, no avisa**. Compara titulo por
 titulo contra el spec vivo:
 
 ```bash
-git grep -n "^### Requirement: " -- openspec/specs/<capability>/spec.md
+grep -rn "^### Requirement: " openspec/specs/<capability>/spec.md
 ```
 
 Un retitulado es legitimo, pero **se declara** en `## RENAMED Requirements` con
@@ -362,6 +368,15 @@ npx --yes @fission-ai/openspec@X.Y.Z list
 
 - `validate --all --strict` en **verde**, y el total de items validados **baja en
   1** (el change dejo de contar como activo).
+
+> ⚠️ **Si el change creo una capability NUEVA, este comando sale ROJO acá, y es
+> esperable.** Una capability nueva nace con `Purpose: TBD` —lo escribio el Paso 2,
+> porque los deltas no transportan la seccion `## Purpose`— y `--strict` rechaza
+> el TBD. **Le pasa al PRIMER change de todo proyecto**, porque su
+> `openspec/specs/` empieza vacio y cualquier delta crea capability.
+>
+> No es un archive mal hecho: es un paso que todavia no hiciste. **Anda al Paso 5,
+> completa los `Purpose`, y volve acá.** Los tres verdes se piden despues de eso.
 - `list` **sin changes activos** (o sin el que acabas de archivar).
 - **El guardrail de deltas en verde.** Ese no corre en local: vive en el marco y
   llega a este repo por el `uses: ...@<version>` del `ci.yml`, asi que su veredicto se
@@ -384,8 +399,14 @@ desactualizado sobrevive al archive: los deltas **no transportan** la seccion
 intactos. No es un bug, es el formato.
 
 ```bash
-git grep -n -E "Purpose: TBD|^TBD$" -- openspec/specs/
+grep -rn -E "Purpose: TBD|^TBD$" openspec/specs/
 ```
+
+> **Va `grep -r` y no `git grep`, y la diferencia importa acá.** `git grep` solo
+> mira lo que git ya tiene registrado: sobre un archivo que el Paso 2 acaba de
+> escribir y que todavia no pasó por `git add`, **devuelve vacio** — y ese vacio se
+> lee como «no hay ningun TBD». Justo al reves de la verdad, y justo en el caso
+> mas comun: la capability recien creada.
 
 Todo lo que aparezca se completa **en este mismo PR**. En el proyecto donde nacio
 el marco una capability vivio una semana con el Purpose en TBD sin que nadie lo

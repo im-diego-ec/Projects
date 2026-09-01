@@ -6,6 +6,7 @@
   "plataforma": "aws",
   "PROYECTO": "{{PROYECTO}}",
   "ORG": "{{ORG}}",
+  "ORG_MARCO": "{{ORG_MARCO}}",
   "PAQUETE_API": "{{PAQUETE_API}}",
   "PAQUETE_WEB": "{{PAQUETE_WEB}}",
   "PAQUETE_SITIO": "{{PAQUETE_SITIO}}",

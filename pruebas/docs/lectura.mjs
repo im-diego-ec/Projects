@@ -388,7 +388,7 @@ export function evolucionSegunElIndice(texto = leer(INDICE)) {
  *  era subcadena de `censo-de-consumidores.md`: una busqueda de subcadena daba por
  *  indexada una pagina gracias a la mencion de OTRA, y este repositorio ya se
  *  habia comido ese falso verde una vez. Con los numeros adelante la colision
- *  murio sola —`"12-censo-de-consumidores.md".includes("13-consumidores.md")` es
+ *  murio sola —`"13-censo-de-consumidores.md".includes("14-consumidores.md")` es
  *  `false`—, pero buscar el destino del enlace y no el nombre suelto no depende
  *  de los nombres de hoy: el mismo tropiezo esta medido con /openspec/specs/ en
  *  el banco de 06-para-el-po.md, y el proximo par de nombres que colisione va a

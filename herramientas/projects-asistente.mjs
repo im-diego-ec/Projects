@@ -42,9 +42,48 @@
  *  claves dejen de existir cuando la plataforma no es AWS, y eso exige editar la
  *  constitucion canonica —usa ocho de ellas en trece lugares— en el mismo acto.
  *  Mientras tanto el asistente escribe el desvio para que quede firmado. */
+/** SI ESTE PROYECTO USA AWS DE VERDAD, y por que es una funcion y no una
+ *  comparacion suelta repetida en siete lugares.
+ *
+ *  EL DEFECTO QUE CIERRA, medido barriendo las 192 combinaciones de las
+ *  preguntas de eleccion: las cinco preguntas de AWS se saltaban cuando la forma
+ *  era un sitio O la plataforma no era AWS, y `derivar` ramificaba mirando SOLO
+ *  la plataforma. Las dos mitades decidian distinto, asi que sitio+AWS —32 de
+ *  las 192— no preguntaba nada y despues escribia cinco `undefined`. El
+ *  asistente imprimia «Cuenta de AWS undefined», SALIA 0, y el paso siguiente
+ *  abortaba con los cinco «falta». Volver a correrlo reproducia el mismo archivo
+ *  roto: un callejon sin salida, y ningun mensaje nombraba la combinacion
+ *  culpable.
+ *
+ *  Que la herramienta afirme exito sobre un archivo que ella misma rechaza dos
+ *  segundos despues es peor que un rojo.
+ *
+ *  Y HABIA UNA TERCERA MITAD, que la primera version de este comentario nego:
+ *  decia «con un solo predicado, las dos mitades no pueden volver a discrepar» y
+ *  eran TRES los lugares que deciden. El que faltaba es `noViajanPorPlataforma`
+ *  de projects-init.mjs, o sea el que decide QUE ARCHIVOS VIAJAN: seguia mirando
+ *  solo la plataforma, asi que sitio+AWS recibia igual `infra/` e `infra-prod/`
+ *  con dos raices de Terraform apuntando a la cuenta del relleno. El rojo se
+ *  habia ido y el arbol equivocado quedaba, que es peor porque nada lo dice.
+ *
+ *  Hoy las tres deciden por lo mismo, y hay un caso del banco que las cruza. */
+export const usaAws = (r) => r.plataforma === "aws" && r.forma !== "sitio";
+
 export const RELLENO_AWS = {
-  CUENTA_DEV: "111111111111",
-  CUENTA_PROD: "222222222222",
+  // LOS CEROS NO SON DECORACION: son la unica forma que tiene una clave con
+  // formato de cuenta de AWS de decir «acá no hay ninguna».
+  //
+  // El relleno anterior era `111111111111` y `222222222222`. La restriccion es
+  // que FORMATOS exige doce digitos, asi que no se puede escribir «sin-aws»
+  // como en los perfiles. Y esos valores no se quedaban en el archivo: la
+  // constitucion del proyecto los IMPRIME en su tabla de ambientes —«| Cuenta
+  // AWS | 111111111111 | 222222222222 |»— y ahi ya no se leen como relleno,
+  // se leen como el dato de la persona.
+  //
+  // Doce ceros no es una cuenta de AWS y no puede serlo. Es el mismo criterio
+  // que el UUID nulo de ID_MCP_SLACK, que ya estaba resuelto asi.
+  CUENTA_DEV: "000000000000",
+  CUENTA_PROD: "000000000000",
   REGION: "us-east-1",
   PERFIL_DEV: "sin-aws-dev",
   PERFIL_PROD: "sin-aws-prod",
@@ -104,6 +143,8 @@ export const PREGUNTAS = [
         valor: "aplicacion",
         etiqueta: "Una aplicación detrás de una puerta",
         detalle:
+          "HOY NO SE PUBLICA SOLO: el marco todavía no reparte un paso que la lleve a internet, así que por " +
+          "ahora se levanta en tu máquina. " +
           "La gente entra con usuario y contraseña y trabaja adentro un rato largo: un panel de gestión, " +
           "un inventario, una herramienta de trabajo. Se siente como un programa y no como un sitio — entrás " +
           "una vez y las pantallas cambian al instante. LO QUE TE CUESTA: ninguna de tus pantallas va a " +
@@ -115,6 +156,7 @@ export const PREGUNTAS = [
         valor: "sitio",
         etiqueta: "Un sitio para leer",
         detalle:
+          "SE PUBLICA SOLO: cada vez que las verificaciones quedan en verde, sale a internet. " +
           "Páginas que alguien abre y lee: un blog, un manual, la web de un producto, un catálogo. Nadie se " +
           "registra y nadie guarda nada. Es la más barata de todas: sin base de datos, sin servidor, sin " +
           "contraseñas que proteger, y las páginas abren al instante porque no mandan ni un programa al " +
@@ -202,6 +244,16 @@ export const PREGUNTAS = [
   },
   {
     id: "ambientes",
+    // NO SE PREGUNTA PARA UN SITIO, y el motivo es que la respuesta no cambiaba
+    // nada. Medido: contestar «dos» sobre forma=sitio produce los MISMOS 42
+    // archivos que contestar «una», y lo unico que se mueve es el valor declarado
+    // `DOMINIO_DEV`. No hay un segundo destino que desplegar: un sitio publica en
+    // uno solo, y ese es el publico.
+    //
+    // Preguntar algo cuya respuesta no cambia nada es peor que no preguntarlo: le
+    // hace creer a la persona que eligio una arquitectura cuando eligio un texto.
+    // Es el mismo criterio con el que las cinco preguntas de AWS ya se saltan.
+    salta: (r) => r.forma === "sitio",
     texto: "¿Cuántas copias del proyecto querés? Una para probar sin miedo, otra para lo que ve la gente de verdad.",
     opciones: [
       {
@@ -231,7 +283,7 @@ export const PREGUNTAS = [
   {
     id: "CUENTA_DEV",
     libre: true,
-    salta: (r) => r.forma === "sitio" || r.plataforma !== "aws",
+    salta: (r) => !usaAws(r),
     texto: (r) =>
       r.ambientes === "dos"
         ? "¿Cuál es el número de cuenta de AWS donde vas a PROBAR? Son doce dígitos."
@@ -242,7 +294,7 @@ export const PREGUNTAS = [
   {
     id: "CUENTA_PROD",
     libre: true,
-    salta: (r) => r.forma === "sitio" || r.plataforma !== "aws" || r.ambientes !== "dos",
+    salta: (r) => !usaAws(r) || r.ambientes !== "dos",
     texto: "¿Y el número de cuenta de AWS donde va lo que ve la gente de verdad?",
     ayuda: "Conviene que sea una cuenta DISTINTA de la de pruebas: es lo que impide que un error de prueba toque lo real.",
     normaliza: (t) => t.replace(/[\s-]/g, ""),
@@ -250,7 +302,7 @@ export const PREGUNTAS = [
   {
     id: "REGION",
     libre: true,
-    salta: (r) => r.forma === "sitio" || r.plataforma !== "aws",
+    salta: (r) => !usaAws(r),
     texto: "¿En qué región de AWS? Es en qué parte del mundo viven tus datos.",
     ayuda: "Ejemplo: us-east-1 (Virginia) · sa-east-1 (São Paulo). Elegí la más cercana a tu gente.",
     normaliza: (t) => t.trim().toLowerCase(),
@@ -258,7 +310,7 @@ export const PREGUNTAS = [
   {
     id: "PERFIL_DEV",
     libre: true,
-    salta: (r) => r.forma === "sitio" || r.plataforma !== "aws",
+    salta: (r) => !usaAws(r),
     texto: (r) =>
       r.ambientes === "dos"
         ? "¿Cómo se llama tu perfil de AWS en esta computadora, el de pruebas?"
@@ -269,7 +321,7 @@ export const PREGUNTAS = [
   {
     id: "PERFIL_PROD",
     libre: true,
-    salta: (r) => r.forma === "sitio" || r.plataforma !== "aws" || r.ambientes !== "dos",
+    salta: (r) => !usaAws(r) || r.ambientes !== "dos",
     texto: "¿Y el perfil de AWS de lo que ve la gente de verdad?",
     ayuda: "Los ves con: aws configure list-profiles",
     normaliza: (t) => t.trim(),
@@ -282,9 +334,10 @@ export const PREGUNTAS = [
         valor: "gratuito",
         etiqueta: "Todavía no tengo",
         detalle:
-          "Se usa la dirección gratuita que da Cloudflare, del tipo tu-proyecto.pages.dev. Funciona " +
-          "desde el primer día y sirve para mostrarle el proyecto a alguien. Cuando compres uno propio, " +
-          "se cambia y listo.",
+          "Se usa la dirección gratuita que da Cloudflare, del tipo tu-proyecto.tu-cuenta.workers.dev. " +
+          "Funciona desde el primer día y sirve para mostrarle el proyecto a alguien. La parte del medio la " +
+          "elegís vos al abrir la cuenta y Cloudflare te la imprime la primera vez que publicás; hasta " +
+          "entonces queda anotada como pendiente. Cuando compres un dominio propio, se cambia y listo.",
         recomendada: true,
       },
       {
@@ -360,7 +413,20 @@ export const PREGUNTAS = [
 /** Las claves de las 21 que salen de una respuesta y no de un relleno. */
 export function derivar(r) {
   const solo = r.equipo !== "equipo";
-  const unDominio = r.dominio === "propio" ? r.DOMINIO_PROD : `${r.PROYECTO}.pages.dev`;
+  // LA DIRECCION GRATUITA ES DE WORKERS, NO DE PAGES, y la diferencia no es de
+  // nombre: este andamio publica con `wrangler deploy` sobre Cloudflare Workers
+  // —argumentado en sitio/wrangler.jsonc citando a la propia Cloudflare— y un
+  // `.pages.dev` solo existe si alguien crea un proyecto de Pages, cosa que aca
+  // no ocurre nunca. Escrito asi, el `site:` de Astro apuntaba a una direccion
+  // que no iba a resolver jamas, y de ahi salen los enlaces canonicos del sitio
+  // publicado.
+  //
+  // LO QUE NO SE PUEDE DERIVAR, y por eso queda anotado como desvio: la direccion
+  // real lleva el subdominio de la cuenta en el medio
+  // (`<proyecto>.<subdominio>.workers.dev`), y ese subdominio lo elige la persona
+  // al abrir la cuenta —que no existe todavia cuando se contesta esta pregunta—.
+  // Cloudflare lo imprime en la primera publicacion.
+  const unDominio = r.dominio === "propio" ? r.DOMINIO_PROD : `${r.PROYECTO}.workers.dev`;
   // Con UN ambiente los dos dominios son el mismo a proposito: el andamio
   // todavia sustituye los dos marcadores, y escribir dos direcciones distintas
   // para una sola copia seria inventar una que no existe.
@@ -373,6 +439,11 @@ export function derivar(r) {
     // que faltaba era que alguien la leyera.
     plataforma: r.plataforma,
     forma: r.forma,
+    // NO SE PREGUNTA. Es la cuenta donde vive el MARCO, no la del proyecto, y
+    // quien corre esta herramienta la tiene delante: sale del remoto del clon.
+    // Preguntarla seria pedirle a la persona un dato que el programa ya sabe —y
+    // que ademas no puede contestar, porque no es una decision suya.
+    ORG_MARCO: r.ORG_MARCO,
     PROYECTO: r.PROYECTO,
     ORG: r.ORG,
     PAQUETE_API: "api",
@@ -389,7 +460,7 @@ export function derivar(r) {
     BUILDER_1: r.ORG,
     BUILDER_2: solo ? r.ORG : r.BUILDER_2,
     PO: r.ORG,
-    ...(r.plataforma === "aws"
+    ...(usaAws(r)
       ? {
           CUENTA_DEV: r.CUENTA_DEV,
           // Con UN ambiente no se pregunta dos veces por lo mismo: la cuenta y
@@ -421,11 +492,38 @@ export function derivar(r) {
  *  NO ES DECORACION. El marco permite apartarse de casi cualquier pieza; lo que
  *  no permite es que apartarse sea algo que se descubre despues. Cada linea de
  *  aca nace de una respuesta y dice que regla queda sin cumplir y por que. */
-export function desvios(r) {
+/** LOS DESVIOS DECLARADOS, y por que su `regla` no es texto libre.
+ *
+ *  EL DEFECTO QUE CIERRA, medido: los cinco ids que esta funcion escribia
+ *  —`revision-cruzada-obligatoria`, `infraestructura-declarada-en-terraform`,
+ *  `alertas-a-un-canal-del-equipo`, `proteccion-de-la-rama-principal` y
+ *  `direccion-publica-declarada`— NO EXISTIAN EN EL CANONICO. Ninguno.
+ *
+ *  El campo `regla` es el id de la regla del canonico de la que el proyecto se
+ *  aparta, y la accion de constitucion lo usa para dos cosas: mostrar el desvio
+ *  al lado de su regla, y cazar «desvios muertos» (una regla que ya no existe).
+ *  Con ids inventados, lo primero no ocurria y lo segundo habria puesto rojo el
+ *  proyecto entero el dia que el otro defecto —la forma del archivo— se
+ *  arreglara. Los dos se arreglan juntos a proposito: arreglar uno solo cambia
+ *  un silencio por cinco rojos. */
+export function desvios(r, hoy = new Date().toISOString().slice(0, 10)) {
+  // LOS CUATRO CAMPOS DEL CONTRATO, y faltaban dos.
+  //
+  // `actions/constitucion` exige `regla`, `motivo`, `aprobado_por` y `fecha`, y
+  // pone ROJO el proyecto por cada desvio al que le falte alguno. El asistente
+  // escribia solo los dos primeros: medido corriendo la accion contra un par de
+  // archivos recien generados, cuatro `::error::` de «no dice quien lo aprobo».
+  //
+  // QUIEN APRUEBA es la persona que contesto el cuestionario, que es la duenia
+  // de la cuenta donde va el proyecto: la decision fue suya y el archivo tiene
+  // que decirlo con un nombre, no con un «alguien». LA FECHA entra por parametro
+  // para que el banco pueda afirmar sobre ella sin depender del dia que corra.
+  const comun = { aprobado_por: r.ORG, fecha: hoy };
   const lista = [];
   if (r.equipo !== "equipo") {
     lista.push({
-      regla: "revision-cruzada-obligatoria",
+      ...comun,
+      regla: "github-review-cruzado-automatizado",
       motivo:
         "El equipo es una sola persona. GitHub pide revision a los duenos del codigo excepto al autor, " +
         "asi que exigir una aprobacion ajena bloquearia todo merge sin salida. El pull request y la " +
@@ -433,11 +531,16 @@ export function desvios(r) {
       revisar: "cuando entre la segunda persona al proyecto",
     });
   }
-  if (r.plataforma !== "aws") {
+  if (!usaAws(r)) {
     lista.push({
-      regla: "infraestructura-declarada-en-terraform",
+      ...comun,
+      regla: "iac-es-terraform",
       motivo:
-        `La plataforma elegida es "${r.plataforma}" y el andamio solo trae Terraform de AWS. Las cinco ` +
+        (r.plataforma === "aws"
+          ? "La plataforma elegida es AWS pero la forma es un sitio para leer: se publica en Cloudflare y no tiene " +
+            "servidor propio que desplegar, asi que las cinco preguntas de AWS no se hicieron. "
+          : `La plataforma elegida es "${r.plataforma}" y el andamio solo trae Terraform de AWS. `) +
+        "Las cinco " +
         "claves de AWS del archivo de valores llevan relleno porque una clave vacia se lee como marcador " +
         "sin resolver y pondria el proyecto en rojo el dia uno. No describen ninguna cuenta real.",
       revisar: "cuando el andamio reparta infraestructura segun la plataforma elegida",
@@ -445,16 +548,55 @@ export function desvios(r) {
   }
   if (r.avisos !== "slack") {
     lista.push({
-      regla: "alertas-a-un-canal-del-equipo",
+      ...comun,
+      regla: "alertar-con-origen-preciso",
       motivo:
         "Los avisos van al correo de GitHub. Las dos claves de Slack llevan relleno por el mismo motivo " +
         "que las de AWS: vacias se leerian como marcador sin resolver.",
       revisar: "cuando haya equipo y un canal donde avisarle",
     });
   }
+  if (r.dominio !== "propio") {
+    lista.push({
+      ...comun,
+      regla: "urls-canonicas-por-cors",
+      motivo:
+        "No hay dominio propio, asi que se anoto la direccion gratuita de Cloudflare Workers " +
+        "`<proyecto>.workers.dev`. LE FALTA EL SUBDOMINIO DE LA CUENTA en el medio " +
+        "(`<proyecto>.<subdominio>.workers.dev`): lo elige la persona al abrir la cuenta y no existe todavia " +
+        "cuando se contesta esta pregunta. Cloudflare imprime la direccion completa en la primera publicacion; " +
+        "hasta entonces el `site:` de Astro apunta a un nombre que no resuelve, lo que afecta los enlaces " +
+        "canonicos del HTML publicado y nada mas.",
+      revisar: "despues de la primera publicacion, con la direccion que imprime Cloudflare",
+    });
+  }
+  // LA PROMOCION POR AMBIENTES, que la constitucion declara y el andamio no
+  // reparte. Va SIEMPRE, para las dos formas, y por eso no lleva condicion.
+  //
+  // EL DEFECTO QUE CIERRA, medido en un proyecto recien generado: la constitucion
+  // que aterriza en TODO proyecto declara «merge → deploy a DEV → smoke API → E2E
+  // → deploy a PROD → verificar-prod» como la practica de ese proyecto, y el
+  // andamio no trae un solo workflow que haga nada de eso: los que viajan son
+  // ci.yml, claude.yml, actualizar-marco.yml y —solo para un sitio—
+  // desplegar.yml, que publica en UN destino y no promueve.
+  //
+  // Una regla que describe maquinaria inexistente es peor que una regla ausente:
+  // los agentes del proyecto la leen como practica vigente y planifican contra
+  // ella. El marco ya tiene el mecanismo para esto y es este: declararlo.
+  lista.push({
+    ...comun,
+    regla: "promocion-por-ambientes",
+    motivo:
+      "El andamio no reparte pipeline de promocion: no hay deploy a dev, ni smoke, ni promocion a prod. Lo que " +
+      "viaja hoy es la verificacion (ci.yml) y, solo para la forma «un sitio para leer», una publicacion a UN " +
+      "destino (desplegar.yml). La regla queda escrita como el destino, no como lo que este proyecto hace hoy. " +
+      "Lo mismo vale para `dev-es-staging-compartido`, que describe la misma maquinaria.",
+    revisar: "cuando el marco reparta el pipeline de promocion, o cuando este proyecto escriba el suyo",
+  });
   if (r.visibilidad === "privado") {
     lista.push({
-      regla: "proteccion-de-la-rama-principal",
+      ...comun,
+      regla: "git-check-requerido-es-el-veredicto-agregado",
       motivo:
         "El repositorio es privado en el plan gratuito de GitHub, donde la proteccion de rama no existe " +
         "y la API responde 403. Las reglas del marco quedan escritas sin nada que las haga cumplir.",
@@ -515,8 +657,8 @@ function envolver(texto, ancho) {
  *
  *  No imprime nada: devuelve las lineas para que quien llama las emita. Una
  *  funcion que decide y ademas escribe en la consola no se puede afirmar. */
-export async function correrAsistente(preguntar, previos = {}, formatos = {}, emitir = () => {}) {
-  const respuestas = { ...previos };
+export async function correrAsistente(preguntar, previos = {}, formatos = {}, emitir = () => {}, derivados = {}) {
+  const respuestas = { ...derivados, ...previos };
   const dicho = [];
 
   // SE EMITE EN EL MOMENTO Y ADEMAS SE GUARDA, y las dos mitades hacen falta.
@@ -619,14 +761,20 @@ export function lineasDeResumen(r, desviosDeR) {
     ["Equipo", r.equipo === "solo" ? "trabajás solo" : `vos y @${r.BUILDER_2}`],
     ["Dónde vive", { supabase: "Supabase + Cloudflare", aws: "AWS", gcp: "GCP", ninguna: "todavía sin decidir" }[r.plataforma]],
     ["Copias", r.ambientes === "uno" ? "una sola" : "una de prueba y una de verdad"],
-    ["Dirección", r.dominio === "propio" ? r.DOMINIO_PROD : `${r.PROYECTO}.pages.dev  (la gratuita de Cloudflare)`],
+    [
+      "Dirección",
+      r.dominio === "propio"
+        ? r.DOMINIO_PROD
+        : `${r.PROYECTO}.workers.dev  (la gratuita de Cloudflare; le falta el subdominio de tu cuenta en el medio, ` +
+          `y sale en la primera publicación)`,
+    ],
     ["Avisos", r.avisos === "slack" ? r.CANAL_ALERTAS : "al correo de GitHub"],
     ["Repositorio", r.visibilidad === "publico" ? "público" : "privado"],
   ];
   // Las de AWS son las UNICAS que la persona tuvo que ir a buscar a otro lado, y
   // la primera version del resumen no las mostraba: se llamaba "todo lo que
   // elegiste" y se comia justo las cinco que mas cuesta verificar.
-  if (r.plataforma === "aws") {
+  if (usaAws(r)) {
     filas.push(["Cuenta de AWS", r.ambientes === "dos" ? `${r.CUENTA_DEV} (pruebas) y ${r.CUENTA_PROD} (de verdad)` : r.CUENTA_DEV]);
     filas.push(["Región", r.REGION]);
     filas.push(["Perfil de AWS", r.ambientes === "dos" ? `${r.PERFIL_DEV} y ${r.PERFIL_PROD}` : r.PERFIL_DEV]);

@@ -46,43 +46,81 @@ abajo, y la tercera —la de este documento— +36 más. Ese archivo es el workf
 reusable del marco y crece por arriba en cada entrega, así que un número de línea
 escrito acá nace viejo: queda equivocado antes de que nadie lo lea, y equivocado en
 silencio, que es peor que ausente. El nombre del paso no se movió ni una vez en las
-tres mediciones, y el `grep` de arriba lo convierte en línea en un segundo. Las citas
-a los demás archivos sí conservan la línea —resuelven al 2026-08-24, verificadas una
-por una— pero envejecen igual: la línea es una comodidad, el nombre es el dato.
+tres mediciones, y el `grep` de arriba lo convierte en línea en un segundo.
 
-**Medido el 2026-08-24, después de promover al contrato tres requirements que el
-marco ya hacía cumplir sin tenerlos escritos: 41 requirements vivos en 8 capabilities**
+**Y como el nombre es el dato, es el nombre lo que se verifica.** Desde el 2026-08-31,
+[`pruebas/docs/cobertura-de-requirements.test.mjs`](../pruebas/docs/cobertura-de-requirements.test.mjs)
+exige que **todo paso citado entre comillas angulares siga existiendo con ese nombre**
+en algún workflow o action del repositorio: renombrar un paso deja esta página mandando
+a buscar una compuerta que ya no se llama así, y la celda se sigue leyendo perfecta.
+Ese control es exacto.
+
+Las citas a los demás archivos sí conservan la línea, y ahí la red es **parcial, y
+conviene saber cuánto atrapa**: el mismo banco se pone rojo si la ruta no existe, si la
+línea se pasa del final del archivo o si cae sobre una línea vacía o de comentario, pero
+medido contra las trece anclas que este lote encontró envejecidas cazaba **seis** —las
+que habían ido a parar a un `#` solo o a un comentario—; las otras siete habían caído
+sobre código de verdad y ninguna forma barata las distingue de un ancla sana. La
+primera que cazó en producción fue una de este mismo lote: al crecer dos líneas un
+comentario de `ci.yml`, la cita `:495` quedó apuntando a un comentario y el banco lo
+dijo en la corrida siguiente. O sea que la línea sigue siendo una comodidad y el nombre
+sigue siendo el dato.
+
+**Lo que este documento ya se hizo a sí mismo, y por eso la advertencia de arriba no
+es retórica.** La medición del 2026-08-24 se quedó vieja en menos de una semana: el
+andamio empezó a repartir `plantilla/.github/workflows/desplegar.yml`, con su banco de
+quince casos, y **tres filas** siguieron diciendo `ninguno` sobre compuertas que ya
+existían — más los tres párrafos que afirmaban en prosa que «el andamio trae `ci.yml`,
+`actualizar-marco.yml` y `claude.yml`, y ninguno despliega». Ninguna se puso roja: una
+tabla que dice que algo *no* está verificado envejece hacia el lado que nadie audita,
+porque un `ninguno` de más no rompe nada — solo hace tomar decisiones con un mapa
+equivocado. El re-conteo del 2026-08-31 es el que sigue.
+
+**Medido el 2026-08-31: 41 requirements vivos en 8 capabilities**
 (12 `calidad-codigo` + 4 `despliegue-ci` + 2 `gestion-secretos` +
 3 `gobierno-contribucion` + 5 `observabilidad` + 6 `operacion-infra` +
-4 `pipeline-entrega` + 5 `verificacion-desplegada`). Hay además una **novena
-capability en vuelo** —`base-tecnologica`, que nace en el change `stack-estandar` y
-todavía no existe en `openspec/specs/`—: su sección va al final, porque una capability
-que nace en un change y no en los specs vivos es la asimetría que hay que ver antes de
-que se consolide, no después.
+4 `pipeline-entrega` + 5 `verificacion-desplegada`). Hay además **2 capabilities en
+vuelo** —`base-tecnologica`, que nace en el change `stack-estandar`, y
+`documentacion-del-marco`, que nace en `orden-de-lectura`—: ninguna existe todavía en
+`openspec/specs/`, y sus secciones van al final, porque una capability que nace en un
+change y no en los specs vivos es la asimetría que hay que ver antes de que se
+consolide, no después.
 
-**Resumen de la medición: 21 de 41 requirements tienen al menos una compuerta que
-falla sola; 20 no la tienen.** Los 20 se concentran donde el marco todavía no reparte
-la pieza que los ejecutaría: `despliegue-ci` (4 de 4 sin compuerta),
-`verificacion-desplegada` (4 de 5) y `observabilidad` (4 de 5) dependen del esqueleto
-de entrega y del código de aplicación que el andamio recién está incorporando.
+**Esa cuenta decía «una» hasta el 2026-08-31, y no es una errata: es el mismo defecto
+otra vez.** `documentacion-del-marco` llevaba semanas en vuelo y esta página no la
+nombraba en ninguna parte — y es la capability cuyo requirement «Ningún enlace del
+repositorio apunta a algo que no existe» hace cumplir `pruebas/docs/enlaces.test.mjs`,
+o sea que la página que existe para decir qué tiene compuerta se salteó una capability
+entera **que sí la tiene**. Desde hoy no se escribe a mano: la lista sale de mirar
+`openspec/changes/*/specs/` contra `openspec/specs/`, y lo mide
+[`pruebas/docs/cobertura-de-requirements.test.mjs`](../pruebas/docs/cobertura-de-requirements.test.mjs).
+
+**Resumen de la medición: 24 de 41 requirements tienen al menos una compuerta que
+falla sola; 17 no la tienen.** Los 17 siguen concentrados donde el marco reparte poco
+o nada de la pieza que los ejecutaría: `verificacion-desplegada` (4 de 5),
+`observabilidad` (4 de 5) y `despliegue-ci` (2 de 4). El andamio ya reparte un
+despliegue —`plantilla/.github/workflows/desplegar.yml`, con su banco en
+`pruebas/andamio/desplegar.test.mjs`— pero publica **un solo destino**: mientras no
+haya ambiente de desarrollo ni promoción de dev a producción, todo lo que se
+especifica *sobre esa secuencia* sigue sin tener dónde fallar.
 
 ---
 
 ## calidad-codigo — 12 requirements, 11 con compuerta
 
-| Requirement | Lo que lo hace fallar solo | Ruta y ancla (2026-08-24) |
+| Requirement | Lo que lo hace fallar solo | Ruta y ancla (2026-08-31) |
 |---|---|---|
-| Lint y formato configurados para todos los paquetes | `pnpm lint` desde la raíz sobre todo el árbol, y el paso que exige que cada paquete DECLARE los scripts que el CI corre | `plantilla/.github/workflows/ci.yml:198`; paso «Todo paquete declara los scripts de verificacion», `plantilla/.github/workflows/ci.yml:344` |
-| Prohibir `any` sin justificación | La regla `@typescript-eslint/no-explicit-any` que trae `tseslint.configs.recommended`, ejecutada por `pnpm lint` | `plantilla/eslint.config.mjs:44` + `plantilla/.github/workflows/ci.yml:198` |
-| Prohibir promesas flotantes | `no-floating-promises` de `recommendedTypeChecked`, más el ajuste de `no-misused-promises` del front | `plantilla/eslint.config.mjs:51` y `:141` + `plantilla/.github/workflows/ci.yml:198` |
-| Scripts de verificación sin enmascaramiento de fallo | Paso «Scripts de verificacion sin enmascaramiento» de `marco-ci.yml`, con banco propio en el andamio | `.github/workflows/marco-ci.yml`, paso «Scripts de verificacion sin enmascaramiento»; `pruebas/andamio/manifiestos.test.mjs` (mutación «vuelve un `\|\| true` al script lint de un paquete», `:348`) |
+| Lint y formato configurados para todos los paquetes | `pnpm lint` desde la raíz sobre todo el árbol, y el paso que exige que cada paquete DECLARE los scripts que el CI corre | `plantilla/.github/workflows/ci.yml:205`; paso «Todo paquete declara los scripts de verificacion», `plantilla/.github/workflows/ci.yml:354` |
+| Prohibir `any` sin justificación | La regla `@typescript-eslint/no-explicit-any` que trae `tseslint.configs.recommended`, ejecutada por `pnpm lint` | `plantilla/eslint.config.mjs:58` + `plantilla/.github/workflows/ci.yml:205` |
+| Prohibir promesas flotantes | `no-floating-promises` de `recommendedTypeChecked`, más el ajuste de `no-misused-promises` del front | `plantilla/eslint.config.mjs:65` y `:155` + `plantilla/.github/workflows/ci.yml:205` |
+| Scripts de verificación sin enmascaramiento de fallo | Paso «Scripts de verificacion sin enmascaramiento» de `marco-ci.yml`, con banco propio en el andamio | `.github/workflows/marco-ci.yml`, paso «Scripts de verificacion sin enmascaramiento»; `pruebas/andamio/manifiestos.test.mjs` (mutación «vuelve un `\|\| true` al script lint de un paquete», `:360`) |
 | Test de regresión obligatorio por defecto conocido | **ninguno** | — |
 | Las definiciones de pipeline se validan como código | Paso «Definiciones de pipeline validas» (actionlint pinado, corre también en el carril de docs) | `.github/workflows/marco-ci.yml`, paso «Definiciones de pipeline validas» |
-| Un repositorio nacido del scaffold no conserva marcadores sin resolver | Paso «Sin marcadores del scaffold sin resolver», con banco que lo hace morder | `.github/workflows/marco-ci.yml`, paso «Sin marcadores del scaffold sin resolver»; `pruebas/marco-ci/higiene-sin-arbol.test.mjs:141` |
+| Un repositorio nacido del scaffold no conserva marcadores sin resolver | Paso «Sin marcadores del scaffold sin resolver», con banco que lo hace morder | `.github/workflows/marco-ci.yml`, paso «Sin marcadores del scaffold sin resolver»; `pruebas/marco-ci/higiene-sin-arbol.test.mjs:139` |
 | Ningún archivo fuente fuera del alcance de la verificación | La composite action del censo, y el paso que verifica que el consumidor la tenga CABLEADA (un guardrail que se puede sacar en silencio no es un guardrail) | `actions/censo-fuentes/action.yml:62`; paso «Censo de fuentes cableado» de `.github/workflows/marco-ci.yml` |
-| El formato acordado se verifica en cada integración | `pnpm format:check` desde la raíz | `plantilla/.github/workflows/ci.yml:199` |
+| El formato acordado se verifica en cada integración | `pnpm format:check` desde la raíz | `plantilla/.github/workflows/ci.yml:206` |
 | La cobertura de pruebas alcanza el mínimo acordado y no retrocede | La composite action de cobertura, en sus dos planos (líneas del cambio y total del paquete), más el paso del marco que verifica que el andamio reparta el umbral | `actions/cobertura-diff/action.yml:151`; paso «El andamio reparte el umbral del total del marco» de `.github/workflows/marco-ci.yml` |
-| Las reglas de identidad visual del área viajan como reglas de lint verificadas | El banco de las reglas de identidad del andamio: exige el bloque con alcance propio y severidad de error, que cada expresión compile, que acepte su violación y rechace el trabajo honesto, y que cada regla de la constitución tenga estado decidido — y muta copias del andamio para probar que cada comprobación MUERDE | `pruebas/marca/reglas-marca.test.mjs` (mutaciones desde `:263`); el bloque verificado vive en `plantilla/eslint.config.mjs` |
+| Las reglas de identidad visual del área viajan como reglas de lint verificadas | El banco de las reglas de identidad del andamio: exige el bloque con alcance propio y severidad de error, que cada expresión compile, que acepte su violación y rechace el trabajo honesto, y que cada regla de la constitución tenga estado decidido — y muta copias del andamio para probar que cada comprobación MUERDE | `pruebas/marca/reglas-marca.test.mjs` (mutaciones desde `:261`); el bloque verificado vive en `plantilla/eslint.config.mjs` |
 | El esqueleto que entrega el andamio encaja consigo mismo | El banco de acoples del andamio, seis comprobaciones con su mutación al lado | `pruebas/andamio/acoples-del-andamio.test.mjs:134` (.env), `:207` (nombre de la base), `:305` (no-root), `:388` (arquitectura), `:536` (contrato), `:619` (organización a mano) |
 
 **El que no tiene compuerta, y por qué.** «Test de regresión obligatorio por defecto
@@ -92,29 +130,35 @@ del review y así hay que contarlo, no como cobertura.
 
 ---
 
-## despliegue-ci — 4 requirements, 0 con compuerta
+## despliegue-ci — 4 requirements, 2 con compuerta
 
-| Requirement | Lo que lo hace fallar solo | Ruta y ancla (2026-08-24) |
+| Requirement | Lo que lo hace fallar solo | Ruta y ancla (2026-08-31) |
 |---|---|---|
-| La rama determina el ambiente de destino | **ninguno** | — |
+| La rama determina el ambiente de destino | **parcial**: el caso «NO publica si las verificaciones no terminaron en verde» exige `branches: [main]` en el disparo, y el de la corrida a mano exige que el disparo manual tampoco publique sin `ci-ok`. Lo que ningún caso mira es la correspondencia rama→ambiente, porque hay **un solo** ambiente | `pruebas/andamio/desplegar.test.mjs:35` y `:208`; el disparo verificado vive en `plantilla/.github/workflows/desplegar.yml` |
 | El Environment de producción solo acepta deployments desde la rama de integración | **ninguno** | — |
 | La trust policy OIDC valida el claim que el proveedor de CI realmente emite | **ninguno** | — |
-| Los despliegues a un ambiente compartido se serializan | **ninguno** | — |
+| Los despliegues a un ambiente compartido se serializan | El caso «dos publicaciones a la vez HACEN COLA: ninguna cancela a la otra», que mira las líneas EJECUTABLES del workflow —no el comentario de al lado— y exige `cancel-in-progress: false` | `pruebas/andamio/desplegar.test.mjs:121` |
 
-**Por qué los cuatro están vacíos, y no es lo mismo que estar olvidados.** El marco
-todavía no reparte el workflow de despliegue: el andamio trae `ci.yml`,
-`actualizar-marco.yml` y `claude.yml`, y ninguno despliega
-(`ls plantilla/.github/workflows/`). Los tres primeros requirements se cumplen en la
-configuración del proveedor —Environments, trust policy del rol— que vive fuera del
-árbol, y el cuarto (serialización por cola) se configura en el workflow que no existe.
-La pieza que los volvería verificables es el esqueleto de entrega, que ya tiene design
-decidido en el change `entrega-referenciada`.
+**Qué cambió desde la medición anterior, que decía «los cuatro vacíos».** El andamio ya
+reparte un despliegue: `plantilla/.github/workflows/desplegar.yml`, con quince casos en
+`pruebas/andamio/desplegar.test.mjs`. La afirmación de que «el andamio trae `ci.yml`,
+`actualizar-marco.yml` y `claude.yml`, y ninguno despliega» era cierta cuando se
+escribió y hoy no lo es — y `ls plantilla/.github/workflows/`, que era el comando que la
+respaldaba, es el que la refuta.
+
+**Qué sigue sin compuerta, y no es lo mismo que estar olvidado.** El Environment de
+producción y la trust policy OIDC se cumplen en la configuración del proveedor, que vive
+fuera del árbol: no hay archivo que un banco pueda leer. Y la correspondencia
+rama→ambiente solo es medible cuando haya **más de un** ambiente: el despliegue de hoy
+publica un destino único, así que el tramo de dev y la promoción que el spec describe no
+tienen todavía dónde fallar. La pieza que los volvería verificables es el esqueleto de
+entrega, que ya tiene design decidido en el change `entrega-referenciada`.
 
 ---
 
 ## gestion-secretos — 2 requirements, 1 con compuerta
 
-| Requirement | Lo que lo hace fallar solo | Ruta y ancla (2026-08-24) |
+| Requirement | Lo que lo hace fallar solo | Ruta y ancla (2026-08-31) |
 |---|---|---|
 | Los secretos de runtime se inyectan por referencia, nunca horneados | **parcial**: el paso «Sin secretos en el repo (arbol y historia del cambio)» detecta el secreto EN TEXTO PLANO en el árbol y en la historia del cambio | `.github/workflows/marco-ci.yml`, paso «Sin secretos en el repo (arbol y historia del cambio)»; `pruebas/marco-ci/secretos.test.mjs` |
 | Una rotación de credenciales no interrumpe el servicio | **ninguno** | — |
@@ -129,10 +173,10 @@ contra un ambiente vivo: pertenece a la familia que cierra la verificación desp
 
 ## gobierno-contribucion — 3 requirements, 1 con compuerta
 
-| Requirement | Lo que lo hace fallar solo | Ruta y ancla (2026-08-24) |
+| Requirement | Lo que lo hace fallar solo | Ruta y ancla (2026-08-31) |
 |---|---|---|
 | Plantilla de pull request | **ninguno** — la plantilla se copia con el scaffold y ningún check verifica que siga existiendo ni que pida lo que el requirement exige | — |
-| Definición de propietarios de código | **parcial**: el paso de marcadores pone rojo un `CODEOWNERS` con la sustitución del scaffold sin resolver (que es el modo de falla silencioso: no asigna a nadie y no da error). Que el archivo EXISTA y que asigne por rol no lo verifica nadie | `.github/workflows/marco-ci.yml`, paso «Sin marcadores del scaffold sin resolver»; `pruebas/marco-ci/higiene-sin-arbol.test.mjs:141-148` |
+| Definición de propietarios de código | **parcial**: el paso de marcadores pone rojo un `CODEOWNERS` con la sustitución del scaffold sin resolver (que es el modo de falla silencioso: no asigna a nadie y no da error). Que el archivo EXISTA y que asigne por rol no lo verifica nadie | `.github/workflows/marco-ci.yml`, paso «Sin marcadores del scaffold sin resolver»; `pruebas/marco-ci/higiene-sin-arbol.test.mjs:139-150` |
 | Branch protection documentada como paso manual | **ninguno** | — |
 
 **El hueco que hay que leer entero.** `CODEOWNERS` **no gatea nada hoy**: la protección
@@ -149,7 +193,7 @@ el árbol; lo que sí depende del árbol es no afirmar lo contrario mientras tan
 
 ## observabilidad — 5 requirements, 1 con compuerta
 
-| Requirement | Lo que lo hace fallar solo | Ruta y ancla (2026-08-24) |
+| Requirement | Lo que lo hace fallar solo | Ruta y ancla (2026-08-31) |
 |---|---|---|
 | El servicio registra en JSON estructurado | **ninguno** | — |
 | La verificación post-deploy entiende el formato del log | **ninguno** | — |
@@ -167,14 +211,14 @@ sí, y eso es exactamente lo que hace la única fila con compuerta.
 
 ## operacion-infra — 6 requirements, 4 con compuerta
 
-| Requirement | Lo que lo hace fallar solo | Ruta y ancla (2026-08-24) |
+| Requirement | Lo que lo hace fallar solo | Ruta y ancla (2026-08-31) |
 |---|---|---|
-| El state de la infraestructura vive en un backend remoto compartido | **parcial**: el pendiente del bucket del state viaja con sus tres partes obligatorias y el banco lo exige; el paso de Terraform del andamio corre `fmt -check` y `validate` sobre las raíces | `pruebas/andamio/infra-pendientes.test.mjs:164` (`pendientesConSusTresPartes`); paso «Formato y validez de las raices de Terraform», `plantilla/.github/workflows/ci.yml:255`, con banco en `pruebas/andamio/terraform-en-ci.test.mjs` |
+| El state de la infraestructura vive en un backend remoto compartido | **parcial**: el pendiente del bucket del state viaja con sus tres partes obligatorias y el banco lo exige; el paso de Terraform del andamio corre `fmt -check` y `validate` sobre las raíces | `pruebas/andamio/infra-pendientes.test.mjs:164` (`pendientesConSusTresPartes`); paso «Formato y validez de las raices de Terraform», `plantilla/.github/workflows/ci.yml:262`, con banco en `pruebas/andamio/terraform-en-ci.test.mjs` |
 | Las caídas se detectan por alarma, no por reporte humano | **parcial**: el banco exige que el pendiente de las alarmas viva SOLO en la raíz de producción, no en la de desarrollo | `pruebas/andamio/infra-pendientes.test.mjs:183` (`alarmasSoloEnProd`) |
 | El gasto tiene un presupuesto con alerta | **ninguno** | — |
 | Los datos de producción están protegidos contra pérdida | **ninguno** | — |
-| Higiene operativa de logs y TLS | **parcial**: el pendiente correspondiente entra en la misma guarda de las tres partes y en la de numeración correlativa | `pruebas/andamio/infra-pendientes.test.mjs:164` y `:262` |
-| El andamio entrega los huecos de decisión de infraestructura con su criterio | El banco de huecos de infraestructura: tres partes por hueco, numeración correlativa, punteros que resuelven, alarmas solo en producción — cada una con su mutación que la hace morder | `pruebas/andamio/infra-pendientes.test.mjs:164`, `:183`, `:201`, `:240`, y las mutaciones desde `:292` |
+| Higiene operativa de logs y TLS | **parcial**: el pendiente correspondiente entra en la misma guarda de las tres partes y en la de numeración correlativa | `pruebas/andamio/infra-pendientes.test.mjs:164` y `:240` |
+| El andamio entrega los huecos de decisión de infraestructura con su criterio | El banco de huecos de infraestructura: tres partes por hueco, numeración correlativa, punteros que resuelven, alarmas solo en producción — cada una con su mutación que la hace morder | `pruebas/andamio/infra-pendientes.test.mjs:164`, `:183`, `:201`, `:240`, y las mutaciones desde `:284` |
 
 **Qué significa «parcial» acá, y es un límite declarado del propio change
 `infra-exigible`.** Lo que hay hoy es que el andamio reparta la raíz de infraestructura
@@ -187,24 +231,29 @@ despliega» sea verificable.
 
 ---
 
-## pipeline-entrega — 4 requirements, 2 con compuerta
+## pipeline-entrega — 4 requirements, 3 con compuerta
 
-| Requirement | Lo que lo hace fallar solo | Ruta y ancla (2026-08-24) |
+| Requirement | Lo que lo hace fallar solo | Ruta y ancla (2026-08-31) |
 |---|---|---|
-| CI verifica todos los paquetes de forma bloqueante | El paso que DERIVA del gestor la lista de paquetes y exige que cada uno declare los scripts, con excepciones que solo pueden equivocarse hacia el rojo, y el paso que los corre parado dentro de cada paquete | `plantilla/.github/workflows/ci.yml:344` y `:470` |
-| El deploy está gateado por el éxito de CI | **ninguno** | — |
+| CI verifica todos los paquetes de forma bloqueante | El paso que DERIVA del gestor la lista de paquetes y exige que cada uno declare los scripts, con excepciones que solo pueden equivocarse hacia el rojo, y el paso que los corre parado dentro de cada paquete | `plantilla/.github/workflows/ci.yml:354` y `:497` |
+| El deploy está gateado por el éxito de CI | **parcial**: cuatro casos del banco del despliegue, y uno de ellos es una mutación que corre la misma detección que la regla — la condición `workflow_run.conclusion == 'success'`, el `ref: head_sha` (se publica el SHA que CI midió, no la punta de la rama), y la corrida a mano, que consulta `ci-ok` sobre ese commit y deja rastro si alguien se aparta. Lo que no está cubierto es la secuencia dev→producción, que necesita el segundo ambiente | `pruebas/andamio/desplegar.test.mjs:35`, `:177` (la mutación), `:193` y `:208` |
 | Cada deploy es reproducible y reversible | **ninguno** | — |
 | Los artefactos regenerados no divergen de la versión pinada | Paso «Artefactos regenerados al dia», con banco propio que verifica además que fuera de un árbol git sea ROJO y no «nada que verificar» | `.github/workflows/marco-ci.yml`, paso «Artefactos regenerados al dia»; `pruebas/marco-ci/artefactos.test.mjs` |
 
-**Los dos vacíos son el mismo vacío que `despliegue-ci`:** el marco no reparte todavía
-el workflow de despliegue, así que no hay dónde verificar que el deploy dependa de CI
-ni que sea reversible.
+**Por qué la compuerta de CI→deploy ya existe y la de reversibilidad no.** La primera
+vive entera dentro del árbol: es una condición escrita en un workflow que el andamio
+reparte, y un banco puede leerla y mutarla. La segunda no: el requirement pide un tag
+inmutable derivado del SHA en un registro de artefactos y un procedimiento de vuelta
+atrás **sin reconstruir**, y el despliegue de hoy compila y publica en el momento — no
+hay artefacto guardado al que volver, así que no hay nada que un banco pueda mirar. La
+fila anterior decía `ninguno` en las dos por el mismo motivo («el marco no reparte
+todavía el workflow de despliegue»), y ese motivo ya solo vale para una.
 
 ---
 
 ## verificacion-desplegada — 5 requirements, 1 con compuerta
 
-| Requirement | Lo que lo hace fallar solo | Ruta y ancla (2026-08-24) |
+| Requirement | Lo que lo hace fallar solo | Ruta y ancla (2026-08-31) |
 |---|---|---|
 | El deploy a dev se verifica solo, sin pedirle smoke a nadie | **ninguno** | — |
 | Producción solo recibe lo que dev ya verificó | **ninguno** | — |
@@ -212,27 +261,45 @@ ni que sea reversible.
 | Credenciales de prueba fuera del repositorio y de los logs | **parcial, en una sola dirección**: el detector de secretos pone rojo la credencial versionada; que no aparezca en los LOGS de una corrida no lo mira nadie | `.github/workflows/marco-ci.yml`, paso «Sin secretos en el repo (arbol y historia del cambio)» |
 | La verificación de producción es read-only | **ninguno** | — |
 
-**Es casi la capability entera esperando la misma pieza.** Sus cinco requirements
-describen lo que pasa DESPUÉS de un deploy, y el marco no reparte el workflow que
-despliega; el único que tiene algo —las credenciales de prueba— lo tiene solo en la
+**Es casi la capability entera esperando la misma pieza, y la pieza que falta ya no es
+el despliegue.** Sus cinco requirements describen la SECUENCIA que va después de un
+deploy —dev se verifica solo, producción recibe únicamente lo que dev aprobó, las
+verificaciones limpian lo que crean—, y el despliegue que el andamio reparte publica un
+destino único sin tramo de dev: no hay dev que verificar ni promoción que gatear. El
+único requirement que tiene algo —las credenciales de prueba— lo tiene solo en la
 dirección del repositorio, no en la de los logs, y por eso cuenta como parcial. Que
-`gestion-secretos`, `despliegue-ci`, `pipeline-entrega` (2 de 4) y esta capability
-compartan el mismo hueco no es cuatro problemas: es uno, y tiene nombre.
+`gestion-secretos` (1 de 2), `despliegue-ci` (2 de 4), `pipeline-entrega` (3 de 4) y
+esta capability compartan el mismo hueco no es cuatro problemas: es uno, y tiene nombre
+—el segundo ambiente y la promoción entre los dos—.
 
 ---
 
 ## base-tecnologica — capability EN VUELO, 3 requirements, 0 con compuerta
 
 No existe en `openspec/specs/`: nace en `openspec/changes/stack-estandar/specs/`
-(2 de 24 tareas al 2026-08-24). Se lista acá **antes** de que se consolide, porque una
+(2 de 24 tareas al 2026-08-31). Se lista acá **antes** de que se consolide, porque una
 capability que solo vive en un change es invisible para quien lee los specs vivos de
 punta a punta.
 
-| Requirement | Lo que lo hace fallar solo | Ruta y ancla (2026-08-24) |
+| Requirement | Lo que lo hace fallar solo | Ruta y ancla (2026-08-31) |
 |---|---|---|
 | El marco publica una base tecnológica única y es la primera opción | **ninguno** | — |
 | Apartarse de la base se pregunta antes de implementar | **ninguno** | — |
 | La base es la primera opción, no una jaula | **ninguno** | — |
+
+---
+
+## documentacion-del-marco — capability EN VUELO, 2 requirements, 2 con compuerta
+
+Tampoco existe en `openspec/specs/`: nace en
+`openspec/changes/orden-de-lectura/specs/`. Es la única capability en vuelo que **ya
+tiene compuertas corriendo**, y por eso su ausencia de esta página era el peor tipo de
+hueco: no faltaba deuda, faltaba cobertura que ya estaba pagada.
+
+| Requirement | Lo que lo hace fallar solo | Ruta y ancla (2026-08-31) |
+|---|---|---|
+| El orden de lectura de la documentación es visible sin abrir nada | **parcial**: el caso «indice · toda pagina de docs/ esta enumerada en el indice» pone rojo un índice que se queda corto, y su refutación saca una página del índice para probar que muerde. Lo que no mira ningún caso es el prefijo numérico de dos dígitos que el requirement exige, ni que el número signifique orden y no importancia | `pruebas/docs/estandar-de-lectura.test.mjs:133`, con la refutación en `:480` |
+| Ningún enlace del repositorio apunta a algo que no existe | El banco de enlaces entero: cada enlace relativo tiene que resolver a un archivo que exista y cada ancla a un encabezado que exista, con el piso declarado que el propio requirement pide —un cero ahí es el detector roto, no un repositorio sin navegación— y con sus dos mutaciones al lado | `pruebas/docs/enlaces.test.mjs:145` (el archivo) y `:170` (el ancla); el piso en `:109`; las mutaciones en `:184` y `:196` |
 
 ---
 
@@ -245,6 +312,28 @@ punta a punta.
 - **No dice que un `ninguno` sea deuda.** Algunos son indecidibles con un escaneo
   («test de regresión obligatorio») y su lugar correcto es el review declarado, no una
   compuerta que se pondría roja cuando el trabajo está bien hecho.
-- **No es un check.** Es una medición fechada, y ninguna compuerta la mantiene al día:
-  agregar un requirement sin agregar su fila no pone nada en rojo. Los comandos de
-  arriba están para rehacerla, que es más barato que confiar en ella.
+- **No dice que la columna del medio esté al día.** Que una fila diga `ninguno` cuando
+  ya existe una compuerta es indecidible para una máquina: saber si algo pone un
+  requirement en rojo exige entender el requirement. Eso sigue dependiendo de que
+  alguien releía, y ya se midió lo que cuesta —tres filas quedaron diciendo `ninguno`
+  durante una semana sobre compuertas que existían—. Los comandos de arriba están para
+  rehacer esa columna, que es más barato que confiar en ella.
+- **Lo que sí tiene compuerta, desde el 2026-08-31, es todo lo demás de esta página**, y
+  lo mide
+  [`pruebas/docs/cobertura-de-requirements.test.mjs`](../pruebas/docs/cobertura-de-requirements.test.mjs):
+  ninguna lista y ningún número de acá se escriben a mano. Las capabilities de las
+  secciones tienen que ser exactamente las de `openspec/specs/`; las que se listan como
+  EN VUELO, exactamente las que los changes vivos declaran y el contrato todavía no
+  tiene; las filas de cada tabla, exactamente los `### Requirement` de su spec y en el
+  mismo orden; los dos conteos de cada encabezado, el universo, el desglose y el
+  resumen, exactamente lo que dan las filas; todo paso citado por su nombre tiene que
+  seguir llamándose así; y toda ruta citada tiene que existir con su línea adentro del
+  archivo. **Promover un requirement al contrato sin agregar su fila se pone rojo el
+  mismo día** — que era, hasta ayer, lo que esta misma sección declaraba imposible.
+- **Y esta página no se puede volver a perder.** Estuvo huérfana: cero enlaces desde
+  todo el repositorio, así que la única forma de encontrarla era saber que existía.
+  Desde el 2026-08-31 está enumerada en `docs/README.md`, que es el mapa de la
+  documentación, y `pruebas/docs/enlaces.test.mjs` se pone rojo si ese enlace
+  desaparece o si aparece otro documento en la raíz de `openspec/` que el mapa no
+  nombre. Un documento sin enlaces no está guardado: está perdido con copia de
+  seguridad.

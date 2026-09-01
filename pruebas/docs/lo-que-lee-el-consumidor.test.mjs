@@ -42,12 +42,36 @@ const PAGINAS = {
   "plantilla/infra-prod/README.md": "-> idem, para el ambiente de produccion",
   "plantilla/infra/adaptadores.md": "-> lo abre quien elige plataforma",
   "plantilla/sitio/README.md": "-> lo abre quien eligio la forma «un sitio para leer», y es donde se declara que los .astro no se verifican por tipos",
+  "plantilla/docs/README.md": "-> el indice de lo que el proyecto deja escrito: lo abre quien busca donde va un ADR, un post-mortem o un runbook",
+  "plantilla/docs/adr/README.md": "-> lo abre quien va a escribir su primera decision estructural",
+  "plantilla/docs/postmortems/README.md": "-> lo abre quien acaba de tener un incidente, apurado y probablemente de noche",
+  "plantilla/docs/runbooks/README.md": "-> lo abre quien atiende una alarma, a las tres de la maniana",
+  "plantilla/docs/plantillas/change.md": "-> el esqueleto del primer change: lo abre quien va a escribir uno y no tiene nada que imitar",
 };
 
 /** Termino -> el texto que TIENE que estar en esa misma pagina explicandolo.
  *  Se busca con los espacios normalizados, porque estos archivos van cortados a
  *  ~95 columnas y la explicacion cruza el corte de linea a menudo. */
 const EXPLICADOS = {
+  "plantilla/docs/README.md": {
+    "constitución": "el documento que el marco deja en cada proyecto con las reglas que no se discuten",
+    ADR: "una decisión estructural escrita con lo que se descartó",
+    change: "la carpeta donde queda escrito, ANTES de programar, qué se va a cambiar y por qué",
+  },
+  "plantilla/docs/adr/README.md": {
+    ADR: "una decisión que cambia la forma del sistema, escrita con lo que se descartó",
+  },
+  "plantilla/docs/plantillas/change.md": {
+    change: "la carpeta donde queda escrito, ANTES de programar, qué se va a cambiar y por qué",
+    PO: "quien decide qué se construye",
+    builder: "quien lo construye",
+    proposal: "el planteo: por qué vale la pena",
+    spec: "cómo se comporta el sistema, en escenarios",
+    requirement: "una afirmación sobre lo que el sistema tiene que hacer, escrita de forma que se pueda comprobar",
+    SHALL: "la palabra que el validador de OpenSpec busca",
+    archive: "o sea que se cierra y se guarda como historia inmutable",
+  },
+
   "plantilla/README-del-proyecto.md": {
     "ci-ok": "mira el resultado de todas las demás y las resume en un sí o un no",
     CODEOWNERS: "un archivo que GitHub lee solo para asignar los revisores de cada pull request",

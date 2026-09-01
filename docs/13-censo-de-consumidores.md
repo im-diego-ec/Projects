@@ -12,7 +12,7 @@ con su estado: qué mecanismo hay, qué se midió de él y qué falta.
 > **Estado, al 2026-08-24.** El caso 3 —el que este documento dejó **abierto**—
 > quedó **explicado y arreglado**: ver [abajo](#el-caso-3-explicado-2026-08-24). Lo
 > que sigue sin mecanismo es la pregunta «quién consume el marco»: **B1 está a
-> medias**. El archivo del registro existe —[`13-consumidores.md`](13-consumidores.md),
+> medias**. El archivo del registro existe —[`14-consumidores.md`](14-consumidores.md),
 > creado el 2026-08-24— y está **vacío**, que no es lo mismo que «cero consumidores»
 > y allá se dice así de frente. Lo que no existe es la mitad que escribe la fila sola:
 > `grep -n consumidores herramientas/projects-init.mjs` → sin coincidencias, y la
@@ -21,7 +21,7 @@ con su estado: qué mecanismo hay, qué se midió de él y qué falta.
 > **Por qué este recuadro existe y no debería hacer falta.** Entre que se escribió
 > este archivo y hoy se publicaron tres versiones —1.5.0 y 1.6.0 el 2026-08-22,
 > 1.7.0 el 2026-08-23 (`grep -nE '^## \[' CHANGELOG.md`)— y el archivo no se tocó
-> ni una vez (`git log --oneline -- docs/12-censo-de-consumidores.md` → **un solo
+> ni una vez (`git log --oneline -- docs/13-censo-de-consumidores.md` → **un solo
 > commit**). Un documento clasificado **Canónico** que dice «abierto» tres releases
 > atrás se lee como la foto de hoy, y no lo es. La regla que se compra con este
 > recuadro: **el estado va arriba y con fecha**, o la próxima vez pasa igual.
@@ -144,7 +144,7 @@ gh run view <id> --repo <consumidor> --log | grep -iE 'cooldown|Latest version|A
 
 Decía: cortar **1.5.0** y leer el job programado del lunes. **La versión se cortó y el
 resultado nunca se anotó acá.** Medido: `grep -nE '^## \[' CHANGELOG.md` devuelve 1.5.0 y
-1.6.0 el 2026-08-22 y 1.7.0 el 2026-08-23; `git log --oneline -- docs/12-censo-de-consumidores.md`
+1.6.0 el 2026-08-22 y 1.7.0 el 2026-08-23; `git log --oneline -- docs/13-censo-de-consumidores.md`
 devuelve un solo commit, el que creó el archivo.
 
 La lectura llegó igual, pero por otra puerta —el log del cooldown de la sección de arriba— y
@@ -177,10 +177,10 @@ Adoptar el marco es el único momento en que se sabe con certeza que un repo lo 
 `herramientas/projects-init.mjs` ya corre exactamente ahí.
 
 Que la herramienta **escriba la línea del registro** y le diga al builder que abra el PR
-contra el marco: [`13-consumidores.md`](13-consumidores.md) con repo, fecha de adopción, y la
+contra el marco: [`14-consumidores.md`](14-consumidores.md) con repo, fecha de adopción, y la
 versión con la que nació. La skill `projects-adoptar` hace lo mismo para un repo existente.
 
-**De las dos mitades, la del archivo ya está hecha** (2026-08-24): `13-consumidores.md` existe,
+**De las dos mitades, la del archivo ya está hecha** (2026-08-24): `14-consumidores.md` existe,
 declara las tres columnas y la regla de quién escribe la fila y cuándo, y arranca **vacío**
 diciendo por qué —una tabla vacía que se leyera como «cero consumidores» sería el mismo
 fail-open que este documento le reprocha al diseño vigente—. Falta la mitad de la
@@ -232,8 +232,8 @@ No construir nada y anotarlo como deuda con su fecha.
 
 | | Estado | Medido con |
 |---|---|---|
-| El experimento del 1.5.0 | **corrió y no se leyó acá**; la respuesta llegó por el log del cooldown | `grep -nE '^## \[' CHANGELOG.md`, `git log --oneline -- docs/12-censo-de-consumidores.md` |
-| **B1** — el registro se escribe en la adopción | **a medias**: el archivo existe y está vacío; lo que falta es lo que escribe la fila | `ls docs/13-consumidores.md` → existe (creado el 2026-08-24, sin filas); `grep -n consumidores herramientas/projects-init.mjs` → sin coincidencias, y el init corrido de verdad tampoco la nombra |
+| El experimento del 1.5.0 | **corrió y no se leyó acá**; la respuesta llegó por el log del cooldown | `grep -nE '^## \[' CHANGELOG.md`, `git log --oneline -- docs/13-censo-de-consumidores.md` |
+| **B1** — el registro se escribe en la adopción | **a medias**: el archivo existe y está vacío; lo que falta es lo que escribe la fila | `ls docs/14-consumidores.md` → existe (creado el 2026-08-24, sin filas); `grep -n consumidores herramientas/projects-init.mjs` → sin coincidencias, y el init corrido de verdad tampoco la nombra |
 | **B2** — el censo se deriva de la organización | **no decidido**: exige credencial de organización, y eso no lo decide un PR | — |
 | **B3** — declararlo hueco | **es el estado de hecho desde el 2026-08-21**, pero nunca se declaró como decisión: quedó siendo lo que pasa por omisión | este documento, hasta esta línea |
 
@@ -247,7 +247,7 @@ No construir nada y anotarlo como deuda con su fecha.
    de seis a siete mientras este párrafo estaba escrito. Lo cuenta
    `... --sin-herramientas 2>&1 | grep -cE '^  [0-9]+\. '`.
 
-   El archivo del registro —[`13-consumidores.md`](13-consumidores.md), con sus tres columnas—
+   El archivo del registro —[`14-consumidores.md`](14-consumidores.md), con sus tres columnas—
    **ya existe y está vacío**; lo que falta es la mitad que lo escribe sola. El cambio es una
    entrada nueva en esa lista de pendientes. Se verifica corriendo el init y leyendo la
    salida:
@@ -270,7 +270,7 @@ No construir nada y anotarlo como deuda con su fecha.
    diferencia no es formal — un hueco declarado tiene fecha y se puede revisar; uno que
    simplemente pasa, no. **Condición de revisión escrita**: cuando exista el segundo
    consumidor. Es el mismo disparador que usa la fila 21 del
-   [backlog](10-reglas-no-escritas.md), y por el mismo motivo: con un solo consumidor, los
+   [backlog](11-reglas-no-escritas.md), y por el mismo motivo: con un solo consumidor, los
    defectos de un mecanismo de censo se descubren en el único repo que hay.
 
 Lo que **no** conviene: dejar el censo apoyado solo en Dependabot. No porque Dependabot esté

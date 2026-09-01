@@ -116,14 +116,49 @@ test("hay enlaces que revisar: un cero aca es este banco roto, no un repositorio
   );
 });
 
+/** Un enlace con marcador no es una ruta TODAVIA.
+ *
+ *  `{{PAQUETE_SITIO}}/README.md` no existe en el arbol del marco y no tiene por
+ *  que: se vuelve una ruta recien cuando `projects init` sustituye el marcador.
+ *  Comprobarlo aca daria un rojo permanente por un enlace correcto.
+ *
+ *  DONDE SI SE COMPRUEBA, para que esta excepcion no sea un agujero: el caso
+ *  «lo que la portada dice sobre publicar coincide con lo que el arbol trae» de
+ *  pruebas/init/formas.test.mjs genera el proyecto de cada forma y exige que
+ *  todo enlace de su README apunte a algo que ESE proyecto tiene. O sea que el
+ *  enlace se verifica ya sustituido, que es la unica forma de verificarlo. */
+const tieneMarcador = (ruta) => /\{\{[A-Z_]+\}\}/.test(ruta);
+
+/** Lo que el andamio enlaza y NO existe en el andamio, porque lo escribe la
+ *  herramienta al generar el proyecto.
+ *
+ *  `.projects/` es la porcion del marco: la RENDERIZA `projects init` en un paso
+ *  posterior al copiado, asi que en el arbol del marco no esta y en el proyecto
+ *  si. Comprobarlo aca daria un rojo permanente por un enlace correcto.
+ *
+ *  DONDE SI SE COMPRUEBA, para que esto no sea un agujero: el caso «todo enlace
+ *  de un archivo que viaja al proyecto resuelve DENTRO del proyecto» de
+ *  pruebas/init/formas.test.mjs genera el proyecto y los resuelve ahi. */
+const loEscribeLaHerramienta = (pagina, ruta) =>
+  pagina.startsWith("plantilla/") && /(^|\/)\.projects\//.test(path.posix.normalize(path.posix.join(path.posix.dirname(pagina), ruta)));
+
 test("todo enlace apunta a un archivo o carpeta que EXISTE", () => {
   const rotos = [];
+  let conMarcador = 0;
   for (const { pagina, destinos } of censo) {
     for (const d of destinos) {
+      if (tieneMarcador(d.ruta) || loEscribeLaHerramienta(pagina, d.ruta)) {
+        conMarcador++;
+        continue;
+      }
       const absoluta = path.resolve(RAIZ, path.dirname(pagina), d.ruta);
       if (!fs.existsSync(absoluta)) rotos.push(`${pagina} -> ${d.crudo}`);
     }
   }
+  // ANTI-VACUIDAD DE LA EXCEPCION: si un dia no queda ningun enlace con
+  // marcador, la excepcion sobra y conviene saberlo; si quedan demasiados, es
+  // que alguien la esta usando para esquivar el control.
+  assert.ok(conMarcador <= 8, `${conMarcador} enlaces exceptuados es demasiado para una excepcion: revisala`);
   assert.deepEqual(
     rotos,
     [],
@@ -163,6 +198,88 @@ test("MUERDE: un ancla inventada sobre una pagina real se caza", () => {
   const anclas = anclasDe(fs.readFileSync(path.join(RAIZ, real), "utf-8"));
   assert.ok(anclas.size > 0, `${real} tiene que tener encabezados para que este caso signifique algo`);
   assert.equal(anclas.has("ancla-que-nadie-escribio-abc123"), false, "el ancla inventada no puede existir en la pagina real");
+});
+
+// ---------------------------------------------------------------------------
+// EL OTRO LADO DEL MISMO DEFECTO: UN DOCUMENTO AL QUE NO APUNTA NADIE.
+//
+// Los casos de arriba miran el enlace y preguntan si el destino existe. Este
+// mira el DESTINO y pregunta si alguien lo enlaza, que es el defecto simetrico
+// y el que no deja rastro: un enlace roto se ve al hacer click, un documento
+// huerfano no se ve nunca — nadie llega a el para descubrir que no llego.
+//
+// MEDIDO EL 2026-08-31: `openspec/cobertura-de-requirements.md` tenia CERO
+// enlaces en todo el repositorio (`grep -rn cobertura-de-requirements .` daba
+// una sola linea, y era una mencion dentro de `openspec/config.yaml`, no un
+// enlace). Es la pagina que contesta que parte del contrato del marco tiene
+// compuerta y cual no; estuvo una semana con tres filas equivocadas y nadie las
+// vio, que es lo que le pasa a un documento al que no se llega.
+//
+// EL ALCANCE ES LA RAIZ DE `openspec/`, y es una eleccion decidible: `specs/` y
+// `changes/` tienen su propio indice —lo lleva la herramienta de OpenSpec— y sus
+// archivos se leen desde ahi. Lo que queda suelto en la raiz no lo indexa nadie:
+// o esta en el mapa de la documentacion, o esta perdido. Un documento nuevo en
+// esa raiz entra a esta regla solo, sin que nadie toque este banco.
+// ---------------------------------------------------------------------------
+
+/** El mapa de la documentacion: la pagina que se vende como el indice de todo. */
+const MAPA = "docs/README.md";
+
+/** Los .md de la RAIZ de openspec/ (sin recursion: specs/ y changes/ se indexan
+ *  solos). Se lee del disco y no de una lista escrita: una lista escrita se
+ *  queda vieja justo cuando entra el documento que hay que vigilar. */
+export function documentosSueltosDeOpenspec() {
+  const dir = path.join(RAIZ, "openspec");
+  return fs
+    .readdirSync(dir, { withFileTypes: true })
+    .filter((e) => e.isFile() && e.name.endsWith(".md"))
+    .map((e) => `openspec/${e.name}`)
+    .sort();
+}
+
+test("hay documentos sueltos en openspec/ que vigilar: un cero aca es este control roto", () => {
+  // Si esta lista quedara vacia, el caso de abajo pasaria verde sin mirar nada
+  // — y el modo de falla seria el mismo que el defecto que persigue: silencio.
+  const sueltos = documentosSueltosDeOpenspec();
+  assert.ok(
+    sueltos.length >= 1,
+    "no se encontro ningun .md en la raiz de openspec/. O se movieron todos —y entonces esta regla ya no vigila " +
+      "nada y hay que decidir que la reemplaza— o el lector se rompio. Lo que no vale es que pase en verde.",
+  );
+  assert.ok(TODAS.includes(MAPA), `${MAPA} no esta entre las paginas rastreadas: sin el mapa, este control mide aire`);
+});
+
+test("ningun documento suelto de openspec/ queda sin un enlace desde el mapa de la documentacion", () => {
+  const destinos = destinosDe(fs.readFileSync(path.join(RAIZ, MAPA), "utf-8")).map((d) =>
+    path.posix.normalize(path.posix.join(path.posix.dirname(MAPA), d.ruta)),
+  );
+  const huerfanos = documentosSueltosDeOpenspec().filter((doc) => !destinos.includes(doc));
+  assert.deepEqual(
+    huerfanos,
+    [],
+    `${MAPA} se vende como el mapa de la documentacion y no enlaza esto: ${huerfanos.join(", ")}. Un documento sin ` +
+      "un solo enlace no esta guardado, esta perdido: nadie llega a el, asi que nadie descubre que quedo viejo. " +
+      "Arreglo: una fila en la tabla, con que es y como evoluciona.",
+  );
+});
+
+test("MUERDE: sacarle el enlace al mapa se caza DE VERDAD", () => {
+  // LA MUTACION CORRE LA MISMA FUNCION QUE LA REGLA: se le pasa a `destinosDe`
+  // el texto del mapa SIN la linea que enlaza el documento, y se exige que el
+  // documento aparezca como huerfano. No se comprueba que un regex deje de
+  // matchear — eso pasaria igual contra un mapa que nunca tuvo el enlace.
+  const objetivo = documentosSueltosDeOpenspec()[0];
+  const texto = fs.readFileSync(path.join(RAIZ, MAPA), "utf-8");
+  const resolver = (t) =>
+    destinosDe(t).map((d) => path.posix.normalize(path.posix.join(path.posix.dirname(MAPA), d.ruta)));
+
+  assert.ok(resolver(texto).includes(objetivo), `el mapa real tiene que enlazar ${objetivo}: sin eso, mutarlo no prueba nada`);
+
+  const sinLaFila = texto
+    .split("\n")
+    .filter((l) => !l.includes(path.posix.basename(objetivo)))
+    .join("\n");
+  assert.equal(resolver(sinLaFila).includes(objetivo), false, `sacada la fila, ${objetivo} tiene que quedar huerfano`);
 });
 
 test("el ancla se calcula como la calcula GitHub, acentos incluidos", () => {

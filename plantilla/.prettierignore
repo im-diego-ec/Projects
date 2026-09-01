@@ -2,6 +2,11 @@ node_modules
 dist
 pnpm-lock.yaml
 
+# Lo escribe `astro build` en cada compilacion: tipos de las colecciones de
+# contenido. Mismo criterio que .projects/ y que el andamio de OpenSpec — un
+# archivo que otra herramienta posee y reescribe no lo policia este formateador.
+**/.astro/
+
 # Generados: los reescribe una herramienta, formatearlos solo genera diffs.
 # Ajustar a los generados de este proyecto (cliente del ORM, componentes de UI).
 # {{PAQUETE_WEB}}/src/components/ui

@@ -378,7 +378,24 @@ jobs:
           # El `if` alrededor del banco es lo unico que apaga el `-e` para esta linea:
           # sin el, un banco en rojo mataria el script antes de que el modo se pueda
           # leer, y la pata en aviso avisaria... poniendose roja.
-          if node --test "${PRUEBAS[@]}"; then
+          # UN TECHO DE TIEMPO POR ARCHIVO. Sin el, un banco que se cuelga en una
+          # plataforma se lleva el job entero al timeout y el error que queda es
+          # «cancelled» a los quince minutos, sin nombrar el archivo ni el caso.
+          # 120000 ms es dos ordenes de magnitud mas de lo que el banco entero tarda
+          # en local (11 s), asi que no puede confundir «lento» con «colgado».
+          #
+          # POR QUE SE AGREGO, Y LA CORRECCION DE ESE MOTIVO. Se puso creyendo que
+          # explicaba un corte de la pata `macos-latest` a los 15m01s. NO ERA ESO: la
+          # API del job devuelve `steps: []` con `conclusion: cancelled`, o sea que la
+          # pata NUNCA EJECUTO UN PASO — no consiguio runner. Las otras cuatro patas
+          # de la misma corrida (windows y los tres ubuntu) salieron con sus siete
+          # pasos en verde. Era infraestructura, no el banco.
+          #
+          # Se deja igual porque lo que hace sigue siendo cierto y util el dia que un
+          # cuelgue de verdad ocurra. Lo que se corrige es el motivo escrito: un
+          # comentario que atribuye un arreglo a una causa que despues se midio falsa
+          # es peor que no tenerlo, porque el que venga lo va a creer.
+          if node --test --test-timeout=120000 "${PRUEBAS[@]}"; then
             echo "el banco de init pasa entero en $(uname -s) con node $(node --version)"
             exit 0
           fi
@@ -613,28 +630,61 @@ jobs:
           # es, byte por byte, el archivo que recibe el consumidor.
 
           TMP="$(mktemp -d)"
-          node herramientas/projects-init.mjs --ejemplo > "${TMP}/valores.json"
-          mkdir -p "${TMP}/repo"
+          node herramientas/projects-init.mjs --ejemplo > "${TMP}/base.json"
+          # SE INSTANCIA UNA VEZ POR FORMA, y no por completitud: cada forma
+          # reparte un juego DISTINTO de workflows. Con una sola pasada —la de
+          # `--ejemplo`, que es una aplicacion— `desplegar.yml` no viajaba, asi
+          # que el unico workflow que PUBLICA no pasaba por ningun validador de
+          # sintaxis en ninguna parte del repositorio.
+
           # `--sin-arranque` ademas de `--sin-herramientas`: lo que este paso lintea son
           # los .yml YA renderizados, y para eso no hace falta instalar dependencias ni
           # generar el cliente de datos ni verificar el proyecto. Arrancarlo aca ataria
           # un lint de sintaxis de workflows al registro de npm y a minutos de install:
           # una caida del registro se leeria como "el andamio no pasa actionlint", que
           # es exactamente el diagnostico equivocado.
-          node herramientas/projects-init.mjs \
-            --valores "${TMP}/valores.json" --destino "${TMP}/repo" --sin-herramientas --sin-arranque > /dev/null
+          TOTAL=0
+          # La lista va LITERAL y no en una variable: `for X in ${VAR}` depende
+          # de que el shell parta la cadena en palabras, y shellcheck lo marca
+          # (SC2086) con razon. Dos formas, escritas.
+          for FORMA in aplicacion sitio; do
+            node -e '
+              const fs = require("node:fs");
+              const v = JSON.parse(fs.readFileSync(process.argv[1], "utf8"));
+              v.forma = process.argv[2];
+              fs.writeFileSync(process.argv[3], JSON.stringify(v, null, 2));
+            ' "${TMP}/base.json" "${FORMA}" "${TMP}/valores-${FORMA}.json"
+            # El destino tiene que existir: la herramienta se niega a crear el
+            # repositorio por vos, y con razon.
+            mkdir -p "${TMP}/repo-${FORMA}"
+            node herramientas/projects-init.mjs \
+              --valores "${TMP}/valores-${FORMA}.json" --destino "${TMP}/repo-${FORMA}" --sin-herramientas --sin-arranque > /dev/null
 
-          if [ ! -d "${TMP}/repo/.github/workflows" ]; then
-            echo "::error::el andamio instanciado no dejo .github/workflows: o projects-init fallo, o el andamio dejo de repartir su pipeline. En los dos casos este paso NO declara verde"
-            exit 1
-          fi
+            if [ ! -d "${TMP}/repo-${FORMA}/.github/workflows" ]; then
+              echo "::error::la forma ${FORMA} instanciada no dejo .github/workflows: o projects-init fallo, o el andamio dejo de repartir su pipeline. En los dos casos este paso NO declara verde"
+              exit 1
+            fi
+            CUANTOS="$(find "${TMP}/repo-${FORMA}/.github/workflows" -name '*.yml' | wc -l | tr -d ' ')"
+            if [ "${CUANTOS}" -eq 0 ]; then
+              echo "::error::cero workflows en la forma ${FORMA}. Un cero aca es este paso roto, no un andamio limpio"
+              exit 1
+            fi
+            echo "forma ${FORMA}: ${CUANTOS} workflow(s)"
+            TOTAL=$((TOTAL + CUANTOS))
+          done
 
-          CUANTOS="$(find "${TMP}/repo/.github/workflows" -name '*.yml' | wc -l | tr -d ' ')"
-          if [ "${CUANTOS}" -eq 0 ]; then
-            echo "::error::cero workflows en el andamio instanciado. Un cero aca es este paso roto, no un andamio limpio"
-            exit 1
-          fi
-          echo "linteando ${CUANTOS} workflow(s) del andamio instanciado"
+          # TODO WORKFLOW DEL ANDAMIO TIENE QUE HABER SIDO LINTEADO POR ALGUNA
+          # FORMA. Sin esta comprobacion, agregar un workflow que solo viaja a
+          # una forma futura lo dejaria fuera del validador sin que nada avise —
+          # que es exactamente como `desplegar.yml` paso meses sin validarse.
+          for F in plantilla/.github/workflows/*.yml; do
+            N="$(basename "${F}")"
+            if ! find "${TMP}" -path "*/repo-*/.github/workflows/${N}" | grep -q .; then
+              echo "::error::${N} vive en el andamio y ninguna de las formas que este paso instancia lo reparte, asi que ningun validador de sintaxis lo mira. Agrega la forma que lo reparte al bucle 'for FORMA in ...' de este paso"
+              exit 1
+            fi
+          done
+          echo "linteando ${TOTAL} workflow(s) en total"
 
           BASE="https://github.com/rhysd/actionlint/releases/download/v${VERSION_ACTIONLINT}"
           TAR="actionlint_${VERSION_ACTIONLINT}_linux_amd64.tar.gz"
@@ -643,11 +693,13 @@ jobs:
           ( cd "${TMP}" && grep " ${TAR}\$" sums.txt | sha256sum --check --ignore-missing )
           tar -xzf "${TMP}/${TAR}" -C "${TMP}" actionlint
 
-          if ! ( cd "${TMP}/repo" && git init -q . && "${TMP}/actionlint" -color ); then
-            echo "::error::el pipeline que el andamio reparte no pasa actionlint (archivo y linea, arriba). Ese archivo es el que recibe cada proyecto nuevo, asi que esto no es un detalle del marco: es un CI en rojo el dia uno del consumidor. Reproducilo local: instancia el andamio y corre actionlint dentro"
-            exit 1
-          fi
-          echo "el pipeline del andamio pasa actionlint"
+          for FORMA in aplicacion sitio; do
+            if ! ( cd "${TMP}/repo-${FORMA}" && git init -q . && "${TMP}/actionlint" -color ); then
+              echo "::error::el pipeline que el andamio reparte para la forma ${FORMA} no pasa actionlint (archivo y linea, arriba). Ese archivo es el que recibe cada proyecto nuevo de esa forma, asi que esto no es un detalle del marco: es un CI en rojo el dia uno del consumidor. Reproducilo local: instancia el andamio con esa forma y corre actionlint dentro"
+              exit 1
+            fi
+          done
+          echo "el pipeline del andamio pasa actionlint en todas las formas"
 
       # EL MARCO NO SE AUTO-IDENTIFICA POR UN LITERAL DE SU CUENTA.
       #
@@ -850,7 +902,7 @@ jobs:
   # el veredicto lo cuenta como exito SOLO si la deteccion dijo solo-docs.
   # EL CHANGELOG ES OBLIGATORIO EN EL PR QUE INTRODUCE EL CAMBIO, y hasta hoy la
   # regla estaba enunciada y sin check (fila 20 del backlog de
-  # docs/10-reglas-no-escritas.md).
+  # docs/11-reglas-no-escritas.md).
   #
   # POR QUE IMPORTA MAS QUE UNA FORMALIDAD. El CHANGELOG es la UNICA superficie por
   # la que un consumidor se entera de que el marco se movio bajo sus pies: pina una

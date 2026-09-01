@@ -70,13 +70,38 @@ change está vivo, es solo el nombre.
 **El directorio lo crea un comando, y el proposal se escribe antes que todo lo demás.**
 
 ```bash
-openspec new change recepcion-de-mercaderia
+npx --yes @fission-ai/openspec@1.9.0 new change recepcion-de-mercaderia
 ```
+
+> **Por qué el comando es tan largo.** `openspec` **no es un programa instalado en
+> tu computadora**: no está en tu proyecto ni en tu sistema, y escribir `openspec`
+> a secas te va a contestar `command not found`. `npx` lo baja y lo corre en el
+> momento, y `@1.9.0` fija **la misma versión que el marco verificó**. Un comando
+> sin versión trae la última publicada, que puede cambiar entre tu máquina y el
+> CI — y entonces el rojo que ves no es el rojo que le pasa a los demás.
+>
+> Es la forma que usan todos los comandos de OpenSpec de esta página. Copiala
+> tal cual.
 
 Crea `openspec/changes/recepcion-de-mercaderia/` y **para ahí**: no escribe ningún
 artefacto. Eso es exactamente lo que hace falta, porque el primero que se escribe es
 `proposal.md` y lo escribís vos. La página [07-para-el-builder.md](07-para-el-builder.md)
 sección 3 dice qué contesta cada archivo del change y en qué orden.
+
+**El nombre no puede llevar espacios.** `new change "recepción de mercadería"` sale con
+`Change name cannot contain spaces`. Usá guiones, en minúscula: es el nombre de una
+carpeta.
+
+##### 7.b.1 ¿Y ahora qué escribo?
+
+Ese comando termina diciéndote el siguiente, y conviene hacerle caso:
+
+```bash
+npx --yes @fission-ai/openspec@1.9.0 status --change recepcion-de-mercaderia
+```
+
+Te contesta **qué artefactos le faltan a tu change y en qué orden van**. Es la respuesta
+directa a «¿y ahora qué?», y no hay que acordarse de nada: lo dice él.
 
 > **Por qué este comando y no `/opsx:propose`.** Los dos crean el change, pero `propose`
 > dice de sí mismo que *«genera todos los artefactos en un solo paso»*: proposal, deltas,
@@ -91,19 +116,11 @@ sección 3 dice qué contesta cada archivo del change y en qué orden.
 > Los comandos `/opsx:*` que llegan al proyecto son **seis** —`explore`, `propose`,
 > `apply`, `archive`, `sync`, `update`— y las skills de OpenSpec son **seis**; la séptima
 > que vas a ver, `projects-archive-change`, la pone este marco y no OpenSpec.
->
-> **Eso rompe la [compuerta](02-glosario.md) del PO**, y por eso esta página no lo usa para empezar: el PO
-> terminaría aprobando un proposal cuyo diseño ya está escrito, o sea decidiendo el *qué*
-> cuando el *cómo* ya está decidido. Un `mkdir` y un archivo son más baratos que esa
-> confusión.
->
-> **Lo que sí conviene usar antes:** `/opsx:explore`, que es para pensar el problema en voz
-> alta sin escribir todavía ningún artefacto. Y una vez que el proposal está aprobado,
-> `/opsx:apply` para implementar las tareas.
 
-**¿Y OpenSpec no se queja de un archivo que él no creó?** No, y está medido: el change
-`capa-descubrimiento` del propio marco tiene **seis archivos extra** adentro (un directorio
-`piloto/` completo) y `openspec validate --all --strict` da *16 passed, 0 failed*, exit 0.
+**¿Y OpenSpec no se queja de un archivo que él no creó?** No, y está medido el 2026-08-31:
+el change `capa-descubrimiento` del propio marco tiene **siete archivos extra** adentro (un
+directorio `piloto/` completo) y `openspec validate --all --strict` da *18 passed, 0 failed*,
+exit 0.
 OpenSpec **ni lee ni valida** los archivos que no son sus artefactos — simplemente los ignora.
 
 **Y por qué ahí y no en `docs/`:** porque la lista habla de los deltas. Cuando el delta cambia,
@@ -250,6 +267,80 @@ contenido** en vez de por confianza.
 Y lo que la lista **no** compra, dicho para que nadie se confíe: garantiza que cada escenario
 tenga **procedencia**, no que la procedencia sea **buena**. Un documento puede contener una
 mala idea, y la lista la va a rastrear con toda fidelidad hasta su origen.
+
+---
+
+### 9 · Lo que viene después de que el PO aprueba
+
+Hasta acá está escrito **qué** hay que construir y el PO lo aprobó. Faltan las dos
+mitades que aprueba el otro builder, y después construir.
+
+**El orden importa y no es estético.** Si el `design.md` ya está escrito cuando el
+PO aprueba el proposal, su aprobación es un trámite: está decidiendo el *qué*
+cuando el *cómo* ya está decidido. Por eso se escribe ahora y no antes.
+
+#### 9.a `design.md` — cómo, y qué se descartó
+
+Lo aprueba **el otro builder**, no el PO. La sección que justifica el archivo es
+**qué se descartó y por qué**: dentro de seis meses alguien va a proponer
+exactamente eso, y sin el motivo escrito no hay forma de saber si el contexto
+cambió o si es la misma idea otra vez.
+
+#### 9.b `tasks.md` — los pasos, en orden
+
+Cada tarea tiene que **poder marcarse**. «Mejorar el rendimiento» no se marca;
+«bajar la consulta de N+1 a una sola, medido con el script X» sí.
+
+> **El esqueleto de los cuatro archivos, con qué contesta cada uno, viaja dentro
+> de tu proyecto**: `docs/plantillas/change.md`. Está ahí y no acá a propósito —
+> lo tenés a mano cuando lo necesitás, sin salir del repositorio.
+
+#### 9.c Implementar
+
+```
+/opsx:apply
+```
+
+**Eso se escribe en la sesión del agente, no en la terminal.** Los `/opsx:…` son
+comandos de Claude Code: en una terminal, `/opsx:apply` da
+`No such file or directory`. Por eso el recuadro de acá arriba no dice `bash`.
+
+> **Y una cosa que conviene saber antes de que pase.** Esos comandos, por dentro,
+> mandan correr `openspec …` **a secas** — y ese programa **no está instalado**:
+> ni en tu sistema, ni en `node_modules/.bin`, ni en las dependencias de tu
+> proyecto. Los archivos que lo dicen los escribe `openspec init` y son de la
+> herramienta, no de este marco; editarlos sería mantener un fork ajeno, y el
+> siguiente `openspec update` los devolvería igual.
+>
+> **Tu proyecto ya se lo dice al agente**: el `AGENTS.md` que trae declara que la
+> forma invocable es `npx --yes @fission-ai/openspec@1.9.0 <subcomando>`, con esa
+> versión exacta, y el allowlist la cubre. Si aun así ves `command not found`,
+> ése es el motivo y ésa es la forma.
+
+Toma las tareas de `tasks.md` y las ejecuta en orden. Es el único comando de la
+familia que escribe código, y por eso va **después** de las dos aprobaciones y no
+antes.
+
+#### 9.d Cerrar el change
+
+Cuando el PR está mergeado y el comportamiento existe, el change **se archiva**:
+pasa a `openspec/changes/archive/YYYY-MM-DD-<nombre>/` y los deltas se incorporan
+a `openspec/specs/`, que es la foto de cómo se comporta el sistema hoy.
+
+Tu proyecto trae una skill para eso —`projects-archive-change`— y **se usa ésa, no
+el `archive` del CLI**: el archivado tiene que dejar también el rastro de qué se
+aprobó y cuándo, y eso el CLI no lo hace.
+
+Para ver en qué estado quedó todo:
+
+```bash
+npx --yes @fission-ai/openspec@1.9.0 list
+```
+
+> **Una pregunta abierta impide archivar.** Es la regla del marco que ya se nombró
+> arriba, y acá es donde muerde: un change con una pregunta abierta sin resolver no
+> se cierra, porque cerrarlo convertiría la duda en contrato sin que nadie la haya
+> decidido.
 
 ---
 

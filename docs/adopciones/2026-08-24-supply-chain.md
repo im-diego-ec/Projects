@@ -11,7 +11,7 @@ marcha deja un documento que funciona para quien lo arregló y para nadie más, 
 el dato que vinimos a buscar: *dónde* se traba alguien que no lo escribió.
 
 **2. Un tropiezo cuyo arreglo empieza con «hay que recordar que…» no va a la guía.**
-Va como fila al [backlog](../10-reglas-no-escritas.md#backlog-de-automatización).
+Va como fila al [backlog](../11-reglas-no-escritas.md#backlog-de-automatización).
 
 ---
 
@@ -62,7 +62,7 @@ fase 7, cuando el primer change de OpenSpec necesita al PO.
 |---|---|---|---|---|
 | 0 · Verificar, no hacer | 30 s | | | |
 | 1 · Arrancar lo asíncrono | — | | | |
-| 2 · Los 21 valores | — | | | |
+| 2 · Los valores | — | | | |
 | 3 · El repo | 2 comandos | | | |
 | 3.1 · Qué quedó en el repo | — | | | |
 | 3.2 · Escritura de los equipos | — | | | |

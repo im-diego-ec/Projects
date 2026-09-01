@@ -510,3 +510,54 @@ test("el rojo historico: los tres fail-opens del esqueleto que se absorbio", () 
     fs.rmSync(tmp, { recursive: true, force: true });
   }
 });
+
+// ---------------------------------------------------------------------------
+// LAS DOS TABLAS DE MARCADORES CONTRA `REQUERIDOS`.
+//
+// EL DEFECTO QUE ESTE BANCO CIERRA, medido: la tabla del README de la raiz tenia
+// 21 filas y `REQUERIDOS` 23 —faltaban `ORG_MARCO` y `PAQUETE_SITIO`, los dos
+// agregados en este mismo lote—. Y el propio README se declaraba "la lista
+// COMPLETA" y decia que el comando de autocomprobacion "hoy no imprime nada",
+// cuando imprimia las dos que faltaban.
+//
+// El README ADEMAS decia que este caso no existia: «hasta que un caso de banco
+// lo corra solo, la unica defensa es correrlo». Era cierto, y por eso la tabla
+// se quedo atras sin que nada lo dijera.
+// ---------------------------------------------------------------------------
+
+/** Los marcadores que una tabla de markdown documenta, leidos de sus filas. */
+const marcadoresDeLaTabla = (texto) =>
+  new Set([...texto.matchAll(/^\|\s*`\{\{([A-Z0-9_]+)\}\}`/gm)].map((m) => m[1]));
+
+test("las dos tablas de marcadores documentan exactamente lo que la herramienta exige", async () => {
+  const init = await import("../../herramientas/projects-init.mjs");
+  const { REQUERIDOS } = init;
+  // Lo que la herramienta DERIVA tambien se documenta, y con razon: quien lee la
+  // tabla necesita saber que existe `PAQUETES` aunque no tenga que decidirlo.
+  // Se lee de `derivar`, no se escribe aca: una segunda lista al lado de la
+  // primera es como empiezan las divergencias.
+  const derivados = Object.keys(init.derivar({}));
+  const legitimos = [...REQUERIDOS, ...derivados];
+  const tablas = {
+    "README.md": marcadoresDeLaTabla(fs.readFileSync(path.join(RAIZ, "README.md"), "utf-8")),
+    "plantilla/README.md": marcadoresDeLaTabla(fs.readFileSync(path.join(ANDAMIO, "README.md"), "utf-8")),
+  };
+
+  const problemas = [];
+  for (const [donde, documentados] of Object.entries(tablas)) {
+    assert.ok(documentados.size >= 10, `${donde}: solo ${documentados.size} filas leidas, se rompio la lectura de la tabla`);
+    const faltan = REQUERIDOS.filter((k) => !documentados.has(k));
+    const sobran = [...documentados].filter((k) => !legitimos.includes(k));
+    // LAS DOS DIRECCIONES: una fila de menos deja un valor sin explicar —y quien
+    // llena el archivo a mano no sabe que poner—; una de mas describe una clave
+    // que la herramienta ya no pide, que es una regla sin fuente.
+    if (faltan.length) problemas.push(`${donde}: no documenta ${faltan.join(", ")}`);
+    if (sobran.length) problemas.push(`${donde}: documenta ${sobran.join(", ")}, que la herramienta ni pide ni deriva`);
+  }
+  assert.deepEqual(
+    problemas,
+    [],
+    `las tablas de marcadores son lo que lee quien llena el archivo de valores a mano: una fila de menos es un valor ` +
+      `que nadie sabe que poner.\n  ${problemas.join("\n  ")}`,
+  );
+});

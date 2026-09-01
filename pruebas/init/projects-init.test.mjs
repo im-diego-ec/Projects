@@ -19,6 +19,7 @@ import {
   derivar,
   validarValores,
   archivosDelAndamio,
+  TODAS,
   archivosDelAndamioAMano,
   faltantesDeCopia,
   paquetesDelAndamio,
@@ -68,6 +69,7 @@ const VALORES_OK = {
   PAQUETE_WEB: "web",
   PAQUETE_E2E: "e2e",
   PAQUETE_SITIO: "sitio",
+  ORG_MARCO: "im-diego-ec",
   GENERAR_CLIENTE_DATOS: "prisma generate",
   EQUIPO_BUILDERS: "builders",
   EQUIPO_PO: "po",
@@ -864,36 +866,61 @@ test("el ejemplo no nombra a ninguna persona: formas por rol, no handles reales"
 test("el ORG del ejemplo es una ORG de GitHub, no el slug de un equipo de adentro", () => {
   // Una pasada automatica de anonimizado convirtio ORG en el slug del equipo del
   // PO, y el ejemplo quedo apuntando a un repo que no existe: {{ORG}} se
-  // interpola en la coordenada con la que GitHub resuelve el marco
-  // (`uses: {{ORG}}/Projects/...`), mientras que los slugs de equipo viven detras
-  // de `orgs/<org>/teams/<slug>`. Nada del banco miraba ORG, asi que paso verde.
+  // interpola como duenio de un repositorio (`{{ORG}}/{{PROYECTO}}`), mientras
+  // que los slugs de equipo viven detras de `orgs/<org>/teams/<slug>`. Nada del
+  // banco miraba ORG, asi que paso verde.
   const v = JSON.parse(correr("--ejemplo").salida);
 
-  // ANTI-VACUIDAD, y la razon de que la distincion importe: el andamio usa
-  // {{ORG}} DENTRO de lineas `uses:`, o sea como duenio del repo del marco.
-  const enUses = archivosDelAndamio(ANDAMIO)
-    .flatMap((rel) => fs.readFileSync(path.join(ANDAMIO, ...rel.split("/")), "utf8").split("\n").map((l) => [rel, l]))
-    .filter(([, l]) => /uses:\s*"?\{\{ORG\}\}\//.test(l));
+  // ANTI-VACUIDAD, y SU ANCLA SE MUDO cuando se arreglo el defecto de al lado.
+  //
+  // Este control se escribio cuando `{{ORG}}` significaba dos cosas a la vez: la
+  // cuenta del proyecto Y la cuenta donde vive el marco, esta ultima adentro de
+  // lineas `uses:`. Buscar `{{ORG}}` en un `uses:` hoy no encuentra nada —el
+  // marco se mudo a `{{ORG_MARCO}}`— y dejar el aserto como estaba habria puesto
+  // ROJO justamente al arreglo. Lo que afirma no cambio: ORG es una cuenta de
+  // GitHub. Cambio donde se lo mira: donde ORG se interpola HOY.
+  const lineas = archivosDelAndamio(ANDAMIO, "aws", TODAS)
+    .flatMap((rel) => fs.readFileSync(path.join(ANDAMIO, ...rel.split("/")), "utf8").split("\n").map((l) => [rel, l]));
+  const comoDuenio = lineas.filter(([, l]) => /\{\{ORG\}\}\/(\{\{PROYECTO\}\}|<)/.test(l));
+  assert.ok(
+    comoDuenio.length >= 1,
+    "ningun archivo del andamio interpola {{ORG}} como duenio de un repositorio: si eso cambio, este control dejo " +
+      "de mirar lo que cree que mira",
+  );
+
+  // Y LA OTRA MITAD DE LA SEPARACION, que es la que costo un dia uno en rojo: el
+  // `uses:` del pipeline resuelve contra la cuenta del MARCO, no contra la del
+  // proyecto. Mientras las dos eran `{{ORG}}`, quien creaba su proyecto en su
+  // propia cuenta terminaba con `uses: su-cuenta/Projects/...`, un repositorio
+  // que no existe, y su CI nacia rojo sin que el mensaje hablara de eso.
+  const enUses = lineas.filter(([, l]) => /uses:\s*"?\{\{ORG_MARCO\}\}\//.test(l));
   assert.ok(
     enUses.length >= 1,
-    "ningun archivo del andamio usa {{ORG}} dentro de un `uses:`: si eso cambio, este control dejo de mirar lo que cree",
+    "ningun `uses:` del andamio resuelve contra {{ORG_MARCO}}: o volvieron a ser el mismo marcador, o el pipeline " +
+      "del proyecto dejo de referirse al marco",
+  );
+  assert.deepEqual(
+    enUses.filter(([, l]) => /\{\{ORG\}\}/.test(l)),
+    [],
+    "un `uses:` no puede resolver contra la cuenta del PROYECTO: ahi no vive el marco",
   );
 
   assert.match(v.ORG, FORMATOS.ORG.patron, `ORG = ${JSON.stringify(v.ORG)} no tiene la forma de un handle de org`);
+  assert.match(v.ORG_MARCO, FORMATOS.ORG_MARCO.patron, `ORG_MARCO = ${JSON.stringify(v.ORG_MARCO)}`);
   for (const equipo of ["EQUIPO_BUILDERS", "EQUIPO_PO"]) {
     assert.notEqual(
       v.ORG,
       v[equipo],
-      `ORG y ${equipo} valen lo mismo (${JSON.stringify(v.ORG)}). ORG es el duenio del repo del marco y ` +
-        `${equipo} es un slug de equipo DENTRO de esa org: si coinciden, el \`uses:\` del ejemplo apunta a un ` +
-        `repo que no existe. Es el residuo tipico de una pasada automatica sobre los nombres.`,
+      `ORG y ${equipo} valen lo mismo (${JSON.stringify(v.ORG)}). ORG es el duenio del repositorio del proyecto y ` +
+        `${equipo} es un slug de equipo DENTRO de esa org: si coinciden, el CODEOWNERS del ejemplo asigna a un ` +
+        `equipo que no existe. Es el residuo tipico de una pasada automatica sobre los nombres.`,
     );
   }
 });
 
-// ══════════════════ LA FORMA DE LOS 21 VALORES ══════════════════
+// ══════════════════ LA FORMA DE LOS VALORES REQUERIDOS ══════════════════
 //
-// Hasta este lote la validacion miraba 2 de los 21: los doce digitos de las dos
+// Hasta este lote la validacion miraba 2 de todos ellos: los doce digitos de las dos
 // cuentas de AWS y el em dash de PREFIJO_RECURSOS y PROYECTO. Lo medido en vivo
 // antes de arreglarlo: con EQUIPO_BUILDERS = "builders\n      - run: echo
 // INYECTADO", la herramienta salia 0 y la linea aterrizaba en .github/CODEOWNERS
@@ -901,7 +928,7 @@ test("el ORG del ejemplo es una ORG de GitHub, no el slug de un equipo de adentr
 // malformado: ignora la linea y no asigna a nadie, que es el primero de los tres
 // modos de falla que la propia salida de la herramienta advierte en su punto 4.
 
-test("los 21 valores requeridos tienen una forma declarada", () => {
+test("todos los valores requeridos tienen una forma declarada", () => {
   // Sin esto, agregar una clave a REQUERIDOS y olvidar su fila en FORMATOS la
   // devuelve al regimen viejo —no-vacio y nada mas— sin que nada lo diga.
   assert.deepEqual(marcadoresSinFormato(), []);
@@ -911,8 +938,8 @@ test("los 21 valores requeridos tienen una forma declarada", () => {
   assert.deepEqual(sobrantes, []);
 });
 
-test("un salto de linea en CUALQUIERA de los 21 es error, y el mensaje dice cual", () => {
-  // Se recorren los 21 y no una muestra: el defecto era exactamente que la
+test("un salto de linea en CUALQUIERA de los requeridos es error, y el mensaje dice cual", () => {
+  // Se recorren TODOS y no una muestra: el defecto era exactamente que la
   // cobertura fuera parcial, asi que probarlo con dos claves lo repetiria.
   const carga = "\n      - run: echo INYECTADO-EN-EL-WORKFLOW";
   for (const k of REQUERIDOS) {
@@ -1650,7 +1677,7 @@ test("la corrida completa avisa por stderr y sigue saliendo 0", () => {
   assert.equal(r.status, 0, r.stderr);
 
   // El aviso tiene que decir la verdad sobre el andamio de HOY, en las dos
-  // direcciones: si manana el andamio guarda los 21, este caso exige silencio.
+  // direcciones: si manana el andamio los guarda todos, este caso exige silencio.
   const registro = JSON.parse(fs.readFileSync(path.join(destino, REGISTRO_DE_VALORES), "utf8"));
   const faltan = REQUERIDOS.filter((k) => !Object.hasOwn(registro, k));
   assert.equal(

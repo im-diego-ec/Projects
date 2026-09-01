@@ -43,7 +43,7 @@ comando copiar y qué vas a ver en pantalla—.
 | **Alguien que no es técnico** — un BA, un PO que recién llega, quien tenga que decidir si esto se adopta | [`docs/01-introduccion.md`](docs/01-introduccion.md) | Qué es esto en castellano llano, qué te da y qué te exige, cuánto cuesta, qué decisiones te va a pedir a vos y qué pasa si el equipo es una sola persona |
 | **Alguien que no es técnico y tiene que arrancarlo igual** | [`docs/04-arrancar-acompanado.md`](docs/04-arrancar-acompanado.md) | El «hacelo conmigo»: qué comando copiar, **qué vas a ver en pantalla**, cómo saber que salió bien, cuánto tarda cada paso, las cuentas que hay que abrir con sus límites gratuitos medidos, y los rojos que son esperados |
 | **El PO** — dueño del qué y el por qué | [`docs/06-para-el-po.md`](docs/06-para-el-po.md) | Una página sin código: qué rutas aprobás, cómo se lee un spec real línea por línea, y las cuatro preguntas con las que se devuelve una propuesta |
-| **Un builder nuevo en el equipo** | [`docs/10-reglas-no-escritas.md`](docs/10-reglas-no-escritas.md), y después [`AGENTS.md`](AGENTS.md) | Cómo se trabaja acá, qué regla está automatizada y cuál todavía depende de una persona — declarado, no supuesto |
+| **Un builder nuevo en el equipo** | [`docs/11-reglas-no-escritas.md`](docs/11-reglas-no-escritas.md), y después [`AGENTS.md`](AGENTS.md) | Cómo se trabaja acá, qué regla está automatizada y cuál todavía depende de una persona — declarado, no supuesto |
 | **Un builder arrancando un proyecto** | [`docs/05-arrancar-tecnico.md`](docs/05-arrancar-tecnico.md) | De no tener repositorio a `ci-ok` en verde, con los fallos silenciosos del día 1 |
 | **Alguien con un incidente en curso** | El runbook del proyecto, en **su** repo | Acá no hay recursos concretos; lo que vive acá es la plantilla con la que ese runbook se escribió ([`docs/plantillas/runbook.md`](docs/plantillas/runbook.md)) |
 
@@ -178,18 +178,18 @@ resultado.
 > bajo *ESOS CUATRO NUMEROS SE MIDEN*. Y una corrida real lo dice sola en su primera
 > línea, con la forma `escritos N archivos, M ocurrencias sustituidas`.
 >
-> Lo que sí está fijo y sí se escribe es **21 marcadores**: es el largo de la lista
+> Lo que sí está fijo y sí se escribe es **23 marcadores**: es el largo de la lista
 > `REQUERIDOS` de la herramienta, y esa lista no crece al agregar un archivo — crece
 > sólo cuando se agrega una **decisión**, que es un acto deliberado y con PR. Quien la
 > sostiene es un banco del marco, `pruebas/andamio/tabla-de-valores.test.mjs`: se pone
-> rojo si `plantilla/.projects-valores.json` deja de declarar uno de los 21, y rojo si
+> rojo si `plantilla/.projects-valores.json` deja de declarar uno de ellos, y rojo si
 > la tabla de `plantilla/README.md` se queda sin la fila de uno. Medido borrando
 > `ID_MCP_SLACK` del registro del andamio: el caso `registro · el andamio declara los
 > valores en su .projects-valores.json` falla nombrando la clave.
 >
 > **Y conviene saber qué NO hace `projects init` con esa cifra, porque es fácil
 > suponerlo de más.** El desfase del andamio no lo mira: sobre el destino ya escrito lo
-> reporta como `::warning::` y sale **0** (medido: `guarda 20 de los 21 valores`,
+> reporta como `::warning::` y sale **0** (medido, con la forma `guarda N de los M valores`,
 > `EXIT=0`, el andamio entero copiado igual). Lo que sí lo pone rojo es el otro lado
 > —un marcador del andamio que el archivo de valores no declara— y ahí es `::error::`
 > con `EXIT=1`, pero **después** de la copia, no antes: esa corrida igual arranca
@@ -204,7 +204,7 @@ resultado.
 Lo que **no** hace, porque no es transcripción:
 
 1. **Crear el repo vacío** en la organización.
-2. **Decidir los valores.** Los 21 que la herramienta pide salen de la tabla de
+2. **Decidir los valores.** Los que la herramienta pide salen de la tabla de
    `plantilla/README.md` sección 2, con ejemplo y caso borde cada uno (el 22.º,
    `{{PAQUETES}}`, **no se pregunta**: se deriva de los tres paquetes). Tres tienen
    un camino "si no existe" que exige borrar bloques a mano: la herramienta los
@@ -223,14 +223,14 @@ Lo que **no** hace, porque no es transcripción:
    proponerlos. En los dos casos el repo simplemente **no recibe versiones nuevas
    y no aparece en el censo de consumidores**, sin avisar.
 
-> **La tabla de los 21 valores**, con qué poner, ejemplo y caso borde de cada uno,
+> **La tabla de valores**, con qué poner, ejemplo y caso borde de cada uno,
 > vive en **[`plantilla/README.md`](plantilla/README.md)** sección 2. Ese archivo es
 > la fuente de verdad de los valores y manda sobre este resumen; también documenta
 > el camino **manual**, que sigue siendo válido y es el fallback si `projects init`
 > falla.
 >
-> **Y no hace falta llenarla a mano.** `projects init --asistente` hace entre 8 y 16
-> preguntas en castellano —depende de lo que contestes— y deriva los 21 valores de
+> **Y no hace falta llenarla a mano.** `projects init --asistente` hace entre 9 y 17
+> preguntas en castellano —depende de lo que contestes— y deriva los 23 valores de
 > las respuestas: no pide un id de cuenta de AWS a quien no eligió AWS. Produce este
 > mismo archivo y lo valida con el mismo `validarValores`, así que no son dos caminos
 > que puedan divergir: es un generador y una puerta. El paso a paso está en
@@ -337,27 +337,31 @@ Los ejemplos de la tabla son **inventados a propósito**: en el marco no se
 escriben handles, cuentas ni dominios reales de ningún proyecto. Es una frontera
 🛑 de [AGENTS.md](AGENTS.md) y un ítem del checklist de PR.
 
-**La tabla es la lista COMPLETA de los 21, y eso es una frontera 🛑 de
+**La tabla es la lista COMPLETA de los marcadores, y eso es una frontera 🛑 de
 [AGENTS.md](AGENTS.md)** («Dejar `{{PLACEHOLDER}}` sin documentar en el README»).
-Que esté completa se comprueba con un comando, y hasta que un caso de banco lo corra
-solo, la única defensa es correrlo:
+Que esté completa **ya lo comprueba un caso del banco** —el que falta abajo era
+justamente lo que faltaba, y la tabla se había quedado en 21 de 23 sin que nada lo
+dijera—. Para verlo a mano:
 
 ```bash
 diff <(grep -rhoE '\{\{[A-Z0-9_]+\}\}' plantilla --exclude=README.md | sort -u) \
      <(grep -oE '^\| `\{\{[A-Z0-9_]+\}\}`' README.md | grep -oE '\{\{[A-Z0-9_]+\}\}' | sort -u)
 ```
 
-Hoy no imprime nada. El caso que falta vive en `pruebas/andamio/manifiestos.test.mjs`
-y compara `REQUERIDOS` de `herramientas/projects-init.mjs` contra esta tabla **y** la
-de `plantilla/README.md`.
+No imprime nada cuando la tabla está completa. El caso que lo sostiene vive en
+`pruebas/andamio/manifiestos.test.mjs` y compara `REQUERIDOS` de
+`herramientas/projects-init.mjs` contra esta tabla **y** la de `plantilla/README.md`,
+en las dos direcciones: una fila de menos y una fila de más son los dos un error.
 
 | Placeholder | Qué es | Ejemplo |
 |---|---|---|
 | `{{PROYECTO}}` | Nombre del proyecto y del repo | `people-agenda` |
-| `{{ORG}}` | Organización de GitHub: el handle de la org, no un equipo dentro de ella. Se interpola en `uses: {{ORG}}/Projects/...` | `Ejemplo-Org` |
+| `{{ORG}}` | Cuenta de GitHub **del proyecto**: el handle, no un equipo dentro de ella. Se interpola en `{{ORG}}/{{PROYECTO}}` y en `@{{ORG}}/<equipo>` | `Ejemplo-Org` |
+| `{{ORG_MARCO}}` | Cuenta de GitHub **donde vive el marco**, que puede no ser la del proyecto. Es la que resuelven los `uses:` del pipeline. **No se pregunta: se deriva** del remoto del clon | `im-diego-ec` |
 | `{{PAQUETE_API}}` | Carpeta del paquete de backend en el monorepo | `api` |
 | `{{PAQUETE_WEB}}` | Carpeta del paquete de frontend. Si el proyecto no tiene frontend, el valor se pide igual y quedan los bloques `[FRONT]` de `eslint.config.mjs` **y sus imports**, que hay que borrar a mano | `web` |
 | `{{PAQUETE_E2E}}` | Carpeta de la suite end-to-end. Sin suite E2E, hay que borrar esa entrada del glob de Node **y** las dos excepciones de `ci.yml` | `e2e` |
+| `{{PAQUETE_SITIO}}` | Carpeta del sitio, cuando la forma elegida es «un sitio para leer». En la forma «aplicación» esa carpeta no viaja | `sitio` |
 | `{{GENERAR_CLIENTE_DATOS}}` | El comando que genera el cliente de la capa de datos, que el CI corre antes de compilar. Si el proyecto no genera ninguno, borrar el paso de `.github/workflows/ci.yml` **no alcanza**: el mismo valor viaja al script `datos` de `package.json` y al `build` de `api/package.json`, donde sin comando queda un `&&` colgando. `grep -rn GENERAR_CLIENTE_DATOS plantilla/` los enumera todos | `prisma generate` |
 | `{{EQUIPO_BUILDERS}}` | Slug del equipo de builders en la org (va en `CODEOWNERS`) | `builders` |
 | `{{EQUIPO_PO}}` | Slug del equipo del PO (va en `CODEOWNERS`) | `po` |
@@ -416,7 +420,7 @@ diff.
 │                          #   con su propio README como guía del bootstrap y un
 │                          #   .github/workflows/ci.yml que ya llama al marco por versión exacta
 ├── herramientas/          # projects-init.mjs: instancia el andamio en un repo nuevo en un comando
-│                          #   (copia + 21 marcadores + openspec init + render de la constitucion)
+│                          #   (copia + marcadores + openspec init + render de la constitucion)
 ├── pruebas/                # el banco de los pasos INLINE de marco-ci.yml y del pinado del andamio:
 │                          #   ese código no puede salir de su bloque `run:` (cuando un consumidor
 │                          #   llama al reusable, el árbol checkouteado es el DEL CONSUMIDOR), así
