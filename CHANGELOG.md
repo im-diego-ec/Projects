@@ -115,6 +115,16 @@ mueve sobre un cambio incompatible.
 
 ### Añadido
 
+- **Dos lanzadores de doble clic: `arrancar.command` (macOS) y `arrancar.cmd`
+  (Windows).** La invocación documentada era `node <ruta-al-clon>/herramientas/projects-init.mjs`,
+  y ese hueco que la persona rellena a mano produce el peor error de todo el
+  recorrido: una ruta mal escrita da un volcado de Node en inglés que **ninguna
+  guarda de la herramienta puede atajar**, porque la herramienta ni llegó a
+  arrancar. Los lanzadores derivan la raíz de dónde está el propio archivo,
+  comprueban Node, corren el comprobador y recién después el asistente, y dejan
+  la ventana abierta al final para que el motivo se pueda leer. **Consumidor:
+  nada** — viven en el clon del marco.
+
 - **`projects-doctor`: el Paso 0 entero en un solo comando.** Antes eran cuatro
   comandos y **comparar la salida a ojo** contra un ejemplo — que no comprueba
   nada, porque el piso de versión de Node vive en el código y no en la pantalla.
