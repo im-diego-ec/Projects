@@ -41,6 +41,39 @@ mueve sobre un cambio incompatible.
 
 ## [No publicado]
 
+### Corregido
+
+- **El marco prometía «sin tarjeta» en seis lugares y ninguno tenía fuente
+  vigente.** De Supabase, la única cita rastreable es un post de marzo de 2021
+  sobre el pricing de la *beta*, un esquema que ya no existe; su página de
+  precios de hoy no lleva la frase. De Cloudflare no la dice **ninguna** página
+  —ni `/plans`, ni la de precios de Workers, ni el get-started—. Probablemente
+  sea cierta en la práctica, pero es la primera columna que mira quien no tiene
+  tarjeta, y si es falsa esa persona lo descubre en el formulario de alta, con el
+  proyecto ya armado. Se sacó de los seis lugares y hay un banco nuevo que la
+  caza si vuelve. **Qué tiene que hacer un consumidor: nada.**
+- **El detalle de AWS vendía como ventaja algo que quien lo lee no puede usar, y
+  omitía el límite que más duele.** Decía que «acá Terraform SÍ vale la pena»
+  siendo que Terraform es una herramienta de terminal y quien contesta el
+  asistente no tiene terminal — por eso existe el asistente. Y no decía que la
+  cuenta gratuita de AWS **se cierra sola a los 6 meses**, o antes si se agotan
+  los créditos, tras lo cual AWS retiene los datos 90 días y los borra. Alguien
+  podía elegir AWS creyendo que empezaba gratis y perder el proyecto medio año
+  después. **Consumidor: nada** — es copia del asistente, no del andamio.
+- **El detalle de Supabase hacía sonar su pausa como una trampa silenciosa.**
+  Supabase avisa por mail una semana antes y otra vez al pausar, y la pausa se
+  evita entrando al panel. La redacción vieja omitía los avisos, y era el
+  argumento más fuerte para mover a alguien de proveedor. **Consumidor: nada.**
+
+### Añadido
+
+- **Un banco que exige constancia para las promesas de dinero.**
+  `pruebas/docs/promesas-sin-fuente.test.mjs` barre todo lo que alguien lee para
+  decidir y falla si vuelve «sin tarjeta» en cualquiera de sus cuatro formas.
+  Lleva una lista `VERIFICADAS` vacía a propósito: el día que alguien dé de alta
+  las cuentas reales sin cargar tarjeta y anote la constancia, la frase vuelve
+  sola a todos lados. **Consumidor: nada** — es un banco del marco.
+
 ## [1.8.0] — 2026-09-01
 
 ### Corregido
