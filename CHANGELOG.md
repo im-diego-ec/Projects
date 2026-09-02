@@ -115,6 +115,12 @@ mueve sobre un cambio incompatible.
 
 ### Añadido
 
+- **El Paso 0 de la guía acompañada arranca con un doble clic, no con un bloque
+  de comandos.** Y la promesa que la guía se hace a sí misma —«cada paso dice qué
+  copiar»— pasó a aceptar también «qué abrir»: esa promesa nunca fue *copiar*,
+  fue **decir qué hacer en concreto**, y exigir la palabra «copiar» obligaba a
+  inventarle un comando a un paso que a propósito no lo tiene.
+
 - **Dos lanzadores de doble clic: `arrancar.command` (macOS) y `arrancar.cmd`
   (Windows).** La invocación documentada era `node <ruta-al-clon>/herramientas/projects-init.mjs`,
   y ese hueco que la persona rellena a mano produce el peor error de todo el

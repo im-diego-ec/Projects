@@ -178,9 +178,23 @@ Son cinco minutos de lectura y te ahorran mantener piezas que tu proyecto no usa
 
 ## Paso 0 — Comprobar que todo está · *2 minutos*
 
-**Qué vas a hacer.** Un solo comando que revisa todo y te dice qué falta.
+**Qué vas a hacer.** Abrir un archivo que revisa todo y te dice qué falta.
 
-**Qué copiar:**
+**En la carpeta que descargaste hay un archivo que se llama `arrancar`.
+Hacele doble clic.** Eso es todo: se abre una ventana negra, revisa tu
+computadora, y te dice si está todo o qué falta.
+
+| Si usás… | El archivo es |
+| --- | --- |
+| **Mac** | `arrancar.command` |
+| **Windows** | `arrancar.cmd` |
+
+> **La primera vez, la Mac te va a preguntar si confiás en el archivo.** Es lo
+> que hace con todo lo que no bajó de su tienda. Si te lo bloquea: clic derecho
+> sobre `arrancar.command` → **Abrir** → **Abrir** otra vez. Sólo hace falta la
+> primera vez.
+
+**Si preferís escribirlo vos**, es esto, y hace exactamente lo mismo:
 
 ```bash
 node ~/Projects/herramientas/projects-doctor.mjs
