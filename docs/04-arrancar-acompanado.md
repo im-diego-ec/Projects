@@ -178,44 +178,54 @@ Son cinco minutos de lectura y te ahorran mantener piezas que tu proyecto no usa
 
 ## Paso 0 — Comprobar que todo está · *2 minutos*
 
-**Qué vas a hacer.** Preguntarle a cada programa su versión. Es la única forma
-de no descubrir a mitad de camino que falta uno.
+**Qué vas a hacer.** Un solo comando que revisa todo y te dice qué falta.
 
-**Qué copiar** (una línea por vez):
+**Qué copiar:**
 
 ```bash
-git --version
-node --version
-gh auth status
-corepack --version
+node ~/Projects/herramientas/projects-doctor.mjs
 ```
 
-**Qué vas a ver.** Un número de versión por cada uno. El tercero es distinto:
-contesta con la cuenta de GitHub con la que estás dentro.
+**Qué vas a ver**, si está todo:
 
 ```
-git version 2.50.1
-v24.19.0
-github.com
-  ✓ Logged in to github.com account <tu-usuario> (keyring)
-  - Active account: true
-  - Git operations protocol: https
-  - Token: gho_************************
-0.35.0
+Esto es lo que necesita el marco para funcionar en esta computadora.
+
+  [OK  ] Node  24.19.0
+  [OK  ] Git  2.50.1
+  [OK  ] corepack  0.35.0
+  [OK  ] gh  2.98.0
+  [OK  ] Docker Desktop  27.5.1
+
+  [OK  ] Sesión de GitHub  tu-usuario
+
+Todo lo que hace falta está. Ya podés seguir con el paso 1.
 ```
 
-**Lo que va a ser distinto en tu pantalla, y está bien.** Los números de versión
-van a ser otros. `git` puede agregar algo entre paréntesis según cómo esté
-instalado. Y `gh auth status` imprime varias líneas más que las de acá: **lo
-único que tenés que encontrar es la línea con el tilde `✓ Logged in`**.
+**Y si falta algo, te lo dice con el enlace de dónde bajarlo**, sin que tengas
+que buscarlo en ningún lado:
 
-**Cómo sabés que salió bien.** Los cuatro contestaron algo y ninguno dijo
-`command not found`. Si `gh auth status` dice que no estás dentro, corré
-`gh auth login` y volvé acá.
+```
+  [FALTA] Docker Desktop  (opcional)
+           levanta la base de datos en tu máquina
+           sólo si vas a construir una APLICACIÓN. Para un sitio no hace falta
+           Se baja de: https://www.docker.com/products/docker-desktop/ — gratis para uso personal
+```
 
-> **Node tiene un piso.** La herramienta de arranque exige una versión mínima y
-> lo dice sola si no la alcanza, con la frase «esta herramienta necesita Node
-> … o más nuevo». No hace falta que lo compruebes vos.
+**Cómo sabés que salió bien.** La última línea dice **«Ya podés seguir con el
+paso 1»**. Si dice otra cosa, arriba está exactamente qué falta y de dónde se
+baja. Instalá eso y **volvé a correr el mismo comando**: es la única señal que
+tenés que mirar.
+
+> **Docker es el único opcional**, y depende de lo que vayas a construir: una
+> **aplicación** lo necesita, un **sitio para leer** no. Si no sabés todavía cuál
+> vas a hacer, instalalo igual — la descarga es grande y es una espera que
+> conviene no tener en el medio.
+
+> **Antes esto eran cuatro comandos y comparar a ojo.** Se cambió porque comparar
+> a ojo no comprueba nada: el piso de versión de Node vive en el código, no en la
+> pantalla. Y porque Docker no estaba en ninguna lista, y era el único requisito
+> que nada comprobaba.
 
 ---
 

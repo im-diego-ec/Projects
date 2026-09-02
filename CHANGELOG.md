@@ -115,6 +115,18 @@ mueve sobre un cambio incompatible.
 
 ### Añadido
 
+- **`projects-doctor`: el Paso 0 entero en un solo comando.** Antes eran cuatro
+  comandos y **comparar la salida a ojo** contra un ejemplo — que no comprueba
+  nada, porque el piso de versión de Node vive en el código y no en la pantalla.
+  Y **Docker no estaba en ninguna lista**: era el único requisito que el marco no
+  comprobaba y el que da el peor error (`command not found: docker`, sin salida),
+  con cero instrucciones de instalación en todo el repositorio. Ahora un comando
+  revisa los cinco programas y la sesión de GitHub, distingue *falta* de *viejo*
+  de *alcanza pero no es lo recomendado*, marca Docker como opcional según lo que
+  se vaya a construir, y **nunca dice que algo falta sin decir en la misma salida
+  de dónde se baja**. **Qué tiene que hacer un consumidor: nada** — es una
+  herramienta del marco.
+
 - **Un banco que exige constancia para las promesas de dinero.**
   `pruebas/docs/promesas-sin-fuente.test.mjs` barre todo lo que alguien lee para
   decidir y falla si vuelve «sin tarjeta» en cualquiera de sus cuatro formas.
