@@ -109,10 +109,10 @@ CLI no lo hace.
 | Frontend                    | **React + TypeScript + Vite + Tailwind + shadcn/ui**                  |
 | Backend                     | **Node + TypeScript + Express**                                       |
 | Datos                       | **PostgreSQL** vía **Prisma**                                         |
-| Auth                        | **Clerk** (componentes en el front; JWT verificado offline en el API) |
+| Auth                        | **Supabase Auth** (el SDK vive detrás de un contrato propio en `{{PAQUETE_WEB}}/src/auth.ts`; el API verifica el JWT offline con `jose`) |
 | Validación de input externo | **Zod**                                                               |
-| Plataforma                  | **La elige el proyecto**; nace en `aws` — ver `infra/adaptadores.md`  |
-| CI/CD                       | **GitHub Actions** (promoción por ambientes, workflows del marco)     |
+| Plataforma                  | **La elige el proyecto**; la que eligió este está en `.projects-valores.json` |
+| CI/CD                       | **GitHub Actions**, con los workflows del marco. La promoción por ambientes que la constitución declara todavía no se reparte: está anotada como desvío |
 | Package manager             | **pnpm** con workspaces (monorepo: web, api, e2e)                     |
 | Tests                       | **Vitest** (unit/integración) + **Playwright** (E2E contra dev)       |
 
@@ -124,18 +124,19 @@ ENCIMA — sus modelos, sus endpoints, sus pantallas.
 marco fija cuatro capacidades —dónde corre la API, dónde vive la base, cómo se resuelven
 los secretos en el arranque de cada tarea, y cómo se despliega y se verifica lo desplegado—
 y no fija el producto que las da. Los valores admitidos son `supabase`, `cloudflare`,
-`gcp`, `aws` y `ninguna`; qué cubre cada uno, qué cuesta y qué límite tiene su plan
-gratuito está en `infra/adaptadores.md`.
+`gcp`, `aws` y `ninguna`.
 
-**Este repositorio nace declarando `aws`**, y eso es una descripción y no un consejo: es la
-única plataforma que el andamio reparte ya escrita, en `infra/` e `infra-prod/`. Su plan
-gratuito es una promoción con fecha de vencimiento, así que si el objetivo es coste cero,
-el adaptador se lee **antes** de quedarse con ésta.
+<!-- projects:solo-si-hay-infra -->
+Qué cubre cada uno, qué cuesta y qué límite tiene su plan gratuito está en
+`infra/adaptadores.md`.
 
-**`ninguna` es una respuesta legítima**, no un hueco: un proyecto que todavía no despliega
-no elige una nube para llenar la fila. Pero elegirla **es trabajo, no omisión**: hoy
-ninguna herramienta reparte el andamio según esta clave, así que las dos raíces de
-Terraform llegan igual y hay que sacarlas a mano. Son cuatro pasos, en este orden:
+**Este repositorio declara `aws`**, y por eso recibió las dos raíces de Terraform, en
+`infra/` e `infra-prod/`. Su plan gratuito es una promoción con fecha de vencimiento —**se
+cierra sola a los 6 meses**, o antes si se agotan los créditos, y después AWS retiene los
+datos 90 días y los borra—, así que si el objetivo es coste cero, el adaptador se lee
+**antes** de quedarse con ésta.
+
+**Si se quiere sacar Terraform de acá**, son cuatro pasos, en este orden:
 
 1. borrar `infra/` e `infra-prod/` enteros, después de mover `infra/adaptadores.md` a la
    raíz del repositorio — es lo único de ahí que sigue valiendo sin Terraform;
@@ -149,6 +150,7 @@ Terraform llegan igual y hay que sacarlas a mano. Son cuatro pasos, en este orde
 Hasta que el paso 1 esté hecho, **el job de Terraform del CI sigue exigiendo el binario**:
 decide mirando si los directorios existen, no la clave. Una vez borrados lo dice con un
 `::notice::` y sale verde, y ya no hay ninguna ventana de gracia que pueda vencer.
+<!-- projects:fin-solo-si-hay-infra -->
 
 Los nombres de la fila **Package manager** son DIRECTORIOS y están escritos literales a
 propósito: `projects init` copia las rutas tal cual y solo sustituye el contenido de los

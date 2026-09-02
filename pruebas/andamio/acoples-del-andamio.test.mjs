@@ -75,8 +75,8 @@ function enTemporal(prefijo, fn) {
 // Los nombres que el ecosistema Node normaliza y que un desarrollador crea sin
 // pensarlo. Los cuatro del medio son los que la version anterior del .gitignore
 // dejaba entrar: lo que hay adentro esta declarado en api/.env.example
-// (CLERK_SECRET_KEY y CLERK_JWT_KEY), y una clave del proveedor de identidad en
-// la historia de git ya no se saca borrando el archivo.
+// (SUPABASE_URL, SUPABASE_ANON_KEY y SUPABASE_JWT_SECRET), y una clave del
+// proveedor de identidad en la historia de git ya no se saca borrando el archivo.
 const NO_PUEDEN_ENTRAR = [
   ".env",
   ".env.local",
@@ -88,6 +88,17 @@ const NO_PUEDEN_ENTRAR = [
   "api/.env.dev",
   "api/.env.test",
   "web/.env.production",
+  // LO QUE ESCRIBE PLAYWRIGHT CUANDO UNA PRUEBA FALLA, y por que esta en la
+  // MISMA lista que los .env y no en una aparte: el criterio de esta lista no es
+  // "es un secreto", es "una herramienta lo escribe sola y el `git add -A` del
+  // Paso 9 lo sube sin que nadie lo decida".
+  //
+  // MEDIDO en una maquina sin navegadores instalados --el estado normal la
+  // primera vez--: `pnpm e2e` falla, deja `e2e/test-results/` escrito, y el
+  // `pnpm verificar` SIGUIENTE sale rojo por archivos que la persona nunca
+  // escribio. Es el mismo caso que `coverage/` y `**/.astro/`, que ya estaban.
+  "e2e/test-results/traza.zip",
+  "test-results/captura.png",
 ];
 
 // Los dos ejemplos que el andamio SI versiona, mas la raiz: si la negacion se

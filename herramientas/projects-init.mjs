@@ -539,6 +539,26 @@ export function podarPorPlataforma(texto, rel, plataforma, forma = "aplicacion")
   // seguia trayendo la fila que las describe, porque esta poda miraba solo la
   // plataforma. Es el mismo predicado de `noViajanPorPlataforma`.
   if (plataforma === "aws" && forma !== "sitio") return texto;
+  if (rel === "AGENTS.md") {
+    // AGENTS.MD DESCRIBIA UN MUNDO ANTERIOR, y es el archivo que los agentes leen
+    // como fuente de verdad. Medido sobre un proyecto generado por el camino
+    // recomendado (aplicacion + Supabase): `infra/` NO viaja --lo poda
+    // `noViajanPorPlataforma`-- y aun asi el archivo apuntaba DOS VECES a
+    // `infra/adaptadores.md`, y su prosa afirmaba que «hoy ninguna herramienta
+    // reparte el andamio segun esta clave, asi que las dos raices de Terraform
+    // llegan igual y hay que sacarlas a mano». Eso era cierto ANTES de que
+    // existiera esa poda.
+    //
+    // El resultado: el archivo mas autoritativo del repositorio le prescribia
+    // cuatro pasos manuales para un problema que ya no tiene, sobre carpetas que
+    // no recibio, leyendo un documento que no esta.
+    //
+    // VA DESPUES DEL CORTE DE ARRIBA A PROPOSITO. Cuando la plataforma SI es AWS,
+    // `infra/` viaja de verdad y el bloque tiene que quedarse: se probo poniendo
+    // esto en `podarPorForma` --que no mira la plataforma-- y el proyecto de AWS
+    // recibia las carpetas SIN la seccion que las explica.
+    return texto.replace(/<!-- projects:solo-si-hay-infra -->\n[\s\S]*?<!-- projects:fin-solo-si-hay-infra -->\n/g, "");
+  }
   if (rel === ".github/dependabot.yml") {
     return texto.replace(/[ \t]*# projects:solo-si-hay-infra\n[\s\S]*?# projects:fin-solo-si-hay-infra\n/g, "");
   }

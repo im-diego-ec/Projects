@@ -144,6 +144,12 @@ todavía no tenés dominio propio, el proyecto quedó anotado con
 `<tu-proyecto>.workers.dev` —sin la parte del medio— y eso está declarado como
 pendiente en `.projects-desvios.json`.
 
+> **Si armaste tu proyecto por el camino del [builder](02-glosario.md)** —escribiendo el archivo de
+> valores a mano en vez de contestarle al asistente— **ese archivo te salió
+> vacío**: `{"desvios": []}`. Los desvíos hoy los escribe el asistente, no
+> `--valores`. Es una asimetría del marco, no algo que hiciste mal; hasta que se
+> cierre, en ese camino los pendientes de esta página hay que anotarlos a mano.
+
 **Cuando veas la dirección real, cambiala en dos lugares:**
 
 | Dónde | Qué es |
@@ -193,8 +199,9 @@ lado y una de verdad por el otro: hay tu máquina, y hay lo publicado.
 
 Eso vale aunque en el Paso 3 hayas contestado **«dos copias»**. Esa respuesta
 cambia lo que tu proyecto **declara** —las direcciones, los nombres de recursos—
-pero **hoy no hay nada que despliegue dos ambientes**. Está anotado en el archivo
-`.projects-desvios.json` de tu proyecto, con esas palabras.
+pero **hoy no hay nada que despliegue dos ambientes**. Si usaste el asistente,
+está anotado con esas palabras en el `.projects-desvios.json` de tu proyecto; si
+escribiste los valores a mano, ese archivo salió vacío —ver el aviso de arriba—.
 
 ### Lo que la [constitución](02-glosario.md) de tu proyecto promete, y todavía no cumple
 

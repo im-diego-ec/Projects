@@ -111,6 +111,13 @@ Se instalan una vez en tu computadora y sirven para todos los proyectos.
 | **Node** | El intérprete con el que corre todo lo del marco | [`nodejs.org`](https://nodejs.org) — la versión con soporte de largo plazo |
 | **corepack** | Lo que trae el instalador de las piezas del proyecto (`pnpm`) sin que tengas que instalarlo aparte | **No lo instalás.** Viene con Node, y el Paso 0 lo comprueba. Todos los comandos de esta página lo llaman con el prefijo `corepack pnpm` |
 | **gh** | Hablar con GitHub desde la consola | [`cli.github.com`](https://cli.github.com) |
+| **Docker Desktop** | **Sólo si tu proyecto es una aplicación**, no si es un sitio: es lo que levanta la base de datos en tu máquina. No lo vas a necesitar hasta el paso 6 | [`docker.com/products/docker-desktop`](https://www.docker.com/products/docker-desktop/) — gratis para uso personal |
+
+> **Docker es el único de esta lista que el marco NO comprueba por vos**, y el
+> que da el peor error cuando falta: la terminal contesta `command not found:
+> docker` y nada más. Si tu proyecto es una aplicación, instalalo ahora aunque
+> recién lo uses en el paso 6 — la descarga es grande y es una espera que
+> conviene no tener en el medio.
 
 > **Lo de Claude Code merece una línea aparte, porque cambia lo que este camino
 > es.** Los pasos 0 a 14 de esta página se hacen **con comandos**: los copiás y

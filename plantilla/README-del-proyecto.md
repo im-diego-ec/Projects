@@ -55,7 +55,7 @@ Lo que se decide de verdad no vive en este archivo: las propuestas y los contrat
 Un solo comando, y no hace falta configurar nada antes:
 
 ```bash
-pnpm dev
+corepack pnpm dev
 ```
 
 Abrilo en la dirección que imprime. La verificación completa —la misma secuencia que corre
@@ -66,14 +66,19 @@ Los comandos exactos, con sus dos variantes por sistema operativo, están en
 **`comandos-levantar-servicios.txt`**. No se repiten acá a propósito: una segunda copia de
 una lista de comandos se desactualiza, y la que se pudre es siempre la que nadie corre.
 
-El resumen, para saber qué esperar: `pnpm install` una vez, copiar los dos `.env.example` a
-`.env` y llenarlos, y `pnpm dev`. La verificación completa —la misma secuencia que corre el
+El resumen, para saber qué esperar: `corepack pnpm install` una vez, copiar los dos
+`.env.example` a `.env` y llenarlos, y `corepack pnpm dev`. La verificación completa —la misma secuencia que corre el
 pipeline— es un solo comando:
 <!-- projects:fin-solo-si-no-es-sitio -->
 
 ```bash
-pnpm verificar
+corepack pnpm verificar
 ```
+
+> **`corepack pnpm` y no `pnpm` a secas.** La versión de pnpm de este repositorio
+> está fijada en `packageManager`, y `corepack` es lo que la trae; viene con Node
+> y no hay que instalar nada. `pnpm` pelado contesta `command not found` si nunca
+> lo instalaste por tu cuenta.
 
 Correlo antes de abrir un PR. Falla en tu máquina por lo mismo que fallaría en el
 pipeline, y el diagnóstico local es varios minutos más barato.

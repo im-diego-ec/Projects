@@ -65,6 +65,35 @@ mueve sobre un cambio incompatible.
   evita entrando al panel. La redacción vieja omitía los avisos, y era el
   argumento más fuerte para mover a alguien de proveedor. **Consumidor: nada.**
 
+- **`AGENTS.md` —el archivo que los agentes leen como fuente de verdad— describía
+  un mundo anterior.** Declaraba **Clerk** como proveedor de identidad cuando el
+  andamio entrega **Supabase Auth**; decía que la plataforma «nace en `aws`»
+  cuando la del proyecto está en su propio `.projects-valores.json`; presentaba la
+  **promoción por ambientes** como pieza entregada cuando está anotada como
+  desvío; y apuntaba **dos veces** a `infra/adaptadores.md` en proyectos donde
+  `infra/` fue podado, prescribiendo cuatro pasos manuales para borrar carpetas
+  que nunca llegaron. Su prosa afirmaba «hoy ninguna herramienta reparte el
+  andamio según esta clave» — cierto antes de que existiera `noViajanPorPlataforma`.
+  Ahora el bloque de infraestructura va detrás de un centinela y se poda con las
+  carpetas. **Qué tiene que hacer un consumidor: nada**, salvo que quiera
+  regenerar para recibir el archivo corregido.
+- **Los comandos copiables decían `pnpm` pelado y contestaban `command not
+  found`.** Este repositorio fija su pnpm en `packageManager` y `corepack` es lo
+  que la trae. Los cinco comandos del proyecto generado ahora llevan el prefijo,
+  con una línea que explica por qué. **Consumidor: nada.**
+- **Un `pnpm e2e` fallido dejaba el `pnpm verificar` siguiente en rojo.**
+  Playwright escribe `e2e/test-results/` con capturas y trazas del intento, y no
+  estaba ignorado: el rojo aparecía por archivos que la persona nunca escribió, y
+  el `git add -A` del Paso 9 los subía al primer commit. Mismo caso que
+  `coverage/` y `**/.astro/`. **Consumidor: nada.**
+- **Nada decía cómo instalar Docker.** Grep sobre todo el repo: cero resultados.
+  Es el único requisito que el marco no comprueba y el que da el peor error
+  —`command not found: docker`, sin salida—. Ahora está en la tabla de programas
+  de `docs/04` y en el encabezado de `comandos-levantar-servicios.txt`, archivo
+  que advertía de esta trampa exacta y no decía dónde conseguirlo.
+- **El system prompt del bot afirmaba que «se despliega solo por el pipeline».**
+  Es a quien la persona le pregunta cómo publicar, y para la forma `aplicacion`
+  ese despliegue no existe. **Consumidor: nada** — viaja en `claude.yml`.
 - **El asistente le decía «undefined» a la persona en su peor momento.** El
   rechazo de una respuesta imprimía `no tiene la forma que corresponde:
   ${formato.espera}`, y de los catorce formatos **sólo dos definen `espera`**.

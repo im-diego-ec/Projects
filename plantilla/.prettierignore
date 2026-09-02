@@ -7,6 +7,12 @@ pnpm-lock.yaml
 # archivo que otra herramienta posee y reescribe no lo policia este formateador.
 **/.astro/
 
+# Lo escribe Playwright con las capturas y trazas de una prueba que fallo. Mismo
+# criterio que `.astro/` y `coverage/`: un artefacto de una herramienta, no del
+# proyecto. Sin esta linea, un `pnpm e2e` fallido deja el `pnpm verificar`
+# siguiente en rojo por archivos que nadie escribio.
+**/test-results/
+
 # Generados: los reescribe una herramienta, formatearlos solo genera diffs.
 # Ajustar a los generados de este proyecto (cliente del ORM, componentes de UI).
 # {{PAQUETE_WEB}}/src/components/ui
