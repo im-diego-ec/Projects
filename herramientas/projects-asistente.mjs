@@ -235,10 +235,34 @@ export const PREGUNTAS = [
       {
         valor: "aws",
         etiqueta: "AWS",
+        // LO QUE ESTE DETALLE AFIRMABA Y NO ERA CIERTO PARA QUIEN LO LEE.
+        //
+        // Decia que «acá Terraform SÍ vale la pena, y es lo único que el andamio
+        // trae preparado hoy», presentandolo como LA VENTAJA de elegir AWS.
+        // Terraform es una herramienta de terminal, y quien contesta estas
+        // preguntas no tiene terminal --por eso existe este archivo--. La ventaja
+        // estaba fuera de su alcance, y aun asi la usabamos para venderle la
+        // opcion.
+        //
+        // Y FALTABA EL LIMITE QUE MAS DUELE, verificado el 2026-09-01: la cuenta
+        // gratuita de AWS SE CIERRA SOLA a los 6 meses o al agotarse los
+        // creditos, lo que pase primero; despues AWS retiene los datos 90 dias y
+        // los borra. https://aws.amazon.com/free/free-tier-faqs/
+        // Alguien podia elegir AWS creyendo que empezaba gratis y perder el
+        // proyecto medio ano despues sin que nada se lo hubiera dicho.
+        //
+        // SI ESTA OPCION SE VA DEL MENU es otra decision, y esta escrita aparte
+        // en openspec/changes/menu-que-no-miente/. No se toma sola desde un
+        // comentario: sacarla deja inalcanzables las cinco preguntas de AWS y el
+        // predicado `usaAws`, y eso es codigo muerto que hay que resolver en el
+        // mismo acto. Mientras tanto, la opcion se queda --pero deja de prometer
+        // lo que no puede dar--.
         detalle:
-          "Para algo grande o de empresa. Lo más potente y lo más caro de aprender: pide tarjeta desde " +
-          "el día uno, y para configurarlo hay que saber qué es una cuenta, una región y un perfil. Acá " +
-          "Terraform SÍ vale la pena, y es lo único que el andamio trae preparado hoy.",
+          "Para algo grande o de empresa, y sólo si tenés a mano a alguien técnico. Pide tarjeta desde " +
+          "el día uno. Ojo con esto: la cuenta gratuita SE CIERRA SOLA a los 6 meses, o antes si se " +
+          "acaban los créditos — después AWS guarda tus datos 90 días y los borra. El andamio te deja " +
+          "listo el Terraform, pero aplicarlo se hace desde una terminal: si no usás terminal, esta " +
+          "opción te va a dejar a mitad de camino.",
       },
       // GCP SALE DE LAS OPCIONES, y es la misma leccion que Slack.
       //

@@ -79,10 +79,11 @@ equivocado. El re-conteo del 2026-08-31 es el que sigue.
 **Medido el 2026-08-31: 41 requirements vivos en 8 capabilities**
 (12 `calidad-codigo` + 4 `despliegue-ci` + 2 `gestion-secretos` +
 3 `gobierno-contribucion` + 5 `observabilidad` + 6 `operacion-infra` +
-4 `pipeline-entrega` + 5 `verificacion-desplegada`). Hay además **3 capabilities en
+4 `pipeline-entrega` + 5 `verificacion-desplegada`). Hay además **4 capabilities en
 vuelo** —`base-tecnologica`, que nace en el change `stack-estandar`,
 `documentacion-del-marco`, que nace en `orden-de-lectura`, y
-`promocion-por-ambientes`, que nace en el change del mismo nombre—: ninguna existe todavía en
+`promocion-por-ambientes`, que nace en el change del mismo nombre, y `capa-descubrimiento`,
+que nace en `menu-que-no-miente`—: ninguna existe todavía en
 `openspec/specs/`, y sus secciones van al final, porque una capability que nace en un
 change y no en los specs vivos es la asimetría que hay que ver antes de que se
 consolide, no después.
@@ -362,3 +363,30 @@ solo paso que la cumpla. Hasta que exista, cada proyecto la anota como desvío d
   desaparece o si aparece otro documento en la raíz de `openspec/` que el mapa no
   nombre. Un documento sin enlaces no está guardado: está perdido con copia de
   seguridad.
+
+---
+
+## capa-descubrimiento — capability EN VUELO, 2 requirements, 0 con compuerta
+
+No existe en `openspec/specs/`: nace en
+`openspec/changes/menu-que-no-miente/specs/`. Es la capability **más chica de esta
+página**, y a propósito: los dos requirements dicen una sola cosa —que el menú del
+asistente no ofrezca lo que el andamio no puede entregar— desde dos ángulos.
+
+**Los dos están sin compuerta porque el change está en proposal, y ese proposal
+todavía no se decidió.** Lo que sí se aplicó sin esperar la decisión es la
+corrección de copia: el detalle de AWS prometía como ventaja un Terraform que
+exige una terminal que quien lee no tiene, y omitía que la cuenta gratuita de AWS
+se cierra sola a los 6 meses. Eso no era una opción discutible sino una afirmación
+que induce a error, y se corrigió.
+
+**La compuerta que sí existe hoy es la de al lado.**
+`pruebas/docs/promesas-sin-fuente.test.mjs` no cubre estos requirements —cubre otra
+cosa: que ninguna copia prometa «sin tarjeta» sin constancia— pero nació del mismo
+hallazgo y en el mismo acto. Se nombra acá para que quien lea esta sección no
+concluya que del asunto no quedó nada verificándose.
+
+| Requirement | Lo que lo hace fallar solo | Ruta y ancla (2026-09-02) |
+|---|---|---|
+| El asistente sólo ofrece opciones que el andamio sabe producir | **ninguno** — el change está en proposal | — |
+| Una opción no se ofrece si su ventaja exige una herramienta que quien elige no tiene | **ninguno** — el change está en proposal | — |
