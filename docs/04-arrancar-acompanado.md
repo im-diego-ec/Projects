@@ -194,11 +194,9 @@ computadora, y te dice si está todo o qué falta.
 > sobre `arrancar.command` → **Abrir** → **Abrir** otra vez. Sólo hace falta la
 > primera vez.
 
-**Si preferís escribirlo vos**, es esto, y hace exactamente lo mismo:
-
-```bash
-node ~/Projects/herramientas/projects-doctor.mjs
-```
+> **Si preferís escribirlo vos**, el archivo `arrancar` no hace más que llamar a
+> `node ~/Projects/herramientas/projects-doctor.mjs` — es exactamente lo mismo,
+> y está acá por si te resulta más cómodo.
 
 **Qué vas a ver**, si está todo:
 
