@@ -46,7 +46,7 @@ sola vez**.
 > todavía no configuraste enseña a ignorar los rojos, que es peor que no tener
 > la compuerta.
 
-### 1 · La cuenta · *3 minutos, sin tarjeta*
+### 1 · La cuenta · *3 minutos*
 
 Entrá a [`dash.cloudflare.com/sign-up`](https://dash.cloudflare.com/sign-up) y
 creá la cuenta. El plan gratuito alcanza de sobra para un sitio: los archivos de

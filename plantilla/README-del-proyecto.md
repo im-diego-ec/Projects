@@ -88,7 +88,7 @@ pipeline, y el diagnóstico local es varios minutos más barato.
 > **Faltan tres cosas, y las tres son humanas: la cuenta de Cloudflare, su
 > credencial y el subdominio de tu cuenta.**
 > Mientras no existan, la publicación **no se pone en rojo**: sale con un aviso
-> amarillo diciendo qué falta. El paso a paso —tres minutos, sin tarjeta— está
+> amarillo diciendo qué falta. El paso a paso —tres minutos— está
 > en [`{{PAQUETE_SITIO}}/README.md`]({{PAQUETE_SITIO}}/README.md).
 >
 > La primera vez, Cloudflare imprime la dirección completa. Si no tenés dominio

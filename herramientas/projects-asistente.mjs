@@ -205,11 +205,31 @@ export const PREGUNTAS = [
       {
         valor: "supabase",
         etiqueta: "Supabase + Cloudflare",
+        // DOS AFIRMACIONES SALIERON DE ACA PORQUE NO SE SOSTIENEN CONTRA LA FUENTE.
+        //
+        // 1. «SIN TARJETA». La cita rastreable de Supabase es un post de marzo de
+        //    2021 sobre el pricing de la BETA, un esquema que ya no existe; la
+        //    pagina de precios de hoy no lleva la frase. Y ninguna pagina de
+        //    Cloudflare dice «sin tarjeta» en ningun lado --ni /plans, ni la de
+        //    precios de Workers, ni el get-started--. Probablemente sea cierto en
+        //    la practica, y por eso la frase VUELVE el dia que alguien de de alta
+        //    una cuenta real de cada uno y lo compruebe: es media hora de trabajo.
+        //    Mientras tanto no se afirma, porque es justo la columna que una
+        //    persona sin tarjeta mira primero para decidir si puede empezar.
+        //
+        // 2. «se pausa solo (se despausa con un clic)» OMITIA QUE SI AVISA. Supabase
+        //    manda un mail una semana antes y otro al pausar, y la pausa se evita
+        //    entrando al panel. La redaccion vieja la hacia sonar como una trampa
+        //    silenciosa --el proyecto deja de andar y nadie te dice por que-- y eso
+        //    era el argumento mas fuerte para mover a alguien de proveedor.
+        //    Verificado el 2026-09-01 contra
+        //    https://supabase.com/docs/guides/platform/free-project-pausing
         detalle:
           "Para una idea o un proyecto chico. Supabase te da la base de datos y las cuentas de usuario; " +
-          "Cloudflare publica el sitio. Empieza gratis y SIN TARJETA. Los límites que sorprenden: 500 MB " +
-          "de base, 50.000 personas usándolo al mes, 2 proyectos activos, y el proyecto se pausa solo si " +
-          "no lo tocás por una semana (se despausa con un clic). Con esto NO necesitás Terraform.",
+          "Cloudflare publica el sitio. Empieza gratis. Los límites que sorprenden: 500 MB de base, " +
+          "50.000 personas usándolo al mes, y 2 proyectos activos. Y si pasa una semana entera sin que " +
+          "nadie entre, Supabase lo pausa: te avisan por mail una semana antes y otro al pausarlo, y se " +
+          "despausa con un clic. Con esto NO necesitás Terraform.",
         recomendada: true,
       },
       {

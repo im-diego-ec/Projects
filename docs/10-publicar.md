@@ -58,7 +58,7 @@ silenciosa de quedarse sin despliegue:
 
 ---
 
-## 3 · Un sitio para leer: publicarlo · *unos minutos, sin tarjeta*
+## 3 · Un sitio para leer: publicarlo · *unos minutos*
 
 El proyecto ya trae la configuración (`sitio/wrangler.jsonc`) y el paso
 automático (`.github/workflows/desplegar.yml`).
