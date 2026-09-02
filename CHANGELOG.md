@@ -65,6 +65,14 @@ mueve sobre un cambio incompatible.
   evita entrando al panel. La redacción vieja omitía los avisos, y era el
   argumento más fuerte para mover a alguien de proveedor. **Consumidor: nada.**
 
+- **El asistente le decía «undefined» a la persona en su peor momento.** El
+  rechazo de una respuesta imprimía `no tiene la forma que corresponde:
+  ${formato.espera}`, y de los catorce formatos **sólo dos definen `espera`**.
+  Los otros doce mostraban la palabra `undefined` — incluido el equívoco más
+  probable de todo el recorrido, escribir el correo donde va el usuario de
+  GitHub. Ahora cae a `que`, que siempre está. **Qué tiene que hacer un
+  consumidor: nada** — es el asistente del marco.
+
 ### Añadido
 
 - **Un banco que exige constancia para las promesas de dinero.**

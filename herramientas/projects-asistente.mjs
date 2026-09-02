@@ -783,7 +783,20 @@ export async function correrAsistente(preguntar, previos = {}, formatos = {}, em
       // distintas divergen, y la que se pudre es la que nadie mira.
       const formato = formatos[p.id];
       if (formato?.patron && !formato.patron.test(valor)) {
-        decir(`  ✗ "${valor}" no tiene la forma que corresponde: ${formato.espera}`);
+        // `?? formato.que` Y NO `formato.espera` PELADO. Medido: de los catorce
+        // formatos, solo DOS definen `espera` --ORG_MARCO y PAQUETE_SITIO--. Los
+        // otros doce imprimian, literal:
+        //
+        //   ✗ "diego@ejemplo.com" no tiene la forma que corresponde: undefined
+        //
+        // Y le pegaba al error MAS PROBABLE de todo el recorrido: escribir el
+        // correo donde va el usuario de GitHub. La persona veia la palabra
+        // `undefined` justo en el momento en que necesitaba que le dijeran que
+        // poner, y el asistente existe para que eso no pase.
+        //
+        // `que` siempre esta --es lo que el validador de siempre ya usa para el
+        // mismo mensaje en projects-init-- asi que el ?? no puede quedar corto.
+        decir(`  ✗ "${valor}" no tiene la forma que corresponde: ${formato.espera ?? formato.que}`);
         continue;
       }
       respuestas[p.id] = valor;
