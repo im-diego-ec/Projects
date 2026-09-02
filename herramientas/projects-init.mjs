@@ -2263,6 +2263,44 @@ async function main(argv) {
     const asis = await import("./projects-asistente.mjs");
     const versiones = await import("./projects-versiones.mjs");
 
+    // EL DESTINO SE MIRA ANTES DE PREGUNTAR NADA, y esto arregla una corrupcion.
+    //
+    // EL DEFECTO. La guarda del destino ocupado vive ~270 lineas mas abajo, y las
+    // tres escrituras del asistente ocurren ANTES: se contestaban las catorce
+    // preguntas, se escribian `.projects-valores.json`, `.projects-respuestas.json`
+    // y `.projects-desvios.json`, y RECIEN DESPUES la corrida abortaba con «el
+    // destino ya tiene N archivo(s) del andamio».
+    //
+    // El resultado es lo peor que puede pasar: los tres archivos DECLARATIVOS
+    // quedan describiendo un proyecto distinto del que hay en el arbol. Alguien
+    // que reabre el asistente para cambiar de plataforma se queda con un
+    // `.projects-valores.json` que dice `aws` sobre un arbol sin `infra/`, y la
+    // constitucion que se renderiza de ahi describe una infraestructura que no
+    // existe. La herramienta que se vende como «no pasa nada si te equivocas»
+    // rompia el proyecto en silencio y salia con error, las dos cosas a la vez.
+    //
+    // POR QUE `AGENTS.md` Y NO LA GUARDA DE ABAJO. Aquella necesita `plataforma` y
+    // `forma`, que salen de las respuestas: para usarla habria que preguntar
+    // primero, que es justo lo que hay que evitar. `AGENTS.md` viaja en TODAS las
+    // formas y plataformas --medido sobre los tres proyectos generados-- y no esta
+    // en `LO_QUE_ESCRIBE_EL_ASISTENTE`, asi que su presencia significa exactamente
+    // «aca ya se armo un proyecto» sin depender de ninguna respuesta.
+    //
+    // Y ADEMAS ES MEJOR ASI PARA QUIEN CONTESTA: enterarse de que el destino esta
+    // ocupado despues de catorce preguntas es peor que enterarse antes de la
+    // primera, aunque no se corrompiera nada.
+    if (o.destino && !o.forzar && fs.existsSync(path.join(o.destino, "AGENTS.md"))) {
+      console.error(`::error::el destino ${o.destino} ya tiene un proyecto armado (AGENTS.md). No se pregunto nada y no se escribio nada.`);
+      console.error("Para no romper lo que ya esta, el asistente se detiene ANTES de preguntar: contestar de nuevo dejaria");
+      console.error("los archivos que declaran el proyecto (.projects-valores.json y sus hermanos) describiendo algo");
+      console.error("distinto de lo que hay en el arbol.");
+      console.error("");
+      console.error("  - Para armar un proyecto NUEVO: elegi una carpeta vacia con --destino <carpeta>.");
+      console.error("  - Para ver que elegiste la vez pasada: abri .projects-valores.json en ese destino.");
+      console.error("  - Si de verdad queres rehacerlo encima, sabiendo que se pisa: --forzar");
+      return 1;
+    }
+
     // Se pregunta por STDIN y no por stdout: lo que hace falta para una pregunta
     // es que haya alguien que pueda CONTESTAR. Con la salida redirigida a un
     // archivo y el teclado disponible, preguntar sigue teniendo sentido; al

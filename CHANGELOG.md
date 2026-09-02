@@ -65,6 +65,17 @@ mueve sobre un cambio incompatible.
   evita entrando al panel. La redacción vieja omitía los avisos, y era el
   argumento más fuerte para mover a alguien de proveedor. **Consumidor: nada.**
 
+- **El asistente corrompía el proyecto y después abortaba.** La guarda del
+  destino ocupado vivía **~270 líneas después** de las tres escrituras del
+  asistente: volver a correr `--asistente` sobre un proyecto ya armado contestaba
+  las catorce preguntas, escribía `.projects-valores.json`,
+  `.projects-respuestas.json` y `.projects-desvios.json`, y **recién ahí** abortaba.
+  Los tres son los archivos **declarativos** —de ahí sale la constitución—, así que
+  quien reabría el asistente para cambiar de plataforma quedaba con un archivo
+  diciendo `aws` sobre un árbol sin `infra/`, describiendo una infraestructura que
+  no existe. La herramienta que se presenta como «no pasa nada si te equivocás»
+  rompía el proyecto **en silencio y salía con error a la vez**. Ahora se detiene
+  antes de la primera pregunta. **Qué tiene que hacer un consumidor: nada.**
 - **`AGENTS.md` —el archivo que los agentes leen como fuente de verdad— describía
   un mundo anterior.** Declaraba **Clerk** como proveedor de identidad cuando el
   andamio entrega **Supabase Auth**; decía que la plataforma «nace en `aws`»
