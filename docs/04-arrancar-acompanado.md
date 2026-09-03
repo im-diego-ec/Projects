@@ -176,6 +176,30 @@ Son cinco minutos de lectura y te ahorran mantener piezas que tu proyecto no usa
 
 ---
 
+## Antes del Paso 0 — el camino sin instalar nada · *3 clics*
+
+**Si no querés instalar nada en tu computadora, no hace falta.** Hay un camino
+que ocurre entero dentro de GitHub, desde el navegador.
+
+| | |
+| --- | --- |
+| **1** | En [el repositorio del marco](https://github.com/im-diego-ec/Projects), apretá el botón verde que dice **«Use this template»** → **«Create a new repository»**. Poné el nombre que quieras para tu proyecto. |
+| **2** | En **tu** repositorio nuevo, andá a la pestaña **Actions** y elegí **«Armar mi proyecto»** en la lista de la izquierda. |
+| **3** | Apretá el botón `Run workflow`. Se abre un formulario con cuatro o cinco preguntas en castellano. Contestalas y apretá el botón verde. |
+
+**Qué vas a ver.** El trabajo tarda un par de minutos. Cuando termina, volvés a
+la portada de tu repositorio y están todos los archivos de tu proyecto.
+
+**Cómo sabés que salió bien.** La corrida queda con un tilde verde, y abajo de
+ella hay un resumen que dice **«Tu proyecto está armado»** con lo que elegiste.
+
+> **Lo que este camino no te da:** el proyecto queda armado en GitHub, pero para
+> *trabajarlo* —abrir el código, probarlo en tu máquina— vas a necesitar las
+> herramientas del Paso 0 igual. La diferencia es que ahora podés decidir eso
+> **después de ver tu proyecto**, y no antes de tener nada.
+
+---
+
 ## Paso 0 — Comprobar que todo está · *2 minutos*
 
 **Qué vas a hacer.** Abrir un archivo que revisa todo y te dice qué falta.

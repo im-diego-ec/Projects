@@ -1,0 +1,158 @@
+# ---------------------------------------------------------------------------
+# LA PUERTA WEB. Arma el proyecto sin que nadie abra una terminal.
+#
+# QUE DEFECTO CIERRA, medido en la auditoria de autonomia: el marco tenia dos
+# entradas y las dos EXIGEN terminal --el asistente aborta si stdin no es una
+# terminal, y `--valores` exige escribir un JSON de 25 claves a mano--. Alguien
+# que no abre una terminal no llegaba ni al Paso 0.
+#
+# COMO SE USA, y son tres clics:
+#   1. "Use this template" arriba, en el repositorio del marco. Eso crea una
+#      copia en la cuenta de la persona.
+#   2. En ESA copia: pestania Actions -> "Armar mi proyecto" -> "Run workflow".
+#      GitHub renderiza los `inputs` de abajo como un formulario web.
+#   3. Apretar el boton. El resto lo hace el runner.
+#
+# POR QUE ESTO Y NO UNA WEB PROPIA: una web propia necesita hosting y una
+# identidad OAuth para crear el repositorio en la cuenta de la persona. Eso es un
+# producto nuevo, no una mejora. Aca el runner corre con el token del PROPIO
+# repositorio de la persona: cero infraestructura nuestra, cero credenciales.
+#
+# EL LIMITE QUE IMPONE: `workflow_dispatch` admite hasta DIEZ inputs y el
+# asistente hace hasta diecisiete preguntas. Las que no entran no se inventan:
+# se derivan de lo que GitHub ya sabe (nombre del repositorio, dueno) o quedan
+# en el relleno declarado del asistente, con su desvio escrito al lado.
+#
+# LO MAS PELIGROSO DE ESTE ARCHIVO, y por eso hay dos guardas: el paso de
+# reemplazo VACIA LA RAIZ del repositorio. Corrido en el repositorio del marco
+# borraria el marco entero. La primera guarda esta en el `if` del job; la
+# segunda, dentro de `projects-puerta.mjs`, que aborta antes de escribir nada.
+# Dos y no una porque un `if` de YAML se edita sin que ningun banco lo mire.
+# ---------------------------------------------------------------------------
+name: Armar mi proyecto
+
+on:
+  workflow_dispatch:
+    inputs:
+      forma:
+        description: "Que vas a construir"
+        type: choice
+        required: true
+        default: "una aplicacion (gente entra, se guarda informacion)"
+        options:
+          - "una aplicacion (gente entra, se guarda informacion)"
+          - "un sitio para leer (paginas, sin cuentas de usuario)"
+      plataforma:
+        description: "Donde van a vivir tus datos"
+        type: choice
+        required: true
+        default: "Supabase (gratis para empezar, trae las cuentas de usuario hechas)"
+        options:
+          - "Supabase (gratis para empezar, trae las cuentas de usuario hechas)"
+          - "Todavia no se (lo decido mas adelante)"
+      equipo:
+        description: "Trabajas solo o hay otra persona que revisa"
+        type: choice
+        required: true
+        default: "solo"
+        options:
+          - "solo"
+          - "hay otra persona"
+      companero:
+        description: "Si hay otra persona: su usuario de GitHub, sin la arroba"
+        type: string
+        required: false
+        default: ""
+      dominio:
+        description: "Si ya tenes un dominio propio, escribilo (miproyecto.com). Si no, dejalo vacio"
+        type: string
+        required: false
+        default: ""
+
+# Escribe en el repositorio de la persona, con el token del propio repositorio.
+permissions:
+  contents: write
+
+jobs:
+  armar:
+    name: Armar mi proyecto
+    # LA PRIMERA DE LAS DOS GUARDAS. Ver el encabezado: correr esto en el
+    # repositorio del marco borraria el marco. La segunda vive en el codigo.
+    if: github.repository != 'im-diego-ec/Projects'
+    # Declarado EN EL JOB y no solo arriba: el bloque del workflow no protege a un
+    # segundo job que alguien agregue despues, y el banco de permisos lo exige.
+    # `contents: write` es el minimo real: este job hace commit y push.
+    permissions:
+      contents: write
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Traer la copia del marco
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        with: { node-version: "22" }
+
+      - name: Traducir lo que elegiste a un archivo de valores
+        env:
+          ENTRADA_FORMA: ${{ startsWith(inputs.forma, 'un sitio') && 'sitio' || 'aplicacion' }}
+          ENTRADA_PLATAFORMA: ${{ startsWith(inputs.plataforma, 'Todavia') && 'ninguna' || 'supabase' }}
+          ENTRADA_EQUIPO: ${{ inputs.equipo == 'hay otra persona' && 'equipo' || 'solo' }}
+          ENTRADA_COMPANERO: ${{ inputs.companero }}
+          ENTRADA_DOMINIO: ${{ inputs.dominio }}
+        run: node herramientas/projects-puerta.mjs "${RUNNER_TEMP}"
+
+      - name: Armar el proyecto en un directorio aparte
+        # Se arma AFUERA y despues se reemplaza, en vez de armar encima. Armar
+        # encima chocaria con la guarda del destino ocupado --la copia del
+        # template ya trae un AGENTS.md, el del marco-- y `--forzar` pisaria
+        # cosas sin mirar. Un directorio limpio no tiene ese problema.
+        run: |
+          mkdir -p "${RUNNER_TEMP}/proyecto"
+          node herramientas/projects-init.mjs \
+            --valores "${RUNNER_TEMP}/valores.json" \
+            --destino "${RUNNER_TEMP}/proyecto" \
+            --sin-arranque
+
+      - name: Poner el proyecto en lugar del marco
+        # EL PASO QUE VACIA LA RAIZ. `.git` se salva a mano: sin el no habria
+        # repositorio al que hacerle commit. El `-mindepth 1` es lo que evita
+        # que `find` intente borrar el propio directorio.
+        run: |
+          find . -mindepth 1 -maxdepth 1 -not -name '.git' -exec rm -rf {} +
+          cp -a "${RUNNER_TEMP}/proyecto/." .
+          cp "${RUNNER_TEMP}/desvios.json" .projects-desvios.json
+
+      - name: Guardarlo
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "Mi proyecto, armado desde el formulario
+
+          Lo armo el marco a partir de lo que se eligio en la pestania Actions.
+          Que hace cada archivo esta en README.md, y las reglas del repositorio
+          en AGENTS.md."
+          git push
+
+      - name: Decir que quedo y que sigue
+        run: |
+          {
+            echo "## Tu proyecto esta armado"
+            echo ""
+            echo "Volve a la portada del repositorio y vas a ver los archivos nuevos."
+            echo "Lo primero que conviene abrir es **README.md**: dice que es cada cosa."
+            echo ""
+            echo "### Lo que eligieron"
+            echo ""
+            echo "| | |"
+            echo "|---|---|"
+            echo "| Que construis | ${{ inputs.forma }} |"
+            echo "| Donde viven los datos | ${{ inputs.plataforma }} |"
+            echo "| Quien lo trabaja | ${{ inputs.equipo }} |"
+            echo ""
+            echo "### Lo que todavia no se puede hacer solo"
+            echo ""
+            echo "Lo que el marco no puede resolver sin vos quedo anotado en"
+            echo "\`.projects-desvios.json\`, con el motivo de cada uno."
+          } >> "${GITHUB_STEP_SUMMARY}"

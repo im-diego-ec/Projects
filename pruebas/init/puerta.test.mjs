@@ -1,0 +1,159 @@
+import test from "node:test";
+import assert from "node:assert/strict";
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+import { execFileSync } from "node:child_process";
+import { CAMPOS, REPO_DEL_MARCO, respuestasDelFormulario, problemas, escribir } from "../../herramientas/projects-puerta.mjs";
+import { validarValores } from "../../herramientas/projects-init.mjs";
+
+const RAIZ = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
+const PUERTA_YML = ".github/workflows/armar-mi-proyecto.yml";
+
+// ---------------------------------------------------------------------------
+// LA PUERTA WEB: LA TERCERA ENTRADA, LA QUE NO PIDE TERMINAL.
+//
+// QUE CIERRA. Las dos entradas que habia exigen terminal: el asistente aborta si
+// stdin no lo es, y `--valores` exige escribir un JSON de 25 claves a mano.
+// Medido: alguien que no abre una terminal no llegaba ni al Paso 0.
+//
+// LO QUE ESTE BANCO VIGILA POR ENCIMA DE TODO: que la puerta NO SEA UN SEGUNDO
+// MOTOR. Traduce el formulario al mismo objeto `respuestas` del asistente y
+// despues llama a las MISMAS `derivar` y `desvios`. Una segunda derivacion
+// diverge, y la que se pudre es la que nadie mira.
+//
+// Y LA COMPROBACION MAS IMPORTANTE DEL ARCHIVO: el paso de reemplazo VACIA LA
+// RAIZ del repositorio. Corrido en el repositorio del marco lo borraria entero.
+// Por eso hay DOS guardas --el `if` del YAML y el chequeo del codigo-- y por eso
+// este banco exige las dos: un `if` de YAML se edita sin que nada lo mire.
+// ---------------------------------------------------------------------------
+
+const enTemporal = (fn) => {
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "puerta-"));
+  try { return fn(tmp); } finally { fs.rmSync(tmp, { recursive: true, force: true }); }
+};
+
+const formulario = (extra = {}) => ({ forma: "aplicacion", plataforma: "supabase", equipo: "solo", companero: "", dominio: "", ...extra });
+
+test("el formulario tiene campos, y entran en el tope de GitHub", () => {
+  assert.ok(CAMPOS.length >= 4, `se declararon ${CAMPOS.length} campos: parece vacio`);
+  assert.ok(CAMPOS.length <= 10, `workflow_dispatch admite 10 inputs y se declararon ${CAMPOS.length}`);
+});
+
+test("el nombre y la cuenta salen del repositorio, no de una pregunta", () => {
+  const r = respuestasDelFormulario(formulario(), "alguien/Mi-Agenda");
+  assert.equal(r.PROYECTO, "mi-agenda", "el nombre de repo se normaliza a minusculas, como hace el asistente");
+  assert.equal(r.ORG, "alguien");
+});
+
+test("un repositorio con forma rara no se adivina: se rechaza nombrandolo", () => {
+  assert.throws(() => respuestasDelFormulario(formulario(), "sin-barra"), /se esperaba duenio\/nombre/);
+});
+
+test("LA GUARDA QUE MAS IMPORTA: correrlo en el repositorio del marco se rechaza", () => {
+  const p = problemas(formulario(), REPO_DEL_MARCO);
+  assert.equal(p.length, 1, `se esperaba exactamente un problema y hubo ${p.length}`);
+  assert.match(p[0], /borraria el marco entero/);
+  assert.match(p[0], /Use this template/, "tiene que decir que hacer en su lugar, no solo que no");
+});
+
+test("y en cualquier otro repositorio deja pasar: una guarda que corta siempre rompe la herramienta", () => {
+  assert.deepEqual(problemas(formulario(), "alguien/su-proyecto"), []);
+});
+
+test("elegir equipo sin nombrar a la otra persona se rechaza antes de escribir nada", () => {
+  const p = problemas(formulario({ equipo: "equipo" }), "alguien/x");
+  assert.equal(p.length, 1);
+  assert.match(p[0], /CODEOWNERS/, "el motivo tiene que decir para que hace falta");
+});
+
+test("un dominio mal escrito se rechaza diciendo como se escribe", () => {
+  for (const malo of ["https://mi.com", "mi.com/", "sin-punto"]) {
+    const p = problemas(formulario({ dominio: malo }), "alguien/x");
+    assert.equal(p.length, 1, `"${malo}" tendria que rechazarse`);
+    assert.match(p[0], /miproyecto\.com/, "tiene que traer la forma correcta, no solo el rechazo");
+  }
+  assert.deepEqual(problemas(formulario({ dominio: "mi-proyecto.com" }), "alguien/x"), [], "un dominio valido pasa");
+});
+
+test("LO QUE MAS IMPORTA: lo que la puerta escribe pasa el validador de siempre", () => {
+  enTemporal((tmp) => {
+    for (const forma of ["aplicacion", "sitio"]) {
+      for (const plataforma of ["supabase", "ninguna"]) {
+        const { valores } = escribir(tmp, formulario({ forma, plataforma }), "alguien/mi-proyecto");
+        const problemasDelInit = validarValores(valores).problemas ?? [];
+        assert.deepEqual(
+          problemasDelInit,
+          [],
+          `forma=${forma} plataforma=${plataforma} produce un archivo que el init rechaza:\n${problemasDelInit.join("\n")}`,
+        );
+      }
+    }
+  });
+});
+
+test("ORG_MARCO NO sale del remoto de la copia: sale del repositorio del marco", () => {
+  enTemporal((tmp) => {
+    const { valores } = escribir(tmp, formulario(), "otra-cuenta/su-proyecto");
+    assert.equal(
+      valores.ORG_MARCO,
+      REPO_DEL_MARCO.split("/")[0],
+      "si ORG_MARCO tomara la cuenta de la persona, su proyecto consumiria workflows de un repositorio inexistente",
+    );
+    assert.notEqual(valores.ORG_MARCO, "otra-cuenta");
+  });
+});
+
+test("escribe los desvios, que es lo que el camino de --valores NO hace", () => {
+  enTemporal((tmp) => {
+    const { desvios } = escribir(tmp, formulario(), "alguien/x");
+    assert.ok(desvios.length > 0, "sin desvios, la constitucion del proyecto sale como si no hubiera ningun hueco");
+    for (const d of desvios) {
+      for (const clave of ["regla", "motivo", "aprobado_por", "fecha"]) {
+        assert.ok(d[clave], `un desvio sin "${clave}" no se puede auditar: ${JSON.stringify(d)}`);
+      }
+    }
+  });
+});
+
+test("el workflow de la puerta tiene LAS DOS guardas, no una", () => {
+  const yml = fs.readFileSync(path.join(RAIZ, PUERTA_YML), "utf8");
+  assert.match(yml, /if:\s*github\.repository\s*!=\s*'im-diego-ec\/Projects'/, "falta la guarda del `if` del job");
+  assert.match(yml, /projects-puerta\.mjs/, "el workflow no llama al codigo, que es donde vive la segunda guarda");
+  assert.match(yml, /permissions:/, "el job tiene que declarar sus permisos");
+});
+
+test("el paso que vacia la raiz salva .git: sin el no queda repositorio", () => {
+  const yml = fs.readFileSync(path.join(RAIZ, PUERTA_YML), "utf8");
+  const borrado = yml.split("\n").find((l) => l.includes("find .") && l.includes("rm -rf"));
+  assert.ok(borrado, "no encontre el paso de reemplazo: si se reescribio, actualiza este banco en el mismo cambio");
+  assert.match(borrado, /-not -name '\.git'/, "el borrado no salva .git");
+  assert.match(borrado, /-mindepth 1/, "sin -mindepth 1, find intenta borrar el propio directorio");
+});
+
+test("MUERDE: sacar la guarda del codigo se caza", () => {
+  // Se simula el defecto en memoria en vez de tocar el archivo.
+  const sinGuarda = (entrada, repo) => problemas(entrada, repo).filter((m) => !/borraria el marco/.test(m));
+  assert.equal(
+    sinGuarda(formulario(), REPO_DEL_MARCO).length,
+    0,
+    "si esto no da cero, el detector de este MUERDE no esta mirando la guarda que dice mirar",
+  );
+});
+
+test("corrido de verdad en el repositorio del marco, sale distinto de cero y no escribe nada", () => {
+  enTemporal((tmp) => {
+    let codigo = 0;
+    try {
+      execFileSync("node", [path.join(RAIZ, "herramientas/projects-puerta.mjs"), tmp], {
+        env: { ...process.env, GITHUB_REPOSITORY: REPO_DEL_MARCO, ENTRADA_FORMA: "sitio", ENTRADA_PLATAFORMA: "ninguna", ENTRADA_EQUIPO: "solo" },
+        stdio: "pipe",
+      });
+    } catch (e) {
+      codigo = e.status;
+    }
+    assert.notEqual(codigo, 0, "tiene que salir distinto de cero");
+    assert.deepEqual(fs.readdirSync(tmp), [], "no puede haber escrito un solo archivo");
+  });
+});

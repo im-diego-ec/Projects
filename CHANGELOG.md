@@ -115,6 +115,18 @@ mueve sobre un cambio incompatible.
 
 ### Añadido
 
+- **La puerta web: se arma un proyecto sin abrir una terminal.** El marco tenía
+  dos entradas y las dos exigen terminal — el asistente aborta si `stdin` no lo
+  es, y `--valores` exige escribir un JSON de 25 claves a mano. Medido: alguien
+  que no abre una terminal **no llegaba ni al Paso 0**. Ahora el repositorio es
+  un *template*, y su copia trae un `workflow_dispatch` que GitHub renderiza como
+  formulario web: tres clics y el runner arma el proyecto con el token del propio
+  repositorio. **Cero infraestructura nuestra, cero credenciales nuevas.**
+  `herramientas/projects-puerta.mjs` traduce el formulario al **mismo** objeto de
+  respuestas del asistente y llama a las **mismas** `derivar` y `desvios`: no es
+  un segundo motor. Y de paso **escribe los desvíos**, que es justo lo que el
+  camino de `--valores` no hacía. **Qué tiene que hacer un consumidor: nada.**
+
 - **El Paso 0 de la guía acompañada arranca con un doble clic, no con un bloque
   de comandos.** Y la promesa que la guía se hace a sí misma —«cada paso dice qué
   copiar»— pasó a aceptar también «qué abrir»: esa promesa nunca fue *copiar*,
