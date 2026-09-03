@@ -76,9 +76,13 @@ permissions:
 jobs:
   armar:
     name: Armar mi proyecto
-    # LA PRIMERA DE LAS DOS GUARDAS. Ver el encabezado: correr esto en el
-    # repositorio del marco borraria el marco. La segunda vive en el codigo.
-    if: github.repository != 'im-diego-ec/Projects'
+    # LA PRIMERA DE LAS DOS GUARDAS. Ver el encabezado: correr esto en un
+    # repositorio TEMPLATE lo borraria entero. La segunda vive en el codigo.
+    #
+    # `is_template` y NO el nombre de la cuenta: un literal deja de coincidir en
+    # cuanto el arbol se copia a otra cuenta --que es exactamente lo que hace
+    # "Use this template"--, y el banco de higiene del marco lo prohibe por eso.
+    if: github.event.repository.is_template != true
     # Declarado EN EL JOB y no solo arriba: el bloque del workflow no protege a un
     # segundo job que alguien agregue despues, y el banco de permisos lo exige.
     # `contents: write` es el minimo real: este job hace commit y push.
@@ -100,6 +104,9 @@ jobs:
           ENTRADA_EQUIPO: ${{ inputs.equipo == 'hay otra persona' && 'equipo' || 'solo' }}
           ENTRADA_COMPANERO: ${{ inputs.companero }}
           ENTRADA_DOMINIO: ${{ inputs.dominio }}
+          # La segunda guarda lee esto. Va por env porque el codigo no tiene
+          # acceso al evento de GitHub.
+          ES_TEMPLATE: ${{ github.event.repository.is_template }}
         run: node herramientas/projects-puerta.mjs "${RUNNER_TEMP}"
 
       - name: Armar el proyecto en un directorio aparte

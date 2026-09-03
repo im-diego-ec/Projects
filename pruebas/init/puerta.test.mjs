@@ -5,7 +5,7 @@ import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { execFileSync } from "node:child_process";
-import { CAMPOS, REPO_DEL_MARCO, respuestasDelFormulario, problemas, escribir } from "../../herramientas/projects-puerta.mjs";
+import { CAMPOS, CUENTA_DEL_MARCO, respuestasDelFormulario, problemas, escribir } from "../../herramientas/projects-puerta.mjs";
 import { validarValores } from "../../herramientas/projects-init.mjs";
 
 const RAIZ = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
@@ -51,14 +51,27 @@ test("un repositorio con forma rara no se adivina: se rechaza nombrandolo", () =
   assert.throws(() => respuestasDelFormulario(formulario(), "sin-barra"), /se esperaba duenio\/nombre/);
 });
 
-test("LA GUARDA QUE MAS IMPORTA: correrlo en el repositorio del marco se rechaza", () => {
-  const p = problemas(formulario(), REPO_DEL_MARCO);
-  assert.equal(p.length, 1, `se esperaba exactamente un problema y hubo ${p.length}`);
-  assert.match(p[0], /borraria el marco entero/);
-  assert.match(p[0], /Use this template/, "tiene que decir que hacer en su lugar, no solo que no");
+test("LA GUARDA QUE MAS IMPORTA: correrlo en un repositorio TEMPLATE se rechaza", () => {
+  const antes = process.env.ES_TEMPLATE;
+  process.env.ES_TEMPLATE = "true";
+  try {
+    const p = problemas(formulario(), "cualquiera/lo-que-sea");
+    assert.equal(p.length, 1, `se esperaba exactamente un problema y hubo ${p.length}`);
+    assert.match(p[0], /borraria el repositorio entero/);
+    assert.match(p[0], /Use this template/, "tiene que decir que hacer en su lugar, no solo que no");
+  } finally {
+    if (antes === undefined) delete process.env.ES_TEMPLATE;
+    else process.env.ES_TEMPLATE = antes;
+  }
 });
 
-test("y en cualquier otro repositorio deja pasar: una guarda que corta siempre rompe la herramienta", () => {
+test("la guarda NO se apoya en el nombre de la cuenta: un literal deja de coincidir al copiarse", () => {
+  // Sin ES_TEMPLATE, ni siquiera el repositorio del marco por su nombre dispara.
+  // Es a proposito: la señal es `is_template`, que viaja con el repositorio.
+  assert.deepEqual(problemas(formulario(), `${CUENTA_DEL_MARCO}/Projects`), []);
+});
+
+test("y en un repositorio normal deja pasar: una guarda que corta siempre rompe la herramienta", () => {
   assert.deepEqual(problemas(formulario(), "alguien/su-proyecto"), []);
 });
 
@@ -98,7 +111,7 @@ test("ORG_MARCO NO sale del remoto de la copia: sale del repositorio del marco",
     const { valores } = escribir(tmp, formulario(), "otra-cuenta/su-proyecto");
     assert.equal(
       valores.ORG_MARCO,
-      REPO_DEL_MARCO.split("/")[0],
+      CUENTA_DEL_MARCO,
       "si ORG_MARCO tomara la cuenta de la persona, su proyecto consumiria workflows de un repositorio inexistente",
     );
     assert.notEqual(valores.ORG_MARCO, "otra-cuenta");
@@ -119,7 +132,8 @@ test("escribe los desvios, que es lo que el camino de --valores NO hace", () => 
 
 test("el workflow de la puerta tiene LAS DOS guardas, no una", () => {
   const yml = fs.readFileSync(path.join(RAIZ, PUERTA_YML), "utf8");
-  assert.match(yml, /if:\s*github\.repository\s*!=\s*'im-diego-ec\/Projects'/, "falta la guarda del `if` del job");
+  assert.match(yml, /if:\s*github\.event\.repository\.is_template\s*!=\s*true/, "falta la guarda del `if` del job");
+  assert.match(yml, /ES_TEMPLATE:\s*\$\{\{\s*github\.event\.repository\.is_template\s*\}\}/, "el workflow no le pasa is_template al codigo, que es donde vive la segunda guarda");
   assert.match(yml, /projects-puerta\.mjs/, "el workflow no llama al codigo, que es donde vive la segunda guarda");
   assert.match(yml, /permissions:/, "el job tiene que declarar sus permisos");
 });
@@ -132,22 +146,19 @@ test("el paso que vacia la raiz salva .git: sin el no queda repositorio", () => 
   assert.match(borrado, /-mindepth 1/, "sin -mindepth 1, find intenta borrar el propio directorio");
 });
 
-test("MUERDE: sacar la guarda del codigo se caza", () => {
-  // Se simula el defecto en memoria en vez de tocar el archivo.
-  const sinGuarda = (entrada, repo) => problemas(entrada, repo).filter((m) => !/borraria el marco/.test(m));
-  assert.equal(
-    sinGuarda(formulario(), REPO_DEL_MARCO).length,
-    0,
-    "si esto no da cero, el detector de este MUERDE no esta mirando la guarda que dice mirar",
-  );
-});
-
-test("corrido de verdad en el repositorio del marco, sale distinto de cero y no escribe nada", () => {
+test("corrido de verdad sobre un template, sale distinto de cero y no escribe nada", () => {
   enTemporal((tmp) => {
     let codigo = 0;
     try {
       execFileSync("node", [path.join(RAIZ, "herramientas/projects-puerta.mjs"), tmp], {
-        env: { ...process.env, GITHUB_REPOSITORY: REPO_DEL_MARCO, ENTRADA_FORMA: "sitio", ENTRADA_PLATAFORMA: "ninguna", ENTRADA_EQUIPO: "solo" },
+        env: {
+          ...process.env,
+          GITHUB_REPOSITORY: "alguien/su-copia",
+          ES_TEMPLATE: "true",
+          ENTRADA_FORMA: "sitio",
+          ENTRADA_PLATAFORMA: "ninguna",
+          ENTRADA_EQUIPO: "solo",
+        },
         stdio: "pipe",
       });
     } catch (e) {
@@ -155,5 +166,22 @@ test("corrido de verdad en el repositorio del marco, sale distinto de cero y no 
     }
     assert.notEqual(codigo, 0, "tiene que salir distinto de cero");
     assert.deepEqual(fs.readdirSync(tmp), [], "no puede haber escrito un solo archivo");
+  });
+});
+
+test("y corrido de verdad en un repositorio normal, escribe y sale 0", () => {
+  enTemporal((tmp) => {
+    execFileSync("node", [path.join(RAIZ, "herramientas/projects-puerta.mjs"), tmp], {
+      env: {
+        ...process.env,
+        GITHUB_REPOSITORY: "alguien/su-proyecto",
+        ES_TEMPLATE: "false",
+        ENTRADA_FORMA: "sitio",
+        ENTRADA_PLATAFORMA: "ninguna",
+        ENTRADA_EQUIPO: "solo",
+      },
+      stdio: "pipe",
+    });
+    assert.deepEqual(fs.readdirSync(tmp).sort(), ["desvios.json", "valores.json"]);
   });
 });

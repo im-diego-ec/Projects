@@ -323,6 +323,31 @@ export function noViajanPorForma(forma) {
 /** La forma declarada en el archivo de valores. Minuscula y fuera de los
  *  marcadores, igual que la plataforma: no se sustituye en ningun archivo, decide
  *  cuales viajan. */
+/** "Me invocaron a MI?", para cualquier modulo del marco.
+ *
+ *  ESTE DEFECTO YA MORDIO DOS VECES, y la segunda fue por copiar el idioma
+ *  ingenuo `import.meta.url === \`file://${process.argv[1]}\`` en herramientas
+ *  nuevas. Falla en dos situaciones distintas y en las dos de la peor forma
+ *  posible --el proceso sale 0 SIN IMPRIMIR NADA, un exito silencioso--:
+ *
+ *    - EN macOS, cuando la ruta pasa por un enlace simbolico: `import.meta.url`
+ *      viene con los enlaces resueltos y `argv[1]` no. `/tmp` es un enlace a
+ *      `/private/tmp`, asi que basta con correr la herramienta desde ahi.
+ *    - EN WINDOWS, siempre: `argv[1]` es `D:\a\x.mjs` y `import.meta.url` es
+ *      `file:///D:/a/x.mjs`. La concatenacion nunca calza. Lo cazo el job de
+ *      windows-latest del CI, sobre `projects-puerta.mjs`.
+ *
+ *  Se resuelve por realpath en los DOS lados. El `try` es por el caso en que
+ *  `argv[1]` no exista en disco (`node --eval`, un REPL): ahi no nos invocaron y
+ *  no corre nada, que es lo correcto. */
+export function invocadoDirecto(urlDelModulo) {
+  try {
+    return fs.realpathSync(fileURLToPath(urlDelModulo)) === fs.realpathSync(process.argv[1] ?? "");
+  } catch {
+    return false;
+  }
+}
+
 export function formaDe(valores) {
   const v = valores?.forma;
   return typeof v === "string" && v.trim() ? v.trim().toLowerCase() : "aplicacion";

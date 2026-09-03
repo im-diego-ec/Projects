@@ -28,7 +28,7 @@
 
 import { execFileSync } from "node:child_process";
 import process from "node:process";
-import { NODE_MINIMO, NODE_RECOMENDADO, compararVersiones } from "./projects-init.mjs";
+import { NODE_MINIMO, NODE_RECOMENDADO, compararVersiones, invocadoDirecto } from "./projects-init.mjs";
 
 /** Si la salida va a una persona o a un log de CI. Con TTY se escribe para leer;
  *  sin TTY se agregan las anotaciones que GitHub Actions sabe subrayar. */
@@ -207,4 +207,7 @@ export function main() {
   return v.codigo;
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) process.exit(main());
+// `invocadoDirecto` y no la comparacion ingenua con `argv[1]`: esa falla
+// siempre en Windows y en macOS cuando la ruta pasa por un enlace simbolico, y
+// falla saliendo 0 sin imprimir nada. Ver su comentario en projects-init.
+if (invocadoDirecto(import.meta.url)) process.exit(main());

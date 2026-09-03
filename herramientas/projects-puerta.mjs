@@ -34,11 +34,33 @@ import fs from "node:fs";
 import path from "node:path";
 import process from "node:process";
 import { derivar, desvios } from "./projects-asistente.mjs";
+import { invocadoDirecto } from "./projects-init.mjs";
 
-/** El repositorio del marco. Armar el proyecto ACA ADENTRO borraria el marco
- *  entero: el paso de reemplazo vacia la raiz. Es la comprobacion mas importante
- *  de este archivo. */
-export const REPO_DEL_MARCO = "im-diego-ec/Projects";
+/** La cuenta que publica el marco. Se usa SOLO para ORG_MARCO --que es un valor
+ *  del proyecto, no una identidad de este repositorio-- y nunca para decidir
+ *  "este es el marco": para eso esta `esElTemplate`, abajo. */
+export const CUENTA_DEL_MARCO = "im-diego-ec";
+
+/** "Este repositorio es el marco?" — resuelto por `is_template` y NO por el
+ *  nombre de la cuenta.
+ *
+ *  POR QUE NO EL LITERAL, y lo cazo el propio banco de higiene del marco: un
+ *  literal `im-diego-ec/Projects` deja de coincidir en cuanto el arbol se copia a
+ *  otra cuenta --que es EXACTAMENTE lo que hace "Use this template"-- y ahi el
+ *  marco deja de reconocerse a si mismo. Alguien que clone el marco a su cuenta
+ *  para trabajarlo tendria la puerta armada y sin guarda: correrla borraria su
+ *  copia entera.
+ *
+ *  `is_template` si distingue, y no depende de ninguna cuenta: el repositorio del
+ *  marco es un template; una copia hecha con "Use this template" nace con
+ *  `false`. GitHub lo pone en el evento, asi que el workflow lo pasa por env.
+ *
+ *  Si alguien marca SU copia como template, la puerta se niega. Es un fallo
+ *  seguro y con motivo claro, que es lo que corresponde cuando la duda es entre
+ *  no armar un proyecto y borrar un repositorio. */
+export function esElTemplate(entorno = process.env) {
+  return String(entorno.ES_TEMPLATE ?? "").toLowerCase() === "true";
+}
 
 /** Lo que el formulario pregunta, con lo que significa cada valor.
  *
@@ -82,10 +104,10 @@ export function respuestasDelFormulario(entrada, repo) {
  *  problemas, vacia si esta todo bien. */
 export function problemas(entrada, repo) {
   const p = [];
-  if (repo === REPO_DEL_MARCO) {
+  if (esElTemplate()) {
     p.push(
-      `esto se corrio en ${REPO_DEL_MARCO}, que es el repositorio DEL MARCO. ` +
-        "Armar un proyecto aca adentro borraria el marco entero. " +
+      `esto se corrio en ${repo}, que es un repositorio TEMPLATE. ` +
+        "Armar un proyecto aca adentro borraria el repositorio entero: el paso de reemplazo vacia la raiz. " +
         'Lo que corresponde es apretar "Use this template" arriba, y correr esto en la copia.',
     );
   }
@@ -110,8 +132,8 @@ export function escribir(destino, entrada, repo) {
   // cuenta de ella, y el proyecto nacería consumiendo workflows de un repositorio
   // que no existe --que es exactamente el defecto que ORG_MARCO vino a cerrar--.
   //
-  // Acá se sabe por otro lado y sin adivinar: es el dueno de REPO_DEL_MARCO.
-  const valores = { ...derivar(r), ORG_MARCO: REPO_DEL_MARCO.split("/")[0] };
+  // Acá se sabe por otro lado y sin adivinar: es la cuenta que publica el marco.
+  const valores = { ...derivar(r), ORG_MARCO: CUENTA_DEL_MARCO };
   const apartamientos = desvios(r);
   fs.mkdirSync(destino, { recursive: true });
   const rutaValores = path.join(destino, "valores.json");
@@ -145,4 +167,7 @@ export function main() {
   return 0;
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) process.exit(main());
+// `invocadoDirecto` y no la comparacion ingenua con `argv[1]`: esa falla
+// siempre en Windows y en macOS cuando la ruta pasa por un enlace simbolico, y
+// falla saliendo 0 sin imprimir nada. Ver su comentario en projects-init.
+if (invocadoDirecto(import.meta.url)) process.exit(main());
