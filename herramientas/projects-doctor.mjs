@@ -182,7 +182,11 @@ export function veredicto(estados, sesion) {
   const l = [];
   if (bloquean.length || sinSesion) {
     const nombres = [...bloquean.map((e) => e.nombre), ...(sinSesion ? ["la sesión de GitHub"] : [])];
-    l.push(`${PROBLEMA} falta ${nombres.length === 1 ? "esto" : "esto"}: ${nombres.join(", ")}.`);
+    l.push(
+      nombres.length === 1
+        ? `${PROBLEMA} falta una cosa: ${nombres[0]}.`
+        : `${PROBLEMA} faltan ${nombres.length} cosas: ${nombres.join(", ")}.`,
+    );
     l.push("Cada uno tiene arriba de dónde se baja. Cuando estén, volvé a correr este mismo comando.");
     return { codigo: 1, lineas: l };
   }

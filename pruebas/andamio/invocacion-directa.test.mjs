@@ -72,12 +72,23 @@ test("MUERDE: el detector caza el idioma ingenuo", () => {
   assert.ok(/import\.meta\.url\s*===\s*`file:\/\/\$\{/.test(linea), "el detector no caza el idioma que dice cazar");
 });
 
-test("las dos herramientas nuevas CORREN de verdad cuando se las invoca", () => {
+test("una herramienta nueva CORRE de verdad cuando se la invoca", () => {
   // Sin esto, el banco de arriba pasaria sobre una herramienta que no imprime
   // nada por otro motivo. Se corre y se exige salida.
-  const salida = execFileSync("node", [path.join(RAIZ, "herramientas/projects-doctor.mjs")], {
-    encoding: "utf-8",
-    stdio: ["ignore", "pipe", "pipe"],
-  });
+  //
+  // SE LEE LA SALIDA PASE LO QUE PASE CON EL CODIGO, y no es indulgencia: en un
+  // runner de CI no hay sesion de GitHub, asi que el comprobador sale 1 --que es
+  // exactamente lo que tiene que hacer--. Lo que este caso mide es que main()
+  // CORRIO, no que el veredicto sea verde. Confundir las dos cosas hacia fallar
+  // este banco sobre una herramienta que funcionaba bien.
+  let salida = "";
+  try {
+    salida = execFileSync("node", [path.join(RAIZ, "herramientas/projects-doctor.mjs")], {
+      encoding: "utf-8",
+      stdio: ["ignore", "pipe", "pipe"],
+    });
+  } catch (e) {
+    salida = `${e.stdout ?? ""}${e.stderr ?? ""}`;
+  }
   assert.match(salida, /necesita el marco/, "projects-doctor no imprimio su informe: no corrio main()");
 });
