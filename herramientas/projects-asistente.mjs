@@ -455,6 +455,36 @@ export const PREGUNTAS = [
 ];
 
 /** Las claves de las 21 que salen de una respuesta y no de un relleno. */
+/** Las palabras que significan "volver a la anterior".
+ *
+ *  SON VARIAS A PROPOSITO. La auditoria probo cinco --`atras`, `b`, `0`,
+ *  `volver`, `<`-- y las cinco se rechazaban. Quien busca volver no sabe cual es
+ *  la palabra magica: prueba la que le sale. Reconocerlas todas cuesta una linea
+ *  y evita que la unica salida sea Ctrl+C.
+ *
+ *  EL RIESGO, y por que es aceptable: una respuesta libre podria ser
+ *  legitimamente "volver". Ninguna de las que este asistente pide lo es --nombres
+ *  de repositorio, handles de GitHub, dominios-- y los patrones de formato
+ *  rechazarian casi todas igual.
+ *
+ *  DOS ABREVIATURAS SALIERON, Y LAS DOS POR LO MISMO: colisionan con respuestas
+ *  legitimas, y una colision aca no da un error --da un retroceso silencioso--.
+ *
+ *    - `0`: es lo primero que uno probaria en una pregunta de opciones
+ *      numeradas, pero un guion que contesta "0" esperando el viejo «no es una
+ *      de las opciones» pasaria a retroceder. Y retroceder NO agota el techo de
+ *      reintentos. Medido: colgo el banco entero hasta que V8 se quedo sin
+ *      memoria.
+ *    - `b`: un handle de GitHub de UNA SOLA LETRA es valido, y el banco del marco
+ *      ya usaba `BUILDER_2: "b"`. Alguien que se llame asi no podria escribir su
+ *      propio nombre.
+ *
+ *  Quedan las cuatro que ninguna respuesta de este asistente puede ser. Un atajo
+ *  comodo no vale un retroceso que la persona no pidio. */
+const VOLVER = new Set(["atras", "atrás", "volver", "<"]);
+
+export const esVolver = (respuesta) => VOLVER.has(String(respuesta ?? "").trim().toLowerCase());
+
 export function derivar(r) {
   const solo = r.equipo !== "equipo";
   // LA DIRECCION GRATUITA ES DE WORKERS, NO DE PAGES, y la diferencia no es de
@@ -729,11 +759,44 @@ export async function correrAsistente(preguntar, previos = {}, formatos = {}, em
   // respuestas de ese momento son ocho, y en cuanto se elige AWS pasa a trece.
   const cuantasQuedan = () => PREGUNTAS.filter((q) => !q.salta || !q.salta(respuestas)).length;
 
+  // ---------------------------------------------------------------------
+  // VOLVER ATRAS. Antes no se podia, y no era una omision menor: la persona
+  // contestaba nueve preguntas y si en la septima se daba cuenta de que la
+  // tercera estaba mal, la unica salida era Ctrl+C --que ademas borraba todo--.
+  // Medido: `atras`, `b`, `0`, `volver` y `<` se rechazaban las cinco, y cada
+  // rechazo reimprimia la pregunta entera.
+  //
+  // EL BUCLE PASA A SER INDEXADO. Era un `for...of` sin indice, o sea que
+  // retroceder no estaba implementado: no era que faltara la palabra, era que no
+  // habia a donde volver.
+  //
+  // AL RETROCEDER SE SALTEAN LAS QUE NO SE PREGUNTARON. Con Supabase elegido, las
+  // cinco de AWS no se hacen; volver "una atras" desde el dominio tiene que
+  // llevar a la pregunta anterior QUE SE HIZO, no a una que la persona nunca vio.
+  // ---------------------------------------------------------------------
+  let i = 0;
   let n = 0;
-  for (const p of PREGUNTAS) {
-    if (p.salta && p.salta(respuestas)) continue;
+  // EL TECHO DE IDAS Y VUELTAS. Retroceder sale del bucle interno sin tocar su
+  // contador de reintentos, asi que una fuente que conteste "atras" para siempre
+  // --un guion de prueba, una tuberia-- va y vuelve sin fin. Es el mismo modo de
+  // falla que el techo de reintentos ya cubre para una pregunta sola, y necesita
+  // su propio techo porque vive en el bucle de AFUERA.
+  //
+  // Doscientos es generoso para una persona --son mas vueltas que preguntas por
+  // diez-- y finito para lo que no lo es.
+  let vueltas = 0;
+  while (i < PREGUNTAS.length) {
+    const p = PREGUNTAS[i];
+    if (p.salta && p.salta(respuestas)) { i += 1; continue; }
     n += 1;
-    const previo = previos[p.id];
+    const previo = respuestas[p.id] ?? previos[p.id];
+    // A donde lleva "atras" desde aca: la anterior que SI se pregunto. En la
+    // primera no hay ninguna, y eso se dice en vez de ignorarse.
+    let anterior = -1;
+    for (let k = i - 1; k >= 0; k -= 1) {
+      if (!PREGUNTAS[k].salta || !PREGUNTAS[k].salta(respuestas)) { anterior = k; break; }
+    }
+    let volviendo = false;
 
     // EL TECHO DE REINTENTOS, y no es paranoia: es un modo de falla medido.
     //
@@ -751,12 +814,25 @@ export async function correrAsistente(preguntar, previos = {}, formatos = {}, em
             "preguntador se quedo sin respuestas; si salio en una terminal, es un defecto de esta herramienta.",
         );
       }
-      for (const linea of lineasDePregunta(p, n, cuantasQuedan(), respuestas)) decir(linea);
+      // LA PREGUNTA ENTERA SOLO LA PRIMERA VEZ. Reimprimirla en cada reintento
+      // empuja el ✗ fuera de la pantalla, y la persona ve la misma pregunta otra
+      // vez SIN NINGUNA SEÑAL de haberse equivocado. Medido en el callejon de
+      // AWS: cincuenta reintentos, cincuenta preguntas repetidas, el motivo
+      // perdido arriba cada vez.
+      if (intentos === 1) {
+        for (const linea of lineasDePregunta(p, n, cuantasQuedan(), respuestas)) decir(linea);
+        if (anterior >= 0) decir(`  (escribí "atrás" para volver a la anterior)`);
+      }
 
       if (p.opciones) {
         const porDefecto = previo ?? p.opciones.find((o) => o.recomendada)?.valor;
         const idx = p.opciones.findIndex((o) => o.valor === porDefecto);
         const cruda = (await preguntar(`\n  Elegí un número [Enter = ${idx + 1}]: `, p.id)).trim();
+        if (esVolver(cruda)) {
+          if (anterior < 0) { decir("  ✗ Esta es la primera: no hay ninguna anterior a la que volver."); continue; }
+          volviendo = true;
+          break;
+        }
         if (!cruda) {
           respuestas[p.id] = porDefecto;
           decir(`  → ${p.opciones[idx].etiqueta}`);
@@ -774,6 +850,11 @@ export async function correrAsistente(preguntar, previos = {}, formatos = {}, em
 
       const sufijo = previo ? ` [Enter mantiene: ${previo}]` : "";
       const cruda = (await preguntar(`\n  Tu respuesta${sufijo}: `, p.id)).trim();
+      if (esVolver(cruda)) {
+        if (anterior < 0) { decir("  ✗ Esta es la primera: no hay ninguna anterior a la que volver."); continue; }
+        volviendo = true;
+        break;
+      }
       const valor = cruda ? (p.normaliza ? p.normaliza(cruda) : cruda) : previo;
       if (!valor) {
         decir("  ✗ Esta no tiene valor por defecto: hay que contestarla.");
@@ -803,6 +884,26 @@ export async function correrAsistente(preguntar, previos = {}, formatos = {}, em
       if (cruda && p.normaliza && valor !== cruda) decir(`  → se guardó como: ${valor}`);
       break;
     }
+
+    if (volviendo) {
+      if (++vueltas > 200) {
+        throw new Error(
+          "se volvio atras 200 veces sin terminar de contestar. Si esto salio en un banco, el preguntador " +
+            'esta devolviendo "atras" para siempre; si salio en una terminal, es un defecto de esta herramienta.',
+        );
+      }
+      // LA RESPUESTA DE ESTA SE CONSERVA, y la primera version la borraba. Era un
+      // error de razonamiento: que aparezca como "ya contestada" al avanzar de
+      // nuevo es JUSTO LO QUE HACE FALTA. El recorrido tipico de volver es
+      // «me equivoque en la tercera»: se vuelve, se corrige, y de ahi en adelante
+      // se avanza con Enter sin recontestar nada. Borrarla obligaba a escribir
+      // otra vez todo lo que ya estaba bien.
+      i = anterior;
+      n -= 2; // la anterior vuelve a numerarse como corresponde
+      if (n < 0) n = 0;
+      continue;
+    }
+    i += 1;
   }
 
   return { respuestas, valores: derivar(respuestas), desvios: desvios(respuestas), dicho };

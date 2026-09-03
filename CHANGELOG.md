@@ -41,6 +41,27 @@ mueve sobre un cambio incompatible.
 
 ## [No publicado]
 
+### Añadido
+
+- **Se puede volver a la pregunta anterior.** Antes no: la persona contestaba
+  nueve preguntas y si en la séptima se daba cuenta de que la tercera estaba mal,
+  **la única salida era Ctrl+C** — que además borraba todo lo contestado. La
+  auditoría probó cinco formas de decir «atrás» y las cinco se rechazaban. Y no
+  era que faltara la palabra: el bucle era un `for...of` **sin índice**, o sea que
+  no había a dónde volver.
+
+  Ahora `atrás`, `atras`, `volver` y `<` retroceden a la anterior **que sí se
+  preguntó** —con Supabase elegido, las cinco de AWS no se hacen y volver no pasa
+  por ellas—, y lo ya contestado se conserva: se vuelve, se corrige, y de ahí en
+  adelante se avanza con Enter sin reescribir nada.
+
+### Corregido
+
+- **El ✗ de un error se iba de pantalla.** Cada reintento reimprimía la pregunta
+  entera, así que la persona veía la misma pregunta otra vez **sin ninguna señal**
+  de haberse equivocado. Medido en el callejón de AWS: cincuenta reintentos,
+  cincuenta preguntas repetidas, el motivo perdido arriba cada vez.
+
 ## [1.9.6] — 2026-09-03
 
 ### Corregido
