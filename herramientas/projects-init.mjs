@@ -763,7 +763,22 @@ export function tipoDeCuentaDe(valores) {
  *
  *  Hoy solo CODEOWNERS las tiene, y a proposito: es el unico archivo del andamio
  *  cuya sintaxis cambia entre una cuenta personal y una organizacion. */
-export function podarPorTipoDeCuenta(texto, tipo = "usuario") {
+export function podarPorTipoDeCuenta(texto, rel, tipo = "usuario") {
+  // EL PROYECTO REGISTRA SU PROPIO TIPO DE CUENTA, igual que registra su forma y
+  // su plataforma. Sin esto, regenerarlo mas adelante volveria al default y un
+  // proyecto de organizacion se quedaria de golpe con handles personales --o
+  // peor, uno personal con equipos que no existen--. Es el mismo defecto que ya
+  // mordio con `forma`: el archivo que declara el proyecto no declaraba una de
+  // las cosas que decide como se arma.
+  if (rel === ".projects-valores.json") {
+    try {
+      const j = JSON.parse(texto);
+      j.TIPO_CUENTA = tipo;
+      return `${JSON.stringify(j, null, 2)}\n`;
+    } catch {
+      return texto;
+    }
+  }
   const sobra = tipo === "usuario" ? "organizacion" : "usuario";
   return texto.replace(
     new RegExp(`[ \\t]*# projects:solo-si-${sobra}\\n[\\s\\S]*?# projects:fin-solo-si-${sobra}\\n`, "g"),
@@ -1160,6 +1175,7 @@ export function instanciar({ raizAndamio, destino, valores }) {
       const texto = sacarCentinelas(
         podarPorTipoDeCuenta(
           podarPorForma(podarPorPlataforma(fs.readFileSync(origen, "utf8"), rel, plataforma, forma), rel, forma),
+          rel,
           tipoDeCuenta,
         ),
       );

@@ -29,6 +29,10 @@
 *                                  @{{ORG}}/{{EQUIPO_BUILDERS}}
 # projects:fin-solo-si-organizacion
 # projects:solo-si-usuario
+# Los dos handles quedan iguales cuando se trabaja solo, y esta bien: GitHub
+# deduplica y el desvio `github-review-cruzado-automatizado` ya declara que ahi
+# no hay revision ajena que pedir. Se escriben los dos igual porque el dia que
+# entre la segunda persona alcanza con cambiar el archivo de valores.
 *                                  @{{BUILDER_1}} @{{BUILDER_2}}
 # projects:fin-solo-si-usuario
 

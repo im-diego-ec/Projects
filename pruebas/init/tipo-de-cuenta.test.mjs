@@ -46,10 +46,26 @@ test("ante la duda se elige el lado que no rompe en silencio", () => {
 
 test("la poda deja UNA de las dos formas, nunca las dos ni ninguna", () => {
   const dos = "# projects:solo-si-organizacion\nEQUIPOS\n# projects:fin-solo-si-organizacion\n# projects:solo-si-usuario\nHANDLES\n# projects:fin-solo-si-usuario\n";
-  const org = sacarCentinelas(podarPorTipoDeCuenta(dos, "organizacion")).trim();
-  const usr = sacarCentinelas(podarPorTipoDeCuenta(dos, "usuario")).trim();
+  const org = sacarCentinelas(podarPorTipoDeCuenta(dos, ".github/CODEOWNERS", "organizacion")).trim();
+  const usr = sacarCentinelas(podarPorTipoDeCuenta(dos, ".github/CODEOWNERS", "usuario")).trim();
   assert.equal(org, "EQUIPOS");
   assert.equal(usr, "HANDLES");
+});
+
+test("el proyecto REGISTRA su tipo de cuenta: sin eso, regenerarlo lo pierde", () => {
+  // Es el mismo defecto que ya mordio con `forma`: el archivo que declara el
+  // proyecto no declaraba una de las cosas que deciden como se arma, asi que
+  // volver a armarlo mas adelante caia al default y cambiaba de forma solo.
+  const crudo = '{"plataforma":"supabase"}';
+  for (const tipo of ["usuario", "organizacion"]) {
+    const j = JSON.parse(podarPorTipoDeCuenta(crudo, ".projects-valores.json", tipo));
+    assert.equal(j.TIPO_CUENTA, tipo, `.projects-valores.json tiene que quedar declarando ${tipo}`);
+  }
+});
+
+test("y un archivo de valores ilegible no revienta la corrida: se devuelve tal cual", () => {
+  const roto = "{esto no es json";
+  assert.equal(podarPorTipoDeCuenta(roto, ".projects-valores.json", "usuario"), roto);
 });
 
 test("el CODEOWNERS del andamio trae las DOS formas: si falta una, media configuracion no existe", () => {

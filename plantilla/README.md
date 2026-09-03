@@ -7,7 +7,7 @@ Projects. Eso lo distingue de las otras piezas del marco:
 | Pieza | Cómo evoluciona |
 |---|---|
 | **Scaffold** (esto) | Se copia una vez. Después es del proyecto. Un cambio acá NO llega a los repos ya creados. |
-| **Referenciado** (workflows reusables, composite actions) | Se consume por `uses: {{ORG_MARCO}}/Projects/...@v1.9.1`, **por versión exacta**. Una versión nueva llega como PR de Dependabot, no empujada. |
+| **Referenciado** (workflows reusables, composite actions) | Se consume por `uses: {{ORG_MARCO}}/Projects/...@v1.9.2`, **por versión exacta**. Una versión nueva llega como PR de Dependabot, no empujada. |
 | **Canónico** (specs del marco) | Viven solo en Projects. Nadie los copia. |
 | **Regenerado** (skills y comandos de OpenSpec, y la porción del marco de la constitución) | No se vendoran: el marco pina la herramienta o publica el texto, y cada repo lo regenera. |
 
@@ -81,7 +81,7 @@ y parecidos— es la firma de esa forma de fijarlo, y no exige nada, porque ya e
 por construcción en el momento en que se anota.
 
 Lo que llega en `.github/workflows/ci.yml` es un **llamador delgado**: hereda del marco el
-carril de docs y la validación de OpenSpec con `uses: {{ORG_MARCO}}/Projects/...@v1.9.1`, y deja el
+carril de docs y la validación de OpenSpec con `uses: {{ORG_MARCO}}/Projects/...@v1.9.2`, y deja el
 `build-test` del producto para que este repo lo llene. La mecánica del marco NO se copia:
 si se copiara, un arreglo en Projects dejaría de llegar acá.
 

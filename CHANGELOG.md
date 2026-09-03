@@ -41,6 +41,17 @@ mueve sobre un cambio incompatible.
 
 ## [No publicado]
 
+## [1.9.2] — 2026-09-03
+
+### Corregido
+
+- **El proyecto no registraba su propio tipo de cuenta.** `TIPO_CUENTA` decidía
+  qué forma de CODEOWNERS viajaba pero no quedaba escrita en
+  `.projects-valores.json`, así que regenerar el proyecto más adelante caía al
+  default y le cambiaba la forma sola. Es el mismo defecto que ya mordió con
+  `forma`: el archivo que declara el proyecto no declaraba una de las cosas que
+  deciden cómo se arma. **Qué tiene que hacer un consumidor: nada.**
+
 ## [1.9.1] — 2026-09-03
 
 ### Corregido
