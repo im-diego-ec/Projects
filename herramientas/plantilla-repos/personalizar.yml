@@ -171,19 +171,21 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
+          # La descripcion NO repite el prefijo: `$1` ya viene como "area:backend",
+          # asi que "Area: $1" salia "Area: area:backend". Se usa `$3`.
           crear() {
-            if gh label create "$1" --color "$2" --description "Area: $1" 2>/dev/null; then
+            if gh label create "$1" --color "$2" --description "Area: $3" 2>/dev/null; then
               echo "  creada: $1"
             else
               echo "  ya estaba: $1"
             fi
           }
-          crear "area:backend"   0052CC
-          crear "area:ci-cd"     006B75
-          crear "area:datos"     FBCA04
-          crear "area:frontend"  1D76DB
-          crear "area:infra"     5319E7
-          crear "area:seguridad" B60205
+          crear "area:backend"   0052CC "backend"
+          crear "area:ci-cd"     006B75 "ci-cd"
+          crear "area:datos"     FBCA04 "datos"
+          crear "area:frontend"  1D76DB "frontend"
+          crear "area:infra"     5319E7 "infra"
+          crear "area:seguridad" B60205 "seguridad"
 
       - name: Pedir el artefacto del marco
         # El proyecto necesita `.projects/AGENTS-marco.md` renderizado por el
@@ -229,4 +231,10 @@ jobs:
             echo "| Proteger la rama main | Settings, Rules, Rulesets | exige administration |"
             echo "| Encender Dependabot | Settings, Advanced Security | exige administration |"
             echo "| Cargar los secretos para publicar | Settings, Secrets and variables, Actions | exige secrets, y los valores solo los tenes vos |"
+            echo "| Dejar que Actions abra pull requests | Settings, Actions, General, Workflow permissions | exige administration |"
+            echo ""
+            echo "La ultima explica algo que vas a ver enseguida: el workflow que trae al dia la"
+            echo "constitucion empuja su rama bien, pero no puede abrir el pull request solo hasta"
+            echo "que tildes esa casilla. Deja el enlace para abrirlo con un clic, y no se pone en"
+            echo "rojo por eso: su trabajo si se hizo."
           } >> "${GITHUB_STEP_SUMMARY}"

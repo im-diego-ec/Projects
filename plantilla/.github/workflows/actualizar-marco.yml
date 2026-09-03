@@ -171,7 +171,7 @@ jobs:
           node-version: "24"
 
       - name: Regenerar la porcion del marco
-        uses: "{{ORG_MARCO}}/Projects/actions/constitucion@v1.9.3"
+        uses: "{{ORG_MARCO}}/Projects/actions/constitucion@v1.9.4"
         with:
           modo: escribir
 
@@ -240,7 +240,28 @@ jobs:
           `GITHUB_TOKEN`: cerralo y reabrilo para que el CI corra.
           FIN
 
-          gh pr create \
+          # SI ABRIR EL PR FALLA, EL TRABAJO NO SE PERDIO: la rama ya se empujo
+          # arriba. Fallar la corrida entera aca es un ROJO FALSO --dice que algo
+          # se rompio cuando lo unico que pasa es que falta un ajuste del
+          # repositorio-- y le tira encima un rojo a alguien que no lo causo.
+          #
+          # EL CASO CONCRETO, medido en un repositorio recien creado:
+          #   pull request create failed: GraphQL: GitHub Actions is not
+          #   permitted to create or approve pull requests (createPullRequest)
+          #
+          # Es el ajuste "Allow GitHub Actions to create and approve pull
+          # requests", apagado por defecto. Un workflow NO PUEDE encenderlo: exige
+          # `administration`, que no existe entre los permisos que puede pedir.
+          # Asi que se dice donde esta, se deja el enlace para abrir el PR a mano,
+          # y la corrida sale VERDE porque su trabajo si se hizo.
+          if gh pr create \
             --head "${RAMA}" \
             --title "chore(marco): traer al dia la porcion del marco de la constitucion" \
-            --body-file "${RUNNER_TEMP}/cuerpo-pr.md"
+            --body-file "${RUNNER_TEMP}/cuerpo-pr.md"; then
+            exit 0
+          fi
+
+          SERVIDOR="${GITHUB_SERVER_URL:-https://github.com}"
+          echo "::notice::La rama \`${RAMA}\` quedo empujada con los cambios: ESO ES LO QUE IMPORTA y ya esta hecho. Lo unico que no se pudo fue abrir el pull request solo."
+          echo "::notice::Abrilo con un clic aca: ${SERVIDOR}/${GITHUB_REPOSITORY}/compare/${RAMA}?expand=1"
+          echo "::notice::Para que se abra solo la proxima vez: Settings -> Actions -> General -> Workflow permissions -> tildar \"Allow GitHub Actions to create and approve pull requests\". Un workflow no puede encender ese ajuste por su cuenta."

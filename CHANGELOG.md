@@ -41,6 +41,21 @@ mueve sobre un cambio incompatible.
 
 ## [No publicado]
 
+## [1.9.4] — 2026-09-03
+
+### Corregido
+
+- **Un rojo falso: el workflow que trae al día la constitución fallaba entero
+  cuando no podía abrir su pull request.** Medido en un repositorio recién
+  creado: *«GitHub Actions is not permitted to create or approve pull
+  requests»*. **La rama ya estaba empujada** —el trabajo estaba hecho— y aun así
+  la corrida salía roja, diciendo que algo se rompió cuando lo único que pasa es
+  que falta un ajuste del repositorio. Y un workflow **no puede encenderlo**:
+  exige `administration`. Ahora deja el enlace para abrir el PR con un clic, dice
+  dónde está la casilla, y sale **verde**, porque su trabajo sí se hizo.
+- **Las etiquetas de área nacían con la descripción duplicada** — *«Area:
+  area:backend»*.
+
 ## [1.9.3] — 2026-09-03
 
 ### Añadido
