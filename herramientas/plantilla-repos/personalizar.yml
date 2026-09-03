@@ -63,6 +63,14 @@ jobs:
     if: github.event.repository.is_template != true
     permissions:
       contents: write
+      # `issues: write` crea las etiquetas de area. `actions: write` dispara el
+      # workflow que genera el artefacto del marco. Son las DOS UNICAS tareas del
+      # arranque que el GITHUB_TOKEN puede hacer: el ruleset de la rama y
+      # Dependabot exigen `administration`, y los secretos exigen `secrets`, y
+      # ninguno de los tres existe entre los permisos que `permissions:` admite.
+      # Lo que no se puede hacer queda impreso al final, con el motivo.
+      issues: write
+      actions: write
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -153,6 +161,48 @@ jobs:
           git commit -m "Mi proyecto, con mis valores"
           git push
 
+      - name: Crear las etiquetas de area
+        # SE CREAN ACA Y NO SE IMPRIMEN COMO TAREA, que es lo que hacia el init:
+        # seis comandos para copiar y pegar. Son mecanicas, no tienen ninguna
+        # decision adentro, y el token puede.
+        #
+        # Si la etiqueta ya existe, `gh` sale distinto de cero y eso NO es un
+        # fallo del arranque: volver a correr esto tiene que ser inofensivo.
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          crear() {
+            if gh label create "$1" --color "$2" --description "Area: $1" 2>/dev/null; then
+              echo "  creada: $1"
+            else
+              echo "  ya estaba: $1"
+            fi
+          }
+          crear "area:backend"   0052CC
+          crear "area:ci-cd"     006B75
+          crear "area:datos"     FBCA04
+          crear "area:frontend"  1D76DB
+          crear "area:infra"     5319E7
+          crear "area:seguridad" B60205
+
+      - name: Pedir el artefacto del marco
+        # El proyecto necesita `.projects/AGENTS-marco.md` renderizado por el
+        # marco. Lo genera su propio `actualizar-marco.yml`, que hasta ahora habia
+        # que disparar a mano.
+        #
+        # Si el disparo falla --el workflow todavia no esta indexado, cosa que
+        # pasa en los primeros segundos de un repositorio nuevo-- el proyecto
+        # igual quedo armado. Se dice y se sigue, en vez de tirar abajo todo el
+        # arranque por un paso que la persona repite con un clic.
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if gh workflow run actualizar-marco.yml 2>/dev/null; then
+            echo "  pedido: el artefacto del marco se esta generando"
+          else
+            echo "::warning::no pude disparar actualizar-marco.yml todavia. No es un fallo: tu proyecto ya esta armado. Corrilo desde la pestania Actions cuando aparezca en la lista."
+          fi
+
       - name: Decir que quedo y que sigue
         run: |
           {
@@ -161,4 +211,22 @@ jobs:
             echo "Volve a la portada del repositorio. Lo primero que conviene abrir es **README.md**."
             echo ""
             echo "Lo que el marco todavia no puede resolver solo quedo anotado en \`.projects-desvios.json\`."
+            echo ""
+            echo "### Lo que ya se hizo por vos"
+            echo ""
+            echo "- Los archivos del proyecto, con tus valores."
+            echo "- Las seis etiquetas de area."
+            echo "- El pedido del artefacto del marco."
+            echo ""
+            echo "### Lo que queda, y por que no se pudo hacer solo"
+            echo ""
+            echo "Tres cosas necesitan permisos que el token de Actions NO PUEDE tener. No es un"
+            echo "olvido: \`administration\` y \`secrets\` no existen entre los permisos que un"
+            echo "workflow puede pedir."
+            echo ""
+            echo "| Que | Donde | Por que no se pudo |"
+            echo "|---|---|---|"
+            echo "| Proteger la rama main | Settings, Rules, Rulesets | exige administration |"
+            echo "| Encender Dependabot | Settings, Advanced Security | exige administration |"
+            echo "| Cargar los secretos para publicar | Settings, Secrets and variables, Actions | exige secrets, y los valores solo los tenes vos |"
           } >> "${GITHUB_STEP_SUMMARY}"

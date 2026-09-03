@@ -28,7 +28,7 @@ repo, no un matiz.
 
 El scaffold llega con huecos a propósito: lo que solo este proyecto sabe, no lo puede
 adivinar una plantilla. Lo que SI llega resuelto es la base técnica — el andamio trae el
-esqueleto de aplicación con sus tres paquetes y las compuertas en verde.
+esqueleto con sus paquetes y las compuertas en verde.
 
 Mientras esta sección exista, el CI sale ROJO: el marco cuenta los símbolos de hueco del
 scaffold y los lee como bootstrap a medias. Es a propósito, y es la razón por la que el
@@ -36,28 +36,27 @@ commit fundacional entra a `main` por push directo y la protección de rama se a
 después. (Este párrafo no nombra el símbolo con el símbolo, justamente para no sumar uno
 más al conteo.)
 
+**Esta lista se acortó, y conviene saber por qué**: tres de los cinco pasos que tenía ya
+no existen. Los placeholders los reemplaza la herramienta —queda cero, y hay una
+comprobación que lo exige—; el artefacto del marco lo pide el propio arranque; y el
+acceso de Dependabot al repositorio del marco dejó de hacer falta el día que el marco
+pasó a ser público. Lo que queda es lo que de verdad necesita a una persona.
+
 1. Revisar **Stack fijado** (la sección siguiente): llega LLENA con la base que el andamio
    implementa. Lo que hay que hacer es borrar la fila —y su paquete— de lo que este
    proyecto no vaya a tener, no llenarla.
-2. Reemplazar todos los placeholders de doble llave del repo, **incluidos los valores de
-   `.projects-valores.json`** (la lista completa, con qué poner en cada uno, está en el README
-   del scaffold de Projects). Ese archivo es el que el marco lee para renderizar su porción de
-   la constitución con los valores de este proyecto: si queda a medias, el artefacto sale
-   con dobles llaves adentro y el CI se pone rojo por marcadores sin resolver.
-3. Confirmar los tres roles (PO y dos builders) y que `.github/CODEOWNERS` tenga los
-   equipos reales de la organización.
-4. **Generar el artefacto del marco**: `gh workflow run actualizar-marco.yml` y mergear el
-   PR que abre (o esperar la corrida semanal). Hasta que ese archivo exista, la línea
-   `@.projects/AGENTS-marco.md` de arriba no carga nada y el CI lo avisa en cada corrida.
-5. Revisar que Dependabot tenga acceso al repo del marco y que el marco esté en **su
-   propio grupo** (`.github/dependabot.yml`). Este repo consume el marco por **versión
-   exacta**, así que cada versión nueva llega como **PR de Dependabot**: el rojo de un
-   check nuevo aparece DENTRO del PR, que es donde se puede leer antes de mergear. Dos
-   cosas que hay que hacer bien o el aviso no llega: sin el acceso, Dependabot no ve el
-   repo del marco; y si el marco comparte grupo con las demás actions, un PR del grupo
-   trabado deja de proponer el bump (medido el 2026-08-21). Qué hacer con cada versión
-   está en el artefacto del marco.
-6. Borrar esta sección y este párrafo. **Recién ahí** corre la verificación final:
+2. Confirmar los tres roles y que `.github/CODEOWNERS` nombre a quien corresponde. El
+   andamio reparte **dos formas** y elige según dónde viva el repositorio: en una
+   organización, equipos (`@org/equipo`); en una cuenta de personal, los handles de las
+   personas. **Los equipos no existen fuera de una organización**: ahí un `@cuenta/equipo`
+   no asigna a nadie, nunca, y GitHub no lo dice.
+3. Las tres cosas que el arranque **no puede** hacer por vos, porque exigen permisos que
+   un workflow no puede pedir (`administration` y `secrets` no existen entre ellos):
+   proteger la rama `main` (Settings → Rules → Rulesets), encender Dependabot
+   (Settings → Advanced Security), y cargar los secretos para publicar
+   (Settings → Secrets and variables → Actions). El último además es imposible en
+   principio: esos valores solo los tenés vos.
+4. Borrar esta sección y este párrafo. **Recién ahí** corre la verificación final:
    `grep -rnE "\{\{[A-Z0-9_]+\}\}" --exclude-dir=node_modules --exclude-dir=.git .` no debe
    devolver nada (esta sección es la única que menciona la doble llave a propósito; el
    patrón exige mayúsculas para no marcar las expresiones `${{ ... }}` de GitHub Actions).

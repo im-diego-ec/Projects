@@ -41,6 +41,28 @@ mueve sobre un cambio incompatible.
 
 ## [No publicado]
 
+## [1.9.3] — 2026-09-03
+
+### Añadido
+
+- **El arranque hace las dos tareas que el token puede hacer.** Las **seis
+  etiquetas de área** y el pedido del **artefacto del marco** se creaban a mano,
+  copiando siete comandos que el `init` imprimía. Son mecánicas y no tienen
+  ninguna decisión adentro: ahora las hace la puerta.
+
+### Cambiado
+
+- **La lista de arranque pasó de seis pasos a cuatro, y la diferencia está
+  explicada en el propio archivo.** Los placeholders los reemplaza la
+  herramienta; el artefacto del marco lo pide el arranque; y el acceso de
+  Dependabot al repositorio del marco **dejó de hacer falta** el día que el marco
+  pasó a ser público. Lo que queda es lo que de verdad necesita a una persona.
+- **Y lo que el arranque NO puede hacer queda dicho con su motivo**, no omitido:
+  proteger la rama, encender Dependabot y cargar los secretos exigen
+  `administration` y `secrets`, que **no existen** entre los permisos que un
+  workflow puede pedir. El último además es imposible en principio: esos valores
+  sólo los tiene la persona.
+
 ## [1.9.2] — 2026-09-03
 
 ### Corregido
