@@ -127,6 +127,18 @@ mueve sobre un cambio incompatible.
   copia —`ORG_MARCO`, los nombres de paquete— se sigue sustituyendo. **Qué tiene
   que hacer un consumidor: nada.**
 
+- **La puerta web, rediseñada: repositorios plantilla, uno por forma.** La primera
+  versión ponía la puerta en el marco y armaba el proyecto en el runner. **No
+  puede funcionar**, y se midió con una corrida real: el `GITHUB_TOKEN` no puede
+  crear archivos de workflow, así que un proyecto armado por un runner nunca
+  podría escribir su propio `ci.yml`. Ahora los workflows llegan por la **copia
+  del template** —que no es un push y no tiene ese límite— y la puerta, que vive
+  dentro de cada plantilla, sólo reescribe lo que sí puede tocar y **se borra a sí
+  misma** al terminar. Y trae el marco en **la versión que el propio proyecto
+  declara**, leída de su `ci.yml`: con `main` el proyecto nacía con un artefacto
+  de la versión en desarrollo y su CI lo rechazaba. **Qué tiene que hacer un
+  consumidor: nada.**
+
 - **La puerta web: se arma un proyecto sin abrir una terminal.** El marco tenía
   dos entradas y las dos exigen terminal — el asistente aborta si `stdin` no lo
   es, y `--valores` exige escribir un JSON de 25 claves a mano. Medido: alguien

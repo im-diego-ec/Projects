@@ -9,7 +9,11 @@ import { CAMPOS, CUENTA_DEL_MARCO, respuestasDelFormulario, problemas, escribir 
 import { validarValores } from "../../herramientas/projects-init.mjs";
 
 const RAIZ = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
-const PUERTA_YML = ".github/workflows/armar-mi-proyecto.yml";
+// La puerta ya no vive en el marco: vive DENTRO de cada repositorio plantilla,
+// y el marco guarda su original aca. El motivo esta en
+// herramientas/projects-plantilla-repos.mjs: una puerta en el marco tendria que
+// CREAR los workflows del proyecto, y el GITHUB_TOKEN no puede.
+const PUERTA_YML = "herramientas/plantilla-repos/personalizar.yml";
 
 // ---------------------------------------------------------------------------
 // LA PUERTA WEB: LA TERCERA ENTRADA, LA QUE NO PIDE TERMINAL.
@@ -130,7 +134,7 @@ test("escribe los desvios, que es lo que el camino de --valores NO hace", () => 
   });
 });
 
-test("el workflow de la puerta tiene LAS DOS guardas, no una", () => {
+test("la puerta tiene LAS DOS guardas, no una", () => {
   const yml = fs.readFileSync(path.join(RAIZ, PUERTA_YML), "utf8");
   assert.match(yml, /if:\s*github\.event\.repository\.is_template\s*!=\s*true/, "falta la guarda del `if` del job");
   assert.match(yml, /ES_TEMPLATE:\s*\$\{\{\s*github\.event\.repository\.is_template\s*\}\}/, "el workflow no le pasa is_template al codigo, que es donde vive la segunda guarda");
@@ -138,9 +142,34 @@ test("el workflow de la puerta tiene LAS DOS guardas, no una", () => {
   assert.match(yml, /permissions:/, "el job tiene que declarar sus permisos");
 });
 
+test("la puerta NO toca los workflows, porque el GITHUB_TOKEN no puede", () => {
+  const yml = fs.readFileSync(path.join(RAIZ, PUERTA_YML), "utf8");
+  assert.match(
+    yml,
+    /rm -rf "\$\{RUNNER_TEMP\}\/proyecto\/\.github\/workflows"/,
+    "la puerta tiene que sacarle los workflows al proyecto recien armado ANTES de copiar: si los copiara, " +
+      "el push se rechaza con «refusing to allow a GitHub App to create or update workflow»",
+  );
+  assert.match(yml, /-not -name '\.github'/, "el vaciado de la raiz tiene que salvar .github");
+});
+
+test("la puerta se borra a si misma, que es lo unico que SI puede hacer con un workflow", () => {
+  const yml = fs.readFileSync(path.join(RAIZ, PUERTA_YML), "utf8");
+  assert.match(yml, /rm -f \.github\/workflows\/personalizar\.yml/, "sin esto, se puede volver a correr sobre un proyecto ya personalizado");
+});
+
+test("la puerta trae el marco en la version que el proyecto declara, no en main", () => {
+  const yml = fs.readFileSync(path.join(RAIZ, PUERTA_YML), "utf8");
+  assert.ok(!/ref:\s*main/.test(yml), "con `main` el proyecto nace con un artefacto de la version en desarrollo y su CI lo rechaza");
+  // El patron del propio workflow lleva el punto escapado para grep, asi que se
+  // busca la parte estable y no la expresion literal.
+  assert.match(yml, /marco-ci/, "la version se lee del propio ci.yml del proyecto");
+  assert.match(yml, /GITHUB_OUTPUT/, "la version leida tiene que salir como output del paso");
+});
+
 test("el paso que vacia la raiz salva .git: sin el no queda repositorio", () => {
   const yml = fs.readFileSync(path.join(RAIZ, PUERTA_YML), "utf8");
-  const borrado = yml.split("\n").find((l) => l.includes("find .") && l.includes("rm -rf"));
+  const borrado = yml.split("\n").find((l) => l.includes("find .") && l.includes("rm -rf") && l.includes("-maxdepth"));
   assert.ok(borrado, "no encontre el paso de reemplazo: si se reescribio, actualiza este banco en el mismo cambio");
   assert.match(borrado, /-not -name '\.git'/, "el borrado no salva .git");
   assert.match(borrado, /-mindepth 1/, "sin -mindepth 1, find intenta borrar el propio directorio");
