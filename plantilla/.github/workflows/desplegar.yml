@@ -181,4 +181,4 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          echo "::notice::publicado. La direccion la imprime el paso anterior, y la primera vez es https://{{PROYECTO}}.<tu-subdominio>.workers.dev"
+          echo "::notice::publicado. La direccion la imprime el paso anterior, y la primera vez es https://${{ github.event.repository.name }}.<tu-subdominio>.workers.dev"

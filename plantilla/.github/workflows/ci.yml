@@ -1,7 +1,7 @@
 name: CI
 
 # ---------------------------------------------------------------------------
-# CI de {{PROYECTO}}. Este archivo es la UNICA pieza de CI que el scaffold
+# CI de este repositorio. Este archivo es la UNICA pieza de CI que el scaffold
 # copia: es un llamador delgado. La MECANICA del marco (deteccion del carril
 # de docs, guardrail de deltas de OpenSpec, validacion estricta) NO vive aca —
 # se consume por referencia desde Projects, asi un arreglo alla llega a este repo

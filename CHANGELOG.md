@@ -115,6 +115,18 @@ mueve sobre un cambio incompatible.
 
 ### Añadido
 
+- **Los workflows del proyecto dejan de llevar marcadores que cambian con cada
+  repositorio.** Medido contra GitHub: el `GITHUB_TOKEN` **no puede crear ni
+  modificar archivos de workflow** —*«refusing to allow a GitHub App to create or
+  update workflow … without `workflows` permission»*— aunque **sí puede
+  borrarlos**, también medido con una corrida real. La consecuencia: un workflow
+  que llega por copia de un template **no se puede arreglar después**. Si llevara
+  el nombre del proyecto sustituido, quedaría nombrando al proyecto equivocado
+  para siempre, en el repositorio de otra persona. Ahora el nombre y el dueño
+  salen del contexto de GitHub en tiempo de ejecución. Lo que es igual en toda
+  copia —`ORG_MARCO`, los nombres de paquete— se sigue sustituyendo. **Qué tiene
+  que hacer un consumidor: nada.**
+
 - **La puerta web: se arma un proyecto sin abrir una terminal.** El marco tenía
   dos entradas y las dos exigen terminal — el asistente aborta si `stdin` no lo
   es, y `--valores` exige escribir un JSON de 25 claves a mano. Medido: alguien

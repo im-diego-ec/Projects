@@ -1,7 +1,7 @@
 name: Claude Code
 
 # ---------------------------------------------------------------------------
-# El bot de @claude en los issues y los PRs de {{PROYECTO}}. Se dispara solo
+# El bot de @claude en los issues y los PRs de este repositorio. Se dispara solo
 # cuando una persona con permiso de escritura escribe "@claude" en un issue, en
 # un comentario o en un review, y contesta en ese mismo hilo.
 #
@@ -30,7 +30,17 @@ name: Claude Code
 #   2. Cargar el secret CLAUDE_CODE_OAUTH_TOKEN en Settings > Secrets and
 #      variables > Actions. Es el paso "cargar vars y secrets" del bootstrap.
 #
-# PLACEHOLDERS QUE USA: {{PROYECTO}} y {{BUILDER_1}}. Como todo el scaffold, no
+# PLACEHOLDERS QUE USA: NINGUNO, y eso es a proposito.
+#
+# El nombre del proyecto y el duenio salen del CONTEXTO de GitHub en tiempo de
+# ejecucion --`github.event.repository.name` y `github.repository_owner`-- y no
+# de una sustitucion del andamio. El motivo es concreto: el GITHUB_TOKEN NO PUEDE
+# crear ni modificar archivos de workflow (medido: "refusing to allow a GitHub App
+# to create or update workflow ... without workflows permission"), asi que un
+# workflow que llegue por copia de un template NO SE PUEDE RETOCAR despues. Si
+# llevara el nombre sustituido, quedaria nombrando al proyecto equivocado para
+# siempre. Derivado del contexto, es correcto en cualquier repositorio sin que
+# nadie lo toque. Como todo el scaffold, no
 # debe sobrevivir ninguno al primer commit —la verificacion del bootstrap es
 # grep -rnE "\{\{[A-Z0-9_]+\}\}" .— y no confundirlos con las expresiones
 # ${{ ... }} de GitHub Actions, que van en minusculas y se quedan.
@@ -241,4 +251,4 @@ jobs:
             --model sonnet
             --effort medium
             --max-turns 5
-            --append-system-prompt "Estas respondiendo en el repo de {{PROYECTO}}. La fuente de verdad del comportamiento son los specs vivos de openspec/, no el codigo: si te piden algo que ningun spec describe, decilo en vez de inventar endpoints, tablas o features. Las reglas del repo estan en AGENTS.md y mandan sobre tu conocimiento general; si el cambio que se discute necesitaria explicar una DECISION y no solo un arreglo, era un change de OpenSpec y no un PR directo. Nunca propongas escribir en produccion sin el OK explicito de {{BUILDER_1}} en esa misma sesion, ni desplegar a mano. OJO CON ESTO: el pipeline publica los sitios, pero para la forma aplicacion el marco TODAVIA NO reparte un paso que despliegue --esta declarado como desvio-- asi que no afirmes que existe un despliegue automatico sin mirar antes .github/workflows/ de ESTE repo. Nunca pidas, imprimas ni transcribas el valor de un secreto: se verifica que exista donde ya vive, no se lee hacia afuera. Opinas y explicas; el merge y el deploy son actos humanos. Tenes turnos contados: si te falta contexto, decilo y pedilo en vez de suponer."
+            --append-system-prompt "Estas respondiendo en el repo de ${{ github.event.repository.name }}. La fuente de verdad del comportamiento son los specs vivos de openspec/, no el codigo: si te piden algo que ningun spec describe, decilo en vez de inventar endpoints, tablas o features. Las reglas del repo estan en AGENTS.md y mandan sobre tu conocimiento general; si el cambio que se discute necesitaria explicar una DECISION y no solo un arreglo, era un change de OpenSpec y no un PR directo. Nunca propongas escribir en produccion sin el OK explicito de ${{ github.repository_owner }} en esa misma sesion, ni desplegar a mano. OJO CON ESTO: el pipeline publica los sitios, pero para la forma aplicacion el marco TODAVIA NO reparte un paso que despliegue --esta declarado como desvio-- asi que no afirmes que existe un despliegue automatico sin mirar antes .github/workflows/ de ESTE repo. Nunca pidas, imprimas ni transcribas el valor de un secreto: se verifica que exista donde ya vive, no se lee hacia afuera. Opinas y explicas; el merge y el deploy son actos humanos. Tenes turnos contados: si te falta contexto, decilo y pedilo en vez de suponer."

@@ -1,7 +1,7 @@
 name: Actualizar el marco
 
 # ---------------------------------------------------------------------------
-# Propone al dia la porcion del marco de la constitucion de {{PROYECTO}}: corre
+# Propone al dia la porcion del marco de la constitucion de este repositorio: corre
 # la action del marco en modo escribir y abre un PR con el artefacto regenerado.
 #
 # POR QUE EXISTE. El resto del marco llega por referencia, y desde la 1.4.0 por
