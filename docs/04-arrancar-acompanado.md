@@ -111,6 +111,13 @@ Se instalan una vez en tu computadora y sirven para todos los proyectos.
 | **Node** | El intérprete con el que corre todo lo del marco | [`nodejs.org`](https://nodejs.org) — la versión con soporte de largo plazo |
 | **corepack** | Lo que trae el instalador de las piezas del proyecto (`pnpm`) sin que tengas que instalarlo aparte | **No lo instalás.** Viene con Node, y el Paso 0 lo comprueba. Todos los comandos de esta página lo llaman con el prefijo `corepack pnpm` |
 | **gh** | Hablar con GitHub desde la consola | [`cli.github.com`](https://cli.github.com) |
+| **Docker Desktop** | **Sólo si tu proyecto es una aplicación**, no si es un sitio: es lo que levanta la base de datos en tu máquina. No lo vas a necesitar hasta el paso 6 | [`docker.com/products/docker-desktop`](https://www.docker.com/products/docker-desktop/) — gratis para uso personal |
+
+> **Docker es el único de esta lista que el marco NO comprueba por vos**, y el
+> que da el peor error cuando falta: la terminal contesta `command not found:
+> docker` y nada más. Si tu proyecto es una aplicación, instalalo ahora aunque
+> recién lo uses en el paso 6 — la descarga es grande y es una espera que
+> conviene no tener en el medio.
 
 > **Lo de Claude Code merece una línea aparte, porque cambia lo que este camino
 > es.** Los pasos 0 a 14 de esta página se hacen **con comandos**: los copiás y
@@ -169,46 +176,92 @@ Son cinco minutos de lectura y te ahorran mantener piezas que tu proyecto no usa
 
 ---
 
+## Antes del Paso 0 — el camino sin instalar nada · *3 clics*
+
+**Si no querés instalar nada en tu computadora, no hace falta.** Hay un camino
+que ocurre entero dentro de GitHub, desde el navegador.
+
+| | |
+| --- | --- |
+| **1** | En [el repositorio del marco](https://github.com/im-diego-ec/Projects), apretá el botón verde que dice **«Use this template»** → **«Create a new repository»**. Poné el nombre que quieras para tu proyecto. |
+| **2** | En **tu** repositorio nuevo, andá a la pestaña **Actions** y elegí **«Armar mi proyecto»** en la lista de la izquierda. |
+| **3** | Apretá el botón `Run workflow`. Se abre un formulario con cuatro o cinco preguntas en castellano. Contestalas y apretá el botón verde. |
+
+**Qué vas a ver.** El trabajo tarda un par de minutos. Cuando termina, volvés a
+la portada de tu repositorio y están todos los archivos de tu proyecto.
+
+**Cómo sabés que salió bien.** La corrida queda con un tilde verde, y abajo de
+ella hay un resumen que dice **«Tu proyecto está armado»** con lo que elegiste.
+
+> **Lo que este camino no te da:** el proyecto queda armado en GitHub, pero para
+> *trabajarlo* —abrir el código, probarlo en tu máquina— vas a necesitar las
+> herramientas del Paso 0 igual. La diferencia es que ahora podés decidir eso
+> **después de ver tu proyecto**, y no antes de tener nada.
+
+---
+
 ## Paso 0 — Comprobar que todo está · *2 minutos*
 
-**Qué vas a hacer.** Preguntarle a cada programa su versión. Es la única forma
-de no descubrir a mitad de camino que falta uno.
+**Qué vas a hacer.** Abrir un archivo que revisa todo y te dice qué falta.
 
-**Qué copiar** (una línea por vez):
+**En la carpeta que descargaste hay un archivo que se llama `arrancar`.
+Hacele doble clic.** Eso es todo: se abre una ventana negra, revisa tu
+computadora, y te dice si está todo o qué falta.
 
-```bash
-git --version
-node --version
-gh auth status
-corepack --version
+| Si usás… | El archivo es |
+| --- | --- |
+| **Mac** | `arrancar.command` |
+| **Windows** | `arrancar.cmd` |
+
+> **La primera vez, la Mac te va a preguntar si confiás en el archivo.** Es lo
+> que hace con todo lo que no bajó de su tienda. Si te lo bloquea: clic derecho
+> sobre `arrancar.command` → **Abrir** → **Abrir** otra vez. Sólo hace falta la
+> primera vez.
+
+> **Si preferís escribirlo vos**, el archivo `arrancar` no hace más que llamar a
+> `node ~/Projects/herramientas/projects-doctor.mjs` — es exactamente lo mismo,
+> y está acá por si te resulta más cómodo.
+
+**Qué vas a ver**, si está todo:
+
+```
+Esto es lo que necesita el marco para funcionar en esta computadora.
+
+  [OK  ] Node  24.19.0
+  [OK  ] Git  2.50.1
+  [OK  ] corepack  0.35.0
+  [OK  ] gh  2.98.0
+  [OK  ] Docker Desktop  27.5.1
+
+  [OK  ] Sesión de GitHub  tu-usuario
+
+Todo lo que hace falta está. Ya podés seguir con el paso 1.
 ```
 
-**Qué vas a ver.** Un número de versión por cada uno. El tercero es distinto:
-contesta con la cuenta de GitHub con la que estás dentro.
+**Y si falta algo, te lo dice con el enlace de dónde bajarlo**, sin que tengas
+que buscarlo en ningún lado:
 
 ```
-git version 2.50.1
-v24.19.0
-github.com
-  ✓ Logged in to github.com account <tu-usuario> (keyring)
-  - Active account: true
-  - Git operations protocol: https
-  - Token: gho_************************
-0.35.0
+  [FALTA] Docker Desktop  (opcional)
+           levanta la base de datos en tu máquina
+           sólo si vas a construir una APLICACIÓN. Para un sitio no hace falta
+           Se baja de: https://www.docker.com/products/docker-desktop/ — gratis para uso personal
 ```
 
-**Lo que va a ser distinto en tu pantalla, y está bien.** Los números de versión
-van a ser otros. `git` puede agregar algo entre paréntesis según cómo esté
-instalado. Y `gh auth status` imprime varias líneas más que las de acá: **lo
-único que tenés que encontrar es la línea con el tilde `✓ Logged in`**.
+**Cómo sabés que salió bien.** La última línea dice **«Ya podés seguir con el
+paso 1»**. Si dice otra cosa, arriba está exactamente qué falta y de dónde se
+baja. Instalá eso y **volvé a correr el mismo comando**: es la única señal que
+tenés que mirar.
 
-**Cómo sabés que salió bien.** Los cuatro contestaron algo y ninguno dijo
-`command not found`. Si `gh auth status` dice que no estás dentro, corré
-`gh auth login` y volvé acá.
+> **Docker es el único opcional**, y depende de lo que vayas a construir: una
+> **aplicación** lo necesita, un **sitio para leer** no. Si no sabés todavía cuál
+> vas a hacer, instalalo igual — la descarga es grande y es una espera que
+> conviene no tener en el medio.
 
-> **Node tiene un piso.** La herramienta de arranque exige una versión mínima y
-> lo dice sola si no la alcanza, con la frase «esta herramienta necesita Node
-> … o más nuevo». No hace falta que lo compruebes vos.
+> **Antes esto eran cuatro comandos y comparar a ojo.** Se cambió porque comparar
+> a ojo no comprueba nada: el piso de versión de Node vive en el código, no en la
+> pantalla. Y porque Docker no estaba en ninguna lista, y era el único requisito
+> que nada comprobaba.
 
 ---
 
@@ -992,7 +1045,7 @@ Qué significa cada una:
 
 | Si dice | Qué pasa |
 | --- | --- |
-| `"sitio"` | Ya trae todo lo necesario para publicarse. Faltan **tres actos humanos de una sola vez**: abrir una cuenta de Cloudflare (gratis, sin tarjeta), crear una credencial y registrar el subdominio |
+| `"sitio"` | Ya trae todo lo necesario para publicarse. Faltan **tres actos humanos de una sola vez**: abrir una cuenta de Cloudflare (gratis), crear una credencial y registrar el subdominio |
 | `"aplicacion"` | El marco **todavía no reparte un paso que publique**. Se levanta en tu máquina con `pnpm dev`, y el día que ese paso exista llega solo, subiendo la versión del marco |
 
 **Cómo sabés que salió bien.** Sabés cuál de las dos te tocó, y por lo tanto si

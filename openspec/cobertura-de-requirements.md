@@ -79,9 +79,11 @@ equivocado. El re-conteo del 2026-08-31 es el que sigue.
 **Medido el 2026-08-31: 41 requirements vivos en 8 capabilities**
 (12 `calidad-codigo` + 4 `despliegue-ci` + 2 `gestion-secretos` +
 3 `gobierno-contribucion` + 5 `observabilidad` + 6 `operacion-infra` +
-4 `pipeline-entrega` + 5 `verificacion-desplegada`). Hay además **2 capabilities en
-vuelo** —`base-tecnologica`, que nace en el change `stack-estandar`, y
-`documentacion-del-marco`, que nace en `orden-de-lectura`—: ninguna existe todavía en
+4 `pipeline-entrega` + 5 `verificacion-desplegada`). Hay además **4 capabilities en
+vuelo** —`base-tecnologica`, que nace en el change `stack-estandar`,
+`documentacion-del-marco`, que nace en `orden-de-lectura`, y
+`promocion-por-ambientes`, que nace en el change del mismo nombre, y `capa-descubrimiento`,
+que nace en `menu-que-no-miente`—: ninguna existe todavía en
 `openspec/specs/`, y sus secciones van al final, porque una capability que nace en un
 change y no en los specs vivos es la asimetría que hay que ver antes de que se
 consolide, no después.
@@ -121,7 +123,7 @@ especifica *sobre esa secuencia* sigue sin tener dónde fallar.
 | El formato acordado se verifica en cada integración | `pnpm format:check` desde la raíz | `plantilla/.github/workflows/ci.yml:206` |
 | La cobertura de pruebas alcanza el mínimo acordado y no retrocede | La composite action de cobertura, en sus dos planos (líneas del cambio y total del paquete), más el paso del marco que verifica que el andamio reparta el umbral | `actions/cobertura-diff/action.yml:151`; paso «El andamio reparte el umbral del total del marco» de `.github/workflows/marco-ci.yml` |
 | Las reglas de identidad visual del área viajan como reglas de lint verificadas | El banco de las reglas de identidad del andamio: exige el bloque con alcance propio y severidad de error, que cada expresión compile, que acepte su violación y rechace el trabajo honesto, y que cada regla de la constitución tenga estado decidido — y muta copias del andamio para probar que cada comprobación MUERDE | `pruebas/marca/reglas-marca.test.mjs` (mutaciones desde `:261`); el bloque verificado vive en `plantilla/eslint.config.mjs` |
-| El esqueleto que entrega el andamio encaja consigo mismo | El banco de acoples del andamio, seis comprobaciones con su mutación al lado | `pruebas/andamio/acoples-del-andamio.test.mjs:134` (.env), `:207` (nombre de la base), `:305` (no-root), `:388` (arquitectura), `:536` (contrato), `:619` (organización a mano) |
+| El esqueleto que entrega el andamio encaja consigo mismo | El banco de acoples del andamio, seis comprobaciones con su mutación al lado | `pruebas/andamio/acoples-del-andamio.test.mjs:134` (.env), `:207` (nombre de la base), `:305` (no-root), `:388` (arquitectura), `:536` (contrato), `:630` (organización a mano) |
 
 **El que no tiene compuerta, y por qué.** «Test de regresión obligatorio por defecto
 conocido» es indecidible con un escaneo: distinguir un test que REPRODUCE el defecto de
@@ -303,6 +305,30 @@ hueco: no faltaba deuda, faltaba cobertura que ya estaba pagada.
 
 ---
 
+## promocion-por-ambientes — capability EN VUELO, 5 requirements, 2 con compuerta
+
+Tampoco existe en `openspec/specs/`: nace en
+`openspec/changes/promocion-por-ambientes/specs/`. Es la capability **con más
+requirements sin compuerta de toda esta página**, y eso es correcto y esperable: el
+change está en su fase de proposal, o sea que todavía no se construyó nada.
+
+**Las dos filas que sí tienen compuerta no son un adelanto del trabajo**: son bancos que
+ya existían por otro motivo y que resultan cubrir parte de estos requirements. Se
+declaran como `parcial` para que nadie lea esa cobertura como completa.
+
+**Lo que esta capability viene a resolver es, justamente, una regla sin compuerta que ya
+existe.** `promocion-por-ambientes` está declarada en el canónico de la constitución
+desde antes de este change, la reciben todos los proyectos, y el andamio no reparte un
+solo paso que la cumpla. Hasta que exista, cada proyecto la anota como desvío declarado.
+
+| Requirement | Lo que lo hace fallar solo | Ruta y ancla (2026-09-01) |
+|---|---|---|
+| Un cambio llega a producción pasando por un ambiente de prueba | **ninguno** — el change está en proposal | — |
+| La promoción a producción es un acto deliberado con rastro | **ninguno** — el change está en proposal | — |
+| El proyecto declara qué puede publicar y qué no | **parcial**: el desvío declarado y la portada por forma ya tienen banco | `pruebas/init/asistente.test.mjs`, `pruebas/init/formas.test.mjs` |
+| Lo que la persona elige decide dónde se despliega | **parcial**: que una opción ofrecida se pueda armar ya tiene banco | `pruebas/docs/la-carta-no-miente.test.mjs` |
+| El costo de publicar está dicho antes de elegir | **ninguno** — el change está en proposal | — |
+
 ## Qué NO dice esta tabla
 
 - **No dice que un requirement con compuerta esté completamente cubierto.** Dice que
@@ -337,3 +363,30 @@ hueco: no faltaba deuda, faltaba cobertura que ya estaba pagada.
   desaparece o si aparece otro documento en la raíz de `openspec/` que el mapa no
   nombre. Un documento sin enlaces no está guardado: está perdido con copia de
   seguridad.
+
+---
+
+## capa-descubrimiento — capability EN VUELO, 2 requirements, 0 con compuerta
+
+No existe en `openspec/specs/`: nace en
+`openspec/changes/menu-que-no-miente/specs/`. Es la capability **más chica de esta
+página**, y a propósito: los dos requirements dicen una sola cosa —que el menú del
+asistente no ofrezca lo que el andamio no puede entregar— desde dos ángulos.
+
+**Los dos están sin compuerta porque el change está en proposal, y ese proposal
+todavía no se decidió.** Lo que sí se aplicó sin esperar la decisión es la
+corrección de copia: el detalle de AWS prometía como ventaja un Terraform que
+exige una terminal que quien lee no tiene, y omitía que la cuenta gratuita de AWS
+se cierra sola a los 6 meses. Eso no era una opción discutible sino una afirmación
+que induce a error, y se corrigió.
+
+**La compuerta que sí existe hoy es la de al lado.**
+`pruebas/docs/promesas-sin-fuente.test.mjs` no cubre estos requirements —cubre otra
+cosa: que ninguna copia prometa «sin tarjeta» sin constancia— pero nació del mismo
+hallazgo y en el mismo acto. Se nombra acá para que quien lea esta sección no
+concluya que del asunto no quedó nada verificándose.
+
+| Requirement | Lo que lo hace fallar solo | Ruta y ancla (2026-09-02) |
+|---|---|---|
+| El asistente sólo ofrece opciones que el andamio sabe producir | **ninguno** — el change está en proposal | — |
+| Una opción no se ofrece si su ventaja exige una herramienta que quien elige no tiene | **ninguno** — el change está en proposal | — |

@@ -46,7 +46,7 @@ sola vez**.
 > todavía no configuraste enseña a ignorar los rojos, que es peor que no tener
 > la compuerta.
 
-### 1 · La cuenta · *3 minutos, sin tarjeta*
+### 1 · La cuenta · *3 minutos*
 
 Entrá a [`dash.cloudflare.com/sign-up`](https://dash.cloudflare.com/sign-up) y
 creá la cuenta. El plan gratuito alcanza de sobra para un sitio: los archivos de
@@ -125,9 +125,14 @@ que ver con este repositorio.
 ### Antes de todo eso, podés ensayar sin publicar nada
 
 ```bash
-pnpm -C {{PAQUETE_SITIO}} run build
-pnpm -C {{PAQUETE_SITIO}} run desplegar:prueba
+corepack pnpm -C {{PAQUETE_SITIO}} run build
+corepack pnpm -C {{PAQUETE_SITIO}} run desplegar:prueba
 ```
+
+> **`corepack pnpm` y no `pnpm` a secas.** Este repositorio fija su versión de
+> pnpm en `packageManager`, y `corepack` es lo que la trae — viene con Node, no
+> hay que instalar nada. Si escribís `pnpm` pelado y nunca lo instalaste aparte,
+> la terminal contesta `command not found`.
 
 El segundo comando hace todo **menos subir**: lee la configuración, encuentra los
 archivos y te dice cuánto pesaría la subida. No necesita cuenta ni credencial, y

@@ -41,6 +41,127 @@ mueve sobre un cambio incompatible.
 
 ## [No publicado]
 
+### Corregido
+
+- **El marco prometía «sin tarjeta» en seis lugares y ninguno tenía fuente
+  vigente.** De Supabase, la única cita rastreable es un post de marzo de 2021
+  sobre el pricing de la *beta*, un esquema que ya no existe; su página de
+  precios de hoy no lleva la frase. De Cloudflare no la dice **ninguna** página
+  —ni `/plans`, ni la de precios de Workers, ni el get-started—. Probablemente
+  sea cierta en la práctica, pero es la primera columna que mira quien no tiene
+  tarjeta, y si es falsa esa persona lo descubre en el formulario de alta, con el
+  proyecto ya armado. Se sacó de los seis lugares y hay un banco nuevo que la
+  caza si vuelve. **Qué tiene que hacer un consumidor: nada.**
+- **El detalle de AWS vendía como ventaja algo que quien lo lee no puede usar, y
+  omitía el límite que más duele.** Decía que «acá Terraform SÍ vale la pena»
+  siendo que Terraform es una herramienta de terminal y quien contesta el
+  asistente no tiene terminal — por eso existe el asistente. Y no decía que la
+  cuenta gratuita de AWS **se cierra sola a los 6 meses**, o antes si se agotan
+  los créditos, tras lo cual AWS retiene los datos 90 días y los borra. Alguien
+  podía elegir AWS creyendo que empezaba gratis y perder el proyecto medio año
+  después. **Consumidor: nada** — es copia del asistente, no del andamio.
+- **El detalle de Supabase hacía sonar su pausa como una trampa silenciosa.**
+  Supabase avisa por mail una semana antes y otra vez al pausar, y la pausa se
+  evita entrando al panel. La redacción vieja omitía los avisos, y era el
+  argumento más fuerte para mover a alguien de proveedor. **Consumidor: nada.**
+
+- **El asistente corrompía el proyecto y después abortaba.** La guarda del
+  destino ocupado vivía **~270 líneas después** de las tres escrituras del
+  asistente: volver a correr `--asistente` sobre un proyecto ya armado contestaba
+  las catorce preguntas, escribía `.projects-valores.json`,
+  `.projects-respuestas.json` y `.projects-desvios.json`, y **recién ahí** abortaba.
+  Los tres son los archivos **declarativos** —de ahí sale la constitución—, así que
+  quien reabría el asistente para cambiar de plataforma quedaba con un archivo
+  diciendo `aws` sobre un árbol sin `infra/`, describiendo una infraestructura que
+  no existe. La herramienta que se presenta como «no pasa nada si te equivocás»
+  rompía el proyecto **en silencio y salía con error a la vez**. Ahora se detiene
+  antes de la primera pregunta. **Qué tiene que hacer un consumidor: nada.**
+- **`AGENTS.md` —el archivo que los agentes leen como fuente de verdad— describía
+  un mundo anterior.** Declaraba **Clerk** como proveedor de identidad cuando el
+  andamio entrega **Supabase Auth**; decía que la plataforma «nace en `aws`»
+  cuando la del proyecto está en su propio `.projects-valores.json`; presentaba la
+  **promoción por ambientes** como pieza entregada cuando está anotada como
+  desvío; y apuntaba **dos veces** a `infra/adaptadores.md` en proyectos donde
+  `infra/` fue podado, prescribiendo cuatro pasos manuales para borrar carpetas
+  que nunca llegaron. Su prosa afirmaba «hoy ninguna herramienta reparte el
+  andamio según esta clave» — cierto antes de que existiera `noViajanPorPlataforma`.
+  Ahora el bloque de infraestructura va detrás de un centinela y se poda con las
+  carpetas. **Qué tiene que hacer un consumidor: nada**, salvo que quiera
+  regenerar para recibir el archivo corregido.
+- **Los comandos copiables decían `pnpm` pelado y contestaban `command not
+  found`.** Este repositorio fija su pnpm en `packageManager` y `corepack` es lo
+  que la trae. Los cinco comandos del proyecto generado ahora llevan el prefijo,
+  con una línea que explica por qué. **Consumidor: nada.**
+- **Un `pnpm e2e` fallido dejaba el `pnpm verificar` siguiente en rojo.**
+  Playwright escribe `e2e/test-results/` con capturas y trazas del intento, y no
+  estaba ignorado: el rojo aparecía por archivos que la persona nunca escribió, y
+  el `git add -A` del Paso 9 los subía al primer commit. Mismo caso que
+  `coverage/` y `**/.astro/`. **Consumidor: nada.**
+- **Nada decía cómo instalar Docker.** Grep sobre todo el repo: cero resultados.
+  Es el único requisito que el marco no comprueba y el que da el peor error
+  —`command not found: docker`, sin salida—. Ahora está en la tabla de programas
+  de `docs/04` y en el encabezado de `comandos-levantar-servicios.txt`, archivo
+  que advertía de esta trampa exacta y no decía dónde conseguirlo.
+- **El system prompt del bot afirmaba que «se despliega solo por el pipeline».**
+  Es a quien la persona le pregunta cómo publicar, y para la forma `aplicacion`
+  ese despliegue no existe. **Consumidor: nada** — viaja en `claude.yml`.
+- **El asistente le decía «undefined» a la persona en su peor momento.** El
+  rechazo de una respuesta imprimía `no tiene la forma que corresponde:
+  ${formato.espera}`, y de los catorce formatos **sólo dos definen `espera`**.
+  Los otros doce mostraban la palabra `undefined` — incluido el equívoco más
+  probable de todo el recorrido, escribir el correo donde va el usuario de
+  GitHub. Ahora cae a `que`, que siempre está. **Qué tiene que hacer un
+  consumidor: nada** — es el asistente del marco.
+
+### Añadido
+
+- **La puerta web: se arma un proyecto sin abrir una terminal.** El marco tenía
+  dos entradas y las dos exigen terminal — el asistente aborta si `stdin` no lo
+  es, y `--valores` exige escribir un JSON de 25 claves a mano. Medido: alguien
+  que no abre una terminal **no llegaba ni al Paso 0**. Ahora el repositorio es
+  un *template*, y su copia trae un `workflow_dispatch` que GitHub renderiza como
+  formulario web: tres clics y el runner arma el proyecto con el token del propio
+  repositorio. **Cero infraestructura nuestra, cero credenciales nuevas.**
+  `herramientas/projects-puerta.mjs` traduce el formulario al **mismo** objeto de
+  respuestas del asistente y llama a las **mismas** `derivar` y `desvios`: no es
+  un segundo motor. Y de paso **escribe los desvíos**, que es justo lo que el
+  camino de `--valores` no hacía. **Qué tiene que hacer un consumidor: nada.**
+
+- **El Paso 0 de la guía acompañada arranca con un doble clic, no con un bloque
+  de comandos.** Y la promesa que la guía se hace a sí misma —«cada paso dice qué
+  copiar»— pasó a aceptar también «qué abrir»: esa promesa nunca fue *copiar*,
+  fue **decir qué hacer en concreto**, y exigir la palabra «copiar» obligaba a
+  inventarle un comando a un paso que a propósito no lo tiene.
+
+- **Dos lanzadores de doble clic: `arrancar.command` (macOS) y `arrancar.cmd`
+  (Windows).** La invocación documentada era `node <ruta-al-clon>/herramientas/projects-init.mjs`,
+  y ese hueco que la persona rellena a mano produce el peor error de todo el
+  recorrido: una ruta mal escrita da un volcado de Node en inglés que **ninguna
+  guarda de la herramienta puede atajar**, porque la herramienta ni llegó a
+  arrancar. Los lanzadores derivan la raíz de dónde está el propio archivo,
+  comprueban Node, corren el comprobador y recién después el asistente, y dejan
+  la ventana abierta al final para que el motivo se pueda leer. **Consumidor:
+  nada** — viven en el clon del marco.
+
+- **`projects-doctor`: el Paso 0 entero en un solo comando.** Antes eran cuatro
+  comandos y **comparar la salida a ojo** contra un ejemplo — que no comprueba
+  nada, porque el piso de versión de Node vive en el código y no en la pantalla.
+  Y **Docker no estaba en ninguna lista**: era el único requisito que el marco no
+  comprobaba y el que da el peor error (`command not found: docker`, sin salida),
+  con cero instrucciones de instalación en todo el repositorio. Ahora un comando
+  revisa los cinco programas y la sesión de GitHub, distingue *falta* de *viejo*
+  de *alcanza pero no es lo recomendado*, marca Docker como opcional según lo que
+  se vaya a construir, y **nunca dice que algo falta sin decir en la misma salida
+  de dónde se baja**. **Qué tiene que hacer un consumidor: nada** — es una
+  herramienta del marco.
+
+- **Un banco que exige constancia para las promesas de dinero.**
+  `pruebas/docs/promesas-sin-fuente.test.mjs` barre todo lo que alguien lee para
+  decidir y falla si vuelve «sin tarjeta» en cualquiera de sus cuatro formas.
+  Lleva una lista `VERIFICADAS` vacía a propósito: el día que alguien dé de alta
+  las cuentas reales sin cargar tarjeta y anote la constancia, la frase vuelve
+  sola a todos lados. **Consumidor: nada** — es un banco del marco.
+
 ## [1.8.0] — 2026-09-01
 
 ### Corregido

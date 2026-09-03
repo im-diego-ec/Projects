@@ -309,8 +309,32 @@ const GUIA = "docs/04-arrancar-acompanado.md";
 /** Las cuatro cosas que cada paso de la guia promete, y la tercera es la que
  *  casi nunca se escribe: que vas a VER. Una guia que dice que copiar pero no
  *  que esperar en pantalla deja al lector sin forma de saber si funciono, que es
- *  exactamente el momento en que alguien que no es tecnico se traba. */
-const PROMESAS_DE_LA_GUIA = ["**Qué vas a hacer.**", "**Qué copiar", "**Qué vas a ver", "**Cómo sabés que salió bien.**"];
+ *  exactamente el momento en que alguien que no es tecnico se traba.
+ *
+ *  LA SEGUNDA ACEPTA DOS FORMAS, y no es una concesion: es que la promesa nunca
+ *  fue «copiar», fue DECIR QUE HACER EN CONCRETO. «Que copiar» lo dice cuando el
+ *  paso es un comando; cuando el paso es abrir un archivo con doble clic, no hay
+ *  nada que copiar y exigir esa palabra obliga a inventarle un comando a un paso
+ *  que a proposito no lo tiene.
+ *
+ *  Se descubrio al reescribir el Paso 0: dejo de ser cuatro comandos y paso a
+ *  ser un doble clic sobre `arrancar`, y este banco --con razon-- lo marco.
+ *  El arreglo no es aflojar la regla sino escribirla como siempre se penso. */
+const PROMESAS_DE_LA_GUIA = [
+  "**Qué vas a hacer.**",
+  ["**Qué copiar", "**Qué abrir", "**En la carpeta que descargaste"],
+  "**Qué vas a ver",
+  "**Cómo sabés que salió bien.**",
+];
+
+/** Una promesa se cumple si el cuerpo trae su marca; cuando la promesa admite
+ *  varias formas, alcanza con UNA. */
+function cumple(cuerpo, promesa) {
+  return Array.isArray(promesa) ? promesa.some((forma) => cuerpo.includes(forma)) : cuerpo.includes(promesa);
+}
+
+/** Como nombrar una promesa en el mensaje de error. */
+const nombreDe = (promesa) => (Array.isArray(promesa) ? promesa.join(" o ") : promesa);
 
 /** Cuantos pasos tiene la guia hoy. MEDIDO el 2026-08-31 sobre el archivo, no
  *  recordado. Es un piso y no una igualdad porque agregar un paso es una mejora;
@@ -343,7 +367,7 @@ function pasosDeLaGuia(texto) {
 function pasosIncompletos(texto) {
   const rotos = [];
   for (const paso of pasosDeLaGuia(texto)) {
-    const faltan = PROMESAS_DE_LA_GUIA.filter((promesa) => !paso.cuerpo.includes(promesa));
+    const faltan = PROMESAS_DE_LA_GUIA.filter((promesa) => !cumple(paso.cuerpo, promesa)).map(nombreDe);
     if (faltan.length > 0) rotos.push(`${paso.titulo} → le falta ${faltan.join(", ")}`);
   }
   return rotos;

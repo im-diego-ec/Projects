@@ -205,20 +205,64 @@ export const PREGUNTAS = [
       {
         valor: "supabase",
         etiqueta: "Supabase + Cloudflare",
+        // DOS AFIRMACIONES SALIERON DE ACA PORQUE NO SE SOSTIENEN CONTRA LA FUENTE.
+        //
+        // 1. «SIN TARJETA». La cita rastreable de Supabase es un post de marzo de
+        //    2021 sobre el pricing de la BETA, un esquema que ya no existe; la
+        //    pagina de precios de hoy no lleva la frase. Y ninguna pagina de
+        //    Cloudflare dice «sin tarjeta» en ningun lado --ni /plans, ni la de
+        //    precios de Workers, ni el get-started--. Probablemente sea cierto en
+        //    la practica, y por eso la frase VUELVE el dia que alguien de de alta
+        //    una cuenta real de cada uno y lo compruebe: es media hora de trabajo.
+        //    Mientras tanto no se afirma, porque es justo la columna que una
+        //    persona sin tarjeta mira primero para decidir si puede empezar.
+        //
+        // 2. «se pausa solo (se despausa con un clic)» OMITIA QUE SI AVISA. Supabase
+        //    manda un mail una semana antes y otro al pausar, y la pausa se evita
+        //    entrando al panel. La redaccion vieja la hacia sonar como una trampa
+        //    silenciosa --el proyecto deja de andar y nadie te dice por que-- y eso
+        //    era el argumento mas fuerte para mover a alguien de proveedor.
+        //    Verificado el 2026-09-01 contra
+        //    https://supabase.com/docs/guides/platform/free-project-pausing
         detalle:
           "Para una idea o un proyecto chico. Supabase te da la base de datos y las cuentas de usuario; " +
-          "Cloudflare publica el sitio. Empieza gratis y SIN TARJETA. Los límites que sorprenden: 500 MB " +
-          "de base, 50.000 personas usándolo al mes, 2 proyectos activos, y el proyecto se pausa solo si " +
-          "no lo tocás por una semana (se despausa con un clic). Con esto NO necesitás Terraform.",
+          "Cloudflare publica el sitio. Empieza gratis. Los límites que sorprenden: 500 MB de base, " +
+          "50.000 personas usándolo al mes, y 2 proyectos activos. Y si pasa una semana entera sin que " +
+          "nadie entre, Supabase lo pausa: te avisan por mail una semana antes y otro al pausarlo, y se " +
+          "despausa con un clic. Con esto NO necesitás Terraform.",
         recomendada: true,
       },
       {
         valor: "aws",
         etiqueta: "AWS",
+        // LO QUE ESTE DETALLE AFIRMABA Y NO ERA CIERTO PARA QUIEN LO LEE.
+        //
+        // Decia que «acá Terraform SÍ vale la pena, y es lo único que el andamio
+        // trae preparado hoy», presentandolo como LA VENTAJA de elegir AWS.
+        // Terraform es una herramienta de terminal, y quien contesta estas
+        // preguntas no tiene terminal --por eso existe este archivo--. La ventaja
+        // estaba fuera de su alcance, y aun asi la usabamos para venderle la
+        // opcion.
+        //
+        // Y FALTABA EL LIMITE QUE MAS DUELE, verificado el 2026-09-01: la cuenta
+        // gratuita de AWS SE CIERRA SOLA a los 6 meses o al agotarse los
+        // creditos, lo que pase primero; despues AWS retiene los datos 90 dias y
+        // los borra. https://aws.amazon.com/free/free-tier-faqs/
+        // Alguien podia elegir AWS creyendo que empezaba gratis y perder el
+        // proyecto medio ano despues sin que nada se lo hubiera dicho.
+        //
+        // SI ESTA OPCION SE VA DEL MENU es otra decision, y esta escrita aparte
+        // en openspec/changes/menu-que-no-miente/. No se toma sola desde un
+        // comentario: sacarla deja inalcanzables las cinco preguntas de AWS y el
+        // predicado `usaAws`, y eso es codigo muerto que hay que resolver en el
+        // mismo acto. Mientras tanto, la opcion se queda --pero deja de prometer
+        // lo que no puede dar--.
         detalle:
-          "Para algo grande o de empresa. Lo más potente y lo más caro de aprender: pide tarjeta desde " +
-          "el día uno, y para configurarlo hay que saber qué es una cuenta, una región y un perfil. Acá " +
-          "Terraform SÍ vale la pena, y es lo único que el andamio trae preparado hoy.",
+          "Para algo grande o de empresa, y sólo si tenés a mano a alguien técnico. Pide tarjeta desde " +
+          "el día uno. Ojo con esto: la cuenta gratuita SE CIERRA SOLA a los 6 meses, o antes si se " +
+          "acaban los créditos — después AWS guarda tus datos 90 días y los borra. El andamio te deja " +
+          "listo el Terraform, pero aplicarlo se hace desde una terminal: si no usás terminal, esta " +
+          "opción te va a dejar a mitad de camino.",
       },
       // GCP SALE DE LAS OPCIONES, y es la misma leccion que Slack.
       //
@@ -739,7 +783,20 @@ export async function correrAsistente(preguntar, previos = {}, formatos = {}, em
       // distintas divergen, y la que se pudre es la que nadie mira.
       const formato = formatos[p.id];
       if (formato?.patron && !formato.patron.test(valor)) {
-        decir(`  ✗ "${valor}" no tiene la forma que corresponde: ${formato.espera}`);
+        // `?? formato.que` Y NO `formato.espera` PELADO. Medido: de los catorce
+        // formatos, solo DOS definen `espera` --ORG_MARCO y PAQUETE_SITIO--. Los
+        // otros doce imprimian, literal:
+        //
+        //   ✗ "diego@ejemplo.com" no tiene la forma que corresponde: undefined
+        //
+        // Y le pegaba al error MAS PROBABLE de todo el recorrido: escribir el
+        // correo donde va el usuario de GitHub. La persona veia la palabra
+        // `undefined` justo en el momento en que necesitaba que le dijeran que
+        // poner, y el asistente existe para que eso no pase.
+        //
+        // `que` siempre esta --es lo que el validador de siempre ya usa para el
+        // mismo mensaje en projects-init-- asi que el ?? no puede quedar corto.
+        decir(`  ✗ "${valor}" no tiene la forma que corresponde: ${formato.espera ?? formato.que}`);
         continue;
       }
       respuestas[p.id] = valor;

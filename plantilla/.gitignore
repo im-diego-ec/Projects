@@ -16,6 +16,17 @@ coverage
 # `coverage/`, que ya esta declarado abajo y en los ignores del linter.
 **/.astro/
 
+# LO QUE ESCRIBE PLAYWRIGHT CUANDO UNA PRUEBA FALLA. `e2e/test-results/` guarda
+# capturas, trazas y videos del intento fallido. Son de la herramienta y del
+# intento, no del proyecto.
+#
+# MEDIDO en una maquina sin navegadores instalados, que es el estado normal la
+# primera vez: `pnpm e2e` falla, deja el directorio escrito, y el `pnpm
+# verificar` SIGUIENTE sale rojo por archivos que la persona nunca escribio. El
+# `git add -A` del Paso 9 de docs/04 ademas los sube al primer commit. Es
+# exactamente el mismo caso que `coverage/` y que `**/.astro/`.
+**/test-results/
+
 # Entorno local y ruido del sistema.
 #
 # EL PATRON ES `.env.*`, NO UNA LISTA DE NOMBRES. Hasta el 2026-08-24 estas tres
@@ -25,8 +36,8 @@ coverage
 # ecosistema Node normalizan justo esos nombres, asi que quien separa las
 # credenciales de la instancia de dev en `api/.env.dev` lo ve limpio en `git
 # status` y lo commitea. Lo que hay adentro esta declarado en api/.env.example:
-# CLERK_SECRET_KEY y CLERK_JWT_KEY. Una clave del proveedor de identidad en la
-# historia de git ya no se saca borrando el archivo.
+# SUPABASE_URL, SUPABASE_ANON_KEY y SUPABASE_JWT_SECRET. Una clave del proveedor
+# de identidad en la historia de git ya no se saca borrando el archivo.
 #
 # La negacion va DESPUES, y es la que mantiene versionados los .env.example de
 # api/ y web/. Es exactamente el par que el .dockerignore de este mismo andamio

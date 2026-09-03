@@ -114,8 +114,8 @@ se elige adaptador. Antes de ese día, elegir es adivinar.
 
 ## `supabase` — base administrada con plan gratuito permanente
 
-Es el adaptador que más capacidades cubre con un plan gratuito **permanente** y sin tarjeta
-de por medio. Lo que sigue es lo que cubre y lo que cuesta; si es la opción correcta para
+Es el adaptador que más capacidades cubre con un plan gratuito **permanente**.
+Lo que sigue es lo que cubre y lo que cuesta; si es la opción correcta para
 este proyecto lo dice el proyecto, no este archivo.
 
 - **CUBRE** — (b) de fábrica: PostgreSQL administrado, con respaldos y con auth incluida.
@@ -163,7 +163,7 @@ descubre en producción que nadie decidió dónde corría.
 ## `cloudflare` — Workers y Pages
 
 De las cuatro plataformas con plan gratuito, la de límites más amplios para (a) y para el
-front, y sin tarjeta.
+front.
 
 - **CUBRE** — (a) con Workers, si la API tolera el modelo de ejecución (no es Node
   completo: hay que verificar cada dependencia nativa antes de prometer nada). El front

@@ -323,6 +323,31 @@ export function noViajanPorForma(forma) {
 /** La forma declarada en el archivo de valores. Minuscula y fuera de los
  *  marcadores, igual que la plataforma: no se sustituye en ningun archivo, decide
  *  cuales viajan. */
+/** "Me invocaron a MI?", para cualquier modulo del marco.
+ *
+ *  ESTE DEFECTO YA MORDIO DOS VECES, y la segunda fue por copiar el idioma
+ *  ingenuo `import.meta.url === \`file://${process.argv[1]}\`` en herramientas
+ *  nuevas. Falla en dos situaciones distintas y en las dos de la peor forma
+ *  posible --el proceso sale 0 SIN IMPRIMIR NADA, un exito silencioso--:
+ *
+ *    - EN macOS, cuando la ruta pasa por un enlace simbolico: `import.meta.url`
+ *      viene con los enlaces resueltos y `argv[1]` no. `/tmp` es un enlace a
+ *      `/private/tmp`, asi que basta con correr la herramienta desde ahi.
+ *    - EN WINDOWS, siempre: `argv[1]` es `D:\a\x.mjs` y `import.meta.url` es
+ *      `file:///D:/a/x.mjs`. La concatenacion nunca calza. Lo cazo el job de
+ *      windows-latest del CI, sobre `projects-puerta.mjs`.
+ *
+ *  Se resuelve por realpath en los DOS lados. El `try` es por el caso en que
+ *  `argv[1]` no exista en disco (`node --eval`, un REPL): ahi no nos invocaron y
+ *  no corre nada, que es lo correcto. */
+export function invocadoDirecto(urlDelModulo) {
+  try {
+    return fs.realpathSync(fileURLToPath(urlDelModulo)) === fs.realpathSync(process.argv[1] ?? "");
+  } catch {
+    return false;
+  }
+}
+
 export function formaDe(valores) {
   const v = valores?.forma;
   return typeof v === "string" && v.trim() ? v.trim().toLowerCase() : "aplicacion";
@@ -539,6 +564,26 @@ export function podarPorPlataforma(texto, rel, plataforma, forma = "aplicacion")
   // seguia trayendo la fila que las describe, porque esta poda miraba solo la
   // plataforma. Es el mismo predicado de `noViajanPorPlataforma`.
   if (plataforma === "aws" && forma !== "sitio") return texto;
+  if (rel === "AGENTS.md") {
+    // AGENTS.MD DESCRIBIA UN MUNDO ANTERIOR, y es el archivo que los agentes leen
+    // como fuente de verdad. Medido sobre un proyecto generado por el camino
+    // recomendado (aplicacion + Supabase): `infra/` NO viaja --lo poda
+    // `noViajanPorPlataforma`-- y aun asi el archivo apuntaba DOS VECES a
+    // `infra/adaptadores.md`, y su prosa afirmaba que «hoy ninguna herramienta
+    // reparte el andamio segun esta clave, asi que las dos raices de Terraform
+    // llegan igual y hay que sacarlas a mano». Eso era cierto ANTES de que
+    // existiera esa poda.
+    //
+    // El resultado: el archivo mas autoritativo del repositorio le prescribia
+    // cuatro pasos manuales para un problema que ya no tiene, sobre carpetas que
+    // no recibio, leyendo un documento que no esta.
+    //
+    // VA DESPUES DEL CORTE DE ARRIBA A PROPOSITO. Cuando la plataforma SI es AWS,
+    // `infra/` viaja de verdad y el bloque tiene que quedarse: se probo poniendo
+    // esto en `podarPorForma` --que no mira la plataforma-- y el proyecto de AWS
+    // recibia las carpetas SIN la seccion que las explica.
+    return texto.replace(/<!-- projects:solo-si-hay-infra -->\n[\s\S]*?<!-- projects:fin-solo-si-hay-infra -->\n/g, "");
+  }
   if (rel === ".github/dependabot.yml") {
     return texto.replace(/[ \t]*# projects:solo-si-hay-infra\n[\s\S]*?# projects:fin-solo-si-hay-infra\n/g, "");
   }
@@ -2242,6 +2287,44 @@ async function main(argv) {
   if (o.asistente) {
     const asis = await import("./projects-asistente.mjs");
     const versiones = await import("./projects-versiones.mjs");
+
+    // EL DESTINO SE MIRA ANTES DE PREGUNTAR NADA, y esto arregla una corrupcion.
+    //
+    // EL DEFECTO. La guarda del destino ocupado vive ~270 lineas mas abajo, y las
+    // tres escrituras del asistente ocurren ANTES: se contestaban las catorce
+    // preguntas, se escribian `.projects-valores.json`, `.projects-respuestas.json`
+    // y `.projects-desvios.json`, y RECIEN DESPUES la corrida abortaba con «el
+    // destino ya tiene N archivo(s) del andamio».
+    //
+    // El resultado es lo peor que puede pasar: los tres archivos DECLARATIVOS
+    // quedan describiendo un proyecto distinto del que hay en el arbol. Alguien
+    // que reabre el asistente para cambiar de plataforma se queda con un
+    // `.projects-valores.json` que dice `aws` sobre un arbol sin `infra/`, y la
+    // constitucion que se renderiza de ahi describe una infraestructura que no
+    // existe. La herramienta que se vende como «no pasa nada si te equivocas»
+    // rompia el proyecto en silencio y salia con error, las dos cosas a la vez.
+    //
+    // POR QUE `AGENTS.md` Y NO LA GUARDA DE ABAJO. Aquella necesita `plataforma` y
+    // `forma`, que salen de las respuestas: para usarla habria que preguntar
+    // primero, que es justo lo que hay que evitar. `AGENTS.md` viaja en TODAS las
+    // formas y plataformas --medido sobre los tres proyectos generados-- y no esta
+    // en `LO_QUE_ESCRIBE_EL_ASISTENTE`, asi que su presencia significa exactamente
+    // «aca ya se armo un proyecto» sin depender de ninguna respuesta.
+    //
+    // Y ADEMAS ES MEJOR ASI PARA QUIEN CONTESTA: enterarse de que el destino esta
+    // ocupado despues de catorce preguntas es peor que enterarse antes de la
+    // primera, aunque no se corrompiera nada.
+    if (o.destino && !o.forzar && fs.existsSync(path.join(o.destino, "AGENTS.md"))) {
+      console.error(`::error::el destino ${o.destino} ya tiene un proyecto armado (AGENTS.md). No se pregunto nada y no se escribio nada.`);
+      console.error("Para no romper lo que ya esta, el asistente se detiene ANTES de preguntar: contestar de nuevo dejaria");
+      console.error("los archivos que declaran el proyecto (.projects-valores.json y sus hermanos) describiendo algo");
+      console.error("distinto de lo que hay en el arbol.");
+      console.error("");
+      console.error("  - Para armar un proyecto NUEVO: elegi una carpeta vacia con --destino <carpeta>.");
+      console.error("  - Para ver que elegiste la vez pasada: abri .projects-valores.json en ese destino.");
+      console.error("  - Si de verdad queres rehacerlo encima, sabiendo que se pisa: --forzar");
+      return 1;
+    }
 
     // Se pregunta por STDIN y no por stdout: lo que hace falta para una pregunta
     // es que haya alguien que pueda CONTESTAR. Con la salida redirigida a un

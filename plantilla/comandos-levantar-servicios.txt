@@ -17,6 +17,16 @@ UNA sola vez y sin rotulo: duplicar lo que no difiere agrega mantenimiento y
 esconde lo que si.
 
 
+LO UNICO QUE TENES QUE TENER INSTALADO ANTES. Node (que trae corepack) y DOCKER
+DESKTOP. Docker es el que levanta la base de datos: sin el, el paso 2 de abajo
+contesta "command not found: docker" y nada mas. Se baja gratis para uso personal
+de https://www.docker.com/products/docker-desktop/ y la descarga es grande, asi
+que conviene arrancarla antes de sentarse a esto.
+
+Este archivo advierte de esta trampa en el parrafo de arriba y hasta hoy no decia
+donde conseguirlo: el lector se quedaba con el "command not found" y sin salida.
+
+
 PRIMERA VEZ EN ESTA MAQUINA (una sola vez por clon)
 ------------------------------------------------------------
 
@@ -28,8 +38,8 @@ PRIMERA VEZ EN ESTA MAQUINA (una sola vez por clon)
 pnpm install
 
 1. Copiar los dos archivos de entorno de ejemplo y llenarlos. Las claves de
-   Clerk son opcionales en local y obligatorias en los ambientes reales; las
-   de dev salen de la instancia dev de Clerk, que es SEPARADA y solo tiene
+   Supabase son opcionales en local y obligatorias en los ambientes reales; las
+   de dev salen del proyecto dev de Supabase, que es SEPARADO y solo tiene
    usuarios de prueba.
 
    [macOS / Linux / Git Bash]
