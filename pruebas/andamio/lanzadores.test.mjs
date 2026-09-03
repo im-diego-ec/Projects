@@ -43,7 +43,19 @@ test("el de macOS es ejecutable: sin el bit, el doble clic abre un editor de tex
   assert.ok(modo & 0o111, "arrancar.command no tiene permiso de ejecucion");
 });
 
-test("el de macOS parsea: bash -n caza los errores de sintaxis de verdad", () => {
+/** Si hay un `bash` que pueda parsear. En Windows normalmente no, y ese caso NO
+ *  es un fallo: lo que se salta es la comprobacion de sintaxis del script de
+ *  macOS, que en Windows no se ejecuta nunca. Los otros casos si corren. */
+function hayBash() {
+  try {
+    execFileSync("bash", ["--version"], { stdio: "ignore" });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+test("el de macOS parsea: bash -n caza los errores de sintaxis de verdad", { skip: hayBash() ? false : "no hay bash en esta maquina" }, () => {
   execFileSync("bash", ["-n", path.join(RAIZ, "arrancar.command")], { stdio: "pipe" });
 });
 
@@ -57,7 +69,7 @@ test("el de macOS parsea: bash -n caza los errores de sintaxis de verdad", () =>
 //
 // Es exactamente el defecto que tuvo la primera version de `arrancar.command`, y
 // un banco que se apoyara solo en `bash -n` habria salido verde sobre el.
-test("MUERDE: bash -n NO caza el // , asi que apoyarse solo en el no protege", () => {
+test("MUERDE: bash -n NO caza el // , asi que apoyarse solo en el no protege", { skip: hayBash() ? false : "no hay bash en esta maquina" }, () => {
   const roto = path.join(RAIZ, "pruebas/.lanzador-roto-temporal.sh");
   fs.writeFileSync(roto, "#!/usr/bin/env bash\n// esto no es un comentario en bash\necho ok\n");
   try {

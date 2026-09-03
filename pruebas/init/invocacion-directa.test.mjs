@@ -24,6 +24,11 @@ const RAIZ = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..")
 // LA SEGUNDA VEZ FUE POR COPIAR EL IDIOMA a dos herramientas nuevas
 // --projects-doctor y projects-puerta-- y lo cazo el job de windows-latest del
 // CI, no una revision. Este banco existe para que no haya una tercera.
+//
+// Y VIVE EN `pruebas/init/` A PROPOSITO: ese es el unico directorio que el CI
+// corre en la matriz de tres sistemas. Nacio en `pruebas/andamio/`, que solo
+// corre en Linux --o sea, el banco que vigila un defecto de WINDOWS no corria en
+// Windows--. La ironia la encontro medir la cobertura, no leerla.
 // ---------------------------------------------------------------------------
 
 /** Los .mjs de herramientas/ que se pueden correr como comando. */
