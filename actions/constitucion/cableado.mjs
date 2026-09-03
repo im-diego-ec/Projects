@@ -1484,7 +1484,7 @@ const JOB_SUGERIDO = [
   // censo — el modo de falla mas callado del bootstrap (README.md, «Nunca @v1 en el
   // repo de un proyecto»).
   // La version la exige el banco del andamio contra el CHANGELOG.
-  `      - uses: im-diego-ec/Projects/${SEGMENTO_ACTION}@v1.8.0`,
+  `      - uses: im-diego-ec/Projects/${SEGMENTO_ACTION}@v1.9.0`,
   "        with:",
   "          modo: verificar",
   "",

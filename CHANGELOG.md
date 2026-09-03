@@ -41,6 +41,8 @@ mueve sobre un cambio incompatible.
 
 ## [No publicado]
 
+## [1.9.0] — 2026-09-03
+
 ### Corregido
 
 - **El marco prometía «sin tarjeta» en seis lugares y ninguno tenía fuente

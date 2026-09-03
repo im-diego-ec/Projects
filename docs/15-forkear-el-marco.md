@@ -55,7 +55,7 @@ git ls-files -z -- '.github/workflows/*' \
 ```
 
 Al 2026-08-24 devuelve dos líneas de `.github/workflows/marco-ci.yml`:
-`actions/guardrail-deltas@v1` y `actions/constitucion@v1.8.0`. **Las dos hay que
+`actions/guardrail-deltas@v1` y `actions/constitucion@v1.9.0`. **Las dos hay que
 reescribirlas con la cuenta del fork**, y es lo primero que se hace: hasta que eso
 pase, el fork no es un marco, es un cliente del marco de al lado.
 
