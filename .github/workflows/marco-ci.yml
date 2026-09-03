@@ -1354,16 +1354,46 @@ jobs:
 
           xargs -0 grep -nIE '(^|[^$])\{\{[A-Z0-9_]+\}\}' < "${LISTA}" > pendientes.txt 2>> "${ERRORES}" || true
 
-          # El hueco de decision del scaffold. Se arma por codepoint (U+1F573)
-          # en vez de pegar el emoji: asi matchea lo mismo lleve o no el
-          # selector de variacion, y no depende del locale del runner.
+          # EL HUECO DE DECISION, Y POR QUE AHORA SON DOS COSAS.
+          #
+          # Se arma por codepoint (U+1F573) en vez de pegar el emoji: asi matchea
+          # lo mismo lleve o no el selector de variacion, y no depende del locale
+          # del runner.
+          #
+          # EL DEFECTO QUE ESTO CIERRA, medido de punta a punta sobre un proyecto
+          # recien creado por la puerta web: TODO proyecto nace con el CI en ROJO,
+          # y no por un error sino por diseno --el andamio entrega huecos a
+          # proposito--. Pero los huecos que entrega NO SON TODOS IGUALES:
+          #
+          #   - EN UN ENCABEZADO (`## HUECO ...`) hay una SECCION ENTERA
+          #     pendiente: la lista de arranque del repositorio. Mientras exista,
+          #     el bootstrap esta a medias de verdad. Eso BLOQUEA.
+          #
+          #   - EN UNA CITA (`> HUECO ...`) hay una INVITACION a escribir algo que
+          #     solo esa persona sabe: "aca van las reglas de este repo". Eso no es
+          #     un estado incompleto, es un lugar reservado. Bloquear por eso
+          #     obliga a inventar contenido para poner el CI en verde, que es
+          #     exactamente lo contrario de lo que la invitacion busca.
+          #
+          # La distincion es MECANICA --encabezado contra cita-- y no un juicio
+          # sobre el texto: se puede comprobar, y se comprueba.
           HUECO=$(printf '\xf0\x9f\x95\xb3')
-          xargs -0 grep -nIF "${HUECO}" < "${LISTA}" >> pendientes.txt 2>> "${ERRORES}" || true
+          xargs -0 grep -nIF "${HUECO}" < "${LISTA}" > huecos.txt 2>> "${ERRORES}" || true
+          # Un encabezado de markdown empieza con almohadillas. El `:N:` del medio
+          # es el prefijo que agrega `grep -n`.
+          grep -E ':[0-9]+:[[:space:]]*#+[[:space:]]' huecos.txt >> pendientes.txt || true
+          grep -vE ':[0-9]+:[[:space:]]*#+[[:space:]]' huecos.txt > avisos.txt || true
 
           if [ -s pendientes.txt ]; then
             echo "::error::quedaron marcadores del scaffold sin resolver — el bootstrap del repo esta a medias y hay promesas del marco que no se estan cumpliendo (revisa sobre todo el archivo de propietarios de codigo)"
             echo "== marcadores pendientes =="
             cat pendientes.txt
+          fi
+          
+          if [ -s avisos.txt ]; then
+            echo "::warning::hay lugares reservados del andamio sin llenar. NO es un error y no pone nada en rojo: son invitaciones a escribir algo que solo vos sabes. Llenalos cuando tengas algo que decir ahi"
+            echo "== lugares reservados =="
+            cat avisos.txt
           fi
 
           if [ -s "${ERRORES}" ]; then
@@ -1747,7 +1777,7 @@ jobs:
             # El marco y sus consumidores viven en la misma cuenta —es la premisa del
             # encabezado, "TODO proyecto de la organizacion"— asi que derivarla del
             # propietario da el mismo texto en el original y el correcto en la copia.
-            echo "        uses: ${PROPIETARIO}/Projects/actions/censo-fuentes@v1.9.4"
+            echo "        uses: ${PROPIETARIO}/Projects/actions/censo-fuentes@v1.9.5"
             exit 1
           fi
 
@@ -3815,7 +3845,7 @@ jobs:
         with: { node-version: "${{ inputs.version_node }}" }
       # Version exacta, no @v1: ver el motivo largo en el paso de deltas de OpenSpec.
       - name: Constitucion del marco cableada
-        uses: im-diego-ec/Projects/actions/constitucion@v1.9.4
+        uses: im-diego-ec/Projects/actions/constitucion@v1.9.5
         with:
           modo: cableado
           # La rama por defecto sale del evento y no de una constante: un `push`

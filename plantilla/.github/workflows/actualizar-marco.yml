@@ -171,7 +171,7 @@ jobs:
           node-version: "24"
 
       - name: Regenerar la porcion del marco
-        uses: "{{ORG_MARCO}}/Projects/actions/constitucion@v1.9.4"
+        uses: "{{ORG_MARCO}}/Projects/actions/constitucion@v1.9.5"
         with:
           modo: escribir
 

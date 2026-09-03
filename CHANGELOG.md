@@ -41,6 +41,23 @@ mueve sobre un cambio incompatible.
 
 ## [No publicado]
 
+## [1.9.5] — 2026-09-03
+
+### Cambiado
+
+- **Un proyecto nuevo ya no nace con el CI en rojo por algo que no está roto.**
+  El chequeo contaba todos los huecos del andamio igual, así que **todo** proyecto
+  nacía rojo — y para ponerlo verde había que llenar un lugar reservado que dice
+  *«acá van las reglas de ESTE repo»*, o sea **inventar contenido**: exactamente
+  lo contrario de lo que esa invitación busca. Y alguien no técnico ve rojo el
+  primer día y concluye que se rompió.
+
+  La distinción ahora es **mecánica**, no un juicio sobre el texto: un hueco en un
+  **encabezado** significa que hay una sección entera pendiente —el bootstrap está
+  a medias de verdad— y **bloquea**; un hueco en una **cita** es un lugar
+  reservado y **avisa**. Los dos greps son el mismo patrón, uno negado, y hay una
+  comprobación que lo exige. **Qué tiene que hacer un consumidor: nada.**
+
 ## [1.9.4] — 2026-09-03
 
 ### Corregido
