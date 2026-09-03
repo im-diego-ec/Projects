@@ -699,6 +699,78 @@ function leerRemoto(raizDelMarco) {
  *  sustituya en ningun archivo: es una decision sobre QUE archivos viajan. La
  *  clave ya existia en `plantilla/.projects-valores.json`; lo unico que faltaba
  *  era que alguien la leyera. */
+/** Si el repositorio vive en una CUENTA DE USUARIO o en una ORGANIZACION.
+ *
+ *  POR QUE ESTA CLAVE EXISTE, y es un defecto medido: el andamio repartia
+ *  SIEMPRE un CODEOWNERS con equipos (`@org/equipo`). En una cuenta de usuario
+ *  los equipos NO EXISTEN --GitHub no los tiene fuera de una organizacion-- asi
+ *  que ese archivo no asignaba a nadie, NUNCA, y sin decir una palabra. O sea:
+ *  todo proyecto creado bajo una cuenta personal nacia con el review cruzado
+ *  apagado en silencio, que es exactamente el modo de falla que el propio
+ *  CODEOWNERS declara querer evitar.
+ *
+ *  EL DEFAULT ES `usuario`, Y LO DECIDE UNA ASIMETRIA, no una preferencia:
+ *
+ *    - Un handle personal (`@ana`) es un code owner VALIDO en los dos lados: en
+ *      una cuenta de usuario y tambien dentro de una organizacion.
+ *    - Un equipo (`@org/equipo`) SOLO existe en una organizacion. En una cuenta
+ *      personal no asigna a nadie, nunca, y GitHub no dice una palabra.
+ *
+ *  O sea que equivocarse hacia `usuario` deja un CODEOWNERS que funciona igual;
+ *  equivocarse hacia `organizacion` lo deja mudo. Ante la duda se elige el lado
+ *  que no rompe en silencio. */
+/** Le pregunta a GitHub si una cuenta es de una persona o de una organizacion.
+ *
+ *  POR QUE SE PREGUNTA Y NO SE ADIVINA: es la unica forma de saberlo, y GitHub
+ *  la contesta gratis. Preguntarselo a la persona seria pedirle que averigue algo
+ *  sobre su propia cuenta que la herramienta puede mirar sola.
+ *
+ *  DEGRADA A `null` Y NO A UN VALOR, y la diferencia importa: sin red, sin `gh`,
+ *  o con la sesion cerrada, esta funcion NO SABE. Devolver "usuario" ahi seria
+ *  inventar un dato y escribirlo como si se hubiera medido. El que llama decide
+ *  que hacer con el no-se, y lo dice en voz alta.
+ *
+ *  Y LA CUENTA SE VALIDA ANTES DE INTERPOLARLA, no despues: esta invocacion lleva
+ *  `shell` en Windows --ahi `gh` puede ser un shim-- y con shell los argumentos
+ *  van concatenados SIN ESCAPAR. Un nombre de cuenta con un `;` o un backtick
+ *  seria ejecucion de comandos. El patron es el de un handle de GitHub, el mismo
+ *  que FORMATOS.ORG: alfanumerico con guiones simples, hasta 39. Lo que no calza
+ *  no llega al shell. */
+export function preguntarTipoDeCuenta(cuenta) {
+  if (!/^[A-Za-z0-9](?:-?[A-Za-z0-9]){0,38}$/.test(String(cuenta ?? ""))) return null;
+  try {
+    const salida = execFileSync("gh", ["api", `users/${cuenta}`, "--jq", ".type"], {
+      encoding: "utf-8",
+      stdio: ["ignore", "pipe", "ignore"],
+      shell: process.platform === "win32",
+      timeout: 15_000,
+    }).trim();
+    if (salida === "Organization") return "organizacion";
+    if (salida === "User") return "usuario";
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+export function tipoDeCuentaDe(valores) {
+  const v = valores?.TIPO_CUENTA;
+  const t = typeof v === "string" ? v.trim().toLowerCase() : "";
+  return t === "organizacion" ? "organizacion" : "usuario";
+}
+
+/** Poda las dos formas de un archivo que depende de donde vive el repositorio.
+ *
+ *  Hoy solo CODEOWNERS las tiene, y a proposito: es el unico archivo del andamio
+ *  cuya sintaxis cambia entre una cuenta personal y una organizacion. */
+export function podarPorTipoDeCuenta(texto, tipo = "usuario") {
+  const sobra = tipo === "usuario" ? "organizacion" : "usuario";
+  return texto.replace(
+    new RegExp(`[ \\t]*# projects:solo-si-${sobra}\\n[\\s\\S]*?# projects:fin-solo-si-${sobra}\\n`, "g"),
+    "",
+  );
+}
+
 export function plataformaDe(valores) {
   const v = valores?.plataforma;
   return typeof v === "string" && v.trim() ? v.trim().toLowerCase() : "aws";
@@ -1051,6 +1123,7 @@ export function instanciar({ raizAndamio, destino, valores }) {
   // parametro mas, y asi no hay dos lugares donde declararla.
   const plataforma = plataformaDe(valores);
   const forma = formaDe(valores);
+  const tipoDeCuenta = tipoDeCuentaDe(valores);
   const rels = archivosDelAndamio(raizAndamio, plataforma, forma);
   if (rels.length === 0) throw new Error(`el andamio esta vacio: ${raizAndamio}`);
 
@@ -1084,7 +1157,12 @@ export function instanciar({ raizAndamio, destino, valores }) {
       // Se poda ANTES de sustituir: lo que se saca puede tener marcadores
       // adentro —`{{PERFIL_DEV}}` vivia en el bloque de permisos de AWS— y
       // sustituirlos primero solo escribiria un relleno que despues se borra.
-      const texto = sacarCentinelas(podarPorForma(podarPorPlataforma(fs.readFileSync(origen, "utf8"), rel, plataforma, forma), rel, forma));
+      const texto = sacarCentinelas(
+        podarPorTipoDeCuenta(
+          podarPorForma(podarPorPlataforma(fs.readFileSync(origen, "utf8"), rel, plataforma, forma), rel, forma),
+          tipoDeCuenta,
+        ),
+      );
       const r = sustituir(texto, valores);
       total += r.cuenta;
       for (const f of r.faltantes) faltantes.add(f);
@@ -2085,6 +2163,11 @@ const EJEMPLO = {
   // ningun validador de sintaxis en ninguna parte.
   forma: "aplicacion",
   plataforma: "aws",
+  // "usuario" u "organizacion". Decide que forma de CODEOWNERS viaja: en una
+  // cuenta de usuario los equipos de GitHub NO EXISTEN. Si falta se asume
+  // "usuario", que es el lado que no rompe en silencio --un handle personal vale
+  // en los dos lados; un equipo solo en una organizacion--.
+  TIPO_CUENTA: "organizacion",
   PROYECTO: "people-agenda",
   // ORG es la ORG de GitHub, no un equipo dentro de ella: se interpola en
   // `uses: {{ORG}}/Projects/...`, o sea en la coordenada con la que GitHub
@@ -2419,6 +2502,27 @@ async function main(argv) {
         return 1;
       }
       resultado = await asis.correrAsistente(preguntarPorTeclado, previos, FORMATOS, (linea) => process.stdout.write(`${linea}\n`), { ORG_MARCO: marco });
+      // EL TIPO DE CUENTA SE MIDE, NO SE PREGUNTA. Decide que forma de
+      // CODEOWNERS viaja, y en una cuenta de usuario los equipos de GitHub NO
+      // EXISTEN: `@cuenta/equipo` no asigna a nadie, nunca, sin decir una
+      // palabra. Ver `tipoDeCuentaDe`.
+      const cuentaDelProyecto = resultado.valores?.ORG;
+      const medido = cuentaDelProyecto ? preguntarTipoDeCuenta(cuentaDelProyecto) : null;
+      if (medido) {
+        resultado.valores.TIPO_CUENTA = medido;
+        process.stdout.write(
+          `\n${cuentaDelProyecto} es una cuenta de ${medido === "usuario" ? "usuario" : "organización"}, ` +
+            `así que los propietarios del código van como ${medido === "usuario" ? "personas" : "equipos"}.\n`,
+        );
+      } else {
+        resultado.valores.TIPO_CUENTA = "usuario";
+        console.error(
+          `::warning::no pude preguntarle a GitHub si "${cuentaDelProyecto}" es una cuenta de persona o de organización ` +
+            "(hace falta `gh` con la sesión abierta). Se anota como cuenta de persona, que es el lado que no rompe en " +
+            "silencio: un handle personal vale en los dos lados y un equipo solo en una organización. Si es una " +
+            'organización, cambiá `TIPO_CUENTA` a "organizacion" en .projects-valores.json.',
+        );
+      }
     } catch (e) {
       console.error("");
       console.error(`::error::${e.message}. NO se escribio nada.`);

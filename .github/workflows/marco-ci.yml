@@ -1747,7 +1747,7 @@ jobs:
             # El marco y sus consumidores viven en la misma cuenta —es la premisa del
             # encabezado, "TODO proyecto de la organizacion"— asi que derivarla del
             # propietario da el mismo texto en el original y el correcto en la copia.
-            echo "        uses: ${PROPIETARIO}/Projects/actions/censo-fuentes@v1.9.0"
+            echo "        uses: ${PROPIETARIO}/Projects/actions/censo-fuentes@v1.9.1"
             exit 1
           fi
 
@@ -3815,7 +3815,7 @@ jobs:
         with: { node-version: "${{ inputs.version_node }}" }
       # Version exacta, no @v1: ver el motivo largo en el paso de deltas de OpenSpec.
       - name: Constitucion del marco cableada
-        uses: im-diego-ec/Projects/actions/constitucion@v1.9.0
+        uses: im-diego-ec/Projects/actions/constitucion@v1.9.1
         with:
           modo: cableado
           # La rama por defecto sale del evento y no de una constante: un `push`

@@ -1159,6 +1159,12 @@ test("la unica entrada que puede llegar a un shell es el pin, y esta acotada", (
         "los casos de mas abajo lo comprueban sobre los VALORES, que es lo que de verdad viaja",
     ],
     [
+      "`users/${cuenta}`",
+      "el nombre de la cuenta de GitHub, que preguntarTipoDeCuenta valida contra el patron de un handle " +
+        "--alfanumerico con guiones simples, hasta 39-- ANTES de interpolarlo, y devuelve null sin invocar nada " +
+        "si no calza. Un `;` o un backtick no llegan al shell",
+    ],
+    [
       "path.join(raizMarco)",
       "la ruta del script de la constitucion dentro del clon del marco; ademas esa invocacion no lleva shell",
     ],

@@ -54,11 +54,24 @@ const CODEOWNERS = [".github/CODEOWNERS", "plantilla/.github/CODEOWNERS"];
 function reglasDeTexto(archivo, texto) {
   const reglas = [];
   const lineas = texto.split(/\r?\n/);
+  // EN QUE BLOQUE DE CENTINELA CAE CADA REGLA, y por que hace falta saberlo.
+  //
+  // El andamio reparte DOS formas de CODEOWNERS --una para organizacion y otra
+  // para cuenta de usuario-- y poda la que no corresponde. Sin esto, este banco
+  // juzgaba las dos con la misma vara y marcaba como invalida la mitad que es
+  // correcta para el otro lado. Era la vara vieja: daba por hecho que todo
+  // proyecto vive en una organizacion, que es exactamente el defecto que las dos
+  // formas vinieron a cerrar.
+  let bloque = null;
   for (let i = 0; i < lineas.length; i += 1) {
+    const cruda = lineas[i].trim();
+    const abre = /^#\s*projects:solo-si-(organizacion|usuario)\s*$/.exec(cruda);
+    if (abre) { bloque = abre[1]; continue; }
+    if (/^#\s*projects:fin-solo-si-(organizacion|usuario)\s*$/.test(cruda)) { bloque = null; continue; }
     const limpia = lineas[i].replace(/\s+#.*$/, "").trim();
     if (limpia === "" || limpia.startsWith("#")) continue;
     const campos = limpia.split(/\s+/);
-    reglas.push({ archivo, linea: i + 1, patron: campos[0], duenios: campos.slice(1) });
+    reglas.push({ archivo, linea: i + 1, patron: campos[0], duenios: campos.slice(1), bloque });
   }
   return reglas;
 }
@@ -70,8 +83,12 @@ const REGLAS = CODEOWNERS.flatMap(reglasDe);
 // Las tres ortografias que GitHub acepta escribir. Ninguna de las tres RESUELVE
 // siempre: cual resuelve depende de donde vive el archivo, y eso lo decide
 // FORMA_ESPERADA de aca abajo.
-const EQUIPO = /^@(?:[A-Za-z0-9][A-Za-z0-9-]*|\{\{[A-Z_]+\}\})\/(?:[A-Za-z0-9][A-Za-z0-9._-]*|\{\{[A-Z_]+\}\})$/;
-const USUARIO = /^@(?:[A-Za-z0-9][A-Za-z0-9-]*|\{\{[A-Z_]+\}\})$/;
+// `[A-Z0-9_]` y no `[A-Z_]`: los marcadores del andamio llevan digitos
+// --`{{BUILDER_1}}`, `{{BUILDER_2}}`-- y sin el digito el patron los declaraba
+// invalidos. No se noto antes porque hasta ahora ningun CODEOWNERS del andamio
+// nombraba a un builder por su marcador.
+const EQUIPO = /^@(?:[A-Za-z0-9][A-Za-z0-9-]*|\{\{[A-Z0-9_]+\}\})\/(?:[A-Za-z0-9][A-Za-z0-9._-]*|\{\{[A-Z0-9_]+\}\})$/;
+const USUARIO = /^@(?:[A-Za-z0-9][A-Za-z0-9-]*|\{\{[A-Z0-9_]+\}\})$/;
 const CORREO = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
 
 /** Que forma tiene que tener el owner en cada archivo, y por que la otra falla. */
@@ -86,15 +103,33 @@ const FORMA_ESPERADA = {
           ? "es un correo: solo funciona si coincide con el de una cuenta de GitHub, y si no coincide falla en silencio"
           : "no tiene la forma @usuario",
   },
+  // LA PIEZA QUE VIAJA AL CONSUMIDOR TIENE DOS FORMAS, y cual vale lo decide el
+  // BLOQUE DE CENTINELA en el que esta la regla, no el archivo.
+  //
+  //   - dentro de `solo-si-organizacion` -> EQUIPO. Sobrevive a que el rol cambie
+  //     de persona y no clava un nombre de cuenta en lo que se copia.
+  //   - dentro de `solo-si-usuario` -> HANDLE. En una cuenta personal los equipos
+  //     NO EXISTEN: `@cuenta/equipo` no asigna a nadie, nunca, y sin decir nada.
+  //   - fuera de todo bloque -> NO puede haber reglas: viajarian a los dos lados
+  //     y en uno de los dos no resolverian.
   "plantilla/.github/CODEOWNERS": {
-    forma: "@{{ORG}}/{{EQUIPO}}",
-    vale: (duenio) => EQUIPO.test(duenio),
-    motivo: (duenio) =>
-      USUARIO.test(duenio)
-        ? "es un handle suelto en la pieza que viaja al consumidor, que es un repo de organizacion: ahi el owner tiene que ser un EQUIPO, que sobrevive a que el rol cambie de persona y no clava un nombre de cuenta en lo que se copia"
-        : CORREO.test(duenio)
-          ? "es un correo: solo funciona si coincide con el de una cuenta de GitHub, y si no coincide falla en silencio"
-          : "no tiene la forma @organizacion/equipo",
+    forma: "@{{ORG}}/{{EQUIPO}} en el bloque de organizacion, @{{HANDLE}} en el de usuario",
+    vale: (duenio, bloque) =>
+      bloque === "organizacion" ? EQUIPO.test(duenio) : bloque === "usuario" ? USUARIO.test(duenio) : false,
+    motivo: (duenio, bloque) =>
+      bloque === null
+        ? "esta fuera de todo bloque de centinela, asi que viajaria a los dos lados y en uno de los dos no resuelve"
+        : bloque === "organizacion"
+          ? USUARIO.test(duenio)
+            ? "es un handle suelto dentro del bloque de ORGANIZACION: ahi el owner tiene que ser un EQUIPO"
+            : CORREO.test(duenio)
+              ? "es un correo: solo funciona si coincide con el de una cuenta de GitHub, y si no falla en silencio"
+              : "no tiene la forma @organizacion/equipo"
+          : EQUIPO.test(duenio)
+            ? "tiene forma de equipo dentro del bloque de CUENTA DE USUARIO, donde los equipos no existen: no resuelve a nadie y GitHub no lo dice"
+            : CORREO.test(duenio)
+              ? "es un correo: solo funciona si coincide con el de una cuenta de GitHub, y si no falla en silencio"
+              : "no tiene la forma @handle",
   },
 };
 
@@ -105,8 +140,8 @@ function ownersInvalidos(reglas) {
     const esperada = FORMA_ESPERADA[regla.archivo];
     if (!esperada) throw new Error(`no hay forma de owner declarada para ${regla.archivo}: agregala antes de creerle a este banco`);
     for (const duenio of regla.duenios) {
-      if (esperada.vale(duenio)) continue;
-      malos.push(`${regla.archivo}:${regla.linea} "${duenio}" ${esperada.motivo(duenio)}`);
+      if (esperada.vale(duenio, regla.bloque)) continue;
+      malos.push(`${regla.archivo}:${regla.linea} "${duenio}" ${esperada.motivo(duenio, regla.bloque)}`);
     }
   }
   return malos;
@@ -149,10 +184,18 @@ test("codeowners · el juicio de owners se pone rojo donde tiene que ponerse", (
   // archivos con reglas OPUESTAS: si las dos mitades se cruzaran, saldria verde
   // sobre lo que existe para prohibir. Se refuta con texto sintetico y no
   // editando los archivos de verdad, que este banco no posee.
+  const org = (linea) => `# projects:solo-si-organizacion\n${linea}# projects:fin-solo-si-organizacion\n`;
+  const usr = (linea) => `# projects:solo-si-usuario\n${linea}# projects:fin-solo-si-usuario\n`;
   const casos = [
     [".github/CODEOWNERS", "*  @im-diego-ec/un-equipo\n", "el equipo en la cuenta personal"],
-    ["plantilla/.github/CODEOWNERS", "*  @un-handle-suelto\n", "el handle suelto en el andamio"],
     [".github/CODEOWNERS", "*  quien@ejemplo.com\n", "el correo en el repo del marco"],
+    ["plantilla/.github/CODEOWNERS", org("*  @un-handle-suelto\n"), "el handle suelto en el bloque de organizacion"],
+    ["plantilla/.github/CODEOWNERS", usr("*  @una-org/un-equipo\n"), "el equipo en el bloque de cuenta de usuario"],
+    // LA TERCERA FORMA DE ROMPERLO, y es la que solo existe desde que hay dos
+    // bloques: una regla FUERA de todo centinela viaja a los dos lados, y en uno
+    // de los dos no resuelve. Sin este caso, agregar una regla suelta al andamio
+    // saldria en verde.
+    ["plantilla/.github/CODEOWNERS", "*  @{{ORG}}/{{EQUIPO_BUILDERS}}\n", "la regla fuera de todo bloque"],
   ];
   for (const [archivo, texto, que] of casos) {
     assert.equal(
@@ -161,13 +204,11 @@ test("codeowners · el juicio de owners se pone rojo donde tiene que ponerse", (
       `${que} tenia que reportarse como invalido en ${archivo} y no se reporto`,
     );
   }
-  // Y la forma buena de cada archivo NO se reporta: un check que reporta todo
+  // Y la forma buena de cada lado NO se reporta: un check que reporta todo
   // tampoco decide nada.
   assert.deepEqual(ownersInvalidos(reglasDeTexto(".github/CODEOWNERS", "*  @im-diego-ec\n")), []);
-  assert.deepEqual(
-    ownersInvalidos(reglasDeTexto("plantilla/.github/CODEOWNERS", "*  @{{ORG}}/{{EQUIPO_BUILDERS}}\n")),
-    [],
-  );
+  assert.deepEqual(ownersInvalidos(reglasDeTexto("plantilla/.github/CODEOWNERS", org("*  @{{ORG}}/{{EQUIPO_BUILDERS}}\n"))), []);
+  assert.deepEqual(ownersInvalidos(reglasDeTexto("plantilla/.github/CODEOWNERS", usr("*  @{{BUILDER_1}} @{{BUILDER_2}}\n"))), []);
 });
 
 test("codeowners · ningun patron usa formas que GitHub ignora en silencio", () => {

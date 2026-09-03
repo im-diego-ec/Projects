@@ -41,6 +41,31 @@ mueve sobre un cambio incompatible.
 
 ## [No publicado]
 
+## [1.9.1] — 2026-09-03
+
+### Corregido
+
+- **El CODEOWNERS que no asignaba a nadie, y no lo decía.** El andamio repartía
+  siempre la forma de **organización** (`@cuenta/equipo`). En una **cuenta de
+  usuario** los equipos de GitHub **no existen**, así que ese archivo no asignaba
+  a nadie, nunca, y GitHub no dice una palabra: el review cruzado quedaba apagado
+  en silencio — que es textualmente el modo de falla que el propio CODEOWNERS
+  declara querer evitar. Medido sobre un proyecto real creado bajo una cuenta
+  personal. Ahora el andamio trae **las dos formas** y reparte la que
+  corresponde, decidida por una clave nueva, `TIPO_CUENTA`.
+- **El asistente mide el tipo de cuenta en vez de suponerlo**, preguntándole a
+  GitHub; si no puede (sin `gh`, sin sesión, sin red) **lo dice en voz alta** y
+  anota `usuario`, que es el lado que no rompe en silencio: un handle personal
+  vale en los dos lados y un equipo sólo en una organización.
+- **Un vector de inyección en esa consulta, cerrado por construcción.** La
+  invocación lleva `shell` en Windows y ahí los argumentos van concatenados sin
+  escapar; el nombre de cuenta ahora se valida contra el patrón de un handle
+  **antes** de interpolarse. Lo cazó el propio banco de seguridad del marco.
+
+**Qué tiene que hacer un consumidor: nada** — pero un proyecto creado antes bajo
+una cuenta personal tiene un CODEOWNERS que no asigna a nadie. Se arregla
+regenerándolo, o cambiando los `@cuenta/equipo` por los handles de las personas.
+
 ## [1.9.0] — 2026-09-03
 
 ### Corregido

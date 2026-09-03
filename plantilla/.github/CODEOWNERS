@@ -1,21 +1,36 @@
 # CODEOWNERS — automatiza el REVIEW CRUZADO entre builders y el gate del PO.
 # Los roles y su alcance estan en AGENTS.md (seccion "Como trabajamos: OpenSpec").
 #
-# Se usan EQUIPOS de la organizacion, no handles personales, por tres razones:
-# sobreviven a que un rol cambie de persona (se edita el equipo, no N archivos
-# en N repos); no filtran nombres propios al scaffold; y un equipo vacio o mal
-# escrito se nota, mientras que un handle mal escrito falla en silencio —
-# GitHub simplemente no asigna a nadie y el review cruzado desaparece sin ruido.
+# ESTE ARCHIVO TIENE DOS FORMAS, y el andamio reparte la que corresponde segun
+# donde viva el repositorio. No es una comodidad: es que una de las dos NO
+# FUNCIONA en el otro lado.
 #
-# REQUISITO: los equipos deben tener acceso de ESCRITURA al repo. Un equipo sin
-# permiso de escritura NO puede ser code owner: GitHub lo ignora y, otra vez, el
-# review cruzado se pierde sin avisar.
+#   - En una ORGANIZACION se usan EQUIPOS (@org/equipo). Sobreviven a que un rol
+#     cambie de persona --se edita el equipo, no N archivos en N repos--, no
+#     filtran nombres propios al scaffold, y un equipo vacio o mal escrito se
+#     nota. REQUISITO: los equipos necesitan acceso de ESCRITURA al repo; sin el,
+#     GitHub los ignora y el review cruzado se pierde sin avisar.
 #
-# Mecanica clave: GitHub solicita review a los owners EXCEPTO el autor del PR.
-# Con el equipo de builders como owner de todo, el PR de un builder auto-asigna
-# a los demas builders — "el que no escribio, revisa", sin automatizacion custom.
+#   - En una CUENTA DE USUARIO los equipos NO EXISTEN. Medido: escribir
+#     @mi-usuario/builders en una cuenta personal no asigna a nadie, nunca, y
+#     GitHub no dice una palabra. Ahi van los handles de las personas.
+#
+# EL DEFECTO QUE ESTO CIERRA: el andamio repartia SIEMPRE la forma de
+# organizacion. Todo proyecto creado bajo una cuenta personal nacia con un
+# CODEOWNERS invalido --el review cruzado desactivado en silencio, que es
+# exactamente el modo de falla que este archivo dice evitar--.
+#
+# Mecanica clave, igual en las dos formas: GitHub solicita review a los owners
+# EXCEPTO el autor del PR. Con los builders como owners de todo, el PR de un
+# builder auto-asigna a los demas — "el que no escribio, revisa", sin
+# automatizacion custom.
 
+# projects:solo-si-organizacion
 *                                  @{{ORG}}/{{EQUIPO_BUILDERS}}
+# projects:fin-solo-si-organizacion
+# projects:solo-si-usuario
+*                                  @{{BUILDER_1}} @{{BUILDER_2}}
+# projects:fin-solo-si-usuario
 
 # El PO es el UNICO owner de los contratos de negocio: la ultima regla que
 # matchea REEMPLAZA a los owners (no suma), asi que en estas rutas el reviewer
@@ -26,6 +41,13 @@
 # podria satisfacer su propio gate desde el otro rol y la separacion se cae.
 # Los builders igual quedan asignados via el resto de archivos del mismo PR
 # (design, tasks, codigo).
+# projects:solo-si-organizacion
 /openspec/changes/**/proposal.md   @{{ORG}}/{{EQUIPO_PO}}
 /openspec/changes/**/specs/        @{{ORG}}/{{EQUIPO_PO}}
 /openspec/specs/                   @{{ORG}}/{{EQUIPO_PO}}
+# projects:fin-solo-si-organizacion
+# projects:solo-si-usuario
+/openspec/changes/**/proposal.md   @{{PO}}
+/openspec/changes/**/specs/        @{{PO}}
+/openspec/specs/                   @{{PO}}
+# projects:fin-solo-si-usuario

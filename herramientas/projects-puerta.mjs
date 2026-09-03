@@ -70,6 +70,20 @@ export function esElTemplate(entorno = process.env) {
  *  a la persona y no le devuelve nada. */
 export const CAMPOS = ["forma", "plataforma", "equipo", "companero", "dominio"];
 
+/** Si el repositorio vive en una cuenta de usuario o en una organizacion.
+ *
+ *  NO SE PREGUNTA, y no es un atajo: GitHub ya lo sabe y lo pone en el evento
+ *  (`github.event.repository.owner.type`). Preguntarselo a la persona seria
+ *  pedirle que averigue algo sobre su propia cuenta que la herramienta tiene
+ *  delante.
+ *
+ *  POR QUE IMPORTA: en una cuenta de usuario los EQUIPOS de GitHub no existen,
+ *  asi que un CODEOWNERS con `@cuenta/equipo` no asigna a nadie, nunca, y sin
+ *  decir una palabra. Es el review cruzado apagado en silencio. */
+export function tipoDeCuenta(entorno = process.env) {
+  return String(entorno.TIPO_DE_DUENIO ?? "").toLowerCase() === "organization" ? "organizacion" : "usuario";
+}
+
 /** Traduce lo que llega del formulario al objeto `respuestas` del asistente.
  *
  *  `repo` llega como "duenio/nombre", que es el formato de `github.repository`.
@@ -133,7 +147,7 @@ export function escribir(destino, entrada, repo) {
   // que no existe --que es exactamente el defecto que ORG_MARCO vino a cerrar--.
   //
   // Acá se sabe por otro lado y sin adivinar: es la cuenta que publica el marco.
-  const valores = { ...derivar(r), ORG_MARCO: CUENTA_DEL_MARCO };
+  const valores = { ...derivar(r), ORG_MARCO: CUENTA_DEL_MARCO, TIPO_CUENTA: tipoDeCuenta() };
   const apartamientos = desvios(r);
   fs.mkdirSync(destino, { recursive: true });
   const rutaValores = path.join(destino, "valores.json");
@@ -163,6 +177,7 @@ export function main() {
   process.stdout.write(`  cuenta        ${hecho.valores.ORG}\n`);
   process.stdout.write(`  forma         ${hecho.respuestas.forma === "sitio" ? "un sitio para leer" : "una aplicación"}\n`);
   process.stdout.write(`  dónde vive    ${hecho.respuestas.plataforma}\n`);
+  process.stdout.write(`  la cuenta es  ${hecho.valores.TIPO_CUENTA}\n`);
   process.stdout.write(`  dirección     ${hecho.valores.DOMINIO_PROD}\n`);
   return 0;
 }

@@ -107,6 +107,11 @@ jobs:
           ENTRADA_COMPANERO: ${{ inputs.companero }}
           ENTRADA_DOMINIO: ${{ inputs.dominio }}
           ES_TEMPLATE: ${{ github.event.repository.is_template }}
+          # GitHub ya sabe si esta cuenta es de una persona o de una
+          # organizacion. Decide que forma de CODEOWNERS reparte el andamio: en
+          # una cuenta de usuario los equipos NO EXISTEN, y un CODEOWNERS con
+          # `@cuenta/equipo` no asigna a nadie, nunca, sin decir una palabra.
+          TIPO_DE_DUENIO: ${{ github.event.repository.owner.type }}
         run: node .marco/herramientas/projects-puerta.mjs "${RUNNER_TEMP}"
 
       - name: Armar el proyecto con tus valores
