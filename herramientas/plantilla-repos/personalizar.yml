@@ -136,7 +136,9 @@ jobs:
         # duenio del contexto-- asi que no hace falta.
         run: |
           set -euo pipefail
-          rm -rf .marco
+          # El marco se guarda aparte ANTES de vaciar: el paso que renderiza la
+          # constitucion lo necesita, y `.marco` cae dentro del borrado.
+          mv .marco "${RUNNER_TEMP}/marco"
           # Se vacia todo menos `.git` y `.github/workflows`.
           find . -mindepth 1 -maxdepth 1 -not -name '.git' -not -name '.github' -exec rm -rf {} +
           find .github -mindepth 1 -maxdepth 1 -not -name 'workflows' -exec rm -rf {} +
@@ -145,13 +147,37 @@ jobs:
           rm -rf "${RUNNER_TEMP}/proyecto/.github/workflows"
           cp -a "${RUNNER_TEMP}/proyecto/." .
           cp "${RUNNER_TEMP}/desvios.json" .projects-desvios.json
+          # Vuelve, con nombre distinto para que no lo confunda nadie con el clon
+          # de trabajo. El paso que borra este workflow lo saca despues.
+          cp -a "${RUNNER_TEMP}/marco" .marco-verificacion
           echo "workflows que sobrevivieron intactos:"
           ls .github/workflows
+
+      - name: Renderizar la constitucion con los desvios adentro
+        # EL DEFECTO QUE ESTO CIERRA, aislado midiendo un proyecto real: el
+        # artefacto que quedaba en el repositorio coincidia EXACTAMENTE con el
+        # render SIN desvios, y el CI espera el que SI los tiene. Cuarenta lineas
+        # de diferencia: los cinco desvios, en las dos superficies.
+        #
+        # LA CAUSA es de orden, no de contenido: `projects-init` renderiza el
+        # artefacto ANTES de que `.projects-desvios.json` exista en el destino
+        # --lo escribe el paso siguiente-- asi que renderiza sin ellos. Quien lo
+        # arreglaba era `actualizar-marco.yml`, y ese workflow no puede abrir su
+        # PR solo mientras la casilla de Actions este apagada. Resultado: el
+        # proyecto nacia con el CI en rojo por un desfase que nadie iba a cerrar.
+        #
+        # Aca ya estan las dos cosas --el artefacto y los desvios-- asi que se
+        # renderiza de nuevo y el proyecto nace consistente.
+        env:
+          CONSTITUCION_MODO: escribir
+        run: node .marco-verificacion/actions/constitucion/constitucion.mjs
 
       - name: Borrar este workflow, que ya cumplio
         # Borrar SI se puede con el GITHUB_TOKEN. Crear y modificar no. Se borra
         # para que nadie lo vuelva a correr sobre un proyecto ya personalizado.
-        run: rm -f .github/workflows/personalizar.yml
+        run: |
+          rm -f .github/workflows/personalizar.yml
+          rm -rf .marco-verificacion
 
       - name: Guardarlo
         run: |

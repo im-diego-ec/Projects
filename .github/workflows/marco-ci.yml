@@ -1385,7 +1385,18 @@ jobs:
           grep -vE ':[0-9]+:[[:space:]]*#+[[:space:]]' huecos.txt > avisos.txt || true
 
           if [ -s pendientes.txt ]; then
-            echo "::error::quedaron marcadores del scaffold sin resolver — el bootstrap del repo esta a medias y hay promesas del marco que no se estan cumpliendo (revisa sobre todo el archivo de propietarios de codigo)"
+            # DOS MENSAJES DISTINTOS, y la diferencia importa mucho para quien abre
+            # su primer proyecto. Un `{{MARCADOR}}` sin resolver es un DEFECTO: el
+            # andamio se copio mal. Un hueco en un encabezado es una SECCION
+            # PENDIENTE: el proyecto esta sano y le falta que una persona haga sus
+            # tareas de arranque. Decir "no se estan cumpliendo promesas del marco"
+            # sobre lo segundo hace que alguien no tecnico crea que algo se rompio el
+            # primer dia, y entrena a ignorar el rojo.
+            if grep -qE '\{\{[A-Z0-9_]+\}\}' pendientes.txt; then
+              echo "::error::quedaron marcadores del scaffold sin resolver — el andamio se copio a medias y hay promesas del marco que no se estan cumpliendo (revisa sobre todo el archivo de propietarios de codigo)"
+            else
+              echo "::error::el arranque de este repositorio todavia no esta terminado, y ESO ES ESPERABLE en un proyecto recien creado: NO se rompio nada. Falta que alguien haga las tareas de la seccion de arranque de AGENTS.md y despues borre esa seccion. Queda en rojo a proposito, para que no se olvide"
+            fi
             echo "== marcadores pendientes =="
             cat pendientes.txt
           fi
@@ -1777,7 +1788,7 @@ jobs:
             # El marco y sus consumidores viven en la misma cuenta —es la premisa del
             # encabezado, "TODO proyecto de la organizacion"— asi que derivarla del
             # propietario da el mismo texto en el original y el correcto en la copia.
-            echo "        uses: ${PROPIETARIO}/Projects/actions/censo-fuentes@v1.9.5"
+            echo "        uses: ${PROPIETARIO}/Projects/actions/censo-fuentes@v1.9.6"
             exit 1
           fi
 
@@ -3845,7 +3856,7 @@ jobs:
         with: { node-version: "${{ inputs.version_node }}" }
       # Version exacta, no @v1: ver el motivo largo en el paso de deltas de OpenSpec.
       - name: Constitucion del marco cableada
-        uses: im-diego-ec/Projects/actions/constitucion@v1.9.5
+        uses: im-diego-ec/Projects/actions/constitucion@v1.9.6
         with:
           modo: cableado
           # La rama por defecto sale del evento y no de una constante: un `push`

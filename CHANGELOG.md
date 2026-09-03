@@ -41,6 +41,29 @@ mueve sobre un cambio incompatible.
 
 ## [No publicado]
 
+## [1.9.6] — 2026-09-03
+
+### Corregido
+
+- **El proyecto nacía con la constitución desfasada, y nadie iba a cerrarlo.**
+  Aislado midiendo un proyecto real: el artefacto del repositorio coincidía
+  **exactamente** con el render **sin** desvíos, y el CI espera el que **sí** los
+  tiene — cuarenta líneas de diferencia, los cinco desvíos en las dos superficies.
+  La causa era de **orden**, no de contenido: `projects-init` renderiza el
+  artefacto *antes* de que exista `.projects-desvios.json`. Quien lo arreglaba era
+  `actualizar-marco.yml`, y ese workflow **no puede abrir su PR solo**. Resultado:
+  un rojo que nadie iba a cerrar. Ahora el arranque renderiza la constitución al
+  final, cuando las dos piezas ya están, y el proyecto nace consistente.
+
+### Cambiado
+
+- **El rojo del arranque deja de sonar a defecto.** Decía *«el bootstrap está a
+  medias y hay promesas del marco que no se están cumpliendo»* tanto para un
+  marcador sin resolver —que **sí** es un defecto— como para la sección de
+  arranque pendiente, que es lo esperable el primer día. Alguien no técnico leía
+  eso y concluía que se había roto algo; y un rojo que no se entiende entrena a
+  ignorar el rojo. Ahora son dos mensajes y la condición elige.
+
 ## [1.9.5] — 2026-09-03
 
 ### Cambiado

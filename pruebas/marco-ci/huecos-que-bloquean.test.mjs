@@ -114,6 +114,35 @@ test("MUERDE: si el patron dejara de reconocer el encabezado, el bootstrap a med
   assert.equal(salida, "", "con un patron que no calza, el encabezado no se reporta: eso es lo que este caso demuestra que hay que evitar");
 });
 
+test("el rojo del bootstrap NO se anuncia como un defecto del andamio", () => {
+  // POR QUE ESTE CASO. El rojo del arranque es deliberado --el propio AGENTS.md
+  // explica que es la razon por la que el commit fundacional entra por push
+  // directo-- pero el mensaje decia "el andamio se copio a medias y hay promesas
+  // del marco que no se estan cumpliendo". Alguien no tecnico lee eso el primer
+  // dia y concluye que se rompio algo. Y un rojo que no se entiende entrena a
+  // ignorar el rojo.
+  //
+  // La condicion del 10 para este tramo NO es "CI en verde": el arranque de
+  // verdad esta pendiente. Es "rojo por un motivo que la persona entiende y no
+  // puede confundir con un defecto".
+  const yml = fs.readFileSync(WF, "utf8");
+  assert.match(
+    yml,
+    /ESO ES ESPERABLE en un proyecto recien creado: NO se rompio nada/,
+    "el mensaje del bootstrap pendiente tiene que decir que es esperable y que nada se rompio",
+  );
+  assert.match(
+    yml,
+    /el andamio se copio a medias/,
+    "y el OTRO mensaje, el de un marcador sin resolver, tiene que seguir diciendo que si es un defecto",
+  );
+  const eligeMensaje = /if grep -qE '\\\{\\\{\[A-Z0-9_\]\+\\\}\\\}' pendientes\.txt; then/.test(yml);
+  assert.ok(
+    eligeMensaje || /grep -qE .*pendientes\.txt; then/.test(yml),
+    "no encontre la condicion que elige entre los dos mensajes: sin ella los dos textos existen pero uno solo se usa",
+  );
+});
+
 test("y el andamio de verdad tiene UNO de cada uno: si eso cambia, este banco deja de medir el caso real", () => {
   const texto = fs.readFileSync(path.join(RAIZ, "plantilla/AGENTS.md"), "utf8");
   const lineas = texto.split("\n");

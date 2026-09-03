@@ -103,7 +103,7 @@ jobs:
   # lo propone Dependabot como PR: el rojo de un check nuevo se lee ahi, no en
   # main. Nunca @v1 —un tag movil no produce PR y este repo no entraria al censo.
   marco:
-    uses: im-diego-ec/Projects/.github/workflows/marco-ci.yml@v1.9.5
+    uses: im-diego-ec/Projects/.github/workflows/marco-ci.yml@v1.9.6
     permissions:
       contents: read
       pull-requests: read
@@ -215,12 +215,12 @@ preferencia:
       # DESPUES del install: el censo EJECUTA el toolchain del repo para
       # preguntarle que archivos ve. Sin dependencias instaladas emite un
       # ::warning:: ruidoso en vez de pasar en verde.
-      - uses: im-diego-ec/Projects/actions/censo-fuentes@v1.9.5
+      - uses: im-diego-ec/Projects/actions/censo-fuentes@v1.9.6
 
       # ... lint, typecheck, tests ...
 
       # DESPUES de los tests: consume los lcov que las suites acaban de escribir.
-      - uses: im-diego-ec/Projects/actions/cobertura-diff@v1.9.5
+      - uses: im-diego-ec/Projects/actions/cobertura-diff@v1.9.6
 
       # ... builds ...
 ```
