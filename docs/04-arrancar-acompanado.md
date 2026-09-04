@@ -181,17 +181,28 @@ Son cinco minutos de lectura y te ahorran mantener piezas que tu proyecto no usa
 **Si no querés instalar nada en tu computadora, no hace falta.** Hay un camino
 que ocurre entero dentro de GitHub, desde el navegador.
 
+**Antes del primer clic, una sola decisión**, porque de ella sale el repositorio
+al que vas a entrar:
+
+| Si querés… | Andá a |
+| --- | --- |
+| **un sitio para leer** — páginas, textos, imágenes | [`im-diego-ec/plantilla-sitio`](https://github.com/im-diego-ec/plantilla-sitio) |
+| **una aplicación** — pantallas, usuarios, base de datos | [`im-diego-ec/plantilla-aplicacion`](https://github.com/im-diego-ec/plantilla-aplicacion) |
+
+> **No es al repositorio del marco.** Ése te daría una copia de las herramientas,
+> no un proyecto. Los dos de arriba son los que están preparados para esto.
+
 | | |
 | --- | --- |
-| **1** | En [el repositorio del marco](https://github.com/im-diego-ec/Projects), apretá el botón verde que dice **«Use this template»** → **«Create a new repository»**. Poné el nombre que quieras para tu proyecto. |
-| **2** | En **tu** repositorio nuevo, andá a la pestaña **Actions** y elegí **«Armar mi proyecto»** en la lista de la izquierda. |
-| **3** | Apretá el botón `Run workflow`. Se abre un formulario con cuatro o cinco preguntas en castellano. Contestalas y apretá el botón verde. |
+| **1** | En el repositorio que elegiste, apretá el botón verde **«Use this template»** → **«Create a new repository»**. Poné el nombre que quieras para tu proyecto. |
+| **2** | En **tu** repositorio nuevo, andá a la pestaña **Actions** y elegí **«Personalizar mi proyecto»** en la lista de la izquierda. |
+| **3** | Apretá el botón `Run workflow`. Se abre un formulario con cinco preguntas en castellano. Contestalas y apretá el botón verde. |
 
 **Qué vas a ver.** El trabajo tarda un par de minutos. Cuando termina, volvés a
 la portada de tu repositorio y están todos los archivos de tu proyecto.
 
 **Cómo sabés que salió bien.** La corrida queda con un tilde verde, y abajo de
-ella hay un resumen que dice **«Tu proyecto está armado»** con lo que elegiste.
+ella hay un resumen que empieza con **«Tu proyecto esta listo»**.
 
 > **Lo que este camino no te da:** el proyecto queda armado en GitHub, pero para
 > *trabajarlo* —abrir el código, probarlo en tu máquina— vas a necesitar las
@@ -200,12 +211,50 @@ ella hay un resumen que dice **«Tu proyecto está armado»** con lo que elegist
 
 ---
 
-## Paso 0 — Comprobar que todo está · *2 minutos*
+## Paso 0 — Bajar el marco a tu computadora · *1 minuto*
+
+**Qué vas a hacer.** Traer a tu computadora la carpeta con las herramientas. Todo
+lo demás de esta guía ocurre adentro de esa carpeta, así que va primero. **No hace
+falta instalar nada para este paso.**
+
+**Qué abrir.** Entrá a
+[`github.com/im-diego-ec/Projects`](https://github.com/im-diego-ec/Projects) y
+apretá el botón verde que dice **«Code»**. Se abre un menú: elegí
+**«Download ZIP»**.
+
+Cuando termine de bajar, **hacele doble clic al archivo `Projects-main.zip`** que
+quedó en tus Descargas. Eso crea una carpeta al lado. Movela donde te quede
+cómodo —tu carpeta personal está bien— y **no la dejes en Descargas ni en una
+carpeta temporal**: te va a servir para todos los proyectos que arranques, no
+sólo para éste.
+
+**Qué vas a ver.** Una carpeta con el marco adentro, con un archivo `README.md`
+y otros al lado. Uno de ellos se llama `arrancar`, y es el del paso siguiente.
+
+**Cómo sabés que salió bien.** La carpeta existe y adentro está el archivo
+`arrancar`. Nada más.
+
+> **La ruta de esa carpeta la vas a necesitar en los Pasos 3 y 5**, pero no hace
+> falta que la busques ahora: **el Paso 1 la imprime en pantalla** apenas abrís
+> `arrancar`, en la segunda línea. Cuando llegues ahí, copiala de la pantalla.
+
+> **Si ya sabés usar `gh`**, `gh repo clone im-diego-ec/Projects` hace lo mismo de
+> una. Si contesta `Could not resolve to a Repository`, no estás dentro de tu
+> cuenta: `gh auth login` y de nuevo. Y si preferís no lidiar con eso, el
+> **«Download ZIP»** de arriba no pide cuenta de nada.
+>
+> *Va sin bloque de comandos a propósito: este paso es el que decide si alguien
+> sigue o cierra la pestaña, y lo primero que se ve no puede ser una pantalla de
+> código. Hay una comprobación que lo exige.*
+
+---
+
+## Paso 1 — Comprobar que todo está · *2 minutos*
 
 **Qué vas a hacer.** Abrir un archivo que revisa todo y te dice qué falta.
 
-**En la carpeta que descargaste hay un archivo que se llama `arrancar`.
-Hacele doble clic.** Eso es todo: se abre una ventana negra, revisa tu
+**En la carpeta que descargaste en el Paso 0 hay un archivo que se llama
+`arrancar`. Hacele doble clic.** Eso es todo: se abre una ventana negra, revisa tu
 computadora, y te dice si está todo o qué falta.
 
 | Si usás… | El archivo es |
@@ -219,9 +268,16 @@ computadora, y te dice si está todo o qué falta.
 > sobre `arrancar.command` → **Abrir** → **Abrir** otra vez. Sólo hace falta la
 > primera vez.
 
-> **Si preferís escribirlo vos**, el archivo `arrancar` no hace más que llamar a
-> `node ~/Projects/herramientas/projects-INEXISTENTE.mjs` — es exactamente lo mismo,
-> y está acá por si te resulta más cómodo.
+> **Si preferís escribirlo vos**, esto corre la misma revisión:
+>
+> ```bash
+> node <la-carpeta-del-marco>/herramientas/projects-doctor.mjs
+> ```
+>
+> **Pero no es lo mismo, y conviene saberlo:** ese comando corre **sólo la
+> revisión**. El doble clic además te hace las preguntas y arma el proyecto
+> entero, sin que tengas que escribir un comando más. Si lo tipeás vos, después
+> tenés que seguir a mano.
 
 **Qué vas a ver**, si está todo:
 
@@ -263,59 +319,6 @@ tenés que mirar.
 > a ojo no comprueba nada: el piso de versión de Node vive en el código, no en la
 > pantalla. Y porque Docker no estaba en ninguna lista, y era el único requisito
 > que nada comprobaba.
-
----
-
-## Paso 1 — Traer el marco a tu computadora · *1 minuto*
-
-**Qué vas a hacer.** Bajar una copia del repositorio del marco. Se hace **una
-sola vez**, y sirve para todos los proyectos que arranques.
-
-**Qué copiar:**
-
-```bash
-gh repo clone im-diego-ec/Projects
-cd Projects
-pwd
-cd ..
-```
-
-**Qué vas a ver.** Una sola línea de la descarga, `Cloning into 'Projects'...`, y
-después la ruta completa de la carpeta que imprime `pwd`, algo así:
-
-```
-Cloning into 'Projects'...
-/Users/tu-nombre/Projects
-```
-
-En tu pantalla, entre esas dos, `git` puede meter unas cuantas líneas más de la
-descarga —cuántos archivos bajó, a qué velocidad—. No importan. **La que tenés
-que copiar es la última: la que empieza con una barra `/` y termina en
-`/Projects`.** Guardala en una nota o en un papel: es lo que en los Pasos 3 y 5
-se escribe como `<ruta-al-clon>`, y ningún otro comando la vuelve a imprimir.
-
-**Cómo sabés que salió bien.** Existe una carpeta `Projects`, adentro hay un
-archivo `README.md`, y tenés la ruta anotada.
-
-> **Si en vez de la descarga ves `Could not resolve to a Repository`**, hay dos
-> causas y la página no puede saber cuál es la tuya:
->
-> 1. **No estás autenticado.** Corré `gh auth login` y volvé a intentar.
-> 2. **Estás autenticado pero no te dieron acceso** al repositorio, que es
->    privado. Eso lo destraba una persona, no un comando: pedile a quien
->    administra la cuenta que te agregue como lector.
->
-> **Cómo distinguirlas.** El mensaje no es el mismo, y eso ayuda:
->
-> - Si dice `Could not resolve to a Repository`, GitHub te está contestando que
->   ese repositorio no existe **para vos** — o sea, la causa 2. Responde eso
->   tanto para lo que no existe como para lo que existe y no es tuyo, a propósito,
->   así que no podés saber cuál de las dos es sin preguntarle a una persona.
-> - Si en cambio el mensaje habla de que no estás dentro de tu cuenta, es la
->   causa 1 y la arreglás vos con `gh auth login`.
-
-> **No la pongas en una carpeta temporal.** El clon te sirve para todos los
-> proyectos, no para éste, y en Windows la carpeta `/tmp` ni siquiera existe.
 
 ---
 
