@@ -1381,9 +1381,13 @@ export const PASOS_DEL_ARRANQUE = [
     porQue:
       "el andamio trae los manifiestos con sus rangos pero NO el lockfile (un lockfile no convive con marcadores). " +
       "El CI corre con --frozen-lockfile: sin este install, el primer push muere ahi",
+    // NO DICE "corre `pnpm install` y lee el error": el arranque corre con la
+    // salida heredada, asi que ese error YA ESTA EN PANTALLA. Repetir el
+    // comando no agrega una sola linea de informacion.
     arreglo:
-      "corre `pnpm install` en el destino y lee el error. Causa habitual: un Node por debajo del que exigen las " +
-      "dependencias del andamio — copiar el andamio y poder instalarlo son dos pisos distintos, y este es el alto",
+      "el error de arriba es la salida de pnpm, tal cual. La causa habitual es un Node por debajo del que exigen " +
+      "las dependencias del andamio: copiar el andamio y poder instalarlo son dos pisos distintos, y este es el " +
+      "alto. El comprobador (herramientas/projects-doctor.mjs) dice que version tenes y cual hace falta",
   },
   {
     clave: "datos",
@@ -1391,9 +1395,11 @@ export const PASOS_DEL_ARRANQUE = [
     args: ["run", "datos"],
     necesitaRed: false,
     porQue: "lint y typecheck leen los tipos que genera este paso: sin el salen rojos por un import que no resuelve",
+    // Tampoco manda a repetir el comando: su salida ya se imprimio arriba.
     arreglo:
-      "corre `pnpm datos` en el destino. Si el proyecto NO genera cliente de datos, el valor GENERAR_CLIENTE_DATOS " +
-      "no corresponde y hay que borrar ese script y su paso del ci.yml (esta en la lista de limpiezas manuales de abajo)",
+      "la salida de arriba es la del generador, tal cual. Si este proyecto NO genera cliente de datos, el valor " +
+      "GENERAR_CLIENTE_DATOS no corresponde: hay que borrar ese script y su paso del ci.yml (esta en la lista de " +
+      "limpiezas manuales de abajo). Si SI lo genera, lo habitual es que falte levantar la base de datos primero",
   },
   {
     clave: "formateado",
@@ -1403,7 +1409,12 @@ export const PASOS_DEL_ARRANQUE = [
     porQue:
       "al sustituir los marcadores cambian los anchos del texto y el formateador alinea las tablas de markdown por " +
       "ancho: sin esta pasada el repo nace desalineado y `format:check` sale rojo por una razon que no es de nadie",
-    arreglo: "corre `pnpm format` en el destino",
+    // Este era el mas circular de los cuatro: decia SOLO "corre `pnpm format`",
+    // que es exactamente lo que acababa de fallar, y nada mas.
+    arreglo:
+      "es raro que este paso falle: el formateador reescribe, no juzga. Lo habitual es que no pueda ESCRIBIR " +
+      "--un archivo de solo lectura, una carpeta sin permiso-- o que un archivo tenga sintaxis rota. La salida " +
+      "de arriba nombra el archivo",
   },
   {
     clave: "verificado",
@@ -1411,9 +1422,15 @@ export const PASOS_DEL_ARRANQUE = [
     args: ["run", "verificar"],
     necesitaRed: false,
     porQue: "es la misma cadena que corre el CI: datos, lint, format:check, typecheck, test y build",
+    // EL CONSEJO NO PUEDE SER EL COMANDO QUE ACABA DE MORIR. Decia "corre
+    // `pnpm verificar` en el destino" justo despues de que `pnpm verificar`
+    // fallara: la persona lo corre otra vez, falla otra vez, y no aprendio nada.
+    // Ahora nombra los eslabones y como correr UNO solo.
     arreglo:
-      "corre `pnpm verificar` en el destino: encadena seis comprobaciones y el primer rojo corta, asi que la salida " +
-      "dice cual fue. Es el MISMO rojo que daria el CI en el primer push, con la diferencia de que aca se arregla antes",
+      "mira la salida de arriba: `verificar` encadena datos, lint, format:check, typecheck, test y build, y el " +
+      "PRIMER rojo corta, asi que ahi esta el nombre del que fallo. Corre ESE solo para iterar rapido " +
+      "(`pnpm lint`, `pnpm typecheck`, `pnpm test`...) en vez de la cadena entera. Es el MISMO rojo que daria el " +
+      "CI en el primer push, con la diferencia de que aca se arregla antes",
   },
 ];
 
@@ -1595,10 +1612,68 @@ export function correrPaso(ejecutor, paso, destino, env = process.env, dirDeShim
       env: entornoDelArranque(env, dirDeShims),
       shell: process.platform === "win32",
     });
-    return { ok: true, error: null };
+    return { ok: true, error: null, codigo: null, estado: null };
   } catch (e) {
-    return { ok: false, error: `${e?.status !== undefined && e?.status !== null ? `salio ${e.status}` : e?.code ?? "fallo"}` };
+    // `codigo` y `estado` se devuelven CRUDOS ademas del texto. El texto es para
+    // la persona; estos dos son para `arregloConcretoDe`, que no puede clasificar
+    // nada si lo unico que recibe es una frase ya armada.
+    return {
+      ok: false,
+      error: `${e?.status !== undefined && e?.status !== null ? `salio ${e.status}` : (e?.code ?? "fallo")}`,
+      codigo: e?.code ?? null,
+      estado: e?.status ?? null,
+    };
   }
+}
+
+/** EL CONSEJO QUE MIRA QUE FALLO, y no solo en que paso.
+ *
+ *  QUE DEFECTO CIERRA. `lineasDelResumen` lee `fallo.arregloConcreto ?? fallo.paso.arreglo`
+ *  desde siempre, pero un grep sobre TODO el repositorio devolvia UNA SOLA linea:
+ *  la lectura. Nadie asignaba nunca ese campo, asi que el 100% de los fallos del
+ *  arranque imprimia el consejo generico del paso.
+ *
+ *  Y EL GENERICO NO PUEDE MIRAR LA CAUSA: dice lo mismo si falto la red, si falto
+ *  un permiso o si el ejecutable no existe. Las tres tienen arreglos distintos, y
+ *  la del ejecutable es la peor, porque el consejo del paso manda a correr un
+ *  comando que tampoco va a existir.
+ *
+ *  DEVUELVE `null` CUANDO NO SABE, a proposito. Inventar una causa es peor que dar
+ *  el consejo generico: manda a la persona a arreglar algo que no esta roto. El
+ *  `??` del resumen se encarga del resto. */
+export function arregloConcretoDe(fallo, ejecutor = {}) {
+  const codigo = fallo?.codigo ?? null;
+  const estado = fallo?.estado ?? null;
+  const cmd = ejecutor?.comando ?? "el instalador";
+
+  // ENOENT de execFileSync = el EJECUTABLE no existe. En Windows, que corre con
+  // shell, el shell contesta 127 en vez de ENOENT: es el mismo caso por otra via.
+  if (codigo === "ENOENT" || estado === 127) {
+    return (
+      `esto no es un fallo del proyecto: falta el programa \`${cmd}\` en esta computadora. ` +
+      "Si es pnpm, se trae con `corepack enable` (viene con Node, no se instala aparte). " +
+      "Si falta Node entero, se baja de https://nodejs.org, la version que dice LTS. " +
+      "El comprobador (herramientas/projects-doctor.mjs) revisa esto y lo demas de una sola vez"
+    );
+  }
+
+  if (codigo === "EACCES" || codigo === "EPERM") {
+    return (
+      "falto un permiso para escribir o para ejecutar, no fallo el codigo. Casi siempre es el destino: tiene que " +
+      "ser una carpeta tuya y no una del sistema (Documentos sirve; la raiz del disco no). NO conviene reintentar " +
+      "con permisos de administrador, porque deja archivos que despues no vas a poder tocar"
+    );
+  }
+
+  if (codigo === "ETIMEDOUT" || codigo === "ENOTFOUND" || codigo === "ECONNRESET" || codigo === "EAI_AGAIN") {
+    return (
+      "se corto internet en el medio: el paso necesitaba bajar cosas y no llego. El proyecto YA ESTA ESCRITO en el " +
+      "destino, asi que no hay que empezar de nuevo: cuando vuelva la conexion alcanza con correr ese paso solo, " +
+      "parado en la carpeta del destino"
+    );
+  }
+
+  return null;
 }
 
 /** El modulo que sabe hablarle al registro de npm, cargado SOLO cuando el
@@ -3110,7 +3185,7 @@ async function main(argv) {
         console.log("");
         console.log(`── ${hechos.length + 1}/${pasosDeEsteDestino.length}  ${paso.titulo}  (${ejecutor.nombre} ${paso.args.join(" ")})`);
         const r = correrPaso(ejecutor, paso, o.destino, process.env, dirDeShims);
-        hechos.push({ paso, ...r });
+        hechos.push({ paso, ...r, arregloConcreto: r.ok ? null : arregloConcretoDe(r, ejecutor) });
         // Se corta en el primero que falla: los que vienen despues dependen de
         // el, y dejarlos correr convierte un rojo legible en una cascada donde
         // el primero —el unico que importa— queda cuatro pantallas arriba.
