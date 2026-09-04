@@ -496,6 +496,52 @@ habías contestado, y reescribe el archivo.
 
 ---
 
+## Si te equivocaste en una respuesta
+
+Pasa, y tiene arreglo en los dos momentos en que te podés dar cuenta.
+
+### Antes de armar el proyecto · *1 minuto*
+
+**Volvé a correr el asistente. No te va a hacer contestar todo de nuevo.**
+
+```bash
+./arrancar.sh
+```
+
+Lo primero que vas a ver es esto:
+
+```
+Retomando lo que contestaste antes (…/.projects-respuestas.json). Enter mantiene cada respuesta.
+```
+
+De ahí en adelante, **Enter deja cada respuesta como estaba**. Llegás a la que
+querías cambiar, escribís la nueva, y seguís apretando Enter hasta el final. Y si
+te pasás de largo, en cualquier pregunta podés escribir `volver` para retroceder
+una: la respuesta que ya diste no se pierde.
+
+> En Windows es `arrancar.cmd` y en macOS `arrancar.command` — el mismo archivo
+> que abriste la primera vez.
+
+### Después de armar el proyecto
+
+Acá depende de cuánto trabajo tuyo haya adentro:
+
+**Si todavía no escribiste nada propio** —o sea, acabás de armarlo— lo más
+limpio es **borrar la carpeta del proyecto, volver a crearla vacía y correr el
+Paso 5 otra vez** con la respuesta corregida. Tarda lo mismo que la primera vez.
+
+**Si ya trabajaste ahí adentro**, no borres nada. El proyecto tiene un archivo
+`.projects-valores.json` con las 23 casillas y el valor que quedó en cada una:
+abrilo, buscá la que está mal, y reemplazá **ese valor viejo por el nuevo** en el
+proyecto. Es una búsqueda y reemplazo de texto, y ese archivo te dice exactamente
+qué texto buscar.
+
+> **Ojo con los valores muy cortos.** Si lo que cambia es, por ejemplo, un nombre
+> de usuario de tres letras, ese texto puede aparecer en lugares que no tienen
+> nada que ver. Mirá cada coincidencia antes de reemplazarla, una por una.
+
+---
+
 ## Paso 5 — Armar el repositorio y dejarlo en verde, de un tirón · *25 segundos (medido)*
 
 **Qué vas a hacer.** Un solo comando que hace **dos cosas seguidas**: copia el
