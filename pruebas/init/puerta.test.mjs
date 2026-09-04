@@ -35,10 +35,21 @@ const PUERTA_YML = "herramientas/plantilla-repos/personalizar.yml";
 
 const enTemporal = (fn) => {
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "puerta-"));
-  try { return fn(tmp); } finally { fs.rmSync(tmp, { recursive: true, force: true }); }
+  try {
+    return fn(tmp);
+  } finally {
+    fs.rmSync(tmp, { recursive: true, force: true });
+  }
 };
 
-const formulario = (extra = {}) => ({ forma: "aplicacion", plataforma: "supabase", equipo: "solo", companero: "", dominio: "", ...extra });
+const formulario = (extra = {}) => ({
+  forma: "aplicacion",
+  plataforma: "supabase",
+  equipo: "solo",
+  companero: "",
+  dominio: "",
+  ...extra,
+});
 
 test("el formulario tiene campos, y entran en el tope de GitHub", () => {
   assert.ok(CAMPOS.length >= 4, `se declararon ${CAMPOS.length} campos: parece vacio`);
@@ -137,7 +148,11 @@ test("escribe los desvios, que es lo que el camino de --valores NO hace", () => 
 test("la puerta tiene LAS DOS guardas, no una", () => {
   const yml = fs.readFileSync(path.join(RAIZ, PUERTA_YML), "utf8");
   assert.match(yml, /if:\s*github\.event\.repository\.is_template\s*!=\s*true/, "falta la guarda del `if` del job");
-  assert.match(yml, /ES_TEMPLATE:\s*\$\{\{\s*github\.event\.repository\.is_template\s*\}\}/, "el workflow no le pasa is_template al codigo, que es donde vive la segunda guarda");
+  assert.match(
+    yml,
+    /ES_TEMPLATE:\s*\$\{\{\s*github\.event\.repository\.is_template\s*\}\}/,
+    "el workflow no le pasa is_template al codigo, que es donde vive la segunda guarda",
+  );
   assert.match(yml, /projects-puerta\.mjs/, "el workflow no llama al codigo, que es donde vive la segunda guarda");
   assert.match(yml, /permissions:/, "el job tiene que declarar sus permisos");
 });
@@ -155,12 +170,19 @@ test("la puerta NO toca los workflows, porque el GITHUB_TOKEN no puede", () => {
 
 test("la puerta se borra a si misma, que es lo unico que SI puede hacer con un workflow", () => {
   const yml = fs.readFileSync(path.join(RAIZ, PUERTA_YML), "utf8");
-  assert.match(yml, /rm -f \.github\/workflows\/personalizar\.yml/, "sin esto, se puede volver a correr sobre un proyecto ya personalizado");
+  assert.match(
+    yml,
+    /rm -f \.github\/workflows\/personalizar\.yml/,
+    "sin esto, se puede volver a correr sobre un proyecto ya personalizado",
+  );
 });
 
 test("la puerta trae el marco en la version que el proyecto declara, no en main", () => {
   const yml = fs.readFileSync(path.join(RAIZ, PUERTA_YML), "utf8");
-  assert.ok(!/ref:\s*main/.test(yml), "con `main` el proyecto nace con un artefacto de la version en desarrollo y su CI lo rechaza");
+  assert.ok(
+    !/ref:\s*main/.test(yml),
+    "con `main` el proyecto nace con un artefacto de la version en desarrollo y su CI lo rechaza",
+  );
   // El patron del propio workflow lleva el punto escapado para grep, asi que se
   // busca la parte estable y no la expresion literal.
   assert.match(yml, /marco-ci/, "la version se lee del propio ci.yml del proyecto");
@@ -213,4 +235,87 @@ test("y corrido de verdad en un repositorio normal, escribe y sale 0", () => {
     });
     assert.deepEqual(fs.readdirSync(tmp).sort(), ["desvios.json", "valores.json"]);
   });
+});
+
+// ---------------------------------------------------------------------------
+// LA PUERTA PEDIA EL DOMINIO, LO VALIDABA, Y DESPUES LO TIRABA.
+//
+// El encabezado de projects-puerta promete que la puerta hereda las derivaciones
+// del asistente porque llama a las MISMAS funciones. Pero escribia las claves
+// `dominio_propio` y `DOMINIO`, y `derivar` lee `dominio` y `DOMINIO_PROD`.
+// Ninguna de las dos existia: el dominio que la persona escribio --y que
+// `problemas` se tomaba el trabajo de rechazar si estaba mal-- se tiraba en
+// silencio, y el proyecto nacia apuntando a la direccion gratuita.
+//
+// Compartir las funciones no alcanza si no se comparten los nombres.
+// ---------------------------------------------------------------------------
+
+test("el dominio que la persona escribe LLEGA hasta el valor final", async () => {
+  const { derivar } = await import("../../herramientas/projects-asistente.mjs");
+  const r = respuestasDelFormulario(
+    { forma: "sitio", plataforma: "ninguna", equipo: "solo", companero: "", dominio: "miproyecto.com" },
+    "yo/mi-sitio",
+  );
+  assert.equal(r.dominio, "propio", "la puerta no marca que hay dominio propio con la clave que derivar lee");
+  assert.equal(derivar(r).DOMINIO_PROD, "miproyecto.com", "el dominio se perdio entre la puerta y la derivacion");
+});
+
+test("sin dominio, la direccion gratuita sigue saliendo bien", async () => {
+  const { derivar } = await import("../../herramientas/projects-asistente.mjs");
+  const r = respuestasDelFormulario({ forma: "sitio", plataforma: "ninguna", equipo: "solo", dominio: "" }, "yo/mi-sitio");
+  assert.equal(r.dominio, "gratuito");
+  assert.match(derivar(r).DOMINIO_PROD, /workers\.dev$/, "sin dominio propio tendria que salir la direccion gratuita");
+});
+
+test("TODAS las claves que la puerta escribe son de las que el asistente lee", async () => {
+  // Es la clase entera del defecto, no el caso del dominio: una clave que la
+  // puerta invente se tira en silencio, sin que nada se ponga rojo.
+  const { PREGUNTAS } = await import("../../herramientas/projects-asistente.mjs");
+  const r = respuestasDelFormulario(
+    { forma: "aplicacion", plataforma: "supabase", equipo: "equipo", companero: "ana", dominio: "x.com" },
+    "yo/mi-app",
+  );
+  const conocidas = new Set(PREGUNTAS.map((p) => p.id));
+  const inventadas = Object.keys(r).filter((k) => !conocidas.has(k));
+  assert.deepEqual(inventadas, [], `la puerta escribe claves que ninguna pregunta del asistente usa: ${inventadas.join(", ")}`);
+
+  // Y LOS VALORES, no solo los nombres. Es la otra mitad del mismo defecto y era
+  // la que quedaba abierta: la puerta escribia `ambientes: "una"` y la pregunta
+  // acepta "uno" o "dos". Un valor que ninguna opcion declara no rompe nada, se
+  // cuela por el `else` de cada comparacion y decide en silencio lo contrario de
+  // lo que la persona hubiera elegido. Con "una", el resumen decia "una de prueba
+  // y una de verdad".
+  const malos = [];
+  for (const p of PREGUNTAS) {
+    const v = r[p.id];
+    if (v === undefined || !p.opciones) continue;
+    if (!p.opciones.some((o) => o.valor === v)) {
+      malos.push(`${p.id}="${v}" (acepta ${p.opciones.map((o) => o.valor).join(", ")})`);
+    }
+  }
+  assert.deepEqual(malos, [], `la puerta escribe valores que la pregunta no acepta: ${malos.join(" | ")}`);
+});
+
+test("la ARROBA se saca, como la saca el asistente", () => {
+  // El campo dice "sin la arroba", y esa aclaracion es la seniial de que la gente
+  // la escribe con arroba. El asistente normaliza; la puerta pasaba `@ana` tal
+  // cual y el error salia un paso despues, en el log rojo de Actions, nombrando
+  // una clave interna y una ruta del runner.
+  const r = respuestasDelFormulario({ forma: "sitio", equipo: "equipo", companero: "@ana" }, "yo/x");
+  assert.equal(r.BUILDER_2, "ana", "la arroba llego hasta BUILDER_2");
+});
+
+test("un nombre que NO es un usuario se rechaza en el formulario, no un paso despues", () => {
+  const p = problemas({ forma: "sitio", equipo: "equipo", companero: "Ana Perez" }, "yo/x");
+  assert.equal(p.length, 1, `esperaba un problema y hubo ${p.length}`);
+  assert.match(p[0], /Ana Perez/, "no dice que fue lo que escribio");
+  assert.match(p[0], /github\.com\//, "no dice donde encontrar el dato correcto");
+  assert.ok(!/BUILDER_2/.test(p[0]), "le muestra el nombre de una clave interna a quien nunca vio el codigo");
+});
+
+test("y un usuario valido con arroba NO se rechaza: la normalizacion va antes que la validacion", () => {
+  // Si se validara el texto crudo, `@ana` --que es correcto y comunisimo-- daria
+  // rojo, y el arreglo seria peor que el defecto.
+  assert.deepEqual(problemas({ forma: "sitio", equipo: "equipo", companero: "@ana" }, "yo/x"), []);
+  assert.deepEqual(problemas({ forma: "sitio", equipo: "equipo", companero: "ana-perez" }, "yo/x"), []);
 });

@@ -34,7 +34,7 @@ import fs from "node:fs";
 import path from "node:path";
 import process from "node:process";
 import { derivar, desvios } from "./projects-asistente.mjs";
-import { invocadoDirecto } from "./projects-init.mjs";
+import { FORMATOS, invocadoDirecto } from "./projects-init.mjs";
 
 /** La cuenta que publica el marco. Se usa SOLO para ORG_MARCO --que es un valor
  *  del proyecto, no una identidad de este repositorio-- y nunca para decidir
@@ -95,9 +95,23 @@ export function respuestasDelFormulario(entrada, repo) {
   if (!duenio || !nombre) throw new Error(`no pude leer el repositorio de "${repo}": se esperaba duenio/nombre`);
 
   const equipo = entrada.equipo === "equipo" ? "equipo" : "solo";
-  const companero = (entrada.companero ?? "").trim();
+  // LA ARROBA SE SACA ACA, como la saca el asistente por terminal. El campo dice
+  // "su usuario de GitHub, SIN la arroba", y esa aclaracion es justamente la
+  // seniial de que la gente lo escribe con arroba. El asistente normaliza; la
+  // puerta pasaba `@ana` tal cual, y el error aparecia un paso despues, dentro de
+  // projects-init, en la unica pantalla que esa persona tiene: el log rojo de
+  // Actions, nombrando una clave interna y una ruta del runner.
+  const companero = (entrada.companero ?? "").trim().replace(/^@/, "");
   const dominio = (entrada.dominio ?? "").trim();
 
+  // LAS CLAVES SON LAS QUE `derivar` LEE DE VERDAD, y esto se habia perdido. El
+  // encabezado de este archivo promete que la puerta hereda las derivaciones del
+  // asistente llamando a las MISMAS funciones; pero escribia `dominio_propio` y
+  // `DOMINIO`, y `derivar` lee `dominio` y `DOMINIO_PROD`. Ninguna de las dos
+  // existia, asi que el dominio que la persona escribio --y que `problemas` se
+  // tomaba el trabajo de validar-- se tiraba en silencio y el proyecto nacia
+  // apuntando a la direccion gratuita. Compartir las funciones no alcanza si no se
+  // comparten los nombres.
   const r = {
     PROYECTO: nombre.toLowerCase(),
     ORG: duenio,
@@ -106,11 +120,11 @@ export function respuestasDelFormulario(entrada, repo) {
     equipo,
     // Trabajando solo, la otra persona es la misma: es lo que hace el asistente.
     BUILDER_2: equipo === "equipo" ? companero : duenio,
-    ambientes: "una",
-    dominio_propio: dominio ? "si" : "no",
-    avisos: "github",
+    ambientes: "uno",
+    dominio: dominio ? "propio" : "gratuito",
+    avisos: "correo",
   };
-  if (dominio) r.DOMINIO = dominio;
+  if (dominio) r.DOMINIO_PROD = dominio;
   return r;
 }
 
@@ -125,8 +139,18 @@ export function problemas(entrada, repo) {
         'Lo que corresponde es apretar "Use this template" arriba, y correr esto en la copia.',
     );
   }
-  if (entrada.equipo === "equipo" && !(entrada.companero ?? "").trim()) {
+  const companero = (entrada.companero ?? "").trim().replace(/^@/, "");
+  if (entrada.equipo === "equipo" && !companero) {
     p.push('elegiste "en equipo" y no pusiste el usuario de la otra persona: sin eso no se puede armar CODEOWNERS');
+  } else if (companero && !FORMATOS.BUILDER_2.patron.test(companero)) {
+    // SE VALIDA ACA Y NO UN PASO DESPUES. El mismo patron que usa el asistente,
+    // pero el mensaje va en el idioma del formulario: quien llego por la puerta web
+    // no sabe que es BUILDER_2 ni tiene una terminal donde mirar.
+    p.push(
+      `"${entrada.companero}" no parece un usuario de GitHub. Es el nombre corto que aparece en ` +
+        "github.com/EL-USUARIO — sin la arroba, sin espacios y sin el nombre completo. " +
+        'Si no lo sabes, se lo podes preguntar: esta arriba a la derecha de su pagina.',
+    );
   }
   const dominio = (entrada.dominio ?? "").trim();
   if (dominio && !/^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$/i.test(dominio)) {
