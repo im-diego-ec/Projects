@@ -2539,6 +2539,26 @@ async function main(argv) {
             'organización, cambiá `TIPO_CUENTA` a "organizacion" en .projects-valores.json.',
         );
       }
+      // EL RESUMEN Y LA CONFIRMACION VAN ADENTRO DEL `try`, y no despues: hacen
+      // falta la misma terminal que hizo las preguntas, y el `finally` de abajo
+      // la cierra.
+      //
+      // EL DEFECTO QUE ESTO CIERRA. El comentario de `lineasDeResumen` dice, con
+      // todas las letras, que el resumen existe «para que la persona pueda
+      // arrepentirse» — y las tres lineas siguientes eran `writeFileSync`. O sea
+      // que mostraba lo elegido y escribia igual, sin darle a nadie la
+      // oportunidad de arrepentirse de nada. Un resumen que no se puede rechazar
+      // no es un resumen: es un aviso.
+      //
+      // EL DEFAULT ES QUE SI: quien llego hasta aca ya contesto todo, y pedirle
+      // que escriba "si" seria un peaje sobre el caso comun. Lo que hace falta es
+      // que el "no" EXISTA y este a la vista.
+      for (const linea of asis.lineasDeResumen(resultado.respuestas, resultado.desvios)) process.stdout.write(`${linea}\n`);
+      const confirmacion = (await preguntarPorTeclado('\n  ¿Escribo esto? [Enter = sí, o escribí "no"]: ', "confirmar")).trim();
+      if (asis.esNo(confirmacion)) {
+        process.stdout.write("\nNo se escribió nada. Volvé a correrlo cuando quieras: no se tocó ningún archivo.\n");
+        return 0;
+      }
     } catch (e) {
       console.error("");
       console.error(`::error::${e.message}. NO se escribio nada.`);
@@ -2548,7 +2568,6 @@ async function main(argv) {
     } finally {
       rl.close();
     }
-    for (const linea of asis.lineasDeResumen(resultado.respuestas, resultado.desvios)) process.stdout.write(`${linea}\n`);
 
     const salida = rutaDeValores;
     fs.writeFileSync(salida, `${JSON.stringify(resultado.valores, null, 2)}\n`);

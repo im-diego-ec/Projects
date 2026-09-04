@@ -483,6 +483,16 @@ export const PREGUNTAS = [
  *  comodo no vale un retroceso que la persona no pidio. */
 const VOLVER = new Set(["atras", "atrás", "volver", "<"]);
 
+/** Las formas de decir que NO al resumen final.
+ *
+ *  EL DEFAULT ES QUE SI --Enter escribe-- porque quien llego hasta aca ya
+ *  contesto todo y lo mas probable es que quiera seguir. Pedirle que escriba
+ *  "si" seria un peaje sobre el caso comun. Lo que hace falta es que el "no"
+ *  EXISTA y sea facil de encontrar. */
+const NO = new Set(["no", "n", "cancelar", "salir"]);
+
+export const esNo = (respuesta) => NO.has(String(respuesta ?? "").trim().toLowerCase());
+
 export const esVolver = (respuesta) => VOLVER.has(String(respuesta ?? "").trim().toLowerCase());
 
 export function derivar(r) {
