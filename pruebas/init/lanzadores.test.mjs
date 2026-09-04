@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import { execFileSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
@@ -107,11 +108,15 @@ function hayBash() {
   }
 }
 
-test("los de shell parsean: bash -n caza los errores de sintaxis de verdad", { skip: hayBash() ? false : "no hay bash en esta maquina" }, () => {
-  for (const nombre of ["arrancar.sh", "arrancar.command"]) {
-    execFileSync("bash", ["-n", path.join(RAIZ, nombre)], { stdio: "pipe" });
-  }
-});
+test(
+  "los de shell parsean: bash -n caza los errores de sintaxis de verdad",
+  { skip: hayBash() ? false : "no hay bash en esta maquina" },
+  () => {
+    for (const nombre of ["arrancar.sh", "arrancar.command"]) {
+      execFileSync("bash", ["-n", path.join(RAIZ, nombre)], { stdio: "pipe" });
+    }
+  },
+);
 
 // LO QUE `bash -n` NO CAZA, y por eso hay un detector aparte abajo.
 //
@@ -123,17 +128,21 @@ test("los de shell parsean: bash -n caza los errores de sintaxis de verdad", { s
 //
 // Es exactamente el defecto que tuvo la primera version de `arrancar.command`, y
 // un banco que se apoyara solo en `bash -n` habria salido verde sobre el.
-test("MUERDE: bash -n NO caza el // , asi que apoyarse solo en el no protege", { skip: hayBash() ? false : "no hay bash en esta maquina" }, () => {
-  const roto = path.join(RAIZ, "pruebas/.lanzador-roto-temporal.sh");
-  fs.writeFileSync(roto, "#!/usr/bin/env bash\n// esto no es un comentario en bash\necho ok\n");
-  try {
-    execFileSync("bash", ["-n", roto], { stdio: "pipe" });
-  } catch {
-    assert.fail("bash -n empezo a cazar el // : si es asi, este detector aparte ya no hace falta y hay que sacarlo");
-  } finally {
-    fs.rmSync(roto, { force: true });
-  }
-});
+test(
+  "MUERDE: bash -n NO caza el // , asi que apoyarse solo en el no protege",
+  { skip: hayBash() ? false : "no hay bash en esta maquina" },
+  () => {
+    const roto = path.join(RAIZ, "pruebas/.lanzador-roto-temporal.sh");
+    fs.writeFileSync(roto, "#!/usr/bin/env bash\n// esto no es un comentario en bash\necho ok\n");
+    try {
+      execFileSync("bash", ["-n", roto], { stdio: "pipe" });
+    } catch {
+      assert.fail("bash -n empezo a cazar el // : si es asi, este detector aparte ya no hace falta y hay que sacarlo");
+    } finally {
+      fs.rmSync(roto, { force: true });
+    }
+  },
+);
 
 test("ninguna linea de un script de shell abre un comentario con // : bash lo lee como un comando", () => {
   const malas = [];
@@ -195,4 +204,144 @@ test("los que llevan logica dejan la ventana abierta al final: si se cierra sola
   assert.match(sh, /read -r -p/, "arrancar.sh se cierra sin que nadie alcance a leer el motivo");
   const win = fs.readFileSync(path.join(RAIZ, "arrancar.cmd"), "utf8");
   assert.match(win, /\bpause\b/, "arrancar.cmd se cierra sin que nadie alcance a leer el motivo");
+});
+
+// ---------------------------------------------------------------------------
+// Y AHORA SE CORREN DE VERDAD.
+//
+// Todo lo de arriba LEE los lanzadores. Leerlos caza un `//` en un archivo de
+// bash, que es el defecto que ya paso, pero no caza nada de lo que solo se ve
+// ejecutando: un `%~dp0` mal cerrado, un `if errorlevel` que compara al reves,
+// un parentesis sin escapar en un `echo` de cmd. El lanzador de Windows en
+// particular NUNCA se habia ejecutado en Windows --ni una vez, ni en el CI ni a
+// mano-- y es el archivo que mas gente va a abrir con doble clic.
+//
+// CADA SISTEMA CORRE EL SUYO, y este archivo vive en `pruebas/init/`, que es el
+// unico directorio que el CI corre en la matriz de los tres. Asi
+// `arrancar.cmd` se ejecuta en windows-latest, `arrancar.command` en
+// macos-latest y `arrancar.sh` en ubuntu-latest, cada uno en el sistema para el
+// que existe.
+//
+// SE CORRE SOBRE UNA COPIA, no sobre el clon. El lanzador hace `cd` a su propia
+// carpeta y el asistente escribe `valores.json` ahi: correrlo sobre el clon real
+// seria un banco que ensucia el arbol que esta probando. La copia lleva los
+// lanzadores y `herramientas/`, que es todo lo que estos dos pasos tocan.
+//
+// LA ENTRADA SE CIERRA. Los dos lanzadores tienen pausas ("Apreta Enter") y el
+// asistente EXIGE una terminal. Con la entrada cerrada, las pausas pasan de
+// largo y el asistente aborta con su mensaje: eso no es una limitacion del
+// banco, es el camino que hay que comprobar --que el lanzador propague ese
+// corte en vez de colgarse o mentir--.
+// ---------------------------------------------------------------------------
+
+/** Una copia del clon con lo justo para que el lanzador corra. */
+function clonDeMentira() {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "lanzador-"));
+  for (const l of LANZADORES) {
+    const destino = path.join(dir, l.archivo);
+    fs.copyFileSync(path.join(RAIZ, l.archivo), destino);
+    fs.chmodSync(destino, 0o755);
+  }
+  fs.cpSync(path.join(RAIZ, "herramientas"), path.join(dir, "herramientas"), { recursive: true });
+  return dir;
+}
+
+/** El lanzador que le toca a ESTE sistema. Es el punto del banco: cada pata de
+ *  la matriz ejercita el archivo que su gente va a abrir. */
+const MIO = process.platform === "win32" ? "arrancar.cmd" : process.platform === "darwin" ? "arrancar.command" : "arrancar.sh";
+
+test(`el lanzador de este sistema (${MIO}) CORRE, y no solo se lee`, () => {
+  const dir = clonDeMentira();
+  const ruta = path.join(dir, MIO);
+  let salida = "";
+  let codigo = 0;
+  try {
+    salida = execFileSync(process.platform === "win32" ? "cmd" : "bash", process.platform === "win32" ? ["/c", ruta] : [ruta], {
+      encoding: "utf8",
+      // La entrada cerrada es parte del caso: ver el comentario de arriba.
+      stdio: ["ignore", "pipe", "pipe"],
+      // Si se cuelga esperando una tecla, el banco tiene que fallar y no quedarse.
+      timeout: 120_000,
+      // SE LO CORRE DESDE OTRO LADO A PROPOSITO, y esto lo enseño una mutacion.
+      // Con `cwd` puesto en la carpeta del lanzador, un lanzador que derive su
+      // raiz de `pwd` en vez de derivarla DE SI MISMO pasa igual, porque los dos
+      // valores coinciden. Y esa es la unica cosa que el lanzador existe para
+      // hacer: Finder abre la terminal en el HOME, no en la carpeta del archivo,
+      // y el Explorador de Windows hace lo mismo. Correrlo desde su propia
+      // carpeta es probarlo en la unica condicion que nunca se da.
+      cwd: os.tmpdir(),
+    });
+  } catch (e) {
+    codigo = e.status ?? -1;
+    salida = `${e.stdout ?? ""}${e.stderr ?? ""}`;
+    assert.notEqual(e.signal, "SIGTERM", `${MIO} se colgo esperando una tecla con la entrada cerrada`);
+  }
+
+  // Lo que tiene que haber pasado, en orden. Si el archivo tuviera un error de
+  // sintaxis, ninguna de estas lineas estaria: es lo que hace que este caso
+  // valga por los tres.
+  assert.match(salida, /Marco de proyectos/, `${MIO} no llego a imprimir su encabezado:\n${salida}`);
+  assert.match(salida, /Paso 0/, `${MIO} no llego al comprobador de requisitos:\n${salida}`);
+  assert.match(salida, /Esto es lo que necesita el marco/, `${MIO} no ejecuto el comprobador:\n${salida}`);
+
+  // Y de ahi se abre en dos, las dos correctas. En una maquina con todo puesto y
+  // la sesion de GitHub abierta llega al Paso 1; en un runner sin sesion, el
+  // comprobador corta y el lanzador tiene que DECIRLO en vez de seguir de largo.
+  const llegoAlPaso1 = /Paso 1/.test(salida);
+  const cortoEnPaso0 = /Arriba dice exactamente que falta/.test(salida);
+  assert.ok(llegoAlPaso1 || cortoEnPaso0, `${MIO} ni llego al paso 1 ni dijo por que se corto en el paso 0:\n${salida}`);
+
+  // EL CODIGO Y EL MENSAJE TIENEN QUE DECIR LO MISMO, y esa es la comprobacion,
+  // no el numero. Una version anterior de este caso exigia que el codigo fuera 0
+  // o 1, y salio rojo con un lanzador que funcionaba PERFECTO: el asistente sin
+  // terminal sale 2 --su codigo de uso-- y el lanzador lo propaga tal cual, que
+  // es justamente lo que tiene que hacer. Fijar la lista de codigos aca la
+  // duplicaba, y la copia de aca se pudria sola.
+  //
+  // Lo que si vale en los tres sistemas y con cualquier codigo: el lanzador NUNCA
+  // termina en silencio, y lo que dice concuerda con como salio. Un archivo con
+  // la sintaxis rota tampoco sale 0, pero no imprime ninguno de estos cierres.
+  if (llegoAlPaso1) {
+    assert.match(
+      salida,
+      codigo === 0 ? /Listo el paso 1/ : /Se corto en el paso 1/,
+      `${MIO} salio con ${codigo} y su mensaje de cierre no concuerda:\n${salida}`,
+    );
+  }
+  assert.notEqual(codigo, null, `${MIO} no devolvio codigo de salida`);
+
+  // Y no escribio nada que no le corresponda: el asistente aborta sin terminal,
+  // asi que valores.json NO tiene que existir. Si existiera, este banco habria
+  // estado escribiendo en el clon real todo este tiempo.
+  assert.ok(!fs.existsSync(path.join(dir, "valores.json")), "el asistente escribio valores.json sin una terminal");
+  fs.rmSync(dir, { recursive: true, force: true });
+});
+
+test("MUERDE: un lanzador con la sintaxis rota se caza al correrlo", () => {
+  // Sin este caso, el de arriba podria estar pasando por una coincidencia de
+  // textos. Se rompe el archivo a proposito y se exige que el encabezado NO
+  // aparezca: es lo que separa "corri el lanzador" de "lei un archivo".
+  const dir = clonDeMentira();
+  const ruta = path.join(dir, MIO);
+  const roto =
+    process.platform === "win32"
+      ? "@echo off\r\nif errorlevel ( echo nunca\r\n" // parentesis sin cerrar
+      : "set -e\nif [ 1 ; then echo nunca; fi\n"; // corchete sin cerrar
+  fs.writeFileSync(ruta, roto);
+  let salida = "";
+  try {
+    salida = execFileSync(process.platform === "win32" ? "cmd" : "bash", process.platform === "win32" ? ["/c", ruta] : [ruta], {
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "pipe"],
+      timeout: 30_000,
+      cwd: os.tmpdir(),
+    });
+  } catch (e) {
+    salida = `${e.stdout ?? ""}${e.stderr ?? ""}`;
+  }
+  assert.ok(
+    !/Marco de proyectos/.test(salida),
+    "un lanzador roto igual imprimio el encabezado: el caso de arriba no lo esta ejecutando",
+  );
+  fs.rmSync(dir, { recursive: true, force: true });
 });
