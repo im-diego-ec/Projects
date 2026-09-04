@@ -407,6 +407,146 @@ export function sugerenciaDeBandera(argumento, banderas = BANDERAS) {
   return mejor && mejorD <= tope ? ` — ¿quisiste decir ${mejor}?` : "";
 }
 
+// ─────────────────────────── La bitacora ───────────────────────────
+//
+// QUE DEFECTO CIERRA, y es el mas humano de todos. Este arranque tarda minutos y
+// escribe cientos de lineas. Cuando algo muere en el minuto ocho, lo que la
+// persona tiene es una terminal con el rojo perdido cuatro pantallas arriba, y
+// si cierra la ventana no tiene NADA. Pedir ayuda entonces es escribir "me dio
+// un error", que es la peor forma de pedir ayuda y la unica disponible.
+//
+// LO QUE LA BITACORA GUARDA, y lo que NO. Guarda todo lo que ESTA herramienta
+// imprimio --los encabezados de cada paso, el diagnostico, el porque de ese paso
+// y su arreglo concreto-- mas los datos de la maquina que hacen falta para
+// entender un rojo ajeno: sistema, version de Node, version del marco, y las
+// banderas con las que se la llamo.
+//
+// NO guarda la salida de los programas que el arranque invoca (pnpm, openspec).
+// Esos corren con `stdio: "inherit"` a proposito: quien mira la pantalla tiene
+// que ver la salida REAL mientras pasa, con su barra de progreso y sus colores.
+// Capturarla obligaria a pasarlos por una tuberia, y sin una terminal del otro
+// lado pnpm apaga el progreso: se ganaria el log y se perderia el minuto ocho,
+// que es cuando la persona esta mirando. Esa salida queda en la terminal, la
+// bitacora dice que esta ahi, y dice tambien cual fue el paso que la produjo.
+//
+// NO LLEVA SECRETOS. Esta herramienta no recibe ninguno --los tokens viven en
+// GitHub, no en el archivo de valores-- y la bitacora no agrega nada que la
+// pantalla no haya mostrado ya. Eso es lo que hace que se pueda mandar sin leerla.
+
+/** El nombre del archivo. Va DENTRO del proyecto y no en una carpeta temporal:
+ *  una ruta como /var/folders/sf/.../T/ es imposible de encontrar para quien no
+ *  vive en una terminal, y la carpeta del proyecto es la unica que esa persona
+ *  sabe abrir. */
+export const NOMBRE_BITACORA = "bitacora-del-arranque.txt";
+
+/** Empieza a copiar todo lo que se imprima, sin dejar de imprimirlo.
+ *
+ *  SE INTERVIENE `console` Y NO SE CAMBIAN LAS ~200 LLAMADAS. Es deliberado: la
+ *  alternativa es reemplazar cada `console.log` de este archivo por un envoltorio,
+ *  y entonces la bitacora depende de que nadie escriba nunca un `console.log`
+ *  suelto — o sea, depende de que alguien se acuerde. Interviniendo el objeto una
+ *  sola vez, cualquier linea que salga por la pantalla queda guardada, incluidas
+ *  las que se escriban dentro de un anio.
+ *
+ *  Solo se hace desde el punto de entrada de esta herramienta, nunca al importarla
+ *  como modulo: un banco que la importa no puede quedarse con la consola tocada. */
+export function abrirBitacora(consola = console) {
+  const lineas = [];
+  const original = { log: consola.log, error: consola.error, warn: consola.warn };
+  const copiar = (marca, escribir) => (...args) => {
+    lineas.push(`${marca}${args.map((a) => (typeof a === "string" ? a : JSON.stringify(a))).join(" ")}`);
+    escribir(...args);
+  };
+  consola.log = copiar("", original.log.bind(consola));
+  consola.error = copiar("! ", original.error.bind(consola));
+  consola.warn = copiar("! ", original.warn.bind(consola));
+  return {
+    lineas,
+    cerrar() {
+      consola.log = original.log;
+      consola.error = original.error;
+      consola.warn = original.warn;
+    },
+  };
+}
+
+/** Los datos de la maquina que hacen falta para entender un rojo ajeno.
+ *
+ *  Cada uno esta porque un rojo real se explico con el: la version de Node
+ *  (el piso), el sistema (los tres se comportan distinto), la version del marco
+ *  (para saber si el defecto ya esta arreglado) y las banderas (para saber si
+ *  faltaba una). */
+export function encabezadoDeBitacora(argv, ahora) {
+  const version = (() => {
+    try {
+      return execFileSync("git", ["rev-parse", "--short", "HEAD"], {
+        cwd: ESTE_DIRECTORIO,
+        encoding: "utf-8",
+        stdio: ["ignore", "pipe", "ignore"],
+      }).trim();
+    } catch {
+      return "desconocida (esto no es un clon de git)";
+    }
+  })();
+  return [
+    "BITACORA DEL ARRANQUE",
+    "",
+    "Este archivo es una copia de lo que salio por pantalla, para que puedas pedir",
+    "ayuda mandandolo en vez de contar de memoria lo que decia. No lleva secretos:",
+    "esta herramienta no recibe ninguno.",
+    "",
+    "Lo que NO esta aca es la salida de pnpm y openspec, que se imprime en vivo en tu",
+    "terminal con su barra de progreso. Si el rojo fue de uno de ellos, copiala de ahi:",
+    "abajo dice cual paso lo produjo.",
+    "",
+    `  cuando       ${ahora}`,
+    `  sistema      ${process.platform} ${process.arch}`,
+    `  node         ${process.version}`,
+    `  marco        ${version}`,
+    `  invocacion   ${argv.join(" ")}`,
+    "",
+    "─".repeat(72),
+    "",
+  ];
+}
+
+/** Donde va la bitacora, que NO es el mismo lugar segun como haya salido.
+ *
+ *  CUANDO SALE BIEN va en el proyecto: existe, es la carpeta que la persona sabe
+ *  abrir, y el andamio la ignora en git.
+ *
+ *  CUANDO FALLA NO PUEDE IR AHI, y esto lo cazo el propio banco del marco con su
+ *  invariante mas fuerte: "aborta sin escribir NADA en el destino". La primera
+ *  version de esto la escribia igual, y rompia esa garantia de dos maneras. La
+ *  obvia: un fallo dejaba de no dejar nada. Y la que muerde de verdad: el guard
+ *  del destino ocupado mira si hay archivos, asi que esa bitacora TRABABA EL
+ *  REINTENTO — el arreglo de un rojo pasaba a exigir borrar un archivo que la
+ *  herramienta acababa de dejar, y que existia justamente para ayudar.
+ *
+ *  Asi que un fallo la deja en la carpeta temporal. La ruta es fea y por eso se
+ *  imprime entera: mejor una ruta fea que una garantia rota. */
+export function baseDeBitacora(destino, codigo, temporal = os.tmpdir()) {
+  return codigo === 0 && destino ? [destino, temporal] : [temporal];
+}
+
+/** La deja escrita y devuelve donde. Devuelve null si no se pudo, y eso NO es un
+ *  fallo de la corrida: una bitacora que no se puede escribir no puede convertir
+ *  un arranque exitoso en un rojo. */
+export function escribirBitacora(bases, lineas, encabezado) {
+  for (const base of bases) {
+    if (!base) continue;
+    try {
+      const ruta = path.join(base, NOMBRE_BITACORA);
+      fs.writeFileSync(ruta, `${[...encabezado, ...lineas].join("\n")}\n`, "utf8");
+      return ruta;
+    } catch {
+      // Y se prueba con la carpeta temporal, que existe siempre. Un destino que
+      // no se puede escribir es justamente uno de los rojos que hay que reportar.
+    }
+  }
+  return null;
+}
+
 export function invocadoDirecto(urlDelModulo) {
   try {
     return fs.realpathSync(fileURLToPath(urlDelModulo)) === fs.realpathSync(process.argv[1] ?? "");
@@ -3549,6 +3689,46 @@ function meInvocaronAMi() {
 //  lado. Las dos formas se cubren: el `try` por si `main` tira antes del primer
 //  await, y el `.catch` por lo demas.
 if (meInvocaronAMi()) {
+  // LA BITACORA SE ABRE ACA Y NO DENTRO DE `main`, y la diferencia importa: `main`
+  // se importa desde los bancos, y uno que se quede con la consola intervenida
+  // contamina a los que corren despues. Aca adentro solo entra la invocacion real.
+  const bitacora = abrirBitacora();
+  const encabezado = encabezadoDeBitacora(process.argv.slice(2), new Date().toISOString());
+
+  /** La deja escrita y dice donde, SIEMPRE — tambien cuando sale bien. Un archivo
+   *  que solo aparece cuando algo falla es uno que nadie sabe que existe hasta que
+   *  lo necesita, y entonces no sabe buscarlo. */
+  const cerrarBitacora = (codigo) => {
+    bitacora.cerrar();
+    // El destino se lee del argv y no de las opciones parseadas: si la corrida
+    // murio ANTES de parsear, el archivo tiene que quedar igual en algun lado.
+    const i = process.argv.indexOf("--destino");
+    const destino = i !== -1 ? process.argv[i + 1] : null;
+    // NO HAY BITACORA SIN DESTINO, y no es un caso raro: `--ejemplo` y `--help`
+    // no arman nada. `--ejemplo` ademas escribe el JSON de valores en STDOUT para
+    // redirigirlo a un archivo, asi que no solo no necesita bitacora: no puede
+    // tenerla. Este encabezado ya lo declaraba para el aviso de version de Node
+    // ("una linea de aviso ahi lo corrompe") y la primera version de esto lo
+    // reintrodujo: el JSON salia con dos lineas de texto pegadas al final y
+    // `JSON.parse` moria en la posicion 836. Lo cazo el banco del andamio.
+    if (!destino) return codigo;
+
+    const ruta = escribirBitacora(baseDeBitacora(destino, codigo), bitacora.lineas, encabezado);
+    if (ruta) {
+      // SIEMPRE POR STDERR, tambien cuando sale bien. Este aviso es sobre la
+      // corrida, no es su resultado: stdout es de la herramienta y cualquier cosa
+      // que se le agregue puede estar entrando a un archivo del otro lado de una
+      // tuberia.
+      process.stderr.write(
+        codigo === 0
+          ? `\nTodo lo que salio por pantalla quedo copiado en:\n  ${ruta}\n`
+          : `\nTodo esto quedo copiado en un archivo, para que puedas pedir ayuda mandandolo en vez\n` +
+              `de contar de memoria lo que decia:\n  ${ruta}\n`,
+      );
+    }
+    return codigo;
+  };
+
   const morir = (e) => {
     console.error(
       `::error::la corrida murio con una excepcion que ningun control de esta herramienta atrapo: ` +
@@ -3560,11 +3740,11 @@ if (meInvocaronAMi()) {
         "Lo que sigue es la traza, para reportarlo:",
     );
     console.error(e?.stack ?? String(e));
-    process.exit(1);
+    process.exit(cerrarBitacora(1));
   };
   try {
     main(process.argv.slice(2))
-      .then((codigo) => process.exit(codigo))
+      .then((codigo) => process.exit(cerrarBitacora(codigo)))
       .catch(morir);
   } catch (e) {
     morir(e);

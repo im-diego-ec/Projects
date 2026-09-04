@@ -1003,6 +1003,41 @@ estimación, la respuesta útil no es un número: es esta lista.
 
 ---
 
+## Si algo sale mal y necesitás pedir ayuda
+
+**No hace falta que cuentes de memoria lo que decía el error.** Cada corrida de
+la herramienta del Paso 5 deja una copia de todo lo que salió por pantalla, y la
+última línea te dice dónde quedó:
+
+```
+Todo esto quedó copiado en un archivo, para que puedas pedir ayuda mandándolo en vez
+de contar de memoria lo que decía:
+  /ruta/a/tu-proyecto/bitacora-del-arranque.txt
+```
+
+Ese archivo es lo que hay que mandar. Trae, además del texto de la pantalla, los
+datos que hacen falta para entender un rojo ajeno: **tu sistema operativo, tu
+versión de Node, la versión del marco y las banderas con las que corriste**. Sin
+eso, la mitad de las preguntas que te van a hacer son justamente ésas.
+
+**No lleva secretos.** Esta herramienta no recibe ninguno —las claves de acceso
+se guardan en GitHub, no en el archivo de respuestas— y la copia no agrega nada
+que la pantalla no te haya mostrado ya. Por eso se puede mandar sin leerla entera.
+
+**Dos cosas que conviene saber:**
+
+- **Si la corrida salió bien**, la copia queda dentro de tu proyecto y el andamio
+  la ignora en git, así que no viaja en tu primer envío.
+- **Si la corrida falló**, queda en la carpeta temporal del sistema y **no** en tu
+  proyecto: un fallo tiene que dejar la carpeta como estaba, entre otras cosas
+  para que puedas reintentar sin borrar nada. La ruta completa está impresa.
+
+**Lo que ese archivo NO trae** es la salida de `pnpm` y `openspec`, que se
+imprime en vivo con su barra de progreso. Si el rojo fue de uno de ellos,
+copiala de tu terminal: el archivo te dice cuál de los pasos la produjo.
+
+---
+
 ## Si algo no coincide con lo que dice acá
 
 Esta página se escribió **mirando la pantalla**, no de memoria: los textos de

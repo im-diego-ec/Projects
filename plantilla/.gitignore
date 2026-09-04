@@ -100,6 +100,13 @@ aviso-version.json
 declarados.txt
 divergentes.txt
 
+# LA COPIA DE LO QUE SALIO POR PANTALLA AL ARMAR ESTE PROYECTO. La escribe
+# `projects init` en la raiz del destino para que quien lo armo pueda pedir ayuda
+# mandando el archivo en vez de contar de memoria lo que decia el error. Es de esa
+# corrida y de esa maquina --lleva el sistema, la version de Node y las banderas--
+# asi que no es del proyecto y no viaja en el primer commit.
+bitacora-del-arranque.txt
+
 # Lockfile espurio: en un workspace pnpm el unico lockfile valido es el de la
 # raiz. Uno dentro de un paquete lo genera un `pnpm install` corrido ahi y hace
 # que local y CI resuelvan dependencias distinto. Se ignora en cualquier nivel
