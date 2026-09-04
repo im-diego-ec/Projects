@@ -18,5 +18,5 @@ export default defineConfig({
   // sitio, y lo LEE de aca. Un puerto que solo vive dentro de Astro obligaria a
   // esa herramienta a repetir el numero, y un numero repetido es correcto hasta
   // el dia que alguien lo cambia de un solo lado.
-  server: { port: 4321 },
+  server: { port: 4321, open: true },
 });

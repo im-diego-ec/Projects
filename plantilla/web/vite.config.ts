@@ -42,7 +42,17 @@ export default defineConfig({
   // (@tailwindcss/postcss) y es la que corresponde a un proyecto que NO use
   // vite; aca la de vite es mas rapida y una pieza menos que mantener.
   plugins: [react(), tailwindcss()],
-  server: { port: 5173 },
+  // `open` abre el navegador solo al arrancar `pnpm dev`. La direccion ya se
+  // imprime al terminar `projects init`, pero copiar una direccion a mano es un
+  // paso donde alguien que recien empieza se pierde, y no cuesta nada evitarlo.
+  //
+  // SOLO AFECTA A `vite dev`. El build, las pruebas y el CI no levantan servidor,
+  // asi que ningun runner intenta abrir un navegador que no tiene.
+  //
+  // El PUERTO se declara aca y NO se repite en ningun otro lado: `projects init`
+  // lo LEE de este archivo para decir en que direccion se ve el proyecto. Si se
+  // cambia aca, ese texto lo sigue solo.
+  server: { port: 5173, open: true },
   test: {
     // Los componentes de React necesitan un DOM. jsdom lo simula; solo lo
     // cargan las pruebas, el build no lo ve.
