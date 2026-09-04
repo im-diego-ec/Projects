@@ -91,6 +91,7 @@
 //   node herramientas/projects-init.mjs --valores <ruta.json> --destino <ruta>
 //                                    [--sin-herramientas] [--forzar]
 //                                    [--version-openspec <x.y.z>]
+//   node herramientas/projects-init.mjs --vista-previa --valores <ruta.json> --destino <ruta>
 //   node herramientas/projects-init.mjs --ejemplo > valores.json
 //   node herramientas/projects-init.mjs --help
 //
@@ -349,6 +350,7 @@ export const BANDERAS = [
   "--sin-herramientas",
   "--sin-arranque",
   "--forzar",
+  "--vista-previa",
   "--ejemplo",
   "--asistente",
   "--solo-valores",
@@ -405,6 +407,94 @@ export function sugerenciaDeBandera(argumento, banderas = BANDERAS) {
   // parecerse en nada. Por eso el maximo depende del largo del que se escribio.
   const tope = Math.min(2, Math.max(1, Math.floor(v.length / 4)));
   return mejor && mejorD <= tope ? ` — ¿quisiste decir ${mejor}?` : "";
+}
+
+/** LO QUE VA A PASAR, ANTES DE QUE PASE.
+ *
+ *  QUE DEFECTO CIERRA. El asistente termina con "¿Escribo esto?" y muestra las
+ *  RESPUESTAS. Despues imprime un comando, y ese comando --el que de verdad
+ *  escribe el proyecto-- no preguntaba ni mostraba nada: se le daba Enter y
+ *  aparecian ochenta archivos en una carpeta. Quien no es tecnico no tiene forma
+ *  de saber que eso iba a pasar hasta que paso.
+ *
+ *  "Supabase + Cloudflare" en el resumen de respuestas no le dice a nadie que van
+ *  a aparecer ochenta archivos, ni cuales, ni donde. Esto si.
+ *
+ *  TODO SE DERIVA, NADA SE ESCRIBE A MANO. La cantidad de archivos sale de
+ *  `archivosDelAndamio`, que es la MISMA funcion que despues los copia; las
+ *  sustituciones, del mismo `MARCADOR`; los pasos, de `PASOS_DEL_ARRANQUE`. Una
+ *  vista previa con numeros propios es una vista previa de otra corrida: seria
+ *  peor que no tenerla, porque la persona confirma una cosa y pasa otra.
+ *
+ *  Y DICE LO QUE **NO** VA A PASAR. Es la mitad que mas tranquiliza a quien nunca
+ *  hizo esto: no se publica nada, no se gasta nada, no se toca ninguna cuenta. */
+export function lineasDeVistaPrevia(raizAndamio, destino, valores, opciones = {}) {
+  const plataforma = plataformaDe(valores);
+  const forma = formaDe(valores);
+  const archivos = archivosDelAndamio(raizAndamio, plataforma, forma);
+
+  let ocurrencias = 0;
+  const marcadores = new Set();
+  for (const rel of archivos) {
+    let texto;
+    try {
+      texto = fs.readFileSync(path.join(raizAndamio, rel), "utf8");
+    } catch {
+      continue;
+    }
+    for (const m of texto.matchAll(MARCADOR)) {
+      ocurrencias += 1;
+      marcadores.add(m[1]);
+    }
+  }
+
+  const yaTiene = (() => {
+    try {
+      return fs.readdirSync(destino).filter((f) => f !== "." && f !== "..");
+    } catch {
+      return null;
+    }
+  })();
+
+  const l = [];
+  l.push("");
+  l.push("ESTO ES LO QUE VA A PASAR. Todavía no pasó nada.");
+  l.push("");
+  l.push(`  Dónde            ${path.resolve(destino)}`);
+  l.push(`  Qué se arma      ${forma === "sitio" ? "un sitio para leer" : "una aplicación (pantallas + servidor + base de datos)"}`);
+  l.push(`  Cuántos archivos ${archivos.length}`);
+  l.push(`  Qué se completa  ${ocurrencias} lugares donde va un dato tuyo, de ${marcadores.size} datos distintos`);
+  if (yaTiene === null) {
+    l.push("");
+    l.push("  ATENCIÓN: esa carpeta no existe. Hay que crearla antes (o crear el repositorio y clonarlo ahí).");
+  } else if (yaTiene.length) {
+    l.push("");
+    l.push(`  ATENCIÓN: esa carpeta YA TIENE ${yaTiene.length} archivo(s): ${yaTiene.slice(0, 4).join(", ")}${yaTiene.length > 4 ? "…" : ""}`);
+    l.push("  La herramienta se va a negar, para no pisar trabajo tuyo.");
+  }
+  l.push("");
+  l.push("  Y después, sin que tengas que hacer nada:");
+  // LOS PASOS QUE VAN A CORRER, no los cuatro de la lista. Un sitio para leer no
+  // tiene capa de datos, asi que `podarPorForma` le borra el script `datos` del
+  // manifiesto y ese paso no corre. Anunciarlo igual seria prometer un paso que
+  // no va a pasar, que es la misma clase de mentira que esta vista previa existe
+  // para evitar. Se deriva del manifiesto YA PODADO, que es lo que el destino va
+  // a tener.
+  for (const paso of pasosSegunElManifiesto(manifiestoPodado(raizAndamio, forma)).corren) {
+    l.push(`    · ${paso.titulo}`);
+  }
+  l.push("");
+  l.push("  LO QUE NO VA A PASAR, y conviene saberlo:");
+  l.push("    · No se publica nada en internet. Nadie va a poder entrar todavía.");
+  l.push("    · No se gasta un peso: nada de esto usa una cuenta paga.");
+  l.push("    · No se toca ninguna cuenta tuya ni ningún ajuste de GitHub.");
+  l.push("    · Fuera de esa carpeta no se escribe nada.");
+  if (opciones.simulado) {
+    l.push("");
+    l.push("  Esto fue sólo una vista previa: NO se escribió nada.");
+    l.push("  Para hacerlo de verdad, corré el mismo comando sin --vista-previa.");
+  }
+  return l;
 }
 
 // ─────────────────────────── La bitacora ───────────────────────────
@@ -1673,14 +1763,45 @@ export function pasosQueCorren(destino, pasos = PASOS_DEL_ARRANQUE) {
     // formas de equivocarse esta es la unica que se nota.
     return { corren: pasos, salteados: [] };
   }
+  return pasosSegunElManifiesto(scripts, pasos);
+}
+
+/** El filtro solo, sin leer disco. Lo comparten la corrida --que lee el
+ *  manifiesto YA ESCRITO en el destino-- y la vista previa, que todavia no
+ *  escribio ninguno. Dos copias de esta regla darian una vista previa que anuncia
+ *  pasos distintos de los que despues corren. */
+export function pasosSegunElManifiesto(scripts, pasos = PASOS_DEL_ARRANQUE) {
+  // SIN MANIFIESTO NO SE PODA NADA, y esto es lo contrario de lo que hacia la
+  // primera version: con `scripts ?? {}` mas abajo, un manifiesto ausente daba un
+  // objeto vacio y se salteaban TODOS los pasos. O sea que el caso "no pude leer"
+  // terminaba anunciando --y en la corrida real, corriendo-- cero pasos, en
+  // silencio. Correr de mas da un error honesto del gestor de paquetes; correr de
+  // menos esconde un paso, y de las dos formas de equivocarse esta es la unica
+  // que se nota.
+  if (scripts === null || scripts === undefined) return { corren: [...pasos], salteados: [] };
   const corren = [];
   const salteados = [];
   for (const paso of pasos) {
     const script = paso.args[0] === "run" ? paso.args[1] : null;
-    if (script !== null && !(script in scripts)) salteados.push({ paso, script });
+    if (script !== null && !(script in (scripts ?? {}))) salteados.push({ paso, script });
     else corren.push(paso);
   }
   return { corren, salteados };
+}
+
+/** Los scripts que el manifiesto del destino VA a tener, sin escribir nada.
+ *
+ *  Se poda el del andamio con la MISMA funcion que usa la copia real. Devuelve
+ *  null si no se pudo leer o parsear, y entonces quien llama no poda: es el mismo
+ *  criterio que `pasosQueCorren`, porque anunciar de mas es un error honesto y
+ *  anunciar de menos esconde un paso. */
+export function manifiestoPodado(raizAndamio, forma) {
+  try {
+    const crudo = fs.readFileSync(path.join(raizAndamio, "package.json"), "utf-8");
+    return JSON.parse(sacarCentinelas(podarPorForma(crudo, "package.json", forma))).scripts ?? null;
+  } catch {
+    return null;
+  }
 }
 
 /** Con que se corren los scripts del proyecto.
@@ -2640,6 +2761,7 @@ function argumentos(argv) {
     else if (argv[i] === "--sin-herramientas") o.herramientas = false;
     else if (argv[i] === "--sin-arranque") o.arranque = false;
     else if (argv[i] === "--forzar") o.forzar = true;
+    else if (argv[i] === "--vista-previa") o.vistaPrevia = true;
     else if (argv[i] === "--ejemplo") o.ejemplo = true;
     else if (argv[i] === "--asistente") o.asistente = true;
     else if (argv[i] === "--solo-valores") o.soloValores = valorDeBandera(argv, ++i, "--solo-valores");
@@ -2671,6 +2793,9 @@ function lineasDeUso() {
     "                             deja esos cuatro comandos como tarea humana, que es como",
     "                             se hacia antes. Util cuando no hay red o se quiere revisar",
     "                             el arbol escrito antes de bajar una sola dependencia",
+    "  --vista-previa             dice que va a pasar y NO escribe nada: cuantos archivos, donde,",
+    "                             que pasos van a correr y que cosas NO van a pasar. Sale 0 y deja",
+    "                             el destino exactamente como estaba",
     "  --forzar                   sobreescribe un destino que ya tiene archivos del andamio",
     "  --asistente                te PREGUNTA las decisiones en castellano y escribe el archivo de",
     "                             valores por vos. Es el camino del PO: 8 preguntas en el caso",
@@ -3103,6 +3228,18 @@ async function main(argv) {
     console.error("");
     console.error(`Un esqueleto con todas las claves: node ${path.join(raizDelMarco, "herramientas", "projects-init.mjs")} --ejemplo`);
     return 1;
+  }
+
+  // ── LA VISTA PREVIA, y va ACA a proposito ──
+  //
+  // Despues de validar los valores y ANTES de mirar el destino o escribir nada.
+  // Antes de validar, la vista previa hablaria de un proyecto que no se puede
+  // armar; despues del guard del destino, no se podria pedir sobre una carpeta
+  // ocupada, que es justo cuando mas sirve --es la que contesta "¿y esto que me
+  // va a hacer?"--. Por eso el aviso de la carpeta ocupada lo da ella misma.
+  if (o.vistaPrevia) {
+    for (const linea of lineasDeVistaPrevia(raizAndamio, o.destino, valores, { simulado: true })) console.log(linea);
+    return 0;
   }
 
   // ── Los tres paquetes tienen que llamarse como las carpetas que el andamio trae ──
@@ -3703,7 +3840,12 @@ if (meInvocaronAMi()) {
     // El destino se lee del argv y no de las opciones parseadas: si la corrida
     // murio ANTES de parsear, el archivo tiene que quedar igual en algun lado.
     const i = process.argv.indexOf("--destino");
-    const destino = i !== -1 ? process.argv[i + 1] : null;
+    // LA VISTA PREVIA NO ESCRIBE NADA, TAMPOCO ESTO. Dice con todas las letras
+    // "NO se escribió nada" y la primera version dejaba igual la bitacora en el
+    // destino: se contradecia a si misma en la linea siguiente, y encima ese
+    // archivo trababa la corrida de verdad contra el guard del destino ocupado.
+    // O sea que mirar antes de decidir salia mas caro que no mirar.
+    const destino = i !== -1 && !process.argv.includes("--vista-previa") ? process.argv[i + 1] : null;
     // NO HAY BITACORA SIN DESTINO, y no es un caso raro: `--ejemplo` y `--help`
     // no arman nada. `--ejemplo` ademas escribe el JSON de valores en STDOUT para
     // redirigirlo a un archivo, asi que no solo no necesita bitacora: no puede
