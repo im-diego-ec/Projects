@@ -29,7 +29,7 @@ con un [change](02-glosario.md) aplicado, un pull request cerrado y `main` en ve
 
 | Tu forma | ¿Se publica solo? | Dónde | Qué falta |
 | --- | --- | --- | --- |
-| **Un sitio para leer** | **Sí** | Cloudflare Workers | tres actos humanos de una sola vez: la cuenta, la credencial y el subdominio |
+| **Un sitio para leer** | **Sí** | Cloudflare Workers | cuatro actos humanos de una sola vez: la cuenta, el subdominio, la credencial y guardarla en GitHub |
 | **Una aplicación** | **No** | — | el paso de publicación no existe todavía en el andamio |
 
 Cómo saber cuál tenés, sin acordarte de nada:
@@ -63,15 +63,17 @@ silenciosa de quedarse sin despliegue:
 El proyecto ya trae la configuración (`sitio/wrangler.jsonc`) y el paso
 automático (`.github/workflows/desplegar.yml`).
 
-**Lo que falta son tres actos humanos**, y por eso están acá y no automatizados:
-**abrir la cuenta**, **crear la credencial** y **registrar el subdominio de tu
-cuenta**. Los tres se hacen una sola vez.
+**Lo que falta son cuatro actos humanos**, y por eso están acá y no
+automatizados: **abrir la cuenta**, **registrar el subdominio**, **crear la
+credencial** y **guardarla en GitHub**. Los cuatro se hacen una sola vez.
 
-> **El tercero cuesta contarlo porque llega tarde.** Cloudflare no te pide el
-> subdominio hasta la primera publicación, así que aparece cuando ya creías haber
-> terminado con lo humano. Contarlos como dos deja a esa persona sin saber que le
-> falta un paso — y ésa es exactamente la sorpresa que esta página existe para
-> evitar.
+> **Dos de los cuatro cuestan contarlos, y por motivos distintos.** El subdominio
+> llega tarde: Cloudflare no te lo pide hasta la primera publicación, así que
+> aparece cuando ya creías haber terminado. Y guardar la credencial en GitHub se
+> contaba junto con crearla, siendo que pasa en otro sitio, con otra pantalla, y
+> falla distinto —un secreto mal pegado no da error al pegarlo, da error recién
+> al publicar—. Contar de menos deja a esa persona sin saber que le falta un
+> paso, y ésa es exactamente la sorpresa que esta página existe para evitar.
 
 **El paso a paso completo, con las pantallas y los nombres exactos de cada
 botón, está en el README del paquete del sitio de tu proyecto** —

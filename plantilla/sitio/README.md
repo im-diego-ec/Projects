@@ -36,10 +36,20 @@ la configuración (`wrangler.jsonc`) y el paso automático
 (`.github/workflows/desplegar.yml`), que corre **solo cuando las verificaciones
 terminan en verde** sobre la rama principal.
 
-Lo que falta son **tres actos humanos** —abrir la cuenta, registrar el subdominio
-y crear la credencial—, y por eso están
-acá y no automatizadas: abrir una cuenta y crear una credencial. Se hacen **una
-sola vez**.
+Lo que falta son **cuatro actos humanos**, y por eso están acá y no
+automatizados. Se hacen **una sola vez**:
+
+1. **abrir la cuenta** de Cloudflare,
+2. **registrar el subdominio** —el nombre que va en el medio de tu dirección—,
+3. **crear la credencial**, y
+4. **guardarla en GitHub**, que es el único que no pasa en Cloudflare.
+
+> **Son cuatro y no tres.** El de guardar en GitHub se contaba junto con el de
+> crear la credencial, y no es el mismo: pasa en otro sitio, con otra pantalla, y
+> falla distinto —un secreto mal pegado no da error al pegarlo, da error recién
+> al publicar—. Contar de menos deja a alguien creyendo que terminó cuando le
+> falta un paso, y ésa es exactamente la sorpresa que esta página existe para
+> evitar.
 
 > **Mientras no las hagas, nada se pone en rojo.** El paso de publicación sale
 > con un aviso amarillo diciendo qué falta. Un rojo permanente por algo que
@@ -55,18 +65,19 @@ tu sitio **no tienen límite de visitas** en ese plan.
 Después copiá tu **Account ID**: está en el panel, en la barra lateral derecha
 de la sección Workers, y es una tira de letras y números.
 
-**Y aprovechá para registrar el subdominio ahora**, en **Workers & Pages →
-Subdomain**: es el nombre que va en el medio de tu dirección
-(`{{PROYECTO}}.<tu-subdominio>.workers.dev`), se elige una vez y no se puede
-cambiar después.
+### 2 · El subdominio · *1 minuto*
+
+En **Workers & Pages → Subdomain**: es el nombre que va en el medio de tu
+dirección (`{{PROYECTO}}.<tu-subdominio>.workers.dev`). Se elige una vez y **no
+se puede cambiar después**.
 
 > **Cloudflare no te lo va a pedir hasta la primera publicación**, así que si lo
-> salteás acá, el paso 4 va a fallar con
+> salteás acá, el paso 5 va a fallar con
 > `you need to register a workers.dev subdomain` cuando ya creías haber terminado
-> con lo humano. Es el tercero de los tres actos humanos de esta página, y el
-> único que llega tarde.
+> con lo humano. Es el único de los cuatro que llega tarde, y por eso tiene paso
+> propio en vez de ser una nota al pie del anterior.
 
-### 2 · La credencial · *2 minutos*
+### 3 · La credencial · *2 minutos*
 
 En [`dash.cloudflare.com/profile/api-tokens`](https://dash.cloudflare.com/profile/api-tokens):
 
@@ -82,7 +93,7 @@ En [`dash.cloudflare.com/profile/api-tokens`](https://dash.cloudflare.com/profil
 > despliegue va a fallar por permisos, con un error que no dice cuál era el
 > correcto.
 
-### 3 · Guardar las dos cosas en GitHub · *2 minutos*
+### 4 · Guardar las dos cosas en GitHub · *2 minutos*
 
 En tu repositorio, **Settings → Secrets and variables → Actions → New repository
 secret**, dos veces:
@@ -96,7 +107,7 @@ secret**, dos veces:
 un secreto público: cualquiera que clone el proyecto se lo lleva, y cambiarlo
 después no borra el que ya se vio.
 
-### 4 · Publicar por primera vez · *1 minuto*
+### 5 · Publicar por primera vez · *1 minuto*
 
 En la pestaña **Actions** de tu repositorio, elegí el workflow **desplegar** y
 apretá **Run workflow**. La primera vez conviene a mano; de ahí en adelante corre
@@ -106,7 +117,7 @@ solo cada vez que las verificaciones quedan en verde sobre la rama principal.
 primera vez tiene la forma `https://{{PROYECTO}}.<tu-subdominio>.workers.dev`.
 Abrila: tiene que verse tu sitio.
 
-### 5 · Si sale rojo: los tres errores que vas a ver
+### 6 · Si sale rojo: los tres errores que vas a ver
 
 Vienen de Cloudflare tal cual, sin traducir, y ninguno dice qué hacer. Esto sí:
 

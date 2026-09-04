@@ -76,14 +76,22 @@ test("la credencial entra por secreto y NUNCA se escribe en un archivo", () => {
   // Y ningun archivo del andamio puede traer un valor que parezca una
   // credencial de verdad: un secreto en el codigo es un secreto publico.
   const config = fs.readFileSync(CONFIG, "utf-8");
-  assert.equal(/[A-Za-z0-9_-]{40,}/.test(config.replace(/https?:\/\/\S+/g, "")), false, "la configuracion no puede traer nada que parezca una credencial");
+  assert.equal(
+    /[A-Za-z0-9_-]{40,}/.test(config.replace(/https?:\/\/\S+/g, "")),
+    false,
+    "la configuracion no puede traer nada que parezca una credencial",
+  );
 });
 
 test("la fecha de compatibilidad esta declarada, y eso no es burocracia", () => {
   // Sin ella, Cloudflare puede cambiar el comportamiento de la plataforma por
   // debajo y el sitio se comporta distinto sin que nadie haya tocado una linea.
   const config = fs.readFileSync(CONFIG, "utf-8");
-  assert.match(config, /"compatibility_date":\s*"\d{4}-\d{2}-\d{2}"/, "hace falta una fecha de compatibilidad con forma de fecha");
+  assert.match(
+    config,
+    /"compatibility_date":\s*"\d{4}-\d{2}-\d{2}"/,
+    "hace falta una fecha de compatibilidad con forma de fecha",
+  );
 });
 
 test("una direccion que no existe devuelve un error, no la portada", () => {
@@ -135,7 +143,11 @@ test("dos publicaciones a la vez HACEN COLA: ninguna cancela a la otra", () => {
     .filter((l) => !/^\s*#/.test(l))
     .join("\n");
   assert.match(t, /concurrency:/, "sin grupo de concurrencia, dos publicaciones corren a la vez");
-  assert.match(ejecutable, /cancel-in-progress:\s*false/, "un despliegue interrumpido deja el destino a medias con las dos en verde");
+  assert.match(
+    ejecutable,
+    /cancel-in-progress:\s*false/,
+    "un despliegue interrumpido deja el destino a medias con las dos en verde",
+  );
   assert.equal(/cancel-in-progress:\s*true/.test(ejecutable), false);
 });
 
@@ -159,7 +171,10 @@ test("el workflow que espera existe de verdad, con ese nombre exacto", () => {
     .map((f) => (fs.readFileSync(path.join(dir, f), "utf-8").match(/^name:\s*(.+)$/m) ?? [])[1]?.trim())
     .filter(Boolean);
   for (const e of esperados) {
-    assert.ok(nombres.includes(e), `desplegar.yml espera al workflow "${e}" y ninguno del andamio se llama asi: ${nombres.join(", ")}`);
+    assert.ok(
+      nombres.includes(e),
+      `desplegar.yml espera al workflow "${e}" y ninguno del andamio se llama asi: ${nombres.join(", ")}`,
+    );
   }
 });
 
@@ -282,7 +297,16 @@ test("MUERDE: sacar la canonica del molde se caza, y sacar la guarda tambien", (
   );
 });
 
-test("el conteo de actos humanos es el mismo en todos lados, y son TRES", () => {
+// EL CONTEO DE ACTOS HUMANOS YA NO SE VIGILA ACA. Este caso buscaba la palabra
+// "tres" suelta en cuatro archivos, o sea respaldaba un numero escrito a mano —y
+// respaldo el equivocado: eran CUATRO, porque guardar la credencial en GitHub se
+// contaba junto con crearla siendo que pasa en otro sitio y falla distinto.
+//
+// Lo reemplaza pruebas/docs/actos-humanos.test.mjs, que DERIVA el numero de los
+// pasos numerados del README canonico en vez de repetirlo. Lo que sigue vigila lo
+// que ese otro no puede ver: que ninguna pagina vuelva a las formas viejas de
+// contarlo, que son las que este caso midio en su momento.
+test("ninguna pagina vuelve a las formas viejas de contar los actos humanos", () => {
   // EL DEFECTO QUE ESTE CASO VIGILA, medido: el marco decia el numero de tres
   // maneras distintas —«una sola cosa», «dos cosas», «dos actos humanos»— y en
   // ninguna decia tres, que es lo que son. El tercero, registrar el subdominio,
@@ -307,7 +331,9 @@ test("el conteo de actos humanos es el mismo en todos lados, y son TRES", () => 
   const malos = [];
   let conteos = 0;
   for (const [f, t] of Object.entries(donde)) {
-    if (/tres (actos humanos|cosas)/i.test(t)) conteos++;
+    // CUANTOS lo dicen, no CUAL numero: el numero lo verifica el otro banco,
+    // contra el README canonico. Aca solo importa que los cuatro sigan diciendolo.
+    if (/(dos|tres|cuatro|cinco) (actos humanos|cosas)/i.test(t)) conteos++;
     const m = t.match(VIEJAS);
     if (m) malos.push(`${f}: dice "${m[0]}"`);
   }
@@ -315,8 +341,9 @@ test("el conteo de actos humanos es el mismo en todos lados, y son TRES", () => 
   assert.deepEqual(
     malos,
     [],
-    "el conteo de actos humanos volvio a decirse de mas de una manera. Son TRES —la cuenta, el subdominio y la " +
-      `credencial— y el tercero es el que llega tarde:\n  ${malos.join("\n  ")}`,
+    "el conteo de actos humanos volvio a decirse de mas de una manera. Son CUATRO —la cuenta, el subdominio, la " +
+      `credencial y guardarla en GitHub— y el numero exacto lo verifica pruebas/docs/actos-humanos.test.mjs contra ` +
+      `los pasos del README canonico:\n  ${malos.join("\n  ")}`,
   );
 });
 
@@ -324,10 +351,16 @@ test("el subdominio se pide donde la persona esta, no donde le explota", () => {
   // Estaba solo en la tabla de errores del ultimo paso: la persona se enteraba
   // cuando el despliegue fallaba. Ahora se pide en el paso de la cuenta, que es
   // donde se puede hacer sin perder nada.
+  // AHORA TIENE PASO PROPIO, y por el mismo motivo por el que antes vivia dentro
+  // del de la cuenta: es el que llega tarde. Como nota al pie del anterior se
+  // saltea; con titulo propio, ademas, entra en la cuenta de actos humanos.
   const t = fs.readFileSync(path.join(ANDAMIO, "sitio/README.md"), "utf-8");
-  const paso1 = t.slice(t.indexOf("### 1 ·"), t.indexOf("### 2 ·"));
-  assert.ok(paso1.length > 100, "no se pudo aislar el paso 1: cambio la forma de los encabezados");
-  assert.match(paso1, /Subdomain/, "el paso de la cuenta tiene que nombrar donde se registra el subdominio");
-  assert.match(paso1, /no se puede cambiar|una vez/i, "y avisar que se elige una sola vez");
-  assert.match(paso1, /primera publicaci(ó|o)n/i, "y por que si se saltea explota mas tarde");
+  const suyo = t.slice(t.indexOf("### 2 ·"), t.indexOf("### 3 ·"));
+  assert.ok(suyo.length > 100, "no se pudo aislar el paso del subdominio: cambio la forma de los encabezados");
+  assert.match(suyo, /Subdomain/, "el paso del subdominio tiene que nombrar donde se registra");
+  assert.match(suyo, /no se puede cambiar|una vez/i, "y avisar que se elige una sola vez");
+  assert.match(suyo, /primera publicaci(ó|o)n/i, "y por que si se saltea explota mas tarde");
+  // Y tiene que venir ANTES de la credencial: es el orden en el que la persona ya
+  // esta parada en el panel de Cloudflare.
+  assert.ok(t.indexOf("### 2 ·") < t.indexOf("### 3 · La credencial"), "el subdominio quedo despues de la credencial");
 });

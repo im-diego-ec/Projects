@@ -1046,7 +1046,7 @@ Qué significa cada una:
 
 | Si dice | Qué pasa |
 | --- | --- |
-| `"sitio"` | Ya trae todo lo necesario para publicarse. Faltan **tres actos humanos de una sola vez**: abrir una cuenta de Cloudflare (gratis), crear una credencial y registrar el subdominio |
+| `"sitio"` | Ya trae todo lo necesario para publicarse. Faltan **cuatro actos humanos de una sola vez**: abrir una cuenta de Cloudflare (gratis), registrar el subdominio, crear una credencial y guardarla en GitHub |
 | `"aplicacion"` | El marco **todavía no reparte un paso que publique**. Se levanta en tu máquina con `pnpm dev`, y el día que ese paso exista llega solo, subiendo la versión del marco |
 
 **Cómo sabés que salió bien.** Sabés cuál de las dos te tocó, y por lo tanto si
