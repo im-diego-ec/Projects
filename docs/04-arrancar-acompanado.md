@@ -212,6 +212,7 @@ computadora, y te dice si está todo o qué falta.
 | --- | --- |
 | **Mac** | `arrancar.command` |
 | **Windows** | `arrancar.cmd` |
+| **Linux** | `arrancar.sh` |
 
 > **La primera vez, la Mac te va a preguntar si confiás en el archivo.** Es lo
 > que hace con todo lo que no bajó de su tienda. Si te lo bloquea: clic derecho

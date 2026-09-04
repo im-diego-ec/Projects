@@ -25,22 +25,48 @@ const RAIZ = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..")
 // LA REGLA QUE VIGILAN: no pueden llevar una ruta absoluta escrita a mano. Todo
 // el sentido del lanzador es derivar la raiz de DONDE ESTA EL PROPIO ARCHIVO; una
 // ruta fija funciona en la maquina de quien lo escribio y en ninguna otra.
+//
+// Y VIVE EN `pruebas/init/` A PROPOSITO: es el unico directorio que el CI corre
+// en la matriz de tres sistemas. Un banco sobre lanzadores de TRES sistemas que
+// solo se ejercita en uno no comprueba lo que dice comprobar. Los casos que
+// necesitan `bash` se saltean solos donde no lo hay --Windows-- y los demas
+// corren igual.
 // ---------------------------------------------------------------------------
 
 const LANZADORES = [
-  { archivo: "arrancar.command", sistema: "macOS", comentario: "#" },
-  { archivo: "arrancar.cmd", sistema: "Windows", comentario: "REM" },
+  { archivo: "arrancar.sh", sistema: "Linux", comentario: "#", tieneLogica: true },
+  { archivo: "arrancar.command", sistema: "macOS", comentario: "#", tieneLogica: false },
+  { archivo: "arrancar.cmd", sistema: "Windows", comentario: "REM", tieneLogica: true },
 ];
 
-test("los dos lanzadores existen: un cero aca es este banco roto", () => {
+/** Los que llevan la logica adentro. El de macOS no: llama al de Linux. */
+const CON_LOGICA = LANZADORES.filter((l) => l.tieneLogica);
+
+test("los TRES lanzadores existen: uno por sistema, y un cero aca es este banco roto", () => {
   for (const l of LANZADORES) {
     assert.ok(fs.existsSync(path.join(RAIZ, l.archivo)), `falta ${l.archivo}, el lanzador de ${l.sistema}`);
   }
+  assert.equal(LANZADORES.length, 3, "son tres sistemas: Linux, macOS y Windows. Si se agrega uno, agregalo aca");
 });
 
-test("el de macOS es ejecutable: sin el bit, el doble clic abre un editor de texto", () => {
-  const modo = fs.statSync(path.join(RAIZ, "arrancar.command")).mode;
-  assert.ok(modo & 0o111, "arrancar.command no tiene permiso de ejecucion");
+test("el de macOS NO copia la logica: la llama", () => {
+  // DOS COPIAS DE LO MISMO DIVERGEN, y la que se pudre es la que nadie corre.
+  // Finder solo abre `.command` con doble clic, asi que ese archivo existe por la
+  // extension y nada mas. Su trabajo es una linea.
+  const texto = fs.readFileSync(path.join(RAIZ, "arrancar.command"), "utf8");
+  const ejecutables = texto.split("\n").filter((l) => l.trim() && !l.trimStart().startsWith("#"));
+  assert.ok(
+    ejecutables.length <= 3,
+    `arrancar.command tiene ${ejecutables.length} lineas ejecutables: parece una copia de la logica en vez de un llamador`,
+  );
+  assert.match(texto, /arrancar\.sh/, "arrancar.command no llama a arrancar.sh: si copiaron la logica, van a divergir");
+});
+
+test("los de shell son ejecutables: sin el bit, el doble clic abre un editor de texto", () => {
+  for (const nombre of ["arrancar.sh", "arrancar.command"]) {
+    const modo = fs.statSync(path.join(RAIZ, nombre)).mode;
+    assert.ok(modo & 0o111, `${nombre} no tiene permiso de ejecucion`);
+  }
 });
 
 /** Si hay un `bash` que pueda parsear. En Windows normalmente no, y ese caso NO
@@ -55,8 +81,10 @@ function hayBash() {
   }
 }
 
-test("el de macOS parsea: bash -n caza los errores de sintaxis de verdad", { skip: hayBash() ? false : "no hay bash en esta maquina" }, () => {
-  execFileSync("bash", ["-n", path.join(RAIZ, "arrancar.command")], { stdio: "pipe" });
+test("los de shell parsean: bash -n caza los errores de sintaxis de verdad", { skip: hayBash() ? false : "no hay bash en esta maquina" }, () => {
+  for (const nombre of ["arrancar.sh", "arrancar.command"]) {
+    execFileSync("bash", ["-n", path.join(RAIZ, nombre)], { stdio: "pipe" });
+  }
 });
 
 // LO QUE `bash -n` NO CAZA, y por eso hay un detector aparte abajo.
@@ -110,9 +138,9 @@ test("ninguno lleva una ruta absoluta escrita a mano: eso funciona en una sola m
   }
 });
 
-test("los dos corren el comprobador ANTES del asistente: preguntar sin Node instalado no lleva a ningun lado", () => {
-  for (const l of LANZADORES) {
-    // SIN LOS COMENTARIOS, y no es un detalle: la cabecera de `arrancar.command`
+test("los que llevan logica corren el comprobador ANTES del asistente: preguntar sin Node instalado no lleva a ningun lado", () => {
+  for (const l of CON_LOGICA) {
+    // SIN LOS COMENTARIOS, y no es un detalle: la cabecera de `arrancar.sh`
     // NOMBRA `projects-init.mjs` para explicar que defecto cierra. Comparar
     // posiciones sobre el texto crudo hacia que esta prueba fallara sobre un
     // archivo correcto --y la primera version fallo exactamente asi--.
@@ -129,16 +157,16 @@ test("los dos corren el comprobador ANTES del asistente: preguntar sin Node inst
   }
 });
 
-test("los dos dicen de donde se baja Node si falta: es lo unico que no pueden comprobar por su cuenta", () => {
-  for (const l of LANZADORES) {
+test("los que llevan logica dicen de donde se baja Node si falta: es lo unico que no pueden comprobar por su cuenta", () => {
+  for (const l of CON_LOGICA) {
     const texto = fs.readFileSync(path.join(RAIZ, l.archivo), "utf8");
     assert.match(texto, /nodejs\.org/, `${l.archivo} detecta que falta Node y no dice de donde se saca`);
   }
 });
 
-test("los dos dejan la ventana abierta al final: si se cierra sola, el mensaje no se lee", () => {
-  const mac = fs.readFileSync(path.join(RAIZ, "arrancar.command"), "utf8");
-  assert.match(mac, /read -r -p/, "arrancar.command se cierra sin que nadie alcance a leer el motivo");
+test("los que llevan logica dejan la ventana abierta al final: si se cierra sola, el mensaje no se lee", () => {
+  const sh = fs.readFileSync(path.join(RAIZ, "arrancar.sh"), "utf8");
+  assert.match(sh, /read -r -p/, "arrancar.sh se cierra sin que nadie alcance a leer el motivo");
   const win = fs.readFileSync(path.join(RAIZ, "arrancar.cmd"), "utf8");
   assert.match(win, /\bpause\b/, "arrancar.cmd se cierra sin que nadie alcance a leer el motivo");
 });
