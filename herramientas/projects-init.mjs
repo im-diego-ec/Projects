@@ -340,6 +340,73 @@ export function noViajanPorForma(forma) {
  *  Se resuelve por realpath en los DOS lados. El `try` es por el caso en que
  *  `argv[1]` no exista en disco (`node --eval`, un REPL): ahi no nos invocaron y
  *  no corre nada, que es lo correcto. */
+/** Las banderas que esta herramienta acepta. Es UNA lista y la lee tanto el
+ *  parser como el que sugiere: dos listas divergen, y la que se pudre es la que
+ *  nadie mira. */
+export const BANDERAS = [
+  "--valores",
+  "--destino",
+  "--sin-herramientas",
+  "--sin-arranque",
+  "--forzar",
+  "--ejemplo",
+  "--asistente",
+  "--solo-valores",
+  "--version-openspec",
+  "--help",
+];
+
+/** Cuantas letras hay que cambiar para pasar de una palabra a la otra
+ *  (Levenshtein). Se usa para decidir si un argumento desconocido es un error de
+ *  tipeo o una bandera que alguien invento. */
+export function distancia(a, b) {
+  const f = Array.from({ length: b.length + 1 }, (_, j) => j);
+  for (let i = 1; i <= a.length; i++) {
+    let anterior = f[0];
+    f[0] = i;
+    for (let j = 1; j <= b.length; j++) {
+      const tmp = f[j];
+      f[j] = a[i - 1] === b[j - 1] ? anterior : 1 + Math.min(anterior, f[j], f[j - 1]);
+      anterior = tmp;
+    }
+  }
+  return f[b.length];
+}
+
+/** "quisiste decir --destino?", cuando se puede afirmar.
+ *
+ *  QUE DEFECTO CIERRA. `--destinno` contestaba "argumento desconocido: --destinno"
+ *  y la lista entera de banderas. La lista es correcta y es lo que hay que leer
+ *  cuando de verdad no se sabe cual era; cuando la diferencia es UNA letra, leer
+ *  diez lineas para encontrar la que ya se estaba tipeando es trabajo que la
+ *  herramienta puede ahorrar.
+ *
+ *  EL UMBRAL ES DOS Y NO "el mas parecido". Sugerir siempre el mas cercano
+ *  convierte cualquier disparate en un consejo con cara de certeza: `--xyz` no se
+ *  parece a nada, y contestar "quisiste decir --ejemplo?" manda a probar algo que
+ *  no tiene nada que ver. Cuando no se sabe, no se sugiere y queda la lista. */
+export function sugerenciaDeBandera(argumento, banderas = BANDERAS) {
+  const v = String(argumento ?? "");
+  // NO SE EXIGE QUE EMPIECE CON GUION, y se probo al reves. Un filtro asi no lo
+  // cazaba ninguna mutacion --el umbral ya rechaza rutas y valores sueltos, que
+  // no se parecen a ninguna bandera-- y ademas apagaba el caso util: quien
+  // escribe `sin-herramientas` sin los dos guiones queria esa bandera, y esta a
+  // dos letras de ella.
+  let mejor = null;
+  let mejorD = Infinity;
+  for (const b of banderas) {
+    const d = distancia(v, b);
+    if (d < mejorD) {
+      mejorD = d;
+      mejor = b;
+    }
+  }
+  // Un umbral fijo castiga a las banderas cortas: `-x` esta a 2 de `--help` sin
+  // parecerse en nada. Por eso el maximo depende del largo del que se escribio.
+  const tope = Math.min(2, Math.max(1, Math.floor(v.length / 4)));
+  return mejor && mejorD <= tope ? ` — ¿quisiste decir ${mejor}?` : "";
+}
+
 export function invocadoDirecto(urlDelModulo) {
   try {
     return fs.realpathSync(fileURLToPath(urlDelModulo)) === fs.realpathSync(process.argv[1] ?? "");
@@ -2431,7 +2498,7 @@ function argumentos(argv) {
     // abajo: la respuesta a la pregunta mas basica era un error. Ahora imprimen
     // el mismo texto que el uso y salen 0, porque pedir ayuda no es un fallo.
     else if (argv[i] === "--help" || argv[i] === "-h") o.ayuda = true;
-    else throw new Error(`argumento desconocido: ${argv[i]}`);
+    else throw new Error(`argumento desconocido: ${argv[i]}${sugerenciaDeBandera(argv[i])}`);
   }
   return o;
 }
