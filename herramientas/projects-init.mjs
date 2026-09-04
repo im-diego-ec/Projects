@@ -1708,14 +1708,25 @@ export function correrPaso(ejecutor, paso, destino, env = process.env, dirDeShim
  *  DEVUELVE `null` CUANDO NO SABE, a proposito. Inventar una causa es peor que dar
  *  el consejo generico: manda a la persona a arreglar algo que no esta roto. El
  *  `??` del resumen se encarga del resto. */
-export function arregloConcretoDe(fallo, ejecutor = {}) {
+export function arregloConcretoDe(fallo, ejecutor = {}, existe = comandoDisponible) {
   const codigo = fallo?.codigo ?? null;
   const estado = fallo?.estado ?? null;
   const cmd = ejecutor?.comando ?? "el instalador";
 
-  // ENOENT de execFileSync = el EJECUTABLE no existe. En Windows, que corre con
-  // shell, el shell contesta 127 en vez de ENOENT: es el mismo caso por otra via.
-  if (codigo === "ENOENT" || estado === 127) {
+  // "FALTA EL PROGRAMA" SE PREGUNTA, NO SE DEDUCE DEL CODIGO DE SALIDA, y esto
+  // lo encontro el runner de Windows con el banco puesto. En Unix un ejecutable
+  // que no existe llega como ENOENT, y un shell POSIX contesta 127. En Windows
+  // el paso corre con `shell: true` y cmd.exe contesta **1** con "no se reconoce
+  // como un comando interno o externo": el mismo 1 que devuelve un `pnpm install`
+  // que fallo de verdad. O sea que en Windows --el sistema donde mas gente tiene
+  // un Node viejo sin corepack-- esta clasificacion no detectaba nada.
+  //
+  // La pregunta directa no depende de ningun codigo: si el paso fallo y el
+  // programa NO esta, la causa es esa y no otra. Se responde igual en los tres
+  // sistemas, y `comandoDisponible` es la misma funcion con la que el arranque ya
+  // elige ejecutor.
+  const faltaElPrograma = ejecutor?.comando ? !existe(ejecutor.comando) : false;
+  if (faltaElPrograma || codigo === "ENOENT" || estado === 127) {
     return (
       `esto no es un fallo del proyecto: falta el programa \`${cmd}\` en esta computadora. ` +
       "Si es pnpm, se trae con `corepack enable` (viene con Node, no se instala aparte). " +

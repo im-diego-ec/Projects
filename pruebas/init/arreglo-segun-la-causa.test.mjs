@@ -108,8 +108,39 @@ test("correrPaso devuelve la CAUSA CRUDA, no solo una frase ya armada", async ()
     process.cwd(),
   );
   assert.equal(r.ok, false);
-  // En Windows corre con shell y el shell contesta 127 en vez de ENOENT: los dos
-  // son "el ejecutable no existe", y `arregloConcretoDe` trata a los dos igual.
-  assert.ok(r.codigo === "ENOENT" || r.estado === 127, `esperaba ENOENT o 127 y vino ${JSON.stringify(r)}`);
-  assert.ok(arregloConcretoDe(r, { comando: "pnpm" }), "con esa causa cruda tendria que salir un arreglo concreto");
+  assert.ok(r.codigo !== undefined && r.estado !== undefined, `no devolvio la causa cruda: ${JSON.stringify(r)}`);
+  // NO SE EXIGE UN CODIGO EN PARTICULAR, y eso lo enseño el runner de Windows.
+  // En Unix esto llega como ENOENT; en Windows el paso corre con shell y cmd.exe
+  // contesta 1, el MISMO 1 de un install que fallo de verdad. Exigir ENOENT o 127
+  // aca era exigirle a Windows algo que Windows no dice.
+  assert.ok(
+    r.codigo === "ENOENT" || typeof r.estado === "number",
+    `esperaba una causa cruda utilizable y vino ${JSON.stringify(r)}`,
+  );
+  // Lo que SI tiene que valer en los tres: con el programa ausente, sale el
+  // arreglo del programa ausente. Se le pasa un "existe" que dice que no, que es
+  // lo que `comandoDisponible` va a contestar de verdad para este comando.
+  const a = arregloConcretoDe(r, { comando: "no-existe-este-programa-jamas" });
+  assert.ok(a && /falta el programa/.test(a), `con el programa ausente esperaba su arreglo y vino ${a}`);
+});
+
+test('"falta el programa" se PREGUNTA, y por eso funciona igual en Windows', () => {
+  // En Windows un ejecutable ausente llega como estado 1, indistinguible de un
+  // install que fallo de verdad. Deducirlo del codigo dejaba a ese sistema sin
+  // clasificacion ninguna, que es donde mas falta hace: es donde mas gente tiene
+  // un Node viejo sin corepack.
+  const comoWindows = { codigo: null, estado: 1 };
+  assert.match(
+    arregloConcretoDe(comoWindows, { comando: "pnpm" }, () => false),
+    /falta el programa/,
+    "con el programa ausente y estado 1 (Windows) no lo detecto",
+  );
+  // Y al reves: el MISMO estado 1 con el programa presente NO es "falta el
+  // programa". Si lo fuera, cualquier fallo real mandaria a instalar algo que ya
+  // esta, que es el consejo mas confuso posible.
+  assert.equal(
+    arregloConcretoDe(comoWindows, { comando: "pnpm" }, () => true),
+    null,
+    "con el programa presente, un estado 1 se dio por 'falta el programa'",
+  );
 });
