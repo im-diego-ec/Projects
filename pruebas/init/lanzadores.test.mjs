@@ -63,10 +63,36 @@ test("el de macOS NO copia la logica: la llama", () => {
 });
 
 test("los de shell son ejecutables: sin el bit, el doble clic abre un editor de texto", () => {
+  // SE LE PREGUNTA A GIT Y NO AL SISTEMA DE ARCHIVOS, y no es un rodeo: en
+  // Windows no existe el bit de ejecucion de POSIX, asi que `statSync().mode`
+  // devuelve algo que no lo tiene NUNCA y este caso salia rojo en el runner de
+  // Windows por una propiedad que esa maquina no puede tener.
+  //
+  // Y ademas es la pregunta correcta en las tres. Lo que decide si el archivo
+  // llega ejecutable a la maquina de otra persona no es el permiso que tiene en
+  // ESTA copia: es el modo que git guarda en el indice, 100755 o 100644, que es
+  // lo unico que viaja en el clon. Un archivo con el bit puesto localmente y
+  // 100644 en git llega sin permiso a todos los demas, y aca salia verde.
+  const modos = Object.fromEntries(
+    execFileSync("git", ["ls-files", "-s", "arrancar.sh", "arrancar.command", "arrancar.cmd"], {
+      cwd: RAIZ,
+      encoding: "utf-8",
+    })
+      .trim()
+      .split("\n")
+      .map((l) => {
+        const m = /^(\d{6})\s+\S+\s+\d+\s+(.+)$/.exec(l);
+        return m ? [m[2], m[1]] : null;
+      })
+      .filter(Boolean),
+  );
+  assert.equal(Object.keys(modos).length, 3, `git no reporto los tres lanzadores: ${JSON.stringify(modos)}`);
   for (const nombre of ["arrancar.sh", "arrancar.command"]) {
-    const modo = fs.statSync(path.join(RAIZ, nombre)).mode;
-    assert.ok(modo & 0o111, `${nombre} no tiene permiso de ejecucion`);
+    assert.equal(modos[nombre], "100755", `${nombre} viaja en git como ${modos[nombre]}: llega sin permiso de ejecucion`);
   }
+  // El de Windows NO lleva el bit, y es correcto: alla lo decide la extension, y
+  // ponerselo seria ruido en el diff de cualquiera que trabaje en Unix.
+  assert.equal(modos["arrancar.cmd"], "100644", "el lanzador de Windows no necesita el bit: alla manda la extension");
 });
 
 /** Si hay un `bash` que pueda parsear. En Windows normalmente no, y ese caso NO

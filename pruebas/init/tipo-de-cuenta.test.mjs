@@ -77,8 +77,20 @@ test("el CODEOWNERS del andamio trae las DOS formas: si falta una, media configu
   assert.match(texto, /@\{\{BUILDER_1\}\} @\{\{BUILDER_2\}\}/, "falta la forma de cuenta de usuario");
 });
 
-/** Genera un proyecto con el tipo de cuenta pedido y devuelve su CODEOWNERS. */
+/** El CODEOWNERS que sale con cada tipo de cuenta, generado UNA sola vez.
+ *
+ *  SE MEMORIZA, y por una medicion: cuatro casos pedian esto y cada pedido
+ *  instanciaba el andamio entero. En el runner de macOS eso paso de los 120
+ *  segundos de tope y el archivo entero salia rojo por lentitud, no por un
+ *  defecto. Lo que estos casos comparan es el CODEOWNERS de cada tipo, y ese no
+ *  cambia entre pedidos: generarlo cuatro veces era trabajo sin pregunta.
+ *
+ *  Y VA `--sin-herramientas`: estos casos no miran openspec ni la constitucion, y
+ *  ese paso baja un CLI de la red. Correr por la red lo que la pregunta no
+ *  necesita es como se llega a un banco que falla por el clima. */
+const CODEOWNERS_CACHE = new Map();
 function codeownersDe(tipo, tmp) {
+  if (CODEOWNERS_CACHE.has(tipo)) return CODEOWNERS_CACHE.get(tipo);
   const destino = path.join(tmp, tipo);
   fs.mkdirSync(destino, { recursive: true });
   const base = JSON.parse(execFileSync("node", [INIT, "--ejemplo"], { encoding: "utf-8" }));
@@ -88,8 +100,12 @@ function codeownersDe(tipo, tmp) {
   };
   const ruta = path.join(tmp, `v-${tipo}.json`);
   fs.writeFileSync(ruta, JSON.stringify(valores));
-  execFileSync("node", [INIT, "--valores", ruta, "--destino", destino, "--sin-arranque"], { stdio: "pipe" });
-  return fs.readFileSync(path.join(destino, ".github/CODEOWNERS"), "utf8");
+  execFileSync("node", [INIT, "--valores", ruta, "--destino", destino, "--sin-arranque", "--sin-herramientas"], {
+    stdio: "pipe",
+  });
+  const c = fs.readFileSync(path.join(destino, ".github/CODEOWNERS"), "utf8");
+  CODEOWNERS_CACHE.set(tipo, c);
+  return c;
 }
 
 test("EN UNA ORGANIZACION el proyecto nace con equipos", () => {
