@@ -567,7 +567,7 @@ marco está al día en 2 superficies».
 | Directorio | Qué hay |
 |---|---|
 | `api/` | Express + TS + Prisma + **Supabase Auth** (el token se verifica en el propio API, sin llamada de red por request), con `lib/log.ts`, `middleware/auth.ts`, `middleware/errorHandler.ts`, `requestId.ts`, `asyncHandler.ts` — y **48 pruebas** |
-| `web/` | React + Vite + Tailwind + **Supabase Auth** (`src/auth.ts` es el único archivo que importa el SDK del proveedor), con **25 pruebas** |
+| `web/` | React + Vite + Tailwind + **Supabase Auth** (`src/auth.ts` es el único archivo que importa el SDK del proveedor), con **28 pruebas** |
 | `e2e/` | Playwright, con una prueba de humo |
 | `.github/`, `eslint.config.mjs`, `AGENTS.md`, … | La mecánica del marco |
 | `.projects/`, `.cursor/rules/` | La porción de la constitución, renderizada al día |

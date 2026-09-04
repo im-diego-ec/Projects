@@ -1705,6 +1705,83 @@ async function moduloDelRegistro() {
 /** El resumen del arranque, en las palabras del encargo: instalado, formateado,
  *  verificado — o exactamente que fallo y como se arregla. Puro sobre lo que
  *  paso, para que el banco lo pueda afirmar sin correr un install. */
+/** EL PUERTO QUE UN SERVIDOR DEL PROYECTO VA A USAR, LEIDO DEL PROYECTO.
+ *
+ *  NO SE ESCRIBE UN NUMERO ACA. El puerto vive en la configuracion que el andamio
+ *  acaba de copiar al destino (`server: { port: 5173 }` de vite, el
+ *  PUERTO_POR_DEFECTO del API), y esa configuracion es la que manda. Un numero
+ *  repetido en esta herramienta seria correcto hasta el dia que alguien cambie el
+ *  del andamio, y entonces mandaria a la persona a una direccion vacia sin que
+ *  nada se pusiera rojo.
+ *
+ *  Devuelve `null` si no lo pudo leer, y entonces la salida NO afirma una
+ *  direccion: decir "abri localhost:5173" cuando no se sabe es peor que no
+ *  decirlo, porque lo que se ve al fallar es una pagina en blanco sin motivo. */
+export function puertoDeclarado(destino, rel, patron) {
+  try {
+    const m = patron.exec(fs.readFileSync(path.join(destino, rel), "utf8"));
+    return m ? Number.parseInt(m[1], 10) : null;
+  } catch {
+    return null;
+  }
+}
+
+/** DONDE MIRAR LO QUE ACABA DE NACER.
+ *
+ *  QUE DEFECTO CIERRA. El arranque terminaba diciendo "ARRANCADO Y EN VERDE:
+ *  instalado, datos, formateado, verificado" y pasaba directo a las tareas
+ *  humanas de GitHub. Nada decia como se enciende el proyecto ni en que direccion
+ *  se ve. Quien no es tecnico no tiene por que saber que `pnpm dev` existe, y
+ *  quien lo sabe igual no sabe el puerto de ESTE proyecto.
+ *
+ *  Y EL PRIMER PASO NO ES `pnpm dev` EN UNA APLICACION: es levantar la base. Sin
+ *  eso la portada se abre y dice "Base de datos: no responde", que es un rojo
+ *  correcto y un pesimo primer minuto. El orden importa y por eso esta escrito. */
+export function lineasParaVerlo(destino, forma, valores = {}) {
+  const l = [];
+  const esSitio = forma === "sitio";
+  const paqueteWeb = esSitio ? (valores.PAQUETE_SITIO ?? "sitio") : (valores.PAQUETE_WEB ?? "web");
+  // NINGUNO DE LOS DOS TIENE NUMERO DE RESPALDO: si no se pudo leer, mas abajo
+  // se manda a mirar lo que imprima `pnpm dev`. Un respaldo escrito aca seria
+  // correcto hasta el dia que alguien cambie el del andamio, y ese dia mandaria
+  // a la persona a una direccion vacia sin que nada se pusiera rojo.
+  const puertoWeb = esSitio
+    ? puertoDeclarado(destino, `${paqueteWeb}/astro.config.mjs`, /server:\s*\{\s*port:\s*(\d+)/)
+    : puertoDeclarado(destino, `${paqueteWeb}/vite.config.ts`, /server:\s*\{\s*port:\s*(\d+)/);
+  const puertoApi = esSitio
+    ? null
+    : puertoDeclarado(destino, `${valores.PAQUETE_API ?? "api"}/src/server.ts`, /PUERTO_POR_DEFECTO = (\d+)/);
+
+  l.push("");
+  l.push("YA PODES VERLO. Parado en la carpeta del proyecto:");
+  if (!esSitio) {
+    l.push("     docker compose up -d      <- levanta la base de datos, y va PRIMERO");
+    l.push("     pnpm dev");
+    l.push("");
+    l.push(
+      puertoWeb
+        ? `  Y abri http://localhost:${puertoWeb} en el navegador.`
+        : "  Y abri en el navegador la direccion que imprima `pnpm dev`.",
+    );
+    if (puertoApi) {
+      l.push(`  El API queda en http://localhost:${puertoApi}: la portada lo consulta sola, no hay que abrirlo.`);
+    }
+    l.push("  Esa portada muestra DOS estados, el del API y el de la base, porque son dos cosas");
+    l.push("  distintas y se rompen por separado. Si la base dice \"no responde\", falta el");
+    l.push("  `docker compose up -d` de arriba: la portada lo dice ahi mismo.");
+  } else {
+    l.push("     pnpm dev");
+    l.push("");
+    l.push(
+      puertoWeb
+        ? `  Y abri http://localhost:${puertoWeb} en el navegador.`
+        : "  Y abri en el navegador la direccion que imprima `pnpm dev`.",
+    );
+    l.push("  Un sitio para leer no tiene base de datos, asi que no hay nada que levantar antes.");
+  }
+  return l;
+}
+
 export function lineasDelResumen(hechos, destino, cuantosIban = PASOS_DEL_ARRANQUE.length) {
   const hechas = hechos.filter((h) => h.ok).map((h) => h.paso.clave);
   const fallo = hechos.find((h) => !h.ok);
@@ -3231,6 +3308,10 @@ async function main(argv) {
         console.error("Lo que sigue —las tareas humanas— NO se imprime: primero hay que dejar el proyecto en verde.");
         return 1;
       }
+      // DONDE MIRARLO, y va ACA y no al final del todo: entre este punto y el
+      // final hay seis tareas de GitHub que no hacen falta para ver el proyecto
+      // andando. Quien acaba de armarlo quiere abrirlo, no configurar Dependabot.
+      for (const linea of lineasParaVerlo(o.destino, forma, valores)) console.log(linea);
     }
   }
 

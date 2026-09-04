@@ -35,10 +35,17 @@ const ORG_DEL_PROYECTO = "{{ORG}}";
 // vigila pruebas/andamio/acoples-del-andamio.test.mjs, que compara estos
 // esquemas contra los `res.json` de app.ts: si se separan otra vez, da rojo.
 const RespuestaSalud = z.object({ estado: z.string() });
+const RespuestaSaludDeLaBase = z.object({ db: z.string() });
 const RespuestaHola = z.object({ mensaje: z.string(), userId: z.string() });
 
 const SIN_CONEXION = "sin conexion con el API";
 const RESPUESTA_INESPERADA = "el API respondio algo que no entiendo";
+// Los dos motivos por los que la base puede no contestar se dicen distinto, y
+// no por prolijidad: el arreglo NO es el mismo. Si el API no contesta, lo que
+// falta es `pnpm dev`; si el API contesta 503, el API esta vivo y lo que falta
+// es la base, o sea Docker.
+const BASE_SIN_API = "no se pudo preguntar (el API no responde)";
+const BASE_CAIDA = "no responde";
 
 /**
  * Las cabeceras con las que sale una peticion al API.
@@ -78,6 +85,36 @@ async function leerSalud(): Promise<string> {
   // decir cual es.
   const leido = RespuestaSalud.safeParse(cuerpo);
   return leido.success ? leido.data.estado : RESPUESTA_INESPERADA;
+}
+
+/** El texto a mostrar del chequeo de LA BASE. Nunca lanza.
+ *
+ *  POR QUE ES UNA SEGUNDA CONSULTA Y NO ALCANZA CON LA DE ARRIBA. `/api/health`
+ *  NO TOCA LA BASE, y esta escrito a proposito en api/src/app.ts: si se mezclaran,
+ *  una base lenta haria que el balanceador diera de baja tareas que estan sanas.
+ *
+ *  Pero esa separacion, que es correcta en produccion, dejaba a esta portada
+ *  diciendo "API health: ok" con Postgres apagado. Y es EL caso de la primera
+ *  corrida: quien acaba de armar el proyecto todavia no levanto Docker, ve un
+ *  verde, y se va convencido de que anda. Un tablero que se pone verde sin haber
+ *  mirado la pieza que mas se rompe es peor que no tener tablero.
+ *
+ *  `/api/db/health` contesta 200 con {db:"ok"} o 503, y el 503 no trae la causa a
+ *  proposito: el endpoint es publico y el mensaje del driver nombra el host y el
+ *  usuario de la base. Aca alcanza con distinguir los dos.
+ */
+async function leerSaludDeLaBase(): Promise<string> {
+  let cuerpo: unknown;
+  try {
+    cuerpo = await pedirJson("/api/db/health");
+  } catch (e) {
+    // `pedirJson` lanza tanto si no hubo conexion como si hubo respuesta con
+    // codigo de error. Son dos cosas distintas, se arreglan en lugares distintos,
+    // y el texto del error es lo unico que las separa de este lado.
+    return /respondio \d/.test(String(e)) ? BASE_CAIDA : BASE_SIN_API;
+  }
+  const leido = RespuestaSaludDeLaBase.safeParse(cuerpo);
+  return leido.success ? leido.data.db : RESPUESTA_INESPERADA;
 }
 
 /**
@@ -182,6 +219,7 @@ function Identidad({ auth, sesion }: { auth: Autenticacion | null; sesion: Sesio
 
 export default function App({ auth }: { auth: Autenticacion | null }) {
   const [salud, setSalud] = useState("...");
+  const [base, setBase] = useState("...");
   const [hola, setHola] = useState("");
   const [sesion, setSesion] = useState<Sesion | null>(null);
 
@@ -190,6 +228,7 @@ export default function App({ auth }: { auth: Autenticacion | null }) {
     // lanza, asi que no hay rechazo que atrapar (no-floating-promises exige
     // que la intencion este escrita, no que se ignore).
     void leerSalud().then(setSalud);
+    void leerSaludDeLaBase().then(setBase);
   }, []);
 
   useEffect(() => {
@@ -215,9 +254,29 @@ export default function App({ auth }: { auth: Autenticacion | null }) {
           <p className="text-sm text-neutral-500">React + Node + Prisma + Supabase · hello world</p>
         </header>
 
-        <div className="text-sm">
-          <span className="text-neutral-500">API health: </span>
-          <span className="font-mono">{salud}</span>
+        <div className="text-sm space-y-1">
+          <div>
+            <span className="text-neutral-500">API: </span>
+            <span className="font-mono" aria-label="Estado del API">
+              {salud}
+            </span>
+          </div>
+          {/* LA BASE VA APARTE Y NO SUMADA A LA DE ARRIBA. Con un solo indicador,
+              el "ok" del API tapaba una base apagada, que es el estado normal de
+              la primera corrida. Y cuando esta caida dice QUE HACER: el mensaje
+              generico obligaba a saber de antemano que la base vive en Docker. */}
+          <div>
+            <span className="text-neutral-500">Base de datos: </span>
+            <span className="font-mono" aria-label="Estado de la base de datos">
+              {base}
+            </span>
+          </div>
+          {base === BASE_CAIDA && (
+            <p className="text-xs text-neutral-500">
+              El API responde pero la base no. Levantala con <code className="font-mono">docker compose up -d</code> y
+              recarga esta pagina.
+            </p>
+          )}
         </div>
 
         <Identidad auth={auth} sesion={sesion} />

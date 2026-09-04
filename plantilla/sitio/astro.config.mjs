@@ -13,4 +13,10 @@ import { defineConfig } from "astro/config";
 // entera no paga por el pedacito que se mueve.
 export default defineConfig({
   site: "https://{{DOMINIO_PROD}}",
+  // EL PUERTO SE DECLARA aunque sea el mismo que Astro elige solo, y no es
+  // redundancia: `projects init` termina diciendo en que direccion se ve el
+  // sitio, y lo LEE de aca. Un puerto que solo vive dentro de Astro obligaria a
+  // esa herramienta a repetir el numero, y un numero repetido es correcto hasta
+  // el dia que alguien lo cambia de un solo lado.
+  server: { port: 4321 },
 });

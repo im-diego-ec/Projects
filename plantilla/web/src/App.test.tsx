@@ -43,6 +43,10 @@ function authFalsa(sesionInicial: Sesion | null = null, token: string | null = n
 // vigila pruebas/andamio/acoples-del-andamio.test.mjs.
 const SALUD_OK = { estado: "ok", servicio: "{{PROYECTO}}-api", ts: "2026-01-01T00:00:00.000Z" };
 const HOLA_OK = { mensaje: "Hola desde el API", userId: "dev-user" };
+// El chequeo de LA BASE, que es otro endpoint y otra respuesta. /api/health no
+// toca la base a proposito, asi que doblarlo solo a el dejaba al banco verde
+// con Postgres apagado, que es justo el estado de la primera corrida.
+const DB_SALUD_OK = { db: "ok" };
 // El saludo que devuelve el API cuando el token SI viajo: el userId sale de los
 // claims firmados, no del "dev-user" que inventa el bypass de desarrollo.
 const HOLA_DE_USUARIO = { mensaje: "Hola desde el API", userId: "usuario-real" };
@@ -52,8 +56,8 @@ const SIN_CABECERA = { headers: {} };
 const CON_BEARER = { headers: { Authorization: `Bearer ${TOKEN}` } };
 
 /** Una respuesta de fetch con lo unico que el codigo bajo prueba le pide. */
-function respuesta(cuerpo: unknown, ok = true) {
-  return { ok, status: ok ? 200 : 401, json: () => Promise.resolve(cuerpo) };
+function respuesta(cuerpo: unknown, ok = true, status = ok ? 200 : 401) {
+  return { ok, status, json: () => Promise.resolve(cuerpo) };
 }
 
 /**
@@ -74,8 +78,11 @@ function cablearFetch(porRuta: (url: string, init?: RequestInit) => unknown) {
   return falso;
 }
 
-const respondeTodoBien = (url: string) =>
-  url.endsWith("/api/health") ? respuesta(SALUD_OK) : respuesta(HOLA_OK);
+const respondeTodoBien = (url: string) => {
+  if (url.endsWith("/api/db/health")) return respuesta(DB_SALUD_OK);
+  if (url.endsWith("/api/health")) return respuesta(SALUD_OK);
+  return respuesta(HOLA_OK);
+};
 
 /** La cabecera Authorization que llevaba una llamada del doble de fetch. */
 function autorizacionDe(init?: RequestInit): string | undefined {
@@ -89,6 +96,7 @@ function autorizacionDe(init?: RequestInit): string | undefined {
  * SUPABASE_URL puesto, o sea todos los reales.
  */
 const comoRequireAuth = (url: string, init?: RequestInit) => {
+  if (url.endsWith("/api/db/health")) return respuesta(DB_SALUD_OK);
   if (url.endsWith("/api/health")) return respuesta(SALUD_OK);
   return autorizacionDe(init) === `Bearer ${TOKEN}`
     ? respuesta(HOLA_DE_USUARIO)
@@ -111,7 +119,7 @@ describe("App", () => {
 
     render(<App auth={null} />);
 
-    expect(await screen.findByText("ok")).toBeTruthy();
+    expect(await screen.findByLabelText("Estado del API")).toBeTruthy();
     // El healthcheck es publico y sale SIN cabecera de autorizacion: no hay
     // proveedor en este caso, asi que tampoco hay token que mandar.
     expect(fetchFalso).toHaveBeenCalledWith("http://localhost:3000/api/health", SIN_CABECERA);
@@ -138,7 +146,7 @@ describe("App", () => {
     const { auth } = authFalsa({ userId: "usuario-real", email: "ana@ejemplo.test" }, TOKEN);
 
     render(<App auth={auth} />);
-    await screen.findByText("ok");
+    await screen.findByLabelText("Estado del API");
 
     fireEvent.click(screen.getByRole("button", { name: "Llamar /api/hello" }));
 
@@ -157,7 +165,7 @@ describe("App", () => {
     cablearFetch(comoRequireAuth);
 
     render(<App auth={null} />);
-    await screen.findByText("ok");
+    await screen.findByLabelText("Estado del API");
 
     fireEvent.click(screen.getByRole("button", { name: "Llamar /api/hello" }));
 
@@ -172,7 +180,7 @@ describe("App", () => {
     vi.mocked(auth.token).mockRejectedValue(new Error("sesion caida"));
 
     render(<App auth={auth} />);
-    await screen.findByText("ok");
+    await screen.findByLabelText("Estado del API");
 
     fireEvent.click(screen.getByRole("button", { name: "Llamar /api/hello" }));
 
@@ -208,7 +216,10 @@ describe("App", () => {
 
     render(<App auth={null} />);
 
-    expect(await screen.findByText("el API respondio algo que no entiendo")).toBeTruthy();
+    // Son DOS al montar y no una: la portada consulta el estado del API y el de
+    // la base, y las dos respuestas tienen la forma ajena. `findByText` en
+    // singular tira "found multiple" aca, que es lo correcto.
+    await waitFor(() => expect(screen.getAllByText("el API respondio algo que no entiendo")).toHaveLength(2));
     expect(screen.queryByText("sin conexion con el API")).toBeNull();
 
     // El endpoint protegido corre por el mismo carril: los dos lugares donde el
@@ -218,20 +229,73 @@ describe("App", () => {
     // waitFor y no findAllByText: findAll* se conforma con UNA coincidencia, y
     // el healthcheck ya puso la primera — la prueba pasaria sin que el click
     // hubiera hecho nada. Lo que se espera es que aparezca la SEGUNDA.
-    await waitFor(() =>
-      expect(screen.getAllByText("el API respondio algo que no entiendo")).toHaveLength(2)
-    );
+    await waitFor(() => expect(screen.getAllByText("el API respondio algo que no entiendo")).toHaveLength(3));
+  });
+
+  // -------------------------------------------------------------------------
+  // EL CHEQUEO DE LA BASE, que es el que faltaba.
+  //
+  // /api/health NO TOCA LA BASE, y eso esta escrito a proposito en el API. La
+  // consecuencia era que esta portada decia "API health: ok" con Postgres
+  // apagado: el estado exacto de la primera corrida de cualquiera que todavia no
+  // levanto Docker. Un verde que no miro la pieza que mas se rompe.
+  // -------------------------------------------------------------------------
+
+  it("pregunta por la base APARTE del API, y no da por buena una sin la otra", async () => {
+    const fetchFalso = cablearFetch(respondeTodoBien);
+
+    render(<App auth={null} />);
+
+    await screen.findByLabelText("Estado de la base de datos");
+    // Las DOS consultas, y las dos publicas: ninguna lleva Authorization.
+    expect(fetchFalso).toHaveBeenCalledWith("http://localhost:3000/api/health", SIN_CABECERA);
+    expect(fetchFalso).toHaveBeenCalledWith("http://localhost:3000/api/db/health", SIN_CABECERA);
+  });
+
+  it("con el API vivo y la base caida lo dice, y dice como levantarla", async () => {
+    // El 503 de /api/db/health es lo que responde el API cuando el `SELECT 1` no
+    // vuelve. No trae la causa a proposito (el endpoint es publico y el mensaje
+    // del driver nombra el host y el usuario), asi que el texto util lo pone el
+    // front: sin esto, la persona ve "no responde" y no sabe que la base vive en
+    // Docker.
+    cablearFetch((url) => {
+      if (url.endsWith("/api/db/health")) return respuesta({ db: "no disponible" }, false, 503);
+      if (url.endsWith("/api/health")) return respuesta(SALUD_OK);
+      return respuesta(HOLA_OK);
+    });
+
+    render(<App auth={null} />);
+
+    expect((await screen.findByLabelText("Estado de la base de datos")).textContent).toBe("no responde");
+    // El API sigue en "ok": son dos indicadores distintos y no se contagian.
+    expect((await screen.findByLabelText("Estado del API")).textContent).toBe("ok");
+    expect(await screen.findByText(/docker compose up -d/)).toBeTruthy();
+  });
+
+  it("sin API no confunde 'la base esta caida' con 'no pude preguntar'", async () => {
+    // Los dos se arreglan en lugares distintos: uno con `pnpm dev` y el otro con
+    // Docker. Decir "la base no responde" cuando lo que falta es el API manda a
+    // la persona a revisar la pieza equivocada.
+    cablearFetch(() => {
+      throw new Error("ECONNREFUSED");
+    });
+
+    render(<App auth={null} />);
+
+    const base = await screen.findByLabelText("Estado de la base de datos");
+    expect(base.textContent).toBe("no se pudo preguntar (el API no responde)");
+    expect(screen.queryByText(/docker compose up -d/)).toBeNull();
   });
 
   it("un endpoint protegido que responde 401 no se lee como si trajera dato", async () => {
-    cablearFetch((url) =>
-      url.endsWith("/api/health")
-        ? respuesta(SALUD_OK)
-        : respuesta({ error: "no autenticado" }, false)
-    );
+    cablearFetch((url) => {
+      if (url.endsWith("/api/db/health")) return respuesta(DB_SALUD_OK);
+      if (url.endsWith("/api/health")) return respuesta(SALUD_OK);
+      return respuesta({ error: "no autenticado" }, false);
+    });
 
     render(<App auth={null} />);
-    await screen.findByText("ok");
+    await screen.findByLabelText("Estado del API");
 
     fireEvent.click(screen.getByRole("button", { name: "Llamar /api/hello" }));
 
@@ -242,7 +306,7 @@ describe("App", () => {
     cablearFetch(respondeTodoBien);
 
     render(<App auth={null} />);
-    await screen.findByText("ok");
+    await screen.findByLabelText("Estado del API");
 
     // Que la app corra sin auth no puede ser silencioso: en dev es comodo y en
     // un ambiente desplegado es un aviso de que faltan las variables.
@@ -255,7 +319,7 @@ describe("App", () => {
     const { auth } = authFalsa();
 
     render(<App auth={auth} />);
-    await screen.findByText("ok");
+    await screen.findByLabelText("Estado del API");
     expect(screen.queryByText(/Supabase no configurado/)).toBeNull();
 
     fireEvent.change(screen.getByLabelText("Correo"), { target: { value: "ana@ejemplo.test" } });
@@ -274,7 +338,7 @@ describe("App", () => {
     vi.mocked(auth.ingresar).mockRejectedValue(new Error("rate limit"));
 
     render(<App auth={auth} />);
-    await screen.findByText("ok");
+    await screen.findByLabelText("Estado del API");
 
     fireEvent.click(screen.getByRole("button", { name: "Enviar enlace de acceso" }));
 
@@ -309,7 +373,7 @@ describe("App", () => {
     const { auth, desuscribir, emitir } = authFalsa();
 
     const { unmount } = render(<App auth={auth} />);
-    await screen.findByText("ok");
+    await screen.findByLabelText("Estado del API");
     expect(screen.getByRole("button", { name: "Enviar enlace de acceso" })).toBeTruthy();
 
     await emitir({ userId: "u2", email: "bruno@ejemplo.test" });
@@ -332,7 +396,7 @@ describe("App", () => {
 
     render(<AppRecargado auth={null} />);
 
-    expect(await screen.findByText("ok")).toBeTruthy();
+    expect(await screen.findByLabelText("Estado del API")).toBeTruthy();
     expect(fetchFalso).toHaveBeenCalledWith("https://api.ejemplo.test/api/health", SIN_CABECERA);
   });
 });

@@ -123,7 +123,7 @@ especifica *sobre esa secuencia* sigue sin tener dónde fallar.
 | El formato acordado se verifica en cada integración | `pnpm format:check` desde la raíz | `plantilla/.github/workflows/ci.yml:206` |
 | La cobertura de pruebas alcanza el mínimo acordado y no retrocede | La composite action de cobertura, en sus dos planos (líneas del cambio y total del paquete), más el paso del marco que verifica que el andamio reparta el umbral | `actions/cobertura-diff/action.yml:151`; paso «El andamio reparte el umbral del total del marco» de `.github/workflows/marco-ci.yml` |
 | Las reglas de identidad visual del área viajan como reglas de lint verificadas | El banco de las reglas de identidad del andamio: exige el bloque con alcance propio y severidad de error, que cada expresión compile, que acepte su violación y rechace el trabajo honesto, y que cada regla de la constitución tenga estado decidido — y muta copias del andamio para probar que cada comprobación MUERDE | `pruebas/marca/reglas-marca.test.mjs` (mutaciones desde `:261`); el bloque verificado vive en `plantilla/eslint.config.mjs` |
-| El esqueleto que entrega el andamio encaja consigo mismo | El banco de acoples del andamio, seis comprobaciones con su mutación al lado | `pruebas/andamio/acoples-del-andamio.test.mjs:134` (.env), `:207` (nombre de la base), `:305` (no-root), `:388` (arquitectura), `:536` (contrato), `:630` (organización a mano) |
+| El esqueleto que entrega el andamio encaja consigo mismo | El banco de acoples del andamio, seis comprobaciones con su mutación al lado | `pruebas/andamio/acoples-del-andamio.test.mjs:134` (.env), `:207` (nombre de la base), `:305` (no-root), `:388` (arquitectura), `:542` (contrato), `:669` (organización a mano) |
 
 **El que no tiene compuerta, y por qué.** «Test de regresión obligatorio por defecto
 conocido» es indecidible con un escaneo: distinguir un test que REPRODUCE el defecto de
@@ -200,7 +200,7 @@ el árbol; lo que sí depende del árbol es no afirmar lo contrario mientras tan
 | El servicio registra en JSON estructurado | **ninguno** | — |
 | La verificación post-deploy entiende el formato del log | **ninguno** | — |
 | Los errores del navegador dejan evidencia en nuestros logs | **ninguno** | — |
-| Los errores son correlacionables entre capas | **parcial**: el banco de acoples exige que el front, el API y el banco del front hablen del MISMO contrato, que es la mitad estática de la correlación | `pruebas/andamio/acoples-del-andamio.test.mjs:536` |
+| Los errores son correlacionables entre capas | **parcial**: el banco de acoples exige que el front, el API y el banco del front hablen del MISMO contrato, que es la mitad estática de la correlación | `pruebas/andamio/acoples-del-andamio.test.mjs:542` |
 | Un aumento de errores del cliente avisa, no espera lectura | **ninguno** | — |
 
 **Por qué esta capability es la que peor se deja verificar estáticamente.** Sus cinco

@@ -511,8 +511,33 @@ function camposDelDoble(texto, nombre) {
 
 const ENDPOINTS = [
   { ruta: "/api/health", esquema: "RespuestaSalud", doble: "SALUD_OK" },
+  { ruta: "/api/db/health", esquema: "RespuestaSaludDeLaBase", doble: "DB_SALUD_OK" },
   { ruta: "/api/hello", esquema: "RespuestaHola", doble: "HOLA_OK" },
 ];
+
+/** LOS CHEQUEOS DE SALUD QUE EL API EXPONE, leidos del API y no de una lista.
+ *
+ *  QUE DEFECTO CIERRA, y es de los que no se ven mirando ningun archivo solo. El
+ *  API tiene DOS: `/api/health`, que a proposito NO TOCA LA BASE --si se mezclaran,
+ *  una base lenta haria que el balanceador diera de baja tareas sanas--, y
+ *  `/api/db/health`, que es el unico que la toca.
+ *
+ *  Esa separacion es correcta en produccion y era una MENTIRA en la portada: el
+ *  hello-world consultaba solo el primero y mostraba "API health: ok" con Postgres
+ *  apagado, que es el estado exacto de la primera corrida de cualquiera que
+ *  todavia no levanto Docker. Un tablero que se pone verde sin haber mirado la
+ *  pieza que mas se rompe es peor que no tener tablero.
+ *
+ *  La lista se DERIVA del API en vez de escribirse aca: un chequeo nuevo entra a
+ *  esta guarda solo, sin que nadie se tenga que acordar. */
+function chequeosDeSaludDelApi(texto) {
+  return [...texto.matchAll(/app\.get\(\s*"(\/api\/[\w/-]*health)"/g)].map((m) => m[1]);
+}
+
+/** Las rutas que la portada de verdad le pide al API. */
+function rutasQueConsultaElFront(texto) {
+  return [...texto.matchAll(/pedirJson\(\s*"([^"]+)"/g)].map((m) => m[1]);
+}
 
 function problemasDelContrato(raizAndamio) {
   const api = sinMarcadores(fs.readFileSync(path.join(raizAndamio, "api", "src", "app.ts"), "utf8"));
@@ -539,6 +564,20 @@ function problemasDelContrato(raizAndamio) {
     }
     for (const c of exige) {
       if (!dobla.has(c)) problemas.push(`el doble ${e.doble} no trae "${c}", que el esquema ${e.esquema} exige: el banco estaria probando el camino de error creyendo probar el bueno`);
+    }
+  }
+  // Y ADEMAS: que la portada CONSULTE todos los chequeos, no solo que sepa leerlos.
+  // Sin esto, agregar un endpoint de salud al API y no llamarlo desde el front
+  // sale en verde, que es como estuvo `/api/db/health` desde que existe.
+  const expuestos = chequeosDeSaludDelApi(api);
+  const consultadas = rutasQueConsultaElFront(front);
+  if (!expuestos.length) problemas.push("no se leyo ningun chequeo de salud en api/src/app.ts: la guarda quedo mirando al vacio");
+  if (!consultadas.length) problemas.push("no se leyo ninguna consulta en web/src/App.tsx: la guarda quedo mirando al vacio");
+  for (const ruta of expuestos) {
+    if (!consultadas.includes(ruta)) {
+      problemas.push(
+        `el API expone ${ruta} y la portada nunca lo consulta: el hello-world muestra un estado que no midio esa pieza`,
+      );
     }
   }
   return problemas;
