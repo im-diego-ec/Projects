@@ -220,7 +220,7 @@ computadora, y te dice si está todo o qué falta.
 > primera vez.
 
 > **Si preferís escribirlo vos**, el archivo `arrancar` no hace más que llamar a
-> `node ~/Projects/herramientas/projects-doctor.mjs` — es exactamente lo mismo,
+> `node ~/Projects/herramientas/projects-INEXISTENTE.mjs` — es exactamente lo mismo,
 > y está acá por si te resulta más cómodo.
 
 **Qué vas a ver**, si está todo:

@@ -409,6 +409,31 @@ export function sugerenciaDeBandera(argumento, banderas = BANDERAS) {
   return mejor && mejorD <= tope ? ` — ¿quisiste decir ${mejor}?` : "";
 }
 
+/** LOS CODIGOS DE SALIDA, y por que son CUATRO y no veintiocho.
+ *
+ *  Esta herramienta tiene 28 `return 1` distintos: 28 clases de fallo con el
+ *  mismo numero. La tentacion es darle un codigo a cada una, y estaria mal: un
+ *  codigo de salida solo sirve si ALGUIEN LO MIRA, y los tres consumidores que
+ *  existen --los lanzadores, el CI y la puerta web-- no pueden hacer nada
+ *  distinto ante "el lockfile no se pudo leer" y "el pin de openspec es invalido".
+ *  Veintiocho constantes con su guarda, su documentacion y su banco, para un
+ *  lector que no existe, es maquinaria que se pudre sola.
+ *
+ *  LO QUE SI CAMBIA LO QUE ALGUIEN HACE son estas cuatro, y cada una entro porque
+ *  habia un consumidor esperandola:
+ *
+ *    0  se hizo.
+ *    1  algo fallo. El diagnostico y su arreglo estan en la pantalla, no en este
+ *       numero: el numero no puede llevar un consejo y la pantalla si.
+ *    2  el comando se escribio mal. Es distinto de 1 porque no hay nada roto que
+ *       arreglar; hay que volver a tipear.
+ *    3  LA PERSONA CANCELO. Este es el que faltaba, y su ausencia era un falso
+ *       verde en la cara de quien lo dijo: cancelar salia 0, y el lanzador
+ *       --que solo mira cero contra no-cero-- contestaba "Listo el paso 1. Lo que
+ *       elegiste quedo en valores.json". Un archivo que la persona acababa de
+ *       decidir que NO se escribiera, y que no existia. */
+export const SALIDA = { ok: 0, fallo: 1, uso: 2, cancelado: 3 };
+
 /** LO QUE VA A PASAR, ANTES DE QUE PASE.
  *
  *  QUE DEFECTO CIERRA. El asistente termina con "¿Escribo esto?" y muestra las
@@ -3079,7 +3104,10 @@ async function main(argv) {
       const confirmacion = (await preguntarPorTeclado('\n  ¿Escribo esto? [Enter = sí, o escribí "no"]: ', "confirmar")).trim();
       if (asis.esNo(confirmacion)) {
         process.stdout.write("\nNo se escribió nada. Volvé a correrlo cuando quieras: no se tocó ningún archivo.\n");
-        return 0;
+        // Y NO 0: cancelar no es haber terminado. Con 0, el lanzador contestaba
+        // "Listo el paso 1, lo que elegiste quedo en valores.json" sobre un
+        // archivo que la persona acababa de decidir que no se escribiera.
+        return SALIDA.cancelado;
       }
     } catch (e) {
       console.error("");

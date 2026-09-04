@@ -58,7 +58,13 @@ node "%~dp0herramientas\projects-init.mjs" --asistente --solo-valores valores.js
 set CODIGO=%errorlevel%
 
 echo.
-if not "%CODIGO%"=="0" (
+REM El 3 es "la persona cancelo", y tiene mensaje propio porque no es ninguno de
+REM los otros dos. Antes cancelar salia 0 y este bloque contestaba "Listo el paso
+REM 1, lo que elegiste quedo en valores.json": un archivo que la persona acababa
+REM de decidir que NO se escribiera.
+if "%CODIGO%"=="3" (
+  echo   Listo, no se escribio nada. Cuando quieras, volve a abrir este mismo archivo.
+) else if not "%CODIGO%"=="0" (
   echo   Se corto en el paso 1. Arriba dice por que.
 ) else (
   echo   Listo el paso 1. Lo que elegiste quedo en: %~dp0valores.json

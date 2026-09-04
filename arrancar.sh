@@ -68,7 +68,14 @@ node "$AQUI/herramientas/projects-init.mjs" --asistente --solo-valores valores.j
 CODIGO=$?
 
 printf '\n'
-if [ "$CODIGO" -ne 0 ]; then
+# EL 3 ES "LA PERSONA CANCELO", y tiene mensaje propio porque no es ninguno de los
+# otros dos. Antes cancelar salia 0 y este bloque contestaba "Listo el paso 1, lo
+# que elegiste quedo en valores.json": un archivo que la persona acababa de decidir
+# que NO se escribiera. Decirle "listo" a alguien que acaba de decir "no" es la
+# forma mas directa de que deje de creerle a la herramienta.
+if [ "$CODIGO" -eq 3 ]; then
+  printf '  Listo, no se escribio nada. Cuando quieras, volve a abrir este mismo archivo.\n'
+elif [ "$CODIGO" -ne 0 ]; then
   printf '  Se corto en el paso 1. Arriba dice por que.\n'
 else
   printf '  Listo el paso 1. Lo que elegiste quedo en: %s/valores.json\n' "$AQUI"
