@@ -26,7 +26,7 @@
 // mas que en una que solo mira.
 // ---------------------------------------------------------------------------
 
-import { execFileSync } from "node:child_process";
+import { execFileSync, spawnSync } from "node:child_process";
 import process from "node:process";
 import { NODE_MINIMO, NODE_RECOMENDADO, compararVersiones, invocadoDirecto } from "./projects-init.mjs";
 
@@ -41,14 +41,38 @@ const AVISO = HAY_TERMINAL ? "AVISO:" : "::warning::";
  *  `shell` en Windows porque ahi los ejecutables de npm son `.cmd` y
  *  `execFileSync` sin shell no los encuentra: es el mismo criterio que ya usa
  *  `projects-init` para comprobar que un ejecutor existe. */
-export function preguntarVersion(cmd, args = ["--version"]) {
-  try {
-    return execFileSync(cmd, args, {
+export function preguntarVersion(cmd, args = ["--version"], juntarStderr = false) {
+  // `spawnSync` CUANDO HACE FALTA LEER LOS DOS CANALES, y no es una preferencia
+  // de estilo: `execFileSync` devuelve SOLO stdout aunque se le capture stderr,
+  // asi que con el, un `gh` que contesta por stderr y sale 0 devolvia la cadena
+  // vacia — que es exactamente el falso rojo que este parametro vino a cerrar,
+  // reintroducido por la funcion que se uso para cerrarlo.
+  if (juntarStderr) {
+    const r = spawnSync(cmd, args, {
       encoding: "utf-8",
+      stdio: ["ignore", "pipe", "pipe"],
+      shell: process.platform === "win32",
+      timeout: 10_000,
+    });
+    // Lo que decide es el TEXTO, no el codigo de salida: `gh auth status` sale
+    // con codigo distinto de cero en algunas versiones aun estando adentro.
+    const t = `${r.stdout ?? ""}${r.stderr ?? ""}`.trim();
+    return t || null;
+  }
+  try {
+    const salida = execFileSync(cmd, args, {
+      encoding: "utf-8",
+      // `juntarStderr` NO es un lujo: `gh auth status` escribio por STDERR durante
+      // anios y recien hace poco se movio a stdout. Descartarlo hacia que este
+      // comprobador le dijera "no entraste a tu cuenta" a alguien que SI habia
+      // entrado, con un `gh auth login` de arreglo que no arregla nada porque no
+      // habia nada roto. Un falso rojo en el Paso 0 es el peor de todos: es la
+      // primera pantalla, y quien lo ve concluye que la herramienta no funciona.
       stdio: ["ignore", "pipe", "ignore"],
       shell: process.platform === "win32",
       timeout: 10_000,
-    }).trim();
+    });
+    return String(salida).trim();
   } catch {
     return null;
   }
@@ -129,10 +153,33 @@ export function revisar(programas = PROGRAMAS) {
 /** Si `gh` esta autenticado. Se pregunta aparte de la version porque son dos
  *  cosas distintas: `gh` instalado y sin sesion es el caso mas comun de todos, y
  *  el mensaje que corresponde no es "instalalo" sino "entrá". */
+/** El patron de `gh auth status`, con las DOS redacciones que tuvo.
+ *
+ *  "Logged in to github.com account nombre" es la nueva; "Logged in to github.com
+ *  as nombre" es la que uso durante anios. Exigir la palabra "account" dejaba
+ *  afuera a cualquiera con un gh de hace un tiempo — o sea, a la mayoria de las
+ *  maquinas que no se actualizan solas, que son justo las de la gente a la que
+ *  esta guia apunta. */
+export const PATRON_DE_SESION = /Logged in to \S+ (?:account|as) (\S+)/;
+
+/** Si `gh` esta autenticado, y con que cuenta.
+ *
+ *  SE PREGUNTA PRIMERO POR `gh api user`, y no por gusto: esa respuesta es UN
+ *  DATO --el nombre de la cuenta, una linea, por stdout-- en todas las versiones,
+ *  mientras que `gh auth status` es un TEXTO PARA HUMANOS que cambio de redaccion
+ *  y de canal entre versiones. Colgar una compuerta del Paso 0 de una frase en
+ *  ingles que sus autores pueden reescribir cuando quieran es colgarla de nada.
+ *
+ *  `gh auth status` queda de respaldo para el caso sin red: ahi `gh api` no puede
+ *  contestar y el estado de la sesion igual se puede leer de lo que gh tiene
+ *  guardado. Se lee de los DOS canales y con las dos redacciones. */
 export function sesionDeGitHub() {
-  const salida = preguntarVersion("gh", ["auth", "status"]);
+  const login = preguntarVersion("gh", ["api", "user", "--jq", ".login"], true);
+  if (login && /^[A-Za-z0-9-]{1,39}$/.test(login.trim())) return { adentro: true, cuenta: login.trim() };
+
+  const salida = preguntarVersion("gh", ["auth", "status"], true);
   if (salida === null) return { adentro: false, cuenta: null };
-  const m = /Logged in to \S+ account (\S+)/.exec(salida);
+  const m = PATRON_DE_SESION.exec(salida);
   return { adentro: Boolean(m), cuenta: m ? m[1] : null };
 }
 
