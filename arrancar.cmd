@@ -64,11 +64,58 @@ REM 1, lo que elegiste quedo en valores.json": un archivo que la persona acababa
 REM de decidir que NO se escribiera.
 if "%CODIGO%"=="3" (
   echo   Listo, no se escribio nada. Cuando quieras, volve a abrir este mismo archivo.
-) else if not "%CODIGO%"=="0" (
+  echo.
+  pause
+  exit /b %CODIGO%
+)
+if not "%CODIGO%"=="0" (
   echo   Se corto en el paso 1. Arriba dice por que.
+  echo.
+  pause
+  exit /b %CODIGO%
+)
+
+REM --- Paso 2: armar el proyecto, ACA MISMO ---------------------------------
+REM
+REM ESTO NO ESTABA, Y ERA EL AGUJERO MAS GRANDE DEL RECORRIDO. El lanzador
+REM terminaba diciendo "el paso que sigue esta impreso arriba", y ese paso era
+REM `--destino .` parado en el clon del marco: medido, ese comando dice "el
+REM destino ya tiene 16 archivo(s) del andamio" y no arma nada nunca. Lo unico
+REM que se ofrecia para destrabarlo era --forzar, que sobre el clon del marco
+REM significa pisar el marco con el andamio.
+REM
+REM El nombre del proyecto no se vuelve a preguntar: se lee del archivo que el
+REM asistente acaba de escribir. La carpeta se crea AL LADO del clon.
+for /f "usebackq delims=" %%N in (`node -e "try{process.stdout.write(String(JSON.parse(require('fs').readFileSync(process.argv[1],'utf8')).PROYECTO||''))}catch(e){}" "%~dp0valores.json"`) do set NOMBRE=%%N
+if "%NOMBRE%"=="" (
+  echo   No pude leer el nombre del proyecto de %~dp0valores.json.
+  echo   El archivo esta escrito: podes armar el proyecto a mano con el comando de arriba.
+  echo.
+  pause
+  exit /b 1
+)
+for %%D in ("%~dp0..") do set PADRE=%%~fD
+set DESTINO=%PADRE%\%NOMBRE%
+
+echo.
+echo   Paso 2 - armando tu proyecto en %DESTINO%
+echo   -------------------------------------------------
+echo.
+echo   Esto tarda unos minutos y va a escribir mucho en pantalla. Es normal.
+echo.
+
+if not exist "%DESTINO%" mkdir "%DESTINO%"
+node "%~dp0herramientas\projects-init.mjs" --valores "%~dp0valores.json" --destino "%DESTINO%"
+set CODIGO=%errorlevel%
+
+echo.
+if "%CODIGO%"=="0" (
+  echo   LISTO. Tu proyecto esta en: %DESTINO%
+  echo   Arriba dice como verlo andando y que queda por hacer.
 ) else (
-  echo   Listo el paso 1. Lo que elegiste quedo en: %~dp0valores.json
-  echo   El paso que sigue esta impreso arriba.
+  echo   Se corto en el paso 2. Arriba dice por que, y como se arregla.
+  echo   Lo que contestaste quedo guardado: volver a abrir este archivo no te
+  echo   va a hacer contestar todo de nuevo.
 )
 echo.
 pause

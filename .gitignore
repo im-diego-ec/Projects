@@ -50,3 +50,14 @@ Thumbs.db
 # 2026-08-21 en el PR del release 1.3.0, con el check dando rojo sobre tres
 # invocaciones inexistentes.
 aviso-version.json
+
+# LO QUE EL ASISTENTE DEJA EN EL CLON CUANDO SE LO ABRE CON DOBLE CLIC. Los tres
+# lanzadores corren el asistente parados aca, asi que sus respuestas quedan en esta
+# carpeta y no en la del proyecto — a proposito: es lo que hace que volver a
+# abrirlo no le haga contestar las nueve preguntas de nuevo. Son de la persona que
+# tiene el clon, no del marco, y ver el clon "sucio" despues de armar un proyecto
+# es la clase de detalle que hace dudar de si algo salio mal.
+valores.json
+.projects-valores.json
+.projects-respuestas.json
+.projects-desvios.json

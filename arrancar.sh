@@ -74,12 +74,57 @@ printf '\n'
 # que NO se escribiera. Decirle "listo" a alguien que acaba de decir "no" es la
 # forma mas directa de que deje de creerle a la herramienta.
 if [ "$CODIGO" -eq 3 ]; then
-  printf '  Listo, no se escribio nada. Cuando quieras, volve a abrir este mismo archivo.\n'
-elif [ "$CODIGO" -ne 0 ]; then
-  printf '  Se corto en el paso 1. Arriba dice por que.\n'
+  printf '  Listo, no se escribio nada. Cuando quieras, volve a abrir este mismo archivo.\n\n'
+  read -r -p '  Apreta Enter para cerrar. ' _ || true
+  exit "$CODIGO"
+fi
+if [ "$CODIGO" -ne 0 ]; then
+  printf '  Se corto en el paso 1. Arriba dice por que.\n\n'
+  read -r -p '  Apreta Enter para cerrar. ' _ || true
+  exit "$CODIGO"
+fi
+
+# --- Paso 2: armar el proyecto, ACA MISMO ----------------------------------
+#
+# ESTO NO ESTABA, Y ERA EL AGUJERO MAS GRANDE DEL RECORRIDO. El lanzador
+# terminaba aca diciendo "el paso que sigue esta impreso arriba", y ese paso
+# impreso era `--destino .` parado en el clon del marco. Medido: ese comando,
+# copiado tal cual, dice "el destino ya tiene 16 archivo(s) del andamio" y no
+# arma nada NUNCA. Lo unico que la pantalla ofrecia para destrabarlo era
+# `--forzar`, que sobre el clon del marco significa pisar el marco con el
+# andamio. O sea que el camino del doble clic --el de la persona que no abre una
+# terminal-- terminaba en un callejon, y el unico cartel que habia apuntaba a un
+# precipicio.
+#
+# El nombre del proyecto NO se vuelve a preguntar: ya esta contestado, se lee del
+# archivo que el asistente acaba de escribir. Y la carpeta se crea AL LADO del
+# clon, no adentro: el marco es una herramienta y el proyecto es del proyecto.
+NOMBRE="$(node -e 'try{process.stdout.write(String(JSON.parse(require("fs").readFileSync(process.argv[1],"utf8")).PROYECTO??""))}catch{}' "$AQUI/valores.json")"
+if [ -z "$NOMBRE" ]; then
+  printf '  No pude leer el nombre del proyecto de %s/valores.json.\n' "$AQUI"
+  printf '  El archivo esta escrito: podes armar el proyecto a mano con el comando de arriba.\n\n'
+  read -r -p '  Apreta Enter para cerrar. ' _ || true
+  exit 1
+fi
+DESTINO="$(cd "$AQUI/.." && pwd)/$NOMBRE"
+
+printf '\n'
+printf '  Paso 2 — armando tu proyecto en %s\n' "$DESTINO"
+printf '  ─────────────────────────────────────────────────\n\n'
+printf '  Esto tarda unos minutos y va a escribir mucho en pantalla. Es normal.\n\n'
+
+mkdir -p "$DESTINO"
+node "$AQUI/herramientas/projects-init.mjs" --valores "$AQUI/valores.json" --destino "$DESTINO"
+CODIGO=$?
+
+printf '\n'
+if [ "$CODIGO" -eq 0 ]; then
+  printf '  LISTO. Tu proyecto esta en: %s\n' "$DESTINO"
+  printf '  Arriba dice como verlo andando y que queda por hacer.\n'
 else
-  printf '  Listo el paso 1. Lo que elegiste quedo en: %s/valores.json\n' "$AQUI"
-  printf '  El paso que sigue esta impreso arriba.\n'
+  printf '  Se corto en el paso 2. Arriba dice por que, y como se arregla.\n'
+  printf '  Lo que contestaste quedo guardado: volver a abrir este archivo no te\n'
+  printf '  va a hacer contestar todo de nuevo.\n'
 fi
 printf '\n'
 read -r -p '  Apreta Enter para cerrar. ' _ || true

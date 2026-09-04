@@ -434,6 +434,46 @@ export function sugerenciaDeBandera(argumento, banderas = BANDERAS) {
  *       decidir que NO se escribiera, y que no existia. */
 export const SALIDA = { ok: 0, fallo: 1, uso: 2, cancelado: 3 };
 
+/** EL PASO QUE SIGUE, Y QUE NO PUEDE APUNTAR AL CLON DEL MARCO.
+ *
+ *  QUE DEFECTO CIERRA, y era el agujero mas grande del recorrido no tecnico. Los
+ *  tres lanzadores hacen `cd` a su propia carpeta --la raiz del clon del marco--
+ *  y corren ahi el asistente. Al terminar, esto imprimia
+ *  `--valores valores.json --destino .`, o sea "arma el proyecto ACA".
+ *
+ *  MEDIDO, corriendo ese comando tal cual desde el clon: "::error::el destino ya
+ *  tiene 16 archivo(s) del andamio. Se aborta para no sobreescribir trabajo". No
+ *  arma nada, NUNCA, en ninguna maquina. Y lo unico que la pantalla ofrecia para
+ *  destrabarlo era `--forzar`, que sobre el clon del marco significa pisar el
+ *  marco con el andamio: el unico cartel del callejon apuntaba a un precipicio.
+ *
+ *  Cuando el archivo de valores quedo DENTRO del clon, el paso que sigue nombra
+ *  una carpeta nueva al lado. Cuando quedo en cualquier otro lado --alguien que
+ *  corrio el asistente parado en la carpeta de su proyecto-- `--destino .` es
+ *  correcto y se sigue imprimiendo ese. */
+export function lineasDelPasoQueSigue(rutaDeValores, proyecto, raizMarco = path.resolve(ESTE_DIRECTORIO, "..")) {
+  const dondeQuedo = path.resolve(path.dirname(rutaDeValores));
+  const enElClon = dondeQuedo === path.resolve(raizMarco);
+  const yo = fileURLToPath(import.meta.url);
+  const l = ["", "No se armo ningun proyecto todavia. El paso que sigue:"];
+  if (!enElClon) {
+    l.push(`  node ${yo} --valores ${path.basename(rutaDeValores)} --destino .`);
+    return l;
+  }
+  // La carpeta va AL LADO del clon y no adentro: el marco es una herramienta y el
+  // proyecto es del proyecto. El nombre sale de lo que la persona ya contesto.
+  const destino = path.join(path.dirname(path.resolve(raizMarco)), proyecto || "mi-proyecto");
+  l.push("");
+  l.push(`  Estas respuestas quedaron en ${rutaDeValores}, que esta DENTRO del clon del marco.`);
+  l.push("  El proyecto NO se arma ahi: el marco es la herramienta, no el proyecto. Va al lado:");
+  l.push("");
+  l.push(`  mkdir -p ${destino}`);
+  l.push(`  node ${yo} --valores ${rutaDeValores} --destino ${destino}`);
+  l.push("");
+  l.push("  (Si abriste el archivo `arrancar` con doble clic, esto lo hace el mismo solo.)");
+  return l;
+}
+
 /** LO QUE VA A PASAR, ANTES DE QUE PASE.
  *
  *  QUE DEFECTO CIERRA. El asistente termina con "¿Escribo esto?" y muestra las
@@ -3143,7 +3183,7 @@ async function main(argv) {
       // ejecutable, y la guia manda `--destino .` con la ruta absoluta al clon:
       // dos comandos distintos para lo mismo, y quien acaba de contestar ocho
       // preguntas no tiene como saber cual de los dos es el bueno.
-      process.stdout.write(`\nNo se armo ningun proyecto todavia. El paso que sigue, aca mismo:\n  node ${fileURLToPath(import.meta.url)} --valores ${path.basename(salida)} --destino .\n`);
+      for (const linea of lineasDelPasoQueSigue(salida, resultado.valores?.PROYECTO)) process.stdout.write(`${linea}\n`);
       return 0;
     }
     o.valores = salida;

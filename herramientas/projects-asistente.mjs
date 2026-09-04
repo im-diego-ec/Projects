@@ -924,11 +924,22 @@ export async function correrAsistente(preguntar, previos = {}, formatos = {}, em
 export function lineasDeResumen(r, desviosDeR) {
   const l = ["", "Esto es lo que elegiste:", ""];
   const filas = [
+    // VA PRIMERA, Y FALTABA. Es la pregunta que el propio asistente presenta como
+    // "la decision que mas cuesta si se toma tarde" --aplicacion contra sitio,
+    // que decide 80 archivos contra 42 y si el proyecto se publica solo o no-- y
+    // no aparecia en la unica pantalla donde alguien puede arrepentirse antes de
+    // que se escriba nada. Un resumen que se come la decision mas cara no es un
+    // resumen.
+    ["Qué vas a construir", r.forma === "sitio" ? "un sitio para leer" : "una aplicación"],
     ["Proyecto", r.PROYECTO],
     ["Cuenta de GitHub", `@${r.ORG}`],
     ["Equipo", r.equipo === "solo" ? "trabajás solo" : `vos y @${r.BUILDER_2}`],
     ["Dónde vive", { supabase: "Supabase + Cloudflare", aws: "AWS", gcp: "GCP", ninguna: "todavía sin decidir" }[r.plataforma]],
-    ["Copias", r.ambientes === "uno" ? "una sola" : "una de prueba y una de verdad"],
+    // `Copias` SOLO SI LA PREGUNTA SE HIZO. Con forma=sitio, `ambientes` tiene
+    // `salta` y nunca se pregunta: la fila salia igual y mostraba "una de prueba y
+    // una de verdad", que es el lado del `else` de una respuesta que nadie dio. El
+    // resumen inventaba una decision, y encima la mas ruidosa de leer.
+    ...(r.ambientes === undefined ? [] : [["Copias", r.ambientes === "uno" ? "una sola" : "una de prueba y una de verdad"]]),
     [
       "Dirección",
       r.dominio === "propio"

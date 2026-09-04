@@ -120,7 +120,14 @@ test("el caso mas simple son NUEVE preguntas, y solo dos hay que escribirlas", a
   );
   // Las seis restantes se contestaron con Enter, o sea con la recomendada.
   assert.deepEqual(
-    { equipo: respuestas.equipo, plataforma: respuestas.plataforma, ambientes: respuestas.ambientes, dominio: respuestas.dominio, avisos: respuestas.avisos, visibilidad: respuestas.visibilidad },
+    {
+      equipo: respuestas.equipo,
+      plataforma: respuestas.plataforma,
+      ambientes: respuestas.ambientes,
+      dominio: respuestas.dominio,
+      avisos: respuestas.avisos,
+      visibilidad: respuestas.visibilidad,
+    },
     { equipo: "solo", plataforma: "supabase", ambientes: "uno", dominio: "gratuito", avisos: "correo", visibilidad: "publico" },
     "Enter tiene que elegir la opcion recomendada de cada pregunta: si no, el 'caso simple' no es simple",
   );
@@ -162,10 +169,29 @@ test("LO QUE MAS IMPORTA: lo que produce el asistente pasa el validador de siemp
   const CASOS = {
     "PO solo, supabase, publico": PO_SOLO,
     "equipo, AWS, dos ambientes": AWS_DOS,
-    "solo, AWS, un ambiente": { PROYECTO: "api-interna", ORG: "alguien", plataforma: "2", CUENTA_DEV: "111111111111", REGION: "sa-east-1", PERFIL_DEV: "mi-perfil" },
-    "solo, sin plataforma, slack, privado": { PROYECTO: "idea-nueva", ORG: "alguien", plataforma: "3", avisos: "2", visibilidad: "2" },
+    "solo, AWS, un ambiente": {
+      PROYECTO: "api-interna",
+      ORG: "alguien",
+      plataforma: "2",
+      CUENTA_DEV: "111111111111",
+      REGION: "sa-east-1",
+      PERFIL_DEV: "mi-perfil",
+    },
+    "solo, sin plataforma, slack, privado": {
+      PROYECTO: "idea-nueva",
+      ORG: "alguien",
+      plataforma: "3",
+      avisos: "2",
+      visibilidad: "2",
+    },
     "un sitio para leer": { PROYECTO: "mi-blog", ORG: "alguien", forma: "2" },
-    "un sitio, con dominio propio": { PROYECTO: "mi-blog", ORG: "alguien", forma: "2", dominio: "2", DOMINIO_PROD: "miblog.com" },
+    "un sitio, con dominio propio": {
+      PROYECTO: "mi-blog",
+      ORG: "alguien",
+      forma: "2",
+      dominio: "2",
+      DOMINIO_PROD: "miblog.com",
+    },
   };
   const rotos = [];
   for (const [nombre, guion] of Object.entries(CASOS)) {
@@ -178,7 +204,8 @@ test("LO QUE MAS IMPORTA: lo que produce el asistente pasa el validador de siemp
   assert.deepEqual(
     rotos,
     [],
-    "el asistente produce el MISMO archivo que entra por --valores, asi que si no pasa validarValores no sirve para nada:\n  " + rotos.join("\n  "),
+    "el asistente produce el MISMO archivo que entra por --valores, asi que si no pasa validarValores no sirve para nada:\n  " +
+      rotos.join("\n  "),
   );
 });
 
@@ -268,7 +295,9 @@ test("no elegir AWS declara por que las cinco claves llevan relleno", () => {
     assert.match(regla.motivo, /no describen ninguna cuenta real/i, "tiene que decir que los numeros no son de verdad");
   }
   assert.equal(
-    desvios({ equipo: "equipo", plataforma: "aws", avisos: "slack", visibilidad: "publico" }).find((x) => x.regla === "iac-es-terraform"),
+    desvios({ equipo: "equipo", plataforma: "aws", avisos: "slack", visibilidad: "publico" }).find(
+      (x) => x.regla === "iac-es-terraform",
+    ),
     undefined,
     "eligiendo AWS no hay nada de que apartarse: los valores son de verdad",
   );
@@ -306,7 +335,11 @@ test("los numeros de cuenta del relleno NO PUEDEN ser una cuenta de AWS", () => 
   for (const clave of ["CUENTA_DEV", "CUENTA_PROD"]) {
     const v = RELLENO_AWS[clave];
     assert.match(v, /^\d{12}$/, `${clave} tiene que seguir teniendo forma de cuenta o el validador lo rechaza`);
-    assert.equal(v, "0".repeat(12), `${clave} vale "${v}", que se lee como una cuenta de verdad en la tabla de la constitucion`);
+    assert.equal(
+      v,
+      "0".repeat(12),
+      `${clave} vale "${v}", que se lee como una cuenta de verdad en la tabla de la constitucion`,
+    );
   }
 });
 
@@ -324,7 +357,8 @@ test("cada opcion explica que te cuesta, no solo como se llama", () => {
   assert.deepEqual(
     flacas,
     [],
-    "una opcion sin explicacion es un formulario, no una pregunta: quien no sabe la respuesta sigue sin saberla.\n  " + flacas.join("\n  "),
+    "una opcion sin explicacion es un formulario, no una pregunta: quien no sabe la respuesta sigue sin saberla.\n  " +
+      flacas.join("\n  "),
   );
 });
 
@@ -335,13 +369,22 @@ test("toda pregunta de opciones tiene UNA recomendada, y una sola", () => {
     const n = p.opciones.filter((o) => o.recomendada).length;
     if (n !== 1) malas.push(`${p.id}: ${n} recomendadas`);
   }
-  assert.deepEqual(malas, [], "sin recomendada, Enter no tiene que elegir; con dos, elige la primera y nadie sabe cual:\n  " + malas.join("\n  "));
+  assert.deepEqual(
+    malas,
+    [],
+    "sin recomendada, Enter no tiene que elegir; con dos, elige la primera y nadie sabe cual:\n  " + malas.join("\n  "),
+  );
 });
 
 test("MUERDE: si una pregunta deja de saltarse, el conteo del caso simple lo caza", async () => {
   // El caso que prueba que el conteo de arriba no pasa por vacuidad.
-  const conAws = PREGUNTAS.filter((p) => !p.salta || !p.salta({ plataforma: "aws", ambientes: "dos", equipo: "equipo", dominio: "propio", avisos: "slack" }));
-  const conSupabase = PREGUNTAS.filter((p) => !p.salta || !p.salta({ plataforma: "supabase", ambientes: "uno", equipo: "solo", dominio: "gratuito", avisos: "correo" }));
+  const conAws = PREGUNTAS.filter(
+    (p) => !p.salta || !p.salta({ plataforma: "aws", ambientes: "dos", equipo: "equipo", dominio: "propio", avisos: "slack" }),
+  );
+  const conSupabase = PREGUNTAS.filter(
+    (p) =>
+      !p.salta || !p.salta({ plataforma: "supabase", ambientes: "uno", equipo: "solo", dominio: "gratuito", avisos: "correo" }),
+  );
   assert.ok(
     conAws.length > conSupabase.length,
     `el camino de AWS tiene que preguntar MAS que el de Supabase; midio ${conAws.length} contra ${conSupabase.length}. ` +
@@ -350,13 +393,56 @@ test("MUERDE: si una pregunta deja de saltarse, el conteo del caso simple lo caz
   assert.equal(conSupabase.length, 9, "y el camino simple son exactamente nueve");
 });
 
-test("el resumen nombra las ocho decisiones, para poder arrepentirse antes de escribir nada", async () => {
+test("el resumen nombra TODAS las decisiones que se preguntaron, y ninguna que no", async () => {
+  // ESTE CASO SE DERIVA DE LAS PREGUNTAS, y antes era una lista de ocho cadenas
+  // escritas a mano. Esa lista no podia ver el agujero de raiz: `forma` --la
+  // pregunta que el propio asistente presenta como "la decision que mas cuesta si
+  // se toma tarde", la que decide 80 archivos contra 42 y si el proyecto se
+  // publica solo-- no estaba en el resumen NI en la lista, asi que faltaba en los
+  // dos lados a la vez y todo quedaba en verde.
+  //
+  // Derivarlo de PREGUNTAS cierra la clase entera: una pregunta nueva entra sola
+  // a esta comprobacion, sin que nadie se acuerde de agregarla.
   const { preguntar } = contestador({ ...TEXTO_VALIDO, ...PO_SOLO });
   const { respuestas, desvios: d } = await correrAsistente(preguntar, {}, {}, () => {}, DERIVADOS);
   const texto = lineasDeResumen(respuestas, d).join("\n");
-  for (const esperado of ["agenda-de-personas", "@im-diego-ec", "trabajás solo", "Supabase", "una sola", "workers.dev", "correo de GitHub", "público"]) {
-    assert.ok(texto.includes(esperado), `el resumen tiene que nombrar "${esperado}": es lo que la persona lee antes de confirmar`);
-  }
+
+  const contestadas = PREGUNTAS.filter((p) => !p.salta || !p.salta(respuestas));
+  assert.ok(contestadas.length >= 8, `solo se contestaron ${contestadas.length} preguntas: la comprobacion mediria poco`);
+  const sinNombrar = contestadas.filter((p) => {
+    const v = respuestas[p.id];
+    if (v === undefined || v === null || v === "") return false;
+    // Se busca el VALOR contestado, o la traduccion que el resumen le da. Lo que
+    // no puede pasar es que la decision no aparezca de ninguna forma.
+    const rastros = {
+      forma: [/Qué vas a construir/],
+      plataforma: [/Dónde vive/],
+      equipo: [/Equipo/],
+      dominio: [/Dirección/],
+      avisos: [/Avisos/],
+      visibilidad: [/Repositorio/],
+      ambientes: [/Copias/],
+      PROYECTO: [new RegExp(String(v))],
+      ORG: [new RegExp(String(v))],
+    };
+    const patrones = rastros[p.id] ?? [new RegExp(String(v).replace(/[.*+?^${}()|[\]\\]/g, "\\$&"))];
+    return !patrones.some((re) => re.test(texto));
+  });
+  assert.deepEqual(
+    sinNombrar.map((p) => p.id),
+    [],
+    `estas decisiones se preguntaron y el resumen no las nombra:\n${texto}`,
+  );
+
+  // Y LA OTRA MITAD: nada que NO se pregunto puede aparecer. Con forma=sitio, la
+  // pregunta de ambientes tiene `salta` y el resumen igual mostraba "una de prueba
+  // y una de verdad" — el lado del `else` de una respuesta que nadie dio.
+  const deSitio = { ...respuestas, forma: "sitio" };
+  delete deSitio.ambientes;
+  assert.ok(
+    !/Copias/.test(lineasDeResumen(deSitio, []).join("\n")),
+    "el resumen inventa la respuesta de una pregunta que no se hizo",
+  );
   // La cantidad se DERIVA de los desvios que se anotaron, no se escribe: cuando
   // se agrego el desvio de la direccion publica, el numero escrito a mano quedo
   // viejo y este caso se puso rojo por la razon equivocada.
@@ -416,7 +502,6 @@ test("si la entrada se corta a mitad, el asistente NO devuelve valores a medias"
 //     posicional desalineado, asi que nadie lo media.
 // ---------------------------------------------------------------------------
 
-
 test("CADA opcion de CADA pregunta produce un archivo que el validador acepta", async () => {
   const rotos = [];
   let combinaciones = 0;
@@ -437,7 +522,9 @@ test("CADA opcion de CADA pregunta produce un archivo que el validador acepta", 
       const faltan = REQUERIDOS.filter((k) => !(k in valores) || valores[k] === undefined);
       const { problemas } = validarValores(valores);
       if (faltan.length || problemas.length) {
-        rotos.push(`${pregunta.id}="${opcion.valor}" (se preguntaron ${preguntado.length}): faltan [${faltan}] problemas [${problemas.join(" | ")}]`);
+        rotos.push(
+          `${pregunta.id}="${opcion.valor}" (se preguntaron ${preguntado.length}): faltan [${faltan}] problemas [${problemas.join(" | ")}]`,
+        );
       }
     }
   }
@@ -650,7 +737,9 @@ test("todo desvio declara una regla que EXISTE en el canonico del marco", async 
     fs
       .readdirSync(canonico)
       .filter((f) => f.endsWith(".md"))
-      .flatMap((f) => [...fs.readFileSync(path.join(canonico, f), "utf-8").matchAll(/projects:regla id=([a-z0-9-]+)/g)].map((m) => m[1])),
+      .flatMap((f) =>
+        [...fs.readFileSync(path.join(canonico, f), "utf-8").matchAll(/projects:regla id=([a-z0-9-]+)/g)].map((m) => m[1]),
+      ),
   );
   assert.ok(idsDelCanonico.size >= 20, `el canonico declara ${idsDelCanonico.size} reglas: se rompio la lectura`);
 
@@ -718,7 +807,11 @@ test("todo desvio trae los cuatro campos que la accion de constitucion exige", a
       for (const campo of exigidos) if (!d[campo]) faltan.push(`${d.regla}: le falta \`${campo}\``);
     }
   }
-  assert.deepEqual([...new Set(faltan)], [], `la accion pone un ::error:: por cada uno:\n  ${[...new Set(faltan)].join("\n  ")}`);
+  assert.deepEqual(
+    [...new Set(faltan)],
+    [],
+    `la accion pone un ::error:: por cada uno:\n  ${[...new Set(faltan)].join("\n  ")}`,
+  );
 
   // Y la fecha tiene forma de fecha: la accion la valida con `esFecha`.
   const uno = desvios({ equipo: "solo", ORG: "alguien" }, "2026-01-01")[0];

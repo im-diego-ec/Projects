@@ -77,10 +77,27 @@ test("LOS DOS LANZADORES lo distinguen, que es para lo que existe el codigo", ()
     const t = fs.readFileSync(path.join(RAIZ, archivo), "utf8");
     assert.match(t, patron, `${archivo} no distingue el cancelado: va a decir "Listo" a quien dijo que no`);
     assert.match(t, /no se escribio nada/i, `${archivo} no dice que no se escribio nada`);
-    // Y NO puede decir las dos cosas: si el mensaje de "listo, quedo en
-    // valores.json" tambien saliera, el arreglo no arreglo nada.
-    const bloque = t.slice(t.indexOf("CODIGO"));
-    assert.ok(/Listo el paso 1/.test(bloque), `${archivo} perdio el mensaje del camino exitoso`);
+    // Y el camino exitoso tiene que seguir teniendo SU mensaje, distinto de este.
+    // Si los dos dijeran lo mismo, distinguir el codigo no habria servido de nada.
+    //
+    // Ese mensaje cambio cuando el lanzador dejo de delegar el paso 2: antes era
+    // "Listo el paso 1, lo que elegiste quedo en valores.json" --que ademas era la
+    // mentira que este caso vino a cerrar-- y ahora es el del proyecto ya armado.
+    assert.match(t, /LISTO\. Tu proyecto esta en/, `${archivo} perdio el mensaje del camino exitoso`);
+    // SOBRE LAS LINEAS EJECUTABLES, no sobre el archivo entero: la frase vieja
+    // sigue escrita --dentro del comentario que explica por que se fue-- y una
+    // busqueda sobre el texto crudo la encuentra ahi y da un rojo que no existe.
+    // Es la misma leccion que el banco del despliegue ya tenia escrita para el
+    // `cancel-in-progress`: se miran las lineas que corren, no el comentario de
+    // al lado.
+    const ejecutables = t
+      .split("\n")
+      .filter((l) => !/^\s*(#|REM\b|::)/i.test(l))
+      .join("\n");
+    assert.ok(
+      !/Listo el paso 1/.test(ejecutables),
+      `${archivo} volvio al mensaje viejo, que anunciaba un paso 1 terminado y dejaba el proyecto sin armar`,
+    );
   }
 });
 
