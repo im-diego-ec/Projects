@@ -167,6 +167,7 @@ jobs:
           echo "a publicar: ${CUANTOS} archivo(s)"
 
       - name: Publicar
+        id: publicar
         if: steps.credencial.outputs.hay == 'si'
         shell: bash
         env:
@@ -174,11 +175,86 @@ jobs:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         run: |
           set -euo pipefail
-          corepack pnpm -C {{PAQUETE_SITIO}} exec wrangler deploy
+          # La salida se GUARDA ademas de imprimirse: de ella sale la direccion que
+          # el paso siguiente va a consultar. `tee` para que el log del runner siga
+          # mostrando todo tal cual, que es donde se lee cuando algo falla.
+          corepack pnpm -C {{PAQUETE_SITIO}} exec wrangler deploy 2>&1 | tee /tmp/wrangler.txt
 
-      - name: Decir donde quedo
+          # La ultima direccion que wrangler nombra es la del despliegue que acaba
+          # de hacer. Si no se pudo leer NO se inventa una: el paso siguiente lo
+          # dice y no afirma que el sitio este arriba.
+          URL="$(grep -Eo 'https://[A-Za-z0-9._-]+\.workers\.dev' /tmp/wrangler.txt | tail -1 || true)"
+          if [ -z "$URL" ]; then
+            URL="$(grep -Eo 'https://[A-Za-z0-9._-]+' /tmp/wrangler.txt | grep -v 'cloudflare.com\|npmjs\|github.com' | tail -1 || true)"
+          fi
+          echo "url=$URL" >> "$GITHUB_OUTPUT"
+
+      # ─────────────────────────────────────────────────────────────────────────
+      # QUE EL DESPLIEGUE HAYA SALIDO 0 NO ES QUE EL SITIO CONTESTE.
+      #
+      # Hasta este paso, el workflow terminaba imprimiendo "publicado" sin haber
+      # consultado nunca la direccion. Un verde que no midio nada: wrangler puede
+      # subir los archivos y el sitio quedar sirviendo un 404 --una ruta base mal
+      # puesta, un adaptador que no se aplico, un subdominio que todavia no
+      # existe-- y el pipeline se ponia igual de verde.
+      #
+      # SE REINTENTA, y no es disimular un rojo: la primera publicacion de un
+      # workers.dev tarda unos segundos en resolver por DNS, y un unico intento
+      # convertiria eso en un rojo que se arregla solo. Cinco intentos con espera
+      # creciente cubren esa ventana; lo que no conteste despues de eso no esta
+      # arriba, y entonces el rojo es correcto.
+      # ─────────────────────────────────────────────────────────────────────────
+      - name: Comprobar que la direccion contesta de verdad
         if: steps.credencial.outputs.hay == 'si'
         shell: bash
+        env:
+          URL: ${{ steps.publicar.outputs.url }}
         run: |
-          set -euo pipefail
-          echo "::notice::publicado. La direccion la imprime el paso anterior, y la primera vez es https://${{ github.event.repository.name }}.<tu-subdominio>.workers.dev"
+          set -uo pipefail
+          if [ -z "${URL:-}" ]; then
+            echo "::error::se publico pero no se pudo leer la direccion de la salida de wrangler, asi que NO se comprobo que el sitio conteste. El log del paso anterior la tiene; abrila a mano antes de dar el despliegue por bueno"
+            exit 1
+          fi
+
+          # El cuerpo baja al espacio de trabajo y no a /tmp: en el runner los dos
+          # existen, pero este mismo script se corre en un banco y ahi el destino
+          # tiene que ser una carpeta que el proceso controle.
+          CUERPO="${RUNNER_TEMP:-.}/cuerpo-del-sitio.html"
+
+          for intento in 1 2 3 4 5; do
+            # `|| CODIGO=000` DESPUES de la sustitucion y no adentro: con el `||`
+            # adentro, curl imprime su 000 y el echo agrega otro, y lo que se veia
+            # en el log era "contesto 000000". Un codigo de estado inventado por
+            # una concatenacion es peor que no tenerlo.
+            CODIGO="$(curl -sS -o "$CUERPO" -w '%{http_code}' --max-time 20 "$URL")" || CODIGO=000
+            # Y el tamanio SOLO si el archivo existe: cuando curl no llega a
+            # ningun lado no lo crea, y `wc` sobre lo que no esta deja TAM vacio,
+            # que despues rompe la comparacion numerica de abajo con un error de
+            # bash en vez de un rojo que se entienda.
+            if [ -s "$CUERPO" ]; then TAM=$(wc -c < "$CUERPO" | tr -d " "); else TAM=0; fi
+            if [ "$CODIGO" = "200" ] && [ "$TAM" -gt 0 ]; then
+              echo "::notice title=Tu sitio esta en linea::$URL contesto 200 con $TAM bytes"
+              {
+                echo "### Tu sitio esta publicado"
+                echo ""
+                echo "**$URL**"
+                echo ""
+                echo "Comprobado desde el runner: contesto 200 con $TAM bytes. No es que el despliegue haya salido bien; es que la pagina abre."
+              } >> "$GITHUB_STEP_SUMMARY"
+              exit 0
+            fi
+            # La espera se duplica pero el total se corta: 3+6+12+24 son 45
+            # segundos, de sobra para la propagacion de un workers.dev nuevo y
+            # poco para un sitio que de verdad no esta. Esperar minutos por algo
+            # que no va a cambiar es un rojo que llega tarde.
+            #
+            # Despues del ULTIMO intento no se espera: no queda nadie a quien
+            # darle tiempo, y esos segundos solo retrasan el rojo.
+            if [ "$intento" -eq 5 ]; then break; fi
+            ESPERA=$((3 * (2 ** (intento - 1))))
+            echo "intento $intento: $URL contesto $CODIGO con $TAM bytes; espero ${ESPERA}s"
+            sleep "$ESPERA"
+          done
+
+          echo "::error::se publico y la direccion NO contesta: $URL devolvio $CODIGO despues de cinco intentos. El despliegue subio los archivos, asi que el problema esta del lado de servirlos: la causa mas comun la primera vez es que falte registrar el subdominio en Workers & Pages -> Subdomain. Ver {{PAQUETE_SITIO}}/README.md"
+          exit 1
