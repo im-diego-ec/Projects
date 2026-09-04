@@ -10,7 +10,9 @@
     "test": "vitest run --coverage",
     "lint": "eslint .",
     "desplegar": "wrangler deploy",
-    "desplegar:prueba": "wrangler deploy --dry-run"
+    "desplegar:prueba": "wrangler deploy --dry-run",
+    "publicaciones": "wrangler deployments list",
+    "volver-atras": "wrangler rollback"
   },
   "dependencies": {
     "astro": "^7.2.8"

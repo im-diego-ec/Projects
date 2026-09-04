@@ -117,6 +117,40 @@ solo cada vez que las verificaciones quedan en verde sobre la rama principal.
 primera vez tiene la forma `https://{{PROYECTO}}.<tu-subdominio>.workers.dev`.
 Abrila: tiene que verse tu sitio.
 
+### Si publicaste algo roto: volver a la versión anterior · *1 minuto*
+
+**Esto es lo primero que hay que hacer, antes de arreglar nada.** Mientras el
+sitio está roto, cada minuto lo paga quien entra. Volver atrás es un comando y
+tarda segundos; arreglar el código bien puede tardar una hora.
+
+```bash
+corepack pnpm -C {{PAQUETE_SITIO}} run publicaciones
+```
+
+Lista las diez publicaciones más recientes, la de arriba es la que está en línea.
+Copiá el identificador de la anterior y:
+
+```bash
+corepack pnpm -C {{PAQUETE_SITIO}} run volver-atras -- <ese-identificador>
+```
+
+En segundos, la dirección vuelve a servir lo que servía antes.
+
+> **Y ahora la parte que se olvida.** Volver atrás cambia lo que Cloudflare
+> sirve, **no lo que hay en tu repositorio**. El código roto sigue en `main`, así
+> que la próxima publicación —que sale sola cuando las verificaciones quedan en
+> verde— lo va a subir otra vez.
+>
+> Volver atrás te compra tiempo, no te arregla el problema. Con el sitio ya sano,
+> el arreglo de verdad es **deshacer el cambio en el repositorio**: en la pestaña
+> **Pull requests → Closed**, abrí el que causó esto y apretá **Revert**. Eso crea
+> un cambio nuevo que deshace el anterior, pasa por las mismas verificaciones, y
+> publica solo.
+
+**También podés hacerlo sin terminal:** en el panel de Cloudflare, **Workers &
+Pages → tu proyecto → Deployments**, cada publicación tiene su botón de rollback.
+Es exactamente lo mismo que el comando de arriba.
+
 ### 6 · Si sale rojo: los tres errores que vas a ver
 
 Vienen de Cloudflare tal cual, sin traducir, y ninguno dice qué hacer. Esto sí:

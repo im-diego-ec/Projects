@@ -113,6 +113,22 @@ de pantalla.** Un secreto que se vio una vez hay que darlo por público: borrarl
 después no borra el que ya se vio. Si te pasó, la salida es revocarlo en
 Cloudflare y crear otro — toma dos minutos y no rompe nada.
 
+### Si publicaste algo roto, volvé atrás antes de arreglarlo
+
+Mientras el sitio está roto, cada minuto lo paga quien entra. **Volver a la
+versión anterior es un comando y tarda segundos**; arreglar el código bien puede
+tardar una hora, y el orden correcto es ése.
+
+El paso a paso, con los dos comandos exactos, está en el README del paquete de tu
+sitio —es la fuente [canónica](02-glosario.md), como todo lo demás de esta
+página—. Lo que conviene saber desde acá es **qué no arregla**:
+
+**Volver atrás cambia lo que Cloudflare sirve, no lo que hay en tu repositorio.**
+El código roto sigue en la rama principal, así que la próxima publicación lo sube
+otra vez. Te compra tiempo, no te arregla el problema. Con el sitio ya sano, el
+arreglo de verdad es deshacer el cambio en el repositorio, con el botón **Revert**
+del trabajo que lo causó.
+
 ### Podés ensayar antes de tener cuenta
 
 ```bash
