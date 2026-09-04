@@ -1800,6 +1800,49 @@ export function seMidio(estado) {
   return !ESTADOS_SIN_MEDICION.has(estado);
 }
 
+/** COMO SE LLAMA CADA "no pude mirar" EN CASTELLANO.
+ *
+ *  Vive aca arriba y no dentro del que escribe el documento porque lo leen DOS:
+ *  el documento y la terminal. Mientras vivio adentro, la terminal imprimia el
+ *  identificador crudo --"NO SE PUDO MEDIR (sin-auth)"--, que es una clave de un
+ *  objeto de este archivo y no una frase. */
+export const TITULO_SIN_MEDICION = {
+  "sin-gh": "no encontré `gh` en el PATH",
+  "sin-auth": "`gh` no está autenticado",
+  "sin-red": "no se llegó a la API de GitHub",
+  "sin-repo": "GitHub no conoce (todavía) a ese repositorio",
+  "no-se-sabe": "la sonda contestó algo que esta herramienta no sabe leer",
+};
+
+/** QUE HAY QUE HACER PARA DESTRABAR CADA UNO.
+ *
+ *  MISMO DEFECTO QUE EL DE ARRIBA, y peor. La terminal decia "el documento dice
+ *  como destrabar la sonda": mandaba a abrir un archivo para leer UNA linea que
+ *  ya estaba escrita en este mismo proceso. Las cinco causas tienen arreglos
+ *  distintos --instalar un programa, entrar a una cuenta, mirar la red, esperar
+ *  al primer push, reportar-- y ninguno llegaba a la pantalla.
+ *
+ *  Cada entrada es una lista de lineas para que el documento las pueda envolver
+ *  a su ancho y la terminal las pueda indentar al suyo, sin que ninguno de los
+ *  dos tenga que cortar texto del otro. */
+export const COMO_SE_DESTRABA = {
+  "sin-gh": ["Instalá GitHub CLI (<https://cli.github.com>), corré `gh auth login`, y después la sonda de arriba."],
+  "sin-auth": ["Corré `gh auth login` y después la sonda de arriba."],
+  "sin-red": [
+    "Es un problema de red o de proxy, no del repositorio. Reintentá la sonda de arriba desde una",
+    "máquina con salida a `api.github.com`.",
+  ],
+  "sin-repo": [
+    "Lo más probable es que el repositorio todavía no exista: `projects init` corre **antes** del",
+    "primer push. También puede ser que el nombre no sea ese, o que la cuenta autenticada no lo",
+    "vea. Volvé a correr la sonda de arriba después del push fundacional.",
+  ],
+  "no-se-sabe": [
+    "Copiá la salida tal cual al reportarlo: esta herramienta sabe leer 200, 403, 404, la falta de",
+    "autenticación y el corte de red, y esto no fue ninguno de los cinco.",
+  ],
+};
+
 /** Que dijo la sonda, leido de lo que el proceso dejo.
  *
  *  NO SE CLASIFICA POR CODIGO DE SALIDA, y esto esta medido: `gh` sale 1 tanto
@@ -2063,30 +2106,14 @@ export function bloqueDeProteccion({ estado, detalle = "", rulesets = [], org, p
   // Los cinco caminos de "no pude mirar". Comparten forma a proposito: lo que
   // tienen que dejar claro es lo mismo, y es que esta herramienta NO afirma nada
   // sobre este repositorio.
+  // El documento nombra el repositorio; la terminal, que ya lo dijo tres lineas
+  // antes, no lo repite. Es la unica diferencia entre los dos textos, y por eso
+  // el mapa compartido guarda la version sin nombre.
   const titulos = {
-    "sin-gh": "no encontré `gh` en el PATH",
-    "sin-auth": "`gh` no está autenticado",
-    "sin-red": "no se llegó a la API de GitHub",
+    ...TITULO_SIN_MEDICION,
     "sin-repo": `GitHub no conoce (todavía) a \`${org}/${proyecto}\``,
-    "no-se-sabe": "la sonda contestó algo que esta herramienta no sabe leer",
   };
-  const comoSeDestraba = {
-    "sin-gh": ["Instalá GitHub CLI (<https://cli.github.com>), corré `gh auth login`, y después la sonda de arriba."],
-    "sin-auth": ["Corré `gh auth login` y después la sonda de arriba."],
-    "sin-red": [
-      "Es un problema de red o de proxy, no del repositorio. Reintentá la sonda de arriba desde una",
-      "máquina con salida a `api.github.com`.",
-    ],
-    "sin-repo": [
-      "Lo más probable es que el repositorio todavía no exista: `projects init` corre **antes** del",
-      "primer push. También puede ser que el nombre no sea ese, o que la cuenta autenticada no lo",
-      "vea. Volvé a correr la sonda de arriba después del push fundacional.",
-    ],
-    "no-se-sabe": [
-      "Copiá la salida tal cual al reportarlo: esta herramienta sabe leer 200, 403, 404, la falta de",
-      "autenticación y el corte de red, y esto no fue ninguno de los cinco.",
-    ],
-  };
+  const comoSeDestraba = COMO_SE_DESTRABA;
   l.push(`### ⚪ No se pudo medir: ${titulos[estado] ?? estado} — intentado el ${dia}`);
   l.push("");
   l.push("```");
@@ -3251,10 +3278,20 @@ async function main(argv) {
     console.log("     entre GitHub Pro, una organizacion con plan Team, o hacer el repo publico —");
     console.log("     las tres estan con su costo en ese documento. NO lo anotes como \"pendiente\".");
   } else {
-    console.log(`  2. Proteccion de main: NO SE PUDO MEDIR (${proteccion.estado}), y eso NO es "esta bien".`);
+    // NO IMPRIME EL IDENTIFICADOR CRUDO NI MANDA A ABRIR UN ARCHIVO. Decia
+    // "NO SE PUDO MEDIR (sin-auth) ... el documento dice como destrabar la
+    // sonda": el parentesis es una clave de un objeto de este archivo, y el
+    // arreglo --una linea-- estaba a un `require` de distancia y se mandaba a
+    // buscar a otro lado.
+    const titulo = TITULO_SIN_MEDICION[proteccion.estado] ?? proteccion.estado;
+    console.log(`  2. Proteccion de main: NO SE PUDO MEDIR, y eso NO es "esta bien".`);
+    console.log(`     Que paso: ${titulo}.`);
     console.log(`     ${proteccion.detalle}`);
-    console.log(`     El documento (${RUTA_PROTECCION}) dice como destrabar la sonda. Correla antes de`);
-    console.log("     declarar en ningun informe que este repo tiene compuerta.");
+    for (const linea of COMO_SE_DESTRABA[proteccion.estado] ?? []) {
+      console.log(`     ${linea.replace(/[*`<>]/g, "")}`);
+    }
+    console.log(`     Mientras tanto el estado es DESCONOCIDO: no lo declares con compuerta en ningun`);
+    console.log(`     informe. El detalle largo esta en ${RUTA_PROTECCION}.`);
   }
   console.log("");
   console.log("  3. Dependabot, y son DOS cosas en DOS lugares distintos:");
