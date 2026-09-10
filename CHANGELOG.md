@@ -43,6 +43,27 @@ mueve sobre un cambio incompatible.
 
 ### Añadido
 
+- **Un desvío incompleto salía rojo por un camino y verde por el otro.**
+  `.projects-desvios.json` lo leen dos piezas con predicados distintos: la action
+  de la constitución exige `motivo` + `aprobado_por` + `fecha` y da error si falta
+  alguno; el paso «Permisos del agente sin escritura» de `marco-ci.yml` pedía sólo
+  `permiso` + `motivo` — leía `aprobado_por` sin mirarlo y `fecha` ni la leía.
+
+  Se pagaba **justo donde el lector estricto no llega**: en un repo que no ejecuta
+  la action, el único validador era el débil, así que la excepción sin aprobador
+  ni fecha pasaba muda donde menos supervisión hay.
+
+  El paso ahora **avisa** nombrando el dato que falta. **Para consumidores: un
+  aviso nuevo si tenés desvíos incompletos, y ningún veredicto cambia** — lo que
+  pasaba en verde sigue en verde. Completalos ahora y no cambia nada después:
+  **en la línea mayor siguiente el desvío incompleto deja de absorber.**
+
+  Se estrena avisando y no en rojo por la regla de `AGENTS.md`: endurecer un check
+  que hoy dejan pasar repos que no pidieron el cambio es breaking. Que no es
+  teórico lo probó el propio banco — su caso verde declaraba desvíos con aprobador
+  y sin fecha.
+
+
 - **El arranque entrega la fila del registro de consumidores, resuelta.**
   `docs/14-consumidores.md` era una tabla con «*(sin filas)*» y el propio archivo
   decía por qué: el lugar donde se escribe la línea existía, **lo que la escribe

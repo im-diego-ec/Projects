@@ -190,3 +190,78 @@ test("permisos · la severidad la decide la sonda por archivos, no un nombre", (
     "la sonda de este paso tiene que mirar archivos rastreados",
   );
 });
+
+// ── LOS DOS LECTORES DEL MISMO ARCHIVO ─────────────────────────────────────
+//
+// QUE CIERRA. `.projects-desvios.json` lo leen DOS piezas con predicados
+// distintos: `actions/constitucion/constitucion.mjs` exige motivo + aprobado_por
+// + fecha AAAA-MM-DD y da ::error:: si falta cualquiera; este paso pedia solo
+// permiso + motivo --leia `aprobado_por` sin mirarlo y `fecha` ni la leia--. Una
+// entrada a medias salia ROJA por un camino y VERDE por el otro, y decidia el
+// que corriera. Se paga justo en el repo al que la action no le llega: ahi el
+// unico validador es este, el debil.
+//
+// POR QUE AVISA Y NO ENROJECE. Cerrarlo de una es endurecer un check: un repo
+// que hoy pasa con un desvio a medias saldria rojo sin haberlo pedido, que
+// AGENTS.md define como breaking. Se estrena avisando; endurece en la mayor
+// siguiente. El caso de abajo fija que HOY sigue absorbiendo, para que el dia
+// que eso cambie sea una decision y no un accidente.
+
+const DESVIO_COMPLETO = {
+  permiso: "Bash(gh:*)",
+  motivo: "la skill del release publica el release",
+  aprobado_por: "quien-sea",
+  fecha: "2026-09-10",
+};
+
+test("desvios · uno SIN aprobador avisa, y por ahora SIGUE ABSORBIENDO", () => {
+  // Se declaran los DOS permisos de la skill --como el caso verde de mas arriba--
+  // para que lo unico que pueda decidir el color sea el desvio incompleto. Con un
+  // solo permiso declarado el repo sale rojo por el otro, y el caso no mediria si
+  // el desvio absorbe o no.
+  const raiz = repo({
+    distribuidor: true,
+    desvios: {
+      desvios: [
+        { permiso: "Bash(git:*)", motivo: "la skill del release mueve tags" },
+        { permiso: "Bash(gh:*)", motivo: "la skill del release publica el release" },
+      ],
+    },
+  });
+  const { exit, salida } = correr(raiz);
+  assert.match(salida, /Desvio de permiso incompleto/, `un desvio sin aprobador tiene que avisar:\n${salida}`);
+  assert.match(salida, /no dice quien lo aprobo/, salida);
+  assert.equal(exit, 0, `el estreno es en modo AVISO: el desvio incompleto todavia absorbe\n${salida}`);
+});
+
+test("desvios · uno SIN fecha avisa, nombrando la fecha y no al aprobador", () => {
+  const { permiso, motivo, aprobado_por } = DESVIO_COMPLETO;
+  const raiz = repo({ distribuidor: true, desvios: { desvios: [{ permiso, motivo, aprobado_por }] } });
+  const { salida } = correr(raiz);
+  assert.match(salida, /Desvio de permiso incompleto/, salida);
+  assert.match(salida, /no tiene fecha AAAA-MM-DD/, salida);
+});
+
+test("desvios · uno COMPLETO no avisa: el aviso distingue, no grita siempre", () => {
+  // Sin este caso el aviso podria estar cableado a "siempre" y los dos de arriba
+  // pasarian igual, midiendo nada.
+  const raiz = repo({
+    distribuidor: true,
+    desvios: { desvios: [{ ...DESVIO_COMPLETO, permiso: "Bash(git:*)" }, DESVIO_COMPLETO] },
+  });
+  const { salida } = correr(raiz);
+  assert.doesNotMatch(salida, /Desvio de permiso incompleto/, `un desvio completo no tiene nada que avisar:\n${salida}`);
+});
+
+test("desvios · MUTACION · sin la comprobacion, la entrada a medias pasa muda", () => {
+  // Anti-vacuidad: se quita el predicado del aviso y se comprueba que el aviso
+  // desaparece. Si no desapareciera, los casos de arriba estarian midiendo otra cosa.
+  const ancla = 'if (!quien || !/^[0-9]{4}-[0-9]{2}-[0-9]{2}$/.test(fecha)) {';
+  assert.ok(script.includes(ancla), "el ancla de la mutacion ya no esta en el paso");
+  const mutado = script.replace(ancla, "if (false) {");
+
+  const { permiso, motivo } = DESVIO_COMPLETO;
+  const raiz = repo({ distribuidor: true, desvios: { desvios: [{ permiso, motivo }] } });
+  assert.match(correr(raiz).salida, /Desvio de permiso incompleto/, "el paso sano tiene que avisar");
+  assert.doesNotMatch(correr(raiz, mutado).salida, /Desvio de permiso incompleto/, "el mutado no puede seguir avisando");
+});
