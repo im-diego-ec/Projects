@@ -3496,7 +3496,16 @@ jobs:
                 // saldria rojo sin haberlo pedido: por la regla de AGENTS.md eso se
                 // estrena avisando y se endurece en la mayor siguiente. El desvio
                 // SIGUE absorbiendo; lo que cambia es que ahora se ve.
-                if (!quien || !/^[0-9]{4}-[0-9]{2}-[0-9]{2}$/.test(fecha)) {
+                // LA FECHA SE VALIDA COMO LA VALIDA LA ACTION, no solo por su forma.
+                // `constitucion.mjs` usa `esFecha`, que ademas exige que la fecha
+                // EXISTA. Con la forma sola, "2026-13-45" daba ::error:: por un
+                // camino y pasaba MUDO por este: los dos lectores seguian
+                // divergiendo justo en el caso que este aviso vino a cerrar.
+                const fechaReal =
+                  /^[0-9]{4}-[0-9]{2}-[0-9]{2}$/.test(fecha) &&
+                  !Number.isNaN(Date.parse(fecha)) &&
+                  new Date(fecha).toISOString().slice(0, 10) === fecha;
+                if (!quien || !fechaReal) {
                   const falta = !quien ? "no dice quien lo aprobo" : "no tiene fecha AAAA-MM-DD";
                   console.log(
                     "::warning file=" + escapar(RUTA_DESVIOS) + ",title=Desvio de permiso incompleto::" +

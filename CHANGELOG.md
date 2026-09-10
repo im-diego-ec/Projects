@@ -235,6 +235,23 @@ mueve sobre un cambio incompatible.
 
 ### Corregido
 
+- **Dos guardas que prometían más de lo que medían, corregidas.**
+
+  - La «guarda anti-divergencia» del registro de consumidores decía: *«si alguien
+    reemplaza el lector por una constante, este caso se pone rojo»*. Era falso para
+    la constante que importa. Como el destino siempre se instancia desde
+    `plantilla/`, su `ci.yml` pina siempre la misma versión: sustituir el lector por
+    **esa misma versión** dejaba los dos lados iguales y el banco entero en verde.
+    Sólo cazaba una constante **equivocada**, que es justo la que nadie escribiría.
+    Ahora se mide contra un árbol con una versión que la plantilla no usa.
+  - **Los dos lectores de `.projects-desvios.json` seguían divergiendo** después del
+    primer arreglo, y en el caso exacto que el aviso vino a cerrar: el paso miraba
+    sólo la **forma** de la fecha y la action exige además que la fecha **exista**.
+    Con `2026-13-45` la action daba error y el paso pasaba **mudo**.
+
+  **Para un consumidor: un aviso más** si tenía una fecha imposible en sus desvíos.
+
+
 - **Dos compuertas nuevas de esta misma tanda no verificaban lo que decían.** Las
   encontró una revisión adversarial de los propios commits, no el banco — que estaba
   en verde con las dos rotas.

@@ -127,6 +127,31 @@ test("un destino sin ci.yml no inventa la version: la declara ilegible", () => {
   );
 });
 
+test("MUERDE: la version sale del ARBOL, no de una constante que hoy acierta", () => {
+  // ESTE CASO EXISTE POR UN DEFECTO DE ESTE MISMO BANCO. El caso de arriba compara
+  // lo que informa la herramienta contra lo que dice el ci.yml del destino, y su
+  // comentario prometia: "si alguien reemplaza el lector por una constante, este
+  // caso se pone rojo". Era FALSO para la constante que importa.
+  //
+  // Como el destino siempre se instancia desde plantilla/, su ci.yml pina SIEMPRE
+  // la misma version. Sustituir el lector por esa misma version --`return "v1.9.6"`--
+  // dejaba los dos lados iguales y el banco entero en verde. Solo cazaba una
+  // constante EQUIVOCADA, que es justo la que nadie escribiria.
+  //
+  // La unica forma de medirlo es un arbol con una version que la plantilla NO usa.
+  const d = carpetaTemporal("pin-ajeno-");
+  fs.mkdirSync(path.join(d, ".github", "workflows"), { recursive: true });
+  fs.writeFileSync(
+    path.join(d, ".github", "workflows", "ci.yml"),
+    'jobs:\n  marco:\n    uses: "quien-sea/Projects/.github/workflows/marco-ci.yml@v0.0.1"\n',
+  );
+  assert.equal(
+    pinDelMarcoEnDestino(d),
+    "v0.0.1",
+    "la herramienta no devolvio la version que dice ESTE arbol: o no lo lee, o devuelve algo declarado aparte",
+  );
+});
+
 test("MUERDE: un ci.yml sin el uses: del marco tampoco produce version", () => {
   // Sin este caso, el anterior pasaria igual con un lector que devolviera null
   // solo cuando el archivo no existe, y una sustitucion rota daria una fila muda.

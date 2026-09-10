@@ -256,7 +256,7 @@ test("desvios · uno COMPLETO no avisa: el aviso distingue, no grita siempre", (
 test("desvios · MUTACION · sin la comprobacion, la entrada a medias pasa muda", () => {
   // Anti-vacuidad: se quita el predicado del aviso y se comprueba que el aviso
   // desaparece. Si no desapareciera, los casos de arriba estarian midiendo otra cosa.
-  const ancla = 'if (!quien || !/^[0-9]{4}-[0-9]{2}-[0-9]{2}$/.test(fecha)) {';
+  const ancla = 'if (!quien || !fechaReal) {';
   assert.ok(script.includes(ancla), "el ancla de la mutacion ya no esta en el paso");
   const mutado = script.replace(ancla, "if (false) {");
 
@@ -264,4 +264,23 @@ test("desvios · MUTACION · sin la comprobacion, la entrada a medias pasa muda"
   const raiz = repo({ distribuidor: true, desvios: { desvios: [{ permiso, motivo }] } });
   assert.match(correr(raiz).salida, /Desvio de permiso incompleto/, "el paso sano tiene que avisar");
   assert.doesNotMatch(correr(raiz, mutado).salida, /Desvio de permiso incompleto/, "el mutado no puede seguir avisando");
+});
+
+test("desvios · una FECHA IMPOSIBLE tambien avisa, como hace la action", () => {
+  // Los dos lectores SEGUIAN divergiendo despues del primer arreglo, y en el caso
+  // exacto que el aviso vino a cerrar: el paso miraba solo la FORMA
+  // (/^\d{4}-\d{2}-\d{2}$/) y `constitucion.mjs` usa `esFecha`, que ademas exige que
+  // la fecha exista. Con "2026-13-45" la action daba ::error:: y el paso pasaba MUDO.
+  const raiz = repo({
+    distribuidor: true,
+    desvios: {
+      desvios: [
+        { permiso: "Bash(git:*)", motivo: "m", aprobado_por: "a", fecha: "2026-13-45" },
+        { permiso: "Bash(gh:*)", motivo: "m", aprobado_por: "a", fecha: "2026-09-10" },
+      ],
+    },
+  });
+  const { salida } = correr(raiz);
+  assert.match(salida, /Desvio de permiso incompleto/, `una fecha que no existe tiene que avisar:\n${salida}`);
+  assert.match(salida, /no tiene fecha AAAA-MM-DD/, salida);
 });
