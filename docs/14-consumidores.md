@@ -11,11 +11,14 @@ marco.
 
 > **Este archivo está VACÍO a propósito y eso no significa «cero consumidores».**
 > Significa que ninguna adopción pasó todavía por él. Es la mitad barata de la
-> recomendación B1 de [13-censo-de-consumidores.md](13-censo-de-consumidores.md): el lugar
-> donde se escribe la línea existe; **lo que falta es lo que la escribe**, y eso vive
-> en `herramientas/projects-init.mjs`. Leer una tabla vacía como «nadie consume el
-> marco» sería exactamente el fail-open que el censo denuncia — un escaneo que no
-> encontró nada saliendo verde por construcción.
+> recomendación B1 de [13-censo-de-consumidores.md](13-censo-de-consumidores.md).
+> **La mitad que escribe la fila YA existe**: `herramientas/projects-init.mjs` la
+> imprime resuelta al terminar un arranque (ver «De dónde sale la fila», más abajo).
+> Lo que falta es el acto humano que no se puede automatizar desde acá — abrir y
+> mergear el PR contra este repositorio — y la ruta de la skill `projects-adoptar`,
+> para el repo que adopta el marco sin pasar por el arranque. Leer una tabla vacía
+> como «nadie consume el marco» sería exactamente el fail-open que el censo denuncia
+> — un escaneo que no encontró nada saliendo verde por construcción.
 
 ## Qué es y por qué está acá
 
@@ -56,8 +59,11 @@ repo.** Tres columnas, y ninguna de las tres se adivina:
    organización—, que necesita una credencial de organización y por eso no entra por un
    PR. Escribir de memoria las filas que faltan sería inventar datos, que es peor que la
    tabla vacía: una fila inventada no se distingue de una medida.
-2. **Las adopciones nuevas todavía no lo escriben solas.** Hoy la línea depende de que
-   alguien se acuerde, y por la premisa de este marco eso no cuenta como enforcement.
+2. **Las adopciones nuevas ya no dependen de que alguien se acuerde de los datos, pero
+   sí de que alguien mergee el PR.** El arranque imprime la fila con sus tres columnas
+   resueltas; lo que no puede hacer es abrir un pull request contra **otro**
+   repositorio desde una máquina que puede no tener credenciales para escribir ahí.
+   Eso sigue siendo un acto humano, y este documento no lo llama enforcement.
 
 La adopción que está en curso al 2026-08-24 tiene su propio registro de fricción en
 [adopciones/2026-08-24-supply-chain.md](adopciones/2026-08-24-supply-chain.md), con la

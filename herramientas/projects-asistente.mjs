@@ -637,15 +637,31 @@ export function desvios(r, hoy = new Date().toISOString().slice(0, 10)) {
   lista.push({
     ...comun,
     regla: "openspec-roles",
-    motivo: soloUno
-      ? "El equipo es una sola persona, asi que el PO y el builder son la misma. En las rutas de contrato " +
-        "(openspec/) el PO es el unico owner, y GitHub no le pide review al autor del pull request: cuando " +
-        "esa persona abre el PR no queda nadie asignado y el gate del PO no ocurre. No hay a quien darle el " +
-        "rol todavia; queda apagado y escrito."
-      : "El andamio asigna el rol de PO a la duenia de la cuenta, que es tambien el builder 1, asi que el gate " +
-        "del PO lo satisface la misma persona que escribe el cambio y la separacion de roles no existe. " +
-        "A DIFERENCIA de cuando se trabaja sin companero, aca SI hay salida: " +
-        `@${r.BUILDER_2} puede ser el PO. Cambiar la clave PO del archivo de valores y regenerar CODEOWNERS.`,
+    motivo:
+      (soloUno
+        ? "El equipo es una sola persona, asi que el PO y el builder son la misma. En las rutas de contrato " +
+          "(openspec/) el PO es el unico owner, y GitHub no le pide review al autor del pull request: cuando " +
+          "esa persona abre el PR no queda nadie asignado y el gate del PO no ocurre. No hay a quien darle el " +
+          "rol todavia; queda apagado y escrito. "
+        : "El andamio asigna el rol de PO a la duenia de la cuenta, que es tambien el builder 1, asi que el gate " +
+          "del PO lo satisface la misma persona que escribe el cambio y la separacion de roles no existe. " +
+          "A DIFERENCIA de cuando se trabaja sin companero, aca SI hay salida: " +
+          `@${r.BUILDER_2} puede ser el PO. Cambiar la clave PO del archivo de valores y regenerar CODEOWNERS. `) +
+      // EL ALCANCE, ACOTADO. `openspec-roles` dice DOS cosas: el reparto PO/builders
+      // y, aparte, que toda escritura en produccion exige el OK explicito del
+      // builder 1. Un desvio anula la REGLA ENTERA, asi que sin esta linea estaria
+      // apagando de paso una garantia que nadie pidio apagar y que sigue vigente.
+      "ALCANCE: este desvio apaga UNICAMENTE el reparto de roles. La otra mitad de la regla --toda escritura " +
+      "en produccion exige el OK explicito del builder 1-- sigue vigente y NO se declara aqui. " +
+      // Y EL TIPO DE CUENTA, que esta herramienta no conoce: corre antes de que el
+      // repositorio exista. En una organizacion los equipos SI existen, asi que el
+      // gate puede ser real si el equipo `po` tiene a otra persona. Se declara
+      // igual, conservador, por el mismo criterio que la visibilidad: un desvio de
+      // mas se lee y se borra; una separacion que se dio por supuesta y no existe no
+      // se nota hasta que alguien mergea su propio contrato.
+      "En una ORGANIZACION el gate puede ser real si el equipo `po` tiene a alguien distinto de quien escribe: " +
+      "esta herramienta corre antes de que el repositorio exista y no puede saberlo, asi que lo declara igual. " +
+      "Si tu equipo `po` ya separa de verdad, borra este desvio.",
     revisar: soloUno
       ? "cuando entre la segunda persona al proyecto"
       : "ahora: decidir si el PO pasa a ser la otra persona, o dejar la separacion apagada a proposito",

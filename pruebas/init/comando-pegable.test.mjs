@@ -71,7 +71,14 @@ test("una comilla doble dentro de la ruta se escapa, en vez de romper la sintaxi
  *  quedaba ninguna barra que matchear. En CI habria puesto rojo las tres patas.
  *
  *  Lo correcto es decidir POR ARGUMENTO: si el valor lleva un espacio, tuvo que
- *  viajar entrecomillado. Eso no depende de como sea el resto de la linea. */
+ *  viajar entrecomillado. Eso no depende de como sea el resto de la linea.
+ *
+ *  LO QUE ESTE BANCO NO MIDE, declarado: cubre los TRES sitios que emite
+ *  `lineasDelPasoQueSigue`. Los otros DOS de `citarRuta` viven en `main()` --el
+ *  comando `--ejemplo` y el de `projects-versiones`-- y ninguna prueba los ejercita:
+ *  mutados a ruta desnuda, este archivo sigue en verde. Esta escrito en el tasks.md
+ *  del change con su destino, para que el numero "cinco" no se lea como "cinco
+ *  medidos". */
 export function argumentosDe(linea) {
   const args = [];
   const re = /"((?:[^"\\]|\\.)*)"|(\S+)/g;
@@ -161,4 +168,28 @@ test("MUERDE de punta a punta: el comando que imprime se EJECUTA y arma el proye
   const r = spawnSync(process.execPath, [...args.slice(1), "--sin-arranque", "--sin-herramientas"], { encoding: "utf8" });
   assert.equal(r.status, 0, `el comando que la herramienta imprime no arma el proyecto:\n  ${lineaNode.trim()}\n${(r.stderr ?? "").slice(-600)}`);
   assert.ok(fs.existsSync(path.join(destino, "package.json")), "salio 0 y no dejo un proyecto");
+});
+
+test("citarRuta · las rutas que la blocklist dejaba pasar ahora se entrecomillan", () => {
+  // La primera version enumeraba caracteres peligrosos y se le escapaban seis. Una
+  // lista de peligros siempre esta incompleta, y una incompleta es PEOR que ninguna
+  // porque parece que cubre. Estas son las que salian desnudas.
+  for (const ruta of [
+    String.raw`/Users/d/Proyectos (2026)/p`,
+    String.raw`/Users/d/notas #1/p`,
+    String.raw`/Users/d/a{b}/p`,
+    String.raw`/Users/d/a,b/p`,
+    String.raw`/Users/d/100%/p`,
+    String.raw`/Users/d/hola!/p`,
+  ]) {
+    assert.equal(citarRuta(ruta), `"${ruta}"`, `esta ruta sale desnuda y rompe el comando: ${ruta}`);
+  }
+});
+
+test("citarRuta · una ruta normal de las tres plataformas sigue viajando sin comillas", () => {
+  // La allowlist no puede ser tan estrecha que entrecomille todo: eso haria ruidosa
+  // la salida en el caso comun y cambiaria cada ejemplo de la documentacion.
+  for (const ruta of ["/home/runner/work/Projects/Projects", String.raw`C:\Users\dev\p`, "./relativa/x.mjs", "/a-b_c.1/d"]) {
+    assert.equal(citarRuta(ruta), ruta, `esta ruta no necesita comillas y se entrecomillo: ${ruta}`);
+  }
 });

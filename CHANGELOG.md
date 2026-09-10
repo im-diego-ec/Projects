@@ -235,6 +235,37 @@ mueve sobre un cambio incompatible.
 
 ### Corregido
 
+- **Los 28 hallazgos medios y bajos de la revisión adversarial, cerrados.** Los más
+  sustantivos:
+
+  - **`citarRuta` usaba una lista de caracteres peligrosos**, y una lista de peligros
+    siempre está incompleta: se le escapaban `\`, `{}`, `,`, `!`, `%` y `#`, así que
+    una carpeta «Proyectos (2026)» o «notas #1» salía desnuda. Ahora es al revés —
+    pasa sin comillas **sólo** lo que se sabe inofensivo.
+  - **El lector del pin tomaba el primer match del archivo entero**, así que un
+    ejemplo comentado le ganaba al `uses:` real. Y con dos pines distintos elegía uno;
+    ahora devuelve el hueco declarado, porque un `ci.yml` a medio actualizar no tiene
+    *una* versión.
+  - **El desvío del gate del PO anulaba más de lo que declaraba.** `openspec-roles`
+    dice dos cosas, y la otra —«toda escritura en producción exige el OK explícito del
+    builder 1»— quedaba apagada de paso. Ahora el desvío acota su alcance, y contempla
+    la cuenta de organización, donde el gate **sí** puede ser real.
+  - **El aviso del desvío incompleto nombraba una sola falta** cuando faltaban las
+    dos: quien completaba el aprobador volvía a chocar con la fecha. Dos viajes de CI
+    para un arreglo que se hace de una.
+  - **Tres `MUERDE` que no mordían**: uno era una tautología (`assert.notEqual(n, n+1)`),
+    otro se auto-anulaba con `assert.ok(true)` cuando no había datos, y el tercero
+    comparaba contra la suma de largos mientras la función deduplica.
+  - **Dos compuertas cruzaban por texto de más o de menos**: una leía sólo la primera
+    oración de la constitución, la otra buscaba en el archivo entero en vez de en su
+    sección.
+  - **`docs/14-consumidores.md` se contradecía a sí mismo** en el mismo PR: una mitad
+    decía que el escritor de la fila ya existe y la otra que falta.
+
+  **Para un consumidor: un aviso más honesto** en los desvíos incompletos; el resto
+  son bancos y documentos del marco.
+
+
 - **Dos guardas que prometían más de lo que medían, corregidas.**
 
   - La «guarda anti-divergencia» del registro de consumidores decía: *«si alguien
@@ -330,7 +361,9 @@ mueve sobre un cambio incompatible.
   La promesa se retiró: ahora dice que Cloudflare tiene plan gratuito y que si pide
   o no tarjeta **no está comprobado por el marco**.
 
-  **Para un consumidor: un comentario más honesto** en el workflow que ya tiene.
+  **Para un consumidor: nada hasta que mueva su pin.** El comentario corregido viaja
+  en el andamio, así que lo recibe un proyecto **nuevo**; uno ya creado se quedó con
+  la copia que le tocó el día que nació y este marco no reescribe repos ajenos.
 
 
 - **Cuatro cosas que el repositorio afirmaba de sí mismo y el árbol contradecía.**

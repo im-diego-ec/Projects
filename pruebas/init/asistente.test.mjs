@@ -914,3 +914,25 @@ test("desvios · MUERDE: el desvio del PO es distinto del de review cruzado", ()
   assert.ok(reglas.includes("openspec-roles"), "falta el desvio del gate del PO");
   assert.equal(new Set(reglas).size, reglas.length, `hay reglas repetidas: ${reglas.join(", ")}`);
 });
+
+test("desvios · el del gate del PO acota su ALCANCE y no apaga la otra mitad de la regla", () => {
+  // `openspec-roles` dice DOS cosas: el reparto PO/builders y, aparte, que toda
+  // escritura en produccion exige el OK explicito del builder 1. Un desvio anula la
+  // REGLA ENTERA, asi que sin decirlo estaria apagando de paso una garantia que
+  // nadie pidio apagar.
+  const base = { equipo: "solo", plataforma: "aws", avisos: "slack", visibilidad: "publico", ORG: "im-diego-ec" };
+  const d = desvios(base, "2026-09-10").find((x) => x.regla === "openspec-roles");
+  assert.match(d.motivo, /ALCANCE: este desvio apaga UNICAMENTE el reparto de roles/, d.motivo);
+  assert.match(d.motivo, /sigue vigente y NO se declara aqui/, "no dice que la otra mitad sigue en pie");
+});
+
+test("desvios · el del PO declara que en ORGANIZACION el gate puede ser real", () => {
+  // El asistente corre ANTES de que el repositorio exista, asi que no sabe si la
+  // cuenta es de una persona o de una organizacion. En una org los equipos existen y
+  // el gate puede ser real. Se declara igual --conservador-- pero diciendo que puede
+  // sobrar, en vez de afirmar una separacion inexistente como si fuera universal.
+  const base = { equipo: "equipo", plataforma: "aws", avisos: "slack", visibilidad: "publico", ORG: "una-org", BUILDER_2: "otra" };
+  const d = desvios(base, "2026-09-10").find((x) => x.regla === "openspec-roles");
+  assert.match(d.motivo, /ORGANIZACION/, "no contempla el caso de organizacion");
+  assert.match(d.motivo, /borra este desvio/, "no le dice a quien SI tiene separacion que puede borrarlo");
+});

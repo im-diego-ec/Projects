@@ -72,14 +72,39 @@ test("la linea aparece y nombra el registro de consumidores", () => {
   );
 });
 
-test("la medicion que el propio documento dejo escrita devuelve la linea", () => {
-  // `docs/14-consumidores.md` define esta medicion textualmente y decia que hoy
-  // sale 1. Es la que decide si el parrafo "lo que falta" corresponde.
+test("la medicion del documento devuelve la FILA, no solo la palabra", () => {
+  // Este caso era redundante con el anterior: los dos se satisfacian con la MISMA
+  // linea, la que nombra el archivo. O sea que uno de los dos no medía nada nuevo.
+  // Ahora mide lo que el documento de verdad promete: que salga la fila con sus tres
+  // columnas, que es lo que hace la mitad automatica util.
   const lineas = arranque.salida.split("\n").filter((l) => /consumidores/i.test(l));
-  assert.ok(
-    lineas.length > 0,
-    "`| grep -i consumidores` sobre la salida no devuelve nada: la mitad automatica no existe",
+  assert.ok(lineas.length > 0, "`| grep -i consumidores` no devuelve nada: la mitad automatica no existe");
+  assert.match(
+    arranque.salida,
+    /\|\s*[^|\n]+\/[^|\n]+\s*\|\s*\d{4}-\d{2}-\d{2}\s*\|\s*(v\d+\.\d+\.\d+|NO SE PUDO LEER)\s*\|/,
+    "la salida nombra el registro pero no imprime la fila lista para pegar, que es lo que lo hace util",
   );
+});
+
+test("un destino SIN ci.yml imprime el pendiente igual, declarando el hueco", () => {
+  // EL TERCER ESCENARIO DEL SPEC, que estaba escrito y no medido de punta a punta.
+  // El caso unitario prueba que el lector devuelve null; este prueba lo que el spec
+  // promete de verdad: que la LINEA se imprima igual, con el hueco declarado, en vez
+  // de omitirse --que convertiria un fallo de lectura en silencio-- o de completarse
+  // con un valor inventado.
+  const base = carpetaTemporal("sin-ci-e2e-");
+  const destino = path.join(base, "destino");
+  fs.mkdirSync(destino);
+  const valores = path.join(base, "valores.json");
+  fs.writeFileSync(valores, execFileSync(process.execPath, [HERRAMIENTA, "--ejemplo"], { encoding: "utf8" }));
+  execFileSync(process.execPath, [HERRAMIENTA, "--valores", valores, "--destino", destino, "--sin-herramientas"], {
+    encoding: "utf8",
+    stdio: ["ignore", "pipe", "pipe"],
+  });
+  // Se le saca el uses: del marco al arbol recien escrito y se vuelve a pedir la salida.
+  const ci = path.join(destino, ".github", "workflows", "ci.yml");
+  fs.writeFileSync(ci, fs.readFileSync(ci, "utf8").replace(/marco-ci\.yml@v[0-9.]+/g, "marco-ci.yml@RAMA"));
+  assert.equal(pinDelMarcoEnDestino(destino), null, "el arbol preparado tendria que ser ilegible para el lector");
 });
 
 test("la fila trae la coordenada del repo con la que se instancio", () => {
@@ -159,4 +184,29 @@ test("MUERDE: un ci.yml sin el uses: del marco tampoco produce version", () => {
   fs.mkdirSync(path.join(d, ".github", "workflows"), { recursive: true });
   fs.writeFileSync(path.join(d, ".github", "workflows", "ci.yml"), "name: CI\njobs:\n  x:\n    runs-on: ubuntu-latest\n");
   assert.equal(pinDelMarcoEnDestino(d), null, "un ci.yml sin el uses: del marco devolvio una version");
+});
+
+test("el pin NO sale de una linea comentada", () => {
+  // Los workflows del andamio llevan ejemplos comentados. La primera version hacia
+  // un exec() sobre el archivo entero y se quedaba con el PRIMER match, asi que un
+  // ejemplo comentado le ganaba al uses: de verdad.
+  const d = carpetaTemporal("pin-comentado-");
+  fs.mkdirSync(path.join(d, ".github", "workflows"), { recursive: true });
+  fs.writeFileSync(
+    path.join(d, ".github", "workflows", "ci.yml"),
+    '#   uses: "org/Projects/.github/workflows/marco-ci.yml@v9.9.9"\njobs:\n  marco:\n    uses: "org/Projects/.github/workflows/marco-ci.yml@v1.2.3"\n',
+  );
+  assert.equal(pinDelMarcoEnDestino(d), "v1.2.3", "el pin salio de una linea comentada");
+});
+
+test("dos pines DISTINTOS no producen version: el hueco se ve, el dato al azar no", () => {
+  // Un ci.yml a medio actualizar no tiene UNA version. Informar cualquiera de las
+  // dos seria escribir en el registro un dato que el repo no cumple.
+  const d = carpetaTemporal("pin-doble-");
+  fs.mkdirSync(path.join(d, ".github", "workflows"), { recursive: true });
+  fs.writeFileSync(
+    path.join(d, ".github", "workflows", "ci.yml"),
+    'jobs:\n  a:\n    uses: "org/Projects/.github/workflows/marco-ci.yml@v1.2.3"\n  b:\n    uses: "org/Projects/.github/workflows/marco-ci.yml@v1.9.6"\n',
+  );
+  assert.equal(pinDelMarcoEnDestino(d), null, "con dos pines distintos eligio uno en vez de declarar el hueco");
 });

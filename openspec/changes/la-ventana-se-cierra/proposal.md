@@ -24,7 +24,13 @@ una línea — que es exactamente el diseño.
 `2026-08-19-calidad-fail-closed` —el 4.5c y el 4.5d— hablan de esta fecha, y
 ninguno dice **dónde** vive ese trabajo. Un pendiente archivado sin destino es
 indistinguible de un olvido: al 2026-09-10 faltaban **20 días** y ningún change
-activo nombraba la fecha.
+activo se hacía **cargo** de ella.
+
+> **«Nombrar» y «hacerse cargo» no son lo mismo, y la diferencia decide la
+> compuerta.** `ventana-vencida` **sí nombra** esta fecha — precisamente para
+> declarar que *no la toca*. Por eso lo que sale de acá exige un marcador explícito
+> y no una coincidencia de texto: la primera versión de la compuerta cruzaba
+> «aparece en algún change activo» y pasaba en verde por el motivo equivocado.
 
 Este change es ese destino.
 

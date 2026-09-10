@@ -3506,7 +3506,14 @@ jobs:
                   !Number.isNaN(Date.parse(fecha)) &&
                   new Date(fecha).toISOString().slice(0, 10) === fecha;
                 if (!quien || !fechaReal) {
-                  const falta = !quien ? "no dice quien lo aprobo" : "no tiene fecha AAAA-MM-DD";
+                  // SE NOMBRAN LAS DOS FALTAS CUANDO FALTAN LAS DOS. Decia solo la
+                  // primera, asi que quien completaba el aprobador volvia a recibir
+                  // el mismo aviso por la fecha: dos viajes de CI para un arreglo
+                  // que se podia hacer de una.
+                  const faltantes = [];
+                  if (!quien) faltantes.push("no dice quien lo aprobo");
+                  if (!fechaReal) faltantes.push("no tiene fecha AAAA-MM-DD valida");
+                  const falta = faltantes.join(" y ");
                   console.log(
                     "::warning file=" + escapar(RUTA_DESVIOS) + ",title=Desvio de permiso incompleto::" +
                       escapar(

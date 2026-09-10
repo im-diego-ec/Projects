@@ -11,6 +11,23 @@ const VALIDAR = path.join(RAIZ, ".claude", "skills", "projects-validar-consumido
 const release = fs.readFileSync(RELEASE, "utf8");
 const validar = fs.readFileSync(VALIDAR, "utf8");
 
+/** El tramo de UNA seccion, para no buscar en el archivo entero.
+ *
+ *  POR QUE. Estas skills tienen miles de lineas y hablan del mismo vocabulario en
+ *  varios pasos: un `assert.match` sobre el archivo completo se satisface con una
+ *  mencion de CUALQUIER otro paso, y entonces el caso deja de medir el paso que
+ *  dice medir. Es coincidencia de cadena disfrazada de compuerta. */
+function seccion(texto, titulo) {
+  const i = texto.indexOf(titulo);
+  assert.notEqual(i, -1, `no se encontro la seccion "${titulo}": el banco quedaria mirando al vacio`);
+  const resto = texto.slice(i + titulo.length);
+  const j = resto.search(/\n## /);
+  return j === -1 ? resto : resto.slice(0, j);
+}
+
+const PASO_6 = seccion(release, "## Paso 6 — Publicar las notas del release en GitHub");
+const PASO_5_VALIDAR = seccion(validar, "## Paso 5 — Cerrar y no dejar rastro");
+
 // ---------------------------------------------------------------------------
 // LA EVIDENCIA DEL ENSAYO TIENE QUE SOBREVIVIR AL PROCEDIMIENTO QUE LA BORRA.
 //
@@ -29,7 +46,7 @@ const validar = fs.readFileSync(VALIDAR, "utf8");
 
 test("el paso 6 del release exige un id de corrida y un SHA, no solo cuerpo", () => {
   assert.match(
-    release,
+    PASO_6,
     /corrida \[0-9\]\{6,\}|\[0-9a-f\]\{40\}/,
     "el paso 6 no busca un id de corrida ni un SHA: medir el largo del cuerpo no acredita ningun ensayo",
   );
@@ -39,7 +56,7 @@ test("el paso 6 dice que sin la evidencia el release NO esta cerrado", () => {
   // Un comando que se puede correr y cuyo resultado no cambia nada no es una
   // compuerta: es una sugerencia. El texto tiene que decir que detiene.
   assert.match(
-    release,
+    PASO_6,
     /release NO esta cerrado/i,
     "el paso 6 propone la medicion pero no dice que el release se detenga sin ella",
   );
@@ -67,7 +84,7 @@ test("las dos skills coinciden en donde vive la evidencia", () => {
     "una de las dos skills dejo de nombrar el CHANGELOG como lugar de la evidencia",
   );
   assert.match(
-    release,
+    PASO_6,
     /--delete-branch/,
     "el paso 6 no menciona por que la evidencia no puede quedarse en el PR del ensayo",
   );
@@ -76,7 +93,7 @@ test("las dos skills coinciden en donde vive la evidencia", () => {
 test("la skill de validacion sigue cerrando el PR: el defecto no se arreglo quitando el cierre", () => {
   // Si alguien "arreglara" esto dejando la rama viva, el rastro sobreviviria pero
   // el pin temporal tambien, que es peor. Este caso fija que la solucion NO fue esa.
-  assert.match(validar, /gh pr close <numero> --delete-branch/, "el cierre con --delete-branch desaparecio del paso 5");
+  assert.match(PASO_5_VALIDAR, /gh pr close <numero> --delete-branch/, "el cierre con --delete-branch desaparecio del paso 5");
 });
 
 // ---------------------------------------------------------------------------
@@ -121,6 +138,20 @@ test("y NO se finge la evidencia: la declaracion dice que no hubo ensayo", () =>
   // El modo de falla peligroso seria una salida que deje pasar el release
   // diciendo algo que suene a evidencia. La declaracion tiene que nombrar lo que
   // NO se hizo.
-  assert.match(release, /no se puede cumplir/, "la salida no declara que la precondicion queda incumplida");
-  assert.match(release, /dogfooding/, "la salida no dice que fue lo que SI se corrio en lugar del ensayo");
+  assert.match(PASO_6, /no se puede cumplir/, "la salida no declara que la precondicion queda incumplida");
+  assert.match(PASO_6, /dogfooding/, "la salida no dice que fue lo que SI se corrio en lugar del ensayo");
+});
+
+test("docs/14 no se contradice a si mismo sobre la mitad automatica", () => {
+  // El documento tenia DOS mitades escritas en momentos distintos: la de abajo decia
+  // que el arranque ya imprime la fila, y la de arriba seguia diciendo que "lo que
+  // falta es lo que la escribe". Las dos en el mismo archivo, en el mismo PR.
+  const doc = fs.readFileSync(path.join(RAIZ, "docs", "14-consumidores.md"), "utf8");
+  assert.doesNotMatch(
+    doc,
+    /lo que falta es lo que la escribe/i,
+    "docs/14 sigue afirmando que no existe lo que escribe la fila, y existe",
+  );
+  assert.match(doc, /La mitad que escribe la fila YA existe/, "la correccion se perdio");
+  assert.match(doc, /De dónde sale la fila/, "el documento no apunta a la seccion que lo explica");
 });

@@ -293,15 +293,17 @@ lee los specs vivos de punta a punta.
 
 ---
 
-## documentacion-del-marco — capability EN VUELO, 2 requirements, 2 con compuerta
+## documentacion-del-marco — capability EN VUELO, 3 requirements, 3 con compuerta
 
 Tampoco existe en `openspec/specs/`: nace en
-`openspec/changes/orden-de-lectura/specs/`. Es la única capability en vuelo que **ya
+`openspec/changes/orden-de-lectura/specs/`, y gana un requirement más en
+`openspec/changes/el-andamio-dice-la-verdad/specs/`. Es la única capability en vuelo que **ya
 tiene compuertas corriendo**, y por eso su ausencia de esta página era el peor tipo de
 hueco: no faltaba deuda, faltaba cobertura que ya estaba pagada.
 
 | Requirement | Lo que lo hace fallar solo | Ruta y ancla (2026-08-31) |
 |---|---|---|
+| Lo que el andamio entrega no afirma lo que el árbol contradice | **parcial**: `pruebas/docs/promesas-sin-fuente.test.mjs` cubre la cláusula de las promesas de dinero sobre todo lo que viaja —desde que mira `.yml`— y `pruebas/docs/lo-que-lee-el-consumidor.test.mjs` exige que cada página que viaja esté clasificada y explique su vocabulario. Lo que **no** mira ningún caso es que un documento del andamio describa el comportamiento vigente de una herramienta: eso se sostiene leyendo | `pruebas/docs/promesas-sin-fuente.test.mjs:100` y `pruebas/docs/lo-que-lee-el-consumidor.test.mjs:148` |
 | El orden de lectura de la documentación es visible sin abrir nada | **parcial**: el caso «indice · toda pagina de docs/ esta enumerada en el indice» pone rojo un índice que se queda corto, y su refutación saca una página del índice para probar que muerde. Lo que no mira ningún caso es el prefijo numérico de dos dígitos que el requirement exige, ni que el número signifique orden y no importancia | `pruebas/docs/estandar-de-lectura.test.mjs:133`, con la refutación en `:480` |
 | Ningún enlace del repositorio apunta a algo que no existe | El banco de enlaces entero: cada enlace relativo tiene que resolver a un archivo que exista y cada ancla a un encabezado que exista, con el piso declarado que el propio requirement pide —un cero ahí es el detector roto, no un repositorio sin navegación— y con sus dos mutaciones al lado | `pruebas/docs/enlaces.test.mjs:145` (el archivo) y `:170` (el ancla); el piso en `:109`; las mutaciones en `:184` y `:196` |
 

@@ -86,9 +86,18 @@ function alcancesReales(rel) {
  *  que decir cual de las dos formas espera en cada archivo en vez de aceptar las dos
  *  en todos. */
 function alcancesDelEjemplo(rel) {
-  const texto = fs.readFileSync(path.join(RAIZ, rel), "utf8");
+  // ACOTADO AL BLOQUE `permissions:` DEL EJEMPLO, y no al archivo entero. La version
+  // anterior barria todos los `#  clave: read` del archivo, asi que cualquier otro
+  // comentario del workflow que mencionara un permiso satisfacia la cuenta. Un
+  // archivo de 4000 lineas lleno de comentarios explicativos es el peor lugar
+  // posible para hacer un grep suelto.
+  const lineas = fs.readFileSync(path.join(RAIZ, rel), "utf8").split("\n");
+  const i = lineas.findIndex((l) => /^#\s+permissions:\s*$/.test(l));
   const alcances = new Set();
-  for (const m of texto.matchAll(/^#\s{0,6}([a-z-]+):\s*(read|write)\s*$/gm)) {
+  if (i === -1) return alcances;
+  for (const l of lineas.slice(i + 1)) {
+    const m = /^#\s+([a-z-]+):\s*(read|write)\s*$/.exec(l);
+    if (!m) break; // el bloque del ejemplo se corto
     alcances.add(`${m[1]}: ${m[2]}`);
   }
   return alcances;

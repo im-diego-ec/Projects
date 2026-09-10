@@ -100,7 +100,13 @@ test("MUERDE: los tres detectores ven la version vieja de la guia", () => {
 
 /** Los inputs del formulario, contados del YAML y no de la memoria. */
 function preguntasDelFormulario() {
-  const lineas = PUERTA.split("\n");
+  return inputsDe(PUERTA);
+}
+
+/** Los inputs declarados en un YAML de workflow. Toma el TEXTO --y no el archivo--
+ *  para que el caso MUERDE pueda pasarle formularios sinteticos. */
+export function inputsDe(yaml) {
+  const lineas = yaml.split("\n");
   const i = lineas.findIndex((l) => l.trim() === "inputs:");
   assert.notEqual(i, -1, "personalizar.yml ya no declara `inputs:`: esta guarda quedaria mirando al vacio");
   const sangria = lineas[i].length - lineas[i].trimStart().length;
@@ -131,15 +137,26 @@ test("el numero de preguntas que promete la guia es el que el formulario tiene",
   );
 });
 
-test("MUERDE: si el formulario gana o pierde una pregunta, la guia queda vieja", () => {
-  // Anti-vacuidad: se comprueba el predicado contra un numero que no es el real.
-  const cuantas = preguntasDelFormulario().length;
-  assert.notEqual(cuantas, cuantas + 1, "predicado degenerado");
-  const m = /formulario con (\w+) preguntas/.exec(GUIA);
+/** El predicado, separado para poder MUTARLO. Devuelve los desacuerdos. */
+export function desacuerdosDelNumero(textoGuia, yamlFormulario) {
+  const cuantas = inputsDe(yamlFormulario).length;
+  const m = /formulario con (\w+) preguntas/.exec(textoGuia);
+  if (!m) return ["la guia no dice cuantas preguntas tiene el formulario"];
   const prometidas = NUMEROS[m[1]] ?? Number(m[1]);
-  assert.notEqual(
-    prometidas,
-    cuantas + 1,
-    "la guia coincide con un formulario que tiene una pregunta MAS que el real: el predicado no distingue",
-  );
+  return prometidas === cuantas ? [] : [`la guia promete ${prometidas} y el formulario tiene ${cuantas}`];
+}
+
+test("MUERDE: el predicado enrojece en los DOS sentidos, de mas y de menos", () => {
+  // ESTE CASO ERA UNA TAUTOLOGIA. Decia `assert.notEqual(cuantas, cuantas + 1)`, que
+  // es verdad siempre y no toca la pieza vigilada: podia quedar verde con el
+  // predicado roto. Ahora se muta de verdad, contra formularios sinteticos.
+  const guiaCuatro = "un formulario con cuatro preguntas en castellano";
+  const yaml = (n) =>
+    ["on:", "  workflow_dispatch:", "    inputs:"]
+      .concat(Array.from({ length: n }, (_, i) => [`      campo${i}:`, "        type: string"]).flat())
+      .join("\n");
+
+  assert.deepEqual(desacuerdosDelNumero(guiaCuatro, yaml(4)), [], "cuatro y cuatro tienen que coincidir");
+  assert.equal(desacuerdosDelNumero(guiaCuatro, yaml(5)).length, 1, "no caza el formulario que gano una pregunta");
+  assert.equal(desacuerdosDelNumero(guiaCuatro, yaml(3)).length, 1, "no caza el formulario que perdio una pregunta");
 });

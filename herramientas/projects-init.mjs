@@ -798,7 +798,12 @@ export function problemasDeEleccion(valores) {
         `plataforma = ${JSON.stringify(crudo)} esta admitida por la constitucion del proyecto ` +
           `(plantilla/AGENTS.md) pero TODAVIA NO esta implementada en esta herramienta: no hay adaptador ` +
           `que la entregue, asi que armarte el proyecto seria darte archivos que no la usan. Las que hoy ` +
-          `funcionan: ${validas.join(", ")}. El trabajo de ${v} vive en openspec/changes/promocion-por-ambientes`,
+          // NO SE NOMBRA LA CARPETA DEL CHANGE. Un change se archiva: el dia que
+          // `promocion-por-ambientes` cierre, esa ruta se mueve a changes/archive/ y
+          // este mensaje --que lo lee una persona que no programa-- la manda a un
+          // lugar que no existe. Se nombra la pagina de documentacion, que es
+          // estable y sobrevive al archive.
+          `funcionan: ${validas.join(", ")}. Que plataformas soporta el marco y cuales estan en camino esta en docs/03-stack.md`,
       );
       continue;
     }
@@ -1817,7 +1822,17 @@ export function avisosDelRegistroDeValores(destino) {
  *  salida en el caso normal, que es una ruta sin nada especial. */
 export function citarRuta(ruta) {
   const texto = String(ruta);
-  if (!/[\s"'`$&|;<>()*?\[\]]/.test(texto)) return texto;
+  // ALLOWLIST Y NO BLOCKLIST, y el cambio no es de estilo. La primera version
+  // enumeraba los caracteres peligrosos, y una lista de peligros SIEMPRE esta
+  // incompleta: se le escapaban `\`, `{}`, `,`, `!`, `%` y `#`, asi que una carpeta
+  // llamada "Proyectos (2026)" o "notas #1" salia DESNUDA. Y una lista incompleta
+  // en un caso asi es peor que no tener nada, porque parece que cubre.
+  //
+  // Al reves no se puede fallar: se deja pasar sin comillas SOLO lo que se sabe
+  // inofensivo en bash, zsh, cmd y PowerShell --letras, digitos, punto, guion,
+  // guion bajo, barra, barra invertida y dos puntos, que son las piezas de una ruta
+  // normal en las tres plataformas-- y todo lo demas se entrecomilla.
+  if (/^[A-Za-z0-9._\/\\:-]*$/.test(texto)) return texto;
   return `"${texto.replace(/"/g, '\\"')}"`;
 }
 
@@ -1844,8 +1859,22 @@ export function pinDelMarcoEnDestino(destino) {
     // El `uses:` del workflow reusable es el que define con que version corre
     // el pipeline ENTERO. Las actions sueltas del marco van pinadas a la misma
     // version, pero esta es la que manda y la que el registro quiere saber.
-    const m = /uses:\s*"?[^"\s]*\/Projects\/\.github\/workflows\/marco-ci\.yml@(v[0-9]+\.[0-9]+\.[0-9]+)"?/.exec(ci);
-    return m ? m[1] : null;
+    // SE RECORRE POR LINEA Y SE DESCARTAN LOS COMENTARIOS. La primera version hacia
+    // un `.exec()` sobre el archivo entero y se quedaba con el PRIMER match: una
+    // linea comentada --y los workflows del andamio llevan ejemplos comentados--
+    // ganaba sobre el `uses:` de verdad.
+    //
+    // Y SI HAY DOS PINES DISTINTOS, DEVUELVE null. Un ci.yml a medio actualizar
+    // --con una parte en la version nueva y otra en la vieja-- no tiene UNA version:
+    // informar cualquiera de las dos seria escribir en el registro un dato que el
+    // repo no cumple. El hueco declarado se ve; el dato elegido al azar, no.
+    const pines = new Set();
+    for (const linea of ci.split("\n")) {
+      if (/^\s*#/.test(linea)) continue;
+      const m = /uses:\s*"?[^"\s]*\/Projects\/\.github\/workflows\/marco-ci\.yml@(v[0-9]+\.[0-9]+\.[0-9]+)"?/.exec(linea);
+      if (m) pines.add(m[1]);
+    }
+    return pines.size === 1 ? [...pines][0] : null;
   } catch {
     return null;
   }

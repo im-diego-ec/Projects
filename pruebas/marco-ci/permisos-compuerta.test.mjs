@@ -284,3 +284,14 @@ test("desvios · una FECHA IMPOSIBLE tambien avisa, como hace la action", () => 
   assert.match(salida, /Desvio de permiso incompleto/, `una fecha que no existe tiene que avisar:\n${salida}`);
   assert.match(salida, /no tiene fecha AAAA-MM-DD/, salida);
 });
+
+test("desvios · cuando faltan las DOS, el aviso nombra las dos", () => {
+  // Decia solo la primera, asi que quien completaba el aprobador volvia a recibir el
+  // mismo aviso por la fecha: dos viajes de CI para un arreglo que se hace de una.
+  const raiz = repo({
+    distribuidor: true,
+    desvios: { desvios: [{ permiso: "Bash(git:*)", motivo: "m" }, { permiso: "Bash(gh:*)", motivo: "m" }] },
+  });
+  const { salida } = correr(raiz);
+  assert.match(salida, /no dice quien lo aprobo y no tiene fecha/, `el aviso nombra una sola falta:\n${salida}`);
+});
