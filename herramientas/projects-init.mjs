@@ -1734,6 +1734,37 @@ export function avisosDelRegistroDeValores(destino) {
  *  cadena) y esa repeticion se deja a proposito: correrlo aparte es lo que hace
  *  que un fallo del generador se lea como "el paso datos fallo" en vez de como
  *  un rojo adentro de una cadena de seis. */
+/** EL PIN DEL MARCO, LEIDO DEL ARBOL QUE SE ACABA DE ESCRIBIR.
+ *
+ *  POR QUE SE LEE Y NO SE DECLARA. El pin lo fija el andamio
+ *  (plantilla/.github/workflows/ci.yml) y lo mueve el paso 5 del release. Una
+ *  constante aca seria un SEGUNDO lugar donde vive el mismo hecho, y nada la
+ *  cruzaria: el dia que el release mueva uno y no el otro, esta herramienta
+ *  informaria una version que ningun repo tiene.
+ *
+ *  Y SE LEE DEL DESTINO, NO DE LA PLANTILLA, que es la parte que importa. La
+ *  plantilla dice lo que se IBA a escribir; el destino dice lo que el repo
+ *  TIENE. La fila del registro existe justamente para razonar sobre que version
+ *  tiene cada repo, asi que derivarla de la plantilla la volveria circular.
+ *
+ *  Devuelve null si no se puede leer, y quien llama imprime el pendiente igual
+ *  diciendo que no se pudo. Omitirlo convertiria un fallo de lectura en
+ *  silencio; completarlo con una constante traeria de vuelta el problema que
+ *  este lector existe para evitar, y encima solo en el caso raro. */
+export function pinDelMarcoEnDestino(destino) {
+  try {
+    const ci = fs.readFileSync(path.join(destino, ".github", "workflows", "ci.yml"), "utf8");
+    // El `uses:` del workflow reusable es el que define con que version corre
+    // el pipeline ENTERO. Las actions sueltas del marco van pinadas a la misma
+    // version, pero esta es la que manda y la que el registro quiere saber.
+    const m = /uses:\s*"?[^"\s]*\/Projects\/\.github\/workflows\/marco-ci\.yml@(v[0-9]+\.[0-9]+\.[0-9]+)"?/.exec(ci);
+    return m ? m[1] : null;
+  } catch {
+    return null;
+  }
+}
+
+
 export const PASOS_DEL_ARRANQUE = [
   {
     clave: "instalado",
@@ -3827,6 +3858,35 @@ async function main(argv) {
   console.log("     CLAUDE_CODE_OAUTH_TOKEN (para que el bot conteste; `claude setup-token`)");
   console.log("     TOKEN_ACTUALIZAR_MARCO   (OPCIONAL: sin el, el PR semanal del marco nace");
   console.log("                               sin checks y el propio workflow lo avisa)");
+
+  // EL REGISTRO DE CONSUMIDORES, con los tres datos YA RESUELTOS.
+  //
+  // POR QUE ESTA LINEA VIVE ACA Y NO EN LA DOCUMENTACION. Adoptar el marco es
+  // el UNICO instante en que se sabe con certeza que un repo lo consume, y es
+  // un instante en el que hay una persona mirando esta salida. Pasado eso, el
+  // dato o se reconstruye con una credencial de organizacion --que esta
+  // herramienta no pide y no deberia tener-- o se inventa. Y una fila
+  // inventada no se distingue de una medida.
+  //
+  // NO MANDA A AVERIGUAR NADA. Los tres datos de la tabla salen resueltos y en
+  // el orden de sus columnas: lo unico humano que queda es abrir el PR. Eso es
+  // deliberado: lo que fallaba por memoria no era la voluntad de anotar el
+  // repo, era tener que juntar los tres datos despues, cuando el momento paso.
+  const pinDelMarco = pinDelMarcoEnDestino(o.destino);
+  const diaDeAdopcion = new Date().toISOString().slice(0, 10);
+  console.log("");
+  console.log("  7. La fila de ESTE repo en el registro de consumidores del marco.");
+  console.log("     Va por PR contra el repo del marco, en docs/14-consumidores.md:");
+  console.log(`       | ${valores.ORG}/${valores.PROYECTO} | ${diaDeAdopcion} | ${pinDelMarco ?? "NO SE PUDO LEER"} |`);
+  if (!pinDelMarco) {
+    // NO SE COMPLETA CON UNA CONSTANTE, a proposito: ver pinDelMarcoEnDestino.
+    // Un hueco declarado se ve; una version adivinada, no.
+    console.log("     La version NO se pudo leer del ci.yml de este destino, y no se adivina.");
+    console.log("     Sale del `uses:` del marco en .github/workflows/ci.yml de este repo.");
+  }
+  console.log("     Sin esa fila el marco no sabe a quien le rompe un cambio breaking, ni");
+  console.log("     contra que arbol probar una compuerta nueva antes de publicarla.");
+
   for (const [k, texto] of Object.entries(CON_LIMPIEZA_MANUAL)) {
     console.log(`  · ${k} = "${valores[k]}" — ${texto}`);
   }

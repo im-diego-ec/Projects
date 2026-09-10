@@ -43,6 +43,30 @@ mueve sobre un cambio incompatible.
 
 ### Añadido
 
+- **El arranque entrega la fila del registro de consumidores, resuelta.**
+  `docs/14-consumidores.md` era una tabla con «*(sin filas)*» y el propio archivo
+  decía por qué: el lugar donde se escribe la línea existía, **lo que la escribe
+  no**. La fila dependía de que alguien se acordara, que por la premisa de
+  `AGENTS.md` no cuenta como enforcement.
+
+  El dato es **perecedero**: adoptar el marco es el único instante en que se sabe
+  con certeza que un repo lo consume. Pasado ese instante sólo se puede
+  reconstruir —con una credencial de organización— o inventar, y una fila
+  inventada no se distingue de una medida. Ahora el arranque imprime las tres
+  columnas listas para pegar, como un pendiente más de su lista de actos humanos.
+
+  **La versión sale del `ci.yml` recién escrito en el destino, no de una
+  constante**: el pin lo fija el andamio y lo mueve el release, así que una
+  constante en la herramienta sería una segunda declaración del mismo hecho.
+  Cuando no se puede leer, la fila dice `NO SE PUDO LEER` en vez de adivinar. La
+  guarda que lo sostiene cruza las dos lecturas y se pone roja si divergen
+  (`pruebas/init/consumidor-se-anota.test.mjs`).
+
+  **Para un consumidor: nada.** El cambio vive en la herramienta que corre en la
+  máquina de quien arranca un proyecto; no toca ningún workflow reusable, ni
+  `inputs`, ni `secrets`, ni permisos del token, ni nombres de jobs.
+
+
 - **Se puede volver a la pregunta anterior.** Antes no: la persona contestaba
   nueve preguntas y si en la séptima se daba cuenta de que la tercera estaba mal,
   **la única salida era Ctrl+C** — que además borraba todo lo contestado. La
