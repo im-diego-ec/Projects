@@ -48,6 +48,16 @@ after(() => {
  *  Se mide sobre la salida y sobre el arbol escrito, no sobre el codigo fuente:
  *  una prueba que leyera el `console.log` del archivo estaria midiendo un
  *  sustituto de la pieza y quedaria verde el dia que la linea deje de imprimirse. */
+/** POR QUE `--sin-arranque` ADEMAS DE `--sin-herramientas`. Son cosas distintas y
+ *  confundirlas puso el CI en rojo: `--sin-herramientas` saltea la copia de las
+ *  herramientas al destino, pero el ARRANQUE --instalar dependencias, generar el
+ *  cliente de datos, formatear, verificar-- corre igual. En un runner sin red util
+ *  ese primer paso muere con salida 1 y la herramienta corta, asi que el banco
+ *  medía la ausencia de pnpm en vez de lo que dice medir.
+ *
+ *  Medido: verde en ubuntu node 22 y macos, ROJO en ubuntu node 20.12.0 y en
+ *  windows. Un banco que depende de que el runner tenga pnpm no mide una propiedad
+ *  del arbol: mide el humor de la maquina. */
 function arrancarUnProyecto() {
   const base = carpetaTemporal("consumidor-");
   const destino = path.join(base, "destino");
@@ -56,7 +66,7 @@ function arrancarUnProyecto() {
   fs.writeFileSync(valores, execFileSync(process.execPath, [HERRAMIENTA, "--ejemplo"], { encoding: "utf8" }));
   const salida = execFileSync(
     process.execPath,
-    [HERRAMIENTA, "--valores", valores, "--destino", destino, "--sin-herramientas"],
+    [HERRAMIENTA, "--valores", valores, "--destino", destino, "--sin-arranque", "--sin-herramientas"],
     { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] },
   );
   return { salida, destino, valores: JSON.parse(fs.readFileSync(valores, "utf8")) };
@@ -97,7 +107,7 @@ test("un destino SIN ci.yml imprime el pendiente igual, declarando el hueco", ()
   fs.mkdirSync(destino);
   const valores = path.join(base, "valores.json");
   fs.writeFileSync(valores, execFileSync(process.execPath, [HERRAMIENTA, "--ejemplo"], { encoding: "utf8" }));
-  execFileSync(process.execPath, [HERRAMIENTA, "--valores", valores, "--destino", destino, "--sin-herramientas"], {
+  execFileSync(process.execPath, [HERRAMIENTA, "--valores", valores, "--destino", destino, "--sin-arranque", "--sin-herramientas"], {
     encoding: "utf8",
     stdio: ["ignore", "pipe", "pipe"],
   });
