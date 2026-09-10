@@ -5,7 +5,7 @@ import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { execFileSync } from "node:child_process";
-import { CAMPOS, CUENTA_DEL_MARCO, respuestasDelFormulario, problemas, escribir } from "../../herramientas/projects-puerta.mjs";
+import { CAMPOS, CUENTA_DEL_MARCO, respuestasDelFormulario, problemas, escribir, visibilidadDelRepo } from "../../herramientas/projects-puerta.mjs";
 import { validarValores } from "../../herramientas/projects-init.mjs";
 
 const RAIZ = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
@@ -318,4 +318,47 @@ test("y un usuario valido con arroba NO se rechaza: la normalizacion va antes qu
   // rojo, y el arreglo seria peor que el defecto.
   assert.deepEqual(problemas({ forma: "sitio", equipo: "equipo", companero: "@ana" }, "yo/x"), []);
   assert.deepEqual(problemas({ forma: "sitio", equipo: "equipo", companero: "ana-perez" }, "yo/x"), []);
+});
+
+// ---------------------------------------------------------------------------
+// EL CAMINO MAS NO-CODER PERDIA LA DECLARACION MAS IMPORTANTE.
+//
+// QUE DEFECTO CIERRA. El asistente por terminal pregunta la visibilidad, y con
+// "privado" emite un desvio: en el plan gratuito de GitHub la proteccion de rama
+// NO EXISTE --la API responde 403-- asi que las reglas del marco quedan escritas
+// sin nada que las haga cumplir. La puerta web no lo preguntaba NI lo derivaba, y
+// dejaba `visibilidad` sin definir: el proyecto nacia sin compuerta y sin decirlo.
+//
+// El arreglo NO fue agregar una quinta pregunta. GitHub ya sabe si el repo es
+// publico, y el propio archivo ya tenia esa doctrina escrita para el tipo de
+// cuenta: "preguntarselo seria pedirle que averigue algo que la herramienta tiene
+// delante". La visibilidad sale del mismo evento.
+// ---------------------------------------------------------------------------
+
+test("puerta · la visibilidad se DERIVA del evento, no se pregunta", () => {
+  assert.equal(CAMPOS.includes("visibilidad"), false, "la visibilidad no tiene que ser una pregunta: GitHub ya la sabe");
+  assert.equal(visibilidadDelRepo({ VISIBILIDAD_DEL_REPO: "public" }), "publico");
+  assert.equal(visibilidadDelRepo({ VISIBILIDAD_DEL_REPO: "private" }), "privado");
+});
+
+test("puerta · sin el dato, asume PRIVADO: el desvio de mas se ve, la proteccion supuesta no", () => {
+  // Asimetrico a proposito. Un desvio sobrante se lee y se borra; una proteccion
+  // que se dio por supuesta y no existe no se nota hasta que alguien empuja a main.
+  assert.equal(visibilidadDelRepo({}), "privado");
+  assert.equal(visibilidadDelRepo({ VISIBILIDAD_DEL_REPO: "" }), "privado");
+  assert.equal(visibilidadDelRepo({ VISIBILIDAD_DEL_REPO: "internal" }), "privado");
+});
+
+test("puerta · el workflow le pasa el dato: sin eso, derivarlo no sirve de nada", () => {
+  // La funcion podria estar perfecta y el valor no llegar nunca. Se cruza contra
+  // el YAML que la invoca, que es la unica forma de que este caso mida el camino
+  // completo y no la mitad.
+  const yml = fs.readFileSync(path.join(RAIZ, "herramientas/plantilla-repos/personalizar.yml"), "utf8");
+  assert.match(yml, /VISIBILIDAD_DEL_REPO:\s*\$\{\{\s*github\.event\.repository\.visibility\s*\}\}/, "personalizar.yml no le pasa la visibilidad a la puerta");
+});
+
+test("puerta · MUERDE: sin la variable en el workflow, el proyecto nace privado y con su desvio", () => {
+  // Anti-vacuidad del caso de arriba: si el YAML dejara de pasarla, la puerta no
+  // explota --cae al default seguro-- y por eso hace falta el cruce anterior.
+  assert.equal(visibilidadDelRepo({ OTRA_COSA: "public" }), "privado");
 });

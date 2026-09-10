@@ -120,6 +120,12 @@ jobs:
           # una cuenta de usuario los equipos NO EXISTEN, y un CODEOWNERS con
           # `@cuenta/equipo` no asigna a nadie, nunca, sin decir una palabra.
           TIPO_DE_DUENIO: ${{ github.event.repository.owner.type }}
+          # GitHub tambien sabe si el repositorio es publico o privado, y decide si
+          # el proyecto nace con la proteccion de rama disponible: en el plan
+          # gratuito, un repo PRIVADO no la tiene --la API responde 403-- y eso hay
+          # que declararlo como desvio en vez de dejarlo mudo. Preguntarselo a la
+          # persona seria pedirle que averigue algo que este evento ya trae.
+          VISIBILIDAD_DEL_REPO: ${{ github.event.repository.visibility }}
         run: node .marco/herramientas/projects-puerta.mjs "${RUNNER_TEMP}"
 
       - name: Armar el proyecto con tus valores

@@ -84,6 +84,27 @@ export function tipoDeCuenta(entorno = process.env) {
   return String(entorno.TIPO_DE_DUENIO ?? "").toLowerCase() === "organization" ? "organizacion" : "usuario";
 }
 
+/** Si el repositorio es publico o privado.
+ *
+ *  TAMPOCO SE PREGUNTA, y por el mismo motivo que el tipo de cuenta: GitHub ya lo
+ *  sabe y lo pone en el evento. Preguntarselo seria pedirle a la persona que
+ *  averigue sobre su propio repositorio algo que la herramienta tiene delante.
+ *
+ *  QUE DEFECTO CIERRA. El asistente por terminal SI pregunta la visibilidad, y con
+ *  "privado" emite un desvio: en el plan gratuito de GitHub la proteccion de rama
+ *  NO EXISTE --la API responde 403-- asi que las reglas del marco quedan escritas
+ *  sin nada que las haga cumplir. La puerta web no lo preguntaba NI lo derivaba, y
+ *  entonces el camino MAS no-coder era el unico que perdia esa declaracion: el
+ *  proyecto nacia sin compuerta y sin decirlo.
+ *
+ *  EL DEFAULT ES "privado", y no es simetrico a proposito: si el dato no llega, lo
+ *  seguro es asumir el caso SIN proteccion y declarar el desvio de mas. Un desvio
+ *  sobrante se ve y se borra; una proteccion que se dio por supuesta y no existe no
+ *  se ve hasta que alguien empuja a main. */
+export function visibilidadDelRepo(entorno = process.env) {
+  return String(entorno.VISIBILIDAD_DEL_REPO ?? "").toLowerCase() === "public" ? "publico" : "privado";
+}
+
 /** Traduce lo que llega del formulario al objeto `respuestas` del asistente.
  *
  *  `repo` llega como "duenio/nombre", que es el formato de `github.repository`.
@@ -120,6 +141,15 @@ export function respuestasDelFormulario(entrada, repo) {
     equipo,
     // Trabajando solo, la otra persona es la misma: es lo que hace el asistente.
     BUILDER_2: equipo === "equipo" ? companero : duenio,
+    // La visibilidad NO se pregunta: se deriva del evento, igual que el tipo de
+    // cuenta. Ver visibilidadDelRepo.
+    visibilidad: visibilidadDelRepo(),
+    // PENDIENTE, y con destino escrito. Este valor esta cableado porque HOY la
+    // respuesta no cambia nada: con plataforma distinta de aws lo unico que
+    // decide es el texto de DOMINIO_DEV. La decision del PO del 2026-09-10 es que
+    // la pregunta se ELIMINA y la topologia pasa a ser siempre Local -> DEV ->
+    // PROD, asi que este campo desaparece con ella.
+    // Destino: openspec/changes/promocion-por-ambientes, tarea 3.1.
     ambientes: "uno",
     dominio: dominio ? "propio" : "gratuito",
     avisos: "correo",

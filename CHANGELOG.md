@@ -185,6 +185,27 @@ mueve sobre un cambio incompatible.
 
 ### Corregido
 
+- **El camino más no-coder perdía la declaración más importante.** El asistente por
+  terminal pregunta si el repo es público o privado, y con privado emite un desvío:
+  en el plan gratuito de GitHub la protección de rama **no existe** y las reglas del
+  marco quedan escritas sin nada que las haga cumplir. La puerta web no lo preguntaba
+  **ni lo derivaba**, así que ese desvío nunca se emitía: el proyecto nacía sin
+  compuerta de rama y sin decirlo, por el camino donde menos capacidad hay de notarlo.
+
+  **No se arregló agregando una quinta pregunta**, y la razón ya estaba escrita en el
+  propio archivo para el tipo de cuenta: *«GitHub ya lo sabe y lo pone en el evento;
+  preguntárselo sería pedirle que averigüe algo que la herramienta tiene delante»*. Se
+  **deriva** de `github.event.repository.visibility`. El formulario sigue con cuatro
+  preguntas.
+
+  **El default, si el dato no llega, es «privado»** — asimétrico a propósito: un
+  desvío sobrante se ve y se borra; una protección que se dio por supuesta y no existe
+  no se ve hasta que alguien empuja a `main`.
+
+  **Para un consumidor: nada.** Un proyecto nacido por la puerta web recibe ahora el
+  desvío que le correspondía desde siempre.
+
+
 - **Cinco citas al canónico apuntaban a un archivo que el fork renombró.** Al
   bifurcarse de Rigel, Projects generalizó su constitución y
   `60-infra-aws-secretos.md` pasó a ser `60-infra-plataforma-secretos.md`. Cinco
