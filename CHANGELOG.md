@@ -163,6 +163,23 @@ mueve sobre un cambio incompatible.
 
 ### Corregido
 
+- **El guard de las promesas de dinero no miraba los workflows, que son justo los
+  que viajan.** `promesas-sin-fuente.test.mjs` prohíbe escribir «sin tarjeta»
+  mientras nadie lo haya comprobado —su lista de verificadas está vacía **a
+  propósito**— pero sólo leía `.md`, `.mjs`, `.json` y `.astro`.
+
+  Al ampliarlo a `.yml`, `.ts` y `.txt` apareció **una sola** violación en todo el
+  árbol, y estaba en `plantilla/.github/workflows/desplegar.yml`: le prometía
+  «gratis, sin tarjeta» a alguien que no programa, **en el archivo que su proyecto
+  se lleva puesto**. Un guard que no mira donde la promesa viaja protege el lugar
+  equivocado.
+
+  La promesa se retiró: ahora dice que Cloudflare tiene plan gratuito y que si pide
+  o no tarjeta **no está comprobado por el marco**.
+
+  **Para un consumidor: un comentario más honesto** en el workflow que ya tiene.
+
+
 - **Cuatro cosas que el repositorio afirmaba de sí mismo y el árbol contradecía.**
   Ninguna rompía nada; las cuatro le mienten a quien las lee, que en este marco es
   el defecto que más caro sale.

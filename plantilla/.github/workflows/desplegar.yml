@@ -5,7 +5,8 @@
 # que este marco existe para impedir. Un push a una rama no publica nada.
 #
 # QUE NECESITA PARA FUNCIONAR, y son dos cosas que solo una persona puede hacer:
-#   1. Una cuenta de Cloudflare (gratis, sin tarjeta).
+#   1. Una cuenta de Cloudflare. Tiene plan gratuito; si pide o no tarjeta al
+#      registrarse NO esta comprobado por el marco, asi que no se promete aca.
 #   2. Dos secretos en Settings -> Secrets and variables -> Actions:
 #        CLOUDFLARE_API_TOKEN    con permiso "Edit Cloudflare Workers"
 #        CLOUDFLARE_ACCOUNT_ID   el identificador de tu cuenta
