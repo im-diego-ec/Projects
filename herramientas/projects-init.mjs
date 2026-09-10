@@ -454,7 +454,21 @@ export const SALIDA = { ok: 0, fallo: 1, uso: 2, cancelado: 3 };
 export function lineasDelPasoQueSigue(rutaDeValores, proyecto, raizMarco = path.resolve(ESTE_DIRECTORIO, "..")) {
   const dondeQuedo = path.resolve(path.dirname(rutaDeValores));
   const enElClon = dondeQuedo === path.resolve(raizMarco);
-  const yo = fileURLToPath(import.meta.url);
+  // LA RUTA A ESTA MISMA HERRAMIENTA, DERIVADA DEL CLON QUE NOS NOMBRARON.
+  //
+  // Decia `fileURLToPath(import.meta.url)`, o sea la ruta del modulo que corre. Es
+  // lo mismo en la practica --se corre desde ese clon-- pero tiene dos problemas.
+  //
+  // El primero es de correccion: el comando que se imprime tiene que apuntar al
+  // clon que la persona esta usando, que es el que llega en `raizMarco`, no al
+  // archivo desde el que se cargo el modulo. Si algun dia se invoca por un enlace
+  // simbolico o desde una copia, el comando impreso mandaria a otro lado.
+  //
+  // El segundo es que hacia esta funcion IMPOSIBLE de probar contra un clon con
+  // espacios: `import.meta.url` es la maquina de quien corre el banco, asi que el
+  // caso solo se ejercitaba si el clon real vivia en una carpeta con espacio. En
+  // CI --donde el checkout es /home/runner/work/...-- no se ejercitaba nunca.
+  const yo = path.join(path.resolve(raizMarco), "herramientas", "projects-init.mjs");
   const l = ["", "No se armo ningun proyecto todavia. El paso que sigue:"];
   if (!enElClon) {
     l.push(`  node ${citarRuta(yo)} --valores ${citarRuta(path.basename(rutaDeValores))} --destino .`);
@@ -3398,7 +3412,7 @@ async function main(argv) {
       console.error("Volve a correr con --asistente: retoma tus respuestas y no te hace contestar todo de nuevo.");
     }
     console.error("");
-    console.error(`Un esqueleto con todas las claves: node ${path.join(raizDelMarco, "herramientas", "projects-init.mjs")} --ejemplo`);
+    console.error(`Un esqueleto con todas las claves: node ${citarRuta(path.join(raizDelMarco, "herramientas", "projects-init.mjs"))} --ejemplo`);
     return 1;
   }
 
@@ -3974,7 +3988,7 @@ async function main(argv) {
   console.log("manifiestos se quedan donde estan y el lockfile los congela. Para comparar lo que");
   console.log("este proyecto DECLARA contra la ultima estable publicada de cada paquete —y decidir,");
   console.log("con dos preguntas, si actualizar todo el stack o solo una parte—:");
-  console.log(`     node <clon-del-marco>/herramientas/projects-versiones.mjs --raiz ${o.destino}`);
+  console.log(`     node <clon-del-marco>/herramientas/projects-versiones.mjs --raiz ${citarRuta(o.destino)}`);
   console.log("Sin terminal (en CI) solo imprime el informe y sale 0: nunca pregunta ni escribe.");
   return 0;
 }

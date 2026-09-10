@@ -57,7 +57,7 @@ test("MEDIDO de punta a punta: el comando propuesto ARMA el proyecto de verdad",
   // No se lee el texto: se extrae el comando que la herramienta imprime y SE LO
   // CORRE. Es la unica forma de saber que el callejon se cerro; la version
   // anterior tambien "decia" un paso que sigue, y ese paso no armaba nada.
-  const base = fs.mkdtempSync(path.join(os.tmpdir(), "doble-clic-"));
+  const base = fs.mkdtempSync(path.join(os.tmpdir(), "doble clic-"));
   const clon = path.join(base, "Projects");
   fs.mkdirSync(clon);
   fs.cpSync(path.join(RAIZ, "herramientas"), path.join(clon, "herramientas"), { recursive: true });
@@ -134,7 +134,7 @@ test("MEDIDO de punta a punta: el comando propuesto ARMA el proyecto de verdad",
 test("MEDIDO: el comando VIEJO fallaba, asi que el caso de arriba mide algo", () => {
   // Anti-vacuidad: si `--destino .` sobre el clon tambien pasara, cerrar el
   // callejon no habria sido un arreglo. Se corre el comando viejo tal cual.
-  const base = fs.mkdtempSync(path.join(os.tmpdir(), "callejon-"));
+  const base = fs.mkdtempSync(path.join(os.tmpdir(), "callejon con espacio-"));
   const clon = path.join(base, "Projects");
   fs.mkdirSync(clon);
   fs.cpSync(path.join(RAIZ, "herramientas"), path.join(clon, "herramientas"), { recursive: true });
