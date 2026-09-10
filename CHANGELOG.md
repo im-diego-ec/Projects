@@ -102,6 +102,28 @@ mueve sobre un cambio incompatible.
 
 ### Corregido
 
+- **El procedimiento de release destruía el único rastro de su propia
+  precondición.** `AGENTS.md` exige probar cada versión contra un consumidor real.
+  La evidencia —id de corrida + SHA del consumidor + SHA del marco— vivía en un
+  comentario del PR del ensayo, y el paso 5 de `projects-validar-consumidor` manda
+  cerrar ese PR con `--delete-branch`.
+
+  La única verificación mecánica del paso 6 medía **el largo** del cuerpo
+  publicado. El largo dice que hay texto; no dice que se haya probado nada.
+  Medido: `grep -c "actions/runs" CHANGELOG.md` daba **0** sobre 237 KB — cero
+  releases con evidencia recuperable, y nada que lo notara.
+
+  Ahora la terna va al `CHANGELOG.md`, que el paso 6 ya recorta a las notas
+  publicadas —no hace falta inventar superficie—, y el paso 6 la exige por
+  **forma** (un id de corrida y un SHA de 40) antes de dar el release por cerrado.
+
+  **No se quitó el `--delete-branch`**, que era la solución tentadora y peor:
+  conservar la rama conserva el pin temporal al SHA. Un caso del banco lo fija.
+
+  **Para un consumidor: nada** en su pipeline; las notas de release ahora dicen
+  contra qué se probó la versión.
+
+
 - **El comando que la herramienta manda a pegar no se podía pegar.** Cuando
   `projects init` no puede terminar solo, imprime el comando exacto para copiar —
   su razón de ser es que quien no programa no transcriba nada. Ese comando se

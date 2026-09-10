@@ -431,6 +431,24 @@ gh release view vX.Y.Z --json body --jq '.body | length'
 
 Tiene que devolver un numero de varios cientos, no `0`.
 
+**Y que las notas traigan la EVIDENCIA del ensayo contra un consumidor real**, no
+solo cuerpo. Medir el largo dice que hay texto; no dice que se haya probado nada:
+
+```bash
+gh release view vX.Y.Z --json body --jq '.body' \
+  | grep -Eo 'corrida [0-9]{6,}|[0-9a-f]{40}'
+```
+
+Tiene que devolver **un id de corrida y al menos un SHA de 40 caracteres**. Si no
+los devuelve, el release NO esta cerrado: la precondicion 1 --"se probo contra un
+consumidor real"-- se estaria apoyando en una premisa que nadie comprueba.
+
+**Por que aca y no en el PR del ensayo.** El paso 5 de `projects-validar-consumidor`
+cierra ese PR con `--delete-branch`. Un comentario ahi es el unico rastro
+reproducible y el propio procedimiento manda destruirlo, asi que la terna tiene
+que viajar al `CHANGELOG.md` --que este paso ya recorta a las notas-- antes de
+que eso pase.
+
 El archivo de notas quedo en un temporal fuera del repo: no hay nada que borrar
 del arbol de trabajo. Confirmalo con `git status --short`, que tiene que estar
 limpio.

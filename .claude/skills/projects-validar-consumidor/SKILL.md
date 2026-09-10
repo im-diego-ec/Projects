@@ -208,9 +208,21 @@ De un tiron, para las corridas de la rama:
 gh run list --branch chore/validar-projects-<sha-corto> --json databaseId,headSha,status,conclusion,workflowName
 ```
 
-**La evidencia que se pega en el PR del marco es la terna: id de corrida + SHA
-del consumidor + SHA del marco pineado.** Un "salio verde" sin esos tres numeros
-no es evidencia de nada.
+**La evidencia es la terna: id de corrida + SHA del consumidor + SHA del marco
+pineado.** Un "salio verde" sin esos tres numeros no es evidencia de nada.
+
+**La terna va al `CHANGELOG.md`, en la entrada de la version que se esta
+validando** — NO a un comentario del PR. El paso que sigue cierra este PR con
+`--delete-branch`, asi que un comentario es el unico rastro reproducible del
+ensayo y el procedimiento manda destruirlo. La linea:
+
+```
+Probado contra <org>/<repo>#<pr>, corrida <id>, marco <sha40>, consumidor <sha40>.
+```
+
+Va en la entrada de esa version, que es la superficie que el paso 6 del release
+ya recorta a las notas publicadas: no hay que inventar ningun lugar nuevo, y el
+paso 6 la exige antes de dar el release por cerrado.
 
 ---
 
