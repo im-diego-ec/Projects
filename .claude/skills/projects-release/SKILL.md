@@ -481,6 +481,37 @@ gh release view vX.Y.Z --json body --jq '.body' \
   | grep -Eo 'corrida [0-9]{6,}|[0-9a-f]{40}'
 ```
 
+**PRIMERO: cuantos consumidores hay.** La respuesta cambia que se exige, y sale del
+registro:
+
+```bash
+grep -c '^| .* | 20[0-9][0-9]-' docs/14-consumidores.md   # filas del registro
+```
+
+**Si devuelve 0 --la circularidad de arranque--.** `AGENTS.md` tiene una frontera
+🛑: "Publicar un cambio del marco que no se probo contra un consumidor real". Y la
+regla es explicita en que el ensayo es ADEMAS del dogfooding: "no solo en el CI de
+este repo". Con cero consumidores esa precondicion **no se puede cumplir**, y no por
+descuido: **el primer consumidor no puede existir hasta que el marco publique una
+version que consumir.**
+
+No se finge la evidencia ni se bloquea el marco para siempre. **Se declara**, en la
+entrada de la version, con esta forma:
+
+```
+Probado contra: NINGUN CONSUMIDOR. El registro (docs/14-consumidores.md) esta vacio
+y la frontera de AGENTS.md no se puede cumplir hasta que exista el primero. Lo que
+SI se corrio: el dogfooding del propio repo (ci.yml llama a marco-ci.yml por ruta
+local) y el banco completo, <N>/<N>.
+```
+
+Es la misma clase de excepcion que el bootstrap ya declarado en el encabezado del
+`CHANGELOG.md`, y por el mismo motivo: una regla que no se puede cumplir **se
+escribe**, no se saltea en silencio. **Y caduca sola:** el dia que el registro tenga
+una fila, esta rama deja de aplicar y vuelve la exigencia de la terna.
+
+**Si devuelve 1 o mas**, la evidencia es obligatoria y se comprueba asi:
+
 Tiene que devolver **un id de corrida y al menos un SHA de 40 caracteres**. Si no
 los devuelve, el release NO esta cerrado: la precondicion 1 --"se probo contra un
 consumidor real"-- se estaria apoyando en una premisa que nadie comprueba.

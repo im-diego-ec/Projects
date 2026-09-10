@@ -78,3 +78,49 @@ test("la skill de validacion sigue cerrando el PR: el defecto no se arreglo quit
   // el pin temporal tambien, que es peor. Este caso fija que la solucion NO fue esa.
   assert.match(validar, /gh pr close <numero> --delete-branch/, "el cierre con --delete-branch desaparecio del paso 5");
 });
+
+// ---------------------------------------------------------------------------
+// LA CIRCULARIDAD DE ARRANQUE: CERO CONSUMIDORES.
+//
+// `AGENTS.md` tiene una frontera 🛑 --"publicar un cambio del marco que no se probo
+// contra un consumidor real"-- y aclara que el ensayo es ADEMAS del dogfooding: "no
+// solo en el CI de este repo". El registro de consumidores esta vacio.
+//
+// O sea que la precondicion no se puede cumplir, y no por descuido: el primer
+// consumidor no puede existir hasta que el marco publique una version que consumir.
+//
+// Este banco existe porque el paso 6 EXIGE la terna desde `la-evidencia-del-ensayo-viaja`,
+// y sin esta rama ese cambio habria convertido una violacion silenciosa en un
+// bloqueo permanente. Las dos son malas; la declaracion escrita no.
+// ---------------------------------------------------------------------------
+
+test("el release distingue cero consumidores de consumidores sin probar", () => {
+  assert.match(
+    release,
+    /NINGUN CONSUMIDOR/,
+    "el paso 6 no contempla el caso de cero consumidores, asi que con el registro vacio el release queda bloqueado para siempre",
+  );
+  assert.match(
+    release,
+    /14-consumidores\.md/,
+    "el paso 6 no dice de donde sale la cuenta de consumidores: quedaria a criterio de quien publique",
+  );
+});
+
+test("la salida de cero consumidores CADUCA sola", () => {
+  // Una excepcion sin caducidad es una excepcion para siempre. Esta se apaga sola
+  // el dia que el registro tenga una fila, sin que nadie se acuerde de apagarla.
+  assert.match(
+    release,
+    /deja de aplicar|caduca sola/i,
+    "la salida por cero consumidores no dice cuando deja de valer, asi que sobreviviria al primer consumidor",
+  );
+});
+
+test("y NO se finge la evidencia: la declaracion dice que no hubo ensayo", () => {
+  // El modo de falla peligroso seria una salida que deje pasar el release
+  // diciendo algo que suene a evidencia. La declaracion tiene que nombrar lo que
+  // NO se hizo.
+  assert.match(release, /no se puede cumplir/, "la salida no declara que la precondicion queda incumplida");
+  assert.match(release, /dogfooding/, "la salida no dice que fue lo que SI se corrio en lugar del ensayo");
+});

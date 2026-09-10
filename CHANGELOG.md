@@ -43,6 +43,26 @@ mueve sobre un cambio incompatible.
 
 ### Añadido
 
+- **La circularidad de arranque de la evidencia, declarada en vez de saltada.**
+  `AGENTS.md` tiene una frontera 🛑 —«publicar un cambio del marco que no se probó
+  contra un consumidor real»— y aclara que el ensayo es **además** del dogfooding.
+  El registro de consumidores está vacío, así que esa precondición **no se puede
+  cumplir**; y no por descuido: **el primer consumidor no puede existir hasta que el
+  marco publique una versión que consumir.**
+
+  Exigir la terna sin contemplar esto habría convertido una violación silenciosa en
+  un **bloqueo permanente**. El paso 6 ahora distingue los dos casos: con cero
+  consumidores se **declara** en la entrada de la versión —nombrando lo que no se
+  hizo y lo que sí se corrió en su lugar— y **la salida caduca sola** el día que el
+  registro tenga una fila.
+
+  Es la misma clase de excepción que el bootstrap ya declarado en el encabezado de
+  este archivo, y por el mismo motivo: una regla que no se puede cumplir se escribe,
+  no se saltea en silencio.
+
+  **Para un consumidor: nada.**
+
+
 - **La mudanza entre plataformas, que era la mitad que faltaba.**
   `plantilla/infra/adaptadores.md` describía cinco destinos y **ninguna línea** sobre
   cómo se va de uno a otro. Probar barato y después mudarse *es el plan* de este

@@ -3398,7 +3398,7 @@ async function main(argv) {
       console.error("Volve a correr con --asistente: retoma tus respuestas y no te hace contestar todo de nuevo.");
     }
     console.error("");
-    console.error(`Un esqueleto con todas las claves: node ${citarRuta(path.join(raizDelMarco, "herramientas", "projects-init.mjs"))} --ejemplo`);
+    console.error(`Un esqueleto con todas las claves: node ${path.join(raizDelMarco, "herramientas", "projects-init.mjs")} --ejemplo`);
     return 1;
   }
 
@@ -3974,7 +3974,7 @@ async function main(argv) {
   console.log("manifiestos se quedan donde estan y el lockfile los congela. Para comparar lo que");
   console.log("este proyecto DECLARA contra la ultima estable publicada de cada paquete —y decidir,");
   console.log("con dos preguntas, si actualizar todo el stack o solo una parte—:");
-  console.log(`     node <clon-del-marco>/herramientas/projects-versiones.mjs --raiz ${citarRuta(o.destino)}`);
+  console.log(`     node <clon-del-marco>/herramientas/projects-versiones.mjs --raiz ${o.destino}`);
   console.log("Sin terminal (en CI) solo imprime el informe y sale 0: nunca pregunta ni escribe.");
   return 0;
 }
