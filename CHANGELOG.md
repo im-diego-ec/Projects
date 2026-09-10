@@ -43,6 +43,28 @@ mueve sobre un cambio incompatible.
 
 ### Añadido
 
+- **El release verifica los dos repos plantilla, que son consumidores que nadie
+  actualiza.** `docs/04` manda al camino más no-coder que existe: *Use this
+  template* sobre `plantilla-sitio` o `plantilla-aplicacion`, y después el workflow
+  *Personalizar mi proyecto* — **que lee el pin del marco del `ci.yml` de la propia
+  plantilla**.
+
+  El día que el marco publique una versión y las plantillas queden en la anterior,
+  cada proyecto que nazca por ahí **nace con un marco viejo y sin un solo rojo**. Y
+  son el único consumidor que no recibe PR de Dependabot: no son repos que alguien
+  mantenga, son moldes que se copian.
+
+  Paso **5-bis** del release: comprobar el pin de las dos y que **sigan siendo
+  plantillas** — un repo que dejó de serlo rompe el botón que la guía manda apretar,
+  con un error que no menciona al marco. La lista se **deriva** de la herramienta que
+  las genera, así que una forma nueva no puede quedar sin verificar.
+
+  Medido al escribirlo: las dos pinan `v1.9.6` y las dos son plantillas.
+
+  **Para un consumidor: nada** — gana que el camino sin instalar deje de poder
+  entregar versiones viejas.
+
+
 - **El andamio apagaba el gate del PO sin declararlo — la única regla del marco que
   violaba en silencio.** `plantilla/.github/CODEOWNERS` escribe en su encabezado que
   *«el PO NO debe ser miembro del equipo de builders: si lo fuera, podría satisfacer

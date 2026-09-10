@@ -369,6 +369,48 @@ paso 3.
 
 ---
 
+## Paso 5-bis — Las plantillas, que quedan atras sin avisar
+
+**Por que existe este paso.** `docs/04-arrancar-acompanado.md` manda al camino sin
+instalar: la persona hace *Use this template* sobre `im-diego-ec/plantilla-sitio` o
+`im-diego-ec/plantilla-aplicacion` y despues corre el workflow *Personalizar mi
+proyecto*. Ese workflow lee el pin del marco **del `ci.yml` de la propia plantilla**.
+
+O sea: si las plantillas se quedan en la version anterior, **cada proyecto que nazca
+por el camino mas no-coder nace pineado a una version vieja**, sin que nada lo diga.
+No hay rojo: el proyecto arranca bien, con el marco de antes.
+
+Es el unico consumidor del marco que **no** recibe PR de Dependabot, porque no es un
+repo que alguien mantenga: es un molde que se copia.
+
+**Verificar, para las DOS:**
+
+```bash
+for r in plantilla-sitio plantilla-aplicacion; do
+  echo -n "$r: "
+  gh api "repos/im-diego-ec/$r/contents/.github/workflows/ci.yml" --jq .content \
+    | base64 -d | grep -oE "marco-ci\.yml@v[0-9]+\.[0-9]+\.[0-9]+" | head -1
+done
+```
+
+Las dos tienen que decir `@vX.Y.Z` — **la version que acabas de publicar**. Si dicen
+la anterior, regeneralas antes de dar el release por cerrado:
+
+```bash
+node herramientas/projects-plantilla-repos.mjs --forma sitio      --destino <tmp>
+node herramientas/projects-plantilla-repos.mjs --forma aplicacion --destino <tmp>
+```
+
+**Y comproba que sigan siendo plantillas**, porque un repo que dejo de serlo rompe el
+boton que la guia manda apretar y el error que ve la persona no menciona al marco:
+
+```bash
+gh api repos/im-diego-ec/plantilla-sitio      --jq .is_template   # true
+gh api repos/im-diego-ec/plantilla-aplicacion --jq .is_template   # true
+```
+
+---
+
 ## Paso 6 — Publicar las notas del release en GitHub
 
 **Este es el paso que se olvido en la practica.** No lo dejes para despues: es
