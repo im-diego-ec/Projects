@@ -27,9 +27,9 @@ on:
 # que los que le concede quien lo llama. Sin pull-requests:read el job de
 # deteccion del carril de docs no puede listar los archivos del PR, cae al
 # fail-open y el carril rapido no actua nunca (incidente del 2026-08-05).
-permissions:
-  contents: read
-  pull-requests: read
+#   permissions:
+#     contents: read
+#     pull-requests: read
 
 # Un PR que recibe varios pushes no necesita corridas viejas compitiendo.
 concurrency:
@@ -379,6 +379,13 @@ jobs:
           #     nadie va a abrir la carpeta a comprobarlo—, y el motivo escrito
           #     al lado de una excepcion es lo unico que impide que la excepcion
           #     sobreviva a lo que la justificaba.
+          #     DESTINO de esta excepcion: el marco tiene abierto el change
+          #     `promocion-por-ambientes`, con la topologia ya decidida --local,
+          #     despues DEV, despues produccion-- y su tarea 6.1 es justamente que
+          #     esta suite deje de estar excluida y corra contra la direccion de
+          #     DEV. Hasta que ese change aterrice, el paquete E2E viaja y no
+          #     corre en ningun lado, y eso queda dicho aca y no descubierto por
+          #     quien abra la carpeta.
           #   {{PAQUETE_E2E}}:build -> una suite de pruebas no produce
           #     artefacto que servir.
           # Es la unica lista del paso, y solo puede equivocarse hacia el
