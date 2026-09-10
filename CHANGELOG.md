@@ -43,6 +43,29 @@ mueve sobre un cambio incompatible.
 
 ### Añadido
 
+- **Una fecha que afloja una compuerta ahora necesita un change que se declare su
+  dueño.** `actions/cobertura-diff/medir-cobertura-diff.mjs` afloja la cobertura
+  hasta el **2026-09-30**: pasada esa fecha, un paquete bajo el mínimo sin deuda
+  declarada nace rojo, solo. El diseño es correcto; lo que faltaba era el dueño.
+  Los dos pendientes que quedaron vivos al archivar el change que la introdujo no
+  decían dónde vivía ese trabajo, y al 2026-09-10 faltaban **20 días** sin que
+  ningún change se hiciera cargo. Un plazo sin dueño no es una compuerta que se
+  dispara: es una sorpresa.
+
+  Ahora existe `openspec/changes/la-ventana-se-cierra`, que la posee, y una
+  compuerta que exige el marcador `DUENO DE LA FECHA: <fecha>` para toda fecha de
+  gracia viva en el código de producción. Se estrena con **una sola** fecha en el
+  árbol, que es cuando estrenarla sale gratis.
+
+  Los dos pendientes heredados quedaron resueltos de distinta forma: el de la
+  limpieza apunta a ese change; el que mandaba mergear una rama de un repo
+  consumidor se declaró **no bloqueante con su razón** — ese consumidor no existe
+  en Projects, así que darle destino sería apuntar a un repositorio que no está.
+
+  **Para un consumidor: nada** hoy; cuando exista el primero, hereda la regla ya
+  cerrada.
+
+
 - **Un desvío incompleto salía rojo por un camino y verde por el otro.**
   `.projects-desvios.json` lo leen dos piezas con predicados distintos: la action
   de la constitución exige `motivo` + `aprobado_por` + `fecha` y da error si falta
