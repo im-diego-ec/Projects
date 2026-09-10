@@ -43,6 +43,29 @@ mueve sobre un cambio incompatible.
 
 ### Añadido
 
+- **La mudanza entre plataformas, que era la mitad que faltaba.**
+  `plantilla/infra/adaptadores.md` describía cinco destinos y **ninguna línea** sobre
+  cómo se va de uno a otro. Probar barato y después mudarse *es el plan* de este
+  marco, no un accidente: sin la mudanza escrita, «después te mudás» era una promesa
+  que nadie verificó — justo lo que el repositorio prohíbe en todo lo demás.
+
+  La sección nueva la vuelve tratable con el contrato que ya existía: **no te mudás
+  «de Supabase a GCP», te mudás de cómputo, de datos, de secretos y de despliegue** —
+  cuatro decisiones con costos muy distintos, que se pueden mover por separado. Con el
+  orden que menos duele y **el motivo de cada paso**: secretos, cómputo contra la base
+  vieja, despliegue, y los datos al final, que es el único paso sin vuelta atrás.
+  Empezar por los datos es el error que parece natural.
+
+  Y dice lo que el marco **no** hace: no migra datos. No hay comando que copie tu base
+  de un proveedor a otro. Es el paso más caro y es tuyo.
+
+  **Queda declarado como pendiente:** ninguna mudanza está hecha ni cronometrada. Lo
+  escrito es el orden que se **deriva del contrato**, no un procedimiento verificado.
+  La primera mudanza real que alguien haga se escribe ahí con sus números.
+
+  **Para un consumidor: nada** — una sección más en un documento que ya recibe.
+
+
 - **El release verifica los dos repos plantilla, que son consumidores que nadie
   actualiza.** `docs/04` manda al camino más no-coder que existe: *Use this
   template* sobre `plantilla-sitio` o `plantilla-aplicacion`, y después el workflow

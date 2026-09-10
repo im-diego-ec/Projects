@@ -88,6 +88,63 @@ plataforma esperando que su aplicación corra ahí recibe archivos, no despliegu
 
 ---
 
+## La mudanza — cuando la idea funciona y hay que cambiar de adaptador
+
+**Esta sección existe porque es la mitad que faltaba.** Los adaptadores de abajo
+describen cinco destinos, y ninguno decía cómo se va de uno a otro. Probar barato y
+después mudarse **es el plan**, no un accidente: sin la mudanza escrita, «después te
+mudás» es una promesa que nadie verificó.
+
+### Una mudanza es mover cuatro cosas, no una
+
+El contrato de arriba es lo que la hace tratable: no te mudás «de Supabase a GCP», te
+mudás de **(a) cómputo**, de **(b) datos**, de **(c) secretos** y de **(d) despliegue**.
+Son cuatro decisiones con costos muy distintos, y se pueden mover **por separado**.
+
+| Capacidad | Qué cuesta moverla | Se puede a medias |
+| --- | --- | --- |
+| **(a) cómputo** | poco: es un contenedor o un proceso, y el código no cambia | sí — se puede correr en dos lados y mover tráfico de a poco |
+| **(b) datos** | **es la cara**: hay que copiar, verificar y cortar | **no** — o los datos están, o no |
+| **(c) secretos** | medio: cambia cómo llegan, no cuáles son | sí |
+| **(d) despliegue** | medio: es reescribir el workflow, con su verificación | sí |
+
+**El orden que menos duele, y el motivo de cada paso:**
+
+1. **(c) primero**, aunque parezca lo menos urgente. Si los secretos no llegan bien en el
+   destino, todo lo demás falla con errores que no hablan de secretos.
+2. **(a) después**, apuntando a la base **vieja**. Así se prueba el cómputo nuevo sin
+   tocar los datos, que es lo único que no tiene vuelta atrás.
+3. **(d) ahí**, con su verificación post-despliegue. Antes de mover los datos hay que
+   poder desplegar y comprobar.
+4. **(b) al final**, y es el único paso con corte. Todo lo demás ya está probado.
+
+Mover **(b) primero** es el error que parece natural —«empiezo por lo difícil»— y deja
+sin vuelta atrás lo único que no la tiene.
+
+### Lo que el marco te da, y lo que no
+
+**Te da:** que las cuatro capacidades estén escritas y con dueño, así que la mudanza es
+una lista y no una arqueología. Y que el pipeline verifique lo desplegado, así que sabés
+si el destino quedó sano.
+
+**No te da, y hay que decirlo:** el marco **no migra datos**. No hay comando que copie
+tu base de un proveedor a otro y te diga que salió bien. Es el paso más caro y es tuyo.
+
+### PENDIENTE-PLATAFORMA · la mudanza · no está medida en ningún par
+
+**QUÉ FALTA** — Ninguna de las mudanzas está hecha ni cronometrada. Lo de arriba es el
+**orden que se deriva del contrato**, no un procedimiento verificado: dice por qué ese
+orden es el que menos duele, y no cuánto tarda ni con qué se rompe.
+
+**CÓMO SE DECIDE** — La primera mudanza real que haga alguien se escribe acá, con sus
+números: qué tardó, qué se rompió, qué había que saber antes. Un par medido vale más que
+cinco descritos.
+
+**SI NO SE HACE** — «Después te mudás» sigue siendo una promesa sin fuente, que es
+exactamente lo que este repositorio prohíbe escribir en todo lo demás.
+
+---
+
 ## `ninguna` — sin infraestructura
 
 **Es una respuesta, no un hueco.** Un proyecto que todavía no despliega no tiene que
