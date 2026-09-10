@@ -27,9 +27,9 @@ on:
 # que los que le concede quien lo llama. Sin pull-requests:read el job de
 # deteccion del carril de docs no puede listar los archivos del PR, cae al
 # fail-open y el carril rapido no actua nunca (incidente del 2026-08-05).
-#   permissions:
-#     contents: read
-#     pull-requests: read
+permissions:
+  contents: read
+  pull-requests: read
 
 # Un PR que recibe varios pushes no necesita corridas viejas compitiendo.
 concurrency:

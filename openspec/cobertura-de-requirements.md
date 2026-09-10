@@ -237,7 +237,7 @@ despliega» sea verificable.
 
 | Requirement | Lo que lo hace fallar solo | Ruta y ancla (2026-08-31) |
 |---|---|---|
-| CI verifica todos los paquetes de forma bloqueante | El paso que DERIVA del gestor la lista de paquetes y exige que cada uno declare los scripts, con excepciones que solo pueden equivocarse hacia el rojo, y el paso que los corre parado dentro de cada paquete | `plantilla/.github/workflows/ci.yml:354` y `:497` |
+| CI verifica todos los paquetes de forma bloqueante | El paso que DERIVA del gestor la lista de paquetes y exige que cada uno declare los scripts, con excepciones que solo pueden equivocarse hacia el rojo, y el paso que los corre parado dentro de cada paquete | `plantilla/.github/workflows/ci.yml:354` y `:504` |
 | El deploy está gateado por el éxito de CI | **parcial**: cuatro casos del banco del despliegue, y uno de ellos es una mutación que corre la misma detección que la regla — la condición `workflow_run.conclusion == 'success'`, el `ref: head_sha` (se publica el SHA que CI midió, no la punta de la rama), y la corrida a mano, que consulta `ci-ok` sobre ese commit y deja rastro si alguien se aparta. Lo que no está cubierto es la secuencia dev→producción, que necesita el segundo ambiente | `pruebas/andamio/desplegar.test.mjs:35`, `:192` (la mutación), `:208` y `:223` |
 | Cada deploy es reproducible y reversible | **ninguno** | — |
 | Los artefactos regenerados no divergen de la versión pinada | Paso «Artefactos regenerados al dia», con banco propio que verifica además que fuera de un árbol git sea ROJO y no «nada que verificar» | `.github/workflows/marco-ci.yml`, paso «Artefactos regenerados al dia»; `pruebas/marco-ci/artefactos.test.mjs` |
