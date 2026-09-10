@@ -43,6 +43,24 @@ mueve sobre un cambio incompatible.
 
 ### Añadido
 
+- **El piso de permisos que el marco documenta ahora se mide contra el que el
+  reusable exige.** Un workflow reusable nunca recibe más permisos que los que le
+  concede quien lo llama, y el marco lo documenta en tres archivos — uno de ellos,
+  `plantilla/.github/workflows/ci.yml`, **viaja a cada proyecto nuevo**. Los tres
+  están bien hoy, pero nada los ataba: el día que un job del reusable gane un
+  permiso, los tres quedarían declarando un piso corto sin que nada lo note.
+
+  No es hipotético — el marco del que Projects se bifurcó agregó `issues: read` y
+  `actions: read` en su línea mayor 2, y su nota de migración advierte que el PR
+  automático no puede arreglarlo: hay que editar el `ci.yml` a mano.
+
+  **Queda declarado, con destino:** la *consecuencia* que esos bloques describen
+  («cae al fail-open») no está verificada, y no se reescribió sin medirla —
+  cambiarla por otra descripción sin evidencia sería el mismo defecto, más nuevo.
+
+  **Para un consumidor: nada.** La compuerta corre en el CI del marco.
+
+
 - **Una fecha que afloja una compuerta ahora necesita un change que se declare su
   dueño.** `actions/cobertura-diff/medir-cobertura-diff.mjs` afloja la cobertura
   hasta el **2026-09-30**: pasada esa fecha, un paquete bajo el mínimo sin deuda
