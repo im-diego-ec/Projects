@@ -24,7 +24,7 @@ que llega a todos los consumidores sin que nadie lo revise— va a llevar una
 topología escrita adentro.
 
 `reglas-al-dia` ya bajó el texto al canónico: la infraestructura base fijada
-como primera opción (`actions/constitucion/canonico/60-infra-aws-secretos.md:5-11`)
+como primera opción (`actions/constitucion/canonico/60-infra-plataforma-secretos.md:5-11`)
 y la frontera ⚠️ de apartarse preguntando antes
 (`actions/constitucion/canonico/40-fronteras.md:93-97`). Ese texto llega a los
 agentes y su contenido se compara byte a byte contra lo publicado — pero **nada

@@ -78,7 +78,7 @@ no escrita, que es exactamente el estado que hoy declara en
       manifiesto, y el `presupuesto_lineas` del canónico todavía en verde.
 - [ ] 1.2 Imprimir la base en la sección del canónico que la publica, con su id
       de regla estable (el patrón `<!-- projects:regla id=... -->` que ya usa
-      `canonico/60-infra-aws-secretos.md:3`), **renderizada desde el
+      `canonico/60-infra-plataforma-secretos.md:3`), **renderizada desde el
       manifiesto** y no tipeada al lado. Evidencia: artefacto renderizado con la
       tabla, y el check de constitución en verde.
 - [ ] 1.3 Reemplazar la tabla de `plantilla/AGENTS.md:57-73`: se van los seis 🕳️
@@ -142,7 +142,7 @@ no escrita, que es exactamente el estado que hoy declara en
       decisiones. Evidencia: el archivo y su entrada en `docs/adr/README.md`.
 - [ ] 3.5 Coherencia con el canónico: la frontera ⚠️ de apartarse
       (`canonico/40-fronteras.md:93-97`) y el texto de infraestructura
-      (`canonico/60-infra-aws-secretos.md:5-11`) tienen que apuntar a la base
+      (`canonico/60-infra-plataforma-secretos.md:5-11`) tienen que apuntar a la base
       renderizada en vez de repetirla en prosa. Dos textos que dicen la misma
       base son dos textos que pueden divergir. Evidencia: `grep` de la topología
       escrita a mano en el canónico → una sola aparición, la renderizada.

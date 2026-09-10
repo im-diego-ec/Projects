@@ -163,6 +163,29 @@ mueve sobre un cambio incompatible.
 
 ### Corregido
 
+- **Cinco citas al canónico apuntaban a un archivo que el fork renombró.** Al
+  bifurcarse de Rigel, Projects generalizó su constitución y
+  `60-infra-aws-secretos.md` pasó a ser `60-infra-plataforma-secretos.md`. Cinco
+  citas en dos changes activos quedaron apuntando al nombre viejo: quien los abra
+  para ejecutarlos no encuentra su evidencia, y lo peor que puede concluir —que la
+  regla no existe— es justo lo contrario de lo que pasa.
+
+  **Corregir la ruta no alcanzaba, y esa es la parte que un renombre automático
+  habría tapado:** el contenido citado también cambió de sentido. `stack-estandar`
+  cita «una base tecnológica **única**» y el canónico dice «cuatro capacidades, **no
+  un producto**»; `infra-exigible` cita «IaC = Terraform, **sin excepción**» y hoy
+  es «Terraform es la **forma por defecto**». Los dos se apoyan en una versión
+  endurecida de una regla que Projects **ablandó a propósito**.
+
+  Cada uno lleva ahora un **aviso del fork** que dice qué cambió. No se les
+  reescribió el argumento: el argumento es de quien lo firmó.
+
+  **Queda una decisión para el PO**, escrita y visible: ¿base única, o cuatro
+  capacidades? `stack-estandar` y el canónico vigente son incompatibles.
+
+  **Para un consumidor: nada.**
+
+
 - **El guard de las promesas de dinero no miraba los workflows, que son justo los
   que viajan.** `promesas-sin-fuente.test.mjs` prohíbe escribir «sin tarjeta»
   mientras nadie lo haya comprobado —su lista de verificadas está vacía **a

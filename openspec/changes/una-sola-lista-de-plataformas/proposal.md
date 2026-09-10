@@ -1,7 +1,14 @@
 ---
 artefacto: proposal
 dri: Builder 1
-aprueba: PO  # qué plataformas ofrece el marco es decisión de producto
+aprueba: Builder 2 (builder par)  # NO el PO: en este repo su gate está acotado a
+                              # `gobierno-contribucion` (.github/CODEOWNERS, últimas
+                              # dos líneas), y este delta es de `base-tecnologica`.
+                              # Que el marco ofrezca cinco plataformas o tres se
+                              # parece a una decisión de producto, pero el reparto
+                              # del repo lo pone del lado de la maquinaria: si eso
+                              # tuviera que cambiar, cambia el CODEOWNERS, no este
+                              # campo. El PO queda informado igual
 informado: PO / Builder 2
 estado: pendiente-de-revision
 ---
