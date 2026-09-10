@@ -26,10 +26,22 @@ La alternativa era dejar el archive intacto y llevar el registro aparte. Se
 descarta por lo de siempre: una segunda superficie que alguien tiene que
 acordarse de cruzar.
 
-## La compuerta, y por qué se pone ahora que hay una sola fecha
+## La compuerta, y qué encuentra de verdad
 
 Escanea el código de producción buscando fechas de gracia y exige que cada una
-esté nombrada por un change activo. Hoy encuentra **una**, así que nace verde.
+tenga un change activo que se declare su dueño.
+
+**Encuentra DOS, y la segunda importa más.** Además de la constante
+`VENTANA_DE_GRACIA_HASTA` de `cobertura-diff`, el input `ventana_terraform` de
+`marco-ci.yml` declara `default: "2026-09-30"` — la **misma fecha**, pero en un
+input del **workflow reusable**, así que su alcance es todo consumidor y no sólo
+este repo. Comparten fecha, así que un solo marcador de dueño cubre las dos.
+
+**La primera versión de la compuerta no veía la segunda**, y afirmaba lo contrario:
+`RAICES` incluye `.github/workflows` y el filtro toma `.yml`, pero el patrón exigía
+`NOMBRE = "fecha"` de JavaScript. En un workflow la clave y su `default:` viven en
+**líneas distintas**, así que ninguna regex de una línea las une. Lo encontró una
+revisión adversarial, no el banco.
 
 Poner una compuerta cuando el problema ya es grande obliga a arreglar N casos
 antes de poder estrenarla; ponerla con N=1 la estrena gratis. Y el caso negativo

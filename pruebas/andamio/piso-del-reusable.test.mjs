@@ -53,15 +53,59 @@ function alcancesQueExigeElReusable() {
   return alcances;
 }
 
-/** Los alcances que un archivo declara como piso, leidos de su bloque
- *  `permissions:` de encabezado (indentacion de dos). */
-function alcancesDeclarados(rel) {
+/** Los alcances que un archivo concede DE VERDAD: lineas vivas, no comentadas.
+ *
+ *  LA PRIMERA VERSION ACEPTABA COMENTARIOS. Su patron llevaba `#?` al principio,
+ *  asi que un `#  pull-requests: read` contaba como concedido. Medido: comentando
+ *  el permiso REAL de `plantilla/.github/workflows/ci.yml` --el archivo que VIAJA a
+ *  cada proyecto nuevo-- la compuerta seguia en VERDE. O sea que no habria cazado
+ *  un andamio repartiendo un piso corto, que es exactamente lo unico que existe
+ *  para cazar. */
+function alcancesReales(rel) {
+  const lineas = fs.readFileSync(path.join(RAIZ, rel), "utf8").split("\n");
+  // SOLO EL BLOQUE DE ENCABEZADO: `permissions:` en la columna 0, y sus hijos.
+  // Barrer el archivo entero era el segundo defecto de esta compuerta: recogia
+  // tambien los `permissions:` de cada JOB --indentados-- asi que comentar el del
+  // encabezado no cambiaba nada, porque un bloque de job satisfacia la cuenta. Y el
+  // que le importa al reusable es justo el del encabezado: es el techo que el
+  // llamador le concede.
+  const i = lineas.findIndex((l) => /^permissions:\s*$/.test(l));
+  const alcances = new Set();
+  if (i === -1) return alcances;
+  for (const l of lineas.slice(i + 1)) {
+    if (!/^\s/.test(l) || !l.trim()) break; // se acabo el bloque
+    const m = /^ {2}([a-z-]+):\s*(read|write)\s*$/.exec(l);
+    if (m) alcances.add(`${m[1]}: ${m[2]}`);
+  }
+  return alcances;
+}
+
+/** Los alcances del EJEMPLO COMENTADO que `marco-ci.yml` lleva escrito para que un
+ *  consumidor lo copie. Ahi el bloque es comentario A PROPOSITO --es una muestra,
+ *  no la configuracion de este archivo-- asi que se lee distinto, y el banco tiene
+ *  que decir cual de las dos formas espera en cada archivo en vez de aceptar las dos
+ *  en todos. */
+function alcancesDelEjemplo(rel) {
   const texto = fs.readFileSync(path.join(RAIZ, rel), "utf8");
   const alcances = new Set();
-  for (const m of texto.matchAll(/^#?\s{0,3}  ([a-z-]+):\s*(read|write)\s*$/gm)) {
+  for (const m of texto.matchAll(/^#\s{0,6}([a-z-]+):\s*(read|write)\s*$/gm)) {
     alcances.add(`${m[1]}: ${m[2]}`);
   }
   return alcances;
+}
+
+/** Que forma se espera en cada archivo. Explicito: aceptar las dos en todos es
+ *  como la primera version dejaba pasar un piso corto. */
+const COMO_LO_DECLARA = {
+  ".github/workflows/marco-ci.yml": alcancesDelEjemplo,
+  "plantilla/.github/workflows/ci.yml": alcancesReales,
+  ".github/workflows/ci.yml": alcancesReales,
+};
+
+function alcancesDeclarados(rel) {
+  const lector = COMO_LO_DECLARA[rel];
+  assert.ok(lector, `${rel} no dice si declara su piso en un bloque vivo o en un ejemplo comentado`);
+  return lector(rel);
 }
 
 test("el reusable exige algo: si no, todo lo de abajo pasa vacuamente", () => {
@@ -92,4 +136,39 @@ test("MUERDE: si el reusable gana un permiso, los bloques quedan cortos", () => 
   const declara = alcancesDeclarados("plantilla/.github/workflows/ci.yml");
   const faltan = [...exige].filter((a) => !declara.has(a));
   assert.deepEqual(faltan, ["issues: read"], "el predicado no detecta un permiso nuevo del reusable");
+});
+
+test("MUERDE: un permiso COMENTADO no cuenta como concedido", () => {
+  // ESTE CASO EXISTE POR DOS DEFECTOS REALES DE ESTA MISMA COMPUERTA, los dos
+  // encontrados por una revision adversarial y no por el banco.
+  //
+  // (1) El patron llevaba `#?`, asi que un `#  pull-requests: read` contaba como
+  //     concedido. (2) Barria el archivo ENTERO, asi que los `permissions:` de los
+  //     JOBS satisfacian la cuenta aunque el del encabezado estuviera vacio.
+  //
+  // Medido con las dos juntas: comentando el permiso real de
+  // plantilla/.github/workflows/ci.yml --el archivo que VIAJA a cada proyecto-- la
+  // compuerta seguia en VERDE. No habria cazado un andamio repartiendo un piso
+  // corto, que es lo unico que existe para cazar.
+  const conComentario = ["permissions:", "  contents: read", "#  pull-requests: read", "", "jobs:"].join("\n");
+  const leidos = new Set();
+  const lineas = conComentario.split("\n");
+  const i = lineas.findIndex((l) => /^permissions:\s*$/.test(l));
+  for (const l of lineas.slice(i + 1)) {
+    if (!/^\s/.test(l) || !l.trim()) break;
+    const m = /^ {2}([a-z-]+):\s*(read|write)\s*$/.exec(l);
+    if (m) leidos.add(`${m[1]}: ${m[2]}`);
+  }
+  assert.deepEqual([...leidos], ["contents: read"], "un permiso comentado se leyo como concedido");
+
+  const conJob = ["permissions:", "  contents: read", "", "jobs:", "  x:", "    permissions:", "      pull-requests: read"].join("\n");
+  const leidos2 = new Set();
+  const l2 = conJob.split("\n");
+  const j = l2.findIndex((l) => /^permissions:\s*$/.test(l));
+  for (const l of l2.slice(j + 1)) {
+    if (!/^\s/.test(l) || !l.trim()) break;
+    const m = /^ {2}([a-z-]+):\s*(read|write)\s*$/.exec(l);
+    if (m) leidos2.add(`${m[1]}: ${m[2]}`);
+  }
+  assert.deepEqual([...leidos2], ["contents: read"], "un permissions: de JOB se leyo como piso del encabezado");
 });

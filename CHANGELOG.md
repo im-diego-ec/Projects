@@ -157,8 +157,15 @@ mueve sobre un cambio incompatible.
 
   Ahora existe `openspec/changes/la-ventana-se-cierra`, que la posee, y una
   compuerta que exige el marcador `DUENO DE LA FECHA: <fecha>` para toda fecha de
-  gracia viva en el código de producción. Se estrena con **una sola** fecha en el
-  árbol, que es cuando estrenarla sale gratis.
+  gracia viva en el código de producción.
+
+  **Son dos, no una**, y la segunda tiene mucho más alcance: además de la constante
+  de `cobertura-diff`, el input `ventana_terraform` de `marco-ci.yml` tiene
+  `default: "2026-09-30"` — la **misma fecha**, en un input del workflow reusable,
+  o sea que llega a **todo consumidor**. La primera versión de esta compuerta
+  afirmaba cubrir los `.yml` y no cazaba ninguno: exigía la forma
+  `NOMBRE = "fecha"` de JavaScript, y en un workflow la clave y su `default:` viven
+  en líneas distintas. Ahora ve las dos formas.
 
   Los dos pendientes heredados quedaron resueltos de distinta forma: el de la
   limpieza apunta a ese change; el que mandaba mergear una rama de un repo
@@ -227,6 +234,26 @@ mueve sobre un cambio incompatible.
   adelante se avanza con Enter sin reescribir nada.
 
 ### Corregido
+
+- **Dos compuertas nuevas de esta misma tanda no verificaban lo que decían.** Las
+  encontró una revisión adversarial de los propios commits, no el banco — que estaba
+  en verde con las dos rotas.
+
+  - **La del piso de permisos aceptaba comentarios y barría el archivo entero.** Su
+    patrón llevaba `#?`, así que un `#  pull-requests: read` contaba como concedido;
+    y como leía todo el archivo, los `permissions:` de cada **job** satisfacían la
+    cuenta aunque el del encabezado estuviera vacío. **Medido:** comentando el
+    permiso real de `plantilla/.github/workflows/ci.yml` —el archivo que **viaja** a
+    cada proyecto— la compuerta seguía en verde. No habría cazado un andamio
+    repartiendo un piso corto, que es lo único que existe para cazar.
+  - **La de las fechas de gracia afirmaba cubrir los `.yml` y no cazaba ninguno.**
+    Exigía la forma `NOMBRE = "fecha"` de JavaScript, y en un workflow la clave y su
+    `default:` viven en líneas distintas. Por eso no veía `ventana_terraform`, que
+    es **la de mayor alcance**: es un input del reusable, así que llega a todo
+    consumidor.
+
+  **Para un consumidor: nada** — las dos son bancos del marco.
+
 
 - **El camino más no-coder perdía la declaración más importante.** El asistente por
   terminal pregunta si el repo es público o privado, y con privado emite un desvío:

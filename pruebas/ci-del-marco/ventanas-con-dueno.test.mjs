@@ -27,7 +27,34 @@ const RAIZ = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", ".
 // Solo codigo de PRODUCCION: los fixtures de los bancos usan fechas sinteticas a
 // proposito y no son plazos de nadie.
 const RAICES = ["actions", "herramientas", ".github/workflows"];
-const PATRON = /\b[A-Z][A-Z_]*(?:VENTANA|GRACIA|HASTA|EXIGIBLE)[A-Z_]*\s*=\s*"(20\d{2}-\d{2}-\d{2})"/g;
+// UNA CONSTANTE DE JAVASCRIPT: `NOMBRE_CON_VENTANA = "2026-09-30"`.
+const PATRON_JS = /\b[A-Z][A-Z_]*(?:VENTANA|GRACIA|HASTA|EXIGIBLE)[A-Z_]*\s*=\s*"(20\d{2}-\d{2}-\d{2})"/g;
+
+// UN INPUT DE WORKFLOW, que es la forma que esta compuerta NO VEIA y que mas
+// importa: `ventana_terraform:` con su `default: "2026-09-30"` unas lineas abajo.
+// La clave y la fecha viven en LINEAS DISTINTAS, asi que ninguna regex de una sola
+// linea las une --por eso la primera version afirmaba cubrir los .yml y no cazaba
+// ninguno--. Y es la forma con MAS alcance: un input del reusable llega a TODO
+// consumidor, no solo a este repo.
+const CLAVE_YAML = /^\s*([a-z_]*(?:ventana|gracia|exigible)[a-z_]*)\s*:\s*$/;
+const DEFAULT_YAML = /^\s*default:\s*"(20\d{2}-\d{2}-\d{2})"/;
+
+/** Las fechas declaradas como default de un input cuyo nombre habla de ventana. */
+export function ventanasDeYaml(texto) {
+  const lineas = texto.split("\n");
+  const out = [];
+  for (let i = 0; i < lineas.length; i++) {
+    const k = CLAVE_YAML.exec(lineas[i]);
+    if (!k) continue;
+    // El default puede estar varias lineas abajo, despues de description y type.
+    for (let j = i + 1; j < Math.min(i + 25, lineas.length); j++) {
+      if (CLAVE_YAML.test(lineas[j])) break; // empezo otro input
+      const d = DEFAULT_YAML.exec(lineas[j]);
+      if (d) { out.push(d[1]); break; }
+    }
+  }
+  return out;
+}
 
 function archivosDeProduccion() {
   const out = [];
@@ -48,12 +75,17 @@ function archivosDeProduccion() {
 }
 
 /** Las fechas de gracia vivas, con el archivo donde estan. */
-function ventanasVivas() {
+export function ventanasVivas() {
   const encontradas = [];
   for (const f of archivosDeProduccion()) {
     const texto = fs.readFileSync(f, "utf8");
-    for (const m of texto.matchAll(PATRON)) {
+    for (const m of texto.matchAll(PATRON_JS)) {
       encontradas.push({ fecha: m[1], archivo: path.relative(RAIZ, f) });
+    }
+    if (f.endsWith(".yml") || f.endsWith(".yaml")) {
+      for (const fecha of ventanasDeYaml(texto)) {
+        encontradas.push({ fecha, archivo: path.relative(RAIZ, f) });
+      }
     }
   }
   return encontradas;
@@ -121,4 +153,37 @@ test("MUERDE: MENCIONAR la fecha no alcanza; hay que declararse su dueno", () =>
   assert.equal(esDuenoDeclarado(declara, "2026-09-30"), true, "el marcador explicito tiene que contar");
 
   assert.equal(esDuenoDeclarado(textoDeChangesActivos(), "2099-12-31"), false, "una fecha sin dueno no puede pasar");
+});
+
+test("MEDIDO: la compuerta VE el input de workflow, que era el que se le escapaba", () => {
+  // Anti-vacuidad de la ampliacion. La primera version afirmaba cubrir los .yml
+  // --RAICES incluye .github/workflows y el filtro toma .yml-- y no cazaba ninguno,
+  // porque exigia la forma `NOMBRE = "fecha"` de JavaScript. La forma que importa es
+  // otra: un input con su `default:` unas lineas abajo. Y es la de MAYOR alcance,
+  // porque un input del reusable llega a TODO consumidor.
+  const enYaml = ventanasVivas().filter((v) => v.archivo.endsWith(".yml") || v.archivo.endsWith(".yaml"));
+  assert.ok(
+    enYaml.length > 0,
+    "la compuerta no ve ninguna ventana en YAML. Si de verdad no queda ninguna, este caso sobra; si el patron dejo de matchear, la compuerta volvio a afirmar que cubre algo que no mira",
+  );
+});
+
+test("MUERDE: un input de ventana sin default fechado no se inventa una fecha", () => {
+  // El predicado no puede alucinar: un input que se llama "ventana" pero cuyo
+  // default no es una fecha no produce hallazgo.
+  const sinFecha = [
+    "      ventana_cualquiera:",
+    "        description: algo",
+    "        type: string",
+    '        default: ""',
+  ].join("\n");
+  assert.deepEqual(ventanasDeYaml(sinFecha), [], "invento una fecha donde no hay ninguna");
+
+  const conFecha = [
+    "      ventana_terraform:",
+    "        description: algo",
+    "        type: string",
+    '        default: "2026-09-30"',
+  ].join("\n");
+  assert.deepEqual(ventanasDeYaml(conFecha), ["2026-09-30"], "no ve el default fechado de un input de ventana");
 });
