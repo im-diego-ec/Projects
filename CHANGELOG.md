@@ -43,6 +43,35 @@ mueve sobre un cambio incompatible.
 
 ### Añadido
 
+- **La tarea bloqueante de `promocion-por-ambientes` está contestada, y era la
+  pregunta equivocada.** Preguntaba si un *container* de Cloudflare puede abrir TCP
+  saliente al **5432**. Las dos mitades estaban mal: el 5432 no era el discriminante
+  —la conexión directa de Supabase es **IPv6** y sus poolers son **IPv4**— y el
+  container era la pieza equivocada.
+
+  Cloudflare documenta, con Supabase nombrado y guía propia, **Worker + Hyperdrive +
+  `node-postgres`**: **0 USD/mes** —Hyperdrive está incluido en el plan gratuito, con
+  100.000 consultas/día— y **sin reescribir la aplicación**, porque implementaron
+  `node:http` en Workers con `httpServerHandler` para migrar apps de Node.
+
+  **Y el container tampoco era la opción barata.** Los «~5 USD» eran el *mínimo de
+  cuenta*, no el precio: prendido todo el mes son ~12, un **72% más que Render** —que
+  además son ~7 y no 13, porque el planteo le sumaba una base que acá no hace falta.
+  Es además mal encaje: *«Cloudflare does not guarantee that any container instance
+  will run for any set period of time»*, disco efímero, duerme a los 10 minutos.
+
+  **Lo que queda por medir cuesta cero** y es un formulario del navegador. Si falla,
+  no se cambia de proveedor: se cambia de cadena de conexión.
+
+  Dos hallazgos que no se buscaban: el andamio necesita **dos** cadenas —el pooler
+  para el cliente, la directa para las migraciones— y **Supabase Free permite 2
+  proyectos y los pausa a la semana**, así que dev+prod consume el cupo entero y **el
+  que se pausa es DEV**.
+
+  Todo en [`donde-corre-la-api.md`](openspec/changes/promocion-por-ambientes/donde-corre-la-api.md),
+  con fuentes y fecha de consulta. **Para un consumidor: nada** todavía.
+
+
 - **La circularidad de arranque de la evidencia, declarada en vez de saltada.**
   `AGENTS.md` tiene una frontera 🛑 —«publicar un cambio del marco que no se probó
   contra un consumidor real»— y aclara que el ensayo es **además** del dogfooding.

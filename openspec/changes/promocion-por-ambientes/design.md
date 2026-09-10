@@ -92,24 +92,46 @@ FALLA**, no se cancela. Una compuerta que nadie atiende deja el despliegue en ro
 **El sitio llega a producción por la promoción completa.** Todo lo que necesita
 está resuelto y medido: Cloudflare, versiones, preview URL, credencial existente.
 
-**La mitad API de una aplicación NO se construye en este change, y la razón es una
-medición que falta**, no una decisión pendiente: ¿puede un container de Cloudflare
-abrir una conexión TCP saliente al 5432 de Postgres? La documentación de Cloudflare
-no lo afirma en ninguna parte, y la respuesta cambia todo:
+**La mitad API se construye sobre Worker + Hyperdrive, y eso lo decidió una
+medición, no una preferencia.** El detalle está en
+[`donde-corre-la-api.md`](donde-corre-la-api.md); acá va lo que cambia el diseño.
 
-- **si pasa** → la aplicación corre por ~5 USD al mes **sin agregar un proveedor**;
-- **si no pasa** → Render a 13 USD es lo más barato que cumple sin terminal, y su
-  `pre-deploy command` es el único lugar donde `prisma migrate deploy` corre
-  **dentro** del despliegue.
+La pregunta original —«¿puede un container abrir TCP saliente al 5432?»— **estaba
+mal formulada en sus dos mitades**:
 
-Escribir el adaptador antes de esa medición sería elegir proveedor a ciegas y
-comprometer a cada proyecto nuevo con esa elección. **Es una tarde de trabajo y
-está escrita como tarea bloqueante.**
+- **El 5432 no era el discriminante.** La conexión directa de Supabase es **IPv6**;
+  sus poolers compartidos son **IPv4**, con session mode en 5432 y transaction mode
+  en 6543. La pregunta no distinguía las dos cosas, que es la distinción que decide.
+- **El container era la pieza equivocada.** Cloudflare documenta —con Supabase
+  nombrado y guía propia— **Worker + Hyperdrive + `node-postgres`**, que sale **0
+  USD/mes** (Hyperdrive está incluido en el plan gratuito, 100.000 consultas/día) y
+  **no exige reescribir la aplicación**: implementaron `node:http` cliente y servidor
+  en Workers, con `httpServerHandler` para migrar apps de Node existentes.
 
-**El escalón gratuito de Render no es una salida**, y conviene decirlo con números:
-el servicio se duerme a los 15 minutos sin tráfico y tarda **un minuto** en
-despertar —lo paga el primer visitante y también la verificación post-despliegue— y
-su base **expira a los 30 días**.
+**Y el container tampoco era la opción barata.** Los «~5 USD» son el **mínimo de
+cuenta** de Workers Paid, no el precio: encima se factura memoria y disco por segundo
+mientras está despierto. Prendido todo el mes son ~12 USD — un **72% más que Render**,
+que además son ~7 USD y no 13, porque el planteo le sumaba una base de Render que acá
+no hace falta.
+
+**Y es mal encaje, además de caro.** La documentación oficial dice que *«Cloudflare
+does not guarantee that any container instance will run for any set period of time»*,
+que *«all disk is ephemeral»*, que duerme a los 10 minutos por default y que arranca
+en frío en 1–3 segundos. Para un no-coder mostrando su idea, eso no es un detalle de
+infraestructura: es la primera impresión.
+
+> Containers **salió de beta** el 2026-04-13 —eso cambió desde el análisis previo—
+> pero GA no trae garantía de permanencia: la FAQ con esas frases está actualizada al
+> 2026-08-28, cuatro meses **después** del GA.
+
+**Lo que queda por medir es una sola cosa y cuesta cero:** si Hyperdrive alcanza la
+cadena *Direct* de un Supabase gratuito, que es IPv6. Si falla **no se cambia de
+proveedor: se cambia de cadena**, porque el pooler compartido es IPv4 en todo plan.
+
+**El riesgo real de la ruta ganadora no es el TCP:** son los **10 ms de CPU** por
+invocación del plan gratuito. Con una salvedad que lo vuelve manejable: la espera de
+Postgres **no cuenta** como CPU. Si aun así se pasa, la ruta sigue siendo la más
+barata — Workers Paid, 5 USD, 5 minutos de CPU.
 
 ## Lo que NO se relaja
 

@@ -40,16 +40,48 @@ estado: pendiente-de-revision
 
 ## 4. La aplicación llega a internet
 
-- [ ] 4.1 **BLOQUEANTE — la medición de una tarde.** ¿Puede un container de
-      Cloudflare abrir una conexión TCP saliente al puerto 5432 de Postgres? La
-      documentación de Cloudflare no lo afirma. **Sin esta medición no se escribe
-      el adaptador**, porque elegir proveedor a ciegas compromete a cada proyecto
-      nuevo con esa elección.
-- [ ] 4.2 Según 4.1: adaptador de la mitad API sobre Cloudflare Containers
-      (~5 USD, cero proveedores nuevos) **o** sobre Render (13 USD, con
-      `pre-deploy command` para `prisma migrate deploy`).
+> **La 4.1 original está contestada y era la pregunta equivocada.** Ver
+> [`donde-corre-la-api.md`](donde-corre-la-api.md), medido el 2026-09-10. En
+> resumen: el puerto 5432 no era el discriminante —Supabase directo es IPv6 y sus
+> poolers son IPv4— y el container era la pieza equivocada. Cloudflare documenta
+> **Worker + Hyperdrive + `node-postgres`**, con Supabase nombrado, **a 0 USD/mes** y
+> sin reescribir la aplicación (`node:http` + `httpServerHandler`).
+>
+> Y el container, además de no ser el camino, **no es la opción barata**: los «~5
+> USD» eran el mínimo de cuenta, no el precio. Prendido todo el mes son ~12 USD,
+> ~72% más que Render.
+
+- [x] 4.1 ~~¿Puede un container abrir TCP saliente al 5432?~~ **Contestada y
+      reformulada.** La ruta es Worker + Hyperdrive. El container queda descartado
+      por costo y por encaje: Cloudflare *no garantiza que una instancia siga
+      corriendo*, el disco es efímero, duerme a los 10 minutos y arranca en frío en
+      1–3 s.
+- [ ] 4.1a **MEDICIÓN, y ahora cuesta cero.** ¿Hyperdrive conecta contra un Supabase
+      del plan gratuito? Su cadena *Direct* es IPv6. Si falla, **no se cambia de
+      proveedor: se cambia de cadena** —el pooler compartido es IPv4 en todo plan—.
+      Es un formulario del navegador.
+- [ ] 4.1b ¿El andamio pasa de **10 ms de CPU** por invocación (plan gratuito)? La
+      espera de Postgres **no** cuenta; cuenta el trabajo de la app. Si se pasa, la
+      ruta sigue siendo la más barata: Workers Paid, 5 USD.
+- [ ] 4.1c ¿`httpServerHandler` levanta **esta** app de Express sin tocarla? Decide
+      si «no hay que reescribir» es cierto para este andamio y no sólo en general.
+- [ ] 4.2 Adaptador de la mitad API sobre **Worker + Hyperdrive**, con las dos
+      cadenas de conexión que el andamio necesita: el **pooler** para el cliente y la
+      **directa** para las migraciones —el pooler en modo transacción no soporta
+      *prepared statements*—. En plan gratuito la directa es IPv6, así que las
+      migraciones salen por **session mode (5432)** del pooler compartido.
 - [ ] 4.3 `desplegar.yml` viaja también con `forma=aplicacion`.
 - [ ] 4.4 Las migraciones corren **dentro** del despliegue, no como paso aparte.
+
+## 4-bis. Lo que la medición destapó y no se buscaba
+
+- [ ] 4bis.1 **Supabase Free permite 2 proyectos activos y los pausa a la semana de
+      inactividad.** Dev + Prod consume el cupo entero, y **el que se va a pausar es
+      DEV**, que es el de menos tráfico. El siguiente escalón son 25 USD/mes. Hay que
+      decirlo en `docs/03-stack.md` antes de que alguien lo descubra con su idea
+      adentro.
+- [ ] 4bis.2 La promesa de costo del marco se reescribe con los números medidos:
+      nunca «~5 USD» a secas.
 
 ## 5. Supabase deja de ser sólo auth
 
