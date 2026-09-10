@@ -457,7 +457,7 @@ export function lineasDelPasoQueSigue(rutaDeValores, proyecto, raizMarco = path.
   const yo = fileURLToPath(import.meta.url);
   const l = ["", "No se armo ningun proyecto todavia. El paso que sigue:"];
   if (!enElClon) {
-    l.push(`  node ${yo} --valores ${path.basename(rutaDeValores)} --destino .`);
+    l.push(`  node ${citarRuta(yo)} --valores ${citarRuta(path.basename(rutaDeValores))} --destino .`);
     return l;
   }
   // La carpeta va AL LADO del clon y no adentro: el marco es una herramienta y el
@@ -467,8 +467,8 @@ export function lineasDelPasoQueSigue(rutaDeValores, proyecto, raizMarco = path.
   l.push(`  Estas respuestas quedaron en ${rutaDeValores}, que esta DENTRO del clon del marco.`);
   l.push("  El proyecto NO se arma ahi: el marco es la herramienta, no el proyecto. Va al lado:");
   l.push("");
-  l.push(`  mkdir -p ${destino}`);
-  l.push(`  node ${yo} --valores ${rutaDeValores} --destino ${destino}`);
+  l.push(`  mkdir -p ${citarRuta(destino)}`);
+  l.push(`  node ${citarRuta(yo)} --valores ${citarRuta(rutaDeValores)} --destino ${citarRuta(destino)}`);
   l.push("");
   l.push("  (Si abriste el archivo `arrancar` con doble clic, esto lo hace el mismo solo.)");
   return l;
@@ -1734,6 +1734,40 @@ export function avisosDelRegistroDeValores(destino) {
  *  cadena) y esa repeticion se deja a proposito: correrlo aparte es lo que hace
  *  que un fallo del generador se lea como "el paso datos fallo" en vez de como
  *  un rojo adentro de una cadena de seis. */
+/** UNA RUTA QUE VIAJA DENTRO DE UN COMANDO IMPRESO, LISTA PARA PEGAR.
+ *
+ *  QUE DEFECTO CIERRA. Esta herramienta existe para que quien no programa no
+ *  transcriba nada: cuando no puede terminar sola, imprime el comando exacto.
+ *  Ese comando se armaba interpolando rutas SIN comillas, asi que en cuanto la
+ *  ruta tenia un espacio el comando no corria. El propio clon del marco vive hoy
+ *  en ".../Personal/No Coders/Projects", y la shell leia `node /Users/.../No` y
+ *  fallaba con un mensaje que no menciona espacios ni comillas.
+ *
+ *  Y ES EL CASO NORMAL, no el raro: las carpetas donde una persona no tecnica
+ *  guarda sus cosas se llaman "Mis Documentos", "My Documents", "Google Drive".
+ *
+ *  COMILLAS DOBLES Y NO SIMPLES. La misma linea tiene que poder pegarse en bash,
+ *  zsh, cmd y PowerShell --esta herramienta corre en las tres plataformas y su
+ *  banco tiene matriz de sistema operativo--. Las simples son mas seguras en
+ *  POSIX, pero cmd no las entiende: en Windows la linea quedaria peor que antes.
+ *  Las dobles sirven en las cuatro para el caso que importa, y dejan literales
+ *  los backslashes de una ruta de Windows.
+ *
+ *  EL LIMITE, DECLARADO. Una ruta con `$` necesitaria un escape distinto en bash
+ *  que en cmd, y no hay forma de escribir una sola linea correcta para las dos.
+ *  Se escapa la comilla doble --que es lo que romperia la sintaxis-- y `$` en una
+ *  ruta de archivo es lo bastante raro como para no justificar una rama por shell
+ *  que nadie podria probar en las cuatro. Su modo de falla es visible: el comando
+ *  falla al pegarlo, no despues y en silencio.
+ *
+ *  Se entrecomilla SOLO cuando hace falta: envolver siempre haria ruidosa la
+ *  salida en el caso normal, que es una ruta sin nada especial. */
+export function citarRuta(ruta) {
+  const texto = String(ruta);
+  if (!/[\s"'`$&|;<>()*?\[\]]/.test(texto)) return texto;
+  return `"${texto.replace(/"/g, '\\"')}"`;
+}
+
 /** EL PIN DEL MARCO, LEIDO DEL ARBOL QUE SE ACABA DE ESCRIBIR.
  *
  *  POR QUE SE LEE Y NO SE DECLARA. El pin lo fija el andamio
@@ -3325,7 +3359,7 @@ async function main(argv) {
       console.error("Volve a correr con --asistente: retoma tus respuestas y no te hace contestar todo de nuevo.");
     }
     console.error("");
-    console.error(`Un esqueleto con todas las claves: node ${path.join(raizDelMarco, "herramientas", "projects-init.mjs")} --ejemplo`);
+    console.error(`Un esqueleto con todas las claves: node ${citarRuta(path.join(raizDelMarco, "herramientas", "projects-init.mjs"))} --ejemplo`);
     return 1;
   }
 
@@ -3901,7 +3935,7 @@ async function main(argv) {
   console.log("manifiestos se quedan donde estan y el lockfile los congela. Para comparar lo que");
   console.log("este proyecto DECLARA contra la ultima estable publicada de cada paquete —y decidir,");
   console.log("con dos preguntas, si actualizar todo el stack o solo una parte—:");
-  console.log(`     node <clon-del-marco>/herramientas/projects-versiones.mjs --raiz ${o.destino}`);
+  console.log(`     node <clon-del-marco>/herramientas/projects-versiones.mjs --raiz ${citarRuta(o.destino)}`);
   console.log("Sin terminal (en CI) solo imprime el informe y sale 0: nunca pregunta ni escribe.");
   return 0;
 }

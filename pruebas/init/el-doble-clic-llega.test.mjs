@@ -91,11 +91,22 @@ test("MEDIDO de punta a punta: el comando propuesto ARMA el proyecto de verdad",
   fs.writeFileSync(path.join(clon, "valores.json"), JSON.stringify(valores));
 
   const texto = lineasDelPasoQueSigue(path.join(clon, "valores.json"), "people-agenda", clon).join("\n");
-  const mkdir = /mkdir -p (\S+)/.exec(texto);
-  const cmd = /node (\S+) --valores (\S+) --destino (\S+)/.exec(texto);
+  // Los argumentos pueden venir ENTRECOMILLADOS: la herramienta entrecomilla toda
+  // ruta con espacios, porque si no el comando que imprime no se puede pegar. Un
+  // `\S+` pelado cortaba en el primer espacio y no extraia nada, que es como este
+  // banco descubrio el defecto: rojo en una maquina con el clon en "No Coders",
+  // verde en CI, donde el checkout no tiene espacios.
+  const ARG = `("[^"]*"|\\S+)`;
+  const sinComillas = (a) => (a.startsWith('"') && a.endsWith('"') ? a.slice(1, -1).replace(/\\"/g, '"') : a);
+  const mkdir = new RegExp(`mkdir -p ${ARG}`).exec(texto);
+  const cmd = new RegExp(`node ${ARG} --valores ${ARG} --destino ${ARG}`).exec(texto);
   assert.ok(mkdir && cmd, `no se pudo extraer el comando propuesto:\n${texto}`);
 
-  fs.mkdirSync(mkdir[1], { recursive: true });
+  const dirDestino = sinComillas(mkdir[1]);
+  const argValores = sinComillas(cmd[2]);
+  const argDestino = sinComillas(cmd[3]);
+
+  fs.mkdirSync(dirDestino, { recursive: true });
   const r = spawnSync(
     process.execPath,
     [
@@ -103,9 +114,9 @@ test("MEDIDO de punta a punta: el comando propuesto ARMA el proyecto de verdad",
       "--sin-arranque",
       "--sin-herramientas",
       "--valores",
-      cmd[2],
+      argValores,
       "--destino",
-      cmd[3],
+      argDestino,
     ],
     {
       encoding: "utf8",
@@ -114,7 +125,7 @@ test("MEDIDO de punta a punta: el comando propuesto ARMA el proyecto de verdad",
   );
   const salida = `${r.stdout ?? ""}${r.stderr ?? ""}`;
   assert.equal(r.status, 0, `el comando que la herramienta propone NO arma el proyecto:\n${salida.slice(-900)}`);
-  assert.ok(fs.existsSync(path.join(cmd[3], "package.json")), "salio 0 y no dejo un proyecto");
+  assert.ok(fs.existsSync(path.join(argDestino, "package.json")), "salio 0 y no dejo un proyecto");
   // Y el clon del marco quedo intacto: nada del andamio se escribio adentro.
   assert.ok(!fs.existsSync(path.join(clon, "docker-compose.yml")), "el andamio se escribio DENTRO del clon del marco");
   fs.rmSync(base, { recursive: true, force: true });

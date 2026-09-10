@@ -81,6 +81,42 @@ mueve sobre un cambio incompatible.
 
 ### Corregido
 
+- **El comando que la herramienta manda a pegar no se podía pegar.** Cuando
+  `projects init` no puede terminar solo, imprime el comando exacto para copiar —
+  su razón de ser es que quien no programa no transcriba nada. Ese comando se
+  armaba **interpolando rutas sin comillas**, así que en cuanto una ruta tenía un
+  espacio, la shell leía `node /Users/…/Personal/No` y fallaba con un mensaje que
+  no menciona espacios ni comillas por ningún lado.
+
+  No era el caso raro: es el caso normal del público de este marco. «Mis
+  Documentos», «My Documents», «Google Drive», «No Coders». **El propio clon de
+  Projects vive hoy en una ruta con espacio.**
+
+  El CI no lo veía nunca porque GitHub hace checkout en `/home/runner/work/…`, sin
+  espacios. El banco **sí** lo cazaba —`el-doble-clic-llega` extrae el comando y lo
+  **corre**— pero sólo enrojece en la máquina de un usuario: estaba rojo localmente
+  y verde en CI, que es la peor combinación posible.
+
+  Las rutas ahora viajan entrecomilladas cuando lo necesitan, con comillas
+  **dobles** porque la línea tiene que servir en bash, zsh, cmd y PowerShell — cmd
+  no entiende las simples — y los backslashes de una ruta de Windows quedan
+  literales.
+
+- **Un banco le pasaba al guardrail de deltas una ruta que no existe, y el
+  guardrail salía en verde.** `guardrail-deltas.test.mjs` armaba la ruta con
+  `new URL(...).pathname`, que la devuelve **percent-encoded**: con el clon en una
+  carpeta con espacio le llegaba un `.../No%20Coders/...` inexistente, el guardrail
+  no encontraba deltas y reportaba «no hay ningún delta que comparar». Ahora usa la
+  conversión correcta, que el propio `ayuda.mjs` del banco ya exportaba.
+
+  **Queda vivo, y con destino:** el guardrail **sale verde ante un directorio que
+  no existe**. Es un fail-open que `AGENTS.md` prohíbe. No se arregla acá porque
+  toca una action publicada y endurecerla puede enrojecer a un consumidor que hoy
+  pasa: se estrena en modo aviso y endurece en la mayor siguiente, en change propio.
+
+  **Para un consumidor: nada** en ambos casos.
+
+
 - **El ✗ de un error se iba de pantalla.** Cada reintento reimprimía la pregunta
   entera, así que la persona veía la misma pregunta otra vez **sin ninguna señal**
   de haberse equivocado. Medido en el callejón de AWS: cincuenta reintentos,
