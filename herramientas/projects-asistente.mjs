@@ -615,6 +615,41 @@ export function desvios(r, hoy = new Date().toISOString().slice(0, 10)) {
       revisar: "cuando entre la segunda persona al proyecto",
     });
   }
+  // EL GATE DEL PO, QUE EL ANDAMIO APAGA SIN DECIRLO.
+  //
+  // `plantilla/.github/CODEOWNERS` lo escribe de frente en su encabezado: "el PO
+  // NO debe ser miembro del equipo de builders: si lo fuera, podria satisfacer su
+  // propio gate desde el otro rol y la separacion se cae". Y `derivar()` asigna
+  // `PO: r.ORG` y `BUILDER_1: r.ORG` --la MISMA persona-- SIEMPRE, con companero o
+  // sin el.
+  //
+  // La mecanica que lo vuelve silencioso es la misma que el propio archivo
+  // explica: GitHub pide review a los owners EXCEPTO al autor. En las rutas de
+  // contrato el PO es el UNICO owner, asi que cuando el PO es quien abre el PR no
+  // queda NADIE asignado. No hay rojo, no hay aviso: el gate simplemente no ocurre.
+  //
+  // SON DOS CASOS DISTINTOS Y NO SE DECLARAN IGUAL. Trabajando solo no hay salida
+  // --no hay a quien darle el rol-- y se revisa cuando entre la segunda persona.
+  // CON companero SI hay salida, y es una decision que alguien tiene que tomar:
+  // el companero puede ser el PO. Decir "es una sola persona" cuando son dos seria
+  // declarar un motivo falso, que es peor que no declarar.
+  const soloUno = r.equipo !== "equipo";
+  lista.push({
+    ...comun,
+    regla: "openspec-roles",
+    motivo: soloUno
+      ? "El equipo es una sola persona, asi que el PO y el builder son la misma. En las rutas de contrato " +
+        "(openspec/) el PO es el unico owner, y GitHub no le pide review al autor del pull request: cuando " +
+        "esa persona abre el PR no queda nadie asignado y el gate del PO no ocurre. No hay a quien darle el " +
+        "rol todavia; queda apagado y escrito."
+      : "El andamio asigna el rol de PO a la duenia de la cuenta, que es tambien el builder 1, asi que el gate " +
+        "del PO lo satisface la misma persona que escribe el cambio y la separacion de roles no existe. " +
+        "A DIFERENCIA de cuando se trabaja sin companero, aca SI hay salida: " +
+        `@${r.BUILDER_2} puede ser el PO. Cambiar la clave PO del archivo de valores y regenerar CODEOWNERS.`,
+    revisar: soloUno
+      ? "cuando entre la segunda persona al proyecto"
+      : "ahora: decidir si el PO pasa a ser la otra persona, o dejar la separacion apagada a proposito",
+  });
   if (!usaAws(r)) {
     lista.push({
       ...comun,

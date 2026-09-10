@@ -865,3 +865,52 @@ test("lo que la constitucion promete y el andamio no reparte queda declarado com
       "`promocion-por-ambientes` dejo de corresponder y hay que sacarlo",
   );
 });
+
+// ---------------------------------------------------------------------------
+// EL GATE DEL PO SE DECLARA, PORQUE EL ANDAMIO LO APAGA.
+//
+// QUE DEFECTO CIERRA. `plantilla/.github/CODEOWNERS` escribe en su encabezado que
+// "el PO NO debe ser miembro del equipo de builders: si lo fuera, podria
+// satisfacer su propio gate desde el otro rol y la separacion se cae". Y
+// `derivar()` asigna `PO: r.ORG` y `BUILDER_1: r.ORG` --la misma persona-- SIEMPRE,
+// con companero o sin el.
+//
+// Lo silencioso es la mecanica que el propio CODEOWNERS explica: GitHub pide
+// review a los owners EXCEPTO al autor. En las rutas de contrato el PO es el UNICO
+// owner, asi que cuando el PO abre el PR no queda NADIE asignado. Ni rojo, ni
+// aviso: el gate no ocurre.
+//
+// Era la unica regla del marco que el andamio violaba SIN declararlo, y el marco
+// entero se apoya en "lo que no se activa se declara".
+// ---------------------------------------------------------------------------
+
+test("desvios · el gate del PO queda declarado, trabajando solo", () => {
+  const base = { equipo: "solo", plataforma: "aws", avisos: "slack", visibilidad: "publico", ORG: "im-diego-ec" };
+  const d = desvios(base, "2026-09-10").find((x) => x.regla === "openspec-roles");
+  assert.ok(d, "no se declara ningun desvio sobre openspec-roles: el gate del PO queda apagado en silencio");
+  assert.match(d.motivo, /una sola persona/, d.motivo);
+  assert.match(d.revisar, /segunda persona/, d.revisar);
+});
+
+test("desvios · CON companero el motivo es OTRO, porque ahi si hay salida", () => {
+  // La distincion importa: decir "es una sola persona" cuando son dos seria
+  // declarar un motivo FALSO, que es peor que no declarar. Con companero el rol
+  // se puede mover, y el desvio tiene que decir a quien.
+  const r = { equipo: "equipo", plataforma: "aws", avisos: "slack", visibilidad: "publico", ORG: "im-diego-ec", BUILDER_2: "la-companiera" };
+  const d = desvios(r, "2026-09-10").find((x) => x.regla === "openspec-roles");
+  assert.ok(d, "con companero tampoco se declara el gate del PO");
+  assert.doesNotMatch(d.motivo, /una sola persona/, `con companero el motivo no puede decir que es una sola persona:\n${d.motivo}`);
+  assert.match(d.motivo, /la-companiera/, "el desvio no nombra a quien puede tomar el rol de PO");
+  assert.match(d.revisar, /ahora/, "con salida disponible, la revision no puede quedar para 'cuando entre alguien'");
+});
+
+test("desvios · MUERDE: el desvio del PO es distinto del de review cruzado", () => {
+  // Sin este caso, alguien podria satisfacer los dos de arriba reusando el desvio
+  // de review cruzado, que habla de otra cosa: aquel apaga la aprobacion ajena
+  // ENTRE BUILDERS; este apaga el gate del PO sobre los contratos.
+  const base = { equipo: "solo", plataforma: "aws", avisos: "slack", visibilidad: "publico", ORG: "im-diego-ec" };
+  const reglas = desvios(base, "2026-09-10").map((x) => x.regla);
+  assert.ok(reglas.includes("github-review-cruzado-automatizado"), "falta el desvio de review cruzado");
+  assert.ok(reglas.includes("openspec-roles"), "falta el desvio del gate del PO");
+  assert.equal(new Set(reglas).size, reglas.length, `hay reglas repetidas: ${reglas.join(", ")}`);
+});

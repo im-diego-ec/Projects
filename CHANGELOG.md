@@ -43,6 +43,26 @@ mueve sobre un cambio incompatible.
 
 ### Añadido
 
+- **El andamio apagaba el gate del PO sin declararlo — la única regla del marco que
+  violaba en silencio.** `plantilla/.github/CODEOWNERS` escribe en su encabezado que
+  *«el PO NO debe ser miembro del equipo de builders: si lo fuera, podría satisfacer
+  su propio gate desde el otro rol y la separación se cae»*. Y el asistente asigna
+  `PO` y `BUILDER_1` **a la misma persona, siempre** — solo y con compañero.
+
+  Lo silencioso es la mecánica que el mismo archivo explica: GitHub pide review a
+  los owners **excepto al autor**, y en `openspec/` el PO es el único owner. Cuando
+  el PO abre el PR **no queda nadie asignado**: ni rojo, ni aviso.
+
+  Ahora se declara, con **dos motivos distintos**. Con compañero, decir «es una
+  sola persona» sería falso, así que el desvío **nombra a la otra persona** como
+  quien puede tomar el rol y su revisión es **ahora**, no «cuando entre alguien».
+  El caso con compañero es el más grave y no el que parece: ahí el proyecto
+  *parece* tener separación de roles y no la tiene.
+
+  **Para un consumidor: nada.** Es una línea más en el archivo de desvíos que
+  escribe el arranque; un proyecto ya creado no cambia solo.
+
+
 - **El piso de permisos que el marco documenta ahora se mide contra el que el
   reusable exige.** Un workflow reusable nunca recibe más permisos que los que le
   concede quien lo llama, y el marco lo documenta en tres archivos — uno de ellos,
