@@ -61,3 +61,9 @@ valores.json
 .projects-valores.json
 .projects-respuestas.json
 .projects-desvios.json
+
+# Residuo de `desplegar.yml` cuando corre con RUNNER_TEMP sin definir: el paso
+# arma el cuerpo del aviso en "${RUNNER_TEMP:-.}/cuerpo-del-sitio.html", y con la
+# variable vacia eso es la raiz del repo. Entro una vez al arbol (commit 1083a7a)
+# como archivo de 0 bytes que no referenciaba nadie.
+cuerpo-del-sitio.html

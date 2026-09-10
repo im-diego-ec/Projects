@@ -60,20 +60,31 @@ Como los de infraestructura, **hoy no tienen compuerta** —ninguna comprobació
 merge por esto—: el pipeline no se pone rojo por
 ellos. Es disciplina declarada y se revisa a mano.
 
-### PENDIENTE-PLATAFORMA · el marco · la clave todavía no la lee nadie
+### PENDIENTE-PLATAFORMA · el marco · la clave decide el reparto, y falta el despliegue
 
-**QUÉ FALTA** — Que una herramienta del marco lea `plataforma` y actúe: que `projects init`
-reparta `infra/` e `infra-prod/` sólo cuando la plataforma elegida use Terraform, y que el
-valor se valide contra la lista de cinco.
+**LO QUE YA SE HIZO, y este bloque decía lo contrario hasta el 2026-09-10.** La clave
+**sí** la lee una herramienta y **sí** cambia lo que se copia: `noViajanPorPlataforma()`
+en `herramientas/projects-init.mjs` decide qué directorios viajan según la plataforma
+elegida. Y el valor **se valida**: uno que no existe detiene el arranque con `EXIT 1`, y
+uno que la constitución admite pero la herramienta todavía no implementa —`cloudflare`,
+`gcp`— recibe un mensaje que lo dice y nombra dónde vive ese trabajo.
 
-**CÓMO SE DECIDE** — No lo decide este proyecto: es trabajo del marco y se pide ahí.
-Mientras tanto la clave es **declarativa** —dice qué eligió el proyecto y no cambia lo que
-la herramienta copia—, así que escribir `azure` o borrarla no produce ningún aviso. Lo que
-sí muerde hoy es el disco: el job de Terraform del CI mira si los directorios existen.
+Este bloque decía *«la clave todavía no la lee nadie»* y *«escribir `azure` o borrarla no
+produce ningún aviso»*. Las dos afirmaciones eran ciertas cuando se escribieron y dejaron
+de serlo sin que nada lo notara — mandaba a sostener a mano una coherencia que la
+herramienta ya sostenía, y a borrar carpetas que ya no llegan.
 
-**SI NO SE HACE** — La clave y el repositorio divergen en silencio, que es exactamente el
-defecto que este archivo existe para evitar. Hasta que el marco lo cierre, **la coherencia
-se sostiene a mano**: si se cambia la clave, los pasos del adaptador van en el mismo commit.
+**QUÉ FALTA TODAVÍA** — Que la plataforma decida el **despliegue** y no sólo el reparto de
+archivos. Hoy un sitio publica en Cloudflare elija lo que elija, y una aplicación no
+publica en ningún lado.
+
+**DÓNDE VIVE** — En el marco, en `openspec/changes/promocion-por-ambientes`. Un **change**
+es la carpeta donde queda escrito, ANTES de programar, qué se va a cambiar y por qué; ése
+ya tiene sus decisiones tomadas (topología Local → DEV → PROD) y su tarea bloqueante
+escrita: medir si un container de Cloudflare puede abrir TCP saliente al 5432.
+
+**SI NO SE HACE** — La palabra sigue prometiendo más de lo que entrega: quien elige una
+plataforma esperando que su aplicación corra ahí recibe archivos, no despliegue.
 
 ---
 

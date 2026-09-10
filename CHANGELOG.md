@@ -143,6 +143,32 @@ mueve sobre un cambio incompatible.
 
 ### Corregido
 
+- **Cuatro cosas que el repositorio afirmaba de sí mismo y el árbol contradecía.**
+  Ninguna rompía nada; las cuatro le mienten a quien las lee, que en este marco es
+  el defecto que más caro sale.
+
+  - `docs/04` prometía un formulario **con cinco preguntas** y tiene **cuatro**.
+    Ahora el número **se deriva** del propio formulario, como esa página ya hacía
+    con los repos, el nombre del workflow y la frase de éxito.
+  - `docs/04` decía que **Docker es el único que el marco NO comprueba**, y
+    `projects-doctor.mjs` lo comprueba — cuarenta líneas más abajo, la misma página
+    imprime `[OK ] Docker Desktop`. Docker es el único **opcional**, que es otra cosa.
+  - `plantilla/infra/adaptadores.md` mandaba a sostener a mano una coherencia que la
+    herramienta **ya sostiene** («la clave todavía no la lee nadie»), y a borrar
+    carpetas que ya no llegan. Ahora dice lo que falta de verdad —el despliegue— y
+    adónde va.
+  - `docs/accesos.md`, citado por la constitución canónica como el lugar donde vive
+    la matriz de accesos, **no existía**. Ahora viaja con el andamio, con su columna
+    de *bus factor* y la regla de no escribir ningún valor de credencial.
+
+- **`cuerpo-del-sitio.html`: un archivo de 0 bytes versionado en la raíz.** Residuo
+  de correr el paso del aviso de `desplegar.yml` con `RUNNER_TEMP` sin definir —
+  `"${RUNNER_TEMP:-.}"` es la raíz del repo—. No lo referenciaba nada. Borrado y
+  agregado al `.gitignore` con la razón, para que no vuelva a entrar.
+
+  **Para un consumidor: nada** en los cinco casos.
+
+
 - **La constitución le admitía al proyecto una plataforma que la herramienta
   rechazaba.** La lista vive en cuatro lugares: tres decían **cinco**
   (`plantilla/AGENTS.md` —que viaja a cada proyecto—, el canónico versionado, y
