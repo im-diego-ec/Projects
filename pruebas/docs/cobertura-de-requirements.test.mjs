@@ -134,7 +134,13 @@ export function capabilidadesVivas() {
  *  su capability o ya esta viva o no existe, y en los dos casos no esta en
  *  vuelo. Se deriva del disco y no de una lista escrita — una lista escrita es
  *  exactamente lo que fallo: la pagina nombraba una capability en vuelo cuando
- *  habia dos. */
+ *  habia dos.
+ *
+ *  Y SE ACUMULA ENTRE CHANGES, que era el mismo defecto un nivel mas arriba.
+ *  Antes hacia `salida[cap] = ...`, o sea que con DOS changes vivos tocando la
+ *  misma capability en vuelo ganaba el ultimo por orden alfabetico y los
+ *  requirements del otro desaparecian de la pagina sin que nada lo dijera. Es
+ *  legitimo que dos changes toquen la misma capability, asi que se suman. */
 export function capabilidadesEnVuelo() {
   const dir = path.join(RAIZ, "openspec/changes");
   const vivas = new Set(Object.keys(capabilidadesVivas()));
@@ -146,7 +152,9 @@ export function capabilidadesEnVuelo() {
     for (const cap of fs.readdirSync(specs).sort()) {
       const spec = `openspec/changes/${change}/specs/${cap}/spec.md`;
       if (vivas.has(cap) || !fs.existsSync(path.join(RAIZ, spec))) continue;
-      salida[cap] = requirementsDe(spec);
+      const yaHabia = salida[cap] ?? [];
+      const nuevos = requirementsDe(spec).filter((r) => !yaHabia.includes(r));
+      salida[cap] = [...yaHabia, ...nuevos];
     }
   }
   return salida;
@@ -569,4 +577,43 @@ test("MUERDE: un ancla que se pasa del final del archivo se caza", () => {
     problemasDeLasAnclas(mutado).some((m) => m.includes("desplegar.test.mjs:99999") && m.includes("lineas")),
     "una linea que se pasa del final tiene que ponerse roja",
   );
+});
+
+test("MUERDE: dos changes sobre la misma capability EN VUELO se SUMAN, no se pisan", () => {
+  // QUE DEFECTO FIJA. `capabilidadesEnVuelo` hacia `salida[cap] = requirementsDe(spec)`,
+  // asi que con dos changes vivos tocando la misma capability ganaba el ultimo por
+  // orden alfabetico y los requirements del otro desaparecian de la pagina sin que
+  // nada lo dijera. Es el mismo defecto que el comentario de esa funcion denuncia
+  // --una lista que no ve que hay dos-- un nivel mas arriba.
+  const enVuelo = capabilidadesEnVuelo();
+  const conDosChanges = Object.entries(enVuelo).filter(([cap]) => {
+    const dir = path.join(RAIZ, "openspec/changes");
+    let n = 0;
+    for (const change of fs.readdirSync(dir)) {
+      if (change === "archive") continue;
+      if (fs.existsSync(path.join(dir, change, "specs", cap, "spec.md"))) n += 1;
+    }
+    return n >= 2;
+  });
+
+  if (conDosChanges.length === 0) {
+    // No hay ninguna hoy: el caso queda declarado en vez de pasar mudo.
+    assert.ok(true, "ninguna capability en vuelo la tocan dos changes: este caso no mide nada hoy");
+    return;
+  }
+
+  for (const [cap, requirements] of conDosChanges) {
+    const dir = path.join(RAIZ, "openspec/changes");
+    let sueltos = 0;
+    for (const change of fs.readdirSync(dir)) {
+      if (change === "archive") continue;
+      const spec = path.join(dir, change, "specs", cap, "spec.md");
+      if (fs.existsSync(spec)) sueltos += requirementsDe(`openspec/changes/${change}/specs/${cap}/spec.md`).length;
+    }
+    assert.equal(
+      requirements.length,
+      sueltos,
+      `${cap}: la pagina ve ${requirements.length} requirements y los changes declaran ${sueltos} entre todos. Si son menos, un change se esta pisando al otro`,
+    );
+  }
 });

@@ -723,6 +723,33 @@ export function formaDe(valores) {
 export const FORMAS = ["aplicacion", "sitio"];
 export const PLATAFORMAS = ["aws", "supabase", "ninguna"];
 
+/** LAS QUE LA CONSTITUCION ADMITE Y ESTA HERRAMIENTA TODAVIA NO IMPLEMENTA.
+ *
+ *  QUE DEFECTO CIERRA. La lista de plataformas vive en CUATRO lugares y tres de
+ *  ellos dicen CINCO: `plantilla/AGENTS.md` --la constitucion que viaja a cada
+ *  proyecto--, `actions/constitucion/canonico/60-infra-plataforma-secretos.md`
+ *  --que es CANONICO y versionado-- y `pruebas/andamio/terraform-en-ci.test.mjs`,
+ *  que se escribio su propia copia. `PLATAFORMAS`, la unica que decide de verdad
+ *  que archivos viajan, dice TRES.
+ *
+ *  O sea: un proyecto nacia con una constitucion que le admite `cloudflare`, y la
+ *  herramienta que se la entrego rechaza ese mismo valor con EXIT 1 y un mensaje
+ *  --"no es una opcion"-- que le echa la culpa a quien lo escribio.
+ *
+ *  POR QUE SE DECLARA EN VEZ DE RECORTAR LA CONSTITUCION. Porque la herramienta es
+ *  la que esta atrasada, no el documento: `plantilla/infra/adaptadores.md` describe
+ *  los adaptadores de cloudflare y gcp como el camino previsto, y el canonico esta
+ *  versionado --recortarlo mueve un artefacto que los consumidores regeneran--. El
+ *  hueco es de implementacion, y lo honesto es que se vea, no que se tape.
+ *
+ *  Su destino esta escrito: `openspec/changes/promocion-por-ambientes`. */
+export const PLATAFORMAS_PENDIENTES = ["cloudflare", "gcp"];
+
+/** Las CINCO que la constitucion admite. Se DERIVA de las otras dos y no se
+ *  escribe aparte: una tercera lista al lado de las dos primeras es exactamente
+ *  como empezo esta divergencia. */
+export const PLATAFORMAS_DECLARADAS = [...PLATAFORMAS, ...PLATAFORMAS_PENDIENTES];
+
 /** LO QUE NO SE VALIDABA, y era justo lo que mas cuesta si se toma mal.
  *
  *  `forma` y `plataforma` eran los DOS UNICOS valores sin ninguna comprobacion,
@@ -749,6 +776,18 @@ export function problemasDeEleccion(valores) {
       continue;
     }
     const v = crudo.trim().toLowerCase();
+    // LA CONSTITUCION LA ADMITE Y ESTA HERRAMIENTA NO LA IMPLEMENTA TODAVIA. Es un
+    // caso distinto de "escribiste cualquier cosa", y decirle lo mismo a los dos
+    // culpa a quien leyo la constitucion y le hizo caso.
+    if (clave === "plataforma" && PLATAFORMAS_PENDIENTES.includes(v)) {
+      problemas.push(
+        `plataforma = ${JSON.stringify(crudo)} esta admitida por la constitucion del proyecto ` +
+          `(plantilla/AGENTS.md) pero TODAVIA NO esta implementada en esta herramienta: no hay adaptador ` +
+          `que la entregue, asi que armarte el proyecto seria darte archivos que no la usan. Las que hoy ` +
+          `funcionan: ${validas.join(", ")}. El trabajo de ${v} vive en openspec/changes/promocion-por-ambientes`,
+      );
+      continue;
+    }
     if (!validas.includes(v)) {
       const cerca = validas.find((x) => x.startsWith(v.slice(0, 4)) || v.startsWith(x.slice(0, 4)));
       problemas.push(

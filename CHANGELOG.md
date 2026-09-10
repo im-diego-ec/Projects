@@ -143,6 +143,28 @@ mueve sobre un cambio incompatible.
 
 ### Corregido
 
+- **La constitución le admitía al proyecto una plataforma que la herramienta
+  rechazaba.** La lista vive en cuatro lugares: tres decían **cinco**
+  (`plantilla/AGENTS.md` —que viaja a cada proyecto—, el canónico versionado, y
+  una cuarta copia dentro de un banco) y la única que decide qué archivos viajan
+  decía **tres**.
+
+  Lo que le pasaba a una persona: nace su proyecto, abre el `AGENTS.md` que el
+  marco le acaba de entregar, lee que puede elegir `cloudflare`, lo elige, y
+  recibe `EXIT 1` con «no es una opcion». El mensaje le echaba la culpa por haber
+  leído la constitución y haberle hecho caso.
+
+  **No se recortó la constitución**, que era el atajo y el lado equivocado: la
+  herramienta es la atrasada — `plantilla/infra/adaptadores.md` describe los
+  adaptadores de `cloudflare` y `gcp` como el camino previsto, y el canónico está
+  versionado. El hueco ahora se **declara** (`PLATAFORMAS_PENDIENTES`) con su
+  destino, el mensaje distingue «no existe» de «todavía no está implementada», y
+  una compuerta cruza las cuatro copias.
+
+  **Para un consumidor: nada.** La constitución y el canónico no se tocaron — son
+  ellos los que estaban bien.
+
+
 - **El procedimiento de release destruía el único rastro de su propia
   precondición.** `AGENTS.md` exige probar cada versión contra un consumidor real.
   La evidencia —id de corrida + SHA del consumidor + SHA del marco— vivía en un

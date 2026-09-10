@@ -276,18 +276,20 @@ esta capability compartan el mismo hueco no es cuatro problemas: es uno, y tiene
 
 ---
 
-## base-tecnologica — capability EN VUELO, 3 requirements, 0 con compuerta
+## base-tecnologica — capability EN VUELO, 4 requirements, 1 con compuerta
 
 No existe en `openspec/specs/`: nace en `openspec/changes/stack-estandar/specs/`
-(2 de 24 tareas al 2026-08-31). Se lista acá **antes** de que se consolide, porque una
-capability que solo vive en un change es invisible para quien lee los specs vivos de
-punta a punta.
+(2 de 24 tareas al 2026-08-31) y gana un requirement más en
+`openspec/changes/una-sola-lista-de-plataformas/specs/`. Se lista acá **antes** de que
+se consolide, porque una capability que solo vive en un change es invisible para quien
+lee los specs vivos de punta a punta.
 
 | Requirement | Lo que lo hace fallar solo | Ruta y ancla (2026-08-31) |
 |---|---|---|
 | El marco publica una base tecnológica única y es la primera opción | **ninguno** | — |
 | Apartarse de la base se pregunta antes de implementar | **ninguno** | — |
 | La base es la primera opción, no una jaula | **ninguno** | — |
+| Lo que la constitución admite y lo que la herramienta entrega no divergen en silencio | cruza las CUATRO copias de la lista de plataformas y exige que coincidan; y que una pendiente no figure como implementada | `pruebas/andamio/una-sola-lista-de-plataformas.test.mjs` |
 
 ---
 
