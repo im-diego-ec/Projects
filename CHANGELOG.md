@@ -76,6 +76,23 @@ mueve sobre un cambio incompatible.
   y espera. Se dice acá porque el criterio del repo es que endurecer un check que un
   repo verde ya pasaba es incompatible aunque no rompa ningún archivo.
 
+### Corregido
+
+- **Cinco páginas seguían prometiendo una publicación automática que ya no ocurre**, y
+  las dejó así el commit anterior de este mismo change. `README-del-proyecto.md` decía
+  *«se publica solo… no hay que apretar nada»*; `docs/10-publicar.md` decía que no hay
+  ambiente intermedio y que *«el marco todavía no te resuelve»* los dos ambientes; el
+  README del sitio contaba una vuelta atrás que ya no funciona así. **Una promesa vieja
+  es peor que una ausente**: la persona espera algo que no va a pasar y no tiene ninguna
+  señal de que falta apretar algo.
+
+  **Y se encontraron con un grep, a mano, después de publicar el cambio** — o sea que la
+  única defensa era acordarse. Por eso lo que cierra esto no es el arreglo sino la
+  compuerta nueva: `pruebas/docs/lo-que-se-publica-solo.test.mjs` **deriva del workflow**
+  si producción sale sola y lo contrasta contra las cuatro páginas, en los dos sentidos.
+  Si mañana la promoción vuelve a ser automática, se pone roja hasta que las páginas lo
+  digan.
+
 ### Añadido
 
 - **Las cuatro capacidades de la combinación Supabase tienen dueño escrito, y antes

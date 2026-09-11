@@ -137,15 +137,18 @@ corepack pnpm -C {{PAQUETE_SITIO}} run volver-atras -- <ese-identificador>
 En segundos, la dirección vuelve a servir lo que servía antes.
 
 > **Y ahora la parte que se olvida.** Volver atrás cambia lo que Cloudflare
-> sirve, **no lo que hay en tu repositorio**. El código roto sigue en `main`, así
-> que la próxima publicación —que sale sola cuando las verificaciones quedan en
-> verde— lo va a subir otra vez.
+> sirve, **no lo que hay en tu repositorio**. El código roto sigue en `main`, y la
+> próxima vez que alguien promueva a producción lo va a subir otra vez.
+>
+> **Lo que sí te da aire:** producción no se publica sola, así que el código roto
+> no vuelve por sí mismo. Va a seguir subiendo a la copia de prueba con cada
+> verificación en verde —que es donde tiene que estar mientras se arregla—.
 >
 > Volver atrás te compra tiempo, no te arregla el problema. Con el sitio ya sano,
 > el arreglo de verdad es **deshacer el cambio en el repositorio**: en la pestaña
 > **Pull requests → Closed**, abrí el que causó esto y apretá **Revert**. Eso crea
 > un cambio nuevo que deshace el anterior, pasa por las mismas verificaciones, y
-> publica solo.
+> sube solo a la copia de prueba. Cuando la mires y esté bien, lo publicás.
 
 **También podés hacerlo sin terminal:** en el panel de Cloudflare, **Workers &
 Pages → tu proyecto → Deployments**, cada publicación tiene su botón de rollback.

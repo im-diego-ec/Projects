@@ -27,10 +27,14 @@ con un [change](02-glosario.md) aplicado, un pull request cerrado y `main` en ve
 
 ## 1 · Qué publica y qué no, en una tabla
 
-| Tu forma | ¿Se publica solo? | Dónde | Qué falta |
-| --- | --- | --- | --- |
-| **Un sitio para leer** | **Sí** | Cloudflare Workers | cuatro actos humanos de una sola vez: la cuenta, el subdominio, la credencial y guardarla en GitHub |
-| **Una aplicación** | **No** | — | el paso de publicación no existe todavía en el andamio |
+| Tu forma | ¿Sale solo a la copia de prueba? | ¿Y a producción? | Dónde | Qué falta |
+| --- | --- | --- | --- | --- |
+| **Un sitio para leer** | **Sí** | **No: lo publicás vos** | Cloudflare Workers | cuatro actos humanos de una sola vez: la cuenta, el subdominio, la credencial y guardarla en GitHub |
+| **Una aplicación** | **No** | **No** | — | el paso de publicación no existe todavía en el andamio |
+
+**Esa segunda columna es el cambio más importante de esta página**, y conviene leerla
+dos veces: un sitio **sube solo** a una dirección de prueba y **se detiene ahí**. A
+producción lo llevás vos, apretando un botón. Por qué, en la sección 5.
 
 Cómo saber cuál tenés, sin acordarte de nada:
 
@@ -203,59 +207,67 @@ la vía de siempre: subís la versión del marco y aparece.
 
 ---
 
-## 5 · El paso a producción, dicho como está hoy
+## 5 · El paso a producción
 
-**Ésta es la pregunta que más se hace y la que peor contestada estaba: cero
-menciones en todo el camino.** Va acá, aunque la respuesta no sea la que se
-espera.
+**Ésta es la pregunta que más se hace y la que peor contestada estaba.** Hoy la
+respuesta depende de tu forma, y son dos respuestas distintas.
 
-### Lo que hoy hay, y es una sola cosa
+### Si tu proyecto es un sitio: hay dos tramos, y el segundo es tuyo
 
-**Un destino, no dos.** Cuando un sitio se publica, se publica **en un solo
-lugar**, y ése es el que ve la gente. No hay una copia de prueba desplegada por un
-lado y una de verdad por el otro: hay tu máquina, y hay lo publicado.
+| Tramo | Quién lo dispara | Qué pasa |
+| --- | --- | --- |
+| **A la copia de prueba** | nadie: sale solo | cuando las verificaciones quedan en verde sobre `main`, tu sitio sube a una dirección `dev-…` y el pipeline **comprueba que conteste** |
+| **A producción** | **vos** | vas a **Actions → desplegar → Run workflow**, marcás la casilla, y publica **esa misma versión** |
 
-Eso vale aunque en el Paso 3 hayas contestado **«dos copias»**. Esa respuesta
-cambia lo que tu proyecto **declara** —las direcciones, los nombres de recursos—
-pero **hoy no hay nada que despliegue dos ambientes**. Si usaste el asistente,
-está anotado con esas palabras en el `.projects-desvios.json` de tu proyecto; si
-escribiste los valores a mano, ese archivo salió vacío —ver el aviso de arriba—.
+**Producción no se compila de nuevo.** Se promueve la versión que ya subió y que ya
+miraste, byte por byte. Si se recompilara, lo publicado dejaría de ser lo verificado
+—otro reloj, otra resolución de dependencias— y la copia de prueba dejaría de probar
+lo que sale.
 
-### Lo que la [constitución](02-glosario.md) de tu proyecto promete, y todavía no cumple
+**Y no se puede promover cualquier cosa.** Antes de publicar, el pipeline pregunta si
+esa versión pasó por la copia de prueba **y terminó en verde**. Si no puede
+preguntar —sin red, sin permiso— **tampoco publica**: no saber no es lo mismo que
+estar bien. Apartarse se puede, con una casilla que tiene nombre, y queda escrito en
+la corrida quién lo pidió.
 
-Si abrís `.projects/AGENTS-marco.md` vas a leer una regla que dice:
+### Por qué un botón y no automático
+
+Porque si publicar ocurriera detrás de cada cambio, la decisión de sacar algo al
+mundo dejaría de ser tuya y pasaría a ser una consecuencia de haber escrito. El botón
+la mantiene tuya, y deja **quién publicó y cuándo** — una decisión sin autor no se
+puede revisar después.
+
+**Y podés pedir un segundo candado**, si tu repositorio lo admite: que **otra persona**
+apruebe antes de publicar. Si lo admite o no depende del plan y de la visibilidad, y
+**tu proyecto lo trae medido sobre sí mismo** en `.github/proteccion-main.md`. Ahí
+está también lo que sorprende: una aprobación que queda esperando **caduca**, y la
+corrida termina **cancelada, no roja** — no vas a ver una ✗ que te llame la atención.
+
+### Lo que esto NO es, dicho antes de que alguien lo lea de más
+
+**No son dos infraestructuras.** Son dos direcciones del mismo sitio: una versión
+subida y otra publicada. **La copia de prueba es pública** para quien tenga el enlace.
+Y si tu proyecto tiene base de datos, **no hay una base de prueba aparte** por este
+mecanismo: eso lo decidís vos, y el cupo del plan gratuito está dicho en
+`infra/adaptadores.md`, adentro de tu proyecto.
+
+### Si tu proyecto es una aplicación: todavía no hay publicación
+
+El andamio **no le reparte** el paso de despliegue: una aplicación no recibe
+`.github/workflows/desplegar.yml`. No es un olvido y no se disimula — está declarado
+como **desvío** en tu proyecto, con esas palabras.
+
+**Lo que la [constitución](02-glosario.md) de tu proyecto promete**, si abrís
+`.projects/AGENTS-marco.md`:
 
 > Promoción por ambientes: merge → deploy a DEV → smoke API → E2E → deploy a PROD
 > → verificar-prod.
 
-**Eso es el destino, no lo que tu proyecto hace hoy.** El andamio no reparte
-ninguno de esos pasos. Lo decimos acá y además queda declarado como **desvío** en
-tu proyecto, porque una regla que describe algo que no existe es peor que una
-regla ausente: los agentes que trabajan en tu repositorio la leen como si fuera
-la práctica de todos los días.
-
-### Entonces, ¿cómo llega un cambio a la gente?
-
-Con lo que hay hoy, así:
-
-| Paso | Qué pasa |
-| --- | --- |
-| 1 | Escribís el cambio en una rama |
-| 2 | Abrís un pull request y las verificaciones corren sobre él |
-| 3 | Con todo en verde, entra a `main` |
-| 4 | El sitio se publica solo, al destino único |
-
-**La compuerta que te protege es la del paso 3**, no un ambiente intermedio: nada
-llega a la gente sin haber pasado las verificaciones. Es menos de lo que la regla
-promete, y es lo que hay.
-
-### Y si tu proyecto necesita de verdad dos ambientes
-
-Es una decisión tuya y el marco todavía no te la resuelve. Lo honesto es decirte
-las dos cosas que vas a tener que hacer vos: **un segundo destino** donde publicar
-y **un paso que promueva** de uno al otro, con su propia condición de verde. El
-día que el marco lo reparta, llega como cualquier otra mejora —subiendo la versión
-del marco— y el desvío de tu proyecto se cierra.
+Para una aplicación **eso sigue siendo el destino y no lo que hace hoy**, y el desvío
+lo dice entero. Para un sitio el desvío **ya no dice «no hay deploy a dev»** —lo hay—
+sino qué queda fuera de esa cadena de seis pasos: el smoke de API **no aplica** (un
+sitio no tiene API) y el E2E **falta**. Distinguir «no aplica» de «falta» importa: lo
+primero no se arregla nunca, lo segundo sí.
 
 ---
 
@@ -267,7 +279,7 @@ del marco— y el desvío de tu proyecto se cierra.
 | Descubrir | [08-descubrimiento.md](08-descubrimiento.md) |
 | Construir | [09-construir-con-openspec.md](09-construir-con-openspec.md) |
 | **Publicar** | **esta página** |
-| **Producción** | **esta página, sección 5** — con lo que hoy no hay, dicho de frente |
+| **Producción** | **esta página, sección 5** — los dos tramos, y cuál de los dos es tuyo |
 
 De acá en adelante el ciclo se repite: un change, un pull request, `main` en
-verde, y lo que publica publica solo.
+verde, y tu sitio esperándote en la copia de prueba hasta que decidas publicarlo.
