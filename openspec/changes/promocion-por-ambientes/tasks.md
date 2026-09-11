@@ -31,12 +31,23 @@ estado: pendiente-de-revision
 
 ## 3. Las dos preguntas que se eliminan
 
-- [ ] 3.1 Sale `ambientes` del asistente (`projects-asistente.mjs`) y de la puerta
-      web. DEV y PROD siempre.
+- [x] 3.1 Sale `ambientes` del asistente y de la puerta web. DEV y PROD siempre.
+      **Medido antes de sacarla:** con `plataforma=supabase` contestar «uno» o «dos»
+      cambiaba **exactamente una clave** —`DOMINIO_DEV`, de `p.workers.dev` a
+      `dev.p.workers.dev`— y **ningún archivo**. Con AWS cambiaba tres, pero sólo
+      porque AWS hace dos preguntas más.
+      El caso simple baja de **9 a 8 preguntas**; con AWS, de 16 a 15. Y las dos
+      cuentas de AWS pasan a preguntarse **siempre**: con una sola topología, que
+      sean distintas deja de ser opcional.
 - [ ] 3.2 Sale `plataforma` del menú: el andamio sabe generar una sola rama que
       funciona. `PLATAFORMAS` queda para el archivo de valores, no para el menú.
-- [ ] 3.3 Banco: ninguna pregunta del asistente puede tener una sola respuesta
-      posible. Es la compuerta que impide que esto vuelva a pasar.
+- [x] 3.3 Banco: ninguna pregunta del asistente puede tener una sola respuesta
+      posible. Evidencia: `pruebas/init/ninguna-pregunta-miente.test.mjs`, que
+      contesta el cuestionario entero variando una respuesta por vez y compara lo que
+      sale de `derivar()` más los desvíos.
+      **El límite, declarado:** caza la pregunta que no cambia **nada**. NO caza la
+      que cambia sólo una cadena cosmética —que es el caso que motivó todo esto— y
+      ése se encontró midiendo, no con la compuerta.
 
 ## 4. La aplicación llega a internet
 

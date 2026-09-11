@@ -43,6 +43,29 @@ mueve sobre un cambio incompatible.
 
 ### Añadido
 
+- **El asistente hace una pregunta menos, y era una que no cambiaba nada.** «¿Cuántas
+  copias querés?» salió del cuestionario y de la puerta web. **Medido antes de
+  sacarla:** con la plataforma recomendada, contestar «uno» o «dos» cambiaba
+  **exactamente una clave** —el texto de `DOMINIO_DEV`— y **ningún archivo**.
+
+  El propio código ya tenía escrito el principio, y saltaba esa pregunta para un
+  sitio por ese motivo: *«preguntar algo cuya respuesta no cambia nada es peor que no
+  preguntarlo: le hace creer a la persona que eligió una arquitectura cuando eligió
+  un texto»*. Lo que faltaba era aplicarlo al otro camino — y **medirlo**.
+
+  El caso simple baja de **9 a 8 preguntas**. Y las dos cuentas de AWS pasan a
+  preguntarse **siempre**: con una sola topología (Local → DEV → PROD, decisión del
+  PO), que la cuenta de pruebas y la de producción sean distintas deja de ser
+  opcional — es lo único que impide que un error de prueba toque lo real.
+
+  **Y queda la compuerta**: ninguna pregunta del asistente puede tener una sola
+  respuesta posible. Contesta el cuestionario entero variando una respuesta por vez y
+  compara lo que sale. Su límite está declarado: caza la pregunta que no cambia
+  **nada**, no la que cambia sólo una cadena cosmética.
+
+  **Para un consumidor: nada.** Cambia el cuestionario de quien arranca un proyecto.
+
+
 - **Los números del plan gratuito de Supabase, medidos y escritos donde se leen.**
   El andamio entrega Supabase y hasta hoy no decía ni uno de sus límites. Los dos que
   cambian cómo se arma un proyecto: **permite 2 proyectos activos** —así que Dev+Prod

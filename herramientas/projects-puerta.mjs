@@ -144,13 +144,6 @@ export function respuestasDelFormulario(entrada, repo) {
     // La visibilidad NO se pregunta: se deriva del evento, igual que el tipo de
     // cuenta. Ver visibilidadDelRepo.
     visibilidad: visibilidadDelRepo(),
-    // PENDIENTE, y con destino escrito. Este valor esta cableado porque HOY la
-    // respuesta no cambia nada: con plataforma distinta de aws lo unico que
-    // decide es el texto de DOMINIO_DEV. La decision del PO del 2026-09-10 es que
-    // la pregunta se ELIMINA y la topologia pasa a ser siempre Local -> DEV ->
-    // PROD, asi que este campo desaparece con ella.
-    // Destino: openspec/changes/promocion-por-ambientes, tarea 3.1.
-    ambientes: "uno",
     dominio: dominio ? "propio" : "gratuito",
     avisos: "correo",
   };

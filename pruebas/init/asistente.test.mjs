@@ -98,7 +98,6 @@ const AWS_DOS = {
   equipo: "2",
   BUILDER_2: "otra-persona",
   plataforma: "2",
-  ambientes: "2",
   CUENTA_DEV: "111111111111",
   CUENTA_PROD: "222222222222",
   REGION: "us-east-1",
@@ -108,14 +107,15 @@ const AWS_DOS = {
   DOMINIO_PROD: "tienda.com",
 };
 
-test("el caso mas simple son NUEVE preguntas, y solo dos hay que escribirlas", async () => {
+test("el caso mas simple son OCHO preguntas, y solo dos hay que escribirlas", async () => {
   const { preguntar } = contestador({ ...TEXTO_VALIDO, ...PO_SOLO });
   const { dicho, respuestas } = await correrAsistente(preguntar, {}, {}, () => {}, DERIVADOS);
   assert.equal(
     cuantasPreguntas(dicho),
-    9,
-    "el numero de preguntas del caso simple es la promesa central de esta herramienta: nueve en vez de veintiuna " +
-      "casillas a mano. " +
+    8,
+    "el numero de preguntas del caso simple es la promesa central de esta herramienta: ocho en vez de veintiuna " +
+      "casillas a mano. Bajo de nueve a ocho al retirar `ambientes`, que con la plataforma recomendada cambiaba " +
+      "EXACTAMENTE UNA CLAVE y ningun archivo. " +
       "Si sube, o se agrego una pregunta que no hacia falta, o se rompio un `salta`",
   );
   // Las seis restantes se contestaron con Enter, o sea con la recomendada.
@@ -123,52 +123,61 @@ test("el caso mas simple son NUEVE preguntas, y solo dos hay que escribirlas", a
     {
       equipo: respuestas.equipo,
       plataforma: respuestas.plataforma,
-      ambientes: respuestas.ambientes,
       dominio: respuestas.dominio,
       avisos: respuestas.avisos,
       visibilidad: respuestas.visibilidad,
     },
-    { equipo: "solo", plataforma: "supabase", ambientes: "uno", dominio: "gratuito", avisos: "correo", visibilidad: "publico" },
+    { equipo: "solo", plataforma: "supabase", dominio: "gratuito", avisos: "correo", visibilidad: "publico" },
     "Enter tiene que elegir la opcion recomendada de cada pregunta: si no, el 'caso simple' no es simple",
   );
 });
 
-test("elegir AWS con dos ambientes hace DIECISEIS preguntas, y ninguna es de relleno", async () => {
+test("elegir AWS hace QUINCE preguntas, y ninguna es de relleno", async () => {
   const { preguntar } = contestador({ ...TEXTO_VALIDO, ...AWS_DOS });
   const { dicho, valores } = await correrAsistente(preguntar, {}, {}, () => {}, DERIVADOS);
-  assert.equal(cuantasPreguntas(dicho), 16, "con AWS y dos ambientes se preguntan las cinco de AWS mas el dominio propio");
+  assert.equal(cuantasPreguntas(dicho), 15, "con AWS se preguntan las cinco de AWS mas el dominio propio");
   // El defecto que este caso vigila: la primera version del asistente SALTEABA
   // las cinco preguntas de AWS junto con el relleno, asi que quien elegia AWS
   // se quedaba sin sus propios datos y el archivo salia invalido.
   assert.equal(valores.CUENTA_DEV, "111111111111", "la cuenta de pruebas tiene que salir de la respuesta, no del relleno");
-  assert.equal(valores.CUENTA_PROD, "222222222222", "con DOS ambientes las cuentas son distintas");
+  assert.equal(valores.CUENTA_PROD, "222222222222", "las cuentas de pruebas y de produccion son distintas, siempre");
   assert.equal(valores.REGION, "us-east-1");
   assert.notEqual(valores.PERFIL_DEV, RELLENO_AWS.PERFIL_DEV, "eligiendo AWS, el perfil no puede ser el relleno de 'sin AWS'");
 });
 
-test("con AWS y UN ambiente no se pregunta dos veces por el mismo dato", async () => {
+test("con AWS, la cuenta de produccion se PREGUNTA y no se hereda de la de pruebas", async () => {
+  // ESTE CASO DESCRIBIA LO CONTRARIO hasta el 2026-09-10, y con razon: mientras
+  // existio la pregunta `ambientes`, contestar "uno" heredaba la cuenta y el perfil
+  // de produccion de los de pruebas, para no pedir dos veces el mismo dato.
+  //
+  // La pregunta se retiro --con la plataforma recomendada cambiaba una sola clave y
+  // ningun archivo-- y la topologia pasa a ser siempre Local -> DEV -> PROD. Con una
+  // sola topologia, que las dos cuentas sean DISTINTAS deja de ser opcional: es lo
+  // unico que impide que un error de prueba toque lo real.
   const { preguntar } = contestador({
     ...TEXTO_VALIDO,
     PROYECTO: "api-interna",
     ORG: "alguien",
     plataforma: "2",
     CUENTA_DEV: "111111111111",
+    CUENTA_PROD: "222222222222",
     REGION: "sa-east-1",
     PERFIL_DEV: "mi-perfil",
+    PERFIL_PROD: "mi-perfil-prod",
     avisos: "2",
     CANAL_ALERTAS: "#alertas",
     visibilidad: "2",
   });
-  const { valores, dicho } = await correrAsistente(preguntar, {}, {}, () => {}, DERIVADOS);
-  assert.equal(cuantasPreguntas(dicho), 13, "con un solo ambiente se saltean la cuenta y el perfil de produccion");
-  assert.equal(valores.CUENTA_PROD, valores.CUENTA_DEV, "con un ambiente, la cuenta de 'produccion' ES la misma");
-  assert.equal(valores.PERFIL_PROD, valores.PERFIL_DEV, "y el perfil tambien");
+  const { valores } = await correrAsistente(preguntar, {}, {}, () => {}, DERIVADOS);
+  assert.equal(valores.CUENTA_PROD, "222222222222", "la cuenta de produccion sale de su propia respuesta");
+  assert.notEqual(valores.CUENTA_PROD, valores.CUENTA_DEV, "las dos cuentas no pueden ser la misma");
+  assert.notEqual(valores.PERFIL_PROD, valores.PERFIL_DEV, "los dos perfiles tampoco");
 });
 
 test("LO QUE MAS IMPORTA: lo que produce el asistente pasa el validador de siempre", async () => {
   const CASOS = {
     "PO solo, supabase, publico": PO_SOLO,
-    "equipo, AWS, dos ambientes": AWS_DOS,
+    "equipo, AWS": AWS_DOS,
     "solo, AWS, un ambiente": {
       PROYECTO: "api-interna",
       ORG: "alguien",
@@ -390,7 +399,7 @@ test("MUERDE: si una pregunta deja de saltarse, el conteo del caso simple lo caz
     `el camino de AWS tiene que preguntar MAS que el de Supabase; midio ${conAws.length} contra ${conSupabase.length}. ` +
       "Si son iguales, los `salta` dejaron de filtrar y el 'caso simple' de 8 preguntas es una coincidencia",
   );
-  assert.equal(conSupabase.length, 9, "y el camino simple son exactamente nueve");
+  assert.equal(conSupabase.length, 8, "y el camino simple son exactamente ocho");
 });
 
 test("el resumen nombra TODAS las decisiones que se preguntaron, y ninguna que no", async () => {

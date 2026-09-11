@@ -287,58 +287,17 @@ export const PREGUNTAS = [
     ],
   },
   {
-    id: "ambientes",
-    // NO SE PREGUNTA PARA UN SITIO, y el motivo es que la respuesta no cambiaba
-    // nada. Medido: contestar «dos» sobre forma=sitio produce los MISMOS 42
-    // archivos que contestar «una», y lo unico que se mueve es el valor declarado
-    // `DOMINIO_DEV`. No hay un segundo destino que desplegar: un sitio publica en
-    // uno solo, y ese es el publico.
-    //
-    // Preguntar algo cuya respuesta no cambia nada es peor que no preguntarlo: le
-    // hace creer a la persona que eligio una arquitectura cuando eligio un texto.
-    // Es el mismo criterio con el que las cinco preguntas de AWS ya se saltan.
-    salta: (r) => r.forma === "sitio",
-    texto: "¿Cuántas copias del proyecto querés? Una para probar sin miedo, otra para lo que ve la gente de verdad.",
-    opciones: [
-      {
-        valor: "uno",
-        etiqueta: "Una sola, para empezar",
-        detalle:
-          "Más simple y más barato. Con el plan gratuito de Supabase es lo que conviene: te deja 2 " +
-          "proyectos activos, y usar los dos en dos copias te deja sin margen. Cuando haya gente " +
-          "usándolo de verdad, agregás la segunda.",
-        recomendada: true,
-      },
-      {
-        valor: "dos",
-        etiqueta: "Dos: una de prueba y una de verdad",
-        detalle:
-          "Lo correcto cuando ya hay personas usando tu proyecto: probás en una sin romperle nada a " +
-          "nadie, y cuando funciona pasa a la otra. Cuesta el doble de configuración.",
-      },
-    ],
-  },
-  // -------------------------------------------------------------------------
-  // LAS CINCO DE AWS. Solo se preguntan si la plataforma ES AWS, y ese `salta`
-  // es la razon de ser de todo este archivo: hasta hoy las cinco eran
-  // OBLIGATORIAS para todo el mundo, asi que quien elegia Supabase para no
-  // gastar tenia que conseguir igual un numero de cuenta de AWS de doce digitos.
-  // -------------------------------------------------------------------------
-  {
     id: "CUENTA_DEV",
     libre: true,
     salta: (r) => !usaAws(r),
-    texto: (r) =>
-      r.ambientes === "dos"
-        ? "¿Cuál es el número de cuenta de AWS donde vas a PROBAR? Son doce dígitos."
-        : "¿Cuál es el número de cuenta de AWS? Son doce dígitos.",
+    texto: "¿Cuál es el número de cuenta de AWS donde vas a PROBAR? Son doce dígitos.",
     ayuda: "Lo ves arriba a la derecha en la consola de AWS, o con: aws sts get-caller-identity",
     normaliza: (t) => t.replace(/[\s-]/g, ""),
   },
   {
     id: "CUENTA_PROD",
     libre: true,
-    salta: (r) => !usaAws(r) || r.ambientes !== "dos",
+    salta: (r) => !usaAws(r),
     texto: "¿Y el número de cuenta de AWS donde va lo que ve la gente de verdad?",
     ayuda: "Conviene que sea una cuenta DISTINTA de la de pruebas: es lo que impide que un error de prueba toque lo real.",
     normaliza: (t) => t.replace(/[\s-]/g, ""),
@@ -355,17 +314,14 @@ export const PREGUNTAS = [
     id: "PERFIL_DEV",
     libre: true,
     salta: (r) => !usaAws(r),
-    texto: (r) =>
-      r.ambientes === "dos"
-        ? "¿Cómo se llama tu perfil de AWS en esta computadora, el de pruebas?"
-        : "¿Cómo se llama tu perfil de AWS en esta computadora?",
+    texto: "¿Cómo se llama tu perfil de AWS en esta computadora, el de pruebas?",
     ayuda: "Es el nombre que le pusiste al configurarlo. Los ves con: aws configure list-profiles",
     normaliza: (t) => t.trim(),
   },
   {
     id: "PERFIL_PROD",
     libre: true,
-    salta: (r) => !usaAws(r) || r.ambientes !== "dos",
+    salta: (r) => !usaAws(r),
     texto: "¿Y el perfil de AWS de lo que ve la gente de verdad?",
     ayuda: "Los ves con: aws configure list-profiles",
     normaliza: (t) => t.trim(),
@@ -514,7 +470,11 @@ export function derivar(r) {
   // Con UN ambiente los dos dominios son el mismo a proposito: el andamio
   // todavia sustituye los dos marcadores, y escribir dos direcciones distintas
   // para una sola copia seria inventar una que no existe.
-  const dominioDev = r.ambientes === "dos" ? `dev.${unDominio}` : unDominio;
+  // LA TOPOLOGIA ES SIEMPRE Local -> DEV -> PROD (decision del PO, 2026-09-10),
+  // asi que DEV siempre tiene su propia direccion. Antes esto colgaba de la
+  // respuesta a `ambientes`, una pregunta que se retiro porque con la plataforma
+  // recomendada cambiaba EXACTAMENTE UNA CLAVE --esta-- y ningun archivo.
+  const dominioDev = `dev.${unDominio}`;
 
   return {
     // EN MINUSCULA Y FUERA DE LOS 21 a proposito: no es un marcador que el
@@ -547,13 +507,13 @@ export function derivar(r) {
     ...(usaAws(r)
       ? {
           CUENTA_DEV: r.CUENTA_DEV,
-          // Con UN ambiente no se pregunta dos veces por lo mismo: la cuenta y
-          // el perfil de "produccion" SON los mismos, y decirlo asi es mas
-          // honesto que pedir dos veces el mismo dato.
-          CUENTA_PROD: r.ambientes === "dos" ? r.CUENTA_PROD : r.CUENTA_DEV,
+          // DOS AMBIENTES SIEMPRE: la cuenta de produccion se pregunta y no se
+          // hereda de la de pruebas. Que sean distintas es lo que impide que un
+          // error de prueba toque lo real.
+          CUENTA_PROD: r.CUENTA_PROD,
           REGION: r.REGION,
           PERFIL_DEV: r.PERFIL_DEV,
-          PERFIL_PROD: r.ambientes === "dos" ? r.PERFIL_PROD : r.PERFIL_DEV,
+          PERFIL_PROD: r.PERFIL_PROD,
         }
       : RELLENO_AWS),
     PREFIJO_RECURSOS: kebab(r.PROYECTO).slice(0, 20),
@@ -990,7 +950,10 @@ export function lineasDeResumen(r, desviosDeR) {
     // `salta` y nunca se pregunta: la fila salia igual y mostraba "una de prueba y
     // una de verdad", que es el lado del `else` de una respuesta que nadie dio. El
     // resumen inventaba una decision, y encima la mas ruidosa de leer.
-    ...(r.ambientes === undefined ? [] : [["Copias", r.ambientes === "uno" ? "una sola" : "una de prueba y una de verdad"]]),
+    // La fila salio con la pregunta: la topologia es siempre una de prueba y una
+    // de verdad, asi que informarla como eleccion de esta persona seria volver a
+    // hacerle creer que eligio algo.
+    ["Ambientes", "una copia de prueba y una de verdad"],
     [
       "Dirección",
       r.dominio === "propio"
@@ -1005,9 +968,9 @@ export function lineasDeResumen(r, desviosDeR) {
   // la primera version del resumen no las mostraba: se llamaba "todo lo que
   // elegiste" y se comia justo las cinco que mas cuesta verificar.
   if (usaAws(r)) {
-    filas.push(["Cuenta de AWS", r.ambientes === "dos" ? `${r.CUENTA_DEV} (pruebas) y ${r.CUENTA_PROD} (de verdad)` : r.CUENTA_DEV]);
+    filas.push(["Cuenta de AWS", `${r.CUENTA_DEV} (pruebas) y ${r.CUENTA_PROD} (de verdad)`]);
     filas.push(["Región", r.REGION]);
-    filas.push(["Perfil de AWS", r.ambientes === "dos" ? `${r.PERFIL_DEV} y ${r.PERFIL_PROD}` : r.PERFIL_DEV]);
+    filas.push(["Perfil de AWS", `${r.PERFIL_DEV} y ${r.PERFIL_PROD}`]);
   }
   const ancho = Math.max(...filas.map(([k]) => k.length));
   for (const [k, v] of filas) l.push(`  ${k.padEnd(ancho)}   ${v}`);

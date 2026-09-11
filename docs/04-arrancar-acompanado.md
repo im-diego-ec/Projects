@@ -421,9 +421,9 @@ te dice por qué la elegirías, qué te cuesta y qué límite tiene. Así:
 
 | Si elegís | Son |
 | --- | --- |
-| Supabase, trabajando solo, sin dominio propio | **9 preguntas**, y solo dos hay que escribirlas |
-| AWS con dos copias del proyecto | **14**, porque ahí los datos de la nube existen de verdad |
-| Todo lo que suma: AWS, dos copias, otra persona, dominio propio y Slack | **17**, el máximo |
+| Supabase, trabajando solo, sin dominio propio | **8 preguntas**, y solo dos hay que escribirlas |
+| AWS | **13**, porque ahí los datos de la nube existen de verdad |
+| Todo lo que suma: AWS, otra persona, dominio propio y Slack | **16**, el máximo |
 
 Las que no escribís se contestan con **Enter**, que elige la opción recomendada.
 Nunca te va a pedir un dato de AWS si no elegiste AWS.
@@ -467,7 +467,7 @@ cat valores.json
 ```
 
 **Qué vas a ver.** Las 23 casillas que el programa necesita, llenas con lo que
-derivó de tus 9 respuestas. Por ejemplo, si dijiste que no tenés dominio propio,
+derivó de tus 8 respuestas. Por ejemplo, si dijiste que no tenés dominio propio,
 vas a encontrar la dirección gratuita de Cloudflare ya puesta:
 
 ```json
