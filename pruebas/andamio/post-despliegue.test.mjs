@@ -12,6 +12,7 @@ import { fileURLToPath } from "node:url";
 
 const RAIZ = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 const WORKFLOW = path.join(RAIZ, "plantilla/.github/workflows/desplegar.yml");
+const SHA_DE_MENTIRA = "0123456789abcdef0123456789abcdef01234567";
 
 // ---------------------------------------------------------------------------
 // QUE EL DESPLIEGUE HAYA SALIDO 0 NO ES QUE EL SITIO CONTESTE.
@@ -100,6 +101,11 @@ async function correr(script, url) {
         PATH: `${relojFalso}${path.delimiter}${process.env.PATH}`,
         URL: url,
         GITHUB_STEP_SUMMARY: path.join(dir, "resumen.md"),
+        // EL RUNNER SIEMPRE LO TRAE, y el script corre con `set -u`: sin esto el
+        // paso muere con "unbound variable" en el banco y en ningun otro lado.
+        // Va con un valor reconocible a proposito, para poder AFIRMAR que el
+        // resumen le dice a la persona QUE commit pegar para promover.
+        GITHUB_SHA: SHA_DE_MENTIRA,
       },
     });
     return { codigo: 0, salida, resumen: fs.readFileSync(path.join(dir, "resumen.md"), "utf8") };
@@ -120,6 +126,17 @@ test("una direccion que contesta 200 con contenido pasa, y queda dicha", async (
     assert.match(r.salida, /::notice title=DEV esta en linea::/, "no dice la direccion donde se ve");
     assert.match(r.resumen, /Tu sitio esta en DEV, todavia no en produccion/, "no queda en el resumen del job, que es lo primero que se mira");
     assert.ok(r.resumen.includes(url), "el resumen no trae la direccion");
+
+    // Y EL RESUMEN TIENE QUE DECIR COMO PROMOVER, con el commit adentro.
+    //
+    // No es cosmetica: desde que la promocion es un acto humano --lo pide
+    // `promocion-por-ambientes`-- este resumen es el UNICO lugar donde la persona
+    // se entera de que su version esta esperando y de que tiene que hacer para
+    // publicarla. Un resumen que solo dice "esta en DEV" deja la version ahi para
+    // siempre, y el sintoma es que nadie publica nunca y nadie sabe por que.
+    assert.match(r.resumen, /Producción no se publica sola/, "el resumen no dice que produccion no sale sola: la version se queda esperando sin que nadie sepa");
+    assert.ok(r.resumen.includes(SHA_DE_MENTIRA), "el resumen no trae el commit que hay que pegar para promover");
+    assert.match(r.resumen, /promover_a_produccion/, "el resumen no nombra la casilla que hay que marcar");
   });
 });
 

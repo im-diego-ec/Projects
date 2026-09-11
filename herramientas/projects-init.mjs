@@ -2627,7 +2627,7 @@ function correrGh({ org, proyecto }) {
  *  reemplaza al recuadro 🕳️, y `frase` es la que reemplaza a la afirmacion
  *  "Se encienden ahora. Son las cuatro que el repo de referencia tiene
  *  funcionando" — que es falsa cuando el repositorio no puede tenerlas. */
-export function bloqueDeProteccion({ estado, detalle = "", rulesets = [], org, proyecto, fecha }) {
+export function bloqueDeProteccion({ estado, detalle = "", rulesets = [], org, proyecto, fecha, forma }) {
   const dia = fecha ?? new Date().toISOString().slice(0, 10);
   const sonda = `gh api repos/${org}/${proyecto}/rulesets`;
   const l = [];
@@ -2638,6 +2638,8 @@ export function bloqueDeProteccion({ estado, detalle = "", rulesets = [], org, p
     l.push("actualizá esto con la fecha: un documento de estado que nadie vuelve a medir es una");
     l.push("afirmación vencida.");
   };
+
+  const compuertaDeProd = bloqueDeLaCompuertaDeProd({ estado, forma, fecha: dia });
 
   if (estado === "puede") {
     l.push(`### 🟢 Este repositorio **sí puede** tener protección de rama — medido el ${dia}`);
@@ -2671,6 +2673,7 @@ export function bloqueDeProteccion({ estado, detalle = "", rulesets = [], org, p
     pie();
     return {
       lineas: l,
+      compuertaDeProd,
       frase: [
         "**Las cuatro que hay que encender.** Este repositorio puede tenerlas —está medido acá",
         "arriba— y alcanzan para que nada entre a `main` sin pasar por un PR verde:",
@@ -2722,6 +2725,7 @@ export function bloqueDeProteccion({ estado, detalle = "", rulesets = [], org, p
     pie();
     return {
       lineas: l,
+      compuertaDeProd,
       frase: [
         "**Las cuatro que habría que encender** — y que este repositorio **no puede** tener hoy",
         "(medido acá arriba, con la respuesta textual de GitHub). Sus 🔴 van a seguir en 🔴 hasta que",
@@ -2765,6 +2769,7 @@ export function bloqueDeProteccion({ estado, detalle = "", rulesets = [], org, p
   pie();
   return {
     lineas: l,
+    compuertaDeProd,
     frase: [
       "**Las cuatro que hay que encender** si este repositorio puede tenerlas — y eso **no se pudo",
       "medir** (está acá arriba, con el motivo). Alcanzan para que nada entre a `main` sin pasar por",
@@ -2796,6 +2801,82 @@ export function avisoDeProteccion({ estado, detalle, org, proyecto }) {
   );
 }
 
+/** La compuerta de PRODUCCION del despliegue, derivada de la MISMA medicion.
+ *
+ *  POR QUE REUSA LA SONDA DE RULESETS Y NO HACE UNA PROPIA. Porque es el mismo
+ *  muro. Medido el 2026-09-10 en la documentacion de GitHub: «Users with GitHub
+ *  Free plans can only configure environments for public repositories». O sea que
+ *  un repositorio privado del plan gratuito no puede tener revisores requeridos
+ *  en un environment, igual que no puede tener rulesets, y por la misma razon: el
+ *  plan. La sonda que ya corre distingue exactamente ese caso --el 403 con
+ *  «Upgrade to GitHub Pro or make this repository public»--, asi que agregar una
+ *  segunda medicion seria preguntar dos veces lo mismo y arriesgarse a que las
+ *  dos respuestas se contradigan.
+ *
+ *  LO QUE ESTE BLOQUE NO HACE, y hay que decirlo: no promete que la promocion
+ *  este desprotegida cuando no hay environment. El piso NO es el environment: es
+ *  que `desplegar.yml` no promueve solo --hay que apretar «Run workflow» y marcar
+ *  la casilla-- y eso vale en TODOS los planes. El environment agrega un segundo
+ *  candado donde se puede, no el primero.
+ *
+ *  SOLO PARA UN SITIO. Una aplicacion no recibe `desplegar.yml` --lo decide
+ *  `noViajanPorForma`--, asi que escribirle esto seria describirle maquinaria que
+ *  no tiene, que es justo lo que el requirement «El proyecto declara que puede
+ *  publicar y que no» prohibe. Para esa forma devuelve vacio. */
+export function bloqueDeLaCompuertaDeProd({ estado, forma, fecha }) {
+  if (forma !== "sitio") return [];
+  const dia = fecha ?? new Date().toISOString().slice(0, 10);
+  const l = [];
+  l.push("");
+  l.push("## La compuerta de PRODUCCION, que sale de esta misma medición");
+  l.push("");
+  l.push("Tu proyecto publica en dos tiempos: un merge a `main` con el CI en verde sube la versión a");
+  l.push("**DEV** y se detiene ahí. **Producción no se publica sola**: hay que ir a Actions → workflow");
+  l.push("`desplegar` → **Run workflow** y marcar la casilla. Eso vale en cualquier plan y es el piso.");
+  l.push("");
+  if (estado === "puede") {
+    l.push(`### 🟢 Y acá podés tener un segundo candado — medido el ${dia}`);
+    l.push("");
+    l.push("Este repositorio admite compuertas de plataforma (es lo que se midió arriba), así que el");
+    l.push("environment `produccion` que el workflow ya declara puede pedir **aprobación de otra");
+    l.push("persona** antes de publicar. Se enciende en **Settings → Environments → produccion →");
+    l.push("Required reviewers**, y es un acto humano: esta herramienta no toca ajustes de seguridad.");
+    l.push("");
+    l.push("**Qué cambia si lo encendés:** GitHub detiene el job *antes* del primer paso y deja escrito");
+    l.push("**quién aprobó**, que no es necesariamente quien disparó. Sin eso, el rastro dice quién");
+    l.push("apretó el botón y nada más.");
+    l.push("");
+    l.push("**Y lo que hay que saber antes de encenderlo**, porque sorprende: una corrida esperando");
+    l.push("aprobación **caduca a los 30 días**, y la corrida entera se **cancela a los 35** contando la");
+    l.push("espera. Queda **cancelada, no roja**: no vas a ver una ✗ que te llame la atención. Una");
+    l.push("aprobación que se deja para después no avisa cuando vence.");
+    return l;
+  }
+  if (estado === "sin-compuertas") {
+    l.push(`### 🔴 DESVÍO DECLARADO: acá el botón es la única compuerta — medido el ${dia}`);
+    l.push("");
+    l.push("GitHub **no permite configurar environments en repositorios privados del plan gratuito**");
+    l.push("(medido el 2026-09-10 en su documentación: *«Users with GitHub Free plans can only");
+    l.push("configure environments for public repositories»*). Es **el mismo muro** que la protección");
+    l.push("de rama de arriba, y las salidas son las mismas tres.");
+    l.push("");
+    l.push("**Qué significa, sin eufemismos.** La promoción a producción sigue exigiendo que una");
+    l.push("persona apriete el botón, y queda escrito quién y cuándo. Lo que NO tenés es que esa");
+    l.push("persona sea **otra**: quien escribe el código puede publicarlo sin que nadie más lo mire.");
+    l.push("");
+    l.push("En cualquier informe de estado esto se escribe **«no hay aprobación de terceros»**, nunca");
+    l.push("«está pendiente»: pendiente es lo que se puede hacer y todavía no se hizo.");
+    return l;
+  }
+  l.push(`### ⚪ No se pudo medir si hay segundo candado — ${dia}`);
+  l.push("");
+  l.push("La sonda no pudo contestar (mirá el bloque de arriba, que dice por qué y cómo destrabarla),");
+  l.push("así que esta página **no afirma nada** sobre si este repositorio admite aprobación de");
+  l.push("terceros en el environment `produccion`. Lo que sí es cierto en cualquier caso: la");
+  l.push("promoción exige apretar el botón.");
+  return l;
+}
+
 /** Mete el bloque medido en el documento del proyecto nuevo.
  *
  *  DOS CIRUGIAS ANCLADAS Y UN AGREGADO, y ninguna reescribe el documento entero:
@@ -2819,7 +2900,7 @@ export function avisoDeProteccion({ estado, detalle, org, proyecto }) {
  *  respuesta correcta a eso no es dejar al proyecto nuevo sin la medicion —seria
  *  cambiar un fail-open por otro—. Lo que no se hace nunca es callarse: cada
  *  ancla que no aparecio sale por `avisos`, para que la divergencia se vea. */
-export function insertarProteccionMedida(texto, { lineas: bloque, frase }) {
+export function insertarProteccionMedida(texto, { lineas: bloque, frase, compuertaDeProd = [] }) {
   const lineas = String(texto).split("\n");
   const avisos = [];
 
@@ -2862,6 +2943,15 @@ export function insertarProteccionMedida(texto, { lineas: bloque, frase }) {
     "> escribió `projects init`.",
     "",
   );
+
+  // 4. Y la compuerta de PRODUCCION, que sale de la misma medicion. Va al final
+  //    y sin ancla por el mismo motivo que el agregado de arriba: no puede
+  //    fallar. Para una forma que no recibe despliegue viene vacia, y entonces
+  //    esto no escribe nada — describirle una promocion a un proyecto que no la
+  //    tiene es el defecto que el change `promocion-por-ambientes` existe para
+  //    cerrar.
+  if (compuertaDeProd.length) lineas.push(...compuertaDeProd, "");
+
   return { texto: lineas.join("\n"), avisos };
 }
 
@@ -3614,7 +3704,7 @@ async function main(argv) {
   // pero el documento ya quedo con el estado REAL, que es justo lo que hay que
   // leer despues de un rojo. Ver el bloque de arriba para el defecto que cierra.
   const proteccion = sondarProteccion({ org: valores.ORG, proyecto: valores.PROYECTO });
-  const escrituraDeProteccion = escribirProteccionMedida(o.destino, { ...proteccion, org: valores.ORG, proyecto: valores.PROYECTO });
+  const escrituraDeProteccion = escribirProteccionMedida(o.destino, { ...proteccion, org: valores.ORG, proyecto: valores.PROYECTO, forma: formaDe(valores) });
   if (!escrituraDeProteccion.ok) {
     console.error(
       `::error::${escrituraDeProteccion.error}. Esta herramienta promete escribir en ${RUTA_PROTECCION} el estado ` +

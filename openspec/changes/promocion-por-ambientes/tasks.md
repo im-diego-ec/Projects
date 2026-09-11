@@ -30,20 +30,69 @@ estado: pendiente-de-revision
 
 ## 2. La compuerta de PROD, medida y no asumida
 
-- [ ] 2.1 La herramienta **mide** si el repositorio admite compuertas de
-      environment. **Y la medición YA EXISTE:** `sondarProteccion` pega a
-      `repos/<org>/<repo>/rulesets` y clasifica el 403 del plan gratuito —*«Upgrade to
-      GitHub Pro or make this repository public to enable this feature»*— como
-      `sin-compuertas`. Es **el mismo muro**: el repositorio privado del plan gratuito
-      que no admite rulesets tampoco admite compuertas de environment.
-      Así que esta tarea no necesita una sonda nueva: reusa el `estado` que la
-      herramienta ya calcula. `puede` → el tramo de PROD pide aprobación;
-      `sin-compuertas` → queda detrás de `workflow_dispatch` y se declara el desvío.
-- [ ] 2.2 Si admite: el tramo de PROD pide aprobación del environment.
-- [ ] 2.3 Si no admite: PROD queda detrás de `workflow_dispatch` y **se declara el
-      desvío**. No se finge una compuerta que no existe.
-- [ ] 2.4 Queda escrito que una corrida esperando aprobación más de 30 días
-      **falla** — deja rojo visible, no silencio.
+> **La tarea suponía un mecanismo y la medición encontró otro mejor.** Lo que
+> decía: `puede` → el tramo de PROD pide aprobación de environment;
+> `sin-compuertas` → queda detrás de `workflow_dispatch`. O sea, dos pisos
+> distintos según el plan, y el plan gratuito privado se quedaba con el más bajo.
+>
+> **Medido el 2026-09-10 en la documentación de GitHub**, tres hechos:
+>
+> 1. *«Users with GitHub Free plans can only configure environments for public
+>    repositories»* — **es el mismo muro** que la protección de rama. La premisa de
+>    la tarea 2.1 era correcta y por eso no hace falta una sonda nueva.
+> 2. *«Running a workflow that references an environment that does not exist will
+>    create an environment with the referenced name»* — declararlo **no rompe nada**
+>    donde no hay compuerta.
+> 3. *«A workflow may wait for up to 30 days on environment approvals»*, y el tope
+>    de una corrida entera es de **35 días** contando la espera, tras los cuales
+>    *«the workflow run is cancelled»*.
+>
+> **Lo que eso cambió:** el piso no es el environment, es el botón. `workflow_dispatch`
+> vale en **todos** los planes, así que la promoción es un acto humano siempre, y el
+> environment pasa a ser un **segundo** candado donde el repositorio lo admite. Un
+> proyecto en plan gratuito privado ya no se queda sin compuerta: se queda sin
+> **tercero**, que es una pérdida mucho más chica y se declara con ese nombre.
+
+- [x] 2.1 La herramienta **mide** si el repositorio admite compuertas de
+      environment, y **reusa la medición que ya existía**: `sondarProteccion` pega a
+      `repos/<org>/<repo>/rulesets` y clasifica el 403 del plan gratuito como
+      `sin-compuertas`. Es el mismo muro, medido arriba. `bloqueDeLaCompuertaDeProd`
+      deriva de ese `estado` lo que el proyecto lee en `.github/proteccion-main.md`.
+- [x] 2.2 Si admite: el documento del proyecto dice dónde se encienden los
+      **Required reviewers** del environment `produccion` —que el workflow ya
+      declara— y qué agrega eso al rastro: **quién aprobó**, que no es
+      necesariamente quien disparó.
+- [x] 2.3 Si no admite: **se declara el desvío**, y se declara con precisión. No
+      dice «no hay compuerta» —sería falso, la promoción sigue exigiendo el botón—
+      sino «no hay aprobación de terceros»: quien escribe el código puede
+      publicarlo sin que nadie más lo mire.
+- [x] 2.4 **Escrito, y con la tarea corregida.** Decía «una corrida esperando más
+      de 30 días **falla** — deja rojo visible». Medido: la aprobación caduca a los
+      **30 días** y la corrida se **cancela** a los **35**. Queda **cancelada, no
+      roja**. Prometer un rojo habría mandado a alguien a esperar una señal que
+      GitHub no da, que es la clase de error que este change persigue.
+
+### Lo que 2.x arrastró, y no estaba en la tarea
+
+- [x] 2.5 **`produccion` ya no corre solo.** El `needs: dev` hacía que cada merge
+      publicara, que es exactamente lo que el requirement «La promoción a producción
+      es un acto deliberado con rastro» prohíbe. Hoy sólo corre por
+      `workflow_dispatch` con la casilla marcada, y el resumen de DEV dice el commit
+      que hay que pegar.
+- [x] 2.6 **La promoción comprueba que esa versión pasó por DEV, y en verde.** El
+      hueco era real y silencioso: el job de DEV **sube** la versión y **después**
+      comprueba que conteste; si lo primero sale bien y lo segundo mal, la versión
+      queda cargada en Cloudflare, promovible, indistinguible de una buena.
+      Banco: `pruebas/andamio/la-compuerta-de-prod.test.mjs`, que **corre el script**
+      contra un `gh` de mentira en vez de leer el YAML.
+- [x] 2.7 **Falla cerrado, y los tres desenlaces se distinguen.** «No pude
+      preguntar», «nunca se subió» y «se subió y salió rojo» piden tres cosas
+      distintas de la persona. Un solo mensaje manda a mirar donde no está el
+      problema — y tratar el primero como éxito sería el fail-open que el marco
+      persigue con más insistencia.
+- [x] 2.8 **El apartamiento tiene nombre** (`sin_pasar_por_dev`) y deja escrito
+      quién lo pidió. Es el escenario «Apartarse de la compuerta» del spec delta,
+      que hasta ahora no tenía implementación.
 
 ## 3. Las dos preguntas que se eliminan
 

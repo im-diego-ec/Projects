@@ -41,7 +41,62 @@ mueve sobre un cambio incompatible.
 
 ## [No publicado]
 
+### Cambiado
+
+- **La promoción a producción dejó de ocurrir sola, y esa era la diferencia entre lo
+  que el spec pedía y lo que el andamio hacía.** `desplegar.yml` tenía `produccion`
+  con un `needs: dev`, así que **cada merge a `main` publicaba**. El requirement que
+  este mismo repositorio ya tenía escrito dice lo contrario: *«The system SHALL
+  require an explicit human decision to promote from the test environment to
+  production»*. Un job que corre detrás de cada merge no es una decisión, es una
+  consecuencia.
+
+  **Cómo funciona ahora:** un merge con el CI en verde sube la versión a DEV y se
+  detiene ahí. El resumen del job dice el commit exacto que hay que pegar para
+  publicar. Promover es ir a Actions → `desplegar` → **Run workflow** y marcar la
+  casilla; queda escrito quién y cuándo.
+
+  **Y la promoción comprueba que esa versión haya pasado por DEV en verde**, que es
+  un hueco que no existía. El job de DEV hace dos cosas —sube la versión y *después*
+  comprueba que su dirección conteste— y la primera puede salir bien con la segunda
+  mal: el sitio sube y sirve un 404. Esa versión quedaba cargada en Cloudflare,
+  promovible, indistinguible de una buena.
+
+  **Los tres desenlaces se distinguen**, y ninguno se lee como éxito: «no se pudo
+  preguntar» (falla cerrado — la ausencia de datos no es un verde), «nunca se subió»
+  y «se subió y salió rojo» mandan a mirar a lugares distintos. El apartamiento
+  existe, se llama `sin_pasar_por_dev`, y deja escrito quién lo pidió.
+
+  **Para un consumidor: nada.** Ningún proyecto recibe todavía este workflow. Para
+  quien genere un sitio desde acá: su producción deja de publicarse sola, que es lo
+  que el marco venía prometiendo por escrito sin cumplir.
+
+- **BREAKING para quien ya tuviera un sitio generado** —hoy, nadie—: `produccion`
+  ya no se dispara por `workflow_run`. Un merge que antes publicaba, ahora sube a DEV
+  y espera. Se dice acá porque el criterio del repo es que endurecer un check que un
+  repo verde ya pasaba es incompatible aunque no rompa ningún archivo.
+
 ### Añadido
+
+- **El proyecto se entera de qué compuerta de producción tiene de verdad, midiendo.**
+  `projects init` ya medía si el repositorio admite protección de rama; la promoción
+  choca contra **el mismo muro** —medido el 2026-09-10 en la documentación de GitHub:
+  *«Users with GitHub Free plans can only configure environments for public
+  repositories»*— y eso no se decía en ningún lado. Ahora `.github/proteccion-main.md`
+  lo escribe derivándolo de la sonda que ya corría, sin preguntar dos veces lo mismo.
+
+  **Lo que dice según el caso:** donde se puede, dónde se encienden los *Required
+  reviewers* y qué agregan al rastro (**quién aprobó**, que no es necesariamente quien
+  disparó), más los dos números que sorprenden —la aprobación **caduca a los 30 días**
+  y la corrida se **cancela a los 35**, quedando **cancelada, no roja**—. Donde no se
+  puede, queda **el desvío declarado** con el nombre preciso: no es que no haya
+  compuerta —el botón sigue siendo un acto humano en cualquier plan— es que no hay
+  **tercero**.
+
+  **A una aplicación no se le escribe nada de esto**, porque no recibe `desplegar.yml`:
+  documentarle una promoción que su proyecto no tiene es el defecto que el change
+  `promocion-por-ambientes` existe para cerrar.
+
 
 - **`docs/03-stack.md` cuenta la promoción en el idioma de quien la va a usar:** el
   proyecto sube tu sitio a una dirección de prueba —una de verdad, que podés abrir y
