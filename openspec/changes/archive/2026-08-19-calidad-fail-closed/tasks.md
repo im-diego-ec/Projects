@@ -156,10 +156,16 @@ excluyendo archivos para llegar— o declarar la deuda con su motivo y su fecha.
       `feat/cobertura-web-funciones-80` (o declarar la deuda de `web` con su
       motivo y su fecha) **antes del 2026-09-30**. Pasada esa fecha el marco lo
       enrojece sin que nadie toque una línea, que es exactamente el punto.
+      **NO BLOQUEA, y la razón:** su sujeto no existe en Projects. La rama es de
+      Rigel —el marco del que Projects se bifurcó el 2026-08-24— y este repo tiene
+      **cero consumidores** (`docs/14-consumidores.md` está vacío), así que no hay
+      ningún paquete `web` bajo el mínimo que mergear ni cuya deuda declarar.
+      Darle un destino sería apuntar a un repositorio que no está.
 - [ ] 4.5d **Limpieza posterior:** borrar `VENTANA_DE_GRACIA_HASTA` y su rama en
       `veredictoDePaquete` cuando la fecha haya pasado. Es un PR de limpieza que
       NO cambia comportamiento: la ventana ya está cerrada por fecha para
       entonces.
+      **Destino:** `openspec/changes/la-ventana-se-cierra`, tarea 3.1.
 - [x] 4.6 **El marco reparte el umbral del total (2026-08-20).** El andamio no
       repartía ninguno, así que cada proyecto inventaba el número, y el que se
       inventa es el que la medición dio ese día: así llegó `functions: 70.6`.

@@ -12,6 +12,7 @@ import { fileURLToPath } from "node:url";
 
 const RAIZ = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 const WORKFLOW = path.join(RAIZ, "plantilla/.github/workflows/desplegar.yml");
+const SHA_DE_MENTIRA = "0123456789abcdef0123456789abcdef01234567";
 
 // ---------------------------------------------------------------------------
 // QUE EL DESPLIEGUE HAYA SALIDO 0 NO ES QUE EL SITIO CONTESTE.
@@ -30,7 +31,10 @@ const WORKFLOW = path.join(RAIZ, "plantilla/.github/workflows/desplegar.yml");
 /** El `run:` del paso que comprueba, sacado del workflow y desindentado. */
 function scriptDeLaComprobacion() {
   const t = fs.readFileSync(WORKFLOW, "utf8");
-  const desde = t.indexOf("- name: Comprobar que la direccion contesta de verdad");
+  // El paso se llama "Comprobar que DEV contesta de verdad" desde que el workflow
+  // se partio en dos ambientes: hay DOS sondas, una por job, y esta mide la de DEV
+  // --que es la que decide si se promueve--. La de produccion tiene su propio caso.
+  const desde = t.indexOf("- name: Comprobar que DEV contesta de verdad");
   assert.notEqual(
     desde,
     -1,
@@ -97,6 +101,11 @@ async function correr(script, url) {
         PATH: `${relojFalso}${path.delimiter}${process.env.PATH}`,
         URL: url,
         GITHUB_STEP_SUMMARY: path.join(dir, "resumen.md"),
+        // EL RUNNER SIEMPRE LO TRAE, y el script corre con `set -u`: sin esto el
+        // paso muere con "unbound variable" en el banco y en ningun otro lado.
+        // Va con un valor reconocible a proposito, para poder AFIRMAR que el
+        // resumen le dice a la persona QUE commit pegar para promover.
+        GITHUB_SHA: SHA_DE_MENTIRA,
       },
     });
     return { codigo: 0, salida, resumen: fs.readFileSync(path.join(dir, "resumen.md"), "utf8") };
@@ -110,9 +119,24 @@ test("una direccion que contesta 200 con contenido pasa, y queda dicha", async (
   await conServidor(200, "<html><body>hola</body></html>", async (url) => {
     const r = await correr(script, url);
     assert.equal(r.codigo, 0, `tendria que pasar y salio ${r.codigo}:\n${r.salida}`);
-    assert.match(r.salida, /::notice title=Tu sitio esta en linea::/, "no dice la direccion donde se ve");
-    assert.match(r.resumen, /Tu sitio esta publicado/, "no queda en el resumen del job, que es lo primero que se mira");
+    // "DEV esta en linea" y no "Tu sitio esta publicado": esta sonda mide el
+    // ambiente de PRUEBA, y decirle a alguien que su sitio esta publicado cuando
+    // todavia no se promovio seria la clase de mentira que este banco existe para
+    // impedir. El aviso de produccion lo da la otra sonda, en el otro job.
+    assert.match(r.salida, /::notice title=DEV esta en linea::/, "no dice la direccion donde se ve");
+    assert.match(r.resumen, /Tu sitio esta en DEV, todavia no en produccion/, "no queda en el resumen del job, que es lo primero que se mira");
     assert.ok(r.resumen.includes(url), "el resumen no trae la direccion");
+
+    // Y EL RESUMEN TIENE QUE DECIR COMO PROMOVER, con el commit adentro.
+    //
+    // No es cosmetica: desde que la promocion es un acto humano --lo pide
+    // `promocion-por-ambientes`-- este resumen es el UNICO lugar donde la persona
+    // se entera de que su version esta esperando y de que tiene que hacer para
+    // publicarla. Un resumen que solo dice "esta en DEV" deja la version ahi para
+    // siempre, y el sintoma es que nadie publica nunca y nadie sabe por que.
+    assert.match(r.resumen, /Producción no se publica sola/, "el resumen no dice que produccion no sale sola: la version se queda esperando sin que nadie sepa");
+    assert.ok(r.resumen.includes(SHA_DE_MENTIRA), "el resumen no trae el commit que hay que pegar para promover");
+    assert.match(r.resumen, /promover_a_produccion/, "el resumen no nombra la casilla que hay que marcar");
   });
 });
 

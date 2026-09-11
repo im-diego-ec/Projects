@@ -6,16 +6,19 @@ hay nada que hacer acá salvo agregar una fila cuando un repositorio adopta el
 marco.
 
 **Palabras del marco que vas a ver acá**, cada una definida en una línea:
-[bump](02-glosario.md), [censo](02-glosario.md), [fail-open](02-glosario.md),
-[pin](02-glosario.md).
+[andamio](02-glosario.md), [bump](02-glosario.md), [censo](02-glosario.md),
+[fail-open](02-glosario.md), [pin](02-glosario.md).
 
 > **Este archivo está VACÍO a propósito y eso no significa «cero consumidores».**
 > Significa que ninguna adopción pasó todavía por él. Es la mitad barata de la
-> recomendación B1 de [13-censo-de-consumidores.md](13-censo-de-consumidores.md): el lugar
-> donde se escribe la línea existe; **lo que falta es lo que la escribe**, y eso vive
-> en `herramientas/projects-init.mjs`. Leer una tabla vacía como «nadie consume el
-> marco» sería exactamente el fail-open que el censo denuncia — un escaneo que no
-> encontró nada saliendo verde por construcción.
+> recomendación B1 de [13-censo-de-consumidores.md](13-censo-de-consumidores.md).
+> **La mitad que escribe la fila YA existe**: `herramientas/projects-init.mjs` la
+> imprime resuelta al terminar un arranque (ver «De dónde sale la fila», más abajo).
+> Lo que falta es el acto humano que no se puede automatizar desde acá — abrir y
+> mergear el PR contra este repositorio — y la ruta de la skill `projects-adoptar`,
+> para el repo que adopta el marco sin pasar por el arranque. Leer una tabla vacía
+> como «nadie consume el marco» sería exactamente el fail-open que el censo denuncia
+> — un escaneo que no encontró nada saliendo verde por construcción.
 
 ## Qué es y por qué está acá
 
@@ -56,31 +59,54 @@ repo.** Tres columnas, y ninguna de las tres se adivina:
    organización—, que necesita una credencial de organización y por eso no entra por un
    PR. Escribir de memoria las filas que faltan sería inventar datos, que es peor que la
    tabla vacía: una fila inventada no se distingue de una medida.
-2. **Las adopciones nuevas todavía no lo escriben solas.** Hoy la línea depende de que
-   alguien se acuerde, y por la premisa de este marco eso no cuenta como enforcement.
+2. **Las adopciones nuevas ya no dependen de que alguien se acuerde de los datos, pero
+   sí de que alguien mergee el PR.** El arranque imprime la fila con sus tres columnas
+   resueltas; lo que no puede hacer es abrir un pull request contra **otro**
+   repositorio desde una máquina que puede no tener credenciales para escribir ahí.
+   Eso sigue siendo un acto humano, y este documento no lo llama enforcement.
 
 La adopción que está en curso al 2026-08-24 tiene su propio registro de fricción en
 [adopciones/2026-08-24-supply-chain.md](adopciones/2026-08-24-supply-chain.md), con la
 versión del marco que pina y el repo destino; cuando aterrice, es la primera fila de
 esta tabla.
 
-## Lo que falta para que la fila no dependa de nadie
+## De dónde sale la fila
 
-`herramientas/projects-init.mjs` ya imprime al final la lista numerada de pendientes
-humanos que sale después de `escritos N archivos`. La línea del registro es **un
-pendiente más de esa lista**: nombra este archivo, dice qué tres datos van en la fila,
-y le dice a quien arranca que abra el PR contra el marco. Mientras eso no exista, el
-comando lo mide:
+`herramientas/projects-init.mjs` la entrega **resuelta** al terminar un arranque,
+como un pendiente más de la lista numerada de actos humanos. No pide averiguar
+nada: imprime las tres columnas en su orden, listas para pegar.
+
+```
+  7. La fila de ESTE repo en el registro de consumidores del marco.
+     Va por PR contra el repo del marco, en docs/14-consumidores.md:
+       | Ejemplo-Org/people-agenda | 2026-09-10 | v1.9.6 |
+```
+
+**La versión se lee del `ci.yml` que la herramienta acaba de escribir en el
+destino, no de una constante.** El pin lo fija el andamio y lo mueve el paso 5 del
+release; declararlo aparte en la herramienta sería un segundo lugar donde vive el
+mismo hecho, y nada lo cruzaría. Leerlo del árbol hace que la línea no pueda
+mentir: dice el pin que el repo **tiene**. Si no se puede leer, la fila lo declara
+—`NO SE PUDO LEER`— en vez de completar un valor adivinado, porque una versión
+inventada no se distingue de una medida. Lo verifica
+`pruebas/init/consumidor-se-anota.test.mjs`, cruzando las dos lecturas.
+
+La medición que este documento usaba para saber si la mitad automática existía:
 
 ```bash
 node <ruta-al-clon>/herramientas/projects-init.mjs --valores valores.json \
   --destino <repo> --sin-herramientas 2>&1 | grep -i consumidores
 ```
 
-Hoy ese `grep` no devuelve nada y sale **1**, que es exactamente la medición de que la
-mitad automática no existe. El día que devuelva la línea, este párrafo se borra.
+Hoy devuelve la línea y sale **0**.
 
-**El límite honesto, que sigue en pie aun con las dos mitades hechas:** es un paso que
-alguien tiene que mergear. Lo que compra no es enforcement, es que una omisión se
-vuelve *visible*: un repo en el registro sin PR de bump, y un PR de bump de un repo que
-no está en el registro, son dos preguntas distintas y las dos se pueden hacer.
+**El límite honesto, que sigue en pie:** es un paso que alguien tiene que
+mergear, y el PR va contra **otro** repositorio —el del marco— desde una máquina
+que puede no tener credenciales para escribir ahí. Lo que se compra no es
+enforcement: es que la omisión se vuelve *visible*. Un repo en el registro sin PR
+de bump, y un PR de bump de un repo que no está en el registro, son dos preguntas
+distintas y las dos se pueden hacer.
+
+**Lo que sigue faltando, y no lo tapa esta mitad:** la migración por la skill
+`projects-adoptar` todavía no nombra el registro, así que un repo que adopta el
+marco sin pasar por el arranque no recibe la línea.

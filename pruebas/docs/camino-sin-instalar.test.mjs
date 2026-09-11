@@ -87,3 +87,76 @@ test("MUERDE: los tres detectores ven la version vieja de la guia", () => {
     "el orden del texto viejo pone el enlace antes del boton, asi que el patron mira los 200 caracteres siguientes",
   );
 });
+
+// ---------------------------------------------------------------------------
+// EL NUMERO DE PREGUNTAS SE CUENTA, NO SE RECUERDA.
+//
+// QUE DEFECTO CIERRA. `docs/04` decia "un formulario con cinco preguntas" y el
+// formulario tiene CUATRO. Escrito a mano una vez, quedo viejo cuando el
+// formulario cambio, y nadie lo contradice: quien abre esa pagina la abre para
+// enterarse. Este archivo ya deriva del arbol los repos, el nombre del workflow y
+// la frase de exito; el numero era lo unico que seguia a mano.
+// ---------------------------------------------------------------------------
+
+/** Los inputs del formulario, contados del YAML y no de la memoria. */
+function preguntasDelFormulario() {
+  return inputsDe(PUERTA);
+}
+
+/** Los inputs declarados en un YAML de workflow. Toma el TEXTO --y no el archivo--
+ *  para que el caso MUERDE pueda pasarle formularios sinteticos. */
+export function inputsDe(yaml) {
+  const lineas = yaml.split("\n");
+  const i = lineas.findIndex((l) => l.trim() === "inputs:");
+  assert.notEqual(i, -1, "personalizar.yml ya no declara `inputs:`: esta guarda quedaria mirando al vacio");
+  const sangria = lineas[i].length - lineas[i].trimStart().length;
+  const nombres = [];
+  for (const l of lineas.slice(i + 1)) {
+    if (!l.trim() || l.trim().startsWith("#")) continue;
+    const k = l.length - l.trimStart().length;
+    if (k <= sangria) break;
+    if (k === sangria + 2 && l.trimEnd().endsWith(":")) nombres.push(l.trim().slice(0, -1));
+  }
+  return nombres;
+}
+
+const NUMEROS = { dos: 2, tres: 3, cuatro: 4, cinco: 5, seis: 6, siete: 7, ocho: 8, nueve: 9 };
+
+test("el numero de preguntas que promete la guia es el que el formulario tiene", () => {
+  const cuantas = preguntasDelFormulario().length;
+  assert.ok(cuantas > 0, "no se leyo ningun input del formulario: la guarda quedaria mirando al vacio");
+
+  const m = /formulario con (\w+) preguntas/.exec(GUIA);
+  assert.ok(m, "la guia ya no dice cuantas preguntas tiene el formulario; si se saco a proposito, este caso sobra");
+  const prometidas = NUMEROS[m[1]] ?? Number(m[1]);
+  assert.equal(
+    prometidas,
+    cuantas,
+    `la guia promete ${m[1]} preguntas y el formulario tiene ${cuantas} (${preguntasDelFormulario().join(", ")}). ` +
+      `Contar de menos deja a alguien creyendo que termino; contar de mas lo manda a buscar una pregunta que no existe`,
+  );
+});
+
+/** El predicado, separado para poder MUTARLO. Devuelve los desacuerdos. */
+export function desacuerdosDelNumero(textoGuia, yamlFormulario) {
+  const cuantas = inputsDe(yamlFormulario).length;
+  const m = /formulario con (\w+) preguntas/.exec(textoGuia);
+  if (!m) return ["la guia no dice cuantas preguntas tiene el formulario"];
+  const prometidas = NUMEROS[m[1]] ?? Number(m[1]);
+  return prometidas === cuantas ? [] : [`la guia promete ${prometidas} y el formulario tiene ${cuantas}`];
+}
+
+test("MUERDE: el predicado enrojece en los DOS sentidos, de mas y de menos", () => {
+  // ESTE CASO ERA UNA TAUTOLOGIA. Decia `assert.notEqual(cuantas, cuantas + 1)`, que
+  // es verdad siempre y no toca la pieza vigilada: podia quedar verde con el
+  // predicado roto. Ahora se muta de verdad, contra formularios sinteticos.
+  const guiaCuatro = "un formulario con cuatro preguntas en castellano";
+  const yaml = (n) =>
+    ["on:", "  workflow_dispatch:", "    inputs:"]
+      .concat(Array.from({ length: n }, (_, i) => [`      campo${i}:`, "        type: string"]).flat())
+      .join("\n");
+
+  assert.deepEqual(desacuerdosDelNumero(guiaCuatro, yaml(4)), [], "cuatro y cuatro tienen que coincidir");
+  assert.equal(desacuerdosDelNumero(guiaCuatro, yaml(5)).length, 1, "no caza el formulario que gano una pregunta");
+  assert.equal(desacuerdosDelNumero(guiaCuatro, yaml(3)).length, 1, "no caza el formulario que perdio una pregunta");
+});

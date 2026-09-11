@@ -200,6 +200,22 @@ export const PREGUNTAS = [
   },
   {
     id: "plataforma",
+    // NO SE PREGUNTA PARA UN SITIO, por el mismo motivo que `ambientes` dejo de
+    // preguntarse y con la misma medicion detras (2026-09-10): con forma=sitio las
+    // TRES opciones producen el mismo proyecto. Medido sobre `derivar()`, lo unico
+    // que cambia entre `aws`, `supabase` y `ninguna` es la clave `plataforma`
+    // misma; el arbol de archivos es identico en los tres casos.
+    //
+    // Lo unico que ademas se movia era el TEXTO de un desvio, que explicaba por que
+    // el Terraform de AWS no habia viajado. O sea: la persona elegia AWS, no recibia
+    // nada de AWS, y recibia un parrafo explicando que no. Eso es exactamente lo que
+    // `menu-que-no-miente` llama hacerle creer que eligio una arquitectura cuando
+    // eligio un texto.
+    //
+    // Un sitio publica en Cloudflare elija lo que elija. Cuando la promocion exista
+    // y un sitio tenga de verdad mas de un destino, esta pregunta vuelve con algo
+    // que contestar.
+    salta: (r) => r.forma === "sitio",
     texto: "¿Dónde va a vivir tu proyecto? O sea: quién guarda tus datos y en qué computadora corre.",
     opciones: [
       {
@@ -287,58 +303,17 @@ export const PREGUNTAS = [
     ],
   },
   {
-    id: "ambientes",
-    // NO SE PREGUNTA PARA UN SITIO, y el motivo es que la respuesta no cambiaba
-    // nada. Medido: contestar «dos» sobre forma=sitio produce los MISMOS 42
-    // archivos que contestar «una», y lo unico que se mueve es el valor declarado
-    // `DOMINIO_DEV`. No hay un segundo destino que desplegar: un sitio publica en
-    // uno solo, y ese es el publico.
-    //
-    // Preguntar algo cuya respuesta no cambia nada es peor que no preguntarlo: le
-    // hace creer a la persona que eligio una arquitectura cuando eligio un texto.
-    // Es el mismo criterio con el que las cinco preguntas de AWS ya se saltan.
-    salta: (r) => r.forma === "sitio",
-    texto: "¿Cuántas copias del proyecto querés? Una para probar sin miedo, otra para lo que ve la gente de verdad.",
-    opciones: [
-      {
-        valor: "uno",
-        etiqueta: "Una sola, para empezar",
-        detalle:
-          "Más simple y más barato. Con el plan gratuito de Supabase es lo que conviene: te deja 2 " +
-          "proyectos activos, y usar los dos en dos copias te deja sin margen. Cuando haya gente " +
-          "usándolo de verdad, agregás la segunda.",
-        recomendada: true,
-      },
-      {
-        valor: "dos",
-        etiqueta: "Dos: una de prueba y una de verdad",
-        detalle:
-          "Lo correcto cuando ya hay personas usando tu proyecto: probás en una sin romperle nada a " +
-          "nadie, y cuando funciona pasa a la otra. Cuesta el doble de configuración.",
-      },
-    ],
-  },
-  // -------------------------------------------------------------------------
-  // LAS CINCO DE AWS. Solo se preguntan si la plataforma ES AWS, y ese `salta`
-  // es la razon de ser de todo este archivo: hasta hoy las cinco eran
-  // OBLIGATORIAS para todo el mundo, asi que quien elegia Supabase para no
-  // gastar tenia que conseguir igual un numero de cuenta de AWS de doce digitos.
-  // -------------------------------------------------------------------------
-  {
     id: "CUENTA_DEV",
     libre: true,
     salta: (r) => !usaAws(r),
-    texto: (r) =>
-      r.ambientes === "dos"
-        ? "¿Cuál es el número de cuenta de AWS donde vas a PROBAR? Son doce dígitos."
-        : "¿Cuál es el número de cuenta de AWS? Son doce dígitos.",
+    texto: "¿Cuál es el número de cuenta de AWS donde vas a PROBAR? Son doce dígitos.",
     ayuda: "Lo ves arriba a la derecha en la consola de AWS, o con: aws sts get-caller-identity",
     normaliza: (t) => t.replace(/[\s-]/g, ""),
   },
   {
     id: "CUENTA_PROD",
     libre: true,
-    salta: (r) => !usaAws(r) || r.ambientes !== "dos",
+    salta: (r) => !usaAws(r),
     texto: "¿Y el número de cuenta de AWS donde va lo que ve la gente de verdad?",
     ayuda: "Conviene que sea una cuenta DISTINTA de la de pruebas: es lo que impide que un error de prueba toque lo real.",
     normaliza: (t) => t.replace(/[\s-]/g, ""),
@@ -355,17 +330,14 @@ export const PREGUNTAS = [
     id: "PERFIL_DEV",
     libre: true,
     salta: (r) => !usaAws(r),
-    texto: (r) =>
-      r.ambientes === "dos"
-        ? "¿Cómo se llama tu perfil de AWS en esta computadora, el de pruebas?"
-        : "¿Cómo se llama tu perfil de AWS en esta computadora?",
+    texto: "¿Cómo se llama tu perfil de AWS en esta computadora, el de pruebas?",
     ayuda: "Es el nombre que le pusiste al configurarlo. Los ves con: aws configure list-profiles",
     normaliza: (t) => t.trim(),
   },
   {
     id: "PERFIL_PROD",
     libre: true,
-    salta: (r) => !usaAws(r) || r.ambientes !== "dos",
+    salta: (r) => !usaAws(r),
     texto: "¿Y el perfil de AWS de lo que ve la gente de verdad?",
     ayuda: "Los ves con: aws configure list-profiles",
     normaliza: (t) => t.trim(),
@@ -514,7 +486,11 @@ export function derivar(r) {
   // Con UN ambiente los dos dominios son el mismo a proposito: el andamio
   // todavia sustituye los dos marcadores, y escribir dos direcciones distintas
   // para una sola copia seria inventar una que no existe.
-  const dominioDev = r.ambientes === "dos" ? `dev.${unDominio}` : unDominio;
+  // LA TOPOLOGIA ES SIEMPRE Local -> DEV -> PROD (decision del PO, 2026-09-10),
+  // asi que DEV siempre tiene su propia direccion. Antes esto colgaba de la
+  // respuesta a `ambientes`, una pregunta que se retiro porque con la plataforma
+  // recomendada cambiaba EXACTAMENTE UNA CLAVE --esta-- y ningun archivo.
+  const dominioDev = `dev.${unDominio}`;
 
   return {
     // EN MINUSCULA Y FUERA DE LOS 21 a proposito: no es un marcador que el
@@ -547,13 +523,13 @@ export function derivar(r) {
     ...(usaAws(r)
       ? {
           CUENTA_DEV: r.CUENTA_DEV,
-          // Con UN ambiente no se pregunta dos veces por lo mismo: la cuenta y
-          // el perfil de "produccion" SON los mismos, y decirlo asi es mas
-          // honesto que pedir dos veces el mismo dato.
-          CUENTA_PROD: r.ambientes === "dos" ? r.CUENTA_PROD : r.CUENTA_DEV,
+          // DOS AMBIENTES SIEMPRE: la cuenta de produccion se pregunta y no se
+          // hereda de la de pruebas. Que sean distintas es lo que impide que un
+          // error de prueba toque lo real.
+          CUENTA_PROD: r.CUENTA_PROD,
           REGION: r.REGION,
           PERFIL_DEV: r.PERFIL_DEV,
-          PERFIL_PROD: r.ambientes === "dos" ? r.PERFIL_PROD : r.PERFIL_DEV,
+          PERFIL_PROD: r.PERFIL_PROD,
         }
       : RELLENO_AWS),
     PREFIJO_RECURSOS: kebab(r.PROYECTO).slice(0, 20),
@@ -615,6 +591,57 @@ export function desvios(r, hoy = new Date().toISOString().slice(0, 10)) {
       revisar: "cuando entre la segunda persona al proyecto",
     });
   }
+  // EL GATE DEL PO, QUE EL ANDAMIO APAGA SIN DECIRLO.
+  //
+  // `plantilla/.github/CODEOWNERS` lo escribe de frente en su encabezado: "el PO
+  // NO debe ser miembro del equipo de builders: si lo fuera, podria satisfacer su
+  // propio gate desde el otro rol y la separacion se cae". Y `derivar()` asigna
+  // `PO: r.ORG` y `BUILDER_1: r.ORG` --la MISMA persona-- SIEMPRE, con companero o
+  // sin el.
+  //
+  // La mecanica que lo vuelve silencioso es la misma que el propio archivo
+  // explica: GitHub pide review a los owners EXCEPTO al autor. En las rutas de
+  // contrato el PO es el UNICO owner, asi que cuando el PO es quien abre el PR no
+  // queda NADIE asignado. No hay rojo, no hay aviso: el gate simplemente no ocurre.
+  //
+  // SON DOS CASOS DISTINTOS Y NO SE DECLARAN IGUAL. Trabajando solo no hay salida
+  // --no hay a quien darle el rol-- y se revisa cuando entre la segunda persona.
+  // CON companero SI hay salida, y es una decision que alguien tiene que tomar:
+  // el companero puede ser el PO. Decir "es una sola persona" cuando son dos seria
+  // declarar un motivo falso, que es peor que no declarar.
+  const soloUno = r.equipo !== "equipo";
+  lista.push({
+    ...comun,
+    regla: "openspec-roles",
+    motivo:
+      (soloUno
+        ? "El equipo es una sola persona, asi que el PO y el builder son la misma. En las rutas de contrato " +
+          "(openspec/) el PO es el unico owner, y GitHub no le pide review al autor del pull request: cuando " +
+          "esa persona abre el PR no queda nadie asignado y el gate del PO no ocurre. No hay a quien darle el " +
+          "rol todavia; queda apagado y escrito. "
+        : "El andamio asigna el rol de PO a la duenia de la cuenta, que es tambien el builder 1, asi que el gate " +
+          "del PO lo satisface la misma persona que escribe el cambio y la separacion de roles no existe. " +
+          "A DIFERENCIA de cuando se trabaja sin companero, aca SI hay salida: " +
+          `@${r.BUILDER_2} puede ser el PO. Cambiar la clave PO del archivo de valores y regenerar CODEOWNERS. `) +
+      // EL ALCANCE, ACOTADO. `openspec-roles` dice DOS cosas: el reparto PO/builders
+      // y, aparte, que toda escritura en produccion exige el OK explicito del
+      // builder 1. Un desvio anula la REGLA ENTERA, asi que sin esta linea estaria
+      // apagando de paso una garantia que nadie pidio apagar y que sigue vigente.
+      "ALCANCE: este desvio apaga UNICAMENTE el reparto de roles. La otra mitad de la regla --toda escritura " +
+      "en produccion exige el OK explicito del builder 1-- sigue vigente y NO se declara aqui. " +
+      // Y EL TIPO DE CUENTA, que esta herramienta no conoce: corre antes de que el
+      // repositorio exista. En una organizacion los equipos SI existen, asi que el
+      // gate puede ser real si el equipo `po` tiene a otra persona. Se declara
+      // igual, conservador, por el mismo criterio que la visibilidad: un desvio de
+      // mas se lee y se borra; una separacion que se dio por supuesta y no existe no
+      // se nota hasta que alguien mergea su propio contrato.
+      "En una ORGANIZACION el gate puede ser real si el equipo `po` tiene a alguien distinto de quien escribe: " +
+      "esta herramienta corre antes de que el repositorio exista y no puede saberlo, asi que lo declara igual. " +
+      "Si tu equipo `po` ya separa de verdad, borra este desvio.",
+    revisar: soloUno
+      ? "cuando entre la segunda persona al proyecto"
+      : "ahora: decidir si el PO pasa a ser la otra persona, o dejar la separacion apagada a proposito",
+  });
   if (!usaAws(r)) {
     lista.push({
       ...comun,
@@ -667,15 +694,40 @@ export function desvios(r, hoy = new Date().toISOString().slice(0, 10)) {
   // Una regla que describe maquinaria inexistente es peor que una regla ausente:
   // los agentes del proyecto la leen como practica vigente y planifican contra
   // ella. El marco ya tiene el mecanismo para esto y es este: declararlo.
+  // Y SE DECLARA SOLO DONDE EL HUECO EXISTE DE VERDAD, que desde el 2026-09-10 ya
+  // no son las dos formas. Un sitio recibe la promocion entera --desplegar.yml sube
+  // la version a DEV con su direccion de prueba, la sonda la comprueba, y el job de
+  // produccion promueve ESA MISMA version-- asi que seguir declarando que "no hay
+  // deploy a dev, ni smoke, ni promocion a prod" seria declarar un hueco tapado.
+  //
+  // Un desvio que describe un hueco que ya no existe es tan malo como la regla que
+  // describe maquinaria inexistente: las dos le mienten a quien las lee, y esta le
+  // mentiria en la direccion mas cara --alguien lo lee y escribe a mano el pipeline
+  // que ya tiene--.
   lista.push({
     ...comun,
     regla: "promocion-por-ambientes",
     motivo:
-      "El andamio no reparte pipeline de promocion: no hay deploy a dev, ni smoke, ni promocion a prod. Lo que " +
-      "viaja hoy es la verificacion (ci.yml) y, solo para la forma «un sitio para leer», una publicacion a UN " +
-      "destino (desplegar.yml). La regla queda escrita como el destino, no como lo que este proyecto hace hoy. " +
-      "Lo mismo vale para `dev-es-staging-compartido`, que describe la misma maquinaria.",
-    revisar: "cuando el marco reparta el pipeline de promocion, o cuando este proyecto escriba el suyo",
+      r.forma === "sitio"
+        ? // UN SITIO YA TIENE CASI TODA LA CADENA, y el desvio se acota a lo que de
+          // verdad le falta. La regla promete seis pasos: merge, deploy a DEV, smoke
+          // API, E2E, deploy a PROD, verificar-prod. Desde el 2026-09-10 este
+          // proyecto tiene cuatro: sube la version a DEV, la sonda la comprueba,
+          // promueve ESA MISMA version a produccion y la vuelve a comprobar.
+          "La promocion existe para esta forma desde el 2026-09-10: el despliegue sube la version a DEV con su " +
+          "direccion de prueba, una sonda la comprueba, y produccion promueve ESA MISMA version sin recompilar. " +
+          "Lo que queda fuera de la cadena que la regla describe son dos pasos, y por motivos distintos: el «smoke " +
+          "API» NO APLICA --un sitio para leer no tiene API-- y el E2E NO EXISTE todavia, porque el paquete de " +
+          "pruebas de punta a punta no viaja a esta forma. Producción no recibe nada que DEV no haya verificado, " +
+          "que es la propiedad de fondo de la regla, y esa SI se cumple."
+        : "La mitad API de una aplicacion no se despliega en ningun lado todavia: no hay deploy a dev, ni smoke, ni " +
+          "promocion a prod para ella. Lo que viaja hoy es la verificacion (ci.yml). La forma «un sitio para leer» SI " +
+          "recibe la promocion desde el 2026-09-10. La regla queda escrita como el destino, no como lo que esta " +
+          "aplicacion hace hoy. Lo mismo vale para `dev-es-staging-compartido`, que describe la misma maquinaria.",
+    revisar:
+      r.forma === "sitio"
+        ? "cuando el marco reparta el E2E contra la direccion de DEV"
+        : "cuando el marco reparta el adaptador de computo de la API, o cuando este proyecto escriba el suyo",
   });
   if (r.visibilidad === "privado") {
     lista.push({
@@ -939,7 +991,10 @@ export function lineasDeResumen(r, desviosDeR) {
     // `salta` y nunca se pregunta: la fila salia igual y mostraba "una de prueba y
     // una de verdad", que es el lado del `else` de una respuesta que nadie dio. El
     // resumen inventaba una decision, y encima la mas ruidosa de leer.
-    ...(r.ambientes === undefined ? [] : [["Copias", r.ambientes === "uno" ? "una sola" : "una de prueba y una de verdad"]]),
+    // La fila salio con la pregunta: la topologia es siempre una de prueba y una
+    // de verdad, asi que informarla como eleccion de esta persona seria volver a
+    // hacerle creer que eligio algo.
+    ["Ambientes", "una copia de prueba y una de verdad"],
     [
       "Dirección",
       r.dominio === "propio"
@@ -954,9 +1009,9 @@ export function lineasDeResumen(r, desviosDeR) {
   // la primera version del resumen no las mostraba: se llamaba "todo lo que
   // elegiste" y se comia justo las cinco que mas cuesta verificar.
   if (usaAws(r)) {
-    filas.push(["Cuenta de AWS", r.ambientes === "dos" ? `${r.CUENTA_DEV} (pruebas) y ${r.CUENTA_PROD} (de verdad)` : r.CUENTA_DEV]);
+    filas.push(["Cuenta de AWS", `${r.CUENTA_DEV} (pruebas) y ${r.CUENTA_PROD} (de verdad)`]);
     filas.push(["Región", r.REGION]);
-    filas.push(["Perfil de AWS", r.ambientes === "dos" ? `${r.PERFIL_DEV} y ${r.PERFIL_PROD}` : r.PERFIL_DEV]);
+    filas.push(["Perfil de AWS", `${r.PERFIL_DEV} y ${r.PERFIL_PROD}`]);
   }
   const ancho = Math.max(...filas.map(([k]) => k.length));
   for (const [k, v] of filas) l.push(`  ${k.padEnd(ancho)}   ${v}`);

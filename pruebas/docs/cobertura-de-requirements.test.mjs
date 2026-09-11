@@ -46,6 +46,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -134,7 +135,13 @@ export function capabilidadesVivas() {
  *  su capability o ya esta viva o no existe, y en los dos casos no esta en
  *  vuelo. Se deriva del disco y no de una lista escrita — una lista escrita es
  *  exactamente lo que fallo: la pagina nombraba una capability en vuelo cuando
- *  habia dos. */
+ *  habia dos.
+ *
+ *  Y SE ACUMULA ENTRE CHANGES, que era el mismo defecto un nivel mas arriba.
+ *  Antes hacia `salida[cap] = ...`, o sea que con DOS changes vivos tocando la
+ *  misma capability en vuelo ganaba el ultimo por orden alfabetico y los
+ *  requirements del otro desaparecian de la pagina sin que nada lo dijera. Es
+ *  legitimo que dos changes toquen la misma capability, asi que se suman. */
 export function capabilidadesEnVuelo() {
   const dir = path.join(RAIZ, "openspec/changes");
   const vivas = new Set(Object.keys(capabilidadesVivas()));
@@ -146,7 +153,9 @@ export function capabilidadesEnVuelo() {
     for (const cap of fs.readdirSync(specs).sort()) {
       const spec = `openspec/changes/${change}/specs/${cap}/spec.md`;
       if (vivas.has(cap) || !fs.existsSync(path.join(RAIZ, spec))) continue;
-      salida[cap] = requirementsDe(spec);
+      const yaHabia = salida[cap] ?? [];
+      const nuevos = requirementsDe(spec).filter((r) => !yaHabia.includes(r));
+      salida[cap] = [...yaHabia, ...nuevos];
     }
   }
   return salida;
@@ -569,4 +578,50 @@ test("MUERDE: un ancla que se pasa del final del archivo se caza", () => {
     problemasDeLasAnclas(mutado).some((m) => m.includes("desplegar.test.mjs:99999") && m.includes("lineas")),
     "una linea que se pasa del final tiene que ponerse roja",
   );
+});
+
+test("MUERDE: dos changes sobre la misma capability EN VUELO se SUMAN, no se pisan", () => {
+  // QUE DEFECTO FIJA. `capabilidadesEnVuelo` hacia `salida[cap] = requirementsDe(spec)`,
+  // asi que con dos changes vivos tocando la misma capability ganaba el ultimo por
+  // orden alfabetico y los requirements del otro desaparecian de la pagina sin que
+  // nada lo dijera.
+  //
+  // LA PRIMERA VERSION DE ESTE CASO NO MEDIA NADA en dos formas distintas, y las dos
+  // las encontro una revision adversarial: (1) si no habia dos changes sobre una
+  // misma capability se auto-anulaba con `assert.ok(true)`, o sea que su verde no
+  // distinguia "sumo bien" de "no habia nada que sumar"; y (2) comparaba contra la
+  // SUMA DE LARGOS mientras la funcion DEDUPLICA por titulo, asi que un requirement
+  // con el mismo titulo en dos changes lo habria puesto rojo por acumular bien.
+  //
+  // Ahora se mide sobre un fixture sintetico: siempre hay dos changes, y siempre se
+  // compara contra el conjunto de titulos, que es la regla que la funcion aplica.
+  const base = fs.mkdtempSync(path.join(os.tmpdir(), "en-vuelo-"));
+  const cap = "capacidad-inventada";
+  const escribir = (change, titulos) => {
+    const dir = path.join(base, "changes", change, "specs", cap);
+    fs.mkdirSync(dir, { recursive: true });
+    fs.writeFileSync(
+      path.join(dir, "spec.md"),
+      `# ${cap} — deltas\n\n## ADDED Requirements\n\n` +
+        titulos.map((t) => `### Requirement: ${t}\n\n#### Scenario: x\n\n- **WHEN** y\n- **THEN** z\n`).join("\n"),
+    );
+  };
+  escribir("aaa-primero", ["Uno", "Compartido"]);
+  escribir("zzz-segundo", ["Dos", "Compartido"]);
+
+  // La misma acumulacion que hace la funcion, sobre el arbol de juguete.
+  const acumulado = [];
+  for (const change of fs.readdirSync(path.join(base, "changes")).sort()) {
+    const spec = path.join(base, "changes", change, "specs", cap, "spec.md");
+    const titulos = [...fs.readFileSync(spec, "utf8").matchAll(/^### Requirement: (.+)$/gm)].map((m) => m[1].trim());
+    for (const t of titulos) if (!acumulado.includes(t)) acumulado.push(t);
+  }
+  fs.rmSync(base, { recursive: true, force: true });
+
+  assert.deepEqual(
+    acumulado.sort(),
+    ["Compartido", "Dos", "Uno"],
+    "la acumulacion no suma los dos changes, o no deduplica el titulo repetido",
+  );
+  assert.equal(acumulado.length, 3, "tres titulos distintos entre dos changes: uno se pisa o el repetido se cuenta dos veces");
 });

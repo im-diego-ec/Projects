@@ -3480,7 +3480,49 @@ jobs:
                 const permiso = cruda && typeof cruda.permiso === "string" ? cruda.permiso.trim() : "";
                 const motivo = cruda && typeof cruda.motivo === "string" ? cruda.motivo.trim() : "";
                 const quien = cruda && typeof cruda.aprobado_por === "string" ? cruda.aprobado_por.trim() : "";
+                const fecha = cruda && typeof cruda.fecha === "string" ? cruda.fecha.trim() : "";
                 if (!permiso || !motivo) continue;
+                // DOS LECTORES DEL MISMO ARCHIVO, Y HASTA ACA PEDIAN COSAS DISTINTAS.
+                // `actions/constitucion/constitucion.mjs` exige motivo + aprobado_por +
+                // fecha AAAA-MM-DD y emite ::error:: si falta cualquiera. Este paso
+                // pedia solo permiso + motivo: leia `aprobado_por` y no lo miraba, y
+                // `fecha` ni la leia. Una entrada sin aprobador ni fecha salia ROJA por
+                // un camino y VERDE por el otro, y decidia el que corriera. Donde de
+                // verdad se pagaba es en el repo al que la action no le llega: ahi el
+                // unico validador era este, el debil.
+                //
+                // ESTRENA EN MODO AVISO, A PROPOSITO. Cerrar el hueco de una es
+                // endurecer un check, y un repo que hoy pasa con un desvio a medias
+                // saldria rojo sin haberlo pedido: por la regla de AGENTS.md eso se
+                // estrena avisando y se endurece en la mayor siguiente. El desvio
+                // SIGUE absorbiendo; lo que cambia es que ahora se ve.
+                // LA FECHA SE VALIDA COMO LA VALIDA LA ACTION, no solo por su forma.
+                // `constitucion.mjs` usa `esFecha`, que ademas exige que la fecha
+                // EXISTA. Con la forma sola, "2026-13-45" daba ::error:: por un
+                // camino y pasaba MUDO por este: los dos lectores seguian
+                // divergiendo justo en el caso que este aviso vino a cerrar.
+                const fechaReal =
+                  /^[0-9]{4}-[0-9]{2}-[0-9]{2}$/.test(fecha) &&
+                  !Number.isNaN(Date.parse(fecha)) &&
+                  new Date(fecha).toISOString().slice(0, 10) === fecha;
+                if (!quien || !fechaReal) {
+                  // SE NOMBRAN LAS DOS FALTAS CUANDO FALTAN LAS DOS. Decia solo la
+                  // primera, asi que quien completaba el aprobador volvia a recibir
+                  // el mismo aviso por la fecha: dos viajes de CI para un arreglo
+                  // que se podia hacer de una.
+                  const faltantes = [];
+                  if (!quien) faltantes.push("no dice quien lo aprobo");
+                  if (!fechaReal) faltantes.push("no tiene fecha AAAA-MM-DD valida");
+                  const falta = faltantes.join(" y ");
+                  console.log(
+                    "::warning file=" + escapar(RUTA_DESVIOS) + ",title=Desvio de permiso incompleto::" +
+                      escapar(
+                        "el desvio de \"" + permiso + "\" " + falta + ". La action de la constitucion ya lo da por ERROR, " +
+                          "asi que este archivo esta rojo por un camino y verde por el otro. Hoy el desvio absorbe igual; " +
+                          "en la linea mayor siguiente deja de absorber. Completalo ahora y no cambia nada despues."
+                      )
+                  );
+                }
                 declarados.set(permiso, { motivo: motivo, quien: quien, usado: false });
               }
             }

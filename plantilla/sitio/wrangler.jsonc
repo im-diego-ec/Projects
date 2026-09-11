@@ -36,6 +36,25 @@
     "not_found_handling": "404-page"
   },
 
+  // LAS DIRECCIONES DE PRUEBA, DECLARADAS A PROPOSITO Y NO HEREDADAS DEL DEFAULT.
+  //
+  // QUE HABILITAN. Una "preview URL" es la direccion de UNA version subida y
+  // todavia no publicada: `<prefijo-o-alias>-<nombre>.<subdominio>.workers.dev`.
+  // Es lo que hace posible el ambiente de prueba de este marco --subir, mirar, y
+  // recien despues promover ESA MISMA version-- sin un segundo Worker ni un
+  // segundo despliegue.
+  //
+  // POR QUE SE ESCRIBE Y NO SE DEJA AL DEFAULT. El default de `preview_urls` se
+  // movio mas de una vez, y hoy es "lo mismo que workers_dev". Un ambiente de
+  // prueba que existe o no segun el default de la version de wrangler instalada
+  // no es un ambiente: es una casualidad. Declarado, no se mueve.
+  //
+  // SON PUBLICAS. Cualquiera con el enlace entra --la documentacion lo dice:
+  // "When enabled, Preview URLs are available publicly"--. Para un sitio que
+  // igual va a ser publico no cambia nada; si algun dia hiciera falta cerrarlas,
+  // se hace con Cloudflare Access y se declara aca. Consultado el 2026-09-10.
+  "preview_urls": true,
+
   "observability": {
     "enabled": true
   }

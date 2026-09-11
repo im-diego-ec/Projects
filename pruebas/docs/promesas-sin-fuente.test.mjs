@@ -63,7 +63,15 @@ const EXENTOS = [
 const PREFIJOS_EXENTOS = ["openspec/", "entregables/"];
 
 function textosQueLeeAlguien() {
-  return execFileSync("git", ["ls-files", "*.md", "*.mjs", "*.json", "*.astro"], {
+  // LOS .yml, .ts Y .txt ENTRARON DESPUES, y el agujero estaba justo donde mas
+  // dolia. El filtro miraba .md, .mjs, .json y .astro, asi que NO veia los
+  // workflows --que son el archivo que VIAJA al proyecto del consumidor-- ni el
+  // codigo TypeScript del andamio. Medido al ampliarlo: una sola violacion en
+  // todo el arbol, y estaba en `plantilla/.github/workflows/desplegar.yml`,
+  // prometiendole "sin tarjeta" a alguien que no programa, en el archivo que ese
+  // proyecto se lleva puesto. Un guard que no mira donde la promesa viaja es un
+  // guard que protege el lugar equivocado.
+  return execFileSync("git", ["ls-files", "*.md", "*.mjs", "*.json", "*.astro", "*.yml", "*.yaml", "*.ts", "*.tsx", "*.txt"], {
     cwd: RAIZ,
     encoding: "utf-8",
   })

@@ -113,7 +113,7 @@ Se instalan una vez en tu computadora y sirven para todos los proyectos.
 | **gh** | Hablar con GitHub desde la consola | [`cli.github.com`](https://cli.github.com) |
 | **Docker Desktop** | **Sólo si tu proyecto es una aplicación**, no si es un sitio: es lo que levanta la base de datos en tu máquina. No lo vas a necesitar hasta el paso 6 | [`docker.com/products/docker-desktop`](https://www.docker.com/products/docker-desktop/) — gratis para uso personal |
 
-> **Docker es el único de esta lista que el marco NO comprueba por vos**, y el
+> **Docker es el único de esta lista que es OPCIONAL**, y el
 > que da el peor error cuando falta: la terminal contesta `command not found:
 > docker` y nada más. Si tu proyecto es una aplicación, instalalo ahora aunque
 > recién lo uses en el paso 6 — la descarga es grande y es una espera que
@@ -196,7 +196,7 @@ al que vas a entrar:
 | --- | --- |
 | **1** | En el repositorio que elegiste, apretá el botón verde **«Use this template»** → **«Create a new repository»**. Poné el nombre que quieras para tu proyecto. |
 | **2** | En **tu** repositorio nuevo, andá a la pestaña **Actions** y elegí **«Personalizar mi proyecto»** en la lista de la izquierda. |
-| **3** | Apretá el botón `Run workflow`. Se abre un formulario con cinco preguntas en castellano. Contestalas y apretá el botón verde. |
+| **3** | Apretá el botón `Run workflow`. Se abre un formulario con cuatro preguntas en castellano. Contestalas y apretá el botón verde. |
 
 **Qué vas a ver.** El trabajo tarda un par de minutos. Cuando termina, volvés a
 la portada de tu repositorio y están todos los archivos de tu proyecto.
@@ -421,9 +421,9 @@ te dice por qué la elegirías, qué te cuesta y qué límite tiene. Así:
 
 | Si elegís | Son |
 | --- | --- |
-| Supabase, trabajando solo, sin dominio propio | **9 preguntas**, y solo dos hay que escribirlas |
-| AWS con dos copias del proyecto | **14**, porque ahí los datos de la nube existen de verdad |
-| Todo lo que suma: AWS, dos copias, otra persona, dominio propio y Slack | **17**, el máximo |
+| Supabase, trabajando solo, sin dominio propio | **8 preguntas**, y solo dos hay que escribirlas |
+| AWS | **13**, porque ahí los datos de la nube existen de verdad |
+| Todo lo que suma: AWS, otra persona, dominio propio y Slack | **16**, el máximo |
 
 Las que no escribís se contestan con **Enter**, que elige la opción recomendada.
 Nunca te va a pedir un dato de AWS si no elegiste AWS.
@@ -467,7 +467,7 @@ cat valores.json
 ```
 
 **Qué vas a ver.** Las 23 casillas que el programa necesita, llenas con lo que
-derivó de tus 9 respuestas. Por ejemplo, si dijiste que no tenés dominio propio,
+derivó de tus 8 respuestas. Por ejemplo, si dijiste que no tenés dominio propio,
 vas a encontrar la dirección gratuita de Cloudflare ya puesta:
 
 ```json

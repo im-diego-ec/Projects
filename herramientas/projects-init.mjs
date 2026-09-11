@@ -454,10 +454,24 @@ export const SALIDA = { ok: 0, fallo: 1, uso: 2, cancelado: 3 };
 export function lineasDelPasoQueSigue(rutaDeValores, proyecto, raizMarco = path.resolve(ESTE_DIRECTORIO, "..")) {
   const dondeQuedo = path.resolve(path.dirname(rutaDeValores));
   const enElClon = dondeQuedo === path.resolve(raizMarco);
-  const yo = fileURLToPath(import.meta.url);
+  // LA RUTA A ESTA MISMA HERRAMIENTA, DERIVADA DEL CLON QUE NOS NOMBRARON.
+  //
+  // Decia `fileURLToPath(import.meta.url)`, o sea la ruta del modulo que corre. Es
+  // lo mismo en la practica --se corre desde ese clon-- pero tiene dos problemas.
+  //
+  // El primero es de correccion: el comando que se imprime tiene que apuntar al
+  // clon que la persona esta usando, que es el que llega en `raizMarco`, no al
+  // archivo desde el que se cargo el modulo. Si algun dia se invoca por un enlace
+  // simbolico o desde una copia, el comando impreso mandaria a otro lado.
+  //
+  // El segundo es que hacia esta funcion IMPOSIBLE de probar contra un clon con
+  // espacios: `import.meta.url` es la maquina de quien corre el banco, asi que el
+  // caso solo se ejercitaba si el clon real vivia en una carpeta con espacio. En
+  // CI --donde el checkout es /home/runner/work/...-- no se ejercitaba nunca.
+  const yo = path.join(path.resolve(raizMarco), "herramientas", "projects-init.mjs");
   const l = ["", "No se armo ningun proyecto todavia. El paso que sigue:"];
   if (!enElClon) {
-    l.push(`  node ${yo} --valores ${path.basename(rutaDeValores)} --destino .`);
+    l.push(`  node ${citarRuta(yo)} --valores ${citarRuta(path.basename(rutaDeValores))} --destino .`);
     return l;
   }
   // La carpeta va AL LADO del clon y no adentro: el marco es una herramienta y el
@@ -467,8 +481,8 @@ export function lineasDelPasoQueSigue(rutaDeValores, proyecto, raizMarco = path.
   l.push(`  Estas respuestas quedaron en ${rutaDeValores}, que esta DENTRO del clon del marco.`);
   l.push("  El proyecto NO se arma ahi: el marco es la herramienta, no el proyecto. Va al lado:");
   l.push("");
-  l.push(`  mkdir -p ${destino}`);
-  l.push(`  node ${yo} --valores ${rutaDeValores} --destino ${destino}`);
+  l.push(`  mkdir -p ${citarRuta(destino)}`);
+  l.push(`  node ${citarRuta(yo)} --valores ${citarRuta(rutaDeValores)} --destino ${citarRuta(destino)}`);
   l.push("");
   l.push("  (Si abriste el archivo `arrancar` con doble clic, esto lo hace el mismo solo.)");
   return l;
@@ -723,6 +737,33 @@ export function formaDe(valores) {
 export const FORMAS = ["aplicacion", "sitio"];
 export const PLATAFORMAS = ["aws", "supabase", "ninguna"];
 
+/** LAS QUE LA CONSTITUCION ADMITE Y ESTA HERRAMIENTA TODAVIA NO IMPLEMENTA.
+ *
+ *  QUE DEFECTO CIERRA. La lista de plataformas vive en CUATRO lugares y tres de
+ *  ellos dicen CINCO: `plantilla/AGENTS.md` --la constitucion que viaja a cada
+ *  proyecto--, `actions/constitucion/canonico/60-infra-plataforma-secretos.md`
+ *  --que es CANONICO y versionado-- y `pruebas/andamio/terraform-en-ci.test.mjs`,
+ *  que se escribio su propia copia. `PLATAFORMAS`, la unica que decide de verdad
+ *  que archivos viajan, dice TRES.
+ *
+ *  O sea: un proyecto nacia con una constitucion que le admite `cloudflare`, y la
+ *  herramienta que se la entrego rechaza ese mismo valor con EXIT 1 y un mensaje
+ *  --"no es una opcion"-- que le echa la culpa a quien lo escribio.
+ *
+ *  POR QUE SE DECLARA EN VEZ DE RECORTAR LA CONSTITUCION. Porque la herramienta es
+ *  la que esta atrasada, no el documento: `plantilla/infra/adaptadores.md` describe
+ *  los adaptadores de cloudflare y gcp como el camino previsto, y el canonico esta
+ *  versionado --recortarlo mueve un artefacto que los consumidores regeneran--. El
+ *  hueco es de implementacion, y lo honesto es que se vea, no que se tape.
+ *
+ *  Su destino esta escrito: `openspec/changes/promocion-por-ambientes`. */
+export const PLATAFORMAS_PENDIENTES = ["cloudflare", "gcp"];
+
+/** Las CINCO que la constitucion admite. Se DERIVA de las otras dos y no se
+ *  escribe aparte: una tercera lista al lado de las dos primeras es exactamente
+ *  como empezo esta divergencia. */
+export const PLATAFORMAS_DECLARADAS = [...PLATAFORMAS, ...PLATAFORMAS_PENDIENTES];
+
 /** LO QUE NO SE VALIDABA, y era justo lo que mas cuesta si se toma mal.
  *
  *  `forma` y `plataforma` eran los DOS UNICOS valores sin ninguna comprobacion,
@@ -749,6 +790,23 @@ export function problemasDeEleccion(valores) {
       continue;
     }
     const v = crudo.trim().toLowerCase();
+    // LA CONSTITUCION LA ADMITE Y ESTA HERRAMIENTA NO LA IMPLEMENTA TODAVIA. Es un
+    // caso distinto de "escribiste cualquier cosa", y decirle lo mismo a los dos
+    // culpa a quien leyo la constitucion y le hizo caso.
+    if (clave === "plataforma" && PLATAFORMAS_PENDIENTES.includes(v)) {
+      problemas.push(
+        `plataforma = ${JSON.stringify(crudo)} esta admitida por la constitucion del proyecto ` +
+          `(plantilla/AGENTS.md) pero TODAVIA NO esta implementada en esta herramienta: no hay adaptador ` +
+          `que la entregue, asi que armarte el proyecto seria darte archivos que no la usan. Las que hoy ` +
+          // NO SE NOMBRA LA CARPETA DEL CHANGE. Un change se archiva: el dia que
+          // `promocion-por-ambientes` cierre, esa ruta se mueve a changes/archive/ y
+          // este mensaje --que lo lee una persona que no programa-- la manda a un
+          // lugar que no existe. Se nombra la pagina de documentacion, que es
+          // estable y sobrevive al archive.
+          `funcionan: ${validas.join(", ")}. Que plataformas soporta el marco y cuales estan en camino esta en docs/03-stack.md`,
+      );
+      continue;
+    }
     if (!validas.includes(v)) {
       const cerca = validas.find((x) => x.startsWith(v.slice(0, 4)) || v.startsWith(x.slice(0, 4)));
       problemas.push(
@@ -1734,6 +1792,95 @@ export function avisosDelRegistroDeValores(destino) {
  *  cadena) y esa repeticion se deja a proposito: correrlo aparte es lo que hace
  *  que un fallo del generador se lea como "el paso datos fallo" en vez de como
  *  un rojo adentro de una cadena de seis. */
+/** UNA RUTA QUE VIAJA DENTRO DE UN COMANDO IMPRESO, LISTA PARA PEGAR.
+ *
+ *  QUE DEFECTO CIERRA. Esta herramienta existe para que quien no programa no
+ *  transcriba nada: cuando no puede terminar sola, imprime el comando exacto.
+ *  Ese comando se armaba interpolando rutas SIN comillas, asi que en cuanto la
+ *  ruta tenia un espacio el comando no corria. El propio clon del marco vive hoy
+ *  en ".../Personal/No Coders/Projects", y la shell leia `node /Users/.../No` y
+ *  fallaba con un mensaje que no menciona espacios ni comillas.
+ *
+ *  Y ES EL CASO NORMAL, no el raro: las carpetas donde una persona no tecnica
+ *  guarda sus cosas se llaman "Mis Documentos", "My Documents", "Google Drive".
+ *
+ *  COMILLAS DOBLES Y NO SIMPLES. La misma linea tiene que poder pegarse en bash,
+ *  zsh, cmd y PowerShell --esta herramienta corre en las tres plataformas y su
+ *  banco tiene matriz de sistema operativo--. Las simples son mas seguras en
+ *  POSIX, pero cmd no las entiende: en Windows la linea quedaria peor que antes.
+ *  Las dobles sirven en las cuatro para el caso que importa, y dejan literales
+ *  los backslashes de una ruta de Windows.
+ *
+ *  EL LIMITE, DECLARADO. Una ruta con `$` necesitaria un escape distinto en bash
+ *  que en cmd, y no hay forma de escribir una sola linea correcta para las dos.
+ *  Se escapa la comilla doble --que es lo que romperia la sintaxis-- y `$` en una
+ *  ruta de archivo es lo bastante raro como para no justificar una rama por shell
+ *  que nadie podria probar en las cuatro. Su modo de falla es visible: el comando
+ *  falla al pegarlo, no despues y en silencio.
+ *
+ *  Se entrecomilla SOLO cuando hace falta: envolver siempre haria ruidosa la
+ *  salida en el caso normal, que es una ruta sin nada especial. */
+export function citarRuta(ruta) {
+  const texto = String(ruta);
+  // ALLOWLIST Y NO BLOCKLIST, y el cambio no es de estilo. La primera version
+  // enumeraba los caracteres peligrosos, y una lista de peligros SIEMPRE esta
+  // incompleta: se le escapaban `\`, `{}`, `,`, `!`, `%` y `#`, asi que una carpeta
+  // llamada "Proyectos (2026)" o "notas #1" salia DESNUDA. Y una lista incompleta
+  // en un caso asi es peor que no tener nada, porque parece que cubre.
+  //
+  // Al reves no se puede fallar: se deja pasar sin comillas SOLO lo que se sabe
+  // inofensivo en bash, zsh, cmd y PowerShell --letras, digitos, punto, guion,
+  // guion bajo, barra, barra invertida y dos puntos, que son las piezas de una ruta
+  // normal en las tres plataformas-- y todo lo demas se entrecomilla.
+  if (/^[A-Za-z0-9._\/\\:-]*$/.test(texto)) return texto;
+  return `"${texto.replace(/"/g, '\\"')}"`;
+}
+
+/** EL PIN DEL MARCO, LEIDO DEL ARBOL QUE SE ACABA DE ESCRIBIR.
+ *
+ *  POR QUE SE LEE Y NO SE DECLARA. El pin lo fija el andamio
+ *  (plantilla/.github/workflows/ci.yml) y lo mueve el paso 5 del release. Una
+ *  constante aca seria un SEGUNDO lugar donde vive el mismo hecho, y nada la
+ *  cruzaria: el dia que el release mueva uno y no el otro, esta herramienta
+ *  informaria una version que ningun repo tiene.
+ *
+ *  Y SE LEE DEL DESTINO, NO DE LA PLANTILLA, que es la parte que importa. La
+ *  plantilla dice lo que se IBA a escribir; el destino dice lo que el repo
+ *  TIENE. La fila del registro existe justamente para razonar sobre que version
+ *  tiene cada repo, asi que derivarla de la plantilla la volveria circular.
+ *
+ *  Devuelve null si no se puede leer, y quien llama imprime el pendiente igual
+ *  diciendo que no se pudo. Omitirlo convertiria un fallo de lectura en
+ *  silencio; completarlo con una constante traeria de vuelta el problema que
+ *  este lector existe para evitar, y encima solo en el caso raro. */
+export function pinDelMarcoEnDestino(destino) {
+  try {
+    const ci = fs.readFileSync(path.join(destino, ".github", "workflows", "ci.yml"), "utf8");
+    // El `uses:` del workflow reusable es el que define con que version corre
+    // el pipeline ENTERO. Las actions sueltas del marco van pinadas a la misma
+    // version, pero esta es la que manda y la que el registro quiere saber.
+    // SE RECORRE POR LINEA Y SE DESCARTAN LOS COMENTARIOS. La primera version hacia
+    // un `.exec()` sobre el archivo entero y se quedaba con el PRIMER match: una
+    // linea comentada --y los workflows del andamio llevan ejemplos comentados--
+    // ganaba sobre el `uses:` de verdad.
+    //
+    // Y SI HAY DOS PINES DISTINTOS, DEVUELVE null. Un ci.yml a medio actualizar
+    // --con una parte en la version nueva y otra en la vieja-- no tiene UNA version:
+    // informar cualquiera de las dos seria escribir en el registro un dato que el
+    // repo no cumple. El hueco declarado se ve; el dato elegido al azar, no.
+    const pines = new Set();
+    for (const linea of ci.split("\n")) {
+      if (/^\s*#/.test(linea)) continue;
+      const m = /uses:\s*"?[^"\s]*\/Projects\/\.github\/workflows\/marco-ci\.yml@(v[0-9]+\.[0-9]+\.[0-9]+)"?/.exec(linea);
+      if (m) pines.add(m[1]);
+    }
+    return pines.size === 1 ? [...pines][0] : null;
+  } catch {
+    return null;
+  }
+}
+
+
 export const PASOS_DEL_ARRANQUE = [
   {
     clave: "instalado",
@@ -2480,7 +2627,7 @@ function correrGh({ org, proyecto }) {
  *  reemplaza al recuadro 🕳️, y `frase` es la que reemplaza a la afirmacion
  *  "Se encienden ahora. Son las cuatro que el repo de referencia tiene
  *  funcionando" — que es falsa cuando el repositorio no puede tenerlas. */
-export function bloqueDeProteccion({ estado, detalle = "", rulesets = [], org, proyecto, fecha }) {
+export function bloqueDeProteccion({ estado, detalle = "", rulesets = [], org, proyecto, fecha, forma }) {
   const dia = fecha ?? new Date().toISOString().slice(0, 10);
   const sonda = `gh api repos/${org}/${proyecto}/rulesets`;
   const l = [];
@@ -2491,6 +2638,8 @@ export function bloqueDeProteccion({ estado, detalle = "", rulesets = [], org, p
     l.push("actualizá esto con la fecha: un documento de estado que nadie vuelve a medir es una");
     l.push("afirmación vencida.");
   };
+
+  const compuertaDeProd = bloqueDeLaCompuertaDeProd({ estado, forma, fecha: dia });
 
   if (estado === "puede") {
     l.push(`### 🟢 Este repositorio **sí puede** tener protección de rama — medido el ${dia}`);
@@ -2524,6 +2673,7 @@ export function bloqueDeProteccion({ estado, detalle = "", rulesets = [], org, p
     pie();
     return {
       lineas: l,
+      compuertaDeProd,
       frase: [
         "**Las cuatro que hay que encender.** Este repositorio puede tenerlas —está medido acá",
         "arriba— y alcanzan para que nada entre a `main` sin pasar por un PR verde:",
@@ -2575,6 +2725,7 @@ export function bloqueDeProteccion({ estado, detalle = "", rulesets = [], org, p
     pie();
     return {
       lineas: l,
+      compuertaDeProd,
       frase: [
         "**Las cuatro que habría que encender** — y que este repositorio **no puede** tener hoy",
         "(medido acá arriba, con la respuesta textual de GitHub). Sus 🔴 van a seguir en 🔴 hasta que",
@@ -2618,6 +2769,7 @@ export function bloqueDeProteccion({ estado, detalle = "", rulesets = [], org, p
   pie();
   return {
     lineas: l,
+    compuertaDeProd,
     frase: [
       "**Las cuatro que hay que encender** si este repositorio puede tenerlas — y eso **no se pudo",
       "medir** (está acá arriba, con el motivo). Alcanzan para que nada entre a `main` sin pasar por",
@@ -2649,6 +2801,82 @@ export function avisoDeProteccion({ estado, detalle, org, proyecto }) {
   );
 }
 
+/** La compuerta de PRODUCCION del despliegue, derivada de la MISMA medicion.
+ *
+ *  POR QUE REUSA LA SONDA DE RULESETS Y NO HACE UNA PROPIA. Porque es el mismo
+ *  muro. Medido el 2026-09-10 en la documentacion de GitHub: «Users with GitHub
+ *  Free plans can only configure environments for public repositories». O sea que
+ *  un repositorio privado del plan gratuito no puede tener revisores requeridos
+ *  en un environment, igual que no puede tener rulesets, y por la misma razon: el
+ *  plan. La sonda que ya corre distingue exactamente ese caso --el 403 con
+ *  «Upgrade to GitHub Pro or make this repository public»--, asi que agregar una
+ *  segunda medicion seria preguntar dos veces lo mismo y arriesgarse a que las
+ *  dos respuestas se contradigan.
+ *
+ *  LO QUE ESTE BLOQUE NO HACE, y hay que decirlo: no promete que la promocion
+ *  este desprotegida cuando no hay environment. El piso NO es el environment: es
+ *  que `desplegar.yml` no promueve solo --hay que apretar «Run workflow» y marcar
+ *  la casilla-- y eso vale en TODOS los planes. El environment agrega un segundo
+ *  candado donde se puede, no el primero.
+ *
+ *  SOLO PARA UN SITIO. Una aplicacion no recibe `desplegar.yml` --lo decide
+ *  `noViajanPorForma`--, asi que escribirle esto seria describirle maquinaria que
+ *  no tiene, que es justo lo que el requirement «El proyecto declara que puede
+ *  publicar y que no» prohibe. Para esa forma devuelve vacio. */
+export function bloqueDeLaCompuertaDeProd({ estado, forma, fecha }) {
+  if (forma !== "sitio") return [];
+  const dia = fecha ?? new Date().toISOString().slice(0, 10);
+  const l = [];
+  l.push("");
+  l.push("## La compuerta de PRODUCCION, que sale de esta misma medición");
+  l.push("");
+  l.push("Tu proyecto publica en dos tiempos: un merge a `main` con el CI en verde sube la versión a");
+  l.push("**DEV** y se detiene ahí. **Producción no se publica sola**: hay que ir a Actions → workflow");
+  l.push("`desplegar` → **Run workflow** y marcar la casilla. Eso vale en cualquier plan y es el piso.");
+  l.push("");
+  if (estado === "puede") {
+    l.push(`### 🟢 Y acá podés tener un segundo candado — medido el ${dia}`);
+    l.push("");
+    l.push("Este repositorio admite compuertas de plataforma (es lo que se midió arriba), así que el");
+    l.push("environment `produccion` que el workflow ya declara puede pedir **aprobación de otra");
+    l.push("persona** antes de publicar. Se enciende en **Settings → Environments → produccion →");
+    l.push("Required reviewers**, y es un acto humano: esta herramienta no toca ajustes de seguridad.");
+    l.push("");
+    l.push("**Qué cambia si lo encendés:** GitHub detiene el job *antes* del primer paso y deja escrito");
+    l.push("**quién aprobó**, que no es necesariamente quien disparó. Sin eso, el rastro dice quién");
+    l.push("apretó el botón y nada más.");
+    l.push("");
+    l.push("**Y lo que hay que saber antes de encenderlo**, porque sorprende: una corrida esperando");
+    l.push("aprobación **caduca a los 30 días**, y la corrida entera se **cancela a los 35** contando la");
+    l.push("espera. Queda **cancelada, no roja**: no vas a ver una ✗ que te llame la atención. Una");
+    l.push("aprobación que se deja para después no avisa cuando vence.");
+    return l;
+  }
+  if (estado === "sin-compuertas") {
+    l.push(`### 🔴 DESVÍO DECLARADO: acá el botón es la única compuerta — medido el ${dia}`);
+    l.push("");
+    l.push("GitHub **no permite configurar environments en repositorios privados del plan gratuito**");
+    l.push("(medido el 2026-09-10 en su documentación: *«Users with GitHub Free plans can only");
+    l.push("configure environments for public repositories»*). Es **el mismo muro** que la protección");
+    l.push("de rama de arriba, y las salidas son las mismas tres.");
+    l.push("");
+    l.push("**Qué significa, sin eufemismos.** La promoción a producción sigue exigiendo que una");
+    l.push("persona apriete el botón, y queda escrito quién y cuándo. Lo que NO tenés es que esa");
+    l.push("persona sea **otra**: quien escribe el código puede publicarlo sin que nadie más lo mire.");
+    l.push("");
+    l.push("En cualquier informe de estado esto se escribe **«no hay aprobación de terceros»**, nunca");
+    l.push("«está pendiente»: pendiente es lo que se puede hacer y todavía no se hizo.");
+    return l;
+  }
+  l.push(`### ⚪ No se pudo medir si hay segundo candado — ${dia}`);
+  l.push("");
+  l.push("La sonda no pudo contestar (mirá el bloque de arriba, que dice por qué y cómo destrabarla),");
+  l.push("así que esta página **no afirma nada** sobre si este repositorio admite aprobación de");
+  l.push("terceros en el environment `produccion`. Lo que sí es cierto en cualquier caso: la");
+  l.push("promoción exige apretar el botón.");
+  return l;
+}
+
 /** Mete el bloque medido en el documento del proyecto nuevo.
  *
  *  DOS CIRUGIAS ANCLADAS Y UN AGREGADO, y ninguna reescribe el documento entero:
@@ -2672,7 +2900,7 @@ export function avisoDeProteccion({ estado, detalle, org, proyecto }) {
  *  respuesta correcta a eso no es dejar al proyecto nuevo sin la medicion —seria
  *  cambiar un fail-open por otro—. Lo que no se hace nunca es callarse: cada
  *  ancla que no aparecio sale por `avisos`, para que la divergencia se vea. */
-export function insertarProteccionMedida(texto, { lineas: bloque, frase }) {
+export function insertarProteccionMedida(texto, { lineas: bloque, frase, compuertaDeProd = [] }) {
   const lineas = String(texto).split("\n");
   const avisos = [];
 
@@ -2715,6 +2943,15 @@ export function insertarProteccionMedida(texto, { lineas: bloque, frase }) {
     "> escribió `projects init`.",
     "",
   );
+
+  // 4. Y la compuerta de PRODUCCION, que sale de la misma medicion. Va al final
+  //    y sin ancla por el mismo motivo que el agregado de arriba: no puede
+  //    fallar. Para una forma que no recibe despliegue viene vacia, y entonces
+  //    esto no escribe nada — describirle una promocion a un proyecto que no la
+  //    tiene es el defecto que el change `promocion-por-ambientes` existe para
+  //    cerrar.
+  if (compuertaDeProd.length) lineas.push(...compuertaDeProd, "");
+
   return { texto: lineas.join("\n"), avisos };
 }
 
@@ -3294,7 +3531,7 @@ async function main(argv) {
       console.error("Volve a correr con --asistente: retoma tus respuestas y no te hace contestar todo de nuevo.");
     }
     console.error("");
-    console.error(`Un esqueleto con todas las claves: node ${path.join(raizDelMarco, "herramientas", "projects-init.mjs")} --ejemplo`);
+    console.error(`Un esqueleto con todas las claves: node ${citarRuta(path.join(raizDelMarco, "herramientas", "projects-init.mjs"))} --ejemplo`);
     return 1;
   }
 
@@ -3467,7 +3704,7 @@ async function main(argv) {
   // pero el documento ya quedo con el estado REAL, que es justo lo que hay que
   // leer despues de un rojo. Ver el bloque de arriba para el defecto que cierra.
   const proteccion = sondarProteccion({ org: valores.ORG, proyecto: valores.PROYECTO });
-  const escrituraDeProteccion = escribirProteccionMedida(o.destino, { ...proteccion, org: valores.ORG, proyecto: valores.PROYECTO });
+  const escrituraDeProteccion = escribirProteccionMedida(o.destino, { ...proteccion, org: valores.ORG, proyecto: valores.PROYECTO, forma: formaDe(valores) });
   if (!escrituraDeProteccion.ok) {
     console.error(
       `::error::${escrituraDeProteccion.error}. Esta herramienta promete escribir en ${RUTA_PROTECCION} el estado ` +
@@ -3827,6 +4064,35 @@ async function main(argv) {
   console.log("     CLAUDE_CODE_OAUTH_TOKEN (para que el bot conteste; `claude setup-token`)");
   console.log("     TOKEN_ACTUALIZAR_MARCO   (OPCIONAL: sin el, el PR semanal del marco nace");
   console.log("                               sin checks y el propio workflow lo avisa)");
+
+  // EL REGISTRO DE CONSUMIDORES, con los tres datos YA RESUELTOS.
+  //
+  // POR QUE ESTA LINEA VIVE ACA Y NO EN LA DOCUMENTACION. Adoptar el marco es
+  // el UNICO instante en que se sabe con certeza que un repo lo consume, y es
+  // un instante en el que hay una persona mirando esta salida. Pasado eso, el
+  // dato o se reconstruye con una credencial de organizacion --que esta
+  // herramienta no pide y no deberia tener-- o se inventa. Y una fila
+  // inventada no se distingue de una medida.
+  //
+  // NO MANDA A AVERIGUAR NADA. Los tres datos de la tabla salen resueltos y en
+  // el orden de sus columnas: lo unico humano que queda es abrir el PR. Eso es
+  // deliberado: lo que fallaba por memoria no era la voluntad de anotar el
+  // repo, era tener que juntar los tres datos despues, cuando el momento paso.
+  const pinDelMarco = pinDelMarcoEnDestino(o.destino);
+  const diaDeAdopcion = new Date().toISOString().slice(0, 10);
+  console.log("");
+  console.log("  7. La fila de ESTE repo en el registro de consumidores del marco.");
+  console.log("     Va por PR contra el repo del marco, en docs/14-consumidores.md:");
+  console.log(`       | ${valores.ORG}/${valores.PROYECTO} | ${diaDeAdopcion} | ${pinDelMarco ?? "NO SE PUDO LEER"} |`);
+  if (!pinDelMarco) {
+    // NO SE COMPLETA CON UNA CONSTANTE, a proposito: ver pinDelMarcoEnDestino.
+    // Un hueco declarado se ve; una version adivinada, no.
+    console.log("     La version NO se pudo leer del ci.yml de este destino, y no se adivina.");
+    console.log("     Sale del `uses:` del marco en .github/workflows/ci.yml de este repo.");
+  }
+  console.log("     Sin esa fila el marco no sabe a quien le rompe un cambio breaking, ni");
+  console.log("     contra que arbol probar una compuerta nueva antes de publicarla.");
+
   for (const [k, texto] of Object.entries(CON_LIMPIEZA_MANUAL)) {
     console.log(`  · ${k} = "${valores[k]}" — ${texto}`);
   }
@@ -3841,7 +4107,7 @@ async function main(argv) {
   console.log("manifiestos se quedan donde estan y el lockfile los congela. Para comparar lo que");
   console.log("este proyecto DECLARA contra la ultima estable publicada de cada paquete —y decidir,");
   console.log("con dos preguntas, si actualizar todo el stack o solo una parte—:");
-  console.log(`     node <clon-del-marco>/herramientas/projects-versiones.mjs --raiz ${o.destino}`);
+  console.log(`     node <clon-del-marco>/herramientas/projects-versiones.mjs --raiz ${citarRuta(o.destino)}`);
   console.log("Sin terminal (en CI) solo imprime el informe y sale 0: nunca pregunta ni escribe.");
   return 0;
 }

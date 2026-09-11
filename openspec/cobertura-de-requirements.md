@@ -136,7 +136,7 @@ del review y así hay que contarlo, no como cobertura.
 
 | Requirement | Lo que lo hace fallar solo | Ruta y ancla (2026-08-31) |
 |---|---|---|
-| La rama determina el ambiente de destino | **parcial**: el caso «NO publica si las verificaciones no terminaron en verde» exige `branches: [main]` en el disparo, y el de la corrida a mano exige que el disparo manual tampoco publique sin `ci-ok`. Lo que ningún caso mira es la correspondencia rama→ambiente, porque hay **un solo** ambiente | `pruebas/andamio/desplegar.test.mjs:35` y `:208`; el disparo verificado vive en `plantilla/.github/workflows/desplegar.yml` |
+| La rama determina el ambiente de destino | **parcial**: el caso «NO publica si las verificaciones no terminaron en verde» exige `branches: [main]` en el disparo, y el de la corrida a mano exige que el disparo manual tampoco publique sin `ci-ok`. **Desde que el workflow tiene dos ambientes**, el caso de la mutación exige además que la condición del verde esté en **los dos** jobs, derivando la cuenta del propio archivo. Lo que ningún caso mira todavía es la correspondencia rama→ambiente: los dos jobs salen de `main` y lo que los separa es la promoción, no la rama | `pruebas/andamio/desplegar.test.mjs:35`, `:192` y `:238`; el disparo verificado vive en `plantilla/.github/workflows/desplegar.yml` |
 | El Environment de producción solo acepta deployments desde la rama de integración | **ninguno** | — |
 | La trust policy OIDC valida el claim que el proveedor de CI realmente emite | **ninguno** | — |
 | Los despliegues a un ambiente compartido se serializan | El caso «dos publicaciones a la vez HACEN COLA: ninguna cancela a la otra», que mira las líneas EJECUTABLES del workflow —no el comentario de al lado— y exige `cancel-in-progress: false` | `pruebas/andamio/desplegar.test.mjs:129` |
@@ -237,8 +237,8 @@ despliega» sea verificable.
 
 | Requirement | Lo que lo hace fallar solo | Ruta y ancla (2026-08-31) |
 |---|---|---|
-| CI verifica todos los paquetes de forma bloqueante | El paso que DERIVA del gestor la lista de paquetes y exige que cada uno declare los scripts, con excepciones que solo pueden equivocarse hacia el rojo, y el paso que los corre parado dentro de cada paquete | `plantilla/.github/workflows/ci.yml:354` y `:497` |
-| El deploy está gateado por el éxito de CI | **parcial**: cuatro casos del banco del despliegue, y uno de ellos es una mutación que corre la misma detección que la regla — la condición `workflow_run.conclusion == 'success'`, el `ref: head_sha` (se publica el SHA que CI midió, no la punta de la rama), y la corrida a mano, que consulta `ci-ok` sobre ese commit y deja rastro si alguien se aparta. Lo que no está cubierto es la secuencia dev→producción, que necesita el segundo ambiente | `pruebas/andamio/desplegar.test.mjs:35`, `:192` (la mutación), `:208` y `:223` |
+| CI verifica todos los paquetes de forma bloqueante | El paso que DERIVA del gestor la lista de paquetes y exige que cada uno declare los scripts, con excepciones que solo pueden equivocarse hacia el rojo, y el paso que los corre parado dentro de cada paquete | `plantilla/.github/workflows/ci.yml:354` y `:504` |
+| El deploy está gateado por el éxito de CI | **parcial**: cuatro casos del banco del despliegue, y uno de ellos es una mutación que corre la misma detección que la regla — la condición `workflow_run.conclusion == 'success'`, el `ref: head_sha` (se publica el SHA que CI midió, no la punta de la rama), y la corrida a mano, que consulta `ci-ok` sobre ese commit y deja rastro si alguien se aparta. **La secuencia dev→producción ya existe**: la mutación exige la condición del verde en los dos jobs y la deriva del archivo, así que un job nuevo que publique sin ella pone el banco rojo. Lo que sigue sin cubrirse es que la promoción publique **la misma versión** que se miró —hoy lo sostiene el `--version-tag`, y ningún caso lo cruza contra la etiqueta que puso el job de DEV | `pruebas/andamio/desplegar.test.mjs:35`, `:192` (la mutación), `:223` y `:238` |
 | Cada deploy es reproducible y reversible | **ninguno** | — |
 | Los artefactos regenerados no divergen de la versión pinada | Paso «Artefactos regenerados al dia», con banco propio que verifica además que fuera de un árbol git sea ROJO y no «nada que verificar» | `.github/workflows/marco-ci.yml`, paso «Artefactos regenerados al dia»; `pruebas/marco-ci/artefactos.test.mjs` |
 
@@ -276,30 +276,34 @@ esta capability compartan el mismo hueco no es cuatro problemas: es uno, y tiene
 
 ---
 
-## base-tecnologica — capability EN VUELO, 3 requirements, 0 con compuerta
+## base-tecnologica — capability EN VUELO, 4 requirements, 1 con compuerta
 
 No existe en `openspec/specs/`: nace en `openspec/changes/stack-estandar/specs/`
-(2 de 24 tareas al 2026-08-31). Se lista acá **antes** de que se consolide, porque una
-capability que solo vive en un change es invisible para quien lee los specs vivos de
-punta a punta.
+(2 de 24 tareas al 2026-08-31) y gana un requirement más en
+`openspec/changes/una-sola-lista-de-plataformas/specs/`. Se lista acá **antes** de que
+se consolide, porque una capability que solo vive en un change es invisible para quien
+lee los specs vivos de punta a punta.
 
 | Requirement | Lo que lo hace fallar solo | Ruta y ancla (2026-08-31) |
 |---|---|---|
 | El marco publica una base tecnológica única y es la primera opción | **ninguno** | — |
 | Apartarse de la base se pregunta antes de implementar | **ninguno** | — |
 | La base es la primera opción, no una jaula | **ninguno** | — |
+| Lo que la constitución admite y lo que la herramienta entrega no divergen en silencio | cruza las CUATRO copias de la lista de plataformas y exige que coincidan; y que una pendiente no figure como implementada | `pruebas/andamio/una-sola-lista-de-plataformas.test.mjs` |
 
 ---
 
-## documentacion-del-marco — capability EN VUELO, 2 requirements, 2 con compuerta
+## documentacion-del-marco — capability EN VUELO, 3 requirements, 3 con compuerta
 
 Tampoco existe en `openspec/specs/`: nace en
-`openspec/changes/orden-de-lectura/specs/`. Es la única capability en vuelo que **ya
+`openspec/changes/orden-de-lectura/specs/`, y gana un requirement más en
+`openspec/changes/el-andamio-dice-la-verdad/specs/`. Es la única capability en vuelo que **ya
 tiene compuertas corriendo**, y por eso su ausencia de esta página era el peor tipo de
 hueco: no faltaba deuda, faltaba cobertura que ya estaba pagada.
 
 | Requirement | Lo que lo hace fallar solo | Ruta y ancla (2026-08-31) |
 |---|---|---|
+| Lo que el andamio entrega no afirma lo que el árbol contradice | **parcial**: `pruebas/docs/promesas-sin-fuente.test.mjs` cubre la cláusula de las promesas de dinero sobre todo lo que viaja —desde que mira `.yml`— y `pruebas/docs/lo-que-lee-el-consumidor.test.mjs` exige que cada página que viaja esté clasificada y explique su vocabulario. Lo que **no** mira ningún caso es que un documento del andamio describa el comportamiento vigente de una herramienta: eso se sostiene leyendo | `pruebas/docs/promesas-sin-fuente.test.mjs:100` y `pruebas/docs/lo-que-lee-el-consumidor.test.mjs:148` |
 | El orden de lectura de la documentación es visible sin abrir nada | **parcial**: el caso «indice · toda pagina de docs/ esta enumerada en el indice» pone rojo un índice que se queda corto, y su refutación saca una página del índice para probar que muerde. Lo que no mira ningún caso es el prefijo numérico de dos dígitos que el requirement exige, ni que el número signifique orden y no importancia | `pruebas/docs/estandar-de-lectura.test.mjs:133`, con la refutación en `:480` |
 | Ningún enlace del repositorio apunta a algo que no existe | El banco de enlaces entero: cada enlace relativo tiene que resolver a un archivo que exista y cada ancla a un encabezado que exista, con el piso declarado que el propio requirement pide —un cero ahí es el detector roto, no un repositorio sin navegación— y con sus dos mutaciones al lado | `pruebas/docs/enlaces.test.mjs:145` (el archivo) y `:170` (el ancla); el piso en `:109`; las mutaciones en `:184` y `:196` |
 

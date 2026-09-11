@@ -189,20 +189,65 @@ test("cada `-C <paquete>` del despliegue apunta a una carpeta que la forma repar
   }
 });
 
-test("MUERDE: sacar la condicion del verde se caza DE VERDAD", () => {
+test("MUERDE: ningun job publica solo sobre un CI rojo, y sacar la guarda se caza", () => {
   // LA VERSION ANTERIOR DE ESTE CASO ERA TAUTOLOGICA. Hacia
   // `workflow().replace(/…success'/, "true")` y despues afirmaba que el regex ya
   // no matcheaba. Con un regex sin `g`, si la cadena NO esta, `replace` es un
   // no-op y el aserto pasa igual: no podia fallar NUNCA contra un archivo que
-  // hubiera perdido la condicion. Era el unico anti-vacuidad del banco y no
-  // media nada.
+  // hubiera perdido la condicion.
   //
-  // Ahora se afirma primero que la condicion ESTA, que es lo que lo vuelve una
-  // mutacion y no un deseo.
-  const CONDICION = /github\.event\.workflow_run\.conclusion == 'success'/;
+  // Y DESPUES CONTABA MAL. Exigia la condicion del verde UNA VEZ POR JOB, que era
+  // correcto mientras los dos jobs podian dispararse solos. Desde que la
+  // promocion es un acto humano --lo pide `promocion-por-ambientes` del marco--
+  // `produccion` NO corre por `workflow_run` en absoluto, asi que pedirle la
+  // condicion del verde era pedirle una guarda contra un camino que ya no tiene.
+  //
+  // LA PROPIEDAD, dicha bien: **ningun job llega a publicar por su cuenta sobre
+  // algo que el CI no aprobo**, y cada job la cumple de una forma distinta.
+  // Por eso se comprueba POR JOB y no contando ocurrencias sueltas en el archivo:
+  // contar no distingue "los dos estan cubiertos" de "uno tiene dos guardas y el
+  // otro ninguna".
   const t = workflow();
-  assert.match(t, CONDICION, "el archivo real tiene que traer la condicion: sin eso, mutarla no prueba nada");
-  assert.equal(CONDICION.test(t.replace(CONDICION, "true")), false, "y sacada, la deteccion tiene que ver que no esta");
+  const bloque = (nombre) => {
+    const desde = t.indexOf(`\n  ${nombre}:\n`);
+    assert.notEqual(desde, -1, `el job \`${nombre}\` no esta en el workflow: la guarda mira al vacio`);
+    const resto = t.slice(desde + 1);
+    const siguiente = resto.slice(1).search(/\n {2}[a-z_]+:\n/);
+    return siguiente === -1 ? resto : resto.slice(0, siguiente + 1);
+  };
+
+  // DEV se dispara solo, asi que su guarda es la condicion del verde.
+  const dev = bloque("dev");
+  assert.match(
+    dev,
+    /github\.event\.workflow_run\.conclusion == 'success'/,
+    "el job `dev` perdio la condicion del verde: un CI rojo publicaria igual",
+  );
+
+  // PRODUCCION no se dispara solo, y esa es SU guarda. Si aceptara `workflow_run`
+  // volveria a publicar detras de cada merge, que es lo que el change prohibe.
+  const prod = bloque("produccion");
+  assert.ok(
+    !/workflow_run/.test(prod.split("steps:")[0]),
+    "el job `produccion` volvio a mirar `workflow_run`: la promocion dejaria de ser un acto humano y pasaria a ocurrir detras de cada merge",
+  );
+  assert.match(
+    prod,
+    /github\.event_name == 'workflow_dispatch' &&\s*\n?\s*github\.event\.inputs\.promover_a_produccion == 'true'/,
+    "el job `produccion` tiene que exigir el disparo a mano Y la casilla marcada",
+  );
+
+  // MUERDE, una mutacion por job y cada una detectada por SU aserto.
+  const sinVerde = dev.replace(/github\.event\.workflow_run\.conclusion == 'success'/g, "true");
+  assert.ok(!/workflow_run\.conclusion == 'success'/.test(sinVerde), "la deteccion de DEV no ve su propia mutacion");
+  const prodAutomatico = prod.replace(
+    "github.event_name == 'workflow_dispatch' &&",
+    "github.event.workflow_run.conclusion == 'success' ||",
+  );
+  assert.ok(
+    /workflow_run/.test(prodAutomatico.split("steps:")[0]),
+    "la deteccion de produccion no ve que le devolvieron el disparo automatico",
+  );
 });
 
 test("se publica el commit que paso el CI, no la punta de main", () => {
@@ -363,4 +408,78 @@ test("el subdominio se pide donde la persona esta, no donde le explota", () => {
   // Y tiene que venir ANTES de la credencial: es el orden en el que la persona ya
   // esta parada en el panel de Cloudflare.
   assert.ok(t.indexOf("### 2 ·") < t.indexOf("### 3 · La credencial"), "el subdominio quedo despues de la credencial");
+});
+
+test("produccion promueve LA ETIQUETA QUE PUSO DEV, y no una cualquiera", () => {
+  // EL HUECO QUE ESTE CASO CIERRA, y lo declaro el propio commit que partio el
+  // workflow: toda la garantia de "se publica lo mismo que se miro" descansa en que
+  // las dos etiquetas coincidan --DEV sube con `--tag X`, produccion promueve con
+  // `--version-tag X`-- y NADA lo medía.
+  //
+  // DESDE QUE LA PROMOCION ES UN ACTO HUMANO la cadena tiene un eslabon mas, y es
+  // el que hay que vigilar: produccion ya no promueve `${GITHUB_SHA}` directo
+  // --seria "lo ultimo que haya en la rama", que puede no ser lo que se miro--
+  // sino una version ELEGIDA, que por defecto es el commit del disparo. Si ese
+  // defecto se separa de la etiqueta de DEV, promover sin elegir publica algo que
+  // nunca se subio.
+  const t = workflow();
+
+  const subida = /versions upload[\s\S]{0,400}?--tag "\$\{([A-Z_]+)\}"/.exec(t);
+  assert.ok(subida, "el job de DEV ya no sube la version con una etiqueta: sin etiqueta, la promocion tiene que adivinar");
+  assert.equal(subida[1], "GITHUB_SHA", "la etiqueta tiene que ser el commit: es lo unico que identifica QUE se miro");
+
+  const promocion = /versions deploy[\s\S]{0,400}?--version-tag "\$\{([A-Z_]+)\}@/.exec(t);
+  assert.ok(promocion, "el job de produccion ya no promueve por etiqueta: estaria raspando un id de alguna salida");
+
+  // Eslabon 1: la variable que promueve viene del paso que elige la version.
+  const cableado = new RegExp(`${promocion[1]}: \\$\\{\\{ steps\\.paso_por_dev\\.outputs\\.sha \\}\\}`);
+  assert.match(
+    t,
+    cableado,
+    `produccion promueve \${${promocion[1]}} pero esa variable no sale del paso que eligio la version: estaria promoviendo otra cosa`,
+  );
+
+  // Eslabon 2: lo que ese paso elige, cuando no se elige nada, ES la etiqueta de DEV.
+  const defecto = /SHA="\$\{VERSION:-\$\{([A-Z_]+)\}\}"/.exec(t);
+  assert.ok(defecto, "el paso que elige la version ya no tiene un defecto legible: no se puede saber que promueve si no se elige");
+  assert.equal(
+    defecto[1],
+    subida[1],
+    `DEV etiqueta con \${${subida[1]}} y promover sin elegir usa \${${defecto[1]}}: si no son la misma, promover por defecto publica algo que nunca se subio`,
+  );
+
+  // Eslabon 3: el arbol que se saca es el de ESA version, no el de la rama.
+  assert.match(
+    t,
+    /ref: \$\{\{ steps\.paso_por_dev\.outputs\.sha \}\}/,
+    "produccion saca el arbol de otra cosa que la version que promueve: la configuracion de wrangler podria no ser la de esa version",
+  );
+});
+
+test("MUERDE: si las dos etiquetas se separan, se caza", () => {
+  // Anti-vacuidad del caso de arriba: se separa el defecto a proposito y se
+  // comprueba que el predicado lo ve. Sin esto, el caso quedaria verde con los dos
+  // extractores rotos --que es como los dos podrian devolver `undefined` y ser
+  // "iguales"--.
+  const mutado = workflow().replace('SHA="${VERSION:-${GITHUB_SHA}}"', 'SHA="${VERSION:-${GITHUB_RUN_ID}}"');
+  const subida = /versions upload[\s\S]{0,400}?--tag "\$\{([A-Z_]+)\}"/.exec(mutado);
+  const defecto = /SHA="\$\{VERSION:-\$\{([A-Z_]+)\}\}"/.exec(mutado);
+  assert.ok(subida && defecto, "los dos extractores tienen que seguir encontrando algo, o la comparacion no mide");
+  assert.notEqual(defecto[1], subida[1], "el predicado no distingue dos etiquetas distintas");
+});
+
+test("MUERDE: si se corta el cable entre el paso que elige y el que promueve, se caza", () => {
+  // El otro extremo de la cadena: el paso puede elegir bien y el comando promover
+  // otra variable. Pasaba desapercibido porque los dos, por separado, son validos.
+  // `replaceAll` Y NO `replace`: el cable esta en DOS pasos --el que promueve y el
+  // que despues comprueba que produccion conteste-- y `String.replace` sin bandera
+  // global cambia solo el primero. El segundo sobreviviria, el predicado lo
+  // seguiria encontrando, y este caso daria rojo sin que hubiera nada roto. Es el
+  // mismo defecto que ya mordio una vez en este archivo, cuando el workflow paso
+  // de un job a dos.
+  const mutado = workflow().replaceAll("SHA: ${{ steps.paso_por_dev.outputs.sha }}", "SHA: ${{ github.sha }}");
+  assert.ok(
+    !/SHA: \$\{\{ steps\.paso_por_dev\.outputs\.sha \}\}/.test(mutado),
+    "el predicado no ve que le cortaron el cable: promoveria la punta de la rama en vez de la version elegida",
+  );
 });

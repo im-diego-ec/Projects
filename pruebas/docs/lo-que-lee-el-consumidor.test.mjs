@@ -47,6 +47,7 @@ const PAGINAS = {
   "plantilla/docs/postmortems/README.md": "-> lo abre quien acaba de tener un incidente, apurado y probablemente de noche",
   "plantilla/docs/runbooks/README.md": "-> lo abre quien atiende una alarma, a las tres de la maniana",
   "plantilla/docs/plantillas/change.md": "-> el esqueleto del primer change: lo abre quien va a escribir uno y no tiene nada que imitar",
+  "plantilla/docs/accesos.md": "-> lo abre quien necesita saber quien puede entrar a que, y que pasa si esa persona no esta",
 };
 
 /** Termino -> el texto que TIENE que estar en esa misma pagina explicandolo.
@@ -98,6 +99,7 @@ const EXPLICADOS = {
   },
   "plantilla/infra/adaptadores.md": {
     compuerta: "ninguna comprobación bloquea el merge por esto",
+    change: "la carpeta donde queda escrito, ANTES de programar, qué se va a cambiar y por qué",
   },
   "plantilla/sitio/README.md": {
     compuerta: "enseña a ignorar los rojos, que es peor que no tener",

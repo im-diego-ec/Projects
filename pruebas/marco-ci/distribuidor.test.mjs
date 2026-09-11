@@ -314,3 +314,28 @@ test("veredicto · un terraform que no salio success es rojo, y la sonda no lo c
     assert.match(salida, /raices de Terraform/, salida);
   }
 });
+
+test("un proceso muerto por SENIAL se reporta como tal, no como un codigo de salida raro", () => {
+  // POR QUE EXISTE ESTE CASO. `spawnSync` devuelve `status: null` cuando al proceso
+  // lo mata una senial, y los ayudantes lo devolvian tal cual: un caso que afirma
+  // `assert.equal(exit, 1)` fallaba con "expected 1, got null", que se LEE como un
+  // error de logica del guion medido y no lo es --el guion no llego a correr--.
+  //
+  // Medido: este banco y el de la bitacora fallaron una vez cada uno bajo la carga
+  // del banco completo, y pasaron 3 de 3 aislados. Un rojo que no se entiende
+  // ensenia a ignorar rojos.
+  //
+  // Se comprueba con un guion que se mata a si mismo, que es la unica forma de
+  // producir la condicion sin depender de la carga de la maquina.
+  assert.throws(
+    () => correrBash("kill -TERM $$\n", { cwd: carpetaTemporal("senial-") }),
+    /no llego a terminar: lo mato la senial/,
+    "un proceso muerto por senial tiene que reportarse como tal",
+  );
+});
+
+test("y un guion que SI termina sigue devolviendo su codigo", () => {
+  // Anti-vacuidad: el ayudante no puede haberse vuelto uno que siempre lanza.
+  assert.equal(correrBash("exit 3\n", { cwd: carpetaTemporal("codigo-") }).exit, 3);
+  assert.equal(correrBash("exit 0\n", { cwd: carpetaTemporal("codigo-") }).exit, 0);
+});

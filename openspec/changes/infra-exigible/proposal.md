@@ -11,11 +11,26 @@ estado: pendiente-de-revision
 
 # infra-exigible — Proposal
 
+> ## ⚠️ AVISO DEL FORK — la cita textual quedó vieja (2026-09-10)
+>
+> Este change cita como **textual** una regla que ya no dice eso. La ruta se corrigió
+> (antes se llamaba `60-infra-aws-secretos`, sin la palabra «plataforma»), pero el texto
+> **se ablandó** al bifurcarse Projects de Rigel:
+>
+> | Lo que el change cita | Lo que el canónico dice hoy (`:27-34`) |
+> |---|---|
+> | «IaC = Terraform, **sin excepción**» | «Terraform es la **forma por defecto**» |
+> | «En los repos del área NO se genera CDK ni CloudFormation» | eso sigue igual |
+> | — | «Una plataforma cuyo despliegue **no pasa por Terraform lo declara en su adaptador**» |
+>
+> El argumento del change se apoyaba en que la regla no admitía excepciones. Hoy sí
+> las admite, por adaptador. **Revisar el «Why» antes de ejecutarlo.**
+
 ## Why
 
 **La regla ya existe y llega a todas las sesiones. Lo que no existe es el lugar
 donde apunta.** El canónico dice, textual
-(`actions/constitucion/canonico/60-infra-aws-secretos.md:15`):
+(`actions/constitucion/canonico/60-infra-plataforma-secretos.md:15`):
 
 > **IaC = Terraform, sin excepción**: `infra/` (dev, cuenta `{{CUENTA_DEV}}`),
 > `infra-prod/` (prod, cuenta `{{CUENTA_PROD}}`), región `{{REGION}}`. En los repos del

@@ -86,9 +86,16 @@ pipeline, y el diagnóstico local es varios minutos más barato.
 ## Ambientes
 
 > # projects:solo-si-es-sitio
-> ✅ **Este proyecto SÍ se publica, y se publica solo.** Cada vez que las
-> verificaciones terminan en verde sobre `main`, el sitio sale a
-> `{{DOMINIO_PROD}}`. No hay que apretar nada.
+> ✅ **Este proyecto SÍ se publica, y lo hace en dos tiempos.** Cada vez que las
+> verificaciones terminan en verde sobre `main`, el sitio sube solo a una copia de
+> prueba —una dirección `dev-…` de verdad, que podés abrir y compartir— y el
+> pipeline comprueba que conteste. **Ahí se detiene.**
+>
+> **A producción (`{{DOMINIO_PROD}}`) lo llevás vos**, y es a propósito: Actions →
+> workflow `desplegar` → **Run workflow**, marcando la casilla. Publica **esa misma
+> versión**, sin recompilarla, y queda escrito quién la publicó y cuándo. Si
+> publicar ocurriera detrás de cada cambio, la decisión de sacar algo al mundo
+> dejaría de ser tuya.
 >
 > **Faltan cuatro actos humanos: la cuenta de Cloudflare, el subdominio de tu
 > cuenta, la credencial y guardarla en GitHub.**

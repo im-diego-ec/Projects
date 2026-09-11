@@ -5,7 +5,8 @@
 # que este marco existe para impedir. Un push a una rama no publica nada.
 #
 # QUE NECESITA PARA FUNCIONAR, y son dos cosas que solo una persona puede hacer:
-#   1. Una cuenta de Cloudflare (gratis, sin tarjeta).
+#   1. Una cuenta de Cloudflare. Tiene plan gratuito; si pide o no tarjeta al
+#      registrarse NO esta comprobado por el marco, asi que no se promete aca.
 #   2. Dos secretos en Settings -> Secrets and variables -> Actions:
 #        CLOUDFLARE_API_TOKEN    con permiso "Edit Cloudflare Workers"
 #        CLOUDFLARE_ACCOUNT_ID   el identificador de tu cuenta
@@ -14,6 +15,19 @@
 # existan, este workflow NO se pone rojo: sale con un aviso diciendo que falta.
 # Un rojo permanente por algo que todavia no se configuro ensena a ignorar los
 # rojos, que es peor que no tener la compuerta.
+#
+# QUE PUBLICA SOLO Y QUE NO. Un merge a `main` con el CI en verde sube la version
+# a DEV y ahi se detiene. **Produccion NO se publica sola**: hay que apretar «Run
+# workflow» y marcar la casilla. No es una precaucion decorativa --es lo que pide
+# `openspec/specs/promocion-por-ambientes` del marco: la promocion es un acto
+# deliberado con rastro, y automatizarla saca de la mano de la persona la unica
+# decision que de verdad es suya--.
+#
+# DONDE QUEDA EL RASTRO, que es la otra mitad de la regla: GitHub guarda quien
+# disparo la corrida y cuando, y este workflow ademas lo escribe en el resumen.
+# Donde el repositorio admite compuertas de environment hay un segundo candado
+# --revisores requeridos-- y ahi GitHub guarda tambien quien APROBO, que no es
+# necesariamente quien disparo.
 name: desplegar
 
 on:
@@ -25,13 +39,33 @@ on:
     workflows: ["CI"]
     types: [completed]
     branches: [main]
-  # A mano, para la primera vez y para volver atras.
+  # A mano: para subir a DEV la primera vez, y para PROMOVER a produccion --que
+  # es el unico camino que publica--.
   workflow_dispatch:
     inputs:
+      promover_a_produccion:
+        description: >-
+          Publicar en producción la versión que ya miraste en DEV. Sin marcar esto,
+          la corrida sube a DEV y se detiene ahí.
+        type: boolean
+        default: false
+      version:
+        description: >-
+          Qué versión promover: el commit que te dio DEV en su resumen. Vacío = la
+          punta de la rama desde la que disparás.
+        type: string
+        required: false
+        default: ""
       sin_esperar_ci:
         description: >-
-          Publicar aunque las verificaciones de este commit no estén en verde.
+          Subir a DEV aunque las verificaciones de este commit no estén en verde.
           Apartarse se puede; apartarse en silencio no: queda escrito en la corrida.
+        type: boolean
+        default: false
+      sin_pasar_por_dev:
+        description: >-
+          Promover una versión que NO terminó en verde en DEV. Es el apartamiento
+          nombrado de la compuerta: queda escrito en la corrida quién lo pidió.
         type: boolean
         default: false
 
@@ -57,16 +91,32 @@ concurrency:
   # Ese desenlace, dos corridas en verde y el destino a medias, es exactamente lo
   # que este archivo existe para impedir. Este workflow decia
   # `cancel-in-progress: true` y defendia lo contrario en un comentario.
-  group: desplegar-${{ github.ref }}
+  # POR AMBIENTE, y no por rama: DEV y PROD son destinos distintos y no compiten
+  # entre si. Serializar los dos juntos haria que una subida a DEV bloquee una
+  # promocion a PROD que no toca lo mismo.
+  group: desplegar-${{ github.ref }}-${{ github.job }}
   cancel-in-progress: false
 
 jobs:
-  desplegar:
+  # ── DEV: se sube la version y se mira. NO se publica. ──────────────────────
+  dev:
     # `workflow_run` dispara TAMBIEN cuando el workflow anterior fallo: sin este
     # `if`, un CI rojo publicaria igual.
+    #
+    # Y NO CORRE CUANDO SE ESTA PROMOVIENDO. Promover es publicar una version que
+    # se subio ANTES --dias antes, quiza-- y volver a subirla aca no promoveria
+    # nada: recompilaria, que es justo lo que el diseno de versiones existe para
+    # evitar. Por eso los dos jobs no se encadenan con `needs`: son dos actos
+    # distintos en dos momentos distintos.
+    #
+    # SE COMPARA CONTRA LA CADENA 'true' Y NO CONTRA EL BOOLEANO, a proposito:
+    # `github.event.inputs` trae los valores del disparo como TEXTO. Bajo
+    # `workflow_run` ese objeto no existe, asi que la comparacion da falso sola y
+    # no hace falta preguntar antes por el evento.
     if: >-
-      github.event_name == 'workflow_dispatch' ||
-      github.event.workflow_run.conclusion == 'success'
+      github.event.workflow_run.conclusion == 'success' ||
+      (github.event_name == 'workflow_dispatch' &&
+       github.event.inputs.promover_a_produccion != 'true')
     runs-on: ubuntu-latest
     timeout-minutes: 10
     # Los permisos van tambien EN EL JOB, no solo arriba: el marco lo exige en
@@ -166,7 +216,7 @@ jobs:
           fi
           echo "a publicar: ${CUANTOS} archivo(s)"
 
-      - name: Publicar
+      - name: Subir la version a DEV
         id: publicar
         if: steps.credencial.outputs.hay == 'si'
         shell: bash
@@ -178,15 +228,30 @@ jobs:
           # La salida se GUARDA ademas de imprimirse: de ella sale la direccion que
           # el paso siguiente va a consultar. `tee` para que el log del runner siga
           # mostrando todo tal cual, que es donde se lee cuando algo falla.
-          corepack pnpm -C {{PAQUETE_SITIO}} exec wrangler deploy 2>&1 | tee /tmp/wrangler.txt
+          # SE SUBE UNA VERSION, NO SE PUBLICA. `versions upload` deja la version
+          # cargada con su propia direccion y NO la pone en produccion: eso es lo
+          # que hace que exista un lugar donde mirar antes.
+          #
+          # LA ETIQUETA ES EL SHA DEL COMMIT, y es la pieza que hace que la
+          # promocion no tenga que adivinar nada: el job de produccion promueve
+          # por `--version-tag` con este mismo sha, asi que publica EXACTAMENTE la
+          # version que se miro aca. Sin etiqueta habria que raspar un id de la
+          # salida y confiar en que sea el correcto.
+          #
+          # `--preview-alias dev` le da ademas una direccion ESTABLE
+          # --dev-<nombre>.<subdominio>.workers.dev-- en vez de una distinta por
+          # version: quien mira DEV usa siempre el mismo enlace.
+          corepack pnpm -C {{PAQUETE_SITIO}} exec wrangler versions upload \
+            --tag "${GITHUB_SHA}" \
+            --preview-alias dev \
+            --message "DEV desde ${GITHUB_SHA}" 2>&1 | tee /tmp/wrangler.txt
 
-          # La ultima direccion que wrangler nombra es la del despliegue que acaba
-          # de hacer. Si no se pudo leer NO se inventa una: el paso siguiente lo
-          # dice y no afirma que el sitio este arriba.
-          URL="$(grep -Eo 'https://[A-Za-z0-9._-]+\.workers\.dev' /tmp/wrangler.txt | tail -1 || true)"
-          if [ -z "$URL" ]; then
-            URL="$(grep -Eo 'https://[A-Za-z0-9._-]+' /tmp/wrangler.txt | grep -v 'cloudflare.com\|npmjs\|github.com' | tail -1 || true)"
-          fi
+          # La direccion se lee ANCLADA AL ALIAS. La version anterior de este paso
+          # tomaba "la ultima direccion que wrangler nombre", con un segundo grep
+          # de rescate que aceptaba cualquier cosa: eso podia devolver la URL de
+          # produccion o una de la documentacion. Con el alias, el patron es
+          # exacto y no hay a que caerse.
+          URL="$(grep -Eo "https://dev-[A-Za-z0-9._-]+\.workers\.dev" /tmp/wrangler.txt | tail -1 || true)"
           echo "url=$URL" >> "$GITHUB_OUTPUT"
 
       # ─────────────────────────────────────────────────────────────────────────
@@ -204,7 +269,7 @@ jobs:
       # creciente cubren esa ventana; lo que no conteste despues de eso no esta
       # arriba, y entonces el rojo es correcto.
       # ─────────────────────────────────────────────────────────────────────────
-      - name: Comprobar que la direccion contesta de verdad
+      - name: Comprobar que DEV contesta de verdad
         if: steps.credencial.outputs.hay == 'si'
         shell: bash
         env:
@@ -212,7 +277,7 @@ jobs:
         run: |
           set -uo pipefail
           if [ -z "${URL:-}" ]; then
-            echo "::error::se publico pero no se pudo leer la direccion de la salida de wrangler, asi que NO se comprobo que el sitio conteste. El log del paso anterior la tiene; abrila a mano antes de dar el despliegue por bueno"
+            echo "::error::la version se subio pero no se pudo leer su direccion de prueba de la salida de wrangler, asi que NO se comprobo que conteste. Si la clave preview_urls no esta en true en wrangler.jsonc, la direccion no existe y es eso. El log del paso anterior tiene la salida entera"
             exit 1
           fi
 
@@ -233,13 +298,23 @@ jobs:
             # bash en vez de un rojo que se entienda.
             if [ -s "$CUERPO" ]; then TAM=$(wc -c < "$CUERPO" | tr -d " "); else TAM=0; fi
             if [ "$CODIGO" = "200" ] && [ "$TAM" -gt 0 ]; then
-              echo "::notice title=Tu sitio esta en linea::$URL contesto 200 con $TAM bytes"
+              echo "::notice title=DEV esta en linea::$URL contesto 200 con $TAM bytes"
               {
-                echo "### Tu sitio esta publicado"
+                echo "### Tu sitio esta en DEV, todavia no en produccion"
                 echo ""
                 echo "**$URL**"
                 echo ""
                 echo "Comprobado desde el runner: contesto 200 con $TAM bytes. No es que el despliegue haya salido bien; es que la pagina abre."
+                echo ""
+                echo "Miralo. **Producción no se publica sola**: esta versión se queda acá hasta que vos lo decidas."
+                echo ""
+                echo "**Para publicarla**, en este mismo repositorio:"
+                echo ""
+                echo "1. Pestaña **Actions** → workflow **desplegar** → botón **Run workflow**."
+                echo "2. Marcá **promover_a_produccion**."
+                echo "3. En **version**, pegá este commit: \`$GITHUB_SHA\`"
+                echo ""
+                echo "Se publica **esta misma versión** --no se vuelve a compilar--, y queda escrito quién la publicó."
               } >> "$GITHUB_STEP_SUMMARY"
               exit 0
             fi
@@ -256,5 +331,252 @@ jobs:
             sleep "$ESPERA"
           done
 
-          echo "::error::se publico y la direccion NO contesta: $URL devolvio $CODIGO despues de cinco intentos. El despliegue subio los archivos, asi que el problema esta del lado de servirlos: la causa mas comun la primera vez es que falte registrar el subdominio en Workers & Pages -> Subdomain. Ver {{PAQUETE_SITIO}}/README.md"
+          echo "::error::la version subio y su direccion de prueba NO contesta: $URL devolvio $CODIGO despues de cinco intentos. Los archivos estan; el problema esta del lado de servirlos, y la causa mas comun la primera vez es que falte registrar el subdominio en Workers & Pages -> Subdomain. Ver {{PAQUETE_SITIO}}/README.md"
+          exit 1
+
+  # ── PRODUCCION: se promueve la version que YA se miro en DEV. ───────────────
+  #
+  # ESTE JOB NO CORRE SOLO. Solo lo dispara una persona, marcando la casilla:
+  # `openspec/specs/promocion-por-ambientes` del marco pide que la promocion sea
+  # un acto deliberado con rastro, y un job que corre detras de cada merge no es
+  # una decision --es una consecuencia--. El rastro es doble: GitHub guarda quien
+  # disparo la corrida y cuando, y el ultimo paso lo escribe en el resumen.
+  #
+  # NO LLEVA `needs: dev`, y no es un olvido: promover no es la segunda mitad de
+  # una subida, es un acto que ocurre despues --dias despues, quiza--. Encadenarlo
+  # obligaria a volver a subir la version para poder publicarla, o sea a
+  # recompilar, que es exactamente lo que este diseno existe para evitar.
+  #
+  # ESTE JOB NO COMPILA, y eso no es un ahorro: es LA garantia. Volver a compilar
+  # para produccion haria que lo publicado no sea byte por byte lo que se verifico
+  # en DEV --otro reloj, otra resolucion de dependencias, otro orden de archivos--
+  # y entonces el ambiente de prueba dejaria de probar lo que sale. Por eso el
+  # diseno eligio "versiones" y no un segundo Worker: es la unica de las tres
+  # formas que promueve un artefacto YA CONSTRUIDO.
+  #
+  # Lo unico que instala es wrangler, que es la herramienta que promueve.
+  produccion:
+    if: >-
+      github.event_name == 'workflow_dispatch' &&
+      github.event.inputs.promover_a_produccion == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    # EL SEGUNDO CANDADO, donde el repositorio lo admite. Si este environment
+    # tiene revisores requeridos, GitHub DETIENE el job aca --antes del primer
+    # paso-- y deja escrito quien aprobo, que no es necesariamente quien disparo.
+    #
+    # MEDIDO EL 2026-09-10 en la documentacion de GitHub, y son tres hechos que
+    # decidieron este diseno:
+    #
+    #   1. "Users with GitHub Free plans can only configure environments for
+    #      public repositories". O sea: en un repo PRIVADO del plan gratuito esta
+    #      compuerta NO se puede configurar. Es el MISMO muro que la proteccion de
+    #      rama, y por eso el piso de este workflow no es el environment sino el
+    #      boton: apretar «Run workflow» es un acto humano en TODOS los planes.
+    #   2. "Running a workflow that references an environment that does not exist
+    #      will create an environment with the referenced name". Por eso se declara
+    #      siempre: donde no hay compuerta esto no rompe nada, crea un environment
+    #      sin reglas y sigue.
+    #   3. "A workflow may wait for up to 30 days on environment approvals", y el
+    #      tope de una corrida entera es de 35 dias contando la espera. Pasado eso
+    #      la corrida queda CANCELADA --gris--, no roja. Una aprobacion que se deja
+    #      para despues no avisa cuando vence: hay que mirarla.
+    #
+    # LO QUE ESTO NO ES: una compuerta que el marco pueda dar por hecha. Que
+    # exista de verdad depende del plan y de la visibilidad del repositorio, y eso
+    # lo mide `projects init` y lo escribe en `.github/proteccion-main.md`.
+    environment:
+      name: produccion
+      url: ${{ steps.promover.outputs.url }}
+    permissions:
+      contents: read
+      # Para preguntar si la version que se va a promover paso por DEV en verde.
+      actions: read
+    steps:
+      # ──────────────────────────────────────────────────────────────────────
+      # QUE LA VERSION EXISTA NO ES QUE HAYA PASADO LA PRUEBA.
+      #
+      # El job de DEV hace dos cosas: sube la version y despues comprueba que su
+      # direccion conteste. La primera puede salir bien y la segunda mal --el
+      # sitio sube y sirve un 404--, y la version queda igual cargada en
+      # Cloudflare, promovible. Sin este paso, promoverla publicaria algo que la
+      # prueba rechazo, en silencio y en verde.
+      #
+      # FALLA CERRADO. Si la consulta no se puede hacer --sin red, sin permiso, la
+      # corrida borrada por retencion-- esto NO sigue: la ausencia de datos no se
+      # lee como exito. Para eso esta el apartamiento nombrado.
+      # ──────────────────────────────────────────────────────────────────────
+      - name: Comprobar que esta version paso por DEV, y en verde
+        id: paso_por_dev
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SIN_DEV: ${{ github.event.inputs.sin_pasar_por_dev }}
+          VERSION: ${{ github.event.inputs.version }}
+        run: |
+          set -uo pipefail
+          SHA="${VERSION:-${GITHUB_SHA}}"
+          echo "sha=${SHA}" >> "${GITHUB_OUTPUT}"
+          echo "version a promover: ${SHA}"
+
+          if [ "${SIN_DEV}" = "true" ]; then
+            echo "::warning::se pidio promover SIN comprobar que ${SHA} haya pasado por DEV. Queda escrito acá: lo pidió @${GITHUB_ACTOR}"
+            exit 0
+          fi
+
+          # Se pregunta por las corridas de ESTE workflow sobre ESE commit, y se
+          # mira el job `dev` de cada una. Se recorren varias porque un mismo
+          # commit puede tener mas de un intento --el primero rojo por una red
+          # caida, el segundo verde-- y alcanza con que UNO haya pasado.
+          #
+          # LOS TRES DESENLACES SE DISTINGUEN, y esto no es prolijidad: "no pude
+          # preguntar", "nunca se subio" y "se subio y salio rojo" piden tres cosas
+          # distintas de la persona. Un solo mensaje para los tres manda a mirar
+          # donde no esta el problema.
+          if ! CORRIDAS="$(gh api "repos/${GITHUB_REPOSITORY}/actions/workflows/desplegar.yml/runs?head_sha=${SHA}&per_page=20" --jq '.workflow_runs[].id' 2>&1)"; then
+            echo "${CORRIDAS}"
+            echo "::error::no se pudo preguntarle a GitHub si ${SHA} pasó por DEV, así que NO se promueve. La ausencia de datos no se lee como éxito: esto no dice que la versión esté mal, dice que no se sabe. Mirá el mensaje de arriba --suele ser la red o un permiso--, y si de verdad hace falta publicar igual, volvé a disparar marcando \"sin_pasar_por_dev\""
+            exit 1
+          fi
+          if [ -z "${CORRIDAS}" ]; then
+            echo "::error::no hay ninguna corrida de este workflow sobre ${SHA}, así que esa versión nunca se subió a DEV y no se promueve: a producción llega lo que se miró funcionando en el ambiente de prueba. Si el commit es correcto, subila primero --mergeá a la rama principal, o dispará este workflow SIN marcar promover--"
+            exit 1
+          fi
+
+          VERDE="no"
+          LEIDAS=0
+          for ID in ${CORRIDAS}; do
+            if ! R="$(gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${ID}/jobs" --jq '[.jobs[] | select(.name == "dev")] | first | .conclusion // "sin-job"' 2>&1)"; then
+              echo "corrida ${ID}: no se pudo leer (${R})"
+              continue
+            fi
+            LEIDAS=$((LEIDAS + 1))
+            echo "corrida ${ID}: dev = ${R}"
+            if [ "${R}" = "success" ]; then VERDE="si"; break; fi
+          done
+
+          if [ "${VERDE}" != "si" ] && [ "${LEIDAS}" -eq 0 ]; then
+            echo "::error::hay corridas sobre ${SHA} pero no se pudo leer ninguna, así que NO se sabe si pasó por DEV y NO se promueve. La ausencia de datos no se lee como éxito"
+            exit 1
+          fi
+
+          if [ "${VERDE}" != "si" ]; then
+            echo "::error::la versión ${SHA} se subió pero su paso por DEV no terminó en verde, así que NO se publica. Es la compuerta del marco: a producción llega lo que se miró funcionando en el ambiente de prueba. Si de verdad hace falta, volvé a disparar marcando \"sin_pasar_por_dev\": el apartamiento queda escrito en la corrida"
+            exit 1
+          fi
+
+          echo "::notice::${SHA} pasó por DEV en verde. Se promueve"
+
+      - name: Traer el arbol
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          # EL MISMO COMMIT QUE SUBIO A DEV, que puede no ser la punta de `main`:
+          # entre que se miro DEV y se decide promover puede entrar otro merge, y
+          # promover "lo ultimo" publicaria algo que nadie miro.
+          ref: ${{ steps.paso_por_dev.outputs.sha }}
+
+      - name: Comprobar que la credencial existe, y NO fallar si no
+        id: credencial
+        shell: bash
+        env:
+          TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CUENTA: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          set -euo pipefail
+          if [ -z "${TOKEN}" ] || [ -z "${CUENTA}" ]; then
+            echo "hay=no" >> "${GITHUB_OUTPUT}"
+            echo "::warning::todavia no se puede publicar: faltan los secretos CLOUDFLARE_API_TOKEN y/o CLOUDFLARE_ACCOUNT_ID. El paso a paso para crearlos esta en {{PAQUETE_SITIO}}/README.md. Esto NO es un fallo del proyecto: es una tarea humana pendiente, y se dice en amarillo a proposito"
+            exit 0
+          fi
+          echo "hay=si" >> "${GITHUB_OUTPUT}"
+
+      - name: Node y el gestor de paquetes
+        if: steps.credencial.outputs.hay == 'si'
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        with:
+          node-version: "24"
+
+      - name: Instalar
+        if: steps.credencial.outputs.hay == 'si'
+        shell: bash
+        run: |
+          set -euo pipefail
+          corepack enable
+          corepack pnpm install --frozen-lockfile
+
+      - name: Promover a produccion la version que se miro en DEV
+        id: promover
+        if: steps.credencial.outputs.hay == 'si'
+        shell: bash
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          SHA: ${{ steps.paso_por_dev.outputs.sha }}
+        run: |
+          set -euo pipefail
+          # `--version-tag` con el MISMO sha que puso el job de DEV. Wrangler
+          # resuelve la etiqueta al id de esa version, asi que lo que se publica es
+          # exactamente lo que se subio y se miro, sin raspar ningun id de ninguna
+          # salida. Si la etiqueta no existe, wrangler no puede resolverla y el
+          # paso falla: no hay forma de que publique "otra".
+          #
+          # `--yes` porque `versions deploy` es INTERACTIVO por defecto: sin esta
+          # bandera se queda esperando una confirmacion que en un runner no va a
+          # llegar nunca, y el job muere por timeout en vez de decir por que.
+          #
+          # `@100%` es el reparto de trafico: toda la gente a esta version. Wrangler
+          # soporta despliegues graduales --`<id>@10%`-- y este marco no los usa
+          # todavia: un reparto parcial exige mirar metricas para decidir cuando
+          # completarlo, y eso es maquinaria que todavia no existe aca.
+          corepack pnpm -C {{PAQUETE_SITIO}} exec wrangler versions deploy \
+            --version-tag "${SHA}@100%" \
+            --yes \
+            --message "PROD desde ${SHA}, promovida por ${GITHUB_ACTOR}" 2>&1 | tee /tmp/promover.txt
+
+          URL="$(grep -Eo "https://[A-Za-z0-9._-]+\.workers\.dev" /tmp/promover.txt | grep -v '^https://dev-' | tail -1 || true)"
+          echo "url=$URL" >> "$GITHUB_OUTPUT"
+
+      - name: Comprobar que produccion contesta de verdad
+        if: steps.credencial.outputs.hay == 'si'
+        shell: bash
+        env:
+          URL: ${{ steps.promover.outputs.url }}
+          SHA: ${{ steps.paso_por_dev.outputs.sha }}
+        run: |
+          set -uo pipefail
+          if [ -z "${URL:-}" ]; then
+            echo "::error::se promovio pero no se pudo leer la direccion de produccion de la salida de wrangler, asi que NO se comprobo que el sitio conteste. El log del paso anterior la tiene; abrila a mano antes de dar la promocion por buena"
+            exit 1
+          fi
+
+          CUERPO="${RUNNER_TEMP:-.}/cuerpo-de-produccion.html"
+          for intento in 1 2 3 4 5; do
+            CODIGO="$(curl -sS -o "$CUERPO" -w '%{http_code}' --max-time 20 "$URL")" || CODIGO=000
+            if [ -s "$CUERPO" ]; then TAM=$(wc -c < "$CUERPO" | tr -d " "); else TAM=0; fi
+            if [ "$CODIGO" = "200" ] && [ "$TAM" -gt 0 ]; then
+              echo "::notice title=Tu sitio esta publicado::$URL contesto 200 con $TAM bytes"
+              {
+                echo "### Tu sitio está publicado"
+                echo ""
+                echo "**$URL**"
+                echo ""
+                echo "Es la MISMA versión que pasó por DEV: se promovió, no se volvió a compilar."
+                echo ""
+                echo "| | |"
+                echo "|---|---|"
+                echo "| Versión | \`$SHA\` |"
+                echo "| La publicó | @$GITHUB_ACTOR |"
+                echo "| Cuándo | $(date -u '+%Y-%m-%d %H:%M UTC') |"
+                echo ""
+                echo "Ese registro no es decoración: una decisión sin autor no se puede revisar después."
+              } >> "$GITHUB_STEP_SUMMARY"
+              exit 0
+            fi
+            if [ "$intento" -eq 5 ]; then break; fi
+            ESPERA=$((3 * (2 ** (intento - 1))))
+            echo "intento $intento: $URL contesto $CODIGO con $TAM bytes; espero ${ESPERA}s"
+            sleep "$ESPERA"
+          done
+
+          echo "::error::se promovio y produccion NO contesta: $URL devolvio $CODIGO despues de cinco intentos. La version se publico, asi que el problema esta del lado de servirla. Para volver atras: la version anterior sigue existiendo y se promueve igual, disparando este mismo workflow con su commit en \"version\""
           exit 1

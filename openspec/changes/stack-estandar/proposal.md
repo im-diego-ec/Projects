@@ -11,6 +11,30 @@ estado: pendiente-de-revision
 
 # stack-estandar — Proposal
 
+> ## ⚠️ AVISO DEL FORK — leer antes de ejecutar este change (2026-09-10)
+>
+> **Su premisa está en discusión con el canónico vigente de Projects.** Este change
+> propone «El marco publica una base tecnológica **única** y es la primera opción», y
+> cita `actions/constitucion/canonico/60-infra-plataforma-secretos.md:5-11` como el
+> lugar donde ese texto ya bajó.
+>
+> Ese archivo, hoy, dice lo contrario:
+>
+> > «Lo que el marco fija son **CUATRO CAPACIDADES, no un producto** […] Fijarlo acá
+> > era un proveedor disfrazado de invariante: dejaba fuera a quien no puede pagar
+> > por hora.»
+>
+> El texto cambió cuando Projects se bifurcó de Rigel el 2026-08-24 y generalizó
+> `aws` → `plataforma`. La ruta ya se corrigió (el archivo se llamaba
+> `60-infra-aws-secretos`, sin la palabra «plataforma»), pero **el contenido citado
+> también cambió de sentido**,
+> y eso no se arregla renombrando.
+>
+> **Decisión pendiente, y es del PO:** ¿Projects fija una base única —el modelo de
+> Rigel— o cuatro capacidades con el producto elegido por el proyecto —el modelo que
+> su canónico declara hoy y que `una-sola-lista-de-plataformas` refuerza—? Mientras no
+> se resuelva, este change **no se puede ejecutar tal como está escrito**.
+
 ## Why
 
 El marco ya fija parte del stack y a la vez declara que no lo fija. Las dos
@@ -51,7 +75,7 @@ apartarse se **pregunta ANTES de implementar**. Es la misma forma que la tabla
 de stack ya usa para las dependencias («toda dependencia nueva se pregunta
 primero»), no la forma débil de «documentá tu desvío después». El texto ya bajó
 al canónico en la rama del change hermano `reglas-al-dia`
-(`actions/constitucion/canonico/60-infra-aws-secretos.md:5-11` y
+(`actions/constitucion/canonico/60-infra-plataforma-secretos.md:5-11` y
 `actions/constitucion/canonico/40-fronteras.md:93-97`) —pero **solo como prosa
 distribuida**: ningún spec del marco dice que exista una base. Verificado hoy:
 los ocho specs vivos de `openspec/specs/` nombran **cero** tecnologías concretas

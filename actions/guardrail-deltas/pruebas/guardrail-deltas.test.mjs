@@ -22,7 +22,8 @@
 //   node --test actions/guardrail-deltas/pruebas/
 import test, { after } from "node:test";
 import assert from "node:assert/strict";
-import { arbol, correr, delta, limpiar, requirement, specVivo } from "./ayuda.mjs";
+import { join } from "node:path";
+import { AQUI, arbol, correr, delta, limpiar, requirement, specVivo } from "./ayuda.mjs";
 
 after(limpiar);
 
@@ -185,15 +186,16 @@ test("un arbol SIN un solo delta lo dice, en vez de afirmar que nada se perderia
 // ── Y el repositorio de verdad ─────────────────────────────────────────────
 
 test("el propio repositorio del marco pasa, y compara mas de cero", () => {
+  // `AQUI` sale de `fileURLToPath` (ver ayuda.mjs) y NO de `new URL(...).pathname`,
+  // que era como se armaba antes. `.pathname` devuelve la ruta PERCENT-ENCODED: con
+  // el clon en una carpeta con espacio --"No Coders", "Mis Documentos"-- le pasaba
+  // al guardrail un ".../No%20Coders/..." que no existe, el guardrail no encontraba
+  // ningun delta y salia EN VERDE diciendo "no hay ningun delta que comparar". Este
+  // caso lo cazaba de casualidad, por exigir que comparara mas de cero.
+  const raizDelRepo = join(AQUI, "..", "..", "..");
   const r = correr("", {
-    OPENSPEC_CHANGES: new URL("../../../openspec/changes", import.meta.url).pathname.replace(
-      /^\/([A-Za-z]:)/,
-      "$1"
-    ),
-    OPENSPEC_SPECS: new URL("../../../openspec/specs", import.meta.url).pathname.replace(
-      /^\/([A-Za-z]:)/,
-      "$1"
-    ),
+    OPENSPEC_CHANGES: join(raizDelRepo, "openspec", "changes"),
+    OPENSPEC_SPECS: join(raizDelRepo, "openspec", "specs"),
   });
   assert.equal(r.codigo, 0, r.todo);
   assert.doesNotMatch(r.stdout, /no hay ningún delta que comparar/i);

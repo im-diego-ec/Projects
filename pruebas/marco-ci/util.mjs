@@ -69,6 +69,31 @@ export function commit(raiz, mensaje) {
  * comillas simples que envuelven los programas de `node -e`. Por archivo el
  * texto llega intacto en cualquier plataforma Y es la forma real del runner.
  */
+/** Un proceso que murio por SENIAL no midio nada, y decirlo importa.
+ *
+ *  QUE DEFECTO CIERRA. `spawnSync` devuelve `status: null` cuando al proceso lo
+ *  mata una senial --sin memoria, matado por el sistema, o el runner de pruebas
+ *  cortandolo-- y estos ayudantes lo devolvian tal cual. Entonces un caso que
+ *  afirma `assert.equal(exit, 1)` fallaba con "expected 1, got null", que se LEE
+ *  como un error de logica del guion y no lo es: el guion no llego a correr.
+ *
+ *  Medido: dos bancos --distribuidor y bitacora-- fallaron una vez cada uno bajo la
+ *  carga del banco completo y pasaron 3 de 3 aislados. Un rojo que no se entiende
+ *  ensenia a ignorar rojos, que es lo contrario de lo que este repositorio quiere.
+ *
+ *  Ahora se distingue: si murio por senial, el mensaje lo dice y nombra la senial. */
+function exigirQueHayaCorrido(resultado, que) {
+  if (resultado.error) throw resultado.error;
+  if (resultado.status === null) {
+    throw new Error(
+      `${que} no llego a terminar: lo mato la senial ${resultado.signal ?? "(desconocida)"}. ` +
+        "Esto NO es un fallo del guion que se estaba midiendo --no llego a dar un codigo de salida-- " +
+        "sino del proceso que lo corria. Si aparece solo con el banco completo y no aislado, es carga.",
+    );
+  }
+  return resultado;
+}
+
 export function correrBash(script, { cwd, env = {} } = {}) {
   const runnerTemp = carpetaTemporal("runner-temp-");
   const guion = join(carpetaTemporal("guion-"), "paso.sh");
@@ -89,7 +114,7 @@ export function correrBash(script, { cwd, env = {} } = {}) {
       },
     },
   );
-  if (resultado.error) throw resultado.error;
+  exigirQueHayaCorrido(resultado, "el guion de bash");
   return {
     exit: resultado.status,
     salida: `${resultado.stdout ?? ""}${resultado.stderr ?? ""}`,
@@ -106,7 +131,7 @@ export function correrNode(programa, { args = [], cwd, env = {} } = {}) {
     encoding: "utf8",
     env: { ...process.env, ...env },
   });
-  if (resultado.error) throw resultado.error;
+  exigirQueHayaCorrido(resultado, "el programa de node");
   return { exit: resultado.status, salida: `${resultado.stdout ?? ""}${resultado.stderr ?? ""}` };
 }
 

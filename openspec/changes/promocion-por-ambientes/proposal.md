@@ -92,7 +92,8 @@ depende de una medición que todavía no se hizo.
 1. **¿El repositorio del proyecto es público o privado?** Es la decisión que más
    arrastra y no es técnica. En un repositorio **privado del plan gratuito no
    existe ninguna compuerta de environment** —ni revisores, ni temporizador, ni
-   política de rama— y tenerlas cuesta **21 USD por persona al mes**. En uno
+   política de rama— y tenerlas cuesta **21 USD por persona al mes** *(cifra **sin
+   fuente confirmada**: ver el aviso en [`design.md`](design.md))*. En uno
    público son gratis. El marco ya se comió este mismo muro con la protección de
    rama.
 

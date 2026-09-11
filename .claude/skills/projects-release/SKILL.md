@@ -369,6 +369,48 @@ paso 3.
 
 ---
 
+## Paso 5-bis — Las plantillas, que quedan atras sin avisar
+
+**Por que existe este paso.** `docs/04-arrancar-acompanado.md` manda al camino sin
+instalar: la persona hace *Use this template* sobre `im-diego-ec/plantilla-sitio` o
+`im-diego-ec/plantilla-aplicacion` y despues corre el workflow *Personalizar mi
+proyecto*. Ese workflow lee el pin del marco **del `ci.yml` de la propia plantilla**.
+
+O sea: si las plantillas se quedan en la version anterior, **cada proyecto que nazca
+por el camino mas no-coder nace pineado a una version vieja**, sin que nada lo diga.
+No hay rojo: el proyecto arranca bien, con el marco de antes.
+
+Es el unico consumidor del marco que **no** recibe PR de Dependabot, porque no es un
+repo que alguien mantenga: es un molde que se copia.
+
+**Verificar, para las DOS:**
+
+```bash
+for r in plantilla-sitio plantilla-aplicacion; do
+  echo -n "$r: "
+  gh api "repos/im-diego-ec/$r/contents/.github/workflows/ci.yml" --jq .content \
+    | base64 -d | grep -oE "marco-ci\.yml@v[0-9]+\.[0-9]+\.[0-9]+" | head -1
+done
+```
+
+Las dos tienen que decir `@vX.Y.Z` — **la version que acabas de publicar**. Si dicen
+la anterior, regeneralas antes de dar el release por cerrado:
+
+```bash
+node herramientas/projects-plantilla-repos.mjs --forma sitio      --destino <tmp>
+node herramientas/projects-plantilla-repos.mjs --forma aplicacion --destino <tmp>
+```
+
+**Y comproba que sigan siendo plantillas**, porque un repo que dejo de serlo rompe el
+boton que la guia manda apretar y el error que ve la persona no menciona al marco:
+
+```bash
+gh api repos/im-diego-ec/plantilla-sitio      --jq .is_template   # true
+gh api repos/im-diego-ec/plantilla-aplicacion --jq .is_template   # true
+```
+
+---
+
 ## Paso 6 — Publicar las notas del release en GitHub
 
 **Este es el paso que se olvido en la practica.** No lo dejes para despues: es
@@ -430,6 +472,55 @@ gh release view vX.Y.Z --json body --jq '.body | length'
 ```
 
 Tiene que devolver un numero de varios cientos, no `0`.
+
+**Y que las notas traigan la EVIDENCIA del ensayo contra un consumidor real**, no
+solo cuerpo. Medir el largo dice que hay texto; no dice que se haya probado nada:
+
+```bash
+gh release view vX.Y.Z --json body --jq '.body' \
+  | grep -Eo 'corrida [0-9]{6,}|[0-9a-f]{40}'
+```
+
+**PRIMERO: cuantos consumidores hay.** La respuesta cambia que se exige, y sale del
+registro:
+
+```bash
+grep -c '^| .* | 20[0-9][0-9]-' docs/14-consumidores.md   # filas del registro
+```
+
+**Si devuelve 0 --la circularidad de arranque--.** `AGENTS.md` tiene una frontera
+🛑: "Publicar un cambio del marco que no se probo contra un consumidor real". Y la
+regla es explicita en que el ensayo es ADEMAS del dogfooding: "no solo en el CI de
+este repo". Con cero consumidores esa precondicion **no se puede cumplir**, y no por
+descuido: **el primer consumidor no puede existir hasta que el marco publique una
+version que consumir.**
+
+No se finge la evidencia ni se bloquea el marco para siempre. **Se declara**, en la
+entrada de la version, con esta forma:
+
+```
+Probado contra: NINGUN CONSUMIDOR. El registro (docs/14-consumidores.md) esta vacio
+y la frontera de AGENTS.md no se puede cumplir hasta que exista el primero. Lo que
+SI se corrio: el dogfooding del propio repo (ci.yml llama a marco-ci.yml por ruta
+local) y el banco completo, <N>/<N>.
+```
+
+Es la misma clase de excepcion que el bootstrap ya declarado en el encabezado del
+`CHANGELOG.md`, y por el mismo motivo: una regla que no se puede cumplir **se
+escribe**, no se saltea en silencio. **Y caduca sola:** el dia que el registro tenga
+una fila, esta rama deja de aplicar y vuelve la exigencia de la terna.
+
+**Si devuelve 1 o mas**, la evidencia es obligatoria y se comprueba asi:
+
+Tiene que devolver **un id de corrida y al menos un SHA de 40 caracteres**. Si no
+los devuelve, el release NO esta cerrado: la precondicion 1 --"se probo contra un
+consumidor real"-- se estaria apoyando en una premisa que nadie comprueba.
+
+**Por que aca y no en el PR del ensayo.** El paso 5 de `projects-validar-consumidor`
+cierra ese PR con `--delete-branch`. Un comentario ahi es el unico rastro
+reproducible y el propio procedimiento manda destruirlo, asi que la terna tiene
+que viajar al `CHANGELOG.md` --que este paso ya recorta a las notas-- antes de
+que eso pase.
 
 El archivo de notas quedo en un temporal fuera del repo: no hay nada que borrar
 del arbol de trabajo. Confirmalo con `git status --short`, que tiene que estar

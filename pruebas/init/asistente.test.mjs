@@ -98,7 +98,6 @@ const AWS_DOS = {
   equipo: "2",
   BUILDER_2: "otra-persona",
   plataforma: "2",
-  ambientes: "2",
   CUENTA_DEV: "111111111111",
   CUENTA_PROD: "222222222222",
   REGION: "us-east-1",
@@ -108,14 +107,15 @@ const AWS_DOS = {
   DOMINIO_PROD: "tienda.com",
 };
 
-test("el caso mas simple son NUEVE preguntas, y solo dos hay que escribirlas", async () => {
+test("el caso mas simple son OCHO preguntas, y solo dos hay que escribirlas", async () => {
   const { preguntar } = contestador({ ...TEXTO_VALIDO, ...PO_SOLO });
   const { dicho, respuestas } = await correrAsistente(preguntar, {}, {}, () => {}, DERIVADOS);
   assert.equal(
     cuantasPreguntas(dicho),
-    9,
-    "el numero de preguntas del caso simple es la promesa central de esta herramienta: nueve en vez de veintiuna " +
-      "casillas a mano. " +
+    8,
+    "el numero de preguntas del caso simple es la promesa central de esta herramienta: ocho en vez de veintiuna " +
+      "casillas a mano. Bajo de nueve a ocho al retirar `ambientes`, que con la plataforma recomendada cambiaba " +
+      "EXACTAMENTE UNA CLAVE y ningun archivo. " +
       "Si sube, o se agrego una pregunta que no hacia falta, o se rompio un `salta`",
   );
   // Las seis restantes se contestaron con Enter, o sea con la recomendada.
@@ -123,52 +123,61 @@ test("el caso mas simple son NUEVE preguntas, y solo dos hay que escribirlas", a
     {
       equipo: respuestas.equipo,
       plataforma: respuestas.plataforma,
-      ambientes: respuestas.ambientes,
       dominio: respuestas.dominio,
       avisos: respuestas.avisos,
       visibilidad: respuestas.visibilidad,
     },
-    { equipo: "solo", plataforma: "supabase", ambientes: "uno", dominio: "gratuito", avisos: "correo", visibilidad: "publico" },
+    { equipo: "solo", plataforma: "supabase", dominio: "gratuito", avisos: "correo", visibilidad: "publico" },
     "Enter tiene que elegir la opcion recomendada de cada pregunta: si no, el 'caso simple' no es simple",
   );
 });
 
-test("elegir AWS con dos ambientes hace DIECISEIS preguntas, y ninguna es de relleno", async () => {
+test("elegir AWS hace QUINCE preguntas, y ninguna es de relleno", async () => {
   const { preguntar } = contestador({ ...TEXTO_VALIDO, ...AWS_DOS });
   const { dicho, valores } = await correrAsistente(preguntar, {}, {}, () => {}, DERIVADOS);
-  assert.equal(cuantasPreguntas(dicho), 16, "con AWS y dos ambientes se preguntan las cinco de AWS mas el dominio propio");
+  assert.equal(cuantasPreguntas(dicho), 15, "con AWS se preguntan las cinco de AWS mas el dominio propio");
   // El defecto que este caso vigila: la primera version del asistente SALTEABA
   // las cinco preguntas de AWS junto con el relleno, asi que quien elegia AWS
   // se quedaba sin sus propios datos y el archivo salia invalido.
   assert.equal(valores.CUENTA_DEV, "111111111111", "la cuenta de pruebas tiene que salir de la respuesta, no del relleno");
-  assert.equal(valores.CUENTA_PROD, "222222222222", "con DOS ambientes las cuentas son distintas");
+  assert.equal(valores.CUENTA_PROD, "222222222222", "las cuentas de pruebas y de produccion son distintas, siempre");
   assert.equal(valores.REGION, "us-east-1");
   assert.notEqual(valores.PERFIL_DEV, RELLENO_AWS.PERFIL_DEV, "eligiendo AWS, el perfil no puede ser el relleno de 'sin AWS'");
 });
 
-test("con AWS y UN ambiente no se pregunta dos veces por el mismo dato", async () => {
+test("con AWS, la cuenta de produccion se PREGUNTA y no se hereda de la de pruebas", async () => {
+  // ESTE CASO DESCRIBIA LO CONTRARIO hasta el 2026-09-10, y con razon: mientras
+  // existio la pregunta `ambientes`, contestar "uno" heredaba la cuenta y el perfil
+  // de produccion de los de pruebas, para no pedir dos veces el mismo dato.
+  //
+  // La pregunta se retiro --con la plataforma recomendada cambiaba una sola clave y
+  // ningun archivo-- y la topologia pasa a ser siempre Local -> DEV -> PROD. Con una
+  // sola topologia, que las dos cuentas sean DISTINTAS deja de ser opcional: es lo
+  // unico que impide que un error de prueba toque lo real.
   const { preguntar } = contestador({
     ...TEXTO_VALIDO,
     PROYECTO: "api-interna",
     ORG: "alguien",
     plataforma: "2",
     CUENTA_DEV: "111111111111",
+    CUENTA_PROD: "222222222222",
     REGION: "sa-east-1",
     PERFIL_DEV: "mi-perfil",
+    PERFIL_PROD: "mi-perfil-prod",
     avisos: "2",
     CANAL_ALERTAS: "#alertas",
     visibilidad: "2",
   });
-  const { valores, dicho } = await correrAsistente(preguntar, {}, {}, () => {}, DERIVADOS);
-  assert.equal(cuantasPreguntas(dicho), 13, "con un solo ambiente se saltean la cuenta y el perfil de produccion");
-  assert.equal(valores.CUENTA_PROD, valores.CUENTA_DEV, "con un ambiente, la cuenta de 'produccion' ES la misma");
-  assert.equal(valores.PERFIL_PROD, valores.PERFIL_DEV, "y el perfil tambien");
+  const { valores } = await correrAsistente(preguntar, {}, {}, () => {}, DERIVADOS);
+  assert.equal(valores.CUENTA_PROD, "222222222222", "la cuenta de produccion sale de su propia respuesta");
+  assert.notEqual(valores.CUENTA_PROD, valores.CUENTA_DEV, "las dos cuentas no pueden ser la misma");
+  assert.notEqual(valores.PERFIL_PROD, valores.PERFIL_DEV, "los dos perfiles tampoco");
 });
 
 test("LO QUE MAS IMPORTA: lo que produce el asistente pasa el validador de siempre", async () => {
   const CASOS = {
     "PO solo, supabase, publico": PO_SOLO,
-    "equipo, AWS, dos ambientes": AWS_DOS,
+    "equipo, AWS": AWS_DOS,
     "solo, AWS, un ambiente": {
       PROYECTO: "api-interna",
       ORG: "alguien",
@@ -390,7 +399,7 @@ test("MUERDE: si una pregunta deja de saltarse, el conteo del caso simple lo caz
     `el camino de AWS tiene que preguntar MAS que el de Supabase; midio ${conAws.length} contra ${conSupabase.length}. ` +
       "Si son iguales, los `salta` dejaron de filtrar y el 'caso simple' de 8 preguntas es una coincidencia",
   );
-  assert.equal(conSupabase.length, 9, "y el camino simple son exactamente nueve");
+  assert.equal(conSupabase.length, 8, "y el camino simple son exactamente ocho");
 });
 
 test("el resumen nombra TODAS las decisiones que se preguntaron, y ninguna que no", async () => {
@@ -639,25 +648,47 @@ test("TODA combinacion de respuestas produce un archivo que el validador acepta"
   );
 });
 
-test("un sitio nunca queda con valores de AWS a medias, y el desvio lo dice", async () => {
-  const { valores, respuestas } = await correrAsistente(
-    // Lo que no se fija a mano se contesta con la primera opcion: lo que este
-    // caso mide es el CRUCE sitio+AWS, no el resto del cuestionario.
-    async (_t, id) => ({ PROYECTO: "p", ORG: "o", forma: "2", plataforma: "2" })[id] ?? LIBRES[id] ?? "1",
-    {},
-    {},
-    () => {},
-    { ORG_MARCO: "im-diego-ec" },
-  );
-  assert.equal(respuestas.forma, "sitio");
-  assert.equal(respuestas.plataforma, "aws", "el guion tiene que haber elegido AWS, o este caso no mide el cruce");
-  assert.equal(usaAws(respuestas), false, "un sitio no despliega servidor propio: no usa AWS aunque se elija AWS");
+test("un sitio nunca queda con valores de AWS a medias, y el desvio lo dice", () => {
+  // ESTE CASO YA NO PASA POR EL CUESTIONARIO, y el motivo es que la combinacion
+  // dejo de poder elegirse ahi: desde el 2026-09-10 la pregunta de plataforma se
+  // SALTA para un sitio, porque las tres opciones producian el mismo proyecto.
+  //
+  // Pero la propiedad sigue importando, y por eso el caso no se borra: el archivo
+  // de valores se puede escribir A MANO --es un JSON, y `projects-init.mjs` lo
+  // acepta-- asi que alguien puede llegar igual a forma=sitio + plataforma=aws. Lo
+  // que cambia es por donde se mide: antes por el asistente, ahora directo sobre
+  // los dos predicados que deciden.
+  const r = {
+    PROYECTO: "p",
+    ORG: "o",
+    forma: "sitio",
+    plataforma: "aws",
+    equipo: "solo",
+    BUILDER_2: "b",
+    dominio: "gratuito",
+    DOMINIO_PROD: "e.com",
+    avisos: "correo",
+    CANAL_ALERTAS: "#a",
+    visibilidad: "publico",
+  };
+  const valores = derivar(r);
+
+  assert.equal(usaAws(r), false, "un sitio no despliega servidor propio: no usa AWS aunque el archivo diga AWS");
   for (const k of Object.keys(RELLENO_AWS)) {
     assert.equal(valores[k], RELLENO_AWS[k], `${k} tiene que llevar el relleno declarado, no undefined`);
   }
-  const d = desvios(respuestas).find((x) => x.regla === "iac-es-terraform");
+  const d = desvios(r).find((x) => x.regla === "iac-es-terraform");
   assert.ok(d, "el desvio tiene que quedar anotado: un relleno sin declarar es una mentira con formato de dato");
   assert.match(d.motivo, /sitio para leer/, "y su motivo tiene que nombrar la combinacion, no repetir el caso generico");
+});
+
+test("la pregunta de plataforma NO se le hace a quien eligio un sitio", () => {
+  // La otra mitad del cambio de arriba. Sin este caso, alguien podria devolver la
+  // pregunta al cuestionario y el banco seguiria en verde.
+  const p = PREGUNTAS.find((x) => x.id === "plataforma");
+  assert.ok(typeof p.salta === "function", "la pregunta de plataforma perdio su `salta`");
+  assert.equal(p.salta({ forma: "sitio" }), true, "un sitio publica en Cloudflare elija lo que elija: preguntarselo es hacerle elegir un texto");
+  assert.equal(p.salta({ forma: "aplicacion" }), false, "para una aplicacion SI cambia algo: decide si viaja el Terraform");
 });
 
 test("MUERDE: si las dos mitades volvieran a decidir distinto, el barrido lo ve", async () => {
@@ -864,4 +895,106 @@ test("lo que la constitucion promete y el andamio no reparte queda declarado com
     `el andamio ya reparte ${promueve.join(", ")}: si eso promueve de dev a prod, el desvio de ` +
       "`promocion-por-ambientes` dejo de corresponder y hay que sacarlo",
   );
+});
+
+// ---------------------------------------------------------------------------
+// EL GATE DEL PO SE DECLARA, PORQUE EL ANDAMIO LO APAGA.
+//
+// QUE DEFECTO CIERRA. `plantilla/.github/CODEOWNERS` escribe en su encabezado que
+// "el PO NO debe ser miembro del equipo de builders: si lo fuera, podria
+// satisfacer su propio gate desde el otro rol y la separacion se cae". Y
+// `derivar()` asigna `PO: r.ORG` y `BUILDER_1: r.ORG` --la misma persona-- SIEMPRE,
+// con companero o sin el.
+//
+// Lo silencioso es la mecanica que el propio CODEOWNERS explica: GitHub pide
+// review a los owners EXCEPTO al autor. En las rutas de contrato el PO es el UNICO
+// owner, asi que cuando el PO abre el PR no queda NADIE asignado. Ni rojo, ni
+// aviso: el gate no ocurre.
+//
+// Era la unica regla del marco que el andamio violaba SIN declararlo, y el marco
+// entero se apoya en "lo que no se activa se declara".
+// ---------------------------------------------------------------------------
+
+test("desvios · el gate del PO queda declarado, trabajando solo", () => {
+  const base = { equipo: "solo", plataforma: "aws", avisos: "slack", visibilidad: "publico", ORG: "im-diego-ec" };
+  const d = desvios(base, "2026-09-10").find((x) => x.regla === "openspec-roles");
+  assert.ok(d, "no se declara ningun desvio sobre openspec-roles: el gate del PO queda apagado en silencio");
+  assert.match(d.motivo, /una sola persona/, d.motivo);
+  assert.match(d.revisar, /segunda persona/, d.revisar);
+});
+
+test("desvios · CON companero el motivo es OTRO, porque ahi si hay salida", () => {
+  // La distincion importa: decir "es una sola persona" cuando son dos seria
+  // declarar un motivo FALSO, que es peor que no declarar. Con companero el rol
+  // se puede mover, y el desvio tiene que decir a quien.
+  const r = { equipo: "equipo", plataforma: "aws", avisos: "slack", visibilidad: "publico", ORG: "im-diego-ec", BUILDER_2: "la-companiera" };
+  const d = desvios(r, "2026-09-10").find((x) => x.regla === "openspec-roles");
+  assert.ok(d, "con companero tampoco se declara el gate del PO");
+  assert.doesNotMatch(d.motivo, /una sola persona/, `con companero el motivo no puede decir que es una sola persona:\n${d.motivo}`);
+  assert.match(d.motivo, /la-companiera/, "el desvio no nombra a quien puede tomar el rol de PO");
+  assert.match(d.revisar, /ahora/, "con salida disponible, la revision no puede quedar para 'cuando entre alguien'");
+});
+
+test("desvios · MUERDE: el desvio del PO es distinto del de review cruzado", () => {
+  // Sin este caso, alguien podria satisfacer los dos de arriba reusando el desvio
+  // de review cruzado, que habla de otra cosa: aquel apaga la aprobacion ajena
+  // ENTRE BUILDERS; este apaga el gate del PO sobre los contratos.
+  const base = { equipo: "solo", plataforma: "aws", avisos: "slack", visibilidad: "publico", ORG: "im-diego-ec" };
+  const reglas = desvios(base, "2026-09-10").map((x) => x.regla);
+  assert.ok(reglas.includes("github-review-cruzado-automatizado"), "falta el desvio de review cruzado");
+  assert.ok(reglas.includes("openspec-roles"), "falta el desvio del gate del PO");
+  assert.equal(new Set(reglas).size, reglas.length, `hay reglas repetidas: ${reglas.join(", ")}`);
+});
+
+test("desvios · el del gate del PO acota su ALCANCE y no apaga la otra mitad de la regla", () => {
+  // `openspec-roles` dice DOS cosas: el reparto PO/builders y, aparte, que toda
+  // escritura en produccion exige el OK explicito del builder 1. Un desvio anula la
+  // REGLA ENTERA, asi que sin decirlo estaria apagando de paso una garantia que
+  // nadie pidio apagar.
+  const base = { equipo: "solo", plataforma: "aws", avisos: "slack", visibilidad: "publico", ORG: "im-diego-ec" };
+  const d = desvios(base, "2026-09-10").find((x) => x.regla === "openspec-roles");
+  assert.match(d.motivo, /ALCANCE: este desvio apaga UNICAMENTE el reparto de roles/, d.motivo);
+  assert.match(d.motivo, /sigue vigente y NO se declara aqui/, "no dice que la otra mitad sigue en pie");
+});
+
+test("desvios · el del PO declara que en ORGANIZACION el gate puede ser real", () => {
+  // El asistente corre ANTES de que el repositorio exista, asi que no sabe si la
+  // cuenta es de una persona o de una organizacion. En una org los equipos existen y
+  // el gate puede ser real. Se declara igual --conservador-- pero diciendo que puede
+  // sobrar, en vez de afirmar una separacion inexistente como si fuera universal.
+  const base = { equipo: "equipo", plataforma: "aws", avisos: "slack", visibilidad: "publico", ORG: "una-org", BUILDER_2: "otra" };
+  const d = desvios(base, "2026-09-10").find((x) => x.regla === "openspec-roles");
+  assert.match(d.motivo, /ORGANIZACION/, "no contempla el caso de organizacion");
+  assert.match(d.motivo, /borra este desvio/, "no le dice a quien SI tiene separacion que puede borrarlo");
+});
+
+test("desvios · un SITIO ya no declara que le falta la promocion, porque la tiene", () => {
+  // El desvio decia "no hay deploy a dev, ni smoke, ni promocion a prod". Para un
+  // sitio eso dejo de ser cierto el 2026-09-10: desplegar.yml sube la version a DEV
+  // con su direccion de prueba, la sonda la comprueba, y el job de produccion
+  // promueve ESA MISMA version.
+  //
+  // Un desvio que describe un hueco TAPADO miente en la direccion mas cara: alguien
+  // lo lee y escribe a mano el pipeline que su proyecto ya tiene.
+  const base = { plataforma: "supabase", equipo: "solo", avisos: "correo", visibilidad: "publico", ORG: "o" };
+  const d = desvios({ ...base, forma: "sitio" }, "2026-09-10").find((x) => x.regla === "promocion-por-ambientes");
+  assert.ok(d, "el desvio sigue existiendo: la cadena que la regla describe tiene seis pasos y este proyecto tiene cuatro");
+  assert.doesNotMatch(
+    d.motivo,
+    /no hay deploy a dev/,
+    "el motivo viejo decia que no habia deploy a DEV, y ahora lo hay: eso es declarar un hueco tapado",
+  );
+  assert.match(d.motivo, /La promocion existe para esta forma/, "el motivo tiene que decir lo que SI hay");
+  assert.match(d.motivo, /NO APLICA/, "y distinguir lo que no aplica --el smoke de API-- de lo que falta");
+  assert.match(d.revisar, /E2E/, "lo unico que de verdad falta es el E2E, y ahi tiene que apuntar la revision");
+});
+
+test("desvios · una APLICACION lo sigue declarando, y su motivo nombra la mitad que falta", () => {
+  // La otra mitad, y es la que evita que el arreglo de arriba se pase de largo: la
+  // mitad API de una aplicacion NO se despliega en ningun lado todavia.
+  const base = { plataforma: "supabase", equipo: "solo", avisos: "correo", visibilidad: "publico", ORG: "o" };
+  const d = desvios({ ...base, forma: "aplicacion" }, "2026-09-10").find((x) => x.regla === "promocion-por-ambientes");
+  assert.ok(d, "una aplicacion sigue sin desplegar su API: eso se declara");
+  assert.match(d.motivo, /mitad API/, "el motivo tiene que nombrar QUE es lo que falta, no repetir el generico viejo");
+  assert.match(d.motivo, /sitio para leer.*SI recibe/s, "y tiene que decir que la otra forma ya la tiene, o el lector no sabe que cambio");
 });

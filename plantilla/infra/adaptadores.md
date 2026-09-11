@@ -60,20 +60,88 @@ Como los de infraestructura, **hoy no tienen compuerta** —ninguna comprobació
 merge por esto—: el pipeline no se pone rojo por
 ellos. Es disciplina declarada y se revisa a mano.
 
-### PENDIENTE-PLATAFORMA · el marco · la clave todavía no la lee nadie
+### PENDIENTE-PLATAFORMA · el marco · la clave decide el reparto, y falta el despliegue
 
-**QUÉ FALTA** — Que una herramienta del marco lea `plataforma` y actúe: que `projects init`
-reparta `infra/` e `infra-prod/` sólo cuando la plataforma elegida use Terraform, y que el
-valor se valide contra la lista de cinco.
+**LO QUE YA SE HIZO, y este bloque decía lo contrario hasta el 2026-09-10.** La clave
+**sí** la lee una herramienta y **sí** cambia lo que se copia: `noViajanPorPlataforma()`
+en `herramientas/projects-init.mjs` decide qué directorios viajan según la plataforma
+elegida. Y el valor **se valida**: uno que no existe detiene el arranque con `EXIT 1`, y
+uno que la constitución admite pero la herramienta todavía no implementa —`cloudflare`,
+`gcp`— recibe un mensaje que lo dice y nombra dónde vive ese trabajo.
 
-**CÓMO SE DECIDE** — No lo decide este proyecto: es trabajo del marco y se pide ahí.
-Mientras tanto la clave es **declarativa** —dice qué eligió el proyecto y no cambia lo que
-la herramienta copia—, así que escribir `azure` o borrarla no produce ningún aviso. Lo que
-sí muerde hoy es el disco: el job de Terraform del CI mira si los directorios existen.
+Este bloque decía *«la clave todavía no la lee nadie»* y *«escribir `azure` o borrarla no
+produce ningún aviso»*. Las dos afirmaciones eran ciertas cuando se escribieron y dejaron
+de serlo sin que nada lo notara — mandaba a sostener a mano una coherencia que la
+herramienta ya sostenía, y a borrar carpetas que ya no llegan.
 
-**SI NO SE HACE** — La clave y el repositorio divergen en silencio, que es exactamente el
-defecto que este archivo existe para evitar. Hasta que el marco lo cierre, **la coherencia
-se sostiene a mano**: si se cambia la clave, los pasos del adaptador van en el mismo commit.
+**QUÉ FALTA TODAVÍA** — Que la plataforma decida el **despliegue** y no sólo el reparto de
+archivos. Hoy un sitio publica en Cloudflare elija lo que elija, y una aplicación no
+publica en ningún lado.
+
+**DÓNDE VIVE** — En el marco, en `openspec/changes/promocion-por-ambientes`. Un **change**
+es la carpeta donde queda escrito, ANTES de programar, qué se va a cambiar y por qué; ése
+ya tiene sus decisiones tomadas (topología Local → DEV → PROD) y su tarea bloqueante
+escrita: medir si un container de Cloudflare puede abrir TCP saliente al 5432.
+
+**SI NO SE HACE** — La palabra sigue prometiendo más de lo que entrega: quien elige una
+plataforma esperando que su aplicación corra ahí recibe archivos, no despliegue.
+
+---
+
+## La mudanza — cuando la idea funciona y hay que cambiar de adaptador
+
+**Esta sección existe porque es la mitad que faltaba.** Los adaptadores de abajo
+describen cinco destinos, y ninguno decía cómo se va de uno a otro. Probar barato y
+después mudarse **es el plan**, no un accidente: sin la mudanza escrita, «después te
+mudás» es una promesa que nadie verificó.
+
+### Una mudanza es mover cuatro cosas, no una
+
+El contrato de arriba es lo que la hace tratable: no te mudás «de Supabase a GCP», te
+mudás de **(a) cómputo**, de **(b) datos**, de **(c) secretos** y de **(d) despliegue**.
+Son cuatro decisiones con costos muy distintos, y se pueden mover **por separado**.
+
+| Capacidad | Qué cuesta moverla | Se puede a medias |
+| --- | --- | --- |
+| **(a) cómputo** | poco: es un contenedor o un proceso, y el código no cambia | sí — se puede correr en dos lados y mover tráfico de a poco |
+| **(b) datos** | **es la cara**: hay que copiar, verificar y cortar | **no** — o los datos están, o no |
+| **(c) secretos** | medio: cambia cómo llegan, no cuáles son | sí |
+| **(d) despliegue** | medio: es reescribir el workflow, con su verificación | sí |
+
+**El orden que menos duele, y el motivo de cada paso:**
+
+1. **(c) primero**, aunque parezca lo menos urgente. Si los secretos no llegan bien en el
+   destino, todo lo demás falla con errores que no hablan de secretos.
+2. **(a) después**, apuntando a la base **vieja**. Así se prueba el cómputo nuevo sin
+   tocar los datos, que es lo único que no tiene vuelta atrás.
+3. **(d) ahí**, con su verificación post-despliegue. Antes de mover los datos hay que
+   poder desplegar y comprobar.
+4. **(b) al final**, y es el único paso con corte. Todo lo demás ya está probado.
+
+Mover **(b) primero** es el error que parece natural —«empiezo por lo difícil»— y deja
+sin vuelta atrás lo único que no la tiene.
+
+### Lo que el marco te da, y lo que no
+
+**Te da:** que las cuatro capacidades estén escritas y con dueño, así que la mudanza es
+una lista y no una arqueología. Y que el pipeline verifique lo desplegado, así que sabés
+si el destino quedó sano.
+
+**No te da, y hay que decirlo:** el marco **no migra datos**. No hay comando que copie
+tu base de un proveedor a otro y te diga que salió bien. Es el paso más caro y es tuyo.
+
+### PENDIENTE-PLATAFORMA · la mudanza · no está medida en ningún par
+
+**QUÉ FALTA** — Ninguna de las mudanzas está hecha ni cronometrada. Lo de arriba es el
+**orden que se deriva del contrato**, no un procedimiento verificado: dice por qué ese
+orden es el que menos duele, y no cuánto tarda ni con qué se rompe.
+
+**CÓMO SE DECIDE** — La primera mudanza real que haga alguien se escribe acá, con sus
+números: qué tardó, qué se rompió, qué había que saber antes. Un par medido vale más que
+cinco descritos.
+
+**SI NO SE HACE** — «Después te mudás» sigue siendo una promesa sin fuente, que es
+exactamente lo que este repositorio prohíbe escribir en todo lo demás.
 
 ---
 
@@ -134,6 +202,44 @@ este proyecto lo dice el proyecto, no este archivo.
   - **el límite que sorprende**: los proyectos gratuitos **se pausan tras una semana sin
     actividad**, y hay un máximo de **2 proyectos activos** por cuenta
 
+### Los números del plan gratuito de Supabase, medidos
+
+Consultados el **2026-09-10** en la página de precios de Supabase. Importan **antes**
+de empezar, no después:
+
+| | Plan gratuito |
+|---|---|
+| Proyectos activos | **2** |
+| Tamaño de base | 500 MB (CPU compartida, 500 MB de RAM) |
+| Tráfico de salida | 5 GB |
+| Conexiones | 60 directas, 200 clientes por el pooler |
+| Inactividad | **los proyectos se pausan a la semana** |
+| Escalón siguiente | desde 25 USD/mes |
+
+**Dos consecuencias que cambian cómo se arma el proyecto:**
+
+1. **Dos ambientes consumen el cupo entero.** La promoción del marco es
+   Local → DEV → PROD; si cada uno tiene su base, son los dos proyectos. No queda
+   lugar para un tercer ambiente ni para una segunda idea sin pagar.
+2. **El que se va a pausar es DEV**, y es contraintuitivo: se pausa por inactividad,
+   y DEV es el que menos tráfico recibe. El ambiente donde probás es el que te vas a
+   encontrar dormido, no el de producción.
+
+No es motivo para no usarlo: para probar una idea, esos números alcanzan de sobra.
+Es motivo para saberlo antes de meter la idea adentro.
+
+### Las DOS cadenas de conexión, y por qué no alcanza una
+
+El cliente y las migraciones **no pueden** usar la misma cadena:
+
+- **El cliente va por el pooler.** Es lo que aguanta muchas conexiones cortas.
+- **Las migraciones van por la conexión directa.** El pooler en modo transacción
+  **no soporta *prepared statements***, y las migraciones los usan.
+
+Y en el plan gratuito hay un detalle más: la conexión directa es **IPv6**. El add-on
+de IPv4 es de organizaciones Pro. Así que las migraciones salen por **session mode**
+del pooler compartido, que es IPv4 en todos los planes.
+
 ### PENDIENTE-PLATAFORMA · supabase · la pausa por inactividad
 
 **QUÉ FALTA** — Decidir qué pasa cuando el proyecto de dev se pausa, y quién lo despierta.
@@ -146,17 +252,38 @@ rachas, el arreglo es un ping periódico o asumir la espera del despertar y escr
 **SI NO SE HACE** — El primer CI que corra después de una pausa sale rojo por un motivo que
 no está en el mensaje, y se busca en el código de la aplicación.
 
-### PENDIENTE-PLATAFORMA · supabase · quién cubre (a) y (d)
+### Quién cubre (a) y (d) cuando la base es Supabase — contestado, midiendo
 
-**QUÉ FALTA** — Dónde corre la API, y cómo se despliega y se verifica.
+Esto era un pendiente abierto: *«dónde corre la API»*. Se midió el **2026-09-10** contra
+la documentación de Cloudflare, y la respuesta es **Worker + Hyperdrive**, con Supabase
+nombrado por la propia documentación de Cloudflare.
 
-**CÓMO SE DECIDE** — Si la API es un Express con dependencias de Node, no entra como
-función: se combina con `cloudflare` o con `gcp` y se escribe cuál. La verificación
-post-deploy es la misma en los tres casos —un endpoint de salud que el pipeline consulta
-después de publicar— y **no depende de la plataforma**, así que se escribe una vez.
+| Capacidad | Quién la cubre | Por qué |
+|---|---|---|
+| **(a)** cómputo de la API | **Cloudflare Workers** | `connect()` de `cloudflare:sockets` abre TCP saliente, y la documentación usa el 5432 como ejemplo literal |
+| **(b)** base | **Supabase** | lo de siempre: PostgreSQL administrado con respaldos |
+| **(c)** secretos | **Supabase + las variables del proyecto** | sin cambios |
+| **(d)** despliegue y verificación | **Cloudflare Workers**, por versiones | se sube una versión, se mira, y se promueve **esa misma** sin recompilar |
 
-**SI NO SE HACE** — Queda una capacidad sin dueño, que es la forma en que un proyecto
-descubre en producción que nadie decidió dónde corría.
+**Y no hay que reescribir la aplicación**, que era el costo escondido que hacía temer
+esta ruta: Cloudflare implementó las APIs de `node:http` —cliente y servidor— y publicó
+`httpServerHandler`, anunciándolo como *«allowing developers to migrate existing Node.js
+applications with minimal code changes»*.
+
+**Cuesta 0 USD/mes**, y no «casi»: Hyperdrive *«is included in both the Free and Paid
+Workers plans»*, con 100 000 consultas por día.
+
+> **Lo que sigue abierto es UNA cosa, y es mucho más barata que la pregunta original.**
+> No está confirmado que Hyperdrive alcance la cadena *Direct connection* de un proyecto
+> Supabase del plan gratuito, porque esa cadena es **IPv6** y el add-on de IPv4 es de
+> organizaciones Pro. **Si falla, no se cambia de proveedor: se cambia de cadena** — el
+> pooler compartido es IPv4 en todos los planes. O sea que la incógnita decide *cuál de
+> las dos cadenas* se escribe en el andamio, no quién cubre qué.
+
+> **Y el techo de CPU de Workers pasa a aplicarte**, ahora que la API corre ahí. No se
+> repite acá: vive una sola vez, en el pendiente **«cloudflare · los 10 ms de CPU»** de la
+> sección de abajo. Dos copias de un mismo límite divergen, y la que alguien lea primero
+> decide — que es la forma más silenciosa de quedarse con la desactualizada.
 
 ---
 
@@ -172,11 +299,46 @@ front.
   `supabase` o se declara el desvío.
 - **COSTO** — cero en el plan Free. El escalón siguiente es una suscripción mensual plana
   más consumo.
+
+> **«Los containers salen ~5 USD» es falso como está escrito, y estuvo escrito.** Medido
+> el 2026-09-10: esos 5 USD son el **mínimo de la cuenta** de Workers Paid, no el precio
+> del container; encima se factura memoria y disco **por segundo mientras está
+> despierto**. Un container `basic` prendido todo el mes son ~12 USD, no 5 — o sea ~72%
+> más que Render, que era la alternativa que se descartaba «por cara».
+>
+> **La regla que queda:** ninguna cifra de costo de este marco se escribe sin decir **qué
+> incluye** y **con qué uso**. Un número sin las dos cosas no es una promesa de costo, es
+> un piso disfrazado de precio.
 - **PLAN GRATUITO** _(medido en developers.cloudflare.com el 2026-08-24)_:
   - Workers: **100 000 peticiones por día**, **10 ms de CPU por petición**, 50
     subpeticiones por invocación, 3 MB de tamaño comprimido del worker
   - Pages: **500 builds por mes**, hasta 20 000 archivos por sitio, 25 MiB por archivo; la
     documentación **no declara** un límite de ancho de banda
+
+### Que la API de este andamio entre en un Worker está **medido**, no supuesto
+
+Medido el **2026-09-10** corriendo el andamio dentro de **workerd** —el mismo runtime
+de Cloudflare— con `wrangler dev`, sin cuenta y sin desplegar:
+
+| Lo que se probó | Resultado |
+|---|---|
+| La app de Express entera | **200**, sin tocar una línea. Lo único nuevo son **cuatro líneas** de `worker.ts` con `httpServerHandler` |
+| El middleware de auth | **401** y falla cerrado, que es su razón de ser |
+| **El driver de Postgres** | `@prisma/adapter-pg` + `pg` cargaron y **abrieron un socket TCP**: la base contestó con su propio código de error |
+| El arranque completo (`server.ts`) | **200** también, con `dotenv/config` y los manejadores de señales adentro |
+| Tamaño del bundle | **1583 KiB comprimidos** contra un techo de **3 MB** |
+
+**Dos cosas que conviene saber antes de que sorprendan:**
+
+1. **El reloj arranca en cero.** En Workers el tiempo está congelado hasta la primera
+   E/S, así que **todo lo que se loguee al arrancar lleva `1970-01-01`**. No rompe
+   nada, y desorienta a cualquiera que investigue un incidente leyendo marcas de tiempo.
+2. **El bundle entra gastando la mitad del presupuesto.** ~52% del techo, antes de la
+   primera línea del proyecto. Es el número que hay que volver a mirar antes de agregar
+   una dependencia grande.
+
+Falta configurar `compatibility_date` ≥ `2025-09-01` y los flags `nodejs_compat` y
+`enable_nodejs_http_server_modules`.
 
 ### PENDIENTE-PLATAFORMA · cloudflare · los 10 ms de CPU
 

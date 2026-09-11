@@ -41,7 +41,434 @@ mueve sobre un cambio incompatible.
 
 ## [No publicado]
 
+### Cambiado
+
+- **La promoción a producción dejó de ocurrir sola, y esa era la diferencia entre lo
+  que el spec pedía y lo que el andamio hacía.** `desplegar.yml` tenía `produccion`
+  con un `needs: dev`, así que **cada merge a `main` publicaba**. El requirement que
+  este mismo repositorio ya tenía escrito dice lo contrario: *«The system SHALL
+  require an explicit human decision to promote from the test environment to
+  production»*. Un job que corre detrás de cada merge no es una decisión, es una
+  consecuencia.
+
+  **Cómo funciona ahora:** un merge con el CI en verde sube la versión a DEV y se
+  detiene ahí. El resumen del job dice el commit exacto que hay que pegar para
+  publicar. Promover es ir a Actions → `desplegar` → **Run workflow** y marcar la
+  casilla; queda escrito quién y cuándo.
+
+  **Y la promoción comprueba que esa versión haya pasado por DEV en verde**, que es
+  un hueco que no existía. El job de DEV hace dos cosas —sube la versión y *después*
+  comprueba que su dirección conteste— y la primera puede salir bien con la segunda
+  mal: el sitio sube y sirve un 404. Esa versión quedaba cargada en Cloudflare,
+  promovible, indistinguible de una buena.
+
+  **Los tres desenlaces se distinguen**, y ninguno se lee como éxito: «no se pudo
+  preguntar» (falla cerrado — la ausencia de datos no es un verde), «nunca se subió»
+  y «se subió y salió rojo» mandan a mirar a lugares distintos. El apartamiento
+  existe, se llama `sin_pasar_por_dev`, y deja escrito quién lo pidió.
+
+  **Para un consumidor: nada.** Ningún proyecto recibe todavía este workflow. Para
+  quien genere un sitio desde acá: su producción deja de publicarse sola, que es lo
+  que el marco venía prometiendo por escrito sin cumplir.
+
+- **BREAKING para quien ya tuviera un sitio generado** —hoy, nadie—: `produccion`
+  ya no se dispara por `workflow_run`. Un merge que antes publicaba, ahora sube a DEV
+  y espera. Se dice acá porque el criterio del repo es que endurecer un check que un
+  repo verde ya pasaba es incompatible aunque no rompa ningún archivo.
+
+### Corregido
+
+- **Cinco páginas seguían prometiendo una publicación automática que ya no ocurre**, y
+  las dejó así el commit anterior de este mismo change. `README-del-proyecto.md` decía
+  *«se publica solo… no hay que apretar nada»*; `docs/10-publicar.md` decía que no hay
+  ambiente intermedio y que *«el marco todavía no te resuelve»* los dos ambientes; el
+  README del sitio contaba una vuelta atrás que ya no funciona así. **Una promesa vieja
+  es peor que una ausente**: la persona espera algo que no va a pasar y no tiene ninguna
+  señal de que falta apretar algo.
+
+  **Y se encontraron con un grep, a mano, después de publicar el cambio** — o sea que la
+  única defensa era acordarse. Por eso lo que cierra esto no es el arreglo sino la
+  compuerta nueva: `pruebas/docs/lo-que-se-publica-solo.test.mjs` **deriva del workflow**
+  si producción sale sola y lo contrasta contra las cuatro páginas, en los dos sentidos.
+  Si mañana la promoción vuelve a ser automática, se pone roja hasta que las páginas lo
+  digan.
+
 ### Añadido
+
+- **Está medido que la API de este andamio corre en un Worker sin tocarla.** La ruta
+  que hace que la mitad API cueste 0 USD/mes se apoyaba en una frase de Cloudflare
+  —*«migrate existing Node.js applications with minimal code changes»*— dicha **en
+  general**; «mínimos cambios» sobre *esta* aplicación podía ser desde cuatro líneas
+  hasta reescribir el acceso a datos. Se corrió el andamio dentro de **workerd** con
+  `wrangler dev`, sin cuenta de Cloudflare: **eran cuatro líneas**.
+
+  **Lo que de verdad decidía es el driver, y contestó:** `@prisma/adapter-pg` + `pg`
+  cargaron y **abrieron un socket TCP** desde adentro del Worker —la base devolvió su
+  propio código de error, que es la prueba de que la conexión se estableció—. El
+  arranque completo (`server.ts`, con `dotenv/config` y manejadores de señales) también
+  entra.
+
+  **Dos hallazgos que no se buscaban** y quedan escritos en `infra/adaptadores.md`: el
+  reloj de Workers **arranca en epoch cero**, así que todo lo que se loguee al arrancar
+  lleva `1970-01-01`; y el bundle pesa **1583 KiB comprimidos** contra un techo de 3 MB
+  — entra, gastando ~52% del presupuesto antes de la primera línea del proyecto.
+
+- **Las cuatro capacidades de la combinación Supabase tienen dueño escrito, y antes
+  eran dos.** `plantilla/infra/adaptadores.md` tenía abierto *«quién cubre (a) y (d)»*
+  —o sea: dónde corre la API y cómo se despliega—, que es la forma en que un proyecto
+  descubre en producción que nadie lo decidió. Medido el 2026-09-10 contra la
+  documentación de Cloudflare: **(a)** y **(d)** son **Workers**, con Supabase nombrado
+  por la propia documentación de Cloudflare, **a 0 USD/mes** (*«Hyperdrive is included
+  in both the Free and Paid Workers plans»*) y **sin reescribir la aplicación**
+  (`node:http` + `httpServerHandler`).
+
+  **Lo que sigue abierto es una sola cosa, y es más chica que la pregunta original:** si
+  Hyperdrive alcanza la cadena *Direct* de un Supabase gratuito, que es IPv6. Si no,
+  **se cambia de cadena, no de proveedor**.
+
+- **La promesa de costo se corrigió donde estaba mal.** «Los containers salen ~5 USD»
+  era falso como estaba escrito: esos 5 USD son el **mínimo de la cuenta**, no el precio
+  —prendido todo el mes son ~12, ~72% más que la alternativa que se descartaba por
+  cara—. Queda además la regla que lo evita hacia adelante: ninguna cifra de costo se
+  escribe sin decir **qué incluye** y **con qué uso**.
+
+- **`docs/03-stack.md` avisa lo que sorprende cuando ya es tarde:** tener prueba y
+  producción puede consumir el cupo entero del plan gratuito de la base, y no queda
+  lugar para una segunda idea sin pagar. Va **en palabras** y no en cifras porque la
+  compuerta de esa página rechaza dígitos escritos a mano, con razón; el número con su
+  fecha de medición vive en `infra/adaptadores.md`.
+
+- **El proyecto se entera de qué compuerta de producción tiene de verdad, midiendo.**
+  `projects init` ya medía si el repositorio admite protección de rama; la promoción
+  choca contra **el mismo muro** —medido el 2026-09-10 en la documentación de GitHub:
+  *«Users with GitHub Free plans can only configure environments for public
+  repositories»*— y eso no se decía en ningún lado. Ahora `.github/proteccion-main.md`
+  lo escribe derivándolo de la sonda que ya corría, sin preguntar dos veces lo mismo.
+
+  **Lo que dice según el caso:** donde se puede, dónde se encienden los *Required
+  reviewers* y qué agregan al rastro (**quién aprobó**, que no es necesariamente quien
+  disparó), más los dos números que sorprenden —la aprobación **caduca a los 30 días**
+  y la corrida se **cancela a los 35**, quedando **cancelada, no roja**—. Donde no se
+  puede, queda **el desvío declarado** con el nombre preciso: no es que no haya
+  compuerta —el botón sigue siendo un acto humano en cualquier plan— es que no hay
+  **tercero**.
+
+  **A una aplicación no se le escribe nada de esto**, porque no recibe `desplegar.yml`:
+  documentarle una promoción que su proyecto no tiene es el defecto que el change
+  `promocion-por-ambientes` existe para cerrar.
+
+
+- **`docs/03-stack.md` cuenta la promoción en el idioma de quien la va a usar:** el
+  proyecto sube tu sitio a una dirección de prueba —una de verdad, que podés abrir y
+  compartir—, comprueba que conteste, y recién cuando vos querés publica **esa misma
+  versión**, sin volver a compilar. Con las dos advertencias que se pagan caro si
+  sorprenden: esa dirección es **pública** para quien tenga el enlace, y en un plan
+  gratuito es **la primera que se duerme**, porque es la que menos tráfico recibe.
+
+- **Y una tarea que se descubrió imposible, medida antes de escribirla.** «El E2E
+  corre contra la dirección de DEV» no se puede hacer hoy, y no por una medición que
+  falte: **las dos formas no se tocan**. Medido con `noViajanPorForma`, una
+  *aplicación* no recibe `desplegar.yml` —no tiene despliegue ni dirección de DEV— y
+  un *sitio* no recibe `e2e`. La forma que tiene la suite no tiene dónde correrla, y
+  la que tiene dónde no tiene la suite.
+
+  Escribir ese paso hubiera sido agregar **una compuerta que no puede dispararse
+  nunca**, que es justo lo que el guardrail de deltas de este repo existe para
+  impedir. Queda anotada como bloqueada por la tarea que hace viajar el despliegue a
+  una aplicación.
+
+  **Para un consumidor: nada.**
+
+
+- **El desvío de la promoción ya no declara un hueco tapado.** Decía «no hay deploy a
+  dev, ni smoke, ni promoción a prod», y para un **sitio** eso dejó de ser cierto en
+  el commit anterior. Un desvío que describe un hueco que ya se llenó miente en la
+  dirección más cara: alguien lo lee y escribe a mano el pipeline que ya tiene.
+
+  No se borró — se **acotó**, y el banco del marco fue el que lo exigió: su barrido
+  pide que toda combinación declare el desvío, y quitarlo puso el caso rojo. Tenía
+  razón: la regla canónica promete **seis** pasos y un sitio tiene **cuatro**. Ahora
+  el motivo dice lo que **sí** hay, y separa lo que **no aplica** —el *smoke* de API,
+  porque un sitio no tiene API— de lo que **falta**: el E2E.
+
+- **Y una compuerta para el hueco que el commit anterior declaró:** toda la garantía
+  de «se publica lo mismo que se miró» descansa en que DEV suba con `--tag X` y
+  producción promueva con `--version-tag X`, **y nada lo medía**. Si alguien cambia
+  una de las dos, producción promueve otra versión —o ninguna— y los dos comandos
+  siguen siendo correctos por separado. Ahora se cruzan, y la mutación lo demuestra.
+
+  **Para un consumidor: un desvío más preciso** en el archivo que escribe el arranque.
+
+
+- **A quien elige «un sitio para leer» ya no se le pregunta la plataforma, porque las
+  tres opciones le daban el mismo proyecto.** Medido: con `forma=sitio`, `aws`,
+  `supabase` y `ninguna` producen **el mismo árbol de archivos**, y lo único que
+  cambia en los valores derivados es la clave `plataforma` misma.
+
+  Lo único que además se movía era el **texto de un desvío**, que explicaba por qué el
+  Terraform de AWS no había viajado. O sea: la persona elegía AWS, no recibía nada de
+  AWS, y recibía un párrafo explicando que no.
+
+  **Para una aplicación la pregunta se queda**, y acá la medición corrigió al
+  proposal: `aws` **sí** cambia algo — viaja el Terraform. Lo que promete de más es su
+  *texto*, que pregunta dónde va a correr la aplicación cuando sólo decide si viaja la
+  infraestructura. Eso se arregla cuando la promoción exista.
+
+  El camino más corto baja a **7 preguntas**.
+
+  **Para un consumidor: nada.**
+
+
+- **El asistente hace una pregunta menos, y era una que no cambiaba nada.** «¿Cuántas
+  copias querés?» salió del cuestionario y de la puerta web. **Medido antes de
+  sacarla:** con la plataforma recomendada, contestar «uno» o «dos» cambiaba
+  **exactamente una clave** —el texto de `DOMINIO_DEV`— y **ningún archivo**.
+
+  El propio código ya tenía escrito el principio, y saltaba esa pregunta para un
+  sitio por ese motivo: *«preguntar algo cuya respuesta no cambia nada es peor que no
+  preguntarlo: le hace creer a la persona que eligió una arquitectura cuando eligió
+  un texto»*. Lo que faltaba era aplicarlo al otro camino — y **medirlo**.
+
+  El caso simple baja de **9 a 8 preguntas**. Y las dos cuentas de AWS pasan a
+  preguntarse **siempre**: con una sola topología (Local → DEV → PROD, decisión del
+  PO), que la cuenta de pruebas y la de producción sean distintas deja de ser
+  opcional — es lo único que impide que un error de prueba toque lo real.
+
+  **Y queda la compuerta**: ninguna pregunta del asistente puede tener una sola
+  respuesta posible. Contesta el cuestionario entero variando una respuesta por vez y
+  compara lo que sale. Su límite está declarado: caza la pregunta que no cambia
+  **nada**, no la que cambia sólo una cadena cosmética.
+
+  **Para un consumidor: nada.** Cambia el cuestionario de quien arranca un proyecto.
+
+
+- **Los números del plan gratuito de Supabase, medidos y escritos donde se leen.**
+  El andamio entrega Supabase y hasta hoy no decía ni uno de sus límites. Los dos que
+  cambian cómo se arma un proyecto: **permite 2 proyectos activos** —así que Dev+Prod
+  consume el cupo entero— y **los pausa a la semana de inactividad**, lo que significa
+  que **el que se va a encontrar dormido es DEV**, que es el de menos tráfico.
+
+  Y quedan escritas **las dos cadenas de conexión** que el andamio necesita: el
+  cliente va por el pooler; las migraciones por la directa, porque el pooler en modo
+  transacción no soporta *prepared statements*. En plan gratuito la directa es IPv6,
+  así que las migraciones salen por session mode del pooler.
+
+  Van en `plantilla/infra/adaptadores.md` y no en `docs/03-stack.md`: **la compuerta
+  de esa página rechaza cualquier dígito escrito a mano**, y tiene razón — un número
+  al lado de algo que otro archivo declara envejece sin que nada lo mida. Estos son
+  de un tercero, y su lugar es el documento de adaptadores, que ya lleva esa clase de
+  dato con su fecha de medición.
+
+  **Para un consumidor: nada** en su pipeline; gana saber dónde corta el plan que
+  está usando.
+
+
+- **La tarea bloqueante de `promocion-por-ambientes` está contestada, y era la
+  pregunta equivocada.** Preguntaba si un *container* de Cloudflare puede abrir TCP
+  saliente al **5432**. Las dos mitades estaban mal: el 5432 no era el discriminante
+  —la conexión directa de Supabase es **IPv6** y sus poolers son **IPv4**— y el
+  container era la pieza equivocada.
+
+  Cloudflare documenta, con Supabase nombrado y guía propia, **Worker + Hyperdrive +
+  `node-postgres`**: **0 USD/mes** —Hyperdrive está incluido en el plan gratuito, con
+  100.000 consultas/día— y **sin reescribir la aplicación**, porque implementaron
+  `node:http` en Workers con `httpServerHandler` para migrar apps de Node.
+
+  **Y el container tampoco era la opción barata.** Los «~5 USD» eran el *mínimo de
+  cuenta*, no el precio: prendido todo el mes son ~12, un **72% más que Render** —que
+  además son ~7 y no 13, porque el planteo le sumaba una base que acá no hace falta.
+  Es además mal encaje: *«Cloudflare does not guarantee that any container instance
+  will run for any set period of time»*, disco efímero, duerme a los 10 minutos.
+
+  **Lo que queda por medir cuesta cero** y es un formulario del navegador. Si falla,
+  no se cambia de proveedor: se cambia de cadena de conexión.
+
+  Dos hallazgos que no se buscaban: el andamio necesita **dos** cadenas —el pooler
+  para el cliente, la directa para las migraciones— y **Supabase Free permite 2
+  proyectos y los pausa a la semana**, así que dev+prod consume el cupo entero y **el
+  que se pausa es DEV**.
+
+  Todo en [`donde-corre-la-api.md`](openspec/changes/promocion-por-ambientes/donde-corre-la-api.md),
+  con fuentes y fecha de consulta. **Para un consumidor: nada** todavía.
+
+
+- **La circularidad de arranque de la evidencia, declarada en vez de saltada.**
+  `AGENTS.md` tiene una frontera 🛑 —«publicar un cambio del marco que no se probó
+  contra un consumidor real»— y aclara que el ensayo es **además** del dogfooding.
+  El registro de consumidores está vacío, así que esa precondición **no se puede
+  cumplir**; y no por descuido: **el primer consumidor no puede existir hasta que el
+  marco publique una versión que consumir.**
+
+  Exigir la terna sin contemplar esto habría convertido una violación silenciosa en
+  un **bloqueo permanente**. El paso 6 ahora distingue los dos casos: con cero
+  consumidores se **declara** en la entrada de la versión —nombrando lo que no se
+  hizo y lo que sí se corrió en su lugar— y **la salida caduca sola** el día que el
+  registro tenga una fila.
+
+  Es la misma clase de excepción que el bootstrap ya declarado en el encabezado de
+  este archivo, y por el mismo motivo: una regla que no se puede cumplir se escribe,
+  no se saltea en silencio.
+
+  **Para un consumidor: nada.**
+
+
+- **La mudanza entre plataformas, que era la mitad que faltaba.**
+  `plantilla/infra/adaptadores.md` describía cinco destinos y **ninguna línea** sobre
+  cómo se va de uno a otro. Probar barato y después mudarse *es el plan* de este
+  marco, no un accidente: sin la mudanza escrita, «después te mudás» era una promesa
+  que nadie verificó — justo lo que el repositorio prohíbe en todo lo demás.
+
+  La sección nueva la vuelve tratable con el contrato que ya existía: **no te mudás
+  «de Supabase a GCP», te mudás de cómputo, de datos, de secretos y de despliegue** —
+  cuatro decisiones con costos muy distintos, que se pueden mover por separado. Con el
+  orden que menos duele y **el motivo de cada paso**: secretos, cómputo contra la base
+  vieja, despliegue, y los datos al final, que es el único paso sin vuelta atrás.
+  Empezar por los datos es el error que parece natural.
+
+  Y dice lo que el marco **no** hace: no migra datos. No hay comando que copie tu base
+  de un proveedor a otro. Es el paso más caro y es tuyo.
+
+  **Queda declarado como pendiente:** ninguna mudanza está hecha ni cronometrada. Lo
+  escrito es el orden que se **deriva del contrato**, no un procedimiento verificado.
+  La primera mudanza real que alguien haga se escribe ahí con sus números.
+
+  **Para un consumidor: nada** — una sección más en un documento que ya recibe.
+
+
+- **El release verifica los dos repos plantilla, que son consumidores que nadie
+  actualiza.** `docs/04` manda al camino más no-coder que existe: *Use this
+  template* sobre `plantilla-sitio` o `plantilla-aplicacion`, y después el workflow
+  *Personalizar mi proyecto* — **que lee el pin del marco del `ci.yml` de la propia
+  plantilla**.
+
+  El día que el marco publique una versión y las plantillas queden en la anterior,
+  cada proyecto que nazca por ahí **nace con un marco viejo y sin un solo rojo**. Y
+  son el único consumidor que no recibe PR de Dependabot: no son repos que alguien
+  mantenga, son moldes que se copian.
+
+  Paso **5-bis** del release: comprobar el pin de las dos y que **sigan siendo
+  plantillas** — un repo que dejó de serlo rompe el botón que la guía manda apretar,
+  con un error que no menciona al marco. La lista se **deriva** de la herramienta que
+  las genera, así que una forma nueva no puede quedar sin verificar.
+
+  Medido al escribirlo: las dos pinan `v1.9.6` y las dos son plantillas.
+
+  **Para un consumidor: nada** — gana que el camino sin instalar deje de poder
+  entregar versiones viejas.
+
+
+- **El andamio apagaba el gate del PO sin declararlo — la única regla del marco que
+  violaba en silencio.** `plantilla/.github/CODEOWNERS` escribe en su encabezado que
+  *«el PO NO debe ser miembro del equipo de builders: si lo fuera, podría satisfacer
+  su propio gate desde el otro rol y la separación se cae»*. Y el asistente asigna
+  `PO` y `BUILDER_1` **a la misma persona, siempre** — solo y con compañero.
+
+  Lo silencioso es la mecánica que el mismo archivo explica: GitHub pide review a
+  los owners **excepto al autor**, y en `openspec/` el PO es el único owner. Cuando
+  el PO abre el PR **no queda nadie asignado**: ni rojo, ni aviso.
+
+  Ahora se declara, con **dos motivos distintos**. Con compañero, decir «es una
+  sola persona» sería falso, así que el desvío **nombra a la otra persona** como
+  quien puede tomar el rol y su revisión es **ahora**, no «cuando entre alguien».
+  El caso con compañero es el más grave y no el que parece: ahí el proyecto
+  *parece* tener separación de roles y no la tiene.
+
+  **Para un consumidor: nada.** Es una línea más en el archivo de desvíos que
+  escribe el arranque; un proyecto ya creado no cambia solo.
+
+
+- **El piso de permisos que el marco documenta ahora se mide contra el que el
+  reusable exige.** Un workflow reusable nunca recibe más permisos que los que le
+  concede quien lo llama, y el marco lo documenta en tres archivos — uno de ellos,
+  `plantilla/.github/workflows/ci.yml`, **viaja a cada proyecto nuevo**. Los tres
+  están bien hoy, pero nada los ataba: el día que un job del reusable gane un
+  permiso, los tres quedarían declarando un piso corto sin que nada lo note.
+
+  No es hipotético — el marco del que Projects se bifurcó agregó `issues: read` y
+  `actions: read` en su línea mayor 2, y su nota de migración advierte que el PR
+  automático no puede arreglarlo: hay que editar el `ci.yml` a mano.
+
+  **Queda declarado, con destino:** la *consecuencia* que esos bloques describen
+  («cae al fail-open») no está verificada, y no se reescribió sin medirla —
+  cambiarla por otra descripción sin evidencia sería el mismo defecto, más nuevo.
+
+  **Para un consumidor: nada.** La compuerta corre en el CI del marco.
+
+
+- **Una fecha que afloja una compuerta ahora necesita un change que se declare su
+  dueño.** `actions/cobertura-diff/medir-cobertura-diff.mjs` afloja la cobertura
+  hasta el **2026-09-30**: pasada esa fecha, un paquete bajo el mínimo sin deuda
+  declarada nace rojo, solo. El diseño es correcto; lo que faltaba era el dueño.
+  Los dos pendientes que quedaron vivos al archivar el change que la introdujo no
+  decían dónde vivía ese trabajo, y al 2026-09-10 faltaban **20 días** sin que
+  ningún change se hiciera cargo. Un plazo sin dueño no es una compuerta que se
+  dispara: es una sorpresa.
+
+  Ahora existe `openspec/changes/la-ventana-se-cierra`, que la posee, y una
+  compuerta que exige el marcador `DUENO DE LA FECHA: <fecha>` para toda fecha de
+  gracia viva en el código de producción.
+
+  **Son dos, no una**, y la segunda tiene mucho más alcance: además de la constante
+  de `cobertura-diff`, el input `ventana_terraform` de `marco-ci.yml` tiene
+  `default: "2026-09-30"` — la **misma fecha**, en un input del workflow reusable,
+  o sea que llega a **todo consumidor**. La primera versión de esta compuerta
+  afirmaba cubrir los `.yml` y no cazaba ninguno: exigía la forma
+  `NOMBRE = "fecha"` de JavaScript, y en un workflow la clave y su `default:` viven
+  en líneas distintas. Ahora ve las dos formas.
+
+  Los dos pendientes heredados quedaron resueltos de distinta forma: el de la
+  limpieza apunta a ese change; el que mandaba mergear una rama de un repo
+  consumidor se declaró **no bloqueante con su razón** — ese consumidor no existe
+  en Projects, así que darle destino sería apuntar a un repositorio que no está.
+
+  **Para un consumidor: nada** hoy; cuando exista el primero, hereda la regla ya
+  cerrada.
+
+
+- **Un desvío incompleto salía rojo por un camino y verde por el otro.**
+  `.projects-desvios.json` lo leen dos piezas con predicados distintos: la action
+  de la constitución exige `motivo` + `aprobado_por` + `fecha` y da error si falta
+  alguno; el paso «Permisos del agente sin escritura» de `marco-ci.yml` pedía sólo
+  `permiso` + `motivo` — leía `aprobado_por` sin mirarlo y `fecha` ni la leía.
+
+  Se pagaba **justo donde el lector estricto no llega**: en un repo que no ejecuta
+  la action, el único validador era el débil, así que la excepción sin aprobador
+  ni fecha pasaba muda donde menos supervisión hay.
+
+  El paso ahora **avisa** nombrando el dato que falta. **Para consumidores: un
+  aviso nuevo si tenés desvíos incompletos, y ningún veredicto cambia** — lo que
+  pasaba en verde sigue en verde. Completalos ahora y no cambia nada después:
+  **en la línea mayor siguiente el desvío incompleto deja de absorber.**
+
+  Se estrena avisando y no en rojo por la regla de `AGENTS.md`: endurecer un check
+  que hoy dejan pasar repos que no pidieron el cambio es breaking. Que no es
+  teórico lo probó el propio banco — su caso verde declaraba desvíos con aprobador
+  y sin fecha.
+
+
+- **El arranque entrega la fila del registro de consumidores, resuelta.**
+  `docs/14-consumidores.md` era una tabla con «*(sin filas)*» y el propio archivo
+  decía por qué: el lugar donde se escribe la línea existía, **lo que la escribe
+  no**. La fila dependía de que alguien se acordara, que por la premisa de
+  `AGENTS.md` no cuenta como enforcement.
+
+  El dato es **perecedero**: adoptar el marco es el único instante en que se sabe
+  con certeza que un repo lo consume. Pasado ese instante sólo se puede
+  reconstruir —con una credencial de organización— o inventar, y una fila
+  inventada no se distingue de una medida. Ahora el arranque imprime las tres
+  columnas listas para pegar, como un pendiente más de su lista de actos humanos.
+
+  **La versión sale del `ci.yml` recién escrito en el destino, no de una
+  constante**: el pin lo fija el andamio y lo mueve el release, así que una
+  constante en la herramienta sería una segunda declaración del mismo hecho.
+  Cuando no se puede leer, la fila dice `NO SE PUDO LEER` en vez de adivinar. La
+  guarda que lo sostiene cruza las dos lecturas y se pone roja si divergen
+  (`pruebas/init/consumidor-se-anota.test.mjs`).
+
+  **Para un consumidor: nada.** El cambio vive en la herramienta que corre en la
+  máquina de quien arranca un proyecto; no toca ningún workflow reusable, ni
+  `inputs`, ni `secrets`, ni permisos del token, ni nombres de jobs.
+
 
 - **Se puede volver a la pregunta anterior.** Antes no: la persona contestaba
   nueve preguntas y si en la séptima se daba cuenta de que la tercera estaba mal,
@@ -56,6 +483,260 @@ mueve sobre un cambio incompatible.
   adelante se avanza con Enter sin reescribir nada.
 
 ### Corregido
+
+- **Un proceso muerto por señal se reportaba como un código de salida raro.** Los
+  ayudantes del banco devolvían `resultado.status` tal cual, y `spawnSync` devuelve
+  **`null`** cuando al proceso lo mata una señal. Entonces un caso que afirma
+  `assert.equal(exit, 1)` fallaba con *«expected 1, got null»* — que **se lee como un
+  error de lógica del guion medido**, y no lo es: el guion no llegó a correr.
+
+  Medido: dos bancos —`distribuidor` y `bitacora`— fallaron una vez cada uno bajo la
+  carga del banco completo y pasaron 3 de 3 aislados. **Un rojo que no se entiende
+  enseña a ignorar rojos**, que es lo contrario de lo que este repositorio quiere.
+
+  Ahora el mensaje nombra la señal y dice que el fallo es del proceso que corría el
+  guion, no del guion. Se comprueba con uno que se mata a sí mismo, que es la única
+  forma de producir la condición sin depender de la carga de la máquina.
+
+  **Para un consumidor: nada** — son ayudantes del banco del marco.
+
+
+- **Los 28 hallazgos medios y bajos de la revisión adversarial, cerrados.** Los más
+  sustantivos:
+
+  - **`citarRuta` usaba una lista de caracteres peligrosos**, y una lista de peligros
+    siempre está incompleta: se le escapaban `\`, `{}`, `,`, `!`, `%` y `#`, así que
+    una carpeta «Proyectos (2026)» o «notas #1» salía desnuda. Ahora es al revés —
+    pasa sin comillas **sólo** lo que se sabe inofensivo.
+  - **El lector del pin tomaba el primer match del archivo entero**, así que un
+    ejemplo comentado le ganaba al `uses:` real. Y con dos pines distintos elegía uno;
+    ahora devuelve el hueco declarado, porque un `ci.yml` a medio actualizar no tiene
+    *una* versión.
+  - **El desvío del gate del PO anulaba más de lo que declaraba.** `openspec-roles`
+    dice dos cosas, y la otra —«toda escritura en producción exige el OK explícito del
+    builder 1»— quedaba apagada de paso. Ahora el desvío acota su alcance, y contempla
+    la cuenta de organización, donde el gate **sí** puede ser real.
+  - **El aviso del desvío incompleto nombraba una sola falta** cuando faltaban las
+    dos: quien completaba el aprobador volvía a chocar con la fecha. Dos viajes de CI
+    para un arreglo que se hace de una.
+  - **Tres `MUERDE` que no mordían**: uno era una tautología (`assert.notEqual(n, n+1)`),
+    otro se auto-anulaba con `assert.ok(true)` cuando no había datos, y el tercero
+    comparaba contra la suma de largos mientras la función deduplica.
+  - **Dos compuertas cruzaban por texto de más o de menos**: una leía sólo la primera
+    oración de la constitución, la otra buscaba en el archivo entero en vez de en su
+    sección.
+  - **`docs/14-consumidores.md` se contradecía a sí mismo** en el mismo PR: una mitad
+    decía que el escritor de la fila ya existe y la otra que falta.
+
+  **Para un consumidor: un aviso más honesto** en los desvíos incompletos; el resto
+  son bancos y documentos del marco.
+
+
+- **Dos guardas que prometían más de lo que medían, corregidas.**
+
+  - La «guarda anti-divergencia» del registro de consumidores decía: *«si alguien
+    reemplaza el lector por una constante, este caso se pone rojo»*. Era falso para
+    la constante que importa. Como el destino siempre se instancia desde
+    `plantilla/`, su `ci.yml` pina siempre la misma versión: sustituir el lector por
+    **esa misma versión** dejaba los dos lados iguales y el banco entero en verde.
+    Sólo cazaba una constante **equivocada**, que es justo la que nadie escribiría.
+    Ahora se mide contra un árbol con una versión que la plantilla no usa.
+  - **Los dos lectores de `.projects-desvios.json` seguían divergiendo** después del
+    primer arreglo, y en el caso exacto que el aviso vino a cerrar: el paso miraba
+    sólo la **forma** de la fecha y la action exige además que la fecha **exista**.
+    Con `2026-13-45` la action daba error y el paso pasaba **mudo**.
+
+  **Para un consumidor: un aviso más** si tenía una fecha imposible en sus desvíos.
+
+
+- **Dos compuertas nuevas de esta misma tanda no verificaban lo que decían.** Las
+  encontró una revisión adversarial de los propios commits, no el banco — que estaba
+  en verde con las dos rotas.
+
+  - **La del piso de permisos aceptaba comentarios y barría el archivo entero.** Su
+    patrón llevaba `#?`, así que un `#  pull-requests: read` contaba como concedido;
+    y como leía todo el archivo, los `permissions:` de cada **job** satisfacían la
+    cuenta aunque el del encabezado estuviera vacío. **Medido:** comentando el
+    permiso real de `plantilla/.github/workflows/ci.yml` —el archivo que **viaja** a
+    cada proyecto— la compuerta seguía en verde. No habría cazado un andamio
+    repartiendo un piso corto, que es lo único que existe para cazar.
+  - **La de las fechas de gracia afirmaba cubrir los `.yml` y no cazaba ninguno.**
+    Exigía la forma `NOMBRE = "fecha"` de JavaScript, y en un workflow la clave y su
+    `default:` viven en líneas distintas. Por eso no veía `ventana_terraform`, que
+    es **la de mayor alcance**: es un input del reusable, así que llega a todo
+    consumidor.
+
+  **Para un consumidor: nada** — las dos son bancos del marco.
+
+
+- **El camino más no-coder perdía la declaración más importante.** El asistente por
+  terminal pregunta si el repo es público o privado, y con privado emite un desvío:
+  en el plan gratuito de GitHub la protección de rama **no existe** y las reglas del
+  marco quedan escritas sin nada que las haga cumplir. La puerta web no lo preguntaba
+  **ni lo derivaba**, así que ese desvío nunca se emitía: el proyecto nacía sin
+  compuerta de rama y sin decirlo, por el camino donde menos capacidad hay de notarlo.
+
+  **No se arregló agregando una quinta pregunta**, y la razón ya estaba escrita en el
+  propio archivo para el tipo de cuenta: *«GitHub ya lo sabe y lo pone en el evento;
+  preguntárselo sería pedirle que averigüe algo que la herramienta tiene delante»*. Se
+  **deriva** de `github.event.repository.visibility`. El formulario sigue con cuatro
+  preguntas.
+
+  **El default, si el dato no llega, es «privado»** — asimétrico a propósito: un
+  desvío sobrante se ve y se borra; una protección que se dio por supuesta y no existe
+  no se ve hasta que alguien empuja a `main`.
+
+  **Para un consumidor: nada.** Un proyecto nacido por la puerta web recibe ahora el
+  desvío que le correspondía desde siempre.
+
+
+- **Cinco citas al canónico apuntaban a un archivo que el fork renombró.** Al
+  bifurcarse de Rigel, Projects generalizó su constitución y
+  `60-infra-aws-secretos.md` pasó a ser `60-infra-plataforma-secretos.md`. Cinco
+  citas en dos changes activos quedaron apuntando al nombre viejo: quien los abra
+  para ejecutarlos no encuentra su evidencia, y lo peor que puede concluir —que la
+  regla no existe— es justo lo contrario de lo que pasa.
+
+  **Corregir la ruta no alcanzaba, y esa es la parte que un renombre automático
+  habría tapado:** el contenido citado también cambió de sentido. `stack-estandar`
+  cita «una base tecnológica **única**» y el canónico dice «cuatro capacidades, **no
+  un producto**»; `infra-exigible` cita «IaC = Terraform, **sin excepción**» y hoy
+  es «Terraform es la **forma por defecto**». Los dos se apoyan en una versión
+  endurecida de una regla que Projects **ablandó a propósito**.
+
+  Cada uno lleva ahora un **aviso del fork** que dice qué cambió. No se les
+  reescribió el argumento: el argumento es de quien lo firmó.
+
+  **Queda una decisión para el PO**, escrita y visible: ¿base única, o cuatro
+  capacidades? `stack-estandar` y el canónico vigente son incompatibles.
+
+  **Para un consumidor: nada.**
+
+
+- **El guard de las promesas de dinero no miraba los workflows, que son justo los
+  que viajan.** `promesas-sin-fuente.test.mjs` prohíbe escribir «sin tarjeta»
+  mientras nadie lo haya comprobado —su lista de verificadas está vacía **a
+  propósito**— pero sólo leía `.md`, `.mjs`, `.json` y `.astro`.
+
+  Al ampliarlo a `.yml`, `.ts` y `.txt` apareció **una sola** violación en todo el
+  árbol, y estaba en `plantilla/.github/workflows/desplegar.yml`: le prometía
+  «gratis, sin tarjeta» a alguien que no programa, **en el archivo que su proyecto
+  se lleva puesto**. Un guard que no mira donde la promesa viaja protege el lugar
+  equivocado.
+
+  La promesa se retiró: ahora dice que Cloudflare tiene plan gratuito y que si pide
+  o no tarjeta **no está comprobado por el marco**.
+
+  **Para un consumidor: nada hasta que mueva su pin.** El comentario corregido viaja
+  en el andamio, así que lo recibe un proyecto **nuevo**; uno ya creado se quedó con
+  la copia que le tocó el día que nació y este marco no reescribe repos ajenos.
+
+
+- **Cuatro cosas que el repositorio afirmaba de sí mismo y el árbol contradecía.**
+  Ninguna rompía nada; las cuatro le mienten a quien las lee, que en este marco es
+  el defecto que más caro sale.
+
+  - `docs/04` prometía un formulario **con cinco preguntas** y tiene **cuatro**.
+    Ahora el número **se deriva** del propio formulario, como esa página ya hacía
+    con los repos, el nombre del workflow y la frase de éxito.
+  - `docs/04` decía que **Docker es el único que el marco NO comprueba**, y
+    `projects-doctor.mjs` lo comprueba — cuarenta líneas más abajo, la misma página
+    imprime `[OK ] Docker Desktop`. Docker es el único **opcional**, que es otra cosa.
+  - `plantilla/infra/adaptadores.md` mandaba a sostener a mano una coherencia que la
+    herramienta **ya sostiene** («la clave todavía no la lee nadie»), y a borrar
+    carpetas que ya no llegan. Ahora dice lo que falta de verdad —el despliegue— y
+    adónde va.
+  - `docs/accesos.md`, citado por la constitución canónica como el lugar donde vive
+    la matriz de accesos, **no existía**. Ahora viaja con el andamio, con su columna
+    de *bus factor* y la regla de no escribir ningún valor de credencial.
+
+- **`cuerpo-del-sitio.html`: un archivo de 0 bytes versionado en la raíz.** Residuo
+  de correr el paso del aviso de `desplegar.yml` con `RUNNER_TEMP` sin definir —
+  `"${RUNNER_TEMP:-.}"` es la raíz del repo—. No lo referenciaba nada. Borrado y
+  agregado al `.gitignore` con la razón, para que no vuelva a entrar.
+
+  **Para un consumidor: nada** en los cinco casos.
+
+
+- **La constitución le admitía al proyecto una plataforma que la herramienta
+  rechazaba.** La lista vive en cuatro lugares: tres decían **cinco**
+  (`plantilla/AGENTS.md` —que viaja a cada proyecto—, el canónico versionado, y
+  una cuarta copia dentro de un banco) y la única que decide qué archivos viajan
+  decía **tres**.
+
+  Lo que le pasaba a una persona: nace su proyecto, abre el `AGENTS.md` que el
+  marco le acaba de entregar, lee que puede elegir `cloudflare`, lo elige, y
+  recibe `EXIT 1` con «no es una opcion». El mensaje le echaba la culpa por haber
+  leído la constitución y haberle hecho caso.
+
+  **No se recortó la constitución**, que era el atajo y el lado equivocado: la
+  herramienta es la atrasada — `plantilla/infra/adaptadores.md` describe los
+  adaptadores de `cloudflare` y `gcp` como el camino previsto, y el canónico está
+  versionado. El hueco ahora se **declara** (`PLATAFORMAS_PENDIENTES`) con su
+  destino, el mensaje distingue «no existe» de «todavía no está implementada», y
+  una compuerta cruza las cuatro copias.
+
+  **Para un consumidor: nada.** La constitución y el canónico no se tocaron — son
+  ellos los que estaban bien.
+
+
+- **El procedimiento de release destruía el único rastro de su propia
+  precondición.** `AGENTS.md` exige probar cada versión contra un consumidor real.
+  La evidencia —id de corrida + SHA del consumidor + SHA del marco— vivía en un
+  comentario del PR del ensayo, y el paso 5 de `projects-validar-consumidor` manda
+  cerrar ese PR con `--delete-branch`.
+
+  La única verificación mecánica del paso 6 medía **el largo** del cuerpo
+  publicado. El largo dice que hay texto; no dice que se haya probado nada.
+  Medido: `grep -c "actions/runs" CHANGELOG.md` daba **0** sobre 237 KB — cero
+  releases con evidencia recuperable, y nada que lo notara.
+
+  Ahora la terna va al `CHANGELOG.md`, que el paso 6 ya recorta a las notas
+  publicadas —no hace falta inventar superficie—, y el paso 6 la exige por
+  **forma** (un id de corrida y un SHA de 40) antes de dar el release por cerrado.
+
+  **No se quitó el `--delete-branch`**, que era la solución tentadora y peor:
+  conservar la rama conserva el pin temporal al SHA. Un caso del banco lo fija.
+
+  **Para un consumidor: nada** en su pipeline; las notas de release ahora dicen
+  contra qué se probó la versión.
+
+
+- **El comando que la herramienta manda a pegar no se podía pegar.** Cuando
+  `projects init` no puede terminar solo, imprime el comando exacto para copiar —
+  su razón de ser es que quien no programa no transcriba nada. Ese comando se
+  armaba **interpolando rutas sin comillas**, así que en cuanto una ruta tenía un
+  espacio, la shell leía `node /Users/…/Personal/No` y fallaba con un mensaje que
+  no menciona espacios ni comillas por ningún lado.
+
+  No era el caso raro: es el caso normal del público de este marco. «Mis
+  Documentos», «My Documents», «Google Drive», «No Coders». **El propio clon de
+  Projects vive hoy en una ruta con espacio.**
+
+  El CI no lo veía nunca porque GitHub hace checkout en `/home/runner/work/…`, sin
+  espacios. El banco **sí** lo cazaba —`el-doble-clic-llega` extrae el comando y lo
+  **corre**— pero sólo enrojece en la máquina de un usuario: estaba rojo localmente
+  y verde en CI, que es la peor combinación posible.
+
+  Las rutas ahora viajan entrecomilladas cuando lo necesitan, con comillas
+  **dobles** porque la línea tiene que servir en bash, zsh, cmd y PowerShell — cmd
+  no entiende las simples — y los backslashes de una ruta de Windows quedan
+  literales.
+
+- **Un banco le pasaba al guardrail de deltas una ruta que no existe, y el
+  guardrail salía en verde.** `guardrail-deltas.test.mjs` armaba la ruta con
+  `new URL(...).pathname`, que la devuelve **percent-encoded**: con el clon en una
+  carpeta con espacio le llegaba un `.../No%20Coders/...` inexistente, el guardrail
+  no encontraba deltas y reportaba «no hay ningún delta que comparar». Ahora usa la
+  conversión correcta, que el propio `ayuda.mjs` del banco ya exportaba.
+
+  **Queda vivo, y con destino:** el guardrail **sale verde ante un directorio que
+  no existe**. Es un fail-open que `AGENTS.md` prohíbe. No se arregla acá porque
+  toca una action publicada y endurecerla puede enrojecer a un consumidor que hoy
+  pasa: se estrena en modo aviso y endurece en la mayor siguiente, en change propio.
+
+  **Para un consumidor: nada** en ambos casos.
+
 
 - **El ✗ de un error se iba de pantalla.** Cada reintento reimprimía la pregunta
   entera, así que la persona veía la misma pregunta otra vez **sin ninguna señal**
