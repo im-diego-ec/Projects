@@ -315,6 +315,31 @@ front.
   - Pages: **500 builds por mes**, hasta 20 000 archivos por sitio, 25 MiB por archivo; la
     documentación **no declara** un límite de ancho de banda
 
+### Que la API de este andamio entre en un Worker está **medido**, no supuesto
+
+Medido el **2026-09-10** corriendo el andamio dentro de **workerd** —el mismo runtime
+de Cloudflare— con `wrangler dev`, sin cuenta y sin desplegar:
+
+| Lo que se probó | Resultado |
+|---|---|
+| La app de Express entera | **200**, sin tocar una línea. Lo único nuevo son **cuatro líneas** de `worker.ts` con `httpServerHandler` |
+| El middleware de auth | **401** y falla cerrado, que es su razón de ser |
+| **El driver de Postgres** | `@prisma/adapter-pg` + `pg` cargaron y **abrieron un socket TCP**: la base contestó con su propio código de error |
+| El arranque completo (`server.ts`) | **200** también, con `dotenv/config` y los manejadores de señales adentro |
+| Tamaño del bundle | **1583 KiB comprimidos** contra un techo de **3 MB** |
+
+**Dos cosas que conviene saber antes de que sorprendan:**
+
+1. **El reloj arranca en cero.** En Workers el tiempo está congelado hasta la primera
+   E/S, así que **todo lo que se loguee al arrancar lleva `1970-01-01`**. No rompe
+   nada, y desorienta a cualquiera que investigue un incidente leyendo marcas de tiempo.
+2. **El bundle entra gastando la mitad del presupuesto.** ~52% del techo, antes de la
+   primera línea del proyecto. Es el número que hay que volver a mirar antes de agregar
+   una dependencia grande.
+
+Falta configurar `compatibility_date` ≥ `2025-09-01` y los flags `nodejs_compat` y
+`enable_nodejs_http_server_modules`.
+
 ### PENDIENTE-PLATAFORMA · cloudflare · los 10 ms de CPU
 
 **QUÉ FALTA** — Verificar que el trabajo por petición de esta API entra en el presupuesto

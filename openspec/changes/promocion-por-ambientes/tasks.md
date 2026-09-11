@@ -148,9 +148,28 @@ estado: pendiente-de-revision
 - [ ] 4.1b ¿El andamio pasa de **10 ms de CPU** por invocación (plan gratuito)? La
       espera de Postgres **no** cuenta; cuenta el trabajo de la app. Si se pasa, la
       ruta sigue siendo la más barata: Workers Paid, 5 USD.
-- [ ] 4.1c ¿`httpServerHandler` levanta **esta** app de Express sin tocarla? Decide
-      si «no hay que reescribir» es cierto para este andamio y no sólo en general.
-- [ ] 4.2 Adaptador de la mitad API sobre **Worker + Hyperdrive**, con las dos
+      **Señal, no medición**, del 2026-09-10: `/api/health` tardó **1 ms de reloj** en
+      repeticiones dentro de workerd. El reloj **no es la CPU**, así que esto no
+      contesta la pregunta — la acerca. Falta ejercitar la petición más pesada y leer
+      CPU, no reloj.
+- [x] 4.1c **Contestado midiendo, y la respuesta es sí: `httpServerHandler` levanta
+      esta app sin tocar una línea.** Se corrió el andamio de verdad dentro de
+      **workerd** con `wrangler dev`, sin cuenta de Cloudflare. Lo único escrito son
+      cuatro líneas de un archivo nuevo. Ver
+      [`la-api-en-un-worker.md`](la-api-en-un-worker.md).
+      **Lo que de verdad decidía la tarea era el driver**, y contestó: `/api/db/health`
+      devolvió `3D000 · database "medicion" does not exist` — que es **Postgres
+      contestando**, o sea que `@prisma/adapter-pg` + `pg` cargaron y abrieron un socket
+      TCP desde adentro del Worker.
+      **Y el arranque completo también entra**, que no se esperaba: `server.ts`, con
+      `dotenv/config` y los manejadores de señales, contestó 200 igual.
+      **Dos hallazgos que no se buscaban:** el reloj arranca en **epoch cero** —todo lo
+      que el andamio loguee al arrancar lleva `1970-01-01`— y el bundle pesa **1583 KiB
+      comprimidos** contra un techo de 3 MB: entra, gastando ~52% del presupuesto antes
+      de la primera línea del proyecto.
+- [ ] 4.2 **Sin riesgo de lenguaje desde 4.1c**; lo que falta decidir es cuál de las
+      dos cadenas, que contesta la medición A.
+      Adaptador de la mitad API sobre **Worker + Hyperdrive**, con las dos
       cadenas de conexión que el andamio necesita: el **pooler** para el cliente y la
       **directa** para las migraciones —el pooler en modo transacción no soporta
       *prepared statements*—. En plan gratuito la directa es IPv6, así que las

@@ -95,6 +95,24 @@ mueve sobre un cambio incompatible.
 
 ### Añadido
 
+- **Está medido que la API de este andamio corre en un Worker sin tocarla.** La ruta
+  que hace que la mitad API cueste 0 USD/mes se apoyaba en una frase de Cloudflare
+  —*«migrate existing Node.js applications with minimal code changes»*— dicha **en
+  general**; «mínimos cambios» sobre *esta* aplicación podía ser desde cuatro líneas
+  hasta reescribir el acceso a datos. Se corrió el andamio dentro de **workerd** con
+  `wrangler dev`, sin cuenta de Cloudflare: **eran cuatro líneas**.
+
+  **Lo que de verdad decidía es el driver, y contestó:** `@prisma/adapter-pg` + `pg`
+  cargaron y **abrieron un socket TCP** desde adentro del Worker —la base devolvió su
+  propio código de error, que es la prueba de que la conexión se estableció—. El
+  arranque completo (`server.ts`, con `dotenv/config` y manejadores de señales) también
+  entra.
+
+  **Dos hallazgos que no se buscaban** y quedan escritos en `infra/adaptadores.md`: el
+  reloj de Workers **arranca en epoch cero**, así que todo lo que se loguee al arrancar
+  lleva `1970-01-01`; y el bundle pesa **1583 KiB comprimidos** contra un techo de 3 MB
+  — entra, gastando ~52% del presupuesto antes de la primera línea del proyecto.
+
 - **Las cuatro capacidades de la combinación Supabase tienen dueño escrito, y antes
   eran dos.** `plantilla/infra/adaptadores.md` tenía abierto *«quién cubre (a) y (d)»*
   —o sea: dónde corre la API y cómo se despliega—, que es la forma en que un proyecto
