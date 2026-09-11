@@ -19,6 +19,8 @@ decisiones-del-po: 2026-09-10
 | **D2** | **La pregunta «¿cuántas copias querés?» se elimina.** DEV y PROD siempre | H2 |
 | **D3** | Una **aplicación** también llega a internet, por el mismo camino | H3 |
 | **D4** | **Supabase** deja de ser sólo auth: tiene despliegue | H4 |
+| **D5** | **El piso de la compuerta de PROD es el botón, no el environment.** La promoción exige `workflow_dispatch` en **todos** los planes; el environment agrega un **segundo** candado donde el repositorio lo admite | la medición de abajo |
+| **D6** | **Promover exige haber pasado por DEV en verde, y se comprueba.** Si no se puede comprobar, **no se promueve** | un hueco que el diseño original no veía |
 
 ### D2 — por qué se elimina en vez de implementarse
 
@@ -66,6 +68,19 @@ privado del plan gratuito no existe ninguna compuerta de environment.** No es qu
 sea cara: los environments directamente no están disponibles. Revisores
 obligatorios en privado exigen Enterprise —**21 USD por persona al mes**, no 4—.
 
+> ⚠️ **Los «21 USD por persona al mes» no están confirmados, y quedan marcados en vez
+> de repetirse.** Al volver a mirar la documentación de GitHub el **2026-09-10**, lo
+> único que dice con todas las letras es que *«Organizations with GitHub Team and users
+> with GitHub Pro can configure environments for private repositories»* y que *«some
+> features for environments have no or limited availability for private repositories»*
+> — **sin decir cuáles ni a qué plan corresponde cada una**. O sea que la cifra puede
+> ser correcta y no está respaldada por ninguna fuente que se haya podido leer.
+>
+> **No cambia ninguna decisión**, y por eso se marca en vez de bloquear: desde **D5**
+> el piso de la compuerta es el botón, que es gratis en todos los planes. Lo que esta
+> cifra decide es sólo cuánto cuesta el **segundo** candado — y nadie tendría que pagar
+> nada apoyándose en un número sin fuente.
+
 | Compuerta | Repo público, gratis | Repo privado, gratis |
 |---|---|---|
 | Revisores obligatorios | **sí** | **no** |
@@ -76,16 +91,50 @@ obligatorios en privado exigen Enterprise —**21 USD por persona al mes**, no 4
 `proteccion-main.md`. La herramienta **mide** si el repositorio admite compuertas
 de environment y escribe lo que encontró:
 
-- **admite** → el pase a PROD pide aprobación del environment. Con una sola
-  persona funciona: alcanza con que uno de los revisores obligatorios apruebe, y
-  puede ser quien disparó la corrida.
-- **no admite** → PROD queda detrás de `workflow_dispatch` manual, y **se declara
-  el desvío**, igual que hoy se declara el de protección de rama. No se finge una
-  compuerta que no existe.
+- **admite** → además del botón, el pase a PROD puede pedir **aprobación de otra
+  persona** en el environment `produccion`. Eso agrega al rastro **quién aprobó**, que
+  no es necesariamente quien disparó.
+- **no admite** → **se declara el desvío**, igual que hoy se declara el de protección
+  de rama. Y se declara con el nombre preciso: no es que no haya compuerta —el botón
+  sigue siendo un acto humano— es que **no hay tercero**.
 
-Un detalle que cambia el diseño: **una corrida esperando aprobación más de 30 días
-FALLA**, no se cancela. Una compuerta que nadie atiende deja el despliegue en rojo
-—visible— y no en silencio. Es el comportamiento correcto y se documenta.
+### Lo que la medición corrigió de este mismo documento
+
+Medido el **2026-09-10** en la documentación de GitHub. Tres hechos, y el tercero
+**contradice lo que este documento afirmaba**:
+
+1. *«Users with GitHub Free plans can only configure environments for public
+   repositories»* — confirma el muro, y confirma que **es el mismo** que el de
+   rulesets. Por eso la sonda no se duplica: se reusa el `estado` que ya se mide.
+2. *«Running a workflow that references an environment that does not exist will create
+   an environment with the referenced name»* — declararlo **no rompe nada** donde no
+   hay compuerta, así que el andamio lo declara siempre y no hace falta partir el YAML
+   en dos variantes.
+3. **Este documento decía: «una corrida esperando aprobación más de 30 días FALLA, no
+   se cancela… deja el despliegue en rojo —visible—. Es el comportamiento correcto».
+   Es al revés.** La documentación dice *«A workflow may wait for up to 30 days on
+   environment approvals»*, y el tope de una corrida entera son **35 días** contando la
+   espera, tras los cuales *«the workflow run is cancelled»*. Queda **cancelada, no
+   roja**. Prometer un rojo mandaba a alguien a esperar una señal que GitHub no da.
+
+**Y eso cambió D5.** Con el environment como piso, un repositorio privado del plan
+gratuito —que es exactamente la gente para la que existe este marco— se quedaba con la
+compuerta más baja de las dos. Con el botón como piso, ese proyecto pierde el
+**tercero**, no la compuerta. Es una pérdida mucho más chica, y se declara con ese
+nombre.
+
+### D6 — el hueco que el diseño original no veía
+
+El job de DEV hace **dos** cosas: sube la versión y **después** comprueba que su
+dirección conteste. La primera puede salir bien con la segunda mal —el sitio sube y
+sirve un 404— y esa versión queda igual cargada en Cloudflare, **promovible**, sin
+nada que la distinga de una buena. Un `needs: dev` no lo cubre: cubre que los dos jobs
+corran juntos, no que el segundo haya aprobado al primero.
+
+Por eso la promoción **pregunta** si esa versión pasó por DEV en verde. Y falla
+cerrado: *«no se pudo preguntar»* no se lee como éxito. Los tres desenlaces —no se
+pudo preguntar, nunca se subió, se subió y salió rojo— se dicen distinto, porque piden
+tres cosas distintas de la persona.
 
 ## Qué se construye ahora y qué queda declarado
 

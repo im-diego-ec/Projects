@@ -69,6 +69,19 @@ Dos precisiones que la verificación trajo y que cambian el cálculo:
   para el diseño: una compuerta que nadie atiende deja el despliegue en rojo, no en
   silencio.
 
+> ⚠️ **Los «21 USD por persona al mes» no están confirmados, y quedan marcados en vez
+> de repetirse.** Al volver a mirar la documentación de GitHub el **2026-09-10**, lo
+> único que dice con todas las letras es que *«Organizations with GitHub Team and users
+> with GitHub Pro can configure environments for private repositories»* y que *«some
+> features for environments have no or limited availability for private repositories»*
+> — **sin decir cuáles ni a qué plan corresponde cada una**. O sea que la cifra puede
+> ser correcta y no está respaldada por ninguna fuente que se haya podido leer.
+>
+> **No cambia ninguna decisión**, y por eso se marca en vez de bloquear: desde **D5**
+> el piso de la compuerta es el botón, que es gratis en todos los planes. Lo que esta
+> cifra decide es sólo cuánto cuesta el **segundo** candado — y nadie tendría que pagar
+> nada apoyándose en un número sin fuente.
+
 **Con una sola persona**, los revisores obligatorios funcionan: *«alcanza con que
 uno de los revisores obligatorios apruebe»*, y esa persona puede ser la misma que
 disparó la corrida.
