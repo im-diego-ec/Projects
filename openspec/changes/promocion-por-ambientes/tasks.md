@@ -122,6 +122,15 @@ estado: pendiente-de-revision
 
 - [ ] 6.1 El paquete `e2e/` deja de estar excluido «porque corre en la promoción»
       y **corre en la promoción**, contra la dirección de DEV.
+      **BLOQUEADA POR 4.3, y la medición lo demuestra.** Las dos formas no se tocan:
+      medido con `noViajanPorForma`, una **aplicación** no recibe
+      `.github/workflows/desplegar.yml` —no tiene despliegue ni dirección de DEV— y
+      un **sitio** no recibe `e2e`. Así que la forma que tiene la suite no tiene
+      dónde correrla, y la que tiene dónde no tiene la suite.
+      Escribir hoy el paso sería agregar una compuerta que **no puede dispararse
+      nunca**, que es exactamente lo que el `guardrail-deltas` de este repo existe
+      para impedir. Se desbloquea cuando `desplegar.yml` viaje también con
+      `forma=aplicacion` (tarea 4.3).
 - [x] 6.2 El desvío se **acota** donde la promoción existe, en vez de cerrarse o
       repetirse. Para un **sitio** ya no dice «no hay deploy a dev» —lo hay— sino qué
       queda fuera de la cadena de seis pasos que la regla describe, y distingue lo
@@ -130,7 +139,11 @@ estado: pendiente-de-revision
       El banco del marco lo cazó: su barrido exige que **toda** combinación declare
       el desvío, y quitarlo para un sitio lo puso rojo. Tenía razón — la regla promete
       seis pasos y un sitio tiene cuatro.
-- [ ] 6.3 `docs/03-stack.md` dice qué publica cada camino, con su columna de estado.
+- [x] 6.3 `docs/03-stack.md` describe la promoción en el idioma de quien la va a
+      usar: sube a una copia de prueba que podés abrir y compartir, la mirás, y
+      producción publica **esa misma versión** sin recompilar. Con las dos
+      advertencias que se pagan caro si sorprenden: la dirección de prueba es
+      **pública**, y es la primera que se duerme por inactividad en un plan gratuito.
 
 ## 7. Verificación
 

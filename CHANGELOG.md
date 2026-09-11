@@ -43,6 +43,28 @@ mueve sobre un cambio incompatible.
 
 ### Añadido
 
+- **`docs/03-stack.md` cuenta la promoción en el idioma de quien la va a usar:** el
+  proyecto sube tu sitio a una dirección de prueba —una de verdad, que podés abrir y
+  compartir—, comprueba que conteste, y recién cuando vos querés publica **esa misma
+  versión**, sin volver a compilar. Con las dos advertencias que se pagan caro si
+  sorprenden: esa dirección es **pública** para quien tenga el enlace, y en un plan
+  gratuito es **la primera que se duerme**, porque es la que menos tráfico recibe.
+
+- **Y una tarea que se descubrió imposible, medida antes de escribirla.** «El E2E
+  corre contra la dirección de DEV» no se puede hacer hoy, y no por una medición que
+  falte: **las dos formas no se tocan**. Medido con `noViajanPorForma`, una
+  *aplicación* no recibe `desplegar.yml` —no tiene despliegue ni dirección de DEV— y
+  un *sitio* no recibe `e2e`. La forma que tiene la suite no tiene dónde correrla, y
+  la que tiene dónde no tiene la suite.
+
+  Escribir ese paso hubiera sido agregar **una compuerta que no puede dispararse
+  nunca**, que es justo lo que el guardrail de deltas de este repo existe para
+  impedir. Queda anotada como bloqueada por la tarea que hace viajar el despliegue a
+  una aplicación.
+
+  **Para un consumidor: nada.**
+
+
 - **El desvío de la promoción ya no declara un hueco tapado.** Decía «no hay deploy a
   dev, ni smoke, ni promoción a prod», y para un **sitio** eso dejó de ser cierto en
   el commit anterior. Un desvío que describe un hueco que ya se llenó miente en la

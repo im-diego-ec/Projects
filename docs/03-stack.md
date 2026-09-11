@@ -89,6 +89,19 @@ abrir la cuenta y crear la credencial. Son cinco minutos, una sola vez, y el pas
 a paso viene adentro del proyecto. Mientras no lo hagas **nada se pone en rojo**:
 el paso avisa en amarillo qué falta.
 
+**Y no publica de una: primero va a una copia de prueba.** Cuando tus
+verificaciones quedan en verde, el proyecto sube tu sitio a una dirección de
+prueba —una de verdad, que podés abrir y compartir— y comprueba que conteste. Lo
+mirás. Si te gusta, el paso de producción publica **esa misma versión**: no la
+vuelve a compilar, así que lo que sale es exactamente lo que miraste. Esa es toda
+la gracia, y es la razón por la que existe la copia de prueba.
+
+> **Dos cosas que conviene saber de esa dirección de prueba.** Es **pública** para
+> quien tenga el enlace: no es un lugar privado. Y si tu proyecto usa una base
+> gratuita, la copia de prueba es justamente la que menos tráfico recibe, así que
+> es la primera que se duerme por inactividad — los números están en
+> `infra/adaptadores.md`, adentro de tu proyecto.
+
 **Qué te cuesta.** No hay botón de publicar. Cada corrección de un texto es un
 cambio en el repositorio, no una edición en una pantalla de administración.
 
