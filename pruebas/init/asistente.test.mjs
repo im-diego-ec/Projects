@@ -967,3 +967,34 @@ test("desvios · el del PO declara que en ORGANIZACION el gate puede ser real", 
   assert.match(d.motivo, /ORGANIZACION/, "no contempla el caso de organizacion");
   assert.match(d.motivo, /borra este desvio/, "no le dice a quien SI tiene separacion que puede borrarlo");
 });
+
+test("desvios · un SITIO ya no declara que le falta la promocion, porque la tiene", () => {
+  // El desvio decia "no hay deploy a dev, ni smoke, ni promocion a prod". Para un
+  // sitio eso dejo de ser cierto el 2026-09-10: desplegar.yml sube la version a DEV
+  // con su direccion de prueba, la sonda la comprueba, y el job de produccion
+  // promueve ESA MISMA version.
+  //
+  // Un desvio que describe un hueco TAPADO miente en la direccion mas cara: alguien
+  // lo lee y escribe a mano el pipeline que su proyecto ya tiene.
+  const base = { plataforma: "supabase", equipo: "solo", avisos: "correo", visibilidad: "publico", ORG: "o" };
+  const d = desvios({ ...base, forma: "sitio" }, "2026-09-10").find((x) => x.regla === "promocion-por-ambientes");
+  assert.ok(d, "el desvio sigue existiendo: la cadena que la regla describe tiene seis pasos y este proyecto tiene cuatro");
+  assert.doesNotMatch(
+    d.motivo,
+    /no hay deploy a dev/,
+    "el motivo viejo decia que no habia deploy a DEV, y ahora lo hay: eso es declarar un hueco tapado",
+  );
+  assert.match(d.motivo, /La promocion existe para esta forma/, "el motivo tiene que decir lo que SI hay");
+  assert.match(d.motivo, /NO APLICA/, "y distinguir lo que no aplica --el smoke de API-- de lo que falta");
+  assert.match(d.revisar, /E2E/, "lo unico que de verdad falta es el E2E, y ahi tiene que apuntar la revision");
+});
+
+test("desvios · una APLICACION lo sigue declarando, y su motivo nombra la mitad que falta", () => {
+  // La otra mitad, y es la que evita que el arreglo de arriba se pase de largo: la
+  // mitad API de una aplicacion NO se despliega en ningun lado todavia.
+  const base = { plataforma: "supabase", equipo: "solo", avisos: "correo", visibilidad: "publico", ORG: "o" };
+  const d = desvios({ ...base, forma: "aplicacion" }, "2026-09-10").find((x) => x.regla === "promocion-por-ambientes");
+  assert.ok(d, "una aplicacion sigue sin desplegar su API: eso se declara");
+  assert.match(d.motivo, /mitad API/, "el motivo tiene que nombrar QUE es lo que falta, no repetir el generico viejo");
+  assert.match(d.motivo, /sitio para leer.*SI recibe/s, "y tiene que decir que la otra forma ya la tiene, o el lector no sabe que cambio");
+});

@@ -43,6 +43,26 @@ mueve sobre un cambio incompatible.
 
 ### Añadido
 
+- **El desvío de la promoción ya no declara un hueco tapado.** Decía «no hay deploy a
+  dev, ni smoke, ni promoción a prod», y para un **sitio** eso dejó de ser cierto en
+  el commit anterior. Un desvío que describe un hueco que ya se llenó miente en la
+  dirección más cara: alguien lo lee y escribe a mano el pipeline que ya tiene.
+
+  No se borró — se **acotó**, y el banco del marco fue el que lo exigió: su barrido
+  pide que toda combinación declare el desvío, y quitarlo puso el caso rojo. Tenía
+  razón: la regla canónica promete **seis** pasos y un sitio tiene **cuatro**. Ahora
+  el motivo dice lo que **sí** hay, y separa lo que **no aplica** —el *smoke* de API,
+  porque un sitio no tiene API— de lo que **falta**: el E2E.
+
+- **Y una compuerta para el hueco que el commit anterior declaró:** toda la garantía
+  de «se publica lo mismo que se miró» descansa en que DEV suba con `--tag X` y
+  producción promueva con `--version-tag X`, **y nada lo medía**. Si alguien cambia
+  una de las dos, producción promueve otra versión —o ninguna— y los dos comandos
+  siguen siendo correctos por separado. Ahora se cruzan, y la mutación lo demuestra.
+
+  **Para un consumidor: un desvío más preciso** en el archivo que escribe el arranque.
+
+
 - **A quien elige «un sitio para leer» ya no se le pregunta la plataforma, porque las
   tres opciones le daban el mismo proyecto.** Medido: con `forma=sitio`, `aws`,
   `supabase` y `ninguna` producen **el mismo árbol de archivos**, y lo único que

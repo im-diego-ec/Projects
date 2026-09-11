@@ -694,15 +694,40 @@ export function desvios(r, hoy = new Date().toISOString().slice(0, 10)) {
   // Una regla que describe maquinaria inexistente es peor que una regla ausente:
   // los agentes del proyecto la leen como practica vigente y planifican contra
   // ella. El marco ya tiene el mecanismo para esto y es este: declararlo.
+  // Y SE DECLARA SOLO DONDE EL HUECO EXISTE DE VERDAD, que desde el 2026-09-10 ya
+  // no son las dos formas. Un sitio recibe la promocion entera --desplegar.yml sube
+  // la version a DEV con su direccion de prueba, la sonda la comprueba, y el job de
+  // produccion promueve ESA MISMA version-- asi que seguir declarando que "no hay
+  // deploy a dev, ni smoke, ni promocion a prod" seria declarar un hueco tapado.
+  //
+  // Un desvio que describe un hueco que ya no existe es tan malo como la regla que
+  // describe maquinaria inexistente: las dos le mienten a quien las lee, y esta le
+  // mentiria en la direccion mas cara --alguien lo lee y escribe a mano el pipeline
+  // que ya tiene--.
   lista.push({
     ...comun,
     regla: "promocion-por-ambientes",
     motivo:
-      "El andamio no reparte pipeline de promocion: no hay deploy a dev, ni smoke, ni promocion a prod. Lo que " +
-      "viaja hoy es la verificacion (ci.yml) y, solo para la forma «un sitio para leer», una publicacion a UN " +
-      "destino (desplegar.yml). La regla queda escrita como el destino, no como lo que este proyecto hace hoy. " +
-      "Lo mismo vale para `dev-es-staging-compartido`, que describe la misma maquinaria.",
-    revisar: "cuando el marco reparta el pipeline de promocion, o cuando este proyecto escriba el suyo",
+      r.forma === "sitio"
+        ? // UN SITIO YA TIENE CASI TODA LA CADENA, y el desvio se acota a lo que de
+          // verdad le falta. La regla promete seis pasos: merge, deploy a DEV, smoke
+          // API, E2E, deploy a PROD, verificar-prod. Desde el 2026-09-10 este
+          // proyecto tiene cuatro: sube la version a DEV, la sonda la comprueba,
+          // promueve ESA MISMA version a produccion y la vuelve a comprobar.
+          "La promocion existe para esta forma desde el 2026-09-10: el despliegue sube la version a DEV con su " +
+          "direccion de prueba, una sonda la comprueba, y produccion promueve ESA MISMA version sin recompilar. " +
+          "Lo que queda fuera de la cadena que la regla describe son dos pasos, y por motivos distintos: el «smoke " +
+          "API» NO APLICA --un sitio para leer no tiene API-- y el E2E NO EXISTE todavia, porque el paquete de " +
+          "pruebas de punta a punta no viaja a esta forma. Producción no recibe nada que DEV no haya verificado, " +
+          "que es la propiedad de fondo de la regla, y esa SI se cumple."
+        : "La mitad API de una aplicacion no se despliega en ningun lado todavia: no hay deploy a dev, ni smoke, ni " +
+          "promocion a prod para ella. Lo que viaja hoy es la verificacion (ci.yml). La forma «un sitio para leer» SI " +
+          "recibe la promocion desde el 2026-09-10. La regla queda escrita como el destino, no como lo que esta " +
+          "aplicacion hace hoy. Lo mismo vale para `dev-es-staging-compartido`, que describe la misma maquinaria.",
+    revisar:
+      r.forma === "sitio"
+        ? "cuando el marco reparta el E2E contra la direccion de DEV"
+        : "cuando el marco reparta el adaptador de computo de la API, o cuando este proyecto escriba el suyo",
   });
   if (r.visibilidad === "privado") {
     lista.push({

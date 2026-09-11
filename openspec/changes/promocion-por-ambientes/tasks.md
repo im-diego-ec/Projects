@@ -122,8 +122,14 @@ estado: pendiente-de-revision
 
 - [ ] 6.1 El paquete `e2e/` deja de estar excluido «porque corre en la promoción»
       y **corre en la promoción**, contra la dirección de DEV.
-- [ ] 6.2 El desvío sobre `promocion-por-ambientes` se cierra donde la promoción
-      exista de verdad, y se sigue declarando donde no.
+- [x] 6.2 El desvío se **acota** donde la promoción existe, en vez de cerrarse o
+      repetirse. Para un **sitio** ya no dice «no hay deploy a dev» —lo hay— sino qué
+      queda fuera de la cadena de seis pasos que la regla describe, y distingue lo
+      que **no aplica** (el smoke de API: un sitio no tiene API) de lo que **falta**
+      (el E2E). Para una **aplicación** sigue entero, nombrando la mitad API.
+      El banco del marco lo cazó: su barrido exige que **toda** combinación declare
+      el desvío, y quitarlo para un sitio lo puso rojo. Tenía razón — la regla promete
+      seis pasos y un sitio tiene cuatro.
 - [ ] 6.3 `docs/03-stack.md` dice qué publica cada camino, con su columna de estado.
 
 ## 7. Verificación

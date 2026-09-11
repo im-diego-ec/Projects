@@ -379,3 +379,41 @@ test("el subdominio se pide donde la persona esta, no donde le explota", () => {
   // esta parada en el panel de Cloudflare.
   assert.ok(t.indexOf("### 2 ·") < t.indexOf("### 3 · La credencial"), "el subdominio quedo despues de la credencial");
 });
+
+test("produccion promueve LA ETIQUETA QUE PUSO DEV, y no una cualquiera", () => {
+  // EL HUECO QUE ESTE CASO CIERRA, y lo declaro el propio commit que partio el
+  // workflow: toda la garantia de "se publica lo mismo que se miro" descansa en que
+  // las dos etiquetas coincidan --DEV sube con `--tag X`, produccion promueve con
+  // `--version-tag X`-- y NADA lo medía.
+  //
+  // Si alguien cambia una de las dos --por ejemplo a `github.run_id`, que parece
+  // igual de unico-- produccion promueve una version que no existe, o peor,
+  // promueve otra. Y el banco seguia verde, porque los dos comandos por separado
+  // eran correctos.
+  const t = workflow();
+
+  const subida = /versions upload[\s\S]{0,400}?--tag "\$\{([A-Z_]+)\}"/.exec(t);
+  assert.ok(subida, "el job de DEV ya no sube la version con una etiqueta: sin etiqueta, la promocion tiene que adivinar");
+
+  const promocion = /versions deploy[\s\S]{0,400}?--version-tag "\$\{([A-Z_]+)\}@/.exec(t);
+  assert.ok(promocion, "el job de produccion ya no promueve por etiqueta: estaria raspando un id de alguna salida");
+
+  assert.equal(
+    promocion[1],
+    subida[1],
+    `DEV etiqueta con \${${subida[1]}} y produccion promueve \${${promocion[1]}}: si no son la misma, lo que se publica no es lo que se miro`,
+  );
+  assert.equal(subida[1], "GITHUB_SHA", "la etiqueta tiene que ser el commit: es lo unico que identifica QUE se miro");
+});
+
+test("MUERDE: si las dos etiquetas se separan, se caza", () => {
+  // Anti-vacuidad del caso de arriba: se separa una de las dos a proposito y se
+  // comprueba que el predicado lo ve. Sin esto, el caso quedaria verde con los dos
+  // extractores rotos --que es como los dos podrian devolver `undefined` y ser
+  // "iguales"--.
+  const mutado = workflow().replace('--version-tag "${GITHUB_SHA}@', '--version-tag "${GITHUB_RUN_ID}@');
+  const subida = /versions upload[\s\S]{0,400}?--tag "\$\{([A-Z_]+)\}"/.exec(mutado);
+  const promocion = /versions deploy[\s\S]{0,400}?--version-tag "\$\{([A-Z_]+)\}@/.exec(mutado);
+  assert.ok(subida && promocion, "los dos extractores tienen que seguir encontrando algo, o la comparacion no mide");
+  assert.notEqual(promocion[1], subida[1], "el predicado no distingue dos etiquetas distintas");
+});
