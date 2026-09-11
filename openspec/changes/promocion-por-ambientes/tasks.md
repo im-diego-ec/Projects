@@ -39,8 +39,17 @@ estado: pendiente-de-revision
       El caso simple baja de **9 a 8 preguntas**; con AWS, de 16 a 15. Y las dos
       cuentas de AWS pasan a preguntarse **siempre**: con una sola topología, que
       sean distintas deja de ser opcional.
-- [ ] 3.2 Sale `plataforma` del menú: el andamio sabe generar una sola rama que
-      funciona. `PLATAFORMAS` queda para el archivo de valores, no para el menú.
+- [x] 3.2 Sale `plataforma` del menú **para un sitio**, y la medición decidió el
+      alcance en vez de la intuición. Medido con `noViajanPorPlataforma` y `derivar`:
+      con `forma=sitio` las **tres** opciones producen el **mismo árbol** y lo único
+      que cambia es la clave `plataforma` misma. Un sitio publica en Cloudflare elija
+      lo que elija.
+      **Para una aplicación NO se saca**, y ahí el proposal decía de más: medido,
+      `aws` **sí** cambia algo —viaja `infra/` e `infra-prod/`, el Terraform—. La
+      pregunta es real; lo que promete de más es su **texto**, que pregunta dónde va a
+      correr la aplicación cuando sólo decide si viaja la infraestructura. Eso se
+      arregla cuando la promoción exista y la respuesta decida un destino.
+      **Efecto medido:** el camino más corto baja de 8 a **7 preguntas**.
 - [x] 3.3 Banco: ninguna pregunta del asistente puede tener una sola respuesta
       posible. Evidencia: `pruebas/init/ninguna-pregunta-miente.test.mjs`, que
       contesta el cuestionario entero variando una respuesta por vez y compara lo que

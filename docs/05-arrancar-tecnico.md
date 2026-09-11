@@ -484,7 +484,7 @@ se parece a un problema de banderas.
 | Bandera | Cuándo |
 |---|---|
 | `--ejemplo` | Fase 2: imprime el esqueleto de `valores.json` |
-| `--asistente` | Fase 2 por preguntas: deriva los 23 valores de 8 a 16 respuestas en castellano. Exige terminal; sin TTY imprime las preguntas y sale 2 |
+| `--asistente` | Fase 2 por preguntas: deriva los 23 valores de 7 a 16 respuestas en castellano. Exige terminal; sin TTY imprime las preguntas y sale 2 |
 | `--solo-valores <ruta>` | Con `--asistente`: escribe el archivo y no arma nada. Gemelo interactivo de `--ejemplo` |
 | `--forzar` | Sobrescribe un destino que **ya tiene** archivos del andamio. Es la bandera que apaga la protección contra pisar trabajo: se usa para reintentar un arranque que se cortó a la mitad, no para «probar otra vez» |
 | `--sin-herramientas` | No corre `openspec init` ni el render de la constitución. Te deja el andamio copiado y nada más — el repo queda **sin** `openspec/` y sin `.projects/`, o sea sin las dos piezas de la la página 08 |

@@ -1,7 +1,13 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+
 import { PREGUNTAS, derivar, desvios } from "../../herramientas/projects-asistente.mjs";
+import { archivosDelAndamio } from "../../herramientas/projects-init.mjs";
+
+const ANDAMIO = path.join(path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", ".."), "plantilla");
 
 // ---------------------------------------------------------------------------
 // NINGUNA PREGUNTA DEL ASISTENTE PUEDE TENER UNA SOLA RESPUESTA POSIBLE.
@@ -47,11 +53,34 @@ const BASE = {
   visibilidad: "publico",
 };
 
-/** Todo lo que una respuesta decide: los valores del proyecto y lo que se declara
- *  como desvio. La fecha va fija para que el resultado no dependa del dia. */
+/** Todo lo que una respuesta decide, y lo que importa es el orden de los tres.
+ *
+ *  LOS ARCHIVOS VAN PRIMERO, y no es cosmetico. La primera version de esta compuerta
+ *  comparaba solo `derivar()` y los desvios, y por eso NO cazo la pregunta de
+ *  plataforma: `plataforma` es ella misma una de las claves que `derivar` devuelve,
+ *  asi que contestar distinto "cambiaba algo" --el valor declarado-- aunque el
+ *  proyecto resultante fuera identico. Medido: con forma=sitio, las tres opciones
+ *  producen EL MISMO arbol.
+ *
+ *  Lo que le importa a una persona no es que su archivo de valores diga otra palabra:
+ *  es que su proyecto sea distinto. Eso son los ARCHIVOS. */
 function loQueDecide(r) {
+  const v = derivar(r);
   return JSON.stringify({
-    valores: derivar(r),
+    archivos: archivosDelAndamio(ANDAMIO, v.plataforma ?? r.plataforma, v.forma ?? r.forma).sort(),
+    valores: v,
+    desvios: desvios(r, "2026-01-01").map((d) => [d.regla, d.motivo, d.revisar]),
+  });
+}
+
+/** Lo que la respuesta decide, SALVO el eco de la propia clave contestada. */
+function loQueDecideSalvo(r, clave) {
+  const v = { ...derivar(r) };
+  delete v[clave];
+  delete v[clave.toUpperCase()];
+  return JSON.stringify({
+    archivos: archivosDelAndamio(ANDAMIO, derivar(r).plataforma ?? r.plataforma, derivar(r).forma ?? r.forma).sort(),
+    valores: v,
     desvios: desvios(r, "2026-01-01").map((d) => [d.regla, d.motivo, d.revisar]),
   });
 }
@@ -87,6 +116,43 @@ test("toda pregunta que se hace cambia algo segun como se conteste", () => {
     [],
     "estas preguntas no son una eleccion, son un texto. Le hacen creer a la persona que eligio una arquitectura:\n  " +
       mudas.join("\n  "),
+  );
+});
+
+test("ninguna pregunta cambia SOLO su propia respuesta", () => {
+  // LA VERSION FUERTE, y el discriminante correcto costo dos intentos.
+  //
+  // El primero comparaba `derivar()` entero y no cazaba `plataforma`, porque
+  // `plataforma` ES una de las claves que `derivar` devuelve: contestar distinto
+  // "cambiaba algo" --esa clave-- aunque el proyecto fuera identico.
+  //
+  // El segundo comparaba el ARBOL de archivos, y marcaba de mas: `equipo`,
+  // `dominio`, `avisos` y `visibilidad` cambian el CONTENIDO de los archivos y los
+  // desvios, no cuales viajan, y son preguntas perfectamente reales.
+  //
+  // El discriminante que si sirve: se compara todo lo que la respuesta decide
+  // MENOS la clave que se acaba de contestar. Si lo unico que cambia es el eco de
+  // la propia respuesta, la pregunta es decorativa: la persona eligio una palabra
+  // que despues aparece escrita en su archivo de valores y en ningun lado mas.
+  const decorativas = [];
+  for (const forma of ["aplicacion", "sitio"]) {
+    const base = { ...BASE, forma };
+    for (const p of preguntasVivas(base)) {
+      const efectos = new Map();
+      for (const o of p.opciones) {
+        const r = { ...base, [p.id]: o.valor };
+        if (typeof p.salta === "function" && p.salta(r)) continue;
+        efectos.set(o.valor, loQueDecideSalvo(r, p.id));
+      }
+      if (efectos.size > 1 && new Set(efectos.values()).size === 1) {
+        decorativas.push(`forma=${forma}, ${p.id}: ${[...efectos.keys()].join(" / ")} no cambian nada salvo el eco de la respuesta`);
+      }
+    }
+  }
+  assert.deepEqual(
+    decorativas,
+    [],
+    "estas preguntas le hacen elegir a la persona una palabra que no cambia su proyecto:\n  " + decorativas.join("\n  "),
   );
 });
 

@@ -200,6 +200,22 @@ export const PREGUNTAS = [
   },
   {
     id: "plataforma",
+    // NO SE PREGUNTA PARA UN SITIO, por el mismo motivo que `ambientes` dejo de
+    // preguntarse y con la misma medicion detras (2026-09-10): con forma=sitio las
+    // TRES opciones producen el mismo proyecto. Medido sobre `derivar()`, lo unico
+    // que cambia entre `aws`, `supabase` y `ninguna` es la clave `plataforma`
+    // misma; el arbol de archivos es identico en los tres casos.
+    //
+    // Lo unico que ademas se movia era el TEXTO de un desvio, que explicaba por que
+    // el Terraform de AWS no habia viajado. O sea: la persona elegia AWS, no recibia
+    // nada de AWS, y recibia un parrafo explicando que no. Eso es exactamente lo que
+    // `menu-que-no-miente` llama hacerle creer que eligio una arquitectura cuando
+    // eligio un texto.
+    //
+    // Un sitio publica en Cloudflare elija lo que elija. Cuando la promocion exista
+    // y un sitio tenga de verdad mas de un destino, esta pregunta vuelve con algo
+    // que contestar.
+    salta: (r) => r.forma === "sitio",
     texto: "¿Dónde va a vivir tu proyecto? O sea: quién guarda tus datos y en qué computadora corre.",
     opciones: [
       {

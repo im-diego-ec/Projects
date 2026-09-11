@@ -648,25 +648,47 @@ test("TODA combinacion de respuestas produce un archivo que el validador acepta"
   );
 });
 
-test("un sitio nunca queda con valores de AWS a medias, y el desvio lo dice", async () => {
-  const { valores, respuestas } = await correrAsistente(
-    // Lo que no se fija a mano se contesta con la primera opcion: lo que este
-    // caso mide es el CRUCE sitio+AWS, no el resto del cuestionario.
-    async (_t, id) => ({ PROYECTO: "p", ORG: "o", forma: "2", plataforma: "2" })[id] ?? LIBRES[id] ?? "1",
-    {},
-    {},
-    () => {},
-    { ORG_MARCO: "im-diego-ec" },
-  );
-  assert.equal(respuestas.forma, "sitio");
-  assert.equal(respuestas.plataforma, "aws", "el guion tiene que haber elegido AWS, o este caso no mide el cruce");
-  assert.equal(usaAws(respuestas), false, "un sitio no despliega servidor propio: no usa AWS aunque se elija AWS");
+test("un sitio nunca queda con valores de AWS a medias, y el desvio lo dice", () => {
+  // ESTE CASO YA NO PASA POR EL CUESTIONARIO, y el motivo es que la combinacion
+  // dejo de poder elegirse ahi: desde el 2026-09-10 la pregunta de plataforma se
+  // SALTA para un sitio, porque las tres opciones producian el mismo proyecto.
+  //
+  // Pero la propiedad sigue importando, y por eso el caso no se borra: el archivo
+  // de valores se puede escribir A MANO --es un JSON, y `projects-init.mjs` lo
+  // acepta-- asi que alguien puede llegar igual a forma=sitio + plataforma=aws. Lo
+  // que cambia es por donde se mide: antes por el asistente, ahora directo sobre
+  // los dos predicados que deciden.
+  const r = {
+    PROYECTO: "p",
+    ORG: "o",
+    forma: "sitio",
+    plataforma: "aws",
+    equipo: "solo",
+    BUILDER_2: "b",
+    dominio: "gratuito",
+    DOMINIO_PROD: "e.com",
+    avisos: "correo",
+    CANAL_ALERTAS: "#a",
+    visibilidad: "publico",
+  };
+  const valores = derivar(r);
+
+  assert.equal(usaAws(r), false, "un sitio no despliega servidor propio: no usa AWS aunque el archivo diga AWS");
   for (const k of Object.keys(RELLENO_AWS)) {
     assert.equal(valores[k], RELLENO_AWS[k], `${k} tiene que llevar el relleno declarado, no undefined`);
   }
-  const d = desvios(respuestas).find((x) => x.regla === "iac-es-terraform");
+  const d = desvios(r).find((x) => x.regla === "iac-es-terraform");
   assert.ok(d, "el desvio tiene que quedar anotado: un relleno sin declarar es una mentira con formato de dato");
   assert.match(d.motivo, /sitio para leer/, "y su motivo tiene que nombrar la combinacion, no repetir el caso generico");
+});
+
+test("la pregunta de plataforma NO se le hace a quien eligio un sitio", () => {
+  // La otra mitad del cambio de arriba. Sin este caso, alguien podria devolver la
+  // pregunta al cuestionario y el banco seguiria en verde.
+  const p = PREGUNTAS.find((x) => x.id === "plataforma");
+  assert.ok(typeof p.salta === "function", "la pregunta de plataforma perdio su `salta`");
+  assert.equal(p.salta({ forma: "sitio" }), true, "un sitio publica en Cloudflare elija lo que elija: preguntarselo es hacerle elegir un texto");
+  assert.equal(p.salta({ forma: "aplicacion" }), false, "para una aplicacion SI cambia algo: decide si viaja el Terraform");
 });
 
 test("MUERDE: si las dos mitades volvieran a decidir distinto, el barrido lo ve", async () => {

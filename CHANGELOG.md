@@ -43,6 +43,25 @@ mueve sobre un cambio incompatible.
 
 ### Añadido
 
+- **A quien elige «un sitio para leer» ya no se le pregunta la plataforma, porque las
+  tres opciones le daban el mismo proyecto.** Medido: con `forma=sitio`, `aws`,
+  `supabase` y `ninguna` producen **el mismo árbol de archivos**, y lo único que
+  cambia en los valores derivados es la clave `plataforma` misma.
+
+  Lo único que además se movía era el **texto de un desvío**, que explicaba por qué el
+  Terraform de AWS no había viajado. O sea: la persona elegía AWS, no recibía nada de
+  AWS, y recibía un párrafo explicando que no.
+
+  **Para una aplicación la pregunta se queda**, y acá la medición corrigió al
+  proposal: `aws` **sí** cambia algo — viaja el Terraform. Lo que promete de más es su
+  *texto*, que pregunta dónde va a correr la aplicación cuando sólo decide si viaja la
+  infraestructura. Eso se arregla cuando la promoción exista.
+
+  El camino más corto baja a **7 preguntas**.
+
+  **Para un consumidor: nada.**
+
+
 - **El asistente hace una pregunta menos, y era una que no cambiaba nada.** «¿Cuántas
   copias querés?» salió del cuestionario y de la puerta web. **Medido antes de
   sacarla:** con la plataforma recomendada, contestar «uno» o «dos» cambiaba
