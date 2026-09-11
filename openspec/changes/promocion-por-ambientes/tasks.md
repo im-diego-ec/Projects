@@ -31,7 +31,14 @@ estado: pendiente-de-revision
 ## 2. La compuerta de PROD, medida y no asumida
 
 - [ ] 2.1 La herramienta **mide** si el repositorio admite compuertas de
-      environment, con el mismo patrón que `proteccion-main.md`.
+      environment. **Y la medición YA EXISTE:** `sondarProteccion` pega a
+      `repos/<org>/<repo>/rulesets` y clasifica el 403 del plan gratuito —*«Upgrade to
+      GitHub Pro or make this repository public to enable this feature»*— como
+      `sin-compuertas`. Es **el mismo muro**: el repositorio privado del plan gratuito
+      que no admite rulesets tampoco admite compuertas de environment.
+      Así que esta tarea no necesita una sonda nueva: reusa el `estado` que la
+      herramienta ya calcula. `puede` → el tramo de PROD pide aprobación;
+      `sin-compuertas` → queda detrás de `workflow_dispatch` y se declara el desvío.
 - [ ] 2.2 Si admite: el tramo de PROD pide aprobación del environment.
 - [ ] 2.3 Si no admite: PROD queda detrás de `workflow_dispatch` y **se declara el
       desvío**. No se finge una compuerta que no existe.

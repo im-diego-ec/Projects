@@ -369,6 +369,23 @@ mueve sobre un cambio incompatible.
 
 ### Corregido
 
+- **Un proceso muerto por señal se reportaba como un código de salida raro.** Los
+  ayudantes del banco devolvían `resultado.status` tal cual, y `spawnSync` devuelve
+  **`null`** cuando al proceso lo mata una señal. Entonces un caso que afirma
+  `assert.equal(exit, 1)` fallaba con *«expected 1, got null»* — que **se lee como un
+  error de lógica del guion medido**, y no lo es: el guion no llegó a correr.
+
+  Medido: dos bancos —`distribuidor` y `bitacora`— fallaron una vez cada uno bajo la
+  carga del banco completo y pasaron 3 de 3 aislados. **Un rojo que no se entiende
+  enseña a ignorar rojos**, que es lo contrario de lo que este repositorio quiere.
+
+  Ahora el mensaje nombra la señal y dice que el fallo es del proceso que corría el
+  guion, no del guion. Se comprueba con uno que se mata a sí mismo, que es la única
+  forma de producir la condición sin depender de la carga de la máquina.
+
+  **Para un consumidor: nada** — son ayudantes del banco del marco.
+
+
 - **Los 28 hallazgos medios y bajos de la revisión adversarial, cerrados.** Los más
   sustantivos:
 
