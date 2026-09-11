@@ -9,15 +9,24 @@ estado: pendiente-de-revision
 
 ## 1. La promoción del sitio: Local → DEV → PROD
 
-- [ ] 1.1 `wrangler.jsonc` del andamio declara `preview_urls` **explícitamente**,
-      con el comentario que dice por qué no se deja al default.
-- [ ] 1.2 `desplegar.yml` se parte en dos tramos: **subir versión** (DEV) y
-      **promover esa misma versión** (PROD). El segundo no vuelve a compilar.
-- [ ] 1.3 La sonda post-despliegue corre en los **dos** tramos, contra la
-      dirección de cada uno. La de DEV es la que decide si se promueve.
-- [ ] 1.4 La concurrencia se serializa **por ambiente**, y sigue sin cancelar.
-- [ ] 1.5 No se declara ningún bloque `env` de wrangler (obliga a `--env` en todo
-      comando y ensucia cada corrida con un warning).
+- [x] 1.1 `wrangler.jsonc` declara `preview_urls: true` explícitamente, con el porqué: su default se movió más de una vez, y un ambiente de prueba que existe o no según la versión de wrangler instalada no es un ambiente, es una casualidad.
+- [x] 1.2 `desplegar.yml` partido en `dev` y `produccion`. **El segundo no compila**, y eso no es un ahorro: es la garantía. Recompilar haría que lo publicado no sea byte por byte lo que se verificó.
+- [x] 1.3 Sonda en los dos tramos, con su propio mensaje: DEV dice «está en DEV, todavía no en producción», no «publicado».
+- [x] 1.4 Concurrencia por ambiente (`${{ github.job }}` en el grupo), sin cancelar.
+- [x] 1.5 Ningún bloque `env` de wrangler: se usan versiones, no ambientes de wrangler.
+
+> **Verificado el 2026-09-10 contra la documentación de Cloudflare**, que era lo que
+> faltaba antes de escribir una línea: `wrangler versions upload` y `versions deploy`
+> existen, no son beta, exigen wrangler ≥ 3.40.0 (el andamio trae ^4.127.0), y
+> `versions deploy` acepta `--version-tag` —que **resuelve la etiqueta al id**— más
+> `--yes` para no quedarse esperando una confirmación que en un runner no llega.
+>
+> Eso decidió el diseño: el job de DEV sube con `--tag <sha>` y el de PROD promueve
+> con `--version-tag <sha>`. **Cero parseo de ids.** Y `--preview-alias dev` da una
+> dirección estable en vez de una distinta por versión.
+>
+> **Lo que NO está verificado y hay que decirlo: esto no se corrió nunca contra una
+> cuenta de Cloudflare real.** La forma del workflow tiene banco; su efecto, no.
 
 ## 2. La compuerta de PROD, medida y no asumida
 

@@ -199,10 +199,25 @@ test("MUERDE: sacar la condicion del verde se caza DE VERDAD", () => {
   //
   // Ahora se afirma primero que la condicion ESTA, que es lo que lo vuelve una
   // mutacion y no un deseo.
-  const CONDICION = /github\.event\.workflow_run\.conclusion == 'success'/;
+  // Y DESDE QUE EL WORKFLOW TIENE DOS JOBS --dev y produccion-- la propiedad es
+  // mas fuerte: la condicion tiene que estar en LOS DOS. Un solo `if` alcanzaba
+  // cuando publicaba un job; con dos, el que se quede sin la condicion publica
+  // sobre un CI rojo y el otro no, que es peor que ninguno porque parece cubierto.
+  //
+  // La mutacion ademas va con /g: `String.replace` con una regex sin bandera
+  // global cambia SOLO LA PRIMERA, asi que con dos jobs la segunda sobrevivia y el
+  // caso se ponia rojo sin que hubiera nada roto.
+  const CONDICION = /github\.event\.workflow_run\.conclusion == 'success'/g;
   const t = workflow();
-  assert.match(t, CONDICION, "el archivo real tiene que traer la condicion: sin eso, mutarla no prueba nada");
-  assert.equal(CONDICION.test(t.replace(CONDICION, "true")), false, "y sacada, la deteccion tiene que ver que no esta");
+  const cuantas = (t.match(CONDICION) || []).length;
+  const jobsQuePublican = (t.match(/^  (dev|produccion):$/gm) || []).length;
+  assert.ok(jobsQuePublican >= 2, `se leyeron ${jobsQuePublican} jobs de despliegue: la guarda quedaria mirando al vacio`);
+  assert.equal(
+    cuantas,
+    jobsQuePublican,
+    `la condicion del verde aparece ${cuantas} veces y hay ${jobsQuePublican} jobs que publican: alguno puede publicar sobre un CI rojo`,
+  );
+  assert.equal((t.replace(CONDICION, "true").match(CONDICION) || []).length, 0, "y sacada, la deteccion tiene que ver que no esta");
 });
 
 test("se publica el commit que paso el CI, no la punta de main", () => {

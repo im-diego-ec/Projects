@@ -58,11 +58,15 @@ concurrency:
   # Ese desenlace, dos corridas en verde y el destino a medias, es exactamente lo
   # que este archivo existe para impedir. Este workflow decia
   # `cancel-in-progress: true` y defendia lo contrario en un comentario.
-  group: desplegar-${{ github.ref }}
+  # POR AMBIENTE, y no por rama: DEV y PROD son destinos distintos y no compiten
+  # entre si. Serializar los dos juntos haria que una subida a DEV bloquee una
+  # promocion a PROD que no toca lo mismo.
+  group: desplegar-${{ github.ref }}-${{ github.job }}
   cancel-in-progress: false
 
 jobs:
-  desplegar:
+  # ── DEV: se sube la version y se mira. NO se publica. ──────────────────────
+  dev:
     # `workflow_run` dispara TAMBIEN cuando el workflow anterior fallo: sin este
     # `if`, un CI rojo publicaria igual.
     if: >-
@@ -167,7 +171,7 @@ jobs:
           fi
           echo "a publicar: ${CUANTOS} archivo(s)"
 
-      - name: Publicar
+      - name: Subir la version a DEV
         id: publicar
         if: steps.credencial.outputs.hay == 'si'
         shell: bash
@@ -179,15 +183,30 @@ jobs:
           # La salida se GUARDA ademas de imprimirse: de ella sale la direccion que
           # el paso siguiente va a consultar. `tee` para que el log del runner siga
           # mostrando todo tal cual, que es donde se lee cuando algo falla.
-          corepack pnpm -C {{PAQUETE_SITIO}} exec wrangler deploy 2>&1 | tee /tmp/wrangler.txt
+          # SE SUBE UNA VERSION, NO SE PUBLICA. `versions upload` deja la version
+          # cargada con su propia direccion y NO la pone en produccion: eso es lo
+          # que hace que exista un lugar donde mirar antes.
+          #
+          # LA ETIQUETA ES EL SHA DEL COMMIT, y es la pieza que hace que la
+          # promocion no tenga que adivinar nada: el job de produccion promueve
+          # por `--version-tag` con este mismo sha, asi que publica EXACTAMENTE la
+          # version que se miro aca. Sin etiqueta habria que raspar un id de la
+          # salida y confiar en que sea el correcto.
+          #
+          # `--preview-alias dev` le da ademas una direccion ESTABLE
+          # --dev-<nombre>.<subdominio>.workers.dev-- en vez de una distinta por
+          # version: quien mira DEV usa siempre el mismo enlace.
+          corepack pnpm -C {{PAQUETE_SITIO}} exec wrangler versions upload \
+            --tag "${GITHUB_SHA}" \
+            --preview-alias dev \
+            --message "DEV desde ${GITHUB_SHA}" 2>&1 | tee /tmp/wrangler.txt
 
-          # La ultima direccion que wrangler nombra es la del despliegue que acaba
-          # de hacer. Si no se pudo leer NO se inventa una: el paso siguiente lo
-          # dice y no afirma que el sitio este arriba.
-          URL="$(grep -Eo 'https://[A-Za-z0-9._-]+\.workers\.dev' /tmp/wrangler.txt | tail -1 || true)"
-          if [ -z "$URL" ]; then
-            URL="$(grep -Eo 'https://[A-Za-z0-9._-]+' /tmp/wrangler.txt | grep -v 'cloudflare.com\|npmjs\|github.com' | tail -1 || true)"
-          fi
+          # La direccion se lee ANCLADA AL ALIAS. La version anterior de este paso
+          # tomaba "la ultima direccion que wrangler nombre", con un segundo grep
+          # de rescate que aceptaba cualquier cosa: eso podia devolver la URL de
+          # produccion o una de la documentacion. Con el alias, el patron es
+          # exacto y no hay a que caerse.
+          URL="$(grep -Eo "https://dev-[A-Za-z0-9._-]+\.workers\.dev" /tmp/wrangler.txt | tail -1 || true)"
           echo "url=$URL" >> "$GITHUB_OUTPUT"
 
       # ─────────────────────────────────────────────────────────────────────────
@@ -205,7 +224,7 @@ jobs:
       # creciente cubren esa ventana; lo que no conteste despues de eso no esta
       # arriba, y entonces el rojo es correcto.
       # ─────────────────────────────────────────────────────────────────────────
-      - name: Comprobar que la direccion contesta de verdad
+      - name: Comprobar que DEV contesta de verdad
         if: steps.credencial.outputs.hay == 'si'
         shell: bash
         env:
@@ -213,7 +232,7 @@ jobs:
         run: |
           set -uo pipefail
           if [ -z "${URL:-}" ]; then
-            echo "::error::se publico pero no se pudo leer la direccion de la salida de wrangler, asi que NO se comprobo que el sitio conteste. El log del paso anterior la tiene; abrila a mano antes de dar el despliegue por bueno"
+            echo "::error::la version se subio pero no se pudo leer su direccion de prueba de la salida de wrangler, asi que NO se comprobo que conteste. Si la clave preview_urls no esta en true en wrangler.jsonc, la direccion no existe y es eso. El log del paso anterior tiene la salida entera"
             exit 1
           fi
 
@@ -234,13 +253,15 @@ jobs:
             # bash en vez de un rojo que se entienda.
             if [ -s "$CUERPO" ]; then TAM=$(wc -c < "$CUERPO" | tr -d " "); else TAM=0; fi
             if [ "$CODIGO" = "200" ] && [ "$TAM" -gt 0 ]; then
-              echo "::notice title=Tu sitio esta en linea::$URL contesto 200 con $TAM bytes"
+              echo "::notice title=DEV esta en linea::$URL contesto 200 con $TAM bytes"
               {
-                echo "### Tu sitio esta publicado"
+                echo "### Tu sitio esta en DEV, todavia no en produccion"
                 echo ""
                 echo "**$URL**"
                 echo ""
                 echo "Comprobado desde el runner: contesto 200 con $TAM bytes. No es que el despliegue haya salido bien; es que la pagina abre."
+                echo ""
+                echo "Miralo. Si te gusta, el job \`produccion\` publica **esta misma version** --no la vuelve a compilar--."
               } >> "$GITHUB_STEP_SUMMARY"
               exit 0
             fi
@@ -257,5 +278,128 @@ jobs:
             sleep "$ESPERA"
           done
 
-          echo "::error::se publico y la direccion NO contesta: $URL devolvio $CODIGO despues de cinco intentos. El despliegue subio los archivos, asi que el problema esta del lado de servirlos: la causa mas comun la primera vez es que falte registrar el subdominio en Workers & Pages -> Subdomain. Ver {{PAQUETE_SITIO}}/README.md"
+          echo "::error::la version subio y su direccion de prueba NO contesta: $URL devolvio $CODIGO despues de cinco intentos. Los archivos estan; el problema esta del lado de servirlos, y la causa mas comun la primera vez es que falte registrar el subdominio en Workers & Pages -> Subdomain. Ver {{PAQUETE_SITIO}}/README.md"
+          exit 1
+
+  # ── PRODUCCION: se promueve la version que YA se miro en DEV. ───────────────
+  #
+  # ESTE JOB NO COMPILA, y eso no es un ahorro: es LA garantia. Volver a compilar
+  # para produccion haria que lo publicado no sea byte por byte lo que se verifico
+  # en DEV --otro reloj, otra resolucion de dependencias, otro orden de archivos--
+  # y entonces el ambiente de prueba dejaria de probar lo que sale. Por eso el
+  # diseno eligio "versiones" y no un segundo Worker: es la unica de las tres
+  # formas que promueve un artefacto YA CONSTRUIDO.
+  #
+  # Lo unico que instala es wrangler, que es la herramienta que promueve.
+  produccion:
+    needs: dev
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - name: Traer el arbol
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          # EL MISMO COMMIT QUE MIDIO EL CI Y QUE SUBIO A DEV. Ver el comentario
+          # largo del job de arriba: bajo `workflow_run`, un checkout pelado trae
+          # lo que main apunte AHORA, que puede no ser lo que se verifico.
+          ref: ${{ github.event.workflow_run.head_sha }}
+
+      - name: Comprobar que la credencial existe, y NO fallar si no
+        id: credencial
+        shell: bash
+        env:
+          TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CUENTA: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          set -euo pipefail
+          if [ -z "${TOKEN}" ] || [ -z "${CUENTA}" ]; then
+            echo "hay=no" >> "${GITHUB_OUTPUT}"
+            echo "::warning::todavia no se puede publicar: faltan los secretos CLOUDFLARE_API_TOKEN y/o CLOUDFLARE_ACCOUNT_ID. El paso a paso para crearlos esta en {{PAQUETE_SITIO}}/README.md. Esto NO es un fallo del proyecto: es una tarea humana pendiente, y se dice en amarillo a proposito"
+            exit 0
+          fi
+          echo "hay=si" >> "${GITHUB_OUTPUT}"
+
+      - name: Node y el gestor de paquetes
+        if: steps.credencial.outputs.hay == 'si'
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        with:
+          node-version: "24"
+
+      - name: Instalar
+        if: steps.credencial.outputs.hay == 'si'
+        shell: bash
+        run: |
+          set -euo pipefail
+          corepack enable
+          corepack pnpm install --frozen-lockfile
+
+      - name: Promover a produccion la version que se miro en DEV
+        id: promover
+        if: steps.credencial.outputs.hay == 'si'
+        shell: bash
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          set -euo pipefail
+          # `--version-tag` con el MISMO sha que puso el job de DEV. Wrangler
+          # resuelve la etiqueta al id de esa version, asi que lo que se publica es
+          # exactamente lo que se subio y se miro, sin raspar ningun id de ninguna
+          # salida.
+          #
+          # `--yes` porque `versions deploy` es INTERACTIVO por defecto: sin esta
+          # bandera se queda esperando una confirmacion que en un runner no va a
+          # llegar nunca, y el job muere por timeout en vez de decir por que.
+          #
+          # `@100%` es el reparto de trafico: toda la gente a esta version. Wrangler
+          # soporta despliegues graduales --`<id>@10%`-- y este marco no los usa
+          # todavia: un reparto parcial exige mirar metricas para decidir cuando
+          # completarlo, y eso es maquinaria que todavia no existe aca.
+          corepack pnpm -C {{PAQUETE_SITIO}} exec wrangler versions deploy \
+            --version-tag "${GITHUB_SHA}@100%" \
+            --yes \
+            --message "PROD desde ${GITHUB_SHA}, promovida desde DEV" 2>&1 | tee /tmp/promover.txt
+
+          URL="$(grep -Eo "https://[A-Za-z0-9._-]+\.workers\.dev" /tmp/promover.txt | grep -v '^https://dev-' | tail -1 || true)"
+          echo "url=$URL" >> "$GITHUB_OUTPUT"
+
+      - name: Comprobar que produccion contesta de verdad
+        if: steps.credencial.outputs.hay == 'si'
+        shell: bash
+        env:
+          URL: ${{ steps.promover.outputs.url }}
+        run: |
+          set -uo pipefail
+          if [ -z "${URL:-}" ]; then
+            echo "::error::se promovio pero no se pudo leer la direccion de produccion de la salida de wrangler, asi que NO se comprobo que el sitio conteste. El log del paso anterior la tiene; abrila a mano antes de dar la promocion por buena"
+            exit 1
+          fi
+
+          CUERPO="${RUNNER_TEMP:-.}/cuerpo-de-produccion.html"
+          for intento in 1 2 3 4 5; do
+            CODIGO="$(curl -sS -o "$CUERPO" -w '%{http_code}' --max-time 20 "$URL")" || CODIGO=000
+            if [ -s "$CUERPO" ]; then TAM=$(wc -c < "$CUERPO" | tr -d " "); else TAM=0; fi
+            if [ "$CODIGO" = "200" ] && [ "$TAM" -gt 0 ]; then
+              echo "::notice title=Tu sitio esta publicado::$URL contesto 200 con $TAM bytes"
+              {
+                echo "### Tu sitio esta publicado"
+                echo ""
+                echo "**$URL**"
+                echo ""
+                echo "Es la MISMA version que paso por DEV: se promovio, no se volvio a compilar."
+              } >> "$GITHUB_STEP_SUMMARY"
+              exit 0
+            fi
+            if [ "$intento" -eq 5 ]; then break; fi
+            ESPERA=$((3 * (2 ** (intento - 1))))
+            echo "intento $intento: $URL contesto $CODIGO con $TAM bytes; espero ${ESPERA}s"
+            sleep "$ESPERA"
+          done
+
+          echo "::error::se promovio y produccion NO contesta: $URL devolvio $CODIGO despues de cinco intentos. La version se publico, asi que el problema esta del lado de servirla. Para volver atras: la version anterior sigue existiendo y se promueve igual, con el mismo comando de promocion apuntando a su etiqueta"
           exit 1

@@ -30,7 +30,10 @@ const WORKFLOW = path.join(RAIZ, "plantilla/.github/workflows/desplegar.yml");
 /** El `run:` del paso que comprueba, sacado del workflow y desindentado. */
 function scriptDeLaComprobacion() {
   const t = fs.readFileSync(WORKFLOW, "utf8");
-  const desde = t.indexOf("- name: Comprobar que la direccion contesta de verdad");
+  // El paso se llama "Comprobar que DEV contesta de verdad" desde que el workflow
+  // se partio en dos ambientes: hay DOS sondas, una por job, y esta mide la de DEV
+  // --que es la que decide si se promueve--. La de produccion tiene su propio caso.
+  const desde = t.indexOf("- name: Comprobar que DEV contesta de verdad");
   assert.notEqual(
     desde,
     -1,
@@ -110,8 +113,12 @@ test("una direccion que contesta 200 con contenido pasa, y queda dicha", async (
   await conServidor(200, "<html><body>hola</body></html>", async (url) => {
     const r = await correr(script, url);
     assert.equal(r.codigo, 0, `tendria que pasar y salio ${r.codigo}:\n${r.salida}`);
-    assert.match(r.salida, /::notice title=Tu sitio esta en linea::/, "no dice la direccion donde se ve");
-    assert.match(r.resumen, /Tu sitio esta publicado/, "no queda en el resumen del job, que es lo primero que se mira");
+    // "DEV esta en linea" y no "Tu sitio esta publicado": esta sonda mide el
+    // ambiente de PRUEBA, y decirle a alguien que su sitio esta publicado cuando
+    // todavia no se promovio seria la clase de mentira que este banco existe para
+    // impedir. El aviso de produccion lo da la otra sonda, en el otro job.
+    assert.match(r.salida, /::notice title=DEV esta en linea::/, "no dice la direccion donde se ve");
+    assert.match(r.resumen, /Tu sitio esta en DEV, todavia no en produccion/, "no queda en el resumen del job, que es lo primero que se mira");
     assert.ok(r.resumen.includes(url), "el resumen no trae la direccion");
   });
 });
