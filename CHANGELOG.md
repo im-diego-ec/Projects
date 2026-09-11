@@ -43,6 +43,27 @@ mueve sobre un cambio incompatible.
 
 ### Añadido
 
+- **Los números del plan gratuito de Supabase, medidos y escritos donde se leen.**
+  El andamio entrega Supabase y hasta hoy no decía ni uno de sus límites. Los dos que
+  cambian cómo se arma un proyecto: **permite 2 proyectos activos** —así que Dev+Prod
+  consume el cupo entero— y **los pausa a la semana de inactividad**, lo que significa
+  que **el que se va a encontrar dormido es DEV**, que es el de menos tráfico.
+
+  Y quedan escritas **las dos cadenas de conexión** que el andamio necesita: el
+  cliente va por el pooler; las migraciones por la directa, porque el pooler en modo
+  transacción no soporta *prepared statements*. En plan gratuito la directa es IPv6,
+  así que las migraciones salen por session mode del pooler.
+
+  Van en `plantilla/infra/adaptadores.md` y no en `docs/03-stack.md`: **la compuerta
+  de esa página rechaza cualquier dígito escrito a mano**, y tiene razón — un número
+  al lado de algo que otro archivo declara envejece sin que nada lo mida. Estos son
+  de un tercero, y su lugar es el documento de adaptadores, que ya lleva esa clase de
+  dato con su fecha de medición.
+
+  **Para un consumidor: nada** en su pipeline; gana saber dónde corta el plan que
+  está usando.
+
+
 - **La tarea bloqueante de `promocion-por-ambientes` está contestada, y era la
   pregunta equivocada.** Preguntaba si un *container* de Cloudflare puede abrir TCP
   saliente al **5432**. Las dos mitades estaban mal: el 5432 no era el discriminante

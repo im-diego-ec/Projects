@@ -202,6 +202,44 @@ este proyecto lo dice el proyecto, no este archivo.
   - **el límite que sorprende**: los proyectos gratuitos **se pausan tras una semana sin
     actividad**, y hay un máximo de **2 proyectos activos** por cuenta
 
+### Los números del plan gratuito de Supabase, medidos
+
+Consultados el **2026-09-10** en la página de precios de Supabase. Importan **antes**
+de empezar, no después:
+
+| | Plan gratuito |
+|---|---|
+| Proyectos activos | **2** |
+| Tamaño de base | 500 MB (CPU compartida, 500 MB de RAM) |
+| Tráfico de salida | 5 GB |
+| Conexiones | 60 directas, 200 clientes por el pooler |
+| Inactividad | **los proyectos se pausan a la semana** |
+| Escalón siguiente | desde 25 USD/mes |
+
+**Dos consecuencias que cambian cómo se arma el proyecto:**
+
+1. **Dos ambientes consumen el cupo entero.** La promoción del marco es
+   Local → DEV → PROD; si cada uno tiene su base, son los dos proyectos. No queda
+   lugar para un tercer ambiente ni para una segunda idea sin pagar.
+2. **El que se va a pausar es DEV**, y es contraintuitivo: se pausa por inactividad,
+   y DEV es el que menos tráfico recibe. El ambiente donde probás es el que te vas a
+   encontrar dormido, no el de producción.
+
+No es motivo para no usarlo: para probar una idea, esos números alcanzan de sobra.
+Es motivo para saberlo antes de meter la idea adentro.
+
+### Las DOS cadenas de conexión, y por qué no alcanza una
+
+El cliente y las migraciones **no pueden** usar la misma cadena:
+
+- **El cliente va por el pooler.** Es lo que aguanta muchas conexiones cortas.
+- **Las migraciones van por la conexión directa.** El pooler en modo transacción
+  **no soporta *prepared statements***, y las migraciones los usan.
+
+Y en el plan gratuito hay un detalle más: la conexión directa es **IPv6**. El add-on
+de IPv4 es de organizaciones Pro. Así que las migraciones salen por **session mode**
+del pooler compartido, que es IPv4 en todos los planes.
+
 ### PENDIENTE-PLATAFORMA · supabase · la pausa por inactividad
 
 **QUÉ FALTA** — Decidir qué pasa cuando el proyecto de dev se pausa, y quién lo despierta.
