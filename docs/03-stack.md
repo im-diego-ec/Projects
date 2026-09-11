@@ -91,16 +91,37 @@ el paso avisa en amarillo qué falta.
 
 **Y no publica de una: primero va a una copia de prueba.** Cuando tus
 verificaciones quedan en verde, el proyecto sube tu sitio a una dirección de
-prueba —una de verdad, que podés abrir y compartir— y comprueba que conteste. Lo
-mirás. Si te gusta, el paso de producción publica **esa misma versión**: no la
-vuelve a compilar, así que lo que sale es exactamente lo que miraste. Esa es toda
-la gracia, y es la razón por la que existe la copia de prueba.
+prueba —una de verdad, que podés abrir y compartir— y comprueba que conteste. Ahí
+se detiene.
+
+**Producción no sale sola: la publicás vos, apretando un botón.** Mirás la copia
+de prueba, y si te gusta vas a la pestaña de verificaciones de tu repositorio y
+disparás la publicación a mano. Publica **esa misma versión** —no la vuelve a
+compilar—, así que lo que sale es exactamente lo que miraste. Esa es toda la
+gracia, y es la razón por la que existe la copia de prueba.
+
+> **Por qué un botón y no automático**, porque parece un paso de más. Si publicar
+> ocurriera detrás de cada cambio, la decisión de sacar algo al mundo dejaría de
+> ser tuya y pasaría a ser una consecuencia de haber escrito. El botón es lo que
+> la mantiene tuya, y además deja escrito quién publicó y cuándo — una decisión
+> sin autor no se puede revisar después. Tu proyecto trae escrito, medido sobre tu
+> propio repositorio, si además podés exigir que **otra persona** apruebe antes de
+> publicar: está en `.github/proteccion-main.md`, adentro del proyecto.
 
 > **Dos cosas que conviene saber de esa dirección de prueba.** Es **pública** para
 > quien tenga el enlace: no es un lugar privado. Y si tu proyecto usa una base
 > gratuita, la copia de prueba es justamente la que menos tráfico recibe, así que
 > es la primera que se duerme por inactividad — los números están en
 > `infra/adaptadores.md`, adentro de tu proyecto.
+
+> **Y lo que sorprende cuando ya es tarde: tener prueba y producción puede
+> consumirte el cupo entero del plan gratuito de tu base.** Si cada ambiente tiene
+> el suyo, son dos proyectos, y ése es exactamente el máximo que Supabase permite
+> gratis hoy. No queda lugar para una segunda idea sin pagar, y el escalón
+> siguiente se cobra por proyecto y por mes. No es motivo para no usarlo —para
+> probar una idea alcanza de sobra— es motivo para saberlo **antes** de meter la
+> idea adentro. La cifra exacta, con la fecha en que se midió, está en
+> `infra/adaptadores.md`.
 
 **Qué te cuesta.** No hay botón de publicar. Cada corrección de un texto es un
 cambio en el repositorio, no una edición en una pantalla de administración.

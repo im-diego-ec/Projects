@@ -78,6 +78,31 @@ mueve sobre un cambio incompatible.
 
 ### Añadido
 
+- **Las cuatro capacidades de la combinación Supabase tienen dueño escrito, y antes
+  eran dos.** `plantilla/infra/adaptadores.md` tenía abierto *«quién cubre (a) y (d)»*
+  —o sea: dónde corre la API y cómo se despliega—, que es la forma en que un proyecto
+  descubre en producción que nadie lo decidió. Medido el 2026-09-10 contra la
+  documentación de Cloudflare: **(a)** y **(d)** son **Workers**, con Supabase nombrado
+  por la propia documentación de Cloudflare, **a 0 USD/mes** (*«Hyperdrive is included
+  in both the Free and Paid Workers plans»*) y **sin reescribir la aplicación**
+  (`node:http` + `httpServerHandler`).
+
+  **Lo que sigue abierto es una sola cosa, y es más chica que la pregunta original:** si
+  Hyperdrive alcanza la cadena *Direct* de un Supabase gratuito, que es IPv6. Si no,
+  **se cambia de cadena, no de proveedor**.
+
+- **La promesa de costo se corrigió donde estaba mal.** «Los containers salen ~5 USD»
+  era falso como estaba escrito: esos 5 USD son el **mínimo de la cuenta**, no el precio
+  —prendido todo el mes son ~12, ~72% más que la alternativa que se descartaba por
+  cara—. Queda además la regla que lo evita hacia adelante: ninguna cifra de costo se
+  escribe sin decir **qué incluye** y **con qué uso**.
+
+- **`docs/03-stack.md` avisa lo que sorprende cuando ya es tarde:** tener prueba y
+  producción puede consumir el cupo entero del plan gratuito de la base, y no queda
+  lugar para una segunda idea sin pagar. Va **en palabras** y no en cifras porque la
+  compuerta de esa página rechaza dígitos escritos a mano, con razón; el número con su
+  fecha de medición vive en `infra/adaptadores.md`.
+
 - **El proyecto se entera de qué compuerta de producción tiene de verdad, midiendo.**
   `projects init` ya medía si el repositorio admite protección de rama; la promoción
   choca contra **el mismo muro** —medido el 2026-09-10 en la documentación de GitHub:

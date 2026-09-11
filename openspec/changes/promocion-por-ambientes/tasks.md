@@ -160,19 +160,37 @@ estado: pendiente-de-revision
 
 ## 4-bis. Lo que la medición destapó y no se buscaba
 
-- [ ] 4bis.1 **Supabase Free permite 2 proyectos activos y los pausa a la semana de
-      inactividad.** Dev + Prod consume el cupo entero, y **el que se va a pausar es
-      DEV**, que es el de menos tráfico. El siguiente escalón son 25 USD/mes. Hay que
-      decirlo en `docs/03-stack.md` antes de que alguien lo descubra con su idea
-      adentro.
-- [ ] 4bis.2 La promesa de costo del marco se reescribe con los números medidos:
-      nunca «~5 USD» a secas.
+- [x] 4bis.1 **Dicho donde la persona lo lee, y la tarea decía dónde a medias.**
+      Pedía escribirlo en `docs/03-stack.md`, y esa página **rechaza cualquier dígito
+      escrito a mano** —su compuerta lo verifica— porque un número al lado de algo que
+      otro archivo declara envejece sin que nada lo mida. Así que la advertencia va ahí
+      **en palabras** (tener prueba y producción puede consumir el cupo entero, y no
+      queda lugar para una segunda idea sin pagar) y **la cifra con su fecha de
+      medición** vive en `plantilla/infra/adaptadores.md`, que es el documento que ya
+      lleva esa clase de dato. Es el mismo criterio que se usó para las dos cadenas de
+      conexión.
+- [x] 4bis.2 **La promesa de costo reescrita, con la regla que la sostiene.** Queda
+      escrito en `adaptadores.md` que los «~5 USD» eran el **mínimo de la cuenta** y no
+      el precio del container —prendido todo el mes son ~12, ~72% más que Render—, y la
+      regla general: ninguna cifra de costo se escribe sin decir **qué incluye** y **con
+      qué uso**. Un número sin las dos cosas es un piso disfrazado de precio.
 
 ## 5. Supabase deja de ser sólo auth
 
-- [ ] 5.1 El adaptador de Supabase contesta las cuatro capacidades que el marco
-      declara obligatorias, no dos. Hoy `plantilla/infra/adaptadores.md` §supabase
-      tiene abierto *«quién cubre (a) y (d)»*.
+- [x] 5.1 **Las cuatro capacidades tienen dueño escrito.** El pendiente *«quién
+      cubre (a) y (d)»* se cerró con la medición del 2026-09-10: **(a)** y **(d)** son
+      Cloudflare Workers —cómputo por `connect()` de `cloudflare:sockets`, despliegue
+      por versiones—, **(b)** Supabase, **(c)** las variables del proyecto. Con la
+      tabla, el porqué, y **0 USD/mes** medido (*«Hyperdrive is included in both the
+      Free and Paid Workers plans»*).
+      **Lo que sigue abierto es una sola cosa y es más chica que la pregunta
+      original**: si Hyperdrive alcanza la cadena *Direct* del plan gratuito —que es
+      IPv6—. Si no, se cambia de **cadena**, no de proveedor. O sea que decide cuál de
+      las dos se escribe en el andamio, no quién cubre qué. Es la medición A de
+      [`la-medicion-en-vivo.md`](la-medicion-en-vivo.md).
+      Y el techo de CPU de Workers **pasa a aplicar** a esta combinación: no se duplicó
+      el pendiente, se apunta al que ya existe en §cloudflare — dos copias de un mismo
+      límite divergen, y la que alguien lea primero decide.
 
 ## 6. Lo que la promoción desbloquea
 

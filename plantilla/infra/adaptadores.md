@@ -252,17 +252,38 @@ rachas, el arreglo es un ping periódico o asumir la espera del despertar y escr
 **SI NO SE HACE** — El primer CI que corra después de una pausa sale rojo por un motivo que
 no está en el mensaje, y se busca en el código de la aplicación.
 
-### PENDIENTE-PLATAFORMA · supabase · quién cubre (a) y (d)
+### Quién cubre (a) y (d) cuando la base es Supabase — contestado, midiendo
 
-**QUÉ FALTA** — Dónde corre la API, y cómo se despliega y se verifica.
+Esto era un pendiente abierto: *«dónde corre la API»*. Se midió el **2026-09-10** contra
+la documentación de Cloudflare, y la respuesta es **Worker + Hyperdrive**, con Supabase
+nombrado por la propia documentación de Cloudflare.
 
-**CÓMO SE DECIDE** — Si la API es un Express con dependencias de Node, no entra como
-función: se combina con `cloudflare` o con `gcp` y se escribe cuál. La verificación
-post-deploy es la misma en los tres casos —un endpoint de salud que el pipeline consulta
-después de publicar— y **no depende de la plataforma**, así que se escribe una vez.
+| Capacidad | Quién la cubre | Por qué |
+|---|---|---|
+| **(a)** cómputo de la API | **Cloudflare Workers** | `connect()` de `cloudflare:sockets` abre TCP saliente, y la documentación usa el 5432 como ejemplo literal |
+| **(b)** base | **Supabase** | lo de siempre: PostgreSQL administrado con respaldos |
+| **(c)** secretos | **Supabase + las variables del proyecto** | sin cambios |
+| **(d)** despliegue y verificación | **Cloudflare Workers**, por versiones | se sube una versión, se mira, y se promueve **esa misma** sin recompilar |
 
-**SI NO SE HACE** — Queda una capacidad sin dueño, que es la forma en que un proyecto
-descubre en producción que nadie decidió dónde corría.
+**Y no hay que reescribir la aplicación**, que era el costo escondido que hacía temer
+esta ruta: Cloudflare implementó las APIs de `node:http` —cliente y servidor— y publicó
+`httpServerHandler`, anunciándolo como *«allowing developers to migrate existing Node.js
+applications with minimal code changes»*.
+
+**Cuesta 0 USD/mes**, y no «casi»: Hyperdrive *«is included in both the Free and Paid
+Workers plans»*, con 100 000 consultas por día.
+
+> **Lo que sigue abierto es UNA cosa, y es mucho más barata que la pregunta original.**
+> No está confirmado que Hyperdrive alcance la cadena *Direct connection* de un proyecto
+> Supabase del plan gratuito, porque esa cadena es **IPv6** y el add-on de IPv4 es de
+> organizaciones Pro. **Si falla, no se cambia de proveedor: se cambia de cadena** — el
+> pooler compartido es IPv4 en todos los planes. O sea que la incógnita decide *cuál de
+> las dos cadenas* se escribe en el andamio, no quién cubre qué.
+
+> **Y el techo de CPU de Workers pasa a aplicarte**, ahora que la API corre ahí. No se
+> repite acá: vive una sola vez, en el pendiente **«cloudflare · los 10 ms de CPU»** de la
+> sección de abajo. Dos copias de un mismo límite divergen, y la que alguien lea primero
+> decide — que es la forma más silenciosa de quedarse con la desactualizada.
 
 ---
 
@@ -278,6 +299,16 @@ front.
   `supabase` o se declara el desvío.
 - **COSTO** — cero en el plan Free. El escalón siguiente es una suscripción mensual plana
   más consumo.
+
+> **«Los containers salen ~5 USD» es falso como está escrito, y estuvo escrito.** Medido
+> el 2026-09-10: esos 5 USD son el **mínimo de la cuenta** de Workers Paid, no el precio
+> del container; encima se factura memoria y disco **por segundo mientras está
+> despierto**. Un container `basic` prendido todo el mes son ~12 USD, no 5 — o sea ~72%
+> más que Render, que era la alternativa que se descartaba «por cara».
+>
+> **La regla que queda:** ninguna cifra de costo de este marco se escribe sin decir **qué
+> incluye** y **con qué uso**. Un número sin las dos cosas no es una promesa de costo, es
+> un piso disfrazado de precio.
 - **PLAN GRATUITO** _(medido en developers.cloudflare.com el 2026-08-24)_:
   - Workers: **100 000 peticiones por día**, **10 ms de CPU por petición**, 50
     subpeticiones por invocación, 3 MB de tamaño comprimido del worker
