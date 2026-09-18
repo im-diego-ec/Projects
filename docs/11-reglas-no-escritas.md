@@ -656,6 +656,47 @@ arriba porque un check ya falla solo cuando alguien se aparta:
   ambiente de producción, así que el de desarrollo no puede contactar
   usuarios reales aunque alguien se equivoque.
 - Dependabot semanal con la política de merge por tipo de bump.
+- **Las reglas del marco llegan enteras y al día a los agentes de cada proyecto.**
+  La porción común de la constitución no se copia: se genera desde un [canónico](02-glosario.md) único
+  que viaja dentro de `actions/constitucion`, y el job `constitucion` del andamio la
+  compara contra el re-render de la versión pinada — ausente, atrasada, editada a
+  mano o no cargada por el agente es rojo, y el desvío declarado con motivo es la
+  única salida. Change `reglas-al-dia`.
+
+### Lo que cerró `reglas-al-dia`, y los cuatro huecos que deja
+
+El change que hizo de la porción del marco un **artefacto generado** cerró el hueco
+grande: las reglas del área dejan de copiarse a mano y llegan renderizadas,
+verificadas en el pipeline del consumidor, con el desvío declarado como única salida
+legítima. Eso se anota arriba.
+
+Lo que **no** cierra queda acá, declarado como deuda y no como olvido. Los cuatro
+huecos comparten una forma: **el marco ve lo que el consumidor tiene, no lo que el
+consumidor hace con eso.**
+
+1. **Que el `AGENTS.md` del proyecto CONTRADIGA al artefacto no lo caza ningún check.**
+   La comparación verifica que el artefacto sea el que el marco publica; no mira el
+   archivo de al lado. Si un proyecto deja una copia vieja de una regla en su
+   `AGENTS.md`, el agente lee las dos, y la regla de precedencia del artefacto —manda
+   el marco, salvo desvío declarado— es una regla para el lector, no un check. La
+   mitigación es de migración: borrar el duplicado al adoptar, y por lo tanto
+   **depende de que alguien lo haga bien una vez**.
+2. **Un consumidor que saca los `uses:` del marco, o los congela en una referencia que
+   el bump no mueve, deja de recibir reglas nuevas, y desde Projects eso no se ve.** El
+   marco sabe quién lo consume por el [registro que se escribe al
+   adoptar](14-consumidores.md) y por los PR de bump que el consumidor recibe; un
+   repositorio que salió de los dos es indistinguible de uno que no existe. Es el
+   mismo punto ciego que [el censo de consumidores](13-censo-de-consumidores.md)
+   describe entero.
+3. **La dirección inversa sigue siendo manual.** Una mejora que un proyecto descubre y
+   que debería subir al marco no tiene carril: depende de la revisión trimestral, que
+   la propia constitución del marco admite que **no es enforcement**. El marco baja
+   bien y sube mal.
+4. **Nada limita cuántos desvíos declara un proyecto.** El desvío es la salida
+   legítima de una regla y está bien que exista; pero un repositorio podría declarar
+   veinte y seguir en verde. No hay umbral, ni aviso, ni lectura agregada de cuántos
+   desvíos acumula el área — que es justo el dato que diría si una regla del marco
+   está mal escrita en vez de mal cumplida.
 
 ---
 

@@ -12,12 +12,17 @@ artefacto falte, esté atrasado respecto de la versión exigible del marco, difi
 del texto que el marco publica para esa versión, o no esté cargado por alguna de
 las superficies de instrucciones que el repositorio declara para sus agentes.
 
-La versión exigible SHALL quedar determinada por una fecha declarada de antemano
-y no por el momento en que el marco publica: entre la publicación y esa fecha el
-atraso SHALL avisar sin bloquear, y desde esa fecha SHALL fallar. La puesta al día
-SHALL proponerse al repositorio sin intervención humana —como un pull request con
-el artefacto regenerado—, de modo que el camino normal no dependa de que alguien
-recuerde ejecutar nada.
+Una versión nueva de la porción del marco SHALL llegar al repositorio dentro del
+pull request que propone subir su pin a esa versión, abierto sin intervención
+humana por el canal de dependencias del propio repositorio, de modo que el camino
+normal no dependa de que alguien recuerde ejecutar nada. Mientras ese pull request
+no se integre, el repositorio SHALL seguir verificándose contra la versión que
+tiene pinada: nada de la porción del marco cambia bajo sus pies sin un pull request
+que alguien pueda leer. El atraso SHALL ser un fallo desde el día en que la versión
+se publica, y por eso aparece dentro de ese pull request y antes de llegar a la
+rama de integración. La única excepción SHALL declararla de antemano la versión
+misma, con una fecha de exigibilidad posterior a su publicación: hasta esa fecha el
+atraso SHALL avisar sin bloquear, nombrando el día desde el cual falla.
 
 Un proyecto SHALL poder apartarse de una regla declarando el desvío con la regla
 que anula y su motivo escrito; el desvío SHALL quedar impreso junto a esa regla
@@ -38,8 +43,8 @@ NO SHALL modificarlo.
 
 #### Scenario: Una regla nueva llega sin que el proyecto la escriba
 - **WHEN** el marco publica una versión con una regla nueva y un repositorio consumidor no modifica una sola línea
-- **THEN** en el repositorio se abre solo un pull request con el artefacto regenerado, y su pipeline avisa en cada corrida que el artefacto está atrasado, indicando desde qué fecha eso pasa a ser un fallo
-- **AND** desde esa fecha el pipeline falla hasta que el artefacto quede al día
+- **THEN** en el repositorio se abre solo un pull request que sube el pin a esa versión, y dentro de ese pull request el pipeline falla nombrando la versión que declara el artefacto y la que publica el marco, con el arreglo escrito en el mensaje
+- **AND** mientras ese pull request no se integre, el pipeline de la rama de integración sigue verificando contra la versión pinada y no cambia de veredicto por la publicación
 
 #### Scenario: El artefacto existe y ningún agente lo carga
 - **WHEN** el artefacto está en el repositorio pero la superficie de instrucciones que el proyecto declara no lo referencia —o lo referencia dentro de un ejemplo de código, donde la referencia no se resuelve—

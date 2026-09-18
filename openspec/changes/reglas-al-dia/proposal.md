@@ -6,12 +6,26 @@ aprueba: PO (el delta de gobierno-contribucion) y revision adversarial (desvio d
                               # el PO por CODEOWNERS (.github/CODEOWNERS, últimas
                               # líneas); el desvío de la revisión cruzada no la toca
 informado: PO / Builder 2
-estado: pendiente-de-revision
+estado: en-ejecucion
 ---
 
 # reglas-al-dia — Proposal
 
 ## Why
+
+> **De dónde salen los hechos de esta sección, dicho el 2026-09-17.** Este change se
+> abrió el 2026-08-19, cinco días antes de que Projects se bifurcara de Rigel
+> (2026-08-24), y los tres hechos que lo motivan se midieron sobre **dos repositorios
+> que consumían ese linaje, no Projects**: uno anterior al scaffold («el consumidor
+> viejo») y uno que en ese momento estaba adoptando el marco («el repositorio en
+> adopción»). Ninguno de los dos es consumidor de Projects. El segundo aparecía acá con
+> un nombre de esta cuenta que era un **renombrado mecánico**, no un repositorio real:
+> ese nombre se retiró, y con él `migracion-intranet.md`, el documento de migración que
+> lo presuponía. Los hechos se conservan porque son el **porqué** del mecanismo —que sí
+> vive y corre en Projects, y llega a sus consumidores con la versión que pinan—, no
+> porque describan a un consumidor de Projects. Los consumidores reales de Projects, al
+> 2026-09-17, son tres y están todos en `@v1.9.6`; que estén al día se mide en el
+> bloque 7 del `tasks.md`, no en el bloque 6, que quedó declarado no aplicable.
 
 El área implementa con agentes, y en ese modo **las reglas que el agente lee SON
 el producto**: una regla que no entra al contexto de la sesión no existe, por
@@ -23,12 +37,12 @@ formas de distribución sin actualización y sin check: el propio README dice de
 
 Tres hechos verificados hoy, cada uno con su número. Las referencias a
 `plantilla/AGENTS.md` son al archivo **vigente al abrir este change** —355
-líneas, el que la adopción de `intranet` copió—, que es justamente el que este
+líneas, el que copió el repositorio en adopción—, que es justamente el que este
 change parte en dos.
 
-**1. El scaffold no entrega bien ni la primera vez.** La adopción de
-`im-diego-ec/intranet` (rama `projects/adopcion-marco`, PR #1, todavía sin
-mergear) copió `plantilla/AGENTS.md` y el resultado tiene **241 líneas contra
+**1. El scaffold no entrega bien ni la primera vez.** La adopción del segundo de
+esos repositorios (su PR de adopción, todavía sin mergear el 2026-08-19) copió
+`plantilla/AGENTS.md` y el resultado tiene **241 líneas contra
 355: 114 líneas perdidas**. No es reflujo de formato, son reglas enteras: de las
 7 viñetas ✅ quedaron 5, y de las 9 🛑 quedaron 8. Se cayeron cinco reglas
 nombrables —el logging estructurado con `no-console` (✅), la 🛑 de escribir en
@@ -96,13 +110,23 @@ referenciado:
   mano, o presente pero **no cargado** por una superficie declarada: falla. El
   eslabón de carga roto es el caso que hoy no emite ninguna señal y es
   indistinguible de que la regla nunca haya existido.
+  *Corregido el 2026-09-17:* desde el 2026-08-21 el canal no es `@v1` sino la
+  versión exacta que el consumidor pina, y el check llega con ella.
 - **La regla nueva entra con ventana de gracia fechada.** Cada versión del texto
   declara cuándo se publica y desde cuándo es exigible; entre las dos fechas el
   atraso avisa, desde la segunda falla. Deja de ser cortesía y pasa a ser
   propiedad del formato.
+  *Corregido el 2026-09-17:* la ventana obligatoria se retiró el 2026-08-22
+  (change `ventana-vencida`): con el pin exacto, el rojo aparece dentro del PR de
+  bump, que es donde se lee. El campo sobrevive como opt-in de quien publica, y
+  todas las versiones del canónico lo fijan igual a su publicación.
 - **La puesta al día se propone sola.** El repositorio consumidor abre por sí
   mismo el pull request con el artefacto regenerado. El camino normal deja de
   ser «acordate de correr algo».
+  *Corregido el 2026-09-17:* el pull request que se abre solo es el del bump del
+  pin, que Dependabot propone; el artefacto regenerado **no** viaja adentro, y el
+  workflow semanal no puede ponerlo porque corre con el pin viejo. Que pin y
+  artefacto lleguen en una sola pieza es el ADR 005, fuera de este change.
 - **El desvío legítimo se declara y se lee.** Un proyecto puede apartarse de una
   regla nombrándola, con quién aprobó y su motivo escrito; el desvío se imprime
   **pegado a la regla que anula, dentro del artefacto que los agentes cargan**, y
@@ -131,7 +155,7 @@ lo que hoy solo vive en los consumidores y la migración de los dos, en
 **Distribución.** Cambian tres de las cuatro formas: **canónico** (el requirement
 nuevo, y el texto de la constitución que pasa a vivir acá como fuente única),
 **referenciado** (el check y el texto viajan dentro del workflow reusable y su
-composite action, así que llegan solos a todo consumidor de `@v1`) y **scaffold**
+composite action, así que llegan solos a todo consumidor con la versión que pina) y **scaffold**
 (el `AGENTS.md` de la plantilla se parte en «lo del marco» + «lo del proyecto», y
 entra el workflow que abre el PR de actualización). *Regenerado* no se toca.
 
@@ -161,14 +185,27 @@ el día uno— así que ningún repositorio que no modifique una línea queda ro
 antes de su fecha de exigibilidad. Desde esa fecha sí se pone rojo, y eso es el
 diseño: el rojo del día 28 es para el repo que ignoró cuatro pull requests.
 
+> **Corregido el 2026-09-17, contra el árbol.** El párrafo de arriba describe un
+> estreno que ya pasó y un canal que ya no rige. El mecanismo se publicó en la
+> **1.3.0** (MINOR, 2026-08-21); desde ese mismo día el marco se consume por
+> **versión exacta** y cada versión llega como un PR de bump que el consumidor lee
+> antes de mergear, y desde la **1.6.0** (2026-08-22) no hay ventana de gracia por
+> defecto: el rojo aparece dentro de ese PR, que es el aviso. Mover `v1` no es parte
+> del estreno de nada (`AGENTS.md`, «Versionado»). Y para los tres consumidores de
+> hoy, **archivar este change no cambia nada**: no viaja, actualiza un spec
+> canónico de este repositorio. El bloque 7 del `tasks.md` se reescribió con esto.
+
 **Efecto neto para un proyecto**: las correcciones del marco dejan de depender
 de que alguien las copie. En el mismo PR de migración, el consumidor viejo
 recupera «cola, **nunca cancelación**», el nombre del check requerido `ci-ok`, el
 porqué de los invariantes de propiedades y la regla de ejecutores pinados —cuya
-ausencia hoy convive con un allowlist que autoriza `npx --yes openspec`—, e
-`intranet` recupera las cinco reglas que la copia perdió y su regla invertida
-sobre la instancia de identidad pasa a ser un **desvío declarado**, con id de
-regla, aprobador y motivo, impreso al lado de la 🛑 que anula.
+ausencia hoy convive con un allowlist que autoriza `npx --yes openspec`—, y el
+repositorio en adopción recupera las cinco reglas que la copia perdió y su regla
+invertida sobre la instancia de identidad pasa a ser un **desvío declarado**, con
+id de regla, aprobador y motivo, impreso al lado de la 🛑 que anula. (Los dos son
+repositorios del linaje anterior a la bifurcación: ver la nota al principio de
+*Why*. Para un proyecto de Projects el efecto neto es el mismo, y lo recibe al
+nacer: el andamio le genera el artefacto en el arranque.)
 
 **Lo que este change NO promete.** El marco puede garantizar que el **texto**
 llegue íntegro y al día a la superficie que el agente carga; no que el agente lo

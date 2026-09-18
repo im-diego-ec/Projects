@@ -94,6 +94,25 @@ mueve sobre un cambio incompatible.
   con doble clic. Para consumidores: nada; es el gobierno del repositorio del
   marco y no viaja.
 
+- **`reglas-al-dia` pasó de marcar 2/41 a 38/41, y las casillas nuevas describen el
+  árbol, no trabajo de hoy.** El change que convirtió la porción común de la
+  constitución en un artefacto generado y verificado estaba casi entero en el árbol:
+  llegó por los changes que vinieron después y ninguno volvió a tildarlo. Un
+  `tasks.md` que dice 2/41 sobre un change terminado empuja a rehacer lo hecho, y un
+  change cuyas casillas no describen el árbol no se puede cerrar. Cada tarea se
+  auditó contra el árbol, con su ruta y su línea o con el comando y su salida, en
+  una sección nueva del propio `tasks.md`; donde la tarea pedía una corrida, se
+  corrió sobre un repositorio de juguete armado desde el andamio. Es el porte de la
+  misma auditoría que Rigel hizo sobre su copia en la 1.11.0 (`ccb4c8a` y
+  `9f8fec7`). Para consumidores: nada; no cambia una línea que un repositorio
+  ejecute ni reciba.
+- **El bloque de estreno de ese change ya no manda a mover `v1`.** Se escribió
+  cuando el tag móvil era el canal y había que amortiguar el estreno con una ventana
+  de gracia; las dos premisas caducaron antes de esta auditoría (versión exacta desde
+  el 2026-08-21, ventana retirada en la 1.6.0). Se reescribió con el canal que rige:
+  cada versión llega por el PR de bump y el rojo aparece adentro. Para consumidores:
+  nada.
+
 ### Corregido
 
 - **Cinco páginas seguían prometiendo una publicación automática que ya no ocurre**, y
@@ -122,6 +141,23 @@ mueve sobre un cambio incompatible.
   nada.
 - **Un caso del banco del piso de permisos decía «exactamente» y comprobaba «al
   menos».** Se renombró a lo que comprueba. Para consumidores: nada.
+
+- **El contrato de `reglas-al-dia` prometía dos cosas que el marco no hace, y se
+  habrían archivado así.** El delta de `gobierno-contribucion` decía que un
+  artefacto atrasado **avisa sin bloquear** durante una ventana y que la puesta al
+  día llega como un **pull request con el artefacto regenerado**. Desde la 1.6.0 el
+  atraso es rojo el día que la versión se publica, y el pull request que llega solo
+  es el del bump de Dependabot, sin el artefacto adentro. El delta ahora dice lo que
+  se sostiene: la versión llega en un pull request que nadie tuvo que abrir, el rojo
+  aparece dentro de ese pull request y la rama de integración no cambia de veredicto
+  mientras no se integre. Queda pendiente la aprobación del PO, porque la capability
+  es suya. Para consumidores: nada; el delta todavía no está en el contrato vivo.
+- **Un change del marco presentaba como consumidor de Projects a un repositorio que
+  no lo es.** El bloque de migración de `reglas-al-dia`, y el documento con su diff
+  (`migracion-intranet.md`), eran de dos repositorios del linaje anterior a la
+  bifurcación; uno figuraba con un nombre de esta cuenta que era un renombrado
+  mecánico. El documento se retiró y el bloque quedó declarado no aplicable, con lo
+  que cada tarea protegía nombrado al lado. Para consumidores: nada.
 
 ### Añadido
 
@@ -532,6 +568,14 @@ mueve sobre un cambio incompatible.
   seis que tocan `gobierno-contribucion` quedan revisados y esperando el OK del
   PO. Para consumidores: nada que hacer; lo que esos changes cambiaron ya está en
   las entradas de arriba, y archivarlos no cambia comportamiento.
+
+- **La deuda que deja la constitución distribuida, escrita.** `docs/11-reglas-no-escritas.md`
+  anota que la regla ya es automática y los cuatro huecos que el mecanismo no
+  cierra: que el `AGENTS.md` de un proyecto contradiga al artefacto no lo caza
+  nada; un consumidor que saca los `uses:` del marco deja de recibir reglas sin que
+  Projects lo vea; lo que un proyecto aprende y debería subir al marco sigue siendo
+  manual; y nada limita cuántos desvíos declara un proyecto. Para consumidores:
+  nada.
 
 ### Corregido
 
