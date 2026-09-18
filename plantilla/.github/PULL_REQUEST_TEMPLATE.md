@@ -24,8 +24,23 @@ openspec/changes/
 
 ## Evidencia de tests
 
-<!-- Obligatorio. Pega la salida relevante o enlaza la corrida de CI verde.
-     Si algo no pudo verificarse localmente, dilo explícitamente y por qué. -->
+<!-- Obligatorio. Lo que este PR afirma que funciona se demuestra con el COMANDO que lo
+     comprueba y el CÓDIGO DE SALIDA que devolvió (0 es que pasó; cualquier otro número es
+     que falló). Por ejemplo:
+
+         pnpm test   → exit 0, 128 pass / 0 fail
+
+     Pegar un pedazo de la salida o decir «se ve bien» no demuestra nada: una herramienta
+     que no llegó a arrancar muestra lo mismo que una que no encontró ningún problema.
+     Un enlace a la corrida de CI en verde también sirve, porque ahí el código de salida
+     queda escrito.
+
+     Y si algo NO se pudo comprobar, va en «No medido», con el motivo, en vez de darlo por
+     bueno. -->
+
+**Comandos y su exit code:**
+
+**No medido** (lo que este PR afirma y no pudo comprobar, con el motivo):
 
 ## Checklist
 
@@ -33,6 +48,7 @@ openspec/changes/
 - [ ] Se cumplen los escenarios de la **spec** —el documento que dice cómo tiene que
       comportarse esto, escrito en ejemplos concretos— y alguien de negocio lo confirmó
 - [ ] Tests verdes en LOCAL antes del push (CI es la corrida final, no el banco de pruebas)
+- [ ] **Todo lo que este PR afirma que funciona trae su comando y su exit code**, y lo que no se pudo comprobar está en «No medido»
 - [ ] **Si corrige un defecto**: incluye el test de regresión que lo REPRODUCE (rojo antes del fix), al nivel más bajo suficiente
 - [ ] **Si toca `openspec/`**: `openspec validate <change> --strict` en verde, y releídas entre sí las cuatro partes del change para que no se contradigan: **proposal** (por qué y qué cambia) ↔ **design** (cómo) ↔ **specs** (cómo se comporta) ↔ **tasks** (los pasos)
 - [ ] **Si toca `infra/` o `infra-prod/`**: el `.tf` del PR es EXACTAMENTE lo aplicado (plan limpio) y se respetó la política de infra (dev primero, con horneado, salvo urgencia)

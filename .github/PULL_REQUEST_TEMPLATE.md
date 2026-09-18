@@ -65,11 +65,29 @@ Si es breaking, marcá cuál aplica:
 
 ## Evidencia
 
-<!-- Obligatorio. Si algo no pudo verificarse, decilo explícitamente y por qué. -->
+<!--
+Obligatorio, y con una forma: TODA afirmación sobre una propiedad verificable viaja con
+el COMANDO que la comprueba y el CÓDIGO DE SALIDA que devolvió. Por ejemplo:
+
+    find actions pruebas -name '*.test.mjs' -print0 | xargs -0 node --test   → exit 0, <n> pass / 0 fail
+
+NO acredita nada contar líneas de salida ni buscar un texto en ella: una herramienta que
+no pudo arrancar imprime lo mismo que una que no encontró nada. Es el defecto que midió la
+auditoría de cierre de la v1 de este marco (docs/16-auditoria-cierre-v1.md): 13 de 20
+afirmaciones de PRs refutadas, cada una con un comando y su exit. Por eso esta sección pide
+el exit code y no una descripción.
+
+Y si algo NO se pudo comprobar, va en «No medido» con el motivo. Una propiedad afirmada
+sin comprobación es un defecto del pull request, no un detalle de redacción.
+-->
 
 **CI de este repo:**
 
+**Comandos y su exit code:**
+
 **Probado contra un consumidor real** (repo, rama y corrida donde se apuntó al SHA/tag de este PR):
+
+**No medido** (lo que este PR afirma y no pudo comprobar, con el motivo):
 
 ## Checklist
 
@@ -82,4 +100,5 @@ Si es breaking, marcá cuál aplica:
 - [ ] **Si toca `plantilla/`**: los valores de proyecto son placeholders `{{...}}` documentados en el README, los handles van por ROL y nada de runtime quedó hardcodeado (eso va por `vars`/`secrets`)
 - [ ] El guardrail que agrega este PR **falla solo** (si depende de que alguien se acuerde, es documentación, no guardrail)
 - [ ] Sin secrets, ARNs, cuentas, dominios ni valores de un proyecto concreto en el diff
+- [ ] **Toda afirmación verificable de este PR trae su comando y su exit code**, y lo que no se pudo comprobar está en «No medido»
 - [ ] Review cruzado del builder par solicitado (CODEOWNERS)

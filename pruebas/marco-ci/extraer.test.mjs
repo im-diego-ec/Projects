@@ -22,7 +22,7 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
 
-import { scriptDelPaso, RAIZ } from "./extraer.mjs";
+import { pasosDe, scriptDelPaso, superficies, RAIZ } from "./extraer.mjs";
 import { carpetaTemporal, escribir, limpiarTodo } from "./util.mjs";
 import { porque } from "../porque.mjs";
 
@@ -156,4 +156,110 @@ test("sobre los workflows reales, cada paso nombrado recibe el `run:` que le per
   }
   assert.ok(comparados >= 30, `solo se compararon ${comparados} pasos: el recorrido dejo de verlos`);
   assert.deepEqual(malos, [], porque("el extractor y el dueno de cada run: no coinciden", malos));
+});
+
+// ---------------------------------------------------------------------------
+// `pasosDe` y `superficies`: el lector que comparten el censo de pasos sin banco y el banco de
+// la pagina de cobertura (change `rojo-primero`). Si se equivoca, los dos se equivocan juntos,
+// y por eso tiene sus propios casos.
+// ---------------------------------------------------------------------------
+
+const JUGUETE_PASOS = [
+  "jobs:",
+  "  uno:",
+  "    runs-on: ubuntu-latest",
+  "    continue-on-error: false",
+  "    steps:",
+  "      - uses: actions/checkout@v7 # v7",
+  "      - name: Con nombre",
+  "        if: always()",
+  "        run: |",
+  "          echo uno",
+  "          echo dos",
+  "      - id: sin-nombre",
+  "        run: echo tres",
+  "      - run: pnpm lint",
+  "      - name: Repetido",
+  "        run: |",
+  "          echo a",
+  "      - name: Repetido",
+  "        continue-on-error: true",
+  "        run: |",
+  "          echo b",
+  "  dos:",
+  "    continue-on-error: ${{ matrix.experimental }}",
+  "    steps:",
+  "    - name: Guion a la altura de steps",
+  "      run: |",
+  "        echo c",
+  "    # un comentario entre pasos no cierra la lista",
+  "    - name: \"Entre comillas\"",
+  "      uses: alguien/algo@v1",
+  "",
+].join("\n");
+
+test("pasosDe · ve TODOS los pasos, con y sin nombre, run de bloque y de una linea, y uses", () => {
+  const pasos = pasosDe(escribir(carpetaTemporal("pasos-"), "wf.yml", JUGUETE_PASOS));
+  const resumen = pasos.map((p) => [p.nombre ?? p.id ?? p.textoRun ?? p.uses, p.run, p.extraible]);
+  assert.deepEqual(
+    resumen,
+    [
+      ["actions/checkout@v7", null, false],
+      ["Con nombre", "bloque", true],
+      ["sin-nombre", "linea", false],
+      ["pnpm lint", "linea", false],
+      ["Repetido", "bloque", true],
+      ["Repetido", "bloque", false],
+      ["Guion a la altura de steps", "bloque", true],
+      ["Entre comillas", null, false],
+    ],
+    porque("el lector de pasos no devolvio lo que el YAML de juguete tiene", pasos),
+  );
+  const conNombre = pasos.find((p) => p.nombre === "Con nombre");
+  assert.equal(conNombre.largo, 2, porque("el largo del bloque run: son sus lineas no vacias", conNombre));
+  assert.equal(conNombre.condicion, "always()", porque("el if: del paso se lee", conNombre));
+});
+
+test("pasosDe · continue-on-error: el del paso, el del job, y `false` no cuenta", () => {
+  const pasos = pasosDe(escribir(carpetaTemporal("pasos-coe-"), "wf.yml", JUGUETE_PASOS));
+  const coe = (nombre, n = 0) => pasos.filter((p) => (p.nombre ?? p.id ?? p.textoRun ?? p.uses) === nombre)[n].continueOnError;
+  assert.equal(coe("Con nombre"), null, porque("continue-on-error: false en el job no desactiva nada", pasos));
+  assert.equal(coe("Repetido", 0), null);
+  assert.deepEqual(coe("Repetido", 1), { valor: "true", linea: 19, delJob: false });
+  // Una expresion puede valer true: "puede no fallar" no es una compuerta.
+  assert.deepEqual(coe("Guion a la altura de steps"), { valor: "${{ matrix.experimental }}", linea: 23, delJob: true });
+});
+
+test("pasosDe · coincide con scriptDelPaso en los workflows y actions REALES", () => {
+  // Por construccion, `extraible` promete que scriptDelPaso devuelve el script de ESE paso.
+  // Se comprueba sobre el arbol: cada paso extraible se extrae sin error y su script tiene
+  // el largo que el lector midio.
+  let medidos = 0;
+  const malos = [];
+  for (const rel of superficies()) {
+    for (const paso of pasosDe(path.join(RAIZ, rel))) {
+      if (!paso.extraible) continue;
+      medidos += 1;
+      const script = scriptDelPaso(paso.nombre, path.join(RAIZ, rel));
+      const noVacias = script.split("\n").filter((l) => l.trim() !== "").length;
+      if (noVacias !== paso.largo) malos.push(`${rel}: «${paso.nombre}» mide ${paso.largo} y el extractor devolvio ${noVacias}`);
+    }
+  }
+  assert.ok(medidos >= 40, `solo se compararon ${medidos} pasos extraibles: el lector dejo de verlos`);
+  assert.deepEqual(malos, [], porque("pasosDe y scriptDelPaso no coinciden", malos));
+});
+
+test("superficies · recorre el arbol: el CI del marco, el andamio y las actions, y ningun fixture", () => {
+  const todas = superficies();
+  assert.ok(todas.includes(".github/workflows/marco-ci.yml"), porque("falta marco-ci.yml", todas));
+  assert.ok(todas.some((r) => r.startsWith("plantilla/.github/workflows/")), porque("faltan los workflows del andamio", todas));
+  assert.ok(todas.some((r) => /^actions\/[^/]+\/action\.yml$/.test(r)), porque("faltan las actions", todas));
+  assert.deepEqual(todas.filter((r) => r.split("/").includes("pruebas")), [], porque("un fixture de un banco no es una superficie", todas));
+
+  // Y un workflow nuevo entra solo, sin tocar ninguna lista.
+  const raiz = carpetaTemporal("superficies-");
+  escribir(raiz, "otra/.github/workflows/nuevo.yml", "jobs: {}\n");
+  escribir(raiz, "actions/x/action.yml", "runs: {}\n");
+  escribir(raiz, "actions/x/pruebas/fixtures/.github/workflows/juguete.yml", "jobs: {}\n");
+  assert.deepEqual(superficies(raiz), ["actions/x/action.yml", "otra/.github/workflows/nuevo.yml"]);
 });

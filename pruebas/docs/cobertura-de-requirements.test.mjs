@@ -50,6 +50,8 @@ import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
+import { pasosDe, superficies } from "../marco-ci/extraer.mjs";
+
 const RAIZ = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 export const PAGINA = "openspec/cobertura-de-requirements.md";
 
@@ -292,6 +294,52 @@ export function pasosQueYaNoExisten(texto) {
 }
 
 // ---------------------------------------------------------------------------
+// UN PASO QUE NO PUEDE FALLAR NO ES LA COMPUERTA DE NADIE.
+//
+// La columna del medio de la pagina se titula «Lo que lo hace fallar solo». Un paso con
+// `continue-on-error` —en el paso o en su job— NO puede poner nada en rojo: su fallo no
+// detiene la corrida. Citarlo ahi publica como sostenido un requirement que no sostiene
+// nadie, y ese error va en la direccion que nadie revisa: un `ninguno` de mas hace una tabla
+// fea; una compuerta de mas hace una tabla FALSA.
+//
+// Viene de Rigel (2.4.0, change `el-numero-del-censo`, issue #341 de alla): el paso «El
+// repositorio llego a su ambiente» estaba publicado como la compuerta entera de un
+// requirement y su propio comentario decia que sale 0 SIEMPRE. Aca no hay ningun caso hoy
+// —ningun workflow ni action del marco usa `continue-on-error`—, y por eso mismo esto tiene
+// que fallar solo el dia que aparezca, en vez de esperar a que alguien lo note.
+//
+// ES UN PROXY Y SE DECLARA COMO PROXY: se lee el modificador, no el motivo. Un paso que
+// "no puede fallar" por otra via —un `exit 0` incondicional, un `|| true` en su ultimo
+// comando— no lo caza esto. El lector de pasos es el del extractor (`pasosDe`), el mismo que
+// usa el censo de pasos sin banco, para que las dos compuertas no discrepen sobre el mismo
+// paso.
+// ---------------------------------------------------------------------------
+
+/** Nombre -> los pasos del arbol que se llaman asi, con su archivo. */
+export function pasosPorNombre() {
+  const mapa = new Map();
+  for (const ruta of superficies(RAIZ)) {
+    for (const paso of pasosDe(path.join(RAIZ, ruta))) {
+      if (paso.nombre === null) continue;
+      mapa.set(paso.nombre, [...(mapa.get(paso.nombre) ?? []), { ...paso, ruta }]);
+    }
+  }
+  return mapa;
+}
+
+export function pasosCitadosQueNoPuedenFallar(texto, porNombre = pasosPorNombre()) {
+  const mal = [];
+  for (const nombre of pasosCitados(texto)) {
+    for (const paso of porNombre.get(nombre) ?? []) {
+      if (!paso.continueOnError) continue;
+      const donde = paso.continueOnError.delJob ? "en su JOB" : "en el paso";
+      mal.push(`«${nombre}» (${paso.ruta}:${paso.linea}) lleva continue-on-error: ${paso.continueOnError.valor} ${donde}, linea ${paso.continueOnError.linea}`);
+    }
+  }
+  return mal;
+}
+
+// ---------------------------------------------------------------------------
 // LOS NUMEROS QUE LA PAGINA AFIRMA SOBRE SI MISMA.
 // ---------------------------------------------------------------------------
 
@@ -456,6 +504,23 @@ test("todo paso que la pagina cita por su nombre sigue llamandose asi", () => {
     [],
     "la pagina apuesta a que el NOMBRE del paso es lo estable y por eso cita varios sin linea. Un paso renombrado " +
       `rompe justo esa apuesta, y en silencio: la celda sigue leyendose bien.\n  ${muertos.join("\n  ")}`,
+  );
+});
+
+test("ningun paso que la pagina publica como compuerta lleva continue-on-error", () => {
+  const porNombre = pasosPorNombre();
+  const citados = pasosCitados(pagina());
+  assert.ok(
+    citados.filter((n) => porNombre.has(n)).length >= 7,
+    "el lector de pasos del extractor no encontro los pasos que la pagina cita: esta regla pasaria vacia",
+  );
+  assert.deepEqual(
+    pasosCitadosQueNoPuedenFallar(pagina(), porNombre),
+    [],
+    "la pagina publica estos pasos en la columna «Lo que lo hace fallar solo», y ninguno puede fallar: su " +
+      "continue-on-error hace que el rojo no detenga nada. Arreglo, uno de dos: sacale el modificador al paso " +
+      "y dale un rojo de verdad, o saca el paso de esa fila y deja al requirement con la cobertura que " +
+      "realmente tenga (si no queda ninguna, `**ninguno**`). Escribir un motivo mejor no es un arreglo.",
   );
 });
 
@@ -631,4 +696,20 @@ test("MUERDE: dos changes sobre la misma capability EN VUELO se SUMAN, no se pis
     "la acumulacion no suma los dos changes, o no deduplica el titulo repetido",
   );
   assert.equal(acumulado.length, 3, "tres titulos distintos entre dos changes: uno se pisa o el repetido se cuenta dos veces");
+});
+
+test("MUERDE: un paso citado con continue-on-error, en el paso o en su job, se caza", () => {
+  // LA MISMA FUNCION QUE LA REGLA, con el mapa de pasos mutado en memoria: el paso citado se
+  // declara con el modificador, como lo dejaria el lector si alguien lo escribiera.
+  const texto = pagina();
+  const porNombre = pasosPorNombre();
+  assert.deepEqual(pasosCitadosQueNoPuedenFallar(texto, porNombre), [], "el arbol real tiene que estar limpio: sin eso, mutarlo no prueba nada");
+  const uno = pasosCitados(texto).find((n) => porNombre.has(n));
+  const mutado = new Map(porNombre);
+  mutado.set(uno, porNombre.get(uno).map((p) => ({ ...p, continueOnError: { valor: "true", linea: p.linea + 1, delJob: false } })));
+  assert.equal(pasosCitadosQueNoPuedenFallar(texto, mutado).length, porNombre.get(uno).length, `«${uno}» con continue-on-error tenia que cazarse`);
+
+  const delJob = new Map(porNombre);
+  delJob.set(uno, porNombre.get(uno).map((p) => ({ ...p, continueOnError: { valor: "${{ matrix.x }}", linea: 1, delJob: true } })));
+  assert.match(pasosCitadosQueNoPuedenFallar(texto, delJob)[0], /en su JOB/);
 });

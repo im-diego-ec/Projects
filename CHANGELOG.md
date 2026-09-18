@@ -287,6 +287,18 @@ mueve sobre un cambio incompatible.
   siguen saliendo como `::warning::` en el resumen de la corrida; si querés que te
   detengan antes de v2, arreglalos con los comandos de arriba.
 
+- **Las plantillas de pull request piden el comando y su código de salida, y un campo «No
+  medido».** Las dos: la del marco y la que el andamio reparte (esta, en lenguaje para
+  quien no programa). Contar líneas de salida o pegar un pedazo del log no demuestra nada:
+  una herramienta que no llegó a arrancar muestra lo mismo que una que no encontró nada. Es
+  el defecto que midió la auditoría de cierre de la v1 (13 de 20 afirmaciones falsas). La
+  regla no tiene compuerta automática, por decisión escrita en el change `rojo-primero`.
+  Viene de Rigel (ac628ab).
+
+  **Para consumidores: nada que hacer.** Es scaffold: un proyecto que ya existe no la
+  recibe. Si querés la sección nueva, copiala de `plantilla/.github/PULL_REQUEST_TEMPLATE.md`
+  a tu `.github/PULL_REQUEST_TEMPLATE.md`.
+
 ### Eliminado
 
 - **El andamio ya no trae su propia copia del paso «Formato y validez de las raices de
@@ -563,6 +575,16 @@ mueve sobre un cambio incompatible.
   juguete apagaba la firma de commits y no la de tags. En una máquina que firma tags, un
   `git tag` moría con `fatal: no tag message?`. En Rigel costó trece rojos (c38e542); acá
   estaba latente. **Para consumidores: nada** (banco del marco).
+
+- **El paso «El andamio reparte el umbral del total del marco» de `marco-ci.yml` pasaba
+  por un comentario.** Exigía el texto `all: true` en la configuración de cobertura del
+  andamio. vitest retiró esa opción en su mayor 4 y el andamio la sacó, pero el comentario
+  que explica el retiro la nombra dos veces, y con eso el paso seguía en verde. Ahora
+  exige el alcance que la reemplaza (`include:`) y mira solo el código, no los
+  comentarios. Lo encontró el banco nuevo del paso en su primer caso rojo.
+
+  **Para consumidores: nada.** En un consumidor el paso sale antes por su camino inerte
+  («no distribuye el comparador») con el mismo `::notice::`, y ningún veredicto cambia.
 
 ### Añadido
 
@@ -1147,6 +1169,33 @@ mueve sobre un cambio incompatible.
   banco de sintaxis**, y también una barra final seguida de espacios, que parece continuar
   y no continúa. Es shell válido que corre el comando sin sus argumentos, y `bash -n` no lo
   ve. Viene de Rigel (cffa81f). **Para consumidores: nada** (banco del marco).
+
+- **Once compuertas que nadie había visto fallar ganan banco, y cada una se vio morder.**
+  Cinco de `marco-ci.yml`: «Exigir OpenSpec en el repo», «Validacion estricta de changes y
+  specs», «Definiciones de pipeline validas», «Censo de fuentes cableado» y el umbral del
+  andamio. Seis del andamio y del CI del marco: «El arbol arranca limpio», «Todo paquete
+  declara los scripts de verificacion», «Verificar cada paquete», el «Veredicto» del
+  andamio (el check que exige el ruleset de cada proyecto nacido de él) y «Verificar que el
+  bot esta configurado», en sus dos copias. Dos de la deuda vieja decían que no se podían
+  probar sin red: se prueban sin red, con un `curl` y un `npm` de mentira. Cada banco corre
+  el script real extraído del YAML, y se lo saboteó para verlo caer. Viene de Rigel (1.11.0
+  y 2.0.0, changes `rojo-primero` y `censo-honesto`). **Para consumidores: nada** (bancos
+  del marco).
+
+- **El censo de pasos sin banco mira todo lo que el marco escribe, y separa la deuda de lo
+  que no puede fallar.** Miraba 17 pasos de `marco-ci.yml`; ahora mira 112, en los
+  workflows del marco, en los que reparte el andamio y en las actions. Cada paso tiene
+  banco, o está declarado como deuda (sale por `::warning::` en cada corrida), o como «sin
+  rojo propio» con su tipo y motivo. Una action ajena se declara una vez. Una cita cuenta
+  solo si es una cadena literal, y un nombre repetido en dos archivos necesita que el banco
+  diga cuál: así el paso de Terraform de `marco-ci.yml` dejó de figurar con el banco de su
+  homónimo del andamio. **Para consumidores: nada** (banco del marco).
+
+- **Un paso con `continue-on-error` no cuenta como compuerta.** Si lleva el modificador
+  —en el paso o en su job, con cualquier valor que no sea `false`— el censo de pasos exige
+  declararlo sin rojo, y la página de cobertura de requirements no lo puede citar como la
+  compuerta de un requirement. Hoy ningún paso del marco lo usa. Viene de Rigel (2.4.0,
+  change `el-numero-del-censo`). **Para consumidores: nada** (banco del marco).
 
 ### Corregido
 
