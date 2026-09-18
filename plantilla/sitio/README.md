@@ -93,7 +93,7 @@ En [`dash.cloudflare.com/profile/api-tokens`](https://dash.cloudflare.com/profil
 > despliegue va a fallar por permisos, con un error que no dice cuál era el
 > correcto.
 
-### 4 · Guardar las dos cosas en GitHub · *5 minutos*
+### 4 · Guardar las dos cosas en GitHub · _5 minutos_
 
 Van **adentro de dos environments**, `dev` y `produccion`, cada uno limitado a la
 rama `main`. En tu repositorio, **Settings → Environments → New environment**,
@@ -193,11 +193,11 @@ Es exactamente lo mismo que el comando de arriba.
 
 Vienen de Cloudflare tal cual, sin traducir, y ninguno dice qué hacer. Esto sí:
 
-| Lo que dice | Qué pasó | Cómo se arregla |
-| --- | --- | --- |
-| `Authentication failed (status: 400) [code: 9106]` | el token no vale: mal pegado, vencido, o revocado | creá otro con la plantilla «Edit Cloudflare Workers» y volvé a guardarlo en los dos environments del paso 4 |
-| `Invalid format for Authorization header [code: 6111]` | al pegarlo entró un espacio, un salto de línea o comillas | pegalo de nuevo, sin nada alrededor |
-| `you need to register a workers.dev subdomain` | tu cuenta todavía no tiene subdominio | elegí uno en el panel, en **Workers & Pages → Subdomain**. Es una vez y es gratis |
+| Lo que dice                                            | Qué pasó                                                  | Cómo se arregla                                                                                             |
+| ------------------------------------------------------ | --------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------- |
+| `Authentication failed (status: 400) [code: 9106]`     | el token no vale: mal pegado, vencido, o revocado         | creá otro con la plantilla «Edit Cloudflare Workers» y volvé a guardarlo en los dos environments del paso 4 |
+| `Invalid format for Authorization header [code: 6111]` | al pegarlo entró un espacio, un salto de línea o comillas | pegalo de nuevo, sin nada alrededor                                                                         |
+| `you need to register a workers.dev subdomain`         | tu cuenta todavía no tiene subdominio                     | elegí uno en el panel, en **Workers & Pages → Subdomain**. Es una vez y es gratis                           |
 
 Los dos primeros son del **token**; el tercero es de la **cuenta** y no tiene nada
 que ver con este repositorio.
