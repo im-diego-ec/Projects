@@ -125,7 +125,7 @@ jobs:
           done
 
           if [ ${#SIN_BANCO[@]} -gt 0 ]; then
-            echo "::warning::estas actions traen script propio y ningun banco de pruebas: ${SIN_BANCO[*]}. Su codigo llega a todos los consumidores de @v1 sin haberse ejecutado nunca sobre un caso controlado. Arreglo: agregar <action>/pruebas/<nombre>.test.mjs, que el paso siguiente recoge solo"
+            echo "::warning::estas actions traen script propio y ningun banco de pruebas: ${SIN_BANCO[*]}. Su codigo llega a todos los consumidores en la version siguiente sin haberse ejecutado nunca sobre un caso controlado. Arreglo: agregar <action>/pruebas/<nombre>.test.mjs, que el paso siguiente recoge solo"
           else
             echo "toda action con script propio trae su banco de pruebas"
           fi

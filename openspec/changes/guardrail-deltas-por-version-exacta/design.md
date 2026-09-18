@@ -145,7 +145,12 @@ pinados hasta la 1.9.6.
   que la condición **evaluada** saltea en el distribuidor y deja correr en un consumidor;
   cada pieza salteada corre por ruta local; fixtures con las siete formas (bien, en
   bloque, solo en el paso, `always() ||`, apagado en todos, reusable remoto, contexto no
-  modelado) y dos que no son referencias (comentario y `echo`).
+  modelado) y dos que no son referencias (comentario y `echo`). Y el lector de jobs se
+  contrasta con un **censo independiente** de las cabeceras a dos espacios de cada
+  workflow: la revisión adversarial (FO-H3) midió que una cabecera con comentario al
+  final (`  terraform: # raices`) no abría un job y le prestaba el `if:` del anterior,
+  así que una referencia sin partición salía verde atribuida a otro job. El lector
+  acepta ahora esa forma, y cualquier otra que se le escape pone rojo el censo.
 - El rojo está demostrado en los dos bancos: pinado con 4 de 8 casos rojos antes de
   pinar la línea; refs-propias con cuatro mutaciones del árbol real, y el resto del banco
   verde bajo dos de ellas (tasks.md, 1.x).

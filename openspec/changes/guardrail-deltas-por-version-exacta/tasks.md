@@ -46,6 +46,19 @@ Líneas medidas sobre el árbol de este change. Las anteriores se citan contra
       de 1.1, que ya estaban rojos sin la mutación. Ningún banco existente vio el job
       nuevo ni el `always() ||`.
 
+- [x] 1.6 **El lector de jobs no veía una cabecera con comentario** (hallazgo FO-H3 de la
+      revisión adversarial). `jobsConCondiciones` (`pruebas/andamio/expresiones.mjs`) sólo
+      abría un job con `  nombre:` exacto: con `  terraform: # raices` el job desaparecía
+      del censo y sus referencias heredaban el `if:` del anterior. Rojo primero en
+      `pruebas/andamio/refs-propias.test.mjs`: un fixture con esa cabecera después de un
+      job particionado, y un caso nuevo (`:369`) que compara el lector contra un censo
+      independiente de las cabeceras a dos espacios en cada workflow del marco →
+      `# tests 5 · # pass 4 · # fail 1`; con `  terraform: # raices de Terraform` escrito
+      a mano en `marco-ci.yml` (restaurado después), `# fail 2`, el censo nombrando
+      `terraform`. Arreglo: la cabecera admite comentario final y nombre entre comillas →
+      `5/5`, y con la mutación del hallazgo (esa cabecera más un `uses:` remoto propio en
+      el job) el banco se pone rojo culpando a `terraform`, no al job anterior.
+
 ## 2. El arreglo
 
 - [x] 2.1 `.github/workflows/marco-ci.yml:992`: `uses: im-diego-ec/Projects/actions/guardrail-deltas@v1.9.6`
@@ -87,6 +100,18 @@ Líneas medidas sobre el árbol de este change. Las anteriores se citan contra
       del paso se probó con `<SHA>` = `v1.9.6` y `HEAD`: vacío en los dos.
 - [x] 3.6 `actions/constitucion/cableado.mjs:1482-1483`: el comentario deja de llamar al
       tag «interno del marco». Solo comentario; ningún cambio de comportamiento.
+- [x] 3.7 **Lo que el traspaso de 7.5(c) perdió** (hallazgo RV-H6 de la revisión
+      adversarial): la tarea se le asignó a la corrección de prosa del lote 5 y ese lote
+      no la hizo. Rojo primero en `pruebas/andamio/pinado.test.mjs`: dos frases nuevas en
+      las listas del rol interno y del canal, y un caso nuevo (`:454`) que lee la prosa de
+      los **bancos**, que las listas no leen porque sus fixtures usan `@v1` a propósito →
+      `# tests 10 · # pass 7 · # fail 3`, con `actions/constitucion/action.yml`,
+      `.github/workflows/aviso-version.yml`, `.github/workflows/ci.yml` (el mensaje de las
+      actions sin banco) y tres líneas de
+      `actions/constitucion/pruebas/regresiones-auditoria.test.mjs` (`:721`, `:806`, `:825`).
+      Reescritas las seis con el canal real —la versión exacta y su PR de bump—:
+      `pinado` 10/10 y `regresiones-auditoria` en verde. Sólo comentarios y mensajes;
+      ningún cambio de comportamiento.
 
 ## 4. Contrato
 
@@ -138,6 +163,6 @@ Líneas medidas sobre el árbol de este change. Las anteriores se citan contra
       `projects-validar-consumidor` corre las piezas internas de `marco-ci.yml` en la
       versión publicada y no en el SHA que prueba (antes por `@v1`, ahora por versión
       exacta); (b) `v1.9.6` es un tag **anotado** (`git cat-file -t v1.9.6` → `tag`),
-      contra la convención de tags ligeros de la trampa 2 del release; (c) el mensaje de
-      `actions/constitucion/pruebas/regresiones-auditoria.test.mjs:825` sigue diciendo que
-      el guardrail «viaja por @v1»: es de la corrección de prosa del lote 5 del porte.
+      contra la convención de tags ligeros de la trampa 2 del release; (c) **resuelto en
+      3.7**: el mensaje de `actions/constitucion/pruebas/regresiones-auditoria.test.mjs:825`
+      y sus hermanos ya no dicen que el guardrail le llega al consumidor por el tag móvil.

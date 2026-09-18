@@ -12,8 +12,8 @@ name: Aviso de version a consumidores
 #
 # EL EVENTO ES LA VERSION, NO EL PUSH. Se dispara al publicar un release, no en
 # cada push a main: un consumidor no necesita enterarse de cada commit del marco,
-# necesita enterarse de lo que le llega por @v1, y eso ocurre exactamente cuando
-# se publica una version.
+# necesita enterarse de lo que le va a llegar en su PR de bump, y eso ocurre
+# exactamente cuando se publica una version.
 #
 # EL CONTENIDO NO SE ESCRIBE DOS VECES. Sale del CHANGELOG.md, que ya se
 # mantiene por version diciendo que tiene que hacer un consumidor (seccion

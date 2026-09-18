@@ -302,9 +302,14 @@ export function jobsConCondiciones(texto) {
   let actual = null;
   for (let i = inicio + 1; i < lineas.length; i += 1) {
     const l = lineas[i];
-    const job = /^ {2}([A-Za-z0-9_-]+):\s*$/.exec(l);
+    // La cabecera admite un comentario al final y el nombre entre comillas, que son
+    // YAML valido. Sin eso (hallazgo FO-H3 de la revision adversarial del porte),
+    // `  terraform: # raices` no abria un job: sus lineas se le pegaban al anterior
+    // y heredaban su `if:`. refs-propias.test.mjs lo contrasta con un censo que no
+    // usa este lector.
+    const job = /^ {2}(["']?)([A-Za-z0-9_-]+)\1:\s*(?:#.*)?$/.exec(l);
     if (job) {
-      actual = { nombre: job[1], si: null, lineas: [], pasos: [] };
+      actual = { nombre: job[2], si: null, lineas: [], pasos: [] };
       jobs.push(actual);
       continue;
     }

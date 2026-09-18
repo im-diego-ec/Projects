@@ -278,6 +278,23 @@ test("y MUERDE: la particion se EVALUA, no se busca como texto", () => {
       "    steps:",
       "      - uses: Org/Projects/actions/pieza@v9.9.9",
     ],
+    // LA CABECERA CON COMENTARIO (hallazgo FO-H3 de la revision adversarial): YAML
+    // valido, y el lector de jobs no la reconocia. Sus lineas se le pegaban al job
+    // anterior y heredaban su `if:`: la referencia sin particion salia verde,
+    // atribuida a un job particionado que no la tiene.
+    "i-cabecera-comentada.yml": [
+      "jobs:",
+      "  particionado:",
+      "    needs: [cambios]",
+      `    if: \${{ !cancelled() && ${P} }}`,
+      "    runs-on: ubuntu-latest",
+      "    steps:",
+      "      - run: echo nada remoto aca",
+      "  comentado: # raices de Terraform",
+      "    runs-on: ubuntu-latest",
+      "    steps:",
+      "      - uses: Org/Projects/actions/pieza@v9.9.9",
+    ],
     // Lo que NO es una referencia: un comentario y un `echo` dentro de un `run:`.
     "h-ruido.yml": [
       "jobs:",
@@ -297,8 +314,8 @@ test("y MUERDE: la particion se EVALUA, no se busca como texto", () => {
     const vistas = remotasPorJob(dir);
     assert.deepEqual(
       vistas.map((v) => v.job),
-      ["bien", "solo_en_el_paso", "en_bloque", "con_o", "apagado", "reusable", "no_modelado"],
-      "el recorrido tiene que ver las siete referencias de verdad, y ni el comentario ni el echo",
+      ["bien", "solo_en_el_paso", "en_bloque", "con_o", "apagado", "reusable", "no_modelado", "comentado"],
+      "el recorrido tiene que ver las ocho referencias de verdad, cada una en SU job, y ni el comentario ni el echo",
     );
     const veredicto = Object.fromEntries(vistas.map((v) => [v.job, particion(v)]));
     assert.equal(veredicto.bien.ok, true, `la particion en el if de job cuenta: ${veredicto.bien.motivo}`);
@@ -313,9 +330,69 @@ test("y MUERDE: la particion se EVALUA, no se busca como texto", () => {
     assert.match(veredicto.reusable.motivo, /REUSABLE/);
     assert.equal(veredicto.no_modelado.ok, false, "lo que el banco no modela no se lee como particionado");
     assert.match(veredicto.no_modelado.motivo, /no se pudo evaluar/);
+    assert.equal(veredicto.comentado.ok, false, "una cabecera con comentario no hereda el `if:` del job anterior");
+    assert.match(veredicto.comentado.motivo, /no tiene `if:` de JOB/);
+    // Y el censo independiente coincide con el lector sobre el fixture entero.
+    for (const [nombre, lineas] of Object.entries(fixtures)) {
+      const texto = `${lineas.join("\n")}\n`;
+      assert.deepEqual(
+        jobsConCondiciones(texto).map((j) => j.nombre),
+        censoDeJobs(texto),
+        `${nombre}: el lector de jobs y el censo independiente no ven los mismos jobs`,
+      );
+    }
   } finally {
     fs.rmSync(dir, { recursive: true, force: true });
   }
+});
+
+/** Los jobs de un workflow contados SIN el lector de expresiones.mjs: toda linea no
+ *  vacia y no comentada a DOS espacios dentro de `jobs:` es la cabecera de un job, y
+ *  su nombre es lo que va antes de los dos puntos (con o sin comillas). Una linea a
+ *  dos espacios que no tiene esa forma se devuelve entera, para que el rojo la nombre.
+ *  Es la contraprueba del lector: si una forma de cabecera nueva lo engana, sus jobs
+ *  desaparecen del censo del lector y no de este. */
+function censoDeJobs(texto) {
+  const lineas = texto.split(/\r?\n/);
+  const inicio = lineas.findIndex((l) => /^jobs:\s*(?:#.*)?$/.test(l));
+  if (inicio === -1) return [];
+  const salida = [];
+  for (const l of lineas.slice(inicio + 1)) {
+    if (/^\S/.test(l) && !/^#/.test(l)) break; // otra clave de primer nivel
+    if (!/^ {2}\S/.test(l) || /^ {2}#/.test(l)) continue;
+    const m = /^ {2}(["']?)([^"'\s:#]+)\1\s*:/.exec(l);
+    salida.push(m ? m[2] : l);
+  }
+  return salida;
+}
+
+test("el lector de jobs ve los mismos jobs que un censo independiente, en cada workflow del marco", () => {
+  // Hallazgo FO-H3 de la revision adversarial: `jobsConCondiciones` solo abria un job
+  // con la cabecera EXACTA `  nombre:`. Con `  terraform: # raices` el job terraform
+  // desaparecia y sus referencias se le atribuian al job anterior, con su `if:`. El
+  // banco hermano la-llave-del-despliegue se protege con una lista exacta de nombres;
+  // este mira todos los workflows, asi que la contraprueba es un conteo que no usa el
+  // lector.
+  const distintos = [];
+  let vistos = 0;
+  for (const archivo of fs.readdirSync(DIR_WORKFLOWS).filter((f) => /\.ya?ml$/.test(f)).sort()) {
+    const texto = fs.readFileSync(path.join(DIR_WORKFLOWS, archivo), "utf8");
+    if (!/^jobs:\s*$/m.test(texto)) continue;
+    const delLector = jobsConCondiciones(texto).map((j) => j.nombre);
+    const delCenso = censoDeJobs(texto);
+    vistos += delCenso.length;
+    if (JSON.stringify(delLector) !== JSON.stringify(delCenso)) {
+      distintos.push(`${archivo}: lector ${JSON.stringify(delLector)} / censo ${JSON.stringify(delCenso)}`);
+    }
+  }
+  assert.ok(vistos >= 10, `el censo independiente vio ${vistos} jobs en .github/workflows: el recorrido se rompio`);
+  assert.deepEqual(
+    distintos,
+    [],
+    "el lector de jobs de pruebas/andamio/expresiones.mjs no ve los mismos jobs que un conteo de las cabeceras a dos " +
+      "espacios: un job que el lector no abre le presta su `if:` al anterior, y una referencia remota sin particion " +
+      "sale verde atribuida a otro job. Arreglo: que el lector reconozca esa forma de cabecera",
+  );
 });
 
 test("el evaluador sigue lanzando ante una funcion que el banco no declaro", () => {

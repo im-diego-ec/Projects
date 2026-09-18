@@ -21,8 +21,9 @@ author: la organización
 # POR QUE EL CANONICO VIAJA ADENTRO. El GITHUB_TOKEN de un consumidor no lee otro
 # repositorio: si el texto viviera en Projects y el consumidor tuviera que ir a
 # buscarlo, haria falta un token con acceso cruzado. Con GITHUB_ACTION_PATH el
-# texto llega con la action, en la misma resolucion de @v1 que ya ocurre. Es el
-# mismo transporte de guardrail-deltas y por la misma razon.
+# texto llega con la action, en la misma resolucion del `uses:` que ya ocurre: la
+# version exacta que el consumidor pina. Es el mismo transporte de guardrail-deltas
+# y por la misma razon.
 #
 # POR QUE ESTA ACTION LLEVA PLACEHOLDERS Y LAS OTRAS NO. actions/README.md dice
 # que las actions no llevan {{...}} porque una pieza referenciada es la misma para

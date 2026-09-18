@@ -370,6 +370,10 @@ test("ningun archivo del marco afirma que marco-ci.yml sigue invocando una pieza
     "El tag existe, pero solo para una línea interna del marco",
     "ULTIMO `@v1` vivo del marco",
     "por una razon estructural, y el paso 5 lo mueve",
+    // Hallazgo RV-H6 de la revision adversarial del porte: la action de la
+    // constitucion decia que su texto llegaba en la resolucion de `@v1` que ya
+    // ocurria. Desde guardrail-deltas-por-version-exacta no ocurre ninguna.
+    "en la misma resolucion de @v1 que ya ocurre",
   ];
   const aplanar = (t) => t.replace(/\r?\n[ \t]*(?:>|#|\/\/|\*)?[ \t]*/g, " ").replace(/[ \t]+/g, " ");
 
@@ -419,6 +423,11 @@ test("ningun archivo del marco afirma que `@v1` es el canal, ni que un arreglo l
     "asi un arreglo alla llega a este repo sin abrir un PR aca",
     "Un arreglo aca arregla el CI de todos los repos a la vez",
     "por eso una subida del pin llega sola",
+    // Hallazgo RV-H6 de la revision adversarial del porte: un traspaso entre lotes
+    // se perdio y estas sobrevivieron en un workflow del marco y en el mensaje de un
+    // paso de su CI. Las de los bancos las cobra el caso de abajo.
+    "necesita enterarse de lo que le llega por @v1",
+    "llega a todos los consumidores de @v1",
   ];
   const aplanar = (t) => t.replace(/\r?\n[ \t]*(?:>|#|\/\/|\*)?[ \t]*/g, " ").replace(/[ \t]+/g, " ");
   assert.ok(
@@ -439,5 +448,48 @@ test("ningun archivo del marco afirma que `@v1` es el canal, ni que un arreglo l
     "el canal de distribucion es la version exacta mas el PR de bump de Dependabot: un arreglo del marco llega a " +
       "cada consumidor como un PR que alguien lee y mergea, y `v1` no avanza con cada release. Reescribi la " +
       "frase con eso; si citas la forma vieja para explicar que se corrigio, parafraseala",
+  );
+});
+
+test("ningun banco del marco afirma en su prosa que su arreglo viaja por `@v1`", () => {
+  // LA MISMA CLASE, DENTRO DE LOS BANCOS. Los casos de arriba no leen `pruebas/`: sus
+  // fixtures usan `@v1` a proposito, porque lo que prueban es el parseo de un ref. Pero
+  // un MENSAJE de asercion es prosa que alguien lee cuando el banco se pone rojo, y el
+  // de actions/constitucion/pruebas/regresiones-auditoria.test.mjs decia que el
+  // guardrail de deltas le llegaba a todos los consumidores por el tag movil: falso
+  // desde que el canal es la version exacta, y un traspaso entre lotes lo dejo vivo
+  // (hallazgo RV-H6 de la revision adversarial del porte). Son frases, no refs: ningun
+  // fixture las contiene. LIMITE, el de los casos de arriba: formas exactas.
+  const FALSAS_EN_BANCOS = [
+    "viaja por @v1 a todos los consumidores",
+    "viaja por `@v1` a todos los consumidores",
+    "llega a todos los consumidores por `@v1`",
+  ];
+  const aplanar = (t) => t.replace(/\r?\n[ \t]*(?:>|#|\/\/|\*)?[ \t]*/g, " ").replace(/[ \t]+/g, " ");
+  const bancos = [];
+  const recorrer = (dir) => {
+    if (!fs.existsSync(dir)) return;
+    for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
+      const p = path.join(dir, e.name);
+      if (e.isDirectory()) {
+        if (e.name !== "node_modules") recorrer(p);
+      } else if (/\.test\.mjs$/.test(e.name) && p !== import.meta.filename) bancos.push(p);
+    }
+  };
+  recorrer(path.join(RAIZ, "actions"));
+  recorrer(path.join(RAIZ, "pruebas"));
+  assert.ok(bancos.length > 40, `solo ${bancos.length} bancos leidos: el recorrido se rompio`);
+  const encontradas = [];
+  for (const abs of bancos) {
+    const texto = aplanar(fs.readFileSync(abs, "utf8"));
+    for (const f of FALSAS_EN_BANCOS) {
+      if (texto.includes(f)) encontradas.push(`${path.relative(RAIZ, abs).replace(/\\/g, "/")}: "${f}"`);
+    }
+  }
+  assert.deepEqual(
+    encontradas,
+    [],
+    "un banco dice que lo que protege le llega a los consumidores por `@v1`. El canal es la version exacta mas el " +
+      "PR de bump: reescribi el mensaje con eso",
   );
 });
