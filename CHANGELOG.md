@@ -49,10 +49,24 @@ por ese PR.
 
 ### Para consumidores
 
-**Ningún veredicto de tus verificaciones cambia**: lo que pasaba en verde sigue en verde.
-Lo único que puede aparecer es **un aviso nuevo** si tu `.projects-desvios.json`
-tiene un desvío incompleto o una fecha imposible; completalo ahora, porque en la
-línea mayor siguiente el desvío incompleto deja de absorber.
+**Antes del 2026-10-01, aunque no actualices.** Tu versión actual (hasta la 1.9.6)
+trae esa fecha adentro: ese día la cobertura pasa a rojo si un paquete está por debajo
+del mínimo sin deuda declarada, y la verificación de `infra/` e `infra-prod/` pasa a
+detener. Arreglo: agregar pruebas o declarar la deuda con su motivo y su fecha. Si tu
+repositorio nació entre la 1.8.0 y la 1.9.6, borrá además de tu `ci.yml` el paso que
+trae `VENTANA_TERRAFORM` (ver «Cambiado» y «Eliminado»).
+
+**Tu PR de actualización a esta versión llega en rojo en la constitución**, porque su
+parte del marco sube a la 1.10.0. Se arregla en ese mismo PR, regenerándola con el
+comando de «Cambiado». Si declarás un change experimental, agregale la fecha
+`veredicto_antes_de`. Y puede aparecer **un aviso nuevo** si tu `.projects-desvios.json`
+tiene un desvío incompleto o una fecha imposible; completalo ahora, porque en la línea
+mayor siguiente el desvío incompleto deja de absorber.
+
+**Si tenés un sitio generado con `desplegar.yml` (de la 1.8.0 a la 1.9.6)**, el código
+de un fork podía correr con la credencial que publica. El arreglo no llega solo:
+aplicalo a mano (ver «Seguridad»). Hasta que copies el archivo nuevo, su producción se
+sigue publicando cada vez que se integra un cambio a `main`.
 
 **Si usás `actions/aviso-version` para anunciar tus propias versiones**, el mensaje
 cambia aunque no toques nada: el primer párrafo cambia de redacción, las dos líneas de
@@ -62,16 +76,17 @@ del archivo de aviso del marco va como la variable de repositorio
 `AVISO_VERSION_FORMATO`, en la pestaña Variables y no en Secrets. Teams y Discord no
 necesitan nada. Si no la usás, nada de esto te toca.
 
-**Desde la próxima versión, una compuerta nueva puede llegar en rojo dentro de tu PR
-de actualización**, con lo que tenés que cambiar escrito en esta sección. Solo lo que
-se arregla fuera de tu repositorio —un ajuste de GitHub, un permiso de quien lo
+**Desde esta versión, una compuerta nueva puede llegar en rojo dentro de tu PR de
+actualización**, con lo que tenés que cambiar escrito en esta sección. Solo lo que se
+arregla fuera de tu repositorio —un ajuste de GitHub, un permiso de quien lo
 administra— sigue llegando primero como aviso.
 
 **Lo demás es andamio y no te llega solo**: un proyecto nuevo nace con la promoción a
 producción manual, desvíos más precisos y documentos al día; uno ya creado conserva la
-copia que recibió. Si tenés un sitio generado con `desplegar.yml`, su producción se
-sigue publicando cada vez que se integra un cambio a `main`, hasta que copies el archivo
-nuevo (ver «Cambiado»).
+copia que recibió. Si tu repositorio nació con la 1.9.6 o antes, en el paso que sube
+`constitucion-al-dia` cambiá `if-no-files-found: warn` por las dos líneas de
+«Corregido». Y si fijás `@v1`, pasá a la versión exacta para volver a recibir estos
+avisos.
 
 ### Cambiado
 
