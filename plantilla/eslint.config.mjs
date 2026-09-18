@@ -184,7 +184,7 @@ export default tseslint.config(
 
   // [FRONT] IDENTIDAD VISUAL DEL AREA. Solo las reglas de marca que un ARBOL DE
   // SINTAXIS puede decidir por si solo. El manual completo (tokens, componentes,
-  // tipografia, data viz) es la skill `la organización-design` de la organizacion; lo que
+  // tipografia, data viz) es el sistema de diseno de la organizacion; lo que
   // no se negocia vive en la constitucion del marco, seccion "Identidad visual y
   // el idioma del producto".
   //

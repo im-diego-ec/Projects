@@ -400,8 +400,12 @@ sin escribir código.
 
 **La regla.** Todo PR de bloque lleva **`Closes #<sub-issue>` en el cuerpo,
 desde que se crea** — no agregado después, no en un comentario. La relación
-bloque ↔ PR es 1:1. El `Closes` apunta **solo** al sub-issue; el issue
-macro del change lo cierra únicamente el PR final.
+bloque ↔ PR es 1:1. El `Closes` apunta **solo** al sub-issue; al issue
+macro del change lo enlaza únicamente el PR final, con la misma exigencia:
+en su cuerpo desde que se crea. «Lo cierra» sería un hecho posterior al
+merge, y la tarea que lo atestigua no se podría marcar en el PR que la
+cumple; que el cuerpo **lleve** el enlace se verifica antes, con
+`gh pr view <n> --json closingIssuesReferences`.
 
 La evidencia del bloque se comenta **en el sub-issue, antes del merge**; el
 merge lo cierra solo. **Los sub-issues no se cierran a mano.**
@@ -420,10 +424,12 @@ exactamente cuando alguien lo mira para saber qué está en curso.
 barato del backlog.
 
 **Cómo volverla automática.**
-- Check de PR: el cuerpo debe contener `Closes #<n>` (con excepciones
-  declaradas por etiqueta para el PR final de un change y para los de solo
-  docs). Una expresión regular; el PR se pone rojo hasta que exista el
-  enlace.
+- Check de PR: el cuerpo debe contener `Closes #<n>` (con excepción
+  declarada por etiqueta para los de solo docs). Una expresión regular; el
+  PR se pone rojo hasta que exista el enlace. El PR final de un change
+  **ya no es excepción**: desde que la regla dice que **lleva** el enlace al
+  issue macro —y no que «lo cierra»—, puede cumplir un check previo al
+  merge como cualquier otro.
 - Plantilla de PR en el scaffold con la línea `Closes #` ya puesta y vacía:
   cuesta más borrarla que completarla.
 

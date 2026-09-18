@@ -377,6 +377,7 @@ npx --yes @fission-ai/openspec@X.Y.Z list
 >
 > No es un archive mal hecho: es un paso que todavia no hiciste. **Anda al Paso 5,
 > completa los `Purpose`, y volve acá.** Los tres verdes se piden despues de eso.
+
 - `list` **sin changes activos** (o sin el que acabas de archivar).
 - **El guardrail de deltas en verde.** Ese no corre en local: vive en el marco y
   llega a este repo por el `uses: ...@<version>` del `ci.yml`, asi que su veredicto se
@@ -423,11 +424,25 @@ verdad despues del archive.
 git add -A
 git commit -m "docs(openspec): <nombre-del-change> cerrado y archivado — <N>/<N> tareas"
 git push -u origin docs/archive-<nombre-del-change>
-gh pr create --title "docs(openspec): archive de <nombre-del-change>" --body "Closes #<sub-issue>"
+gh pr create --title "docs(openspec): archive de <nombre-del-change>" --body "Closes #<sub-issue>
+Closes #<issue-macro>"
 ```
 
 `Closes #<numero>` va en el cuerpo **desde la creacion**: es lo unico que crea el
-enlace real. Un `ref #N` en texto plano **no enlaza nada**.
+enlace real. Un `ref #N` en texto plano **no enlaza nada**. El PR final del change
+lleva DOS: el del sub-issue de este bloque y el del issue macro.
+
+**Verificalo ANTES de mergear, y marca la tarea en ESTE mismo PR:**
+
+```bash
+gh pr view <n> --json closingIssuesReferences
+```
+
+Los dos numeros tienen que aparecer ahi. Que el PR **lleve** el enlace es una propiedad
+de su CUERPO, verdadera desde que el PR nace, asi que la tarea que lo atestigua se
+marca aca y no despues del merge. Enunciada como «el PR final CIERRA el issue macro»
+—que solo es verdad despues del merge— la tarea no se podia marcar en el PR que la
+cumple, y costaba un PR de una linea mas por change.
 
 En el cuerpo del PR van las tres salidas del paso 4 y una linea que explique que
 los specs que aparecen en el diff **son el contrato vigente promovido**, no
@@ -489,4 +504,5 @@ reales.
 - [ ] Change movido con `git mv`, carpeta original vacia
 - [ ] `validate --all --strict` + `list` sin changes activos + guardrail de deltas: los tres verdes
 - [ ] Sin `Purpose: TBD` pendientes
-- [ ] PR con `Closes #<sub-issue>` desde la creacion
+- [ ] PR con `Closes` al sub-issue Y al issue macro, en el cuerpo desde la creacion
+- [ ] `closingIssuesReferences` verificado ANTES del merge, y la tarea marcada en este PR

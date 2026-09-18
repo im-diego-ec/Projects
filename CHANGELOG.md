@@ -142,6 +142,33 @@ mueve sobre un cambio incompatible.
   existiendo, siempre con la misma fecha que la publicación, y se retira en v2. Para
   consumidores: nada; ninguna versión publicada usó nunca una fecha distinta.
 
+- **La porción del marco de la constitución suma estas reglas a la misma 1.10.0 que
+  abrió el cierre de la ventana de gracia** (número tentativo, lo corrige el
+  release). Juntas cuestan un rojo por consumidor en vez de dos. Para consumidores:
+  **el PR de bump a esta versión llega con el job `constitucion` en ROJO**, el mismo
+  rojo que ya anuncia la entrada de la ventana, y se arregla igual —regenerando el
+  artefacto con el modo `escribir` de la versión nueva, en ese mismo PR—. Ningún id
+  de regla cambió ni desapareció, así que ningún desvío declarado deja de resolver;
+  ni jobs, ni `inputs`, ni `outputs`, ni permisos cambian.
+- **El PR final de un change LLEVA `Closes` al issue macro en su cuerpo desde que se
+  crea**, en vez de «cerrarlo» (`openspec-flujo` y
+  `github-closes-apunta-al-sub-issue`, con sus ids intactos). «Cierra» sólo es verdad
+  después del merge, así que la tarea que lo atestigua no se podía marcar en el PR
+  que la cumple: en Rigel costó un PR de una línea en dos changes seguidos. Las dos
+  copias de la skill `projects-archive-change` suman los dos `Closes` en el ejemplo y
+  la verificación previa al merge con
+  `gh pr view <n> --json closingIssuesReferences`. Para consumidores: nada
+  obligatorio; un proyecto ya nacido conserva su copia de la skill y puede copiar a
+  mano las dos líneas nuevas del checklist.
+- **El presupuesto de líneas de la constitución sube de 700 a 738, y el manifiesto
+  dice por fin cómo se mide** (`presupuesto_nota`). El check no cuenta `wc -l`:
+  cuenta el cuerpo que arma `leerCanonico()`, que pega las secciones con una línea en
+  blanco entre cada par. Medido antes de tocarlo: `wc -l` daba 687 y el check 696,
+  o sea cuatro líneas de margen y no trece. Quedan 733 usadas: las 37 nuevas son
+  reglas, y las cinco que sobran son colchón de mantenimiento que no alcanza para una
+  regla nueva. Subir el número sin reescribir la nota pone rojo el CI del marco. Para
+  consumidores: nada.
+
 ### Corregido
 
 - **Cinco páginas seguían prometiendo una publicación automática que ya no ocurre**, y
@@ -213,6 +240,21 @@ mueve sobre un cambio incompatible.
   que «pasa de aviso a rojo». Todo en prosa: la action verifica exactamente lo
   mismo que antes. Para consumidores: nada. Un repo nacido del andamio conserva su copia
   del comentario de `actualizar-marco.yml`, que es prosa y no cambia nada que corra.
+
+- **La constitución y el andamio arrastraban residuos del renombrado que separó al
+  marco de su origen.** `90-marca` mandaba a buscar el manual de marca en una skill
+  cuyo nombre había roto el reemplazo —y que no existe con ese nombre en ningún
+  lado—, dejaba un artículo doble delante de «consumidor» y nombraba el símbolo de
+  otra marca; el comentario de `plantilla/eslint.config.mjs` repetía la skill
+  inexistente. Se reescribieron sin cambiar lo que exige ninguna regla ni ningún id,
+  y un banco nuevo caza esas formas en todo lo que viaja. Para consumidores: el texto
+  corregido llega con la regeneración de «Cambiado»; el comentario de ESLint sólo
+  en proyectos nuevos.
+- **La copia de la skill `projects-archive-change` que reparte el andamio no pasaba
+  el formateador del andamio** (un bloque de cita pegado a una lista). El arranque la
+  reescribía en su paso `pnpm format`, así que no ponía nada en rojo, pero cada
+  proyecto nacía con una copia distinta de la del marco: ruido en la revisión de
+  divergencia. Para consumidores: nada.
 
 ### Añadido
 
@@ -649,6 +691,36 @@ mueve sobre un cambio incompatible.
   fecha. Ahora el PR del marco que lo intente da rojo, medido contra el día más
   adelantado del planeta (UTC+14). Para consumidores: nada; ninguna versión publicada
   usó una fecha futura.
+
+- **Cuatro reglas nuevas en la constitución para que una revisión no gire en
+  círculo: `revision-declara-su-meta`, `hallazgo-se-clasifica-contra-la-meta`,
+  `pregunta-al-po-declara-que-desbloquea` y `change-congelado-contra-su-insumo`**
+  (`40-fronteras`, ✅ Siempre, más una remisión en el flujo de `10-openspec`). Toda
+  revisión declara antes de empezar una meta que se pueda cerrar; lo que no la
+  bloquea se anota en los pendientes del change y no se pregunta; una pregunta al PO
+  dice qué desbloquea; y un change se congela contra la versión del insumo con que se
+  escribió. Es el porte de `revision-con-meta` de Rigel (1.8.0), nacido de una
+  adopción que gastó 40 horas y diez documentos del PO en cuatro días para terminar
+  con seis bloqueantes que no tocaban ninguno de los 24 escenarios. Cada una tiene su
+  propio id, y la del PO lo nombra por `{{PO}}`, que ya era obligatorio. Para
+  consumidores: nada más que regenerar el artefacto (ver «Cambiado»); ningún
+  marcador nuevo.
+- **La regla `terminado-en-local-y-no-cerrado`, pegada a la definición de
+  terminado** (`30-git-despliegue`). Done exige «desplegado y verificado», y un
+  repositorio sin ambiente —o con plataforma `ninguna`, que es legítima— no puede
+  cumplirlo: ahora el estado tiene nombre. Lo abierto es el **bloque**, no sus
+  tareas; si el bloque lleva casilla, va `[~]`; con `ninguna` no vence; y tener
+  ambiente no cierra los bloques que quedaron atrás. La guía (`docs/09`, §9.d)
+  muestra las formas. Porte de `dev-alcanzable` de Rigel (1.9.0), con su corrección
+  de bloque contra tarea. Para consumidores: si tenés bloques implementados y sin
+  desplegar, ahora hay cómo declararlos en vez de elegir entre un `[x]` que miente y
+  quedar en falta.
+- **Tres bancos del marco que se ponen rojos solos**, los tres vistos en rojo sobre
+  el árbol anterior: las reglas nuevas por id y por lo que dicen
+  (`inventario-canonico.test.mjs`), el presupuesto y su nota
+  (`presupuesto-del-canonico.test.mjs`) y los residuos del renombrado en lo que viaja
+  (`pruebas/andamio/residuos-del-renombrado.test.mjs`). Para consumidores: nada;
+  corren en el CI de Projects.
 
 ### Corregido
 

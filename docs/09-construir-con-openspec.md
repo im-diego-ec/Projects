@@ -342,6 +342,39 @@ npx --yes @fission-ai/openspec@1.9.0 list
 > se cierra, porque cerrarlo convertiría la duda en contrato sin que nadie la haya
 > decidido.
 
+**Si tu proyecto todavía no tiene dónde desplegar.** La definición de terminado
+termina en «desplegado y verificado», y un repositorio sin ambiente —o con
+plataforma `ninguna`, que es una respuesta legítima— no puede cumplir esa última
+parte. La constitución le da nombre a ese estado
+(`terminado-en-local-y-no-cerrado`) para que no tengas que elegir entre mentir y
+quedar en falta. Lo que queda abierto es el **bloque**, no sus tareas: las tareas de
+implementación se hicieron y quedan en `[x]`. Se declara en el `tasks.md`, con lo
+que falta escrito, y la forma depende de cómo esté escrito el bloque:
+
+```markdown
+## 3. El endpoint rechaza una solicitud sin firma vigente
+
+**Terminado en local y NO cerrado**: falta desplegar y verificar; este repositorio
+todavía no tiene ambiente.
+
+- [x] 3.1 Rojo primero: la prueba de la firma vencida falla sin el cambio.
+- [x] 3.2 El endpoint rechaza la solicitud; 14 pruebas verdes en local, PR revisado.
+```
+
+Ésa es la forma para un bloque escrito como encabezado, que es lo habitual. Si el
+bloque **lleva casilla** —una línea `- [ ] 3. …` que lo representa entero—, esa
+casilla va `[~]` en vez de `[x]`, con la misma línea de qué falta. Y si **todos**
+los bloques del change están igual —lo común cuando todavía no hay ambiente—,
+alcanza con **una sola declaración al principio** del `tasks.md`, que diga cuáles
+son y qué les falta.
+
+`[~]` no es `[x]` con una nota: un `[x]` cuenta como hecho en cualquier lectura
+rápida, y es lo que hace que nadie note que **ningún** bloque cerró. Tampoco es
+`[ ]`: el trabajo está hecho, y marcarlo pendiente invita a empezarlo de nuevo. El
+bloque pasa a hecho cuando se despliega por la promoción y se verifica. **Tener
+ambiente no cierra los bloques que quedaron atrás**: hay que desplegarlos, y hasta
+entonces el archive no los cuenta como hechos.
+
 ---
 
 ### Lo primero que hacés, y lleva media hora

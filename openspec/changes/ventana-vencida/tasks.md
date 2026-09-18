@@ -107,6 +107,9 @@ donde la política dice una cosa y el manifiesto otra.
       lo deja atrás»; `manifiesto.json:61` entrada `1.10.0` (número tentativo, lo corrige
       el release), fechas iguales, huella `006fa20b…9939`. `leerCanonico()` → `1.10.0 696
       [] 90c41b5865e9`: 696 de 700 líneas, cero problemas.
+      *Después, en el mismo día*: `el-canonico-dice-como-se-trabaja` metió sus reglas en
+      **esta misma** 1.10.0 (no publicada) y reescribió su huella a `c58a8cd9…98f2`, con
+      733 de 738 líneas. La 1.10.0 que se publique lleva los dos changes.
 - [x] 2.3 **La action deja de prometerla**, sin tocar comportamiento:
       `action.yml:48-56`, `:66-69`, `:240-245`; `constitucion.mjs` cabecera (`:39-52`),
       la nota de «hoy» (`:86`), el bloque de la ventana (`:111-129`), `validarManifiesto`
