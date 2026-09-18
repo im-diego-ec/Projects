@@ -28,7 +28,7 @@ tres bancos nuevos copiados encima, y `node --test` sobre esa copia.
       `openspec-flujo` y `github-closes-apunta-al-sub-issue` «vuelven a decir que el PR
       final CIERRA el issue macro»—.
 - [x] 1.2 **El presupuesto y su nota**:
-      `actions/constitucion/pruebas/presupuesto-del-canonico.test.mjs:86`, `:90` y `:106`.
+      `actions/constitucion/pruebas/presupuesto-del-canonico.test.mjs:101`, `:105` y `:121`.
       Tres reglas: la nota existe, nombra `leerCanonico()` y advierte `wc -l`; nombra el
       tope vigente; y la aritmética (suma de secciones + secciones − 1) es la que cobra
       el check. **Rojo sobre el árbol anterior**: «el manifiesto declara
@@ -127,3 +127,24 @@ tres bancos nuevos copiados encima, y `node --test` sobre esa copia.
       el artefacto regenerado, en verde. No se escribe en un consumidor desde esta sesión.
 - [ ] 4.8 **Archive**, con la skill `projects-archive-change`, y las filas de los cinco
       requirements nuevos en `openspec/cobertura-de-requirements.md`. Después de 4.5 y 4.6.
+
+## 5. La revisión adversarial del carril (2026-09-18)
+
+- [x] 5.1 **El presupuesto se nombra como presupuesto** (FO-S5). La regla 2 de
+      `presupuesto-del-canonico.test.mjs` buscaba el número como token en toda la
+      nota, y la nota trae fechas: subir `presupuesto_lineas` a 2026 sin tocarla
+      quedaba verde por «Medido el 2026-09-17», y con 2026 el check dejaba de
+      contener nada. Refutación escrita primero, contra la regla vieja → `tests 4 /
+      pass 3 / fail 1`; prueba con cada número de la nota mayor que el presupuesto.
+      Ahora la nota tiene que decir «el presupuesto sube/baja de X a N» o «es N»
+      (`nombraElPresupuesto`) → `tests 4 / pass 4`. Contrapeso en la misma
+      refutación: la nota real («sube de 700 a 738»), bajarlo escrito igual, y «las
+      733 usadas» que NO cuentan como presupuesto. `manifiesto.json` no se tocó.
+- [x] 5.2 **El rojo del primer día de un proyecto nuevo** (RV-L3L11-01): la 1.10.0
+      que este change comparte con `ventana-vencida` vive en el árbol antes de su
+      release. Lo arregló `ventana-vencida` (D13, tarea 3.2): `projects-init`
+      renderiza con la action del tag que pina el proyecto. El fragmento de este
+      change lo remite.
+- [ ] 5.3 **El camino ZIP de `main` antes del release**: el resto de RV-L3L11-01.
+      **Motivo:** es la tarea 3.3 de `ventana-vencida`, que espera la decisión del PO
+      sobre cómo se integra el porte a `main`; no se duplica acá.

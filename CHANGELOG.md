@@ -149,7 +149,10 @@ mueve sobre un cambio incompatible.
   rojo que ya anuncia la entrada de la ventana, y se arregla igual —regenerando el
   artefacto con el modo `escribir` de la versión nueva, en ese mismo PR—. Ningún id
   de regla cambió ni desapareció, así que ningún desvío declarado deja de resolver;
-  ni jobs, ni `inputs`, ni `outputs`, ni permisos cambian.
+  ni jobs, ni `inputs`, ni `outputs`, ni permisos cambian. **Y mientras esta versión
+  viva en `main` sin su release**, un proyecto armado desde una descarga en ZIP de
+  `main` nace con ese mismo rojo: ver la entrada de `projects-init` en el fragmento
+  de `ventana-vencida`, que dice cómo evitarlo.
 - **El PR final de un change LLEVA `Closes` al issue macro en su cuerpo desde que se
   crea**, en vez de «cerrarlo» (`openspec-flujo` y
   `github-closes-apunta-al-sub-issue`, con sus ids intactos). «Cierra» sólo es verdad
@@ -166,8 +169,8 @@ mueve sobre un cambio incompatible.
   blanco entre cada par. Medido antes de tocarlo: `wc -l` daba 687 y el check 696,
   o sea cuatro líneas de margen y no trece. Quedan 733 usadas: las 37 nuevas son
   reglas, y las cinco que sobran son colchón de mantenimiento que no alcanza para una
-  regla nueva. Subir el número sin reescribir la nota pone rojo el CI del marco. Para
-  consumidores: nada.
+  regla nueva. Subir el número sin reescribir la nota —diciendo «el presupuesto sube
+  de X a N»— pone rojo el CI del marco. Para consumidores: nada.
 
 ### Corregido
 

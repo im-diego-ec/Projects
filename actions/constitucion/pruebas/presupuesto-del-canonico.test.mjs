@@ -29,21 +29,35 @@ const MANIFIESTO = path.join(CANONICO, "manifiesto.json");
 // LAS TRES REGLAS, y cada una se pone roja sola:
 //   1. El manifiesto que declara presupuesto declara tambien `presupuesto_nota`, y
 //      la nota nombra `leerCanonico()` y advierte contra `wc -l`.
-//   2. La nota nombra el presupuesto VIGENTE. Subirlo sin reescribir la nota da
+//   2. La nota nombra el presupuesto VIGENTE, COMO presupuesto: «el presupuesto
+//      sube de X a N», «baja de X a N» o «es N». Subirlo sin reescribir la nota da
 //      rojo: «subir el presupuesto es una decision, no un ajuste» es lo que dice el
 //      mensaje del check desde el primer dia, y hasta hoy nada impedia hacerlo
-//      como ajuste —cambiar un numero y seguir—.
+//      como ajuste —cambiar un numero y seguir—. Hasta el 2026-09-18 bastaba con
+//      que el numero APARECIERA en la nota, y la nota trae fechas: subirlo a 2026
+//      quedaba verde por el año de «Medido el 2026-09-17» (revision adversarial
+//      del carril). Por eso la forma esta anclada a la palabra.
 //   3. La aritmetica que la nota describe es la que cobra el check: las lineas de
 //      `leerCanonico()` son la suma de las secciones mas una por cada par. Si
 //      alguien cambia como se arma el cuerpo, la nota queda mintiendo y esto lo
 //      dice.
 //
-// LIMITE DECLARADO. La regla 2 exige que el numero APAREZCA, no que la razon
-// escrita sea buena: eso no se decide con un escaneo de texto. Lo que si garantiza
-// es que nadie sube el presupuesto sin abrir la nota.
+// LIMITE DECLARADO. La regla 2 exige que la nota DIGA el presupuesto, no que la
+// razon escrita sea buena: eso no se decide con un escaneo de texto. Lo que si
+// garantiza es que nadie sube el presupuesto sin abrir la nota.
 // ---------------------------------------------------------------------------
 
 const manifiesto = () => JSON.parse(fs.readFileSync(MANIFIESTO, "utf8"));
+
+/** La nota dice ESE numero como presupuesto: «sube/baja de X a N», o «es N». Un
+ *  «de N» seguido de «a …» es el numero de ANTES, no el vigente. */
+export function nombraElPresupuesto(nota, n) {
+  return new RegExp(
+    `presupuesto\\s+(?:(?:sube|baja|pasa)\\s+)?de\\s+\\d+\\s+a\\s+${n}(?!\\d)` +
+      `|presupuesto\\s+(?:es|queda en|de)\\s+${n}(?!\\d|\\s+a\\s+\\d)`,
+    "i",
+  ).test(nota);
+}
 
 /** Los problemas de la declaracion del presupuesto. [] si esta bien. Pura sobre sus
  *  argumentos, para que la corran el manifiesto real y las copias mutadas. */
@@ -72,12 +86,13 @@ export function problemasDelPresupuesto(m) {
         "de menos. Arreglo: decirlo en la nota.",
     );
   }
-  if (!new RegExp(`(^|[^0-9])${presupuesto}([^0-9]|$)`).test(nota)) {
+  if (!nombraElPresupuesto(nota, presupuesto)) {
     problemas.push(
-      `el presupuesto es ${presupuesto} y \`presupuesto_nota\` no lo nombra: se cambio el numero sin escribir la ` +
-        "decision. Subir el presupuesto es una decision, no un ajuste, y cada linea la carga cada sesion de cada " +
-        `repo. Arreglo: reescribir la nota con el ${presupuesto}, la fecha, las lineas medidas con \`leerCanonico()\` ` +
-        "y por que no se podia recortar otra cosa.",
+      `el presupuesto es ${presupuesto} y \`presupuesto_nota\` no lo nombra como presupuesto: se cambio el numero ` +
+        "sin escribir la decision (que el numero aparezca en una fecha o en las lineas usadas no cuenta). Subir el " +
+        "presupuesto es una decision, no un ajuste, y cada linea la carga cada sesion de cada repo. Arreglo: " +
+        `reescribir la nota con la decision —«el presupuesto sube de X a ${presupuesto}»—, la fecha, las lineas ` +
+        "medidas con `leerCanonico()` y por que no se podia recortar otra cosa.",
     );
   }
   return problemas;
@@ -123,4 +138,29 @@ test("MUERDE: subir el presupuesto sin reescribir la nota, o sacarle la medida, 
   // Sin presupuesto no hay nada que declarar: un canonico sintetico de las pruebas
   // no tiene por que traer la nota.
   assert.deepEqual(problemasDelPresupuesto({ presupuesto_lineas: 0 }), []);
+});
+
+test("MUERDE: un numero de la nota que NO es el presupuesto no cuenta como nombrarlo", () => {
+  // EL HUECO que encontro la revision adversarial del carril (2026-09-18): la regla 2
+  // buscaba el numero como token en CUALQUIER lugar de la nota, y la nota trae sus
+  // fechas. Subir el presupuesto a 2026 sin tocarla quedaba verde —el año de
+  // «Medido el 2026-09-17» contaba como el presupuesto— y con 2026 el check deja de
+  // contener nada.
+  const real = manifiesto();
+  const numerosDeLaNota = [...new Set(real.presupuesto_nota.match(/\d+/g))].map(Number);
+  for (const n of numerosDeLaNota.filter((x) => x > Number(real.presupuesto_lineas))) {
+    assert.match(
+      problemasDelPresupuesto({ ...real, presupuesto_lineas: n }).join("\n"),
+      /no lo nombra/,
+      `subir el presupuesto a ${n} sin reescribir la nota tenia que dar rojo: ese ${n} de la nota no es el presupuesto`,
+    );
+  }
+  // CONTRAPESO: la forma en que la nota lo dice hoy («sube de 700 a 738»), bajarlo
+  // escrito igual, y declararlo sin historia, pasan.
+  const conNota = (nota, n) => problemasDelPresupuesto({ ...real, presupuesto_lineas: n, presupuesto_nota: nota });
+  const base = "leerCanonico() cobra; wc -l no. ";
+  assert.deepEqual(conNota(`${base}El presupuesto sube de 700 a 738.`, 738), []);
+  assert.deepEqual(conNota(`${base}DECISION: el presupuesto baja de 738 a 720 y quedan 700 usadas.`, 720), []);
+  assert.deepEqual(conNota(`${base}El presupuesto es 738.`, 738), []);
+  assert.match(conNota(`${base}Medido el 2026-09-17: 733 usadas.`, 733).join("\n"), /no lo nombra/, "733 son las usadas, no el presupuesto");
 });
