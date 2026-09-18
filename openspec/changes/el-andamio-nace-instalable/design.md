@@ -82,6 +82,18 @@ poda real de un sitio los saca y la de una aplicación los conserva.
 
 - **La imagen es la del `docker-compose.yml`** (`postgres:16`), no una elegida aparte: el
   banco las compara.
+- **Pendiente, declarado (revisión adversarial, RV-H3): la imagen entra al pipeline de
+  cada aplicación nueva por tag móvil y sin OK humano.** AGENTS.md pone «agregar una
+  dependencia o una action de terceros al marco» en «Pregunta primero» y exige pinarla
+  por SHA. La imagen ya viajaba en el `docker-compose.yml` —solo para la máquina de quien
+  desarrolla— y este change la mete en la integración. No se pina por digest desde acá
+  porque es una decisión con costo que no es de un builder solo: el Dependabot que
+  reparte el andamio solo mira el `Dockerfile` de `api/` (ecosistema `docker`), no el
+  `docker-compose.yml` ni los `services:` de un workflow, así que un digest quedaría
+  congelado sin parches de seguridad, y subirlo en uno de los dos lados pondría rojo el
+  banco que exige que sean iguales. Queda como tarea abierta con su motivo (tasks 8.5),
+  y el paso «Pines de actions de terceros por SHA» del CI del marco sigue sin mirar
+  imágenes de servicio: eso también se decide ahí.
 - **El nombre de la base es `${{ github.event.repository.name }}`** en el servicio y en la
   URL. `{{PROYECTO}}` no puede ir en un workflow (`workflows-sin-marcadores-por-repo`), y
   ese banco declara el nombre del repositorio como su equivalente. En los dos caminos el
@@ -178,7 +190,7 @@ rojos; ignorar el trace del balanceador → 3 rojos.
 | `herramientas/plantilla-repos/personalizar.yml` | **scaffold del molde** | Vive en los repos plantilla y se regenera desde acá; no puede ser referenciado porque el `GITHUB_TOKEN` no puede escribir workflows |
 | `herramientas/projects-init.mjs` (`CON_LIMPIEZA_MANUAL`) | **herramienta del marco** | Corre desde el clon y no viaja |
 | Los bancos nuevos y los ampliados | **CI propio del marco** | Miden el andamio del marco; en un consumidor no hay andamio que medir |
-| Delta a `calidad-codigo` | **canónico** | Vive solo en este repo; los proyectos lo cumplen |
+| Delta a `calidad-codigo` | **canónico** | Vive solo en este repo. Lo cumplen el andamio y lo que nace de él desde esta versión; los requirements del cliente generado y del motor real lo dicen, porque los tres consumidores existentes no los cumplen y nada del marco los verifica en ellos (RV-H4) |
 
 No hay nada **referenciado** ni **regenerado**: no cambia ningún workflow reusable, ninguna
 action ni el pin de OpenSpec.

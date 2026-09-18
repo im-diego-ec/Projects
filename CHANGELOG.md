@@ -432,9 +432,11 @@ sin `pnpm-lock.yaml`, corré `corepack pnpm install` y guardá ese archivo.
   2.6.0, commit 4d0bd19). El paso explícito del CI y el script `datos` se conservan. La
   salida de `projects init` para un proyecto sin cliente de datos nombra ahora los **tres**
   archivos donde viaja el comando (antes, uno), y un banco la deriva del andamio. Para
-  consumidores: llega a las aplicaciones nuevas. Una existente que lo quiera agrega la
-  línea `postinstall` con el mismo comando que su script `datos`; si el proyecto no
-  genera cliente de datos, no la agrega.
+  consumidores: llega a las aplicaciones nuevas. **Una existente NO lo recibe** y sigue
+  necesitando `pnpm datos` antes de `pnpm lint`; el requirement que lo pide se enuncia
+  para lo que nace desde esta versión. Para adoptarlo agrega la línea `postinstall` con
+  el mismo comando que su script `datos`; si el proyecto no genera cliente de datos, no
+  la agrega.
 - **vitest y `@vitest/coverage-v8` pasan a `^5.0.1`, como par, en `api`, `web` y `sitio`.**
   El sitio venía con `^4.0.18`, un piso por debajo del de los otros dos (`^4.1.11`), y
   ningún banco exigía que el proveedor de cobertura fuera del mismo rango que el
@@ -1609,9 +1611,14 @@ sin `pnpm-lock.yaml`, corré `corepack pnpm install` y guardá ese archivo.
   Viene de Rigel 1.9.0 (commits 4bf260e y 755207b) y 2.4.0 (commit b7d3201: los lugares
   que nombran la base se descubren en vez de listarse). Para consumidores: llega a las
   aplicaciones que nacen desde esta versión; no es un check nuevo y `ci-ok` sigue siendo
-  el único requerido. Una aplicación existente que lo quiera copia el bloque entre
+  el único requerido. **Una aplicación existente NO lo recibe**: sus pruebas siguen
+  corriendo sin el motor real, y el requirement que lo pide se enuncia para lo que nace
+  desde esta versión, así que nada del marco lo verifica en ella. Para adoptarlo copia el bloque entre
   `# projects:solo-si-hay-datos` y `# projects:fin-solo-si-hay-datos` de nivel de job
-  (`services:` y `env:`) desde `plantilla/.github/workflows/ci.yml`.
+  (`services:` y `env:`) desde `plantilla/.github/workflows/ci.yml`. La imagen va por
+  tag (`postgres:16`), no por digest, igual que en el `docker-compose.yml`: el pin está
+  pendiente de decisión porque el Dependabot del andamio no actualiza ninguno de los dos
+  lugares.
 - **`requestId.ts` del andamio trae su prueba.** Cinco casos en
   `plantilla/api/src/middleware/requestId.test.ts`: el trace del balanceador, el header
   `X-Request-Id`, el contexto de log leído desde el handler, el id `local-` y que dos

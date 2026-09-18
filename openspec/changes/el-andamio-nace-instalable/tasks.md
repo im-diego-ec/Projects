@@ -154,6 +154,11 @@ cambiados a `forma`/`plataforma` (aplicación + supabase, sitio + ninguna) y
       `:308`→`:361`, `:400`→`:453`, `:504`→`:557`; `:305`→`:516`, `:388`→`:599`,
       `:542`→`:753`, `:669`→`:880`). **Evidencia**: `pruebas/docs/cobertura-de-requirements.test.mjs`
       → `# pass 13` (antes, `not ok 684` y `not ok 691` con «cae sobre una linea vacia o de comentario»).
+      **Corrección (revisión adversarial, RV-H5)**: el `:504`→`:557` fue un error. El `:504`
+      ya estaba viejo después del lote 22 (el paso «Verificar cada paquete» estaba en la
+      550) y la 557 cae dentro de otro paso, en un `problema(`; el paso está en la 603. El
+      remapeo por contenido no se hizo para esa ancla, y el banco no lo vio porque solo
+      exige que la línea no esté vacía ni sea un comentario. Corregida en la 9.2.
 - [x] 6.2 `docs/05-arrancar-tecnico.md:569`: `api/` pasa de **48** a **53 pruebas** (la de
       `requestId` suma cinco) y deja de nombrar `asyncHandler.ts`, que no existe desde el paso
       a Express 5. **Evidencia**: `pruebas/docs/pruebas-del-andamio.test.mjs` → `# pass 3`.
@@ -183,3 +188,25 @@ cambiados a `forma`/`plataforma` (aplicación + supabase, sitio + ninguna) y
 - [ ] 8.4 Las filas de los cinco requirements ADDED en `openspec/cobertura-de-requirements.md`
       y la revisión adversarial. **Motivo**: van en la pasada de archive, como en los lotes
       anteriores del carril.
+- [ ] 8.5 La imagen `postgres:16` del servicio de `build_test` (y la del
+      `docker-compose.yml`, que el banco exige igual): OK humano para meter una imagen de
+      terceros en la integración que el andamio reparte, y decidir si se pina por digest
+      (RV-H3). **Motivo**: AGENTS.md lo pone en «Pregunta primero», y pinarla tiene un costo
+      que no se resuelve desde un lote —el Dependabot del andamio no actualiza ni el
+      `docker-compose.yml` ni los `services:` de un workflow, así que el digest quedaría
+      congelado sin parches—; ver design D3. La misma decisión alcanza al paso «Pines de
+      actions de terceros por SHA» del CI del marco, que no mira imágenes.
+
+## 9. Revisión adversarial del carril: lo que cazó y cómo se cerró
+
+- [x] 9.1 Los requirements del cliente generado y del motor real afirmaban de «un
+      repositorio nacido del andamio» algo que los tres consumidores en `@v1.9.6` no
+      cumplen, y el fragmento lo presentaba como opcional (RV-H4). Acotados al andamio y a
+      lo que nace de él, cada uno con un escenario para el repositorio nacido antes; el
+      fragmento dice que un proyecto existente no lo recibe y qué copiar.
+      **Evidencia**: `openspec validate el-andamio-nace-instalable --strict` →
+      `Change 'el-andamio-nace-instalable' is valid`.
+- [x] 9.2 El ancla de «CI verifica todos los paquetes de forma bloqueante» en
+      `openspec/cobertura-de-requirements.md` pasa de `:557` a `:603` (RV-H5).
+      **Evidencia**: `grep -n 'name: Verificar cada paquete' plantilla/.github/workflows/ci.yml`
+      → `603`; `sed -n 603p` → `      - name: Verificar cada paquete`.

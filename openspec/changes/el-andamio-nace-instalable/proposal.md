@@ -114,8 +114,10 @@ Hay tres consumidores reales, los tres en `@v1.9.6` (`im-diego-ec/custodia-bingo
 - **Nada del contrato referenciado cambia**: ningún workflow reusable, action, input,
   output, permiso ni nombre de check.
 - **Todo lo demás es scaffold** y llega a los proyectos que nacen después. Los
-  existentes no reciben nada solos; el fragmento del CHANGELOG da lo que cada uno puede
-  copiar.
+  existentes no reciben nada solos, y los dos requirements que lo piden (el cliente
+  generado al instalar y el motor real en la integración) se enuncian para lo que nace
+  del andamio y lo dicen: nada del marco los verifica en un repositorio que ya existía.
+  El fragmento del CHANGELOG da lo que cada uno tiene que copiar para adoptarlos.
 - **Los dos repositorios plantilla son el caso que más importa**: su `personalizar.yml`
   es el de la 1.9.6, sin el paso del lockfile, y hasta que se **regeneren** desde el
   marco cada proyecto que nazca por la vía sin programas lo hace sin lockfile. La
@@ -125,7 +127,10 @@ Hay tres consumidores reales, los tres en `@v1.9.6` (`im-diego-ec/custodia-bingo
   por los dos archivos de configuración: el arreglo son dos exclusiones en
   `sitio/package.json`, escritas en el fragmento.
 - **Una aplicación nueva tiene un servicio de Postgres en `build_test`**. No es un check
-  nuevo ni un renombrado: `ci-ok` sigue siendo el único requerido.
+  nuevo ni un renombrado: `ci-ok` sigue siendo el único requerido. La imagen
+  (`postgres:16`) es de un tercero y va por tag móvil: **falta el OK humano** que
+  AGENTS.md pide para meter una dependencia de terceros en un pipeline, y la decisión de
+  pinarla por digest (design D3, tasks 8.5).
 
 Contrato: **minor** (capacidad nueva compatible; ningún repo que hoy pasa empieza a
 fallar por esta versión).

@@ -46,6 +46,11 @@ de modo que cualquier comprobación que lea los tipos de ese cliente funcione de
 instalar sin un paso que haya que recordar. Un repositorio cuya forma no tiene capa de
 datos NO SHALL recibir ese paso.
 
+El alcance es el del andamio, que un repositorio recibe una sola vez, al nacer:
+SHALL cumplirlo todo repositorio que nace de un andamio que ya lo trae. Uno nacido
+antes no lo recibe sin copiarlo, el marco NO SHALL afirmar que lo cumple, y la nota
+de la versión que lo introduce SHALL decirle qué copiar para adoptarlo.
+
 Cuando el proyecto no genera cliente de datos, la herramienta de arranque SHALL nombrar
 en su salida cada lugar del repositorio donde viaja ese comando, y la verificación del
 marco SHALL fallar si el andamio lleva el comando a un lugar que esa salida no nombra.
@@ -70,6 +75,11 @@ marco SHALL fallar si el andamio lleva el comando a un lugar que esa salida no n
 - **WHEN** el andamio lleva el comando de generación a un archivo que la salida de la herramienta no nombra en el camino «sin cliente de datos»
 - **THEN** la verificación del marco falla nombrando ese archivo
 
+#### Scenario: Un repositorio con capa de datos nacido antes
+
+- **WHEN** un repositorio con capa de datos nació de un andamio que no generaba el cliente al instalar
+- **THEN** la nota de la versión que lo introduce le dice qué línea agregar para adoptarlo, y el marco no afirma que ese repositorio lo cumple
+
 ### Requirement: La integración ofrece el motor de datos real y una sola base lo nombra
 
 Un repositorio nacido del andamio con capa de datos SHALL disponer, durante la ejecución
@@ -92,6 +102,11 @@ SHALL fallar cuando alguno diverja o aparezca sin declarar.
 La unicidad se verifica porque su incumplimiento no da error: un cliente de datos que
 encuentra ausente la base nombrada la crea vacía y sigue, de modo que las pruebas
 correrían contra una base distinta de la que el proyecto usa, sin una sola señal.
+
+El alcance es el del andamio, que un repositorio recibe una sola vez, al nacer:
+SHALL cumplirlo todo repositorio que nace de un andamio que ya lo trae. Uno nacido
+antes no lo recibe sin copiarlo, el marco NO SHALL afirmar que lo cumple, y la nota
+de la versión que lo introduce SHALL decirle qué copiar para adoptarlo.
 
 #### Scenario: La suite dispone de una instancia real del motor de datos
 
@@ -117,6 +132,11 @@ correrían contra una base distinta de la que el proyecto usa, sin una sola señ
 
 - **WHEN** el repositorio nace con una forma que no tiene capa de datos
 - **THEN** su integración no levanta ningún motor de datos ni declara una conexión a uno
+
+#### Scenario: Una integración con capa de datos nacida antes
+
+- **WHEN** un repositorio con capa de datos nació de un andamio cuya integración no levantaba el motor de datos
+- **THEN** la nota de la versión que lo introduce le dice qué bloque copiar para adoptarlo, y el marco no afirma que ese repositorio lo cumple
 
 ### Requirement: El corredor de pruebas y su proveedor de cobertura se declaran como un par
 
