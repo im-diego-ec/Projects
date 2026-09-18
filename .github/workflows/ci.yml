@@ -1026,12 +1026,17 @@ jobs:
       # entrada y un enlace, sin decirle a nadie que hacer. La 1.9.0 ya se armo asi, y
       # no le llego a nadie solo porque el destino del aviso nunca se configuro.
       #
-      # Cobra TRES causas de rojo, y el nombre del paso las nombra porque es lo que
+      # Cobra CUATRO causas de rojo, y el nombre del paso las nombra porque es lo que
       # alguien lee cuando su PR se pone rojo: que falte el resumen para consumidores,
       # que el texto de fabrica del paso 1 del release quede encima de cambios reales,
-      # y que el mensaje no entre en el limite. Mide las dos secciones que el aviso
-      # todavia puede mandar —[No publicado] y la version mas alta— porque en el PR de
-      # release la primera acaba de vaciarse y la que importa es la segunda.
+      # que el resumen use jerga de oficio que quien no es tecnico no lee, y que el
+      # mensaje no entre en el limite. La jerga se cobra desde el lote 10 del porte
+      # (que-es-breaking): una compuerta nueva sale en rojo el dia que sale solo si su
+      # arreglo llega escrito en palabras que entiende quien recibe el PR de bump.
+      #
+      # Mide las dos secciones que el aviso todavia puede mandar —[No publicado] y la
+      # version mas alta— porque en el PR de release la primera acaba de vaciarse y la
+      # que importa es la segunda.
       #
       # ROJO Y NO AVISO, por la misma razon que el paso de arriba: vive en el ci.yml de
       # Projects y no viaja a ningun consumidor; los unicos afectados son quienes
@@ -1043,7 +1048,7 @@ jobs:
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
         with: { node-version: "22" }
 
-      - name: El aviso de la proxima version dice que hacer y entra sin recortarse
+      - name: El aviso de la proxima version dice que hacer, sin jerga, y entra sin recortarse
         shell: bash
         run: node herramientas/aviso-entra-en-el-mensaje.mjs CHANGELOG.md
 
@@ -1398,7 +1403,7 @@ jobs:
           # if al job, y eso es apagarlo.
           if [ "${{ github.event_name }}" = "pull_request" ]; then
             [ "${{ needs.changelog.result }}" = "success" ] || {
-              echo "::error::el check del CHANGELOG en el PR termino en '${{ needs.changelog.result }}'. Mira cual de sus dos pasos: 'El PR que cambia el marco toca el CHANGELOG' (falta la entrada) o 'El aviso de la proxima version dice que hacer y entra sin recortarse' (falta el resumen para consumidores, quedo el texto de fabrica encima de cambios, o el mensaje no entra); cada uno deja su arreglo escrito"
+              echo "::error::el check del CHANGELOG en el PR termino en '${{ needs.changelog.result }}'. Mira cual de sus dos pasos: 'El PR que cambia el marco toca el CHANGELOG' (falta la entrada) o 'El aviso de la proxima version dice que hacer, sin jerga, y entra sin recortarse' (falta el resumen para consumidores, quedo el texto de fabrica encima de cambios, el resumen usa jerga de oficio, o el mensaje no entra); cada uno deja su arreglo escrito"
               exit 1
             }
           else

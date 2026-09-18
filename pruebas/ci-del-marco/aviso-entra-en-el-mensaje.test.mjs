@@ -38,6 +38,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import * as laAction from "../../actions/aviso-version/aviso-version.mjs";
+import { SIN_TRADUCCION } from "../docs/lectura.mjs";
 import {
   ENTRADA_SIN_PUBLICAR,
   PLACEHOLDER_SIN_CAMBIOS,
@@ -583,4 +584,105 @@ test("el centinela va ANTES del recorte, y el predicado puro lo dice solo", () =
   );
   assert.equal(esPlaceholderConCambios(["### Para consumidores", "", PLACEHOLDER_SIN_CAMBIOS].join("\n")), null, "sin subsecciones no hay nada que denunciar");
   assert.equal(esPlaceholderConCambios(["### Añadido", "", "- x"].join("\n")), null, "sin la seccion el hallazgo es el otro: no se acumulan");
+});
+
+// ---------------------------------------------------------------------------
+// La seccion se entiende: «Para consumidores» sin jerga de oficio (lote 10 del porte)
+// ---------------------------------------------------------------------------
+//
+// POR QUE. Desde la decision D1 del PO (2026-09-17), una compuerta nueva cuyo arreglo
+// cabe en el repositorio del consumidor sale en ROJO el dia que sale (AGENTS.md, «Qué es
+// BREAKING»). Eso solo es justo si el arreglo llega escrito, y llega en ESTA seccion: es
+// lo que el aviso manda y lo que el PR de bump pone adelante. Quien lo recibe puede no
+// saber leer un `::error::`, asi que la seccion se escribe con la regla de las paginas
+// para quien no es tecnico: sin la jerga de oficio que `pruebas/docs/lectura.mjs` les
+// prohibe. Si esa mitad faltara, la regla nueva se degrada en un PR rojo que nadie
+// mergea.
+//
+// Los casos usan solo `medir` y `main`, que ya existian: contra la compuerta vieja cada
+// uno cae por su propia razon (no hay hallazgo de jerga), y no el archivo entero por un
+// import faltante.
+
+const jergaDe = (r, etiqueta = ENTRADA_SIN_PUBLICAR) =>
+  r.hallazgos.filter((h) => h.etiqueta === etiqueta && h.motivo === "jerga-en-para-consumidores");
+
+test("ROJO PRIMERO: un «Para consumidores» escrito en jerga de oficio es ROJO, y nombra las palabras", () => {
+  const r = medir(changelogCon("Nada cambia en tu pipeline hasta que hagas merge del PR de bump."), LIMITE_POR_DEFECTO, {});
+  const hallazgos = jergaDe(r);
+  assert.equal(hallazgos.length, 1, "UN hallazgo por seccion, no uno por palabra ni por dialecto: la jerga no depende del dialecto");
+  assert.deepEqual(hallazgos[0].palabras, ["pipeline", "merge"], "y nombra las palabras, que es lo que vuelve accionable el rojo");
+});
+
+test("ROJO PRIMERO: la lista es LA de las paginas para quien no es tecnico, no una copia", () => {
+  // Una definicion, tres usos: el banco del estandar de lectura, el de la puerta de
+  // entrada y esta compuerta. Si la compuerta copiara la lista, la primera palabra que se
+  // agregue en docs quedaria permitida aca sin que nadie lo note.
+  const escapadas = SIN_TRADUCCION.filter((palabra) => {
+    const r = medir(changelogCon(`Revisá el ${palabra} de tu repositorio.`), LIMITE_POR_DEFECTO, {});
+    return jergaDe(r).length !== 1;
+  });
+  assert.ok(SIN_TRADUCCION.length > 20, "la lista de lectura.mjs salio vacia: el caso pasaria sin medir nada");
+  assert.deepEqual(escapadas, [], "estas palabras estan prohibidas en las paginas para quien no es tecnico y la compuerta las deja pasar");
+});
+
+test("ROJO PRIMERO: el gerundio ingles cae por la forma, aunque ninguna lista lo tenga", () => {
+  const r = medir(changelogCon("Revisá el bumping de tu repositorio antes de aceptar."), LIMITE_POR_DEFECTO, {});
+  assert.deepEqual(jergaDe(r)[0]?.palabras, ["bumping"]);
+});
+
+test("CONTROL POSITIVO: lo que va entre backticks es un nombre que se copia, no prosa", () => {
+  // Es la misma escotilla que tienen las paginas: un archivo o un comando se escriben
+  // como son. Sin ella, decir «copiá `desplegar.yml`» o nombrar el workflow que hay que
+  // editar seria rojo, y la seccion tendria que mentir sobre el nombre.
+  const r = medir(
+    changelogCon("Copiá `desplegar.yml` del andamio nuevo y corré `pnpm build`; el archivo `.github/workflows/ci.yml` no cambia."),
+    LIMITE_POR_DEFECTO,
+    {},
+  );
+  assert.deepEqual(jergaDe(r), []);
+});
+
+test("la jerga FUERA de «Para consumidores» no se cobra: el detalle de abajo es para quien lo quiera leer", () => {
+  const r = medir(
+    sinPublicarCon("Nada que hacer: la compuerta nueva corre en el CI del marco.", ["", "### Añadido", "", "- un workflow y un check nuevos en el pipeline"]),
+    LIMITE_POR_DEFECTO,
+    {},
+  );
+  assert.deepEqual(r.hallazgos.filter((h) => h.etiqueta === ENTRADA_SIN_PUBLICAR), []);
+});
+
+test("la jerga no se acumula con la falta de la seccion ni con el texto de fabrica", () => {
+  // Excluyentes por seccion, como los otros dos: sin la seccion el arreglo es escribirla,
+  // y con el texto de fabrica el arreglo es reemplazarlo. Un tercer rojo encima no agrega
+  // un dato.
+  const sinSeccion = ["# Changelog", "", `## [${ENTRADA_SIN_PUBLICAR}]`, "", "### Corregido", "", "- el pipeline y el merge", ""].join("\n");
+  assert.deepEqual(medir(sinSeccion, LIMITE_POR_DEFECTO, {}).hallazgos.map((h) => h.motivo), ["sin-para-consumidores"]);
+
+  const deFabrica = sinPublicarCon(PLACEHOLDER_SIN_CAMBIOS, ["", "### Añadido", "", "- un check en el pipeline"]);
+  assert.deepEqual(
+    medir(deFabrica, LIMITE_POR_DEFECTO, {}).hallazgos.filter((h) => h.etiqueta === ENTRADA_SIN_PUBLICAR).map((h) => h.motivo),
+    ["placeholder-con-cambios"],
+  );
+});
+
+test("jerga y recorte se cobran JUNTOS: son dos arreglos distintos", () => {
+  const r = medir(changelogCon(`Mirá el pipeline. ${rellenoQuePasa(LIMITE_POR_DEFECTO)}`), LIMITE_POR_DEFECTO, {});
+  const motivos = r.hallazgos.filter((h) => h.etiqueta === ENTRADA_SIN_PUBLICAR).map((h) => h.motivo);
+  assert.deepEqual(motivos, ["jerga-en-para-consumidores", ...FORMATOS.map(() => "recorte")]);
+});
+
+test("EL PR DE RELEASE: la version recien cortada tambien se lee, no solo el [No publicado]", () => {
+  const r = medir(changelogRecienCortado("1.10.0", "Actualizá el workflow de tu repositorio."), LIMITE_POR_DEFECTO, {});
+  assert.deepEqual(jergaDe(r, "1.10.0")[0]?.palabras, ["workflow"]);
+  assert.deepEqual(jergaDe(r), [], "el placeholder de la skill no tiene jerga");
+});
+
+test("el ::error:: de la jerga nombra la seccion, las palabras y el arreglo, y sale 1", () => {
+  const { codigo, dicho } = conTexto(changelogCon("Nada cambia en tu pipeline."));
+  assert.equal(codigo, 1);
+  const error = errores(dicho).join("\n");
+  assert.match(error, /\[No publicado\]/);
+  assert.match(error, /pipeline/);
+  assert.match(error, /Arreglo:/);
+  assert.match(error, /backticks/, "y dice la salida legitima para un nombre que hay que copiar tal cual");
 });

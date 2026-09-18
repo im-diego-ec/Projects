@@ -832,8 +832,10 @@ caro posible, porque le diría a un consumidor que haga algo que no corresponde.
 - **«Para consumidores» es una convención del changelog, y en el marco se verifica
   al escribirla.** `herramientas/aviso-entra-en-el-mensaje.mjs` corre en el CI
   propio de Projects (job `changelog-en-el-pr`) y pone rojo el PR si falta la
-  sección, si el texto de fábrica del release quedó encima de cambios reales o si
-  el mensaje no entra en el límite en **alguno de los dos dialectos**; mide
+  sección, si el texto de fábrica del release quedó encima de cambios reales, si
+  la sección usa la jerga de oficio que las páginas para quien no es técnico tienen
+  prohibida (fuera de backticks) o si el mensaje no entra en el límite en **alguno
+  de los dos dialectos**; mide
   `[No publicado]` y la versión más alta, con las mismas funciones de esta action. Un repo que use la action sin esa
   compuerta la detecta recién al avisar, cuando la versión ya está publicada.
 - **Esta action no envía nada, así que no puede garantizar que el aviso llegue.**

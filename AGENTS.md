@@ -187,11 +187,14 @@ trae un check nuevo, el rojo aparece **dentro de ese PR**.
 - Cada release lleva un tag inmutable `vX.Y.Z`, y **el release mueve los pines
   internos** del marco a esa versión. No depende de que nadie se acuerde:
   `pruebas/andamio/pinado.test.mjs` los compara contra el CHANGELOG.
-- **MAJOR** (`v2`): cambio incompatible. Los consumidores migran deliberadamente,
-  guiados por una nota de migración en `docs/`, y el PR de bump del major es donde
-  cada uno decide cuándo.
-- **MINOR**: capacidad nueva compatible (un `input` opcional, un workflow
-  nuevo, un check adicional que no rompe lo verde de nadie).
+- **MAJOR** (`v2`): un cambio de la lista cerrada de «Qué es BREAKING», abajo. Los
+  consumidores migran deliberadamente, guiados por una nota de migración en `docs/`, y
+  el PR de bump del major es donde cada uno decide cuándo.
+- **MINOR**: capacidad nueva compatible (un `input` opcional, un workflow nuevo) **y
+  también una compuerta nueva o endurecida cuyo arreglo cabe en el repositorio del
+  consumidor**, aunque ponga en rojo su PR de bump. Eso no rompe a nadie: el consumidor
+  pina la versión exacta, así que publicar no le mueve nada, y el rojo aparece dentro de
+  un PR que él decide cuándo mergear, con el arreglo escrito en «Para consumidores».
 - **PATCH**: corrección de comportamiento dentro del contrato.
 - **El `CHANGELOG.md` es obligatorio en el PR que introduce el cambio**, no en
   el release. Es la única superficie por la que un consumidor se entera de qué
@@ -199,25 +202,72 @@ trae un check nuevo, el rojo aparece **dentro de ese PR**.
 
 ### Qué es BREAKING
 
-Un cambio es breaking si un repo consumidor **que mergea el PR de bump sin leerlo**
-puede quedar roto, o —peor— seguir en verde haciendo algo distinto. El bump por PR
-da la oportunidad de leer; no obliga a nadie a usarla, así que la vara no baja:
+Un cambio es breaking si está en esta lista, y la lista es **cerrada**: lo que no está
+acá no es breaking, y sumarle un caso es un change de este repo, no el criterio de
+quien clasifica un PR.
 
-- Quitar o renombrar un `input`, `secret` u `output` de un workflow reusable, o
-  volver requerido uno que era opcional.
-- Cambiar un valor por defecto de forma que cambie el comportamiento.
-- **Renombrar un job cuyo nombre publica un check.** Si un consumidor tiene ese
-  nombre como check requerido en su ruleset, el renombrado le bloquea todos los
-  PRs y el error no menciona a Projects por ningún lado. Es el breaking más caro y
-  el más fácil de cometer sin darse cuenta.
-- Exigir un permiso nuevo del token, o un runtime/herramienta de versión mayor.
-- Endurecer un check de modo que un repo que hoy pasa mañana falle. Si el
-  endurecimiento es el objetivo, se estrena en modo aviso y el endurecimiento
-  va en el major siguiente.
+1. **Quitar o renombrar un `input`, `secret` u `output` de un workflow reusable, o
+   volver requerido uno que era opcional.**
+2. **Cambiar un valor por defecto de forma que cambie el comportamiento.** Es el más
+   traicionero para quien no lee: el consumidor sigue en verde haciendo otra cosa.
+3. **Renombrar un job cuyo nombre publica un check.** Si un consumidor tiene ese
+   nombre como check requerido en su ruleset, el renombrado le bloquea todos los
+   PRs y el error no menciona a Projects por ningún lado. Es el breaking más caro y
+   el más fácil de cometer sin darse cuenta.
+4. **Exigir un permiso nuevo del token, o un runtime/herramienta de versión mayor.**
+5. **Exigir algo que solo se arregla fuera del repositorio del consumidor.** Una
+   compuerta nueva o endurecida cuyo arreglo es una configuración de GitHub (el
+   ruleset, un ajuste de la organización), un secreto o una variable que carga quien
+   administra el repo, o un acto de administrador: nada que se commitee en el PR de
+   bump la pone verde. Tiene dos salidas y solo dos: se estrena en **modo aviso**
+   —ruidoso, con el arreglo escrito en el `::warning::` y en «Para consumidores»— y
+   se endurece en la línea mayor siguiente, o va directo a esa línea como breaking.
 
-Ante la duda: **es breaking**. Se nombra en la sección «Para consumidores» del
-CHANGELOG con lo que hay que hacer, que es la superficie que el PR de bump pone
-adelante.
+Las cuatro primeras son el **contrato publicado** de una pieza referenciada, y son
+incompatibles aunque alguna se pueda arreglar editando el propio `ci.yml`: un contrato
+que cambia sin versión mayor deja de ser un contrato. La quinta es la frontera de las
+compuertas, y la decide una sola pregunta: **¿puede el consumidor volver a verde con
+cambios propios dentro de su PR de bump?**
+
+- **Si puede, NO es breaking**, aunque el PR nazca rojo en todos los consumidores: la
+  compuerta sale **exigible el día que sale**, en un MINOR. A cambio, su arreglo va
+  escrito en la sección «Para consumidores» del CHANGELOG **en el lenguaje de las
+  páginas para quien no es técnico** (`docs/01-introduccion.md`), porque quien recibe
+  el PR de bump puede no saber leer un `::error::`. La compuerta del aviso
+  (`herramientas/aviso-entra-en-el-mensaje.mjs`, en el CI de este repo) pone rojo el PR
+  que escribe esa sección con la jerga de oficio que esas páginas tienen prohibida. Que
+  el arreglo **esté** escrito no lo verifica ninguna máquina: lo pregunta la plantilla
+  de PR.
+- **Si no puede, es el caso 5.**
+
+**Un cambio de andamio no es breaking para nadie.** `plantilla/` se copia una vez y no
+viaja por el PR de bump, así que no le cambia nada a un consumidor que ya existe. Se
+anuncia igual en «Para consumidores», con lo que hay que copiar a mano para quien lo
+quiera.
+
+> **Esta regla cambió el 2026-09-17 (decisión D1 del PO), y el motivo importa más que
+> la regla.** Hasta entonces endurecer cualquier check contaba como breaking, y la
+> salida escrita era estrenarlo avisando y dejar el rojo para la línea mayor
+> siguiente. Esa regla nació del incidente del 2026-08-19, cuando un check nuevo
+> enrojeció a un consumidor **sin que mediara ningún PR**, porque el canal era el tag
+> móvil `v1`. El 2026-08-21 el canal pasó a ser el pin exacto: desde ahí el rojo llega
+> dentro de un PR que nadie está obligado a mergear, y la regla sobrevivió a su causa.
+> Lo que costaba: compuertas que existían y no se le exigían a nadie, y cada compuerta
+> portada desde Rigel volviendo a ser breaking.
+>
+> Rigel —el marco del que Projects se bifurcó— hizo el mismo cambio en su 2.0.0
+> (change `linea-v2`, 2026-09-04) con una lista cerrada de cuatro casos, sin el
+> quinto: no decía qué pasa cuando el arreglo no cabe en el PR. Y dos días después
+> encontró su skill de release todavía con la regla vieja. Por eso acá
+> `pruebas/ci-del-marco/que-es-breaking.test.mjs` exige que la plantilla de PR ofrezca
+> exactamente esta lista y que ninguna superficie que dicta la regla vuelva a decir la
+> vieja.
+
+Ante la duda: **es breaking**, con la duda entendida así —¿puede el consumidor volver
+a verde con cambios suyos dentro de su PR de bump, sin quedar en verde haciendo otra
+cosa?—. Si no lo sabés, es breaking. Sea o no breaking, se nombra en la sección «Para
+consumidores» del CHANGELOG con lo que hay que hacer, que es la superficie que el PR
+de bump pone adelante.
 
 ### Antes de publicar una versión
 

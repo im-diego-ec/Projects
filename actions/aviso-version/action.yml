@@ -58,9 +58,10 @@ author: la organización
 #     destino que exija otra forma es un change del marco, no una config.
 #   · "Para consumidores" es una convencion del CHANGELOG. En el marco SI se
 #     verifica al escribirla: herramientas/aviso-entra-en-el-mensaje.mjs corre
-#     en el CI propio y pone rojo el PR si falta, si el mensaje no entra o si el
-#     texto de fabrica del release quedo encima de cambios reales. Un repo que
-#     use esta action sin esa compuerta la detecta recien al avisar.
+#     en el CI propio y pone rojo el PR si falta, si el mensaje no entra, si el
+#     texto de fabrica del release quedo encima de cambios reales o si la
+#     seccion usa jerga de oficio. Un repo que use esta action sin esa
+#     compuerta la detecta recien al avisar.
 # ---------------------------------------------------------------------------
 
 inputs:

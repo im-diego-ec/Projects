@@ -19,9 +19,15 @@ Hasta la 1.3.0 el canal era el tag móvil `v1`, que empujaba el cambio a todos a
 la vez. `v1` sigue existiendo, pero ya no es el canal de distribución.
 
 Convención de secciones: `Añadido`, `Cambiado`, `Obsoleto`, `Eliminado`,
-`Corregido`, `Seguridad`. Todo lo que sea **BREAKING para `@v1`** se marca en
-mayúsculas al inicio de la línea y obliga a abrir línea mayor nueva: `v1` no se
-mueve sobre un cambio incompatible.
+`Corregido`, `Seguridad`, y en cada versión un `### Para consumidores` con lo que un
+consumidor tiene que hacer, escrito para quien no es técnico. Todo lo **BREAKING** se
+marca en mayúsculas al inicio de la línea y obliga a abrir línea mayor nueva. Qué es
+breaking es una lista **cerrada** que vive en `AGENTS.md` («Qué es BREAKING»): el
+contrato publicado de una pieza referenciada, y lo que solo se arregla fuera del
+repositorio del consumidor. Una compuerta nueva o endurecida cuyo arreglo cabe en su
+repositorio **no** es breaking, aunque su PR de bump nazca rojo: se arregla ahí mismo,
+con el arreglo escrito en «Para consumidores». Un cambio de andamio tampoco: no viaja
+por ese PR.
 
 > Nota: en los **proyectos** el changelog es el archive de OpenSpec y no se
 > mantiene un archivo aparte. Projects es la excepción deliberada porque tiene
@@ -43,7 +49,7 @@ mueve sobre un cambio incompatible.
 
 ### Para consumidores
 
-**Ningún veredicto de tu pipeline cambia**: lo que pasaba en verde sigue en verde.
+**Ningún veredicto de tus verificaciones cambia**: lo que pasaba en verde sigue en verde.
 Lo único que puede aparecer es **un aviso nuevo** si tu `.projects-desvios.json`
 tiene un desvío incompleto o una fecha imposible; completalo ahora, porque en la
 línea mayor siguiente el desvío incompleto deja de absorber.
@@ -51,7 +57,8 @@ línea mayor siguiente el desvío incompleto deja de absorber.
 **El resto es andamio y no te llega solo**: un proyecto nuevo nace con la promoción a
 producción manual, desvíos más precisos y documentos al día; uno ya creado conserva la
 copia que recibió. Si tenés un sitio generado con `desplegar.yml`, su producción se
-sigue publicando en cada merge hasta que copies el archivo nuevo (ver «Cambiado»).
+sigue publicando cada vez que se integra un cambio a `main`, hasta que copies el archivo
+nuevo (ver «Cambiado»).
 
 ### Cambiado
 
@@ -83,10 +90,14 @@ sigue publicando en cada merge hasta que copies el archivo nuevo (ver «Cambiado
   quien genere un sitio desde acá: su producción deja de publicarse sola, que es lo
   que el marco venía prometiendo por escrito sin cumplir.
 
-- **BREAKING para quien ya tuviera un sitio generado** —hoy, nadie—: `produccion`
-  ya no se dispara por `workflow_run`. Un merge que antes publicaba, ahora sube a DEV
-  y espera. Se dice acá porque el criterio del repo es que endurecer un check que un
-  repo verde ya pasaba es incompatible aunque no rompa ningún archivo.
+- **Un sitio ya generado no cambia solo, y esto no es BREAKING.** `desplegar.yml` es
+  andamio: se copió una vez y no viaja por el PR de bump, así que en un repo que ya lo
+  tiene `produccion` se sigue disparando por `workflow_run` y cada merge sigue
+  publicando. Quien quiera la promoción manual copia el archivo nuevo. Hasta el
+  2026-09-17 esta viñeta se declaraba incompatible «para quien ya tuviera un sitio
+  generado —hoy, nadie—», y las dos mitades estaban mal: un cambio de andamio no le
+  llega a ningún consumidor (`AGENTS.md`, «Qué es BREAKING»), y sí había un
+  consumidor con un sitio generado.
 
 - **El marco declara que tiene un solo mantenedor, y deja de esperar una revisión
   que no puede llegar.** `AGENTS.md` pedía que lo que escribe un builder lo revise
@@ -337,6 +348,24 @@ sigue publicando en cada merge hasta que copies el archivo nuevo (ver «Cambiado
 - **La compuerta del aviso mide cada dialecto que la action acepta**, porque la
   traducción cambia el largo, y el `::error::` nombra el dialecto que no entra. **Para
   consumidores: nada** — corre en el CI del marco.
+
+- **Una compuerta nueva o endurecida deja de ser incompatible por sí misma, y lo
+  incompatible pasa a ser una lista cerrada.** `AGENTS.md` decía que endurecer un check
+  era breaking y que «se estrena en modo aviso» hasta la versión mayor siguiente: una
+  regla nacida del incidente del 2026-08-19, cuando el canal era el tag móvil y el rojo
+  llegaba sin PR. Desde el 2026-08-21 el canal es el pin exacto y el rojo llega dentro
+  del PR de bump, así que la regla sobrevivió a su causa. La decisión D1 del PO
+  (2026-09-17) la reemplaza: lo incompatible son **cinco casos** —los cuatro de contrato
+  de siempre y uno nuevo, **exigir algo que solo se arregla fuera del repositorio del
+  consumidor** (configuración de GitHub, un acto de administrador), que se estrena
+  avisando o va a la línea mayor—. Una compuerta cuyo arreglo cabe en el repositorio
+  sale exigible el día que sale, en un MINOR, con el arreglo escrito en «Para
+  consumidores». Un cambio de andamio no es incompatible para nadie. La plantilla de PR,
+  la skill del release, el glosario y `docs/11-reglas-no-escritas.md` dicen lo mismo.
+  Portado de Rigel (2.0.0, change `linea-v2`), con el quinto caso que su lista no tenía.
+  **Para consumidores: nada hoy.** Desde la próxima versión, una compuerta nueva puede
+  llegar en rojo dentro de tu PR de actualización, con lo que tenés que cambiar escrito
+  en «Para consumidores».
 
 ### Eliminado
 
@@ -1343,6 +1372,20 @@ sigue publicando en cada merge hasta que copies el archivo nuevo (ver «Cambiado
   secret.** Compara `secrets.AVISO_VERSION_FORMATO` con vacío —sin leer su valor— y
   emite `::warning::` con el arreglo; no detiene el envío. **Para consumidores: nada**
   — es el workflow propio del marco.
+
+- **«Para consumidores» se escribe para quien no es técnico, y el PR que la escribe en
+  jerga sale rojo.** `herramientas/aviso-entra-en-el-mensaje.mjs` suma una cuarta causa:
+  la sección de `[No publicado]` o de la versión más alta usa, fuera de backticks, la
+  jerga de oficio que tienen prohibida las páginas como `docs/01-introduccion.md`. La
+  lista no se copia: se importa de `pruebas/docs/lectura.mjs`. Es la otra mitad de la
+  regla de arriba: exigir una compuerta el día que sale solo es justo si quien recibe el
+  PR de bump entiende el arreglo. **Para consumidores: nada** — corre en el CI del marco.
+- **Un banco ata la definición de incompatible a sus copias.**
+  `pruebas/ci-del-marco/que-es-breaking.test.mjs` exige que la plantilla de PR ofrezca
+  exactamente la lista cerrada de `AGENTS.md`, con la misma frase, y que ninguna
+  superficie que dicta la regla vuelva a decir la vieja. A Rigel le pasó: su skill de
+  release contradijo su `AGENTS.md` dos días sin que nada se pusiera rojo. **Para
+  consumidores: nada.**
 
 ### Corregido
 

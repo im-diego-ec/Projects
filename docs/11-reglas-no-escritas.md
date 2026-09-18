@@ -41,7 +41,7 @@ otros tres sino una cosa distinta:
 
 | Estado | Significa |
 |---|---|
-| 🟠 **MODO AVISO** | Existe un check, corre, mira y **anota** — y está declarado que **no es compuerta**. Se usa cuando la propiedad que la regla promete no se puede decidir con lo que el check puede leer, y la medición lo demuestra. Un 🟠 **no** es un 🟡: el 🟡 se puede evadir en silencio, el 🟠 avisa siempre y dice qué parte no acredita. |
+| 🟠 **MODO AVISO** | Existe un check, corre, mira y **anota** — y está declarado que **no es compuerta**. Se usa cuando la propiedad que la regla promete no se puede decidir con lo que el check puede leer, y la medición lo demuestra; o cuando lo que exige solo se arregla fuera del repositorio que lo recibe —una configuración de GitHub, un acto de quien lo administra— y el marco eligió estrenarlo así en vez de tratarlo como incompatible ([`AGENTS.md`](../AGENTS.md), «Qué es BREAKING», caso 5). Un 🟠 **no** es un 🟡: el 🟡 se puede evadir en silencio, el 🟠 avisa siempre y dice qué parte no acredita. |
 
 **Por qué existe este estado.** Un check que se pone rojo por una propiedad que
 no puede decidir se lee como compuerta sin serlo, y eso es peor que no tenerlo:

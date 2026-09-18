@@ -64,7 +64,7 @@
 // Y NINGUNA de las dos es ROJO, no un aviso: no haber podido medir nada no es haber
 // medido bien.
 //
-// ── Y SE MIDEN TRES COSAS, Y SÓLO UNA ES UN LARGO ────────────────────────────────
+// ── Y SE MIDEN CUATRO COSAS, Y SÓLO UNA ES UN LARGO ──────────────────────────────
 //
 // 1. QUE FALTE `### Para consumidores` ES ROJO, aunque el cuerpo entre en el límite.
 //    Rigel lo decidió el 2026-09-09 (su issue #369) y Projects lo adopta por la política
@@ -83,11 +83,28 @@
 //    detalle del marco.
 //
 // 3. EL CENTINELA DEL TEXTO DE FÁBRICA (ver `esPlaceholderConCambios`).
+//
+// 4. QUE LA SECCIÓN SE ENTIENDA SIN SER TÉCNICO (ver `jergaEnParaConsumidores`). Es la
+//    otra mitad de la política D1 del PO (2026-09-17): una compuerta nueva cuyo arreglo
+//    cabe en el repositorio del consumidor sale en ROJO el día que sale (`AGENTS.md`,
+//    «Qué es BREAKING»), y eso sólo es justo si el arreglo llega escrito en palabras que
+//    quien recibe el PR de bump entiende. Esa persona puede no saber leer un `::error::`.
+//    Rigel hizo el mismo cambio de política en su 2.0.0 sin esta mitad; acá se cobra con
+//    la MISMA regla que las páginas para quien no es técnico (`docs/01-introduccion.md`):
+//    la lista y la forma viven en `pruebas/docs/lectura.mjs` y se importan, no se copian.
+//    Lo que va entre backticks queda afuera, como en esas páginas: un archivo o un
+//    comando se escriben como son. LÍMITE DECLARADO: mide palabras, no si la sección se
+//    entiende, ni si el arreglo ESTÁ escrito — eso lo pregunta la plantilla de PR.
 
 import { readFileSync, realpathSync } from "node:fs";
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
+// La regla de lectura de las páginas para quien no es técnico. Vive en `pruebas/docs/`
+// porque nació para medir docs/; se importa y no se copia para que haya UNA lista: si se
+// agrega una palabra allá, esta compuerta la cobra sin que nadie toque este archivo (lo
+// exige un caso del banco, palabra por palabra).
+import { SIN_TRADUCCION, jergaDeOficio, jergaPorForma } from "../pruebas/docs/lectura.mjs";
 import {
   FORMATOS,
   LIMITE_POR_DEFECTO,
@@ -181,6 +198,19 @@ export function esPlaceholderConCambios(cuerpo) {
 }
 
 /**
+ * Las palabras de oficio que usa la PROSA de `### Para consumidores`, o `[]` si no usa
+ * ninguna (o si la sección no existe: ese es otro hallazgo, con otro arreglo). Primero
+ * las de la lista, en su orden, y después las que caen por la forma (el gerundio
+ * inglés), sin repetir.
+ */
+export function jergaEnParaConsumidores(cuerpo) {
+  const { encontrada, texto } = extraerParaConsumidores(cuerpo);
+  if (!encontrada) return [];
+  const porLista = jergaDeOficio(texto, SIN_TRADUCCION).map((p) => p.toLowerCase());
+  return [...new Set([...porLista, ...jergaPorForma(texto)])];
+}
+
+/**
  * Mide cada sección que el aviso todavía puede mandar y devuelve un hallazgo por cada
  * defecto encontrado. Cada hallazgo trae su `motivo`, porque los tres piden arreglos
  * distintos:
@@ -192,13 +222,17 @@ export function esPlaceholderConCambios(cuerpo) {
  *    `recortar`), y `recortadoEnAlgunDialecto`.
  *  · `"placeholder-con-cambios"` — la sección sigue con el texto de fábrica y la
  *    entrada YA tiene otras subsecciones. Trae sus títulos.
+ *  · `"jerga-en-para-consumidores"` — la sección está y su prosa usa jerga de oficio que
+ *    las páginas para quien no es técnico tienen prohibida. UNO por sección (la jerga no
+ *    depende del dialecto). Trae `palabras`.
  *  · `"recorte"` — la sección está y el mensaje no entra. UNO por (sección, dialecto),
  *    porque puede entrar en uno y no en el otro. Trae `formato` y `largo`.
  *
- * Son EXCLUYENTES por sección, a propósito: cuando falta el encabezado no se emite
- * también el recorte, porque el arreglo es el mismo y ya se dice; y el centinela va
- * antes del recorte porque, mientras el anuncio sea el de fábrica, el largo medido no
- * es el del mensaje que va a salir.
+ * Los dos primeros son EXCLUYENTES por sección, a propósito: cuando falta el encabezado
+ * no se emite también el recorte, porque el arreglo es el mismo y ya se dice; y el
+ * centinela va antes del recorte porque, mientras el anuncio sea el de fábrica, el largo
+ * medido no es el del mensaje que va a salir. La jerga y el recorte, en cambio, se cobran
+ * JUNTOS: son dos arreglos distintos sobre el mismo texto.
  *
  * Lista de hallazgos vacía = está todo. `sinCandidatos` = no había nada que medir, y
  * eso `main` lo trata como ROJO. Devuelve también el `limite` que USÓ, no el default:
@@ -260,6 +294,8 @@ export function medir(changelog, limite = LIMITE_POR_DEFECTO, env = process.env)
     } else if (anuncioVacioConCambios) {
       hallazgos.push({ etiqueta: c.etiqueta, motivo: "placeholder-con-cambios", subsecciones: anuncioVacioConCambios });
     } else {
+      const palabras = jergaEnParaConsumidores(c.seccion.cuerpo);
+      if (palabras.length > 0) hallazgos.push({ etiqueta: c.etiqueta, motivo: "jerga-en-para-consumidores", palabras });
       for (const r of recortes) hallazgos.push({ etiqueta: c.etiqueta, motivo: "recorte", ...r });
     }
 
@@ -314,7 +350,7 @@ export function main(argv = process.argv.slice(2), env = process.env) {
 
   if (hallazgos.length === 0) {
     console.log(
-      `✓ el aviso manda su seccion «Para consumidores» y entra sin recortarse en ${FORMATOS.join(" y ")}, para las ` +
+      `✓ el aviso manda su seccion «Para consumidores», sin jerga de oficio, y entra sin recortarse en ${FORMATOS.join(" y ")}, para las ` +
         "secciones que todavia se pueden mandar: " +
         candidatos.map((c) => `[${c.etiqueta}]`).join(" y ")
     );
@@ -332,6 +368,19 @@ export function main(argv = process.argv.slice(2), env = process.env) {
           "version que si lo toca. Arreglo: reemplazar ese texto por lo que un consumidor tiene " +
           "que hacer con estos cambios; si de verdad no tiene que hacer nada, decirlo con otras " +
           "palabras y no con el texto de fabrica, para que se vea que alguien lo penso"
+      );
+      continue;
+    }
+
+    if (h.motivo === "jerga-en-para-consumidores") {
+      console.log(
+        `::error file=${ruta}::la seccion [${h.etiqueta}] dice su "### Para consumidores" con jerga de oficio: ` +
+          `${h.palabras.join(", ")}. Esa seccion es lo que el aviso manda y lo que el PR de actualizacion de cada ` +
+          "consumidor pone adelante, y quien lo recibe puede no ser tecnico. Desde la decision D1 del PO una " +
+          "compuerta nueva sale en rojo el dia que sale (AGENTS.md, «Qué es BREAKING»), y eso solo es justo si el " +
+          "arreglo se entiende. Arreglo: decirlo con palabras corrientes, con la misma regla que docs/01-introduccion.md " +
+          "(la lista vive en pruebas/docs/lectura.mjs); si la palabra es un nombre que hay que copiar tal cual —un " +
+          "archivo, un comando—, ponerla entre backticks"
       );
       continue;
     }

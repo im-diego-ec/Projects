@@ -109,17 +109,32 @@ cambios (`### Añadido`, `### Corregido`, …) o solo el anuncio de fabrica.
 
 - **PATCH** — correccion de comportamiento dentro del contrato ya publicado.
 - **MINOR** — capacidad nueva compatible: un `input` opcional, un workflow o una
-  action nueva, un check adicional que no pone en rojo a nadie que hoy pasa.
-- **MAJOR** — cambio incompatible. **`v1` no se mueve**: se abre la linea `v2` y
-  los consumidores migran deliberadamente. Si dudas entre MINOR y MAJOR, **es
-  MAJOR**: mover `v1` sobre un cambio breaking rompe repos ajenos en silencio.
+  action nueva, **y tambien una compuerta nueva o endurecida cuyo arreglo cabe en el
+  repositorio del consumidor**, aunque su PR de bump nazca rojo. Su arreglo va escrito
+  en «Para consumidores», en palabras de quien no es tecnico.
+- **MAJOR** — un cambio de la lista cerrada de `AGENTS.md` («Que es BREAKING»). **`v1`
+  no se mueve**: se abre la linea `v2` y los consumidores migran deliberadamente. Si
+  dudas entre MINOR y MAJOR, **es MAJOR**: mover `v1` sobre un cambio breaking rompe
+  repos ajenos en silencio.
 
-Es breaking, entre otros: quitar o renombrar un `input`/`secret`/`output`,
-volver requerido uno opcional, cambiar un default de forma que cambie el
-comportamiento, **renombrar un job cuyo nombre publica un check** (le bloquea
-todos los PRs a quien lo tenga como check requerido, con un error que no
-menciona a Projects), exigir un permiso nuevo del token, o endurecer un check de
-modo que un repo que hoy pasa manana falle.
+**La lista no se copia aca, a proposito.** Vive en `AGENTS.md` y la plantilla de PR la
+repite frase por frase porque ahi se marca el caso; una tercera copia es la que se queda
+atras. A Rigel le paso exactamente eso: reescribio la regla el 2026-09-04 y esta skill,
+en su version, siguio diciendo la contraria hasta el 2026-09-06 (commit 9dfba86). Aca lo
+vigila `pruebas/ci-del-marco/que-es-breaking.test.mjs`.
+
+Lo que decide una compuerta nueva o endurecida es una sola pregunta: **puede el
+consumidor volver a verde con cambios propios dentro de su PR de bump?** Si puede, es
+MINOR aunque el PR nazca rojo en todos. Si el arreglo queda fuera de su repositorio
+—configuracion de GitHub, un secreto que carga quien administra, un acto de
+administrador—, es el caso 5 de la lista: se estrena en modo aviso o va a la linea
+mayor. Y un cambio de andamio no es breaking para nadie: no viaja por el PR de bump.
+
+> **Hasta el 2026-09-17 esta seccion clasificaba como breaking cualquier
+> endurecimiento**, por la regla que nacio del incidente del 2026-08-19, cuando el canal
+> era el tag movil y el rojo llegaba sin PR. Con el pin exacto, el rojo llega dentro de
+> un PR que el consumidor decide cuando mergear, y la regla sobrevivio a su causa. La
+> cambio la decision D1 del PO; el motivo largo esta en `AGENTS.md`, pegado a la lista.
 
 ---
 
@@ -279,12 +294,13 @@ node herramientas/aviso-entra-en-el-mensaje.mjs CHANGELOG.md
 ```
 
 Tiene que salir **0**. Mide las dos secciones que el aviso todavia puede mandar
-—`[No publicado]` y la recien cortada— y cobra tres cosas:
+—`[No publicado]` y la recien cortada— y cobra cuatro cosas:
 
 | Lo que cobra | Por que |
 |---|---|
 | Que cada una tenga su `### Para consumidores` | Sin ella el aviso manda la entrada entera, recortada si no entra |
 | Que el texto de fabrica no quede encima de cambios reales | El centinela del paso 1: hay cambios y el anuncio diria que no hay ninguno |
+| Que su `### Para consumidores` no use jerga de oficio (la lista de `pruebas/docs/lectura.mjs`, fuera de backticks) | Una compuerta nueva sale en rojo el dia que sale solo si su arreglo se entiende sin ser tecnico (`AGENTS.md`, «Que es BREAKING») |
 | Que el mensaje entre en el limite | El `::warning::` de la action llega DESPUES de mandar el mensaje recortado |
 
 Va como tabla para que agregar un cobro nuevo sea agregar una fila y no reescribir
