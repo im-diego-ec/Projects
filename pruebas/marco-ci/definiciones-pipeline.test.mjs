@@ -122,7 +122,9 @@ test("ROJO: un hallazgo de actionlint pone el paso rojo y el error dice como rep
   const res = correr(repoConWorkflows(), { PATH: `${curlQueSirve(release({ resultado: 1 }))}:${process.env.PATH}` });
   assert.equal(res.exit, 1, porque("un workflow invalido tiene que ser rojo", res.salida));
   assert.match(res.salida, /un hallazgo de juguete/);
-  assert.match(res.salida, /::error::las definiciones de pipeline no pasan la validacion.*actionlint 1\.7\.12/);
+  // El change el-arranque-no-supone-el-shell-ni-la-cuenta cambio el como: reproducirlo es
+  // correr herramientas/actionlint-local.mjs, que baja esa misma version.
+  assert.match(res.salida, /::error::las definiciones de pipeline no pasan la validacion.*misma version \(1\.7\.12\).*actionlint-local\.mjs/);
 });
 
 test("VERDE de control: el mismo camino con un validador conforme pasa", () => {

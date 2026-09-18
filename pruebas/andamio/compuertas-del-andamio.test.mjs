@@ -218,11 +218,14 @@ function veredicto(valores) {
 const TODO_BIEN = {
   "needs.marco.result": "success",
   "needs.constitucion.result": "success",
+  // El job `formato` lo sumo el change el-andamio-nace-formateado: corre en los dos
+  // carriles y el Veredicto no le acepta `skipped` (ver el caso ROJO de abajo).
+  "needs.formato.result": "success",
   "needs.build_test.result": "success",
   "needs.marco.outputs.solo_docs": "false",
 };
 
-test("veredicto del andamio · VERDE: los tres jobs en success", () => {
+test("veredicto del andamio · VERDE: los cuatro jobs en success", () => {
   const res = veredicto(TODO_BIEN);
   assert.equal(res.exit, 0, porque("con todo en verde el veredicto pasa", res.salida));
 });
@@ -232,6 +235,8 @@ for (const [job, valor, motivo] of [
   ["needs.marco.result", "skipped", /el CI de marco fallo/],
   ["needs.constitucion.result", "skipped", /la verificacion de la constitucion del marco termino en 'skipped'/],
   ["needs.build_test.result", "failure", /build-test termino en 'failure'/],
+  ["needs.formato.result", "skipped", /el formateador termino en 'skipped'/],
+  ["needs.formato.result", "failure", /el formateador termino en 'failure'/],
 ]) {
   test(`veredicto del andamio · ROJO: ${job} en ${valor}`, () => {
     // Un job que no corrio no verifico nada: "skipped" es rojo salvo donde el carril de

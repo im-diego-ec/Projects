@@ -220,6 +220,13 @@ const SIN_ROJO = {
       { tipo: "rojo-ajeno", motivo: "el rojo de un lockfile desalineado es el de pnpm con --frozen-lockfile" },
     ],
     [
+      "(sin name, run: pnpm install --frozen-lockfile --ignore-scripts)",
+      {
+        tipo: "rojo-ajeno",
+        motivo: "instala para el job `formato` sin correr scripts de dependencias: el rojo de un lockfile desalineado es el de pnpm con --frozen-lockfile",
+      },
+    ],
+    [
       "Generar el cliente de la capa de datos",
       {
         tipo: "plomeria",
