@@ -41,6 +41,18 @@ mueve sobre un cambio incompatible.
 
 ## [No publicado]
 
+### Para consumidores
+
+**Ningún veredicto de tu pipeline cambia**: lo que pasaba en verde sigue en verde.
+Lo único que puede aparecer es **un aviso nuevo** si tu `.projects-desvios.json`
+tiene un desvío incompleto o una fecha imposible; completalo ahora, porque en la
+línea mayor siguiente el desvío incompleto deja de absorber.
+
+**El resto es andamio y no te llega solo**: un proyecto nuevo nace con la promoción a
+producción manual, desvíos más precisos y documentos al día; uno ya creado conserva la
+copia que recibió. Si tenés un sitio generado con `desplegar.yml`, su producción se
+sigue publicando en cada merge hasta que copies el archivo nuevo (ver «Cambiado»).
+
 ### Cambiado
 
 - **La promoción a producción dejó de ocurrir sola, y esa era la diferencia entre lo
@@ -306,6 +318,21 @@ mueve sobre un cambio incompatible.
   firmada. La de `@v1` de `pruebas/andamio/pinado.test.mjs` ya no existe: la retiró el
   pin exacto del guardrail de deltas (entrada de arriba). Viene de Rigel (2.5.0).
   **Para consumidores: nada** (bancos del marco).
+
+- **El límite del aviso vive en un solo lugar.** El input `limite` de
+  `actions/aviso-version` deja de declarar `default: "3500"`: un vacío cae en la
+  constante `LIMITE_POR_DEFECTO` del script, que es la misma contra la que mide la
+  compuerta. El valor efectivo no cambia. En Rigel los dos números se separaron y la
+  compuerta midió contra uno mientras el envío recortaba en otro. **Para
+  consumidores: nada** — quien no pasa `limite` sigue con el mismo número, y quien lo
+  pasa, con el suyo.
+- **El preámbulo del aviso deriva el tag móvil de la versión** en vez de escribir `v1`,
+  y un banco ata el canal que nombra (Dependabot) a la configuración que reparte el
+  andamio: si el andamio deja de recibir el marco por Dependabot, el banco se pone rojo
+  en vez de dejar la frase vieja. **Para consumidores: nada.**
+- **El paso 1 de la skill de release escribe `[No publicado]` con su `### Para
+  consumidores` de fábrica**, que es lo que la compuerta nueva acepta; un banco extrae
+  ese bloque de la skill y lo pasa por la misma compuerta. **Para consumidores: nada.**
 
 ### Eliminado
 
@@ -607,6 +634,17 @@ mueve sobre un cambio incompatible.
   que ya existían; nadie los había cruzado con la página. Ahora
   figuran como parciales, con lo que cubren y lo que no: 30 de 41 requirements del
   contrato con compuerta (antes se contaban 24). **Para consumidores: nada.**
+
+- **El aviso de versión cortaba la viñeta BREAKING a mitad de frase.** Filtraba líneas
+  físicas, así que la única viñeta BREAKING de `[No publicado]`, envuelta en cuatro
+  líneas, iba a salir como «…—hoy, nadie—: `produccion`» y nada más. Ahora pega las
+  líneas de continuación hasta la viñeta siguiente, un encabezado o una línea vacía.
+  **Para consumidores: nada.**
+- **El emisor del aviso daba el consejo al revés.** Sin «Para consumidores» y con el
+  mensaje recortado, mandaba a «acortar la sección Para consumidores» —que no existía—
+  y afirmaba que el aviso salía «con el cuerpo completo» mientras lo recortaba. Ahora
+  dice a cuánto se recortó y, según la rama, manda a escribir la sección o a acortarla.
+  **Para consumidores: nada** — cambia el texto de dos `::warning::`.
 
 ### Añadido
 
@@ -1254,6 +1292,22 @@ mueve sobre un cambio incompatible.
   (2.2.0 y 2.6.0, issues #375 y #457 de allá). **Para consumidores: nada**; si usás
   `carril-docs` por `uses:`, sigue igual.
 
+- **El aviso de la próxima versión se mide en el PR que lo escribe, no después de
+  mandarlo.** `herramientas/aviso-entra-en-el-mensaje.mjs` corre en el job
+  `changelog-en-el-pr` del `ci.yml` del marco y pone **rojo** el PR por tres causas,
+  cada una con su arreglo escrito: que la entrada no traiga `### Para consumidores`,
+  que el texto de fábrica del release quede encima de cambios reales, o que el mensaje
+  no entre en el límite. Mide `[No publicado]` y la versión más alta —la del PR de
+  release— con las mismas funciones de la action, y no una estimación. Medido el
+  2026-09-17: el `[No publicado]` tenía 40488 caracteres y ninguna sección para
+  consumidores, así que el próximo aviso iba a armar 41091 y entregar 3451 recortados,
+  sin decirle a nadie qué hacer. Portado de Rigel en su forma corregida (1.17.3 y 2.4.0).
+  **Para consumidores: nada** — la compuerta corre en el CI del marco.
+- **La corrida del aviso que no envía nada ya no sale verde en silencio.** En
+  `aviso-version.yml`, el simulacro emite `::warning::` en vez de `::notice::` y el
+  nombre de la corrida dice «SIMULACRO (no envia)». `simulacro` sigue marcado por
+  defecto, a propósito. **Para consumidores: nada** — es el workflow propio del marco.
+
 ### Corregido
 
 - **Un proceso muerto por señal se reportaba como un código de salida raro.** Los
@@ -1600,6 +1654,11 @@ mueve sobre un cambio incompatible.
   eso y concluía que se había roto algo; y un rojo que no se entiende entrena a
   ignorar el rojo. Ahora son dos mensajes y la condición elige.
 
+### Para consumidores
+
+**Nada que hacer.** Un proyecto nuevo nace con la constitución al día; el rojo del
+arranque cambia de redacción, no de veredicto.
+
 ## [1.9.5] — 2026-09-03
 
 ### Cambiado
@@ -1617,6 +1676,12 @@ mueve sobre un cambio incompatible.
   reservado y **avisa**. Los dos greps son el mismo patrón, uno negado, y hay una
   comprobación que lo exige. **Qué tiene que hacer un consumidor: nada.**
 
+### Para consumidores
+
+**Nada que hacer.** Con el bump, un proyecto que estaba rojo solo por un lugar
+reservado en una cita pasa a verde con un aviso; una sección entera pendiente sigue
+siendo rojo.
+
 ## [1.9.4] — 2026-09-03
 
 ### Corregido
@@ -1631,6 +1696,11 @@ mueve sobre un cambio incompatible.
   dónde está la casilla, y sale **verde**, porque su trabajo sí se hizo.
 - **Las etiquetas de área nacían con la descripción duplicada** — *«Area:
   area:backend»*.
+
+### Para consumidores
+
+**Nada que hacer en el pipeline.** Los dos arreglos son del andamio: un proyecto
+nuevo los trae, y uno ya creado conserva su copia de `actualizar-marco.yml`.
 
 ## [1.9.3] — 2026-09-03
 
@@ -1654,6 +1724,11 @@ mueve sobre un cambio incompatible.
   workflow puede pedir. El último además es imposible en principio: esos valores
   sólo los tiene la persona.
 
+### Para consumidores
+
+**Nada que hacer.** Cambia lo que hace el arranque de un proyecto nuevo; uno ya
+creado no cambia.
+
 ## [1.9.2] — 2026-09-03
 
 ### Corregido
@@ -1664,6 +1739,10 @@ mueve sobre un cambio incompatible.
   default y le cambiaba la forma sola. Es el mismo defecto que ya mordió con
   `forma`: el archivo que declara el proyecto no declaraba una de las cosas que
   deciden cómo se arma. **Qué tiene que hacer un consumidor: nada.**
+
+### Para consumidores
+
+**Nada que hacer.** El cambio es de la herramienta que arma el proyecto.
 
 ## [1.9.1] — 2026-09-03
 
@@ -1685,6 +1764,8 @@ mueve sobre un cambio incompatible.
   invocación lleva `shell` en Windows y ahí los argumentos van concatenados sin
   escapar; el nombre de cuenta ahora se valida contra el patrón de un handle
   **antes** de interpolarse. Lo cazó el propio banco de seguridad del marco.
+
+### Para consumidores
 
 **Qué tiene que hacer un consumidor: nada** — pero un proyecto creado antes bajo
 una cuenta personal tiene un CODEOWNERS que no asigna a nadie. Se arregla
@@ -1836,6 +1917,12 @@ regenerándolo, o cambiando los `@cuenta/equipo` por los handles de las personas
   Lleva una lista `VERIFICADAS` vacía a propósito: el día que alguien dé de alta
   las cuentas reales sin cargar tarjeta y anote la constancia, la frase vuelve
   sola a todos lados. **Consumidor: nada** — es un banco del marco.
+
+### Para consumidores
+
+**Nada que hacer.** Todo lo de esta versión es del asistente, la puerta web, los
+lanzadores y el andamio: lo recibe un proyecto nuevo, y uno ya creado no cambia. Quien
+quiera el `AGENTS.md` corregido lo recibe regenerando.
 
 ## [1.8.0] — 2026-09-01
 

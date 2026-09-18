@@ -88,15 +88,20 @@ Todos los comandos se corren **desde la raiz del repo del marco**
    `projects-validar-consumidor`; la evidencia es un id de corrida verde sobre el
    SHA que se va a taguear. Si no existe esa evidencia, para y consegui la.
 2. **El `CHANGELOG.md` ya tiene las entradas.** El changelog se escribe en el PR
-   que introduce cada cambio, no en el release. Si `## [No publicado]` dice
-   "Nada todavia", **no hay version que cortar**: lo que hay es un cambio que se
-   mergeo sin su entrada, y eso se arregla antes.
+   que introduce cada cambio, no en el release. Si `## [No publicado]` sigue en
+   su placeholder —su unica seccion es el `### Para consumidores` con el texto de
+   fabrica que dejo el paso 1 del release anterior—, **no hay version que
+   cortar**: lo que hay es un cambio que se mergeo sin su entrada, y eso se
+   arregla antes.
 
 Verificacion de la 2, antes de nada:
 
 ```bash
 sed -n "/^## \[No publicado\]/,/^## \[/p" CHANGELOG.md
 ```
+
+**Leelo, no lo grepees contra una frase:** lo que miras es si hay subsecciones de
+cambios (`### Añadido`, `### Corregido`, …) o solo el anuncio de fabrica.
 
 ---
 
@@ -223,16 +228,37 @@ En `CHANGELOG.md`:
 
 1. Renombrar el encabezado `## [No publicado]` a `## [X.Y.Z] — YYYY-MM-DD` con
    la fecha de hoy (raya larga y espacios, igual que las versiones anteriores).
-2. Insertar arriba un `## [No publicado]` nuevo y vacio, con el mismo separador
-   que usan las demas secciones:
+2. Insertar arriba un `## [No publicado]` nuevo, **con su `### Para
+   consumidores`**, con el mismo separador que usan las demas secciones:
 
 ```markdown
 ## [No publicado]
 
-Nada todavia.
+### Para consumidores
+
+Nada todavía: no hay ningún cambio sin publicar.
 
 ---
 ```
+
+> **Ese `### Para consumidores` no es decorativo, y el texto va LITERAL.** La
+> compuerta `herramientas/aviso-entra-en-el-mensaje.mjs` mide esta seccion en el CI
+> de este mismo PR, y su ausencia es rojo aunque el cuerpo entre en el limite: sin
+> ella el aviso cae al fail-open y arma el mensaje con la entrada ENTERA. Hasta que
+> existio la compuerta este bloque decia solo «Nada todavia.», o sea que aplicarlo
+> literal ponia rojo al PR de release — justo donde el texto ya es final. El texto es
+> la constante `PLACEHOLDER_SIN_CAMBIOS` de la compuerta, y
+> `pruebas/ci-del-marco/placeholder-del-release.test.mjs` extrae este bloque y exige
+> las dos cosas: que pase la compuerta y que el texto coincida.
+>
+> **La explicacion va aca y no adentro del bloque**, a proposito: el cuerpo de esa
+> seccion es exactamente lo que viaja al canal de los consumidores.
+
+> **Y el dia que escribas una entrada de verdad, ese texto se reemplaza.** El
+> centinela de la compuerta pone ROJO una seccion cuyo `Para consumidores` siga
+> siendo el texto de fabrica y que ya tenga otras subsecciones (`### Añadido`,
+> `### Corregido`, …): hay cambios y el anuncio diria que no hay ninguno. Sin el
+> centinela, el placeholder habria cambiado un rojo molesto por un verde mudo.
 
 **Verificacion del paso 1** — los dos encabezados, en este orden:
 
@@ -244,9 +270,29 @@ Tiene que mostrar `## [No publicado]` primero y `## [X.Y.Z] — YYYY-MM-DD`
 inmediatamente despues. Si la version nueva no aparece, o aparece sin fecha, el
 paso no esta hecho.
 
-Si el repo ya trae `actions/aviso-version/`, esta es la comprobacion barata de
-que la entrada existe y es la que van a recibir los consumidores (arma el
-mensaje y **no envia nada**, no necesita credenciales):
+**Ese `grep` no alcanza:** mira encabezados `## [` y nada mas, asi que da por bueno
+un arbol que la compuerta del aviso rechaza. La verificacion que cubre las dos cosas
+es la compuerta misma, y conviene correrla aca en vez de esperar el CI:
+
+```bash
+node herramientas/aviso-entra-en-el-mensaje.mjs CHANGELOG.md
+```
+
+Tiene que salir **0**. Mide las dos secciones que el aviso todavia puede mandar
+—`[No publicado]` y la recien cortada— y cobra tres cosas:
+
+| Lo que cobra | Por que |
+|---|---|
+| Que cada una tenga su `### Para consumidores` | Sin ella el aviso manda la entrada entera, recortada si no entra |
+| Que el texto de fabrica no quede encima de cambios reales | El centinela del paso 1: hay cambios y el anuncio diria que no hay ninguno |
+| Que el mensaje entre en el limite | El `::warning::` de la action llega DESPUES de mandar el mensaje recortado |
+
+Va como tabla para que agregar un cobro nuevo sea agregar una fila y no reescribir
+una frase.
+
+Si el repo ya trae `actions/aviso-version/`, esta es la comprobacion barata para
+**leer** el mensaje que van a recibir los consumidores (arma el mensaje y **no
+envia nada**, no necesita credenciales):
 
 ```bash
 AVISO_VERSION=X.Y.Z node actions/aviso-version/aviso-version.mjs
@@ -635,7 +681,8 @@ El orden 1 → 6 de esta skill es el orden. No se reordena por comodidad.
 
 - [ ] Evidencia de validacion contra un consumidor real (id de corrida verde)
 - [ ] `X.Y.Z` elegido con el criterio de semver
-- [ ] CHANGELOG cortado: `## [X.Y.Z] — YYYY-MM-DD` + `## [No publicado]` nuevo y vacio
+- [ ] CHANGELOG cortado: `## [X.Y.Z] — YYYY-MM-DD` + `## [No publicado]` nuevo con su
+      `### Para consumidores` de fabrica, y `node herramientas/aviso-entra-en-el-mensaje.mjs` en 0
 - [ ] **Pines internos movidos a `X.Y.Z`** y `node --test pruebas/andamio/pinado.test.mjs` en verde
 - [ ] Si el canonico de la constitucion cambio: entrada nueva en `manifiesto.json`
 - [ ] El ledger del canonico no declara una version que no existe: corrido el `node -e`

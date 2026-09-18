@@ -1,5 +1,14 @@
 name: Aviso de version a consumidores
 
+# EL NOMBRE DE LA CORRIDA DICE SI ENVIA, y es lo unico visible sin abrir el log.
+# Con `simulacro` marcado la corrida sale verde sin mandar nada; el ::warning:: de
+# adentro lo dice, pero hay que entrar a leerlo. Esto lo pone en la lista de
+# corridas. Lo fija pruebas/ci-del-marco/el-simulacro-avisa.test.mjs.
+run-name: >-
+  ${{ github.event_name == 'release' && format('Aviso de {0}', github.event.release.tag_name)
+  || (inputs.simulacro && format('SIMULACRO (no envia) de {0}', inputs.version)
+  || format('Aviso de {0}', inputs.version)) }}
+
 # ---------------------------------------------------------------------------
 # QUE ES ESTO
 #
@@ -153,7 +162,21 @@ jobs:
           }
 
           if [ "${SIMULACRO}" = "true" ]; then
-            echo "::notice::simulacro: el mensaje quedo armado y NO se envio. Esta completo en el resumen de esta corrida"
+            # ::warning:: Y NO ::notice::, y el motivo es la lectura y no el tono. Este
+            # workflow existe para ENVIAR. Un ::notice:: no cambia ningun color: la
+            # corrida sale success, la lista de corridas dice success, y la diferencia
+            # entre "envie" y "no envie" queda solo en el cuerpo del log.
+            #
+            # Medido en Rigel (el marco del que Projects se bifurco) el 2026-09-12,
+            # reenviando el aviso de su 2.5.0: se disparo sin desmarcar `simulacro`
+            # —que por defecto es true, y ESO ESTA BIEN: protege de mandarle un mensaje
+            # al canal de todos los consumidores por un dispatch descuidado—. La
+            # corrida salio verde sin enviar nada y quien la miro leyo el color.
+            #
+            # AGENTS.md pide hacer ruidoso todo camino que termine en verde sin haber
+            # hecho el trabajo. Un simulacro no es un fail-open, pero produce la misma
+            # lectura: verde sobre cero envio.
+            echo "::warning::SIMULACRO: el mensaje quedo armado y NO SE ENVIO A NADIE. Esta completo en el resumen de esta corrida. Para mandarlo de verdad: volver a disparar el boton con 'simulacro' DESMARCADO"
             echo "== payload que se habria enviado =="
             cat "${PAYLOAD}"
             resumen "### Envio: NO — simulacro" "" \

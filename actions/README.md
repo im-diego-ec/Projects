@@ -768,7 +768,7 @@ el changelog que se lee es el de **esa** versión.
 | --- | --- | --- |
 | `version` | (obligatorio) | Versión a avisar, con o sin la `v` del tag (`1.2.0` o `v1.2.0`) |
 | `changelog` | `CHANGELOG.md` | Ruta del changelog, relativa al working directory |
-| `limite` | `3500` | Largo máximo del mensaje; por encima recorta y lo dice |
+| `limite` | la constante `LIMITE_POR_DEFECTO` del script | Largo máximo del mensaje; por encima recorta y lo dice. Sin default en `action.yml` a propósito: el número vive en un solo lugar |
 | `campo` | `text` | Campo de texto del payload JSON (`content` para Discord) |
 | `salida` | `$RUNNER_TEMP/aviso-version.json` | Dónde escribir el payload |
 
@@ -787,9 +787,9 @@ el changelog que se lee es el de **esa** versión.
 | Situación | Veredicto |
 | --- | --- |
 | Entrada con su sección «Para consumidores» | Mensaje completo, con los dos enlaces |
-| Entrada **sin** esa sección | `::warning::` y va el **cuerpo completo** de la versión: se manda de más, no de menos |
-| Entrada con líneas `BREAKING` | `::warning::` y el mensaje las pone **primero** |
-| Mensaje más largo que el límite | `::warning::`, recorta por línea y deja el enlace al release |
+| Entrada **sin** esa sección | `::warning::` y el mensaje se **arma con el cuerpo completo** de la versión: se manda de más, no de menos. Si ese cuerpo no entra en el límite, llega recortado y el aviso dice a cuánto |
+| Entrada con líneas `BREAKING` | `::warning::` y el mensaje las pone **primero**, cada viñeta entera aunque venga envuelta en varias líneas |
+| Mensaje más largo que el límite | `::warning::` con el largo al que recortó, deja el enlace al release y da el arreglo **de su rama**: sin la sección, escribirla; con la sección, acortarla |
 | **No hay entrada para esa versión** | **Rojo**, con el arreglo: agregar la entrada y re-disparar el botón |
 | No se puede leer el changelog | **Rojo**: falta el `checkout` |
 
@@ -808,10 +808,13 @@ caro posible, porque le diría a un consumidor que haga algo que no corresponde.
 - **El payload es `{"<campo>": "<mensaje>"}` y nada más.** Sirve para Slack,
   Google Chat y Teams con `text`, y para Discord con `content`. Un destino que
   exija otra forma es un change del marco, no una configuración.
-- **«Para consumidores» es una convención del changelog, no un contrato que algo
-  verifique al escribirlo.** Su ausencia se detecta al avisar —cuando la versión
-  ya está publicada—, no en el PR que la introdujo. Cerrar ese hueco es otro
-  check y otra fila del backlog.
+- **«Para consumidores» es una convención del changelog, y en el marco se verifica
+  al escribirla.** `herramientas/aviso-entra-en-el-mensaje.mjs` corre en el CI
+  propio de Projects (job `changelog-en-el-pr`) y pone rojo el PR si falta la
+  sección, si el texto de fábrica del release quedó encima de cambios reales o si
+  el mensaje no entra en el límite; mide `[No publicado]` y la versión más alta,
+  con las mismas funciones de esta action. Un repo que use la action sin esa
+  compuerta la detecta recién al avisar, cuando la versión ya está publicada.
 - **Esta action no envía nada, así que no puede garantizar que el aviso llegue.**
   Lo que el workflow que la consuma no puede hacer es callarse: sin destino
   configurado, `::warning::` y el mensaje al resumen de la corrida.

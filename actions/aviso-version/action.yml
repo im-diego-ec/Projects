@@ -31,10 +31,15 @@ author: la organización
 #     posible: un aviso vacio o inventado seria el formato paralelo que este
 #     diseno evita. El arreglo (agregar la entrada y re-disparar el boton) va
 #     en el mensaje de error.
-#   · Entrada sin seccion "Para consumidores" -> ::warning:: y se manda el
-#     cuerpo COMPLETO. Se manda de mas, no de menos, y se dice por que.
-#   · Mensaje mas largo que el limite -> ::warning:: y se recorta con el enlace
-#     al release. Un truncado en silencio es peor que un mensaje largo.
+#   · Entrada sin seccion "Para consumidores" -> ::warning:: y el mensaje se
+#     ARMA con el cuerpo completo de la entrada. Se manda de mas, no de menos,
+#     y se dice por que. "Arma" y no "manda": ese cuerpo pasa por el mismo
+#     limite, y si no entra llega recortado — el aviso lo dice con el numero.
+#   · Mensaje mas largo que el limite -> ::warning:: con el largo al que se
+#     recorto y el enlace al release. Un truncado en silencio es peor que un
+#     mensaje largo. El arreglo depende de la rama: sin la seccion, ESCRIBIRLA;
+#     con la seccion, acortarla. Mandar a acortar una seccion que no existe era
+#     el consejo al reves.
 #   · Entrada con lineas BREAKING -> ::warning:: y el aviso las pone primero.
 #
 # LIMITES DECLARADOS
@@ -44,8 +49,11 @@ author: la organización
 #   · El payload es {"<campo>": "<mensaje>"} y nada mas. Sirve para Slack,
 #     Google Chat y Teams con campo "text", y para Discord con "content". Un
 #     destino que exija otra forma es un change del marco, no una config.
-#   · "Para consumidores" es una convencion del CHANGELOG, no un contrato que
-#     algo verifique al escribirlo: su ausencia se detecta al avisar, no antes.
+#   · "Para consumidores" es una convencion del CHANGELOG. En el marco SI se
+#     verifica al escribirla: herramientas/aviso-entra-en-el-mensaje.mjs corre
+#     en el CI propio y pone rojo el PR si falta, si el mensaje no entra o si el
+#     texto de fabrica del release quedo encima de cambios reales. Un repo que
+#     use esta action sin esa compuerta la detecta recien al avisar.
 # ---------------------------------------------------------------------------
 
 inputs:
@@ -61,10 +69,13 @@ inputs:
   limite:
     description: >-
       Largo maximo del mensaje en caracteres. Por encima se recorta y se avisa.
-      El default entra en casi cualquier destino (Slack corta los bloques en
-      3000, Google Chat en 4096).
+      SIN default a proposito: vacio cae en LIMITE_POR_DEFECTO de
+      aviso-version.mjs, que es el mismo numero contra el que mide la compuerta
+      del marco (herramientas/aviso-entra-en-el-mensaje.mjs). Un numero, un
+      lugar: con un literal aca, mover la constante deja a la compuerta midiendo
+      contra un limite y al envio recortando en otro, en silencio. El banco de
+      la compuerta pone rojo un default reintroducido.
     required: false
-    default: "3500"
   campo:
     description: >-
       Campo de texto del payload JSON. "text" para Slack, Google Chat y Teams;

@@ -934,10 +934,13 @@ jobs:
   # el ci.yml de Projects, no viaja a ningun consumidor. Los unicos afectados son los
   # builders que lo estan agregando, y un aviso dirigido a quien lo escribio no avisa.
   #
-  # LO QUE MIRA Y LO QUE NO. Mira que el PR TOQUE el CHANGELOG. NO puede juzgar si lo
-  # que escribiste es bueno ni si esta en la seccion correcta: eso es del review. La
-  # frontera esta ahi a proposito — un check que intenta leer la calidad de una
-  # entrada se pone rojo con entradas buenas, y eso ensena a ignorarlo.
+  # LO QUE MIRA Y LO QUE NO. El primer paso mira que el PR TOQUE el CHANGELOG. NO
+  # puede juzgar si lo que escribiste es bueno ni si esta en la seccion correcta: eso
+  # es del review. La frontera esta ahi a proposito — un check que intenta leer la
+  # calidad de una entrada se pone rojo con entradas buenas, y eso ensena a ignorarlo.
+  # El segundo paso tampoco juzga calidad: mide PROPIEDADES del aviso que el CHANGELOG
+  # va a producir (que exista el resumen para consumidores, que no quede el texto de
+  # fabrica encima de cambios reales y que el mensaje entre sin recortarse).
   changelog:
     name: changelog-en-el-pr
     # Solo en PRs: en un push a main el PR ya se mergeo y no hay diff que mirar.
@@ -1013,6 +1016,36 @@ jobs:
 
           echo "::error::este PR cambia el marco (${TOCA_MARCO# }) y NO toca CHANGELOG.md. El CHANGELOG es la unica superficie por la que un consumidor se entera de que el marco se movio bajo sus pies, y se escribe en el PR que introduce el cambio, no al cortar la version. Arreglo: agrega tu entrada en la seccion '## [No publicado]', diciendo que tiene que hacer un consumidor (normalmente: nada)"
           exit 1
+
+      # EL AVISO DE LA PROXIMA VERSION SE MIDE EN EL PR QUE LO ESCRIBE, no despues de
+      # mandarlo. La action del aviso ya avisa cuando el mensaje se recorta o cuando la
+      # entrada no trae "### Para consumidores", pero lo hace en la corrida del release,
+      # o sea DESPUES de que el mensaje salio. Medido el 2026-09-17 sobre este repo: el
+      # [No publicado] tenia 40488 caracteres y ningun "Para consumidores"; el aviso del
+      # proximo release iba a armar 41091 y entregar 3451 recortados, el principio de la
+      # entrada y un enlace, sin decirle a nadie que hacer. La 1.9.0 ya se armo asi, y
+      # no le llego a nadie solo porque el destino del aviso nunca se configuro.
+      #
+      # Cobra TRES causas de rojo, y el nombre del paso las nombra porque es lo que
+      # alguien lee cuando su PR se pone rojo: que falte el resumen para consumidores,
+      # que el texto de fabrica del paso 1 del release quede encima de cambios reales,
+      # y que el mensaje no entre en el limite. Mide las dos secciones que el aviso
+      # todavia puede mandar —[No publicado] y la version mas alta— porque en el PR de
+      # release la primera acaba de vaciarse y la que importa es la segunda.
+      #
+      # ROJO Y NO AVISO, por la misma razon que el paso de arriba: vive en el ci.yml de
+      # Projects y no viaja a ningun consumidor; los unicos afectados son quienes
+      # escriben el CHANGELOG. Banco: pruebas/ci-del-marco/aviso-entra-en-el-mensaje.test.mjs
+      # y pruebas/ci-del-marco/placeholder-del-release.test.mjs.
+      #
+      # Node explicito: hasta este paso el job solo corria git. Mismo pin que el resto
+      # de este archivo, sin action nueva.
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        with: { node-version: "22" }
+
+      - name: El aviso de la proxima version dice que hacer y entra sin recortarse
+        shell: bash
+        run: node herramientas/aviso-entra-en-el-mensaje.mjs CHANGELOG.md
 
   # UNA VERSION PUBLICADA DEL CANONICO NO SE REESCRIBE, Y ESTE ES EL UNICO LUGAR DONDE
   # ESO SE PUEDE CAZAR A TIEMPO.
@@ -1365,7 +1398,7 @@ jobs:
           # if al job, y eso es apagarlo.
           if [ "${{ github.event_name }}" = "pull_request" ]; then
             [ "${{ needs.changelog.result }}" = "success" ] || {
-              echo "::error::el check del CHANGELOG en el PR termino en '${{ needs.changelog.result }}'"
+              echo "::error::el check del CHANGELOG en el PR termino en '${{ needs.changelog.result }}'. Mira cual de sus dos pasos: 'El PR que cambia el marco toca el CHANGELOG' (falta la entrada) o 'El aviso de la proxima version dice que hacer y entra sin recortarse' (falta el resumen para consumidores, quedo el texto de fabrica encima de cambios, o el mensaje no entra); cada uno deja su arreglo escrito"
               exit 1
             }
           else

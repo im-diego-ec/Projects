@@ -25,9 +25,13 @@
 //   node actions/aviso-version/aviso-version.mjs      (con AVISO_VERSION=1.2.0)
 //
 // Fail-open ruidoso (regla 3): si la entrada existe pero le falta la sección
-// «Para consumidores», el aviso NO se calla — manda el cuerpo completo de la
-// versión y emite un `::warning::` con el motivo. La rama de duda va al camino
-// caro (mandar de más) y lo dice.
+// «Para consumidores», el aviso NO se calla — ARMA el mensaje con el cuerpo
+// completo de la versión y emite un `::warning::` con el motivo. La rama de duda
+// va al camino caro (mandar de más) y lo dice. «Arma» y no «manda»: ese cuerpo
+// pasa por el mismo límite que cualquier mensaje, así que si no entra llega
+// recortado, y los dos avisos dicen a cuánto y qué hacer (escribir la sección,
+// no acortarla). En el marco esa ausencia ya es ROJO antes, en el PR que escribe
+// la entrada: la mide `herramientas/aviso-entra-en-el-mensaje.mjs` en el CI propio.
 //
 // Rojo (no hay degradación posible): si el CHANGELOG no tiene entrada para la
 // versión publicada, no hay mensaje que armar. Se sale 1 con el arreglo escrito.
@@ -35,7 +39,7 @@
 // Variables de entorno:
 //   AVISO_VERSION     (obligatoria) versión o tag: "1.2.0" o "v1.2.0"
 //   AVISO_CHANGELOG   ruta del changelog        (default: CHANGELOG.md)
-//   AVISO_LIMITE      largo máximo del mensaje  (default: 3500)
+//   AVISO_LIMITE      largo máximo del mensaje  (default: LIMITE_POR_DEFECTO, abajo)
 //   AVISO_CAMPO       campo de texto del payload JSON (default: text)
 //   AVISO_SALIDA      ruta del payload a escribir (default: $RUNNER_TEMP o cwd)
 //   GITHUB_SERVER_URL / GITHUB_REPOSITORY   para armar los enlaces
@@ -44,9 +48,25 @@ import { appendFileSync, readFileSync, realpathSync, writeFileSync } from "node:
 import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
-/** Largo por defecto del mensaje. Slack corta los bloques en 3000 y Google Chat
- *  en 4096: 3500 entra en el mensaje de casi cualquier destino sin recortar la
- *  sección que importa. Es un input, no una constante escondida. */
+/** Largo por defecto del mensaje, y el ÚNICO lugar donde vive el número.
+ *
+ *  Slack corta los bloques en 3000 y Google Chat en 4096: 3500 entra en el mensaje
+ *  de casi cualquier destino sin recortar la sección que importa. Se puede cambiar
+ *  por el input `limite`, pero el default es ESTE.
+ *
+ *  UN NÚMERO, UN LUGAR. `action.yml` no declara default para `limite`: un vacío cae
+ *  acá. En Rigel —el marco del que Projects se bifurcó— el action.yml repetía el
+ *  número como `default: "3500"`, que viaja como AVISO_LIMITE y GANA sobre esta
+ *  constante; el día que la constante subió, la compuerta del PR midió contra el
+ *  número nuevo y el envío siguió recortando en el viejo, en silencio. Lo sostiene
+ *  `pruebas/ci-del-marco/aviso-entra-en-el-mensaje.test.mjs`.
+ *
+ *  POR QUÉ NO SE SUBE TODAVÍA. Rigel lo llevó a 7000 midiendo SU destino (Slack con
+ *  el campo `text`, donde 3000 es el tope de un bloque y no del campo). El destino de
+ *  Projects no está medido —ni siquiera configurado: el secret AVISO_VERSION_DESTINO
+ *  no existe (docs/16-auditoria-cierre-v1.md, hallazgo 12)— y el campo es
+ *  configurable por `vars.AVISO_VERSION_CAMPO`. Subirlo sin medir es apostar el único
+ *  mensaje que los consumidores leen. */
 export const LIMITE_POR_DEFECTO = 3500;
 
 /** El release publica el tag inmutable `vX.Y.Z`; el CHANGELOG titula `[X.Y.Z]`.
@@ -145,10 +165,40 @@ export function extraerParaConsumidores(cuerpo) {
  * aviso lo destaca sin que nadie toque este archivo.
  */
 export function lineasBreaking(cuerpo) {
-  return String(cuerpo)
-    .split(/\r?\n/)
-    .filter((l) => /^\s*(?:[-*+]\s+)?\**BREAKING\b/.test(l))
-    .map((l) => l.trim());
+  // PEGA LAS LINEAS DE CONTINUACION DE LA VIÑETA, y no es un detalle de presentacion.
+  //
+  // Esto filtraba lineas FISICAS y devolvia solo la que matchea. La unica viñeta
+  // BREAKING del `[No publicado]` de este repo viene envuelta en cuatro lineas, asi que
+  // el aviso del proximo release iba a publicar «…—hoy, nadie—: `produccion`» y ahi
+  // terminaba, sin decir QUE cambia. Medido el 2026-09-17. A Rigel le paso lo mismo en
+  // el anuncio de su 2.0.0, con el `**` sin cerrar (su commit 0363a05).
+  //
+  // Envolver a ~88 columnas es lo que hace prettier y lo que hace cualquiera
+  // escribiendo, asi que arreglar solo el CHANGELOG dejaba el defecto esperando la
+  // proxima viñeta envuelta.
+  //
+  // LIMITE DECLARADO: la continuacion termina en la primera linea vacia. Una viñeta
+  // BREAKING con un segundo parrafo lleva al aviso solo el primero; el resto sigue en
+  // el CHANGELOG, que el mensaje enlaza.
+  const lineas = String(cuerpo).split(/\r?\n/);
+  const arrancaViñeta = (l) => /^\s*(?:[-*+]\s+)/.test(l);
+  const esBreaking = (l) => /^\s*(?:[-*+]\s+)?\**BREAKING\b/.test(l);
+
+  const salida = [];
+  for (let i = 0; i < lineas.length; i += 1) {
+    if (!esBreaking(lineas[i])) continue;
+    const partes = [lineas[i].trim()];
+    // Sigue mientras la linea este indentada, no arranque otra viñeta y no sea un
+    // encabezado ni una linea vacia: eso es exactamente una continuacion de esta viñeta.
+    for (let j = i + 1; j < lineas.length; j += 1) {
+      const l = lineas[j];
+      if (l.trim() === "" || arrancaViñeta(l) || /^\s*#/.test(l) || !/^\s+\S/.test(l)) break;
+      partes.push(l.trim());
+      i = j;
+    }
+    salida.push(partes.join(" "));
+  }
+  return salida;
 }
 
 /** Recorta al límite por el último salto de línea que entre, y DICE que
@@ -172,10 +222,23 @@ export function construirMensaje({ version, seccion, urlRelease, urlChangelog, l
   const breaking = lineasBreaking(seccion.cuerpo);
   const consumidores = extraerParaConsumidores(seccion.cuerpo);
 
+  // EL PUNTERO SE DERIVA DE LA VERSION, no se escribe. Decia `v1` literal: hoy es
+  // verdad, y el dia que se abra la linea 2 el anuncio de la 2.0.0 iba a nombrar el
+  // puntero de la linea 1. A Rigel le paso exactamente eso (su commit c677ede).
+  //
+  // EL CANAL ES DEPENDABOT (decision D2 del PO, 2026-09-17), y no queda escrito a ciegas:
+  // el banco lo ata a `plantilla/.github/dependabot.yml`. Si el andamio deja de recibir
+  // el bump del marco por Dependabot, esta frase se pone roja en vez de quedar vieja.
+  //
+  // Y NO SE CUENTAN REFERENCIAS: cuantas lineas del marco usan el puntero no es asunto
+  // del consumidor, y un numero mantenido a mano en la unica prosa del marco que viaja
+  // directo a los consumidores obliga a acordarse.
+  const punteroDeLaLinea = `v${String(version).split(".")[0]}`;
   const partes = [
     `Projects ${version} publicado.` +
       " El bump llega a cada repo como PR de Dependabot, sobre la version exacta." +
-      " El tag movil \`v1\` sigue existiendo y ya no es el canal de distribucion.",
+      ` El tag movil \`${punteroDeLaLinea}\` no es el canal de distribucion: existe solo para` +
+      " la referencia interna del marco que no puede pinar una version exacta.",
   ];
 
   if (breaking.length) {
@@ -207,6 +270,22 @@ export function construirMensaje({ version, seccion, urlRelease, urlChangelog, l
     breaking: breaking.length > 0,
     sinParaConsumidores: !consumidores.encontrada,
     recortado,
+  };
+}
+
+/** Los dos enlaces del mensaje, en UN solo lugar. Cuentan para el límite, así que
+ *  quien quiera medir el mensaje que se manda los tiene que armar igual: la compuerta
+ *  del CHANGELOG (`herramientas/aviso-entra-en-el-mensaje.mjs`) llama a esta misma
+ *  función en vez de reconstruirlos. En Rigel —el marco del que Projects se bifurcó—
+ *  la compuerta los rearmaba con `blob/main/` y medía tres caracteres de menos sin
+ *  que nadie lo notara. El default del repo es el único literal de la cuenta en este
+ *  archivo, y `docs/15-forkear-el-marco.md` lo lista para quien copie el marco. */
+export function enlacesDelRelease(version, env = process.env) {
+  const servidor = env.GITHUB_SERVER_URL || "https://github.com";
+  const repo = env.GITHUB_REPOSITORY || "im-diego-ec/Projects";
+  return {
+    urlRelease: `${servidor}/${repo}/releases/tag/v${version}`,
+    urlChangelog: `${servidor}/${repo}/blob/v${version}/CHANGELOG.md`,
   };
 }
 
@@ -275,10 +354,7 @@ export async function main(env = process.env) {
     return 1;
   }
 
-  const servidor = env.GITHUB_SERVER_URL || "https://github.com";
-  const repo = env.GITHUB_REPOSITORY || "im-diego-ec/Projects";
-  const urlRelease = `${servidor}/${repo}/releases/tag/v${version}`;
-  const urlChangelog = `${servidor}/${repo}/blob/v${version}/CHANGELOG.md`;
+  const { urlRelease, urlChangelog } = enlacesDelRelease(version, env);
 
   const seccion = extraerSeccionVersion(changelog, version);
   if (!seccion.encontrada) {
@@ -302,17 +378,36 @@ export async function main(env = process.env) {
   const salida = env.AVISO_SALIDA || join(env.RUNNER_TEMP || process.cwd(), "aviso-version.json");
   writeFileSync(salida, payload + "\n", "utf8");
 
+  // «ARMADO», NO «COMPLETO». Este aviso decia «el aviso sale igual con el cuerpo
+  // completo» incluso cuando ese cuerpo no entraba y se recortaba: medido el 2026-09-17
+  // con AVISO_VERSION=1.9.0, las dos frases salian juntas sobre la misma entrada.
   if (armado.sinParaConsumidores) {
     console.log(
       `::warning::la entrada [${version}] del CHANGELOG no trae la seccion "### Para consumidores", ` +
-        "que es la que dice que tiene que hacer un consumidor. El aviso sale igual con el cuerpo completo. " +
-        "Arreglo: agregar esa seccion a la entrada, aunque diga solo \"Nada que hacer\""
+        "que es la que dice que tiene que hacer un consumidor. El aviso sale igual, armado con el cuerpo " +
+        "completo de la entrada" +
+        (armado.recortado
+          ? `, y ese cuerpo NO entra: se recorto a ${armado.mensaje.length} de ${limite} caracteres`
+          : "") +
+        ". Arreglo: agregar esa seccion a la entrada, aunque diga solo \"Nada que hacer\""
     );
   }
+  // EL CONSEJO SE BIFURCA POR LA RAMA QUE `construirMensaje` TOMO DE VERDAD, y no por
+  // el largo. Era el mismo texto en las dos ramas —«acortar la seccion Para
+  // consumidores»—, asi que sin la seccion mandaba a acortar algo que no existe, y lo
+  // que se termina acortando entonces es la entrada: detalle del marco borrado para que
+  // entre un mensaje que, con la seccion escrita, nunca lo habria incluido. Rigel lo
+  // cerro en su compuerta y lo dejo vivo aca, palabra por palabra (su commit caa6925).
   if (armado.recortado) {
     console.log(
-      `::warning::el mensaje supero los ${limite} caracteres y se recorto: el destino recibe el principio y el enlace al release. ` +
-        "Arreglo: acortar la seccion \"Para consumidores\" (es un resumen accionable, no la entrada entera) o subir el input `limite`"
+      `::warning::el mensaje supero los ${limite} caracteres y se recorto a ${armado.mensaje.length}: ` +
+        "el destino recibe el principio y el enlace al release. Arreglo: " +
+        (armado.sinParaConsumidores
+          ? `ESCRIBIR la seccion "### Para consumidores" en la entrada [${version}] — sin ella el aviso ` +
+            "arma el mensaje con el cuerpo entero de la entrada, y es ese cuerpo el que no entra; con la " +
+            "seccion escrita viaja solo el resumen"
+          : "acortar la seccion \"Para consumidores\" (es un resumen accionable, no la entrada entera)") +
+        ", o subir el input `limite`"
     );
   }
   if (armado.breaking) {
@@ -331,7 +426,7 @@ export async function main(env = process.env) {
     `## Aviso de version ${version}`,
     "",
     `- Enlace del release: ${urlRelease}`,
-    `- Seccion «Para consumidores»: ${armado.sinParaConsumidores ? "**ausente** (va el cuerpo completo)" : "presente"}`,
+    `- Seccion «Para consumidores»: ${armado.sinParaConsumidores ? "**ausente** (el mensaje se armo con el cuerpo completo de la entrada)" : "presente"}`,
     `- BREAKING declarado: ${armado.breaking ? "**si**" : "no"}`,
     `- Recortado: ${armado.recortado ? `**si** (limite ${limite})` : "no"}`,
     `- Largo del mensaje: ${armado.mensaje.length} caracteres`,
