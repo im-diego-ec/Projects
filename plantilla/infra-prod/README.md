@@ -29,14 +29,19 @@ en el bucket de dev — que es el modo de falla peligroso.
 proveedor con sus etiquetas, la referencia a la base compartida y la referencia a
 la red.
 
-**Sin resolver, en `pendientes.tf`**: siete. Uno más que dev, y es el de
-**alarmas**. Cada pendiente dice qué falta, **con qué criterio se decide** y qué
-garantía del marco queda sin cumplir.
+**Sin resolver, en `pendientes.tf`**: ocho. Uno más que dev, y es el de
+**alarmas**. Cada pendiente dice qué falta, **con qué criterio se decide**, **cuándo se
+resuelve** y qué garantía del marco queda sin cumplir.
 
-⚠️ **Todavía no hay compuerta** —una comprobación que bloquea el merge—: el pipeline
-**no** se pone rojo por estos pendientes, y esa comprobación llega con el change —la
-propuesta escrita— del despliegue. Hasta entonces se
-revisa a mano: `grep -rn PENDIENTE-INFRA infra infra-prod`.
+El de **la retención y la clase del grupo de logs** está en los dos ambientes, y acá pesa
+más: la clase no se puede cambiar después de crear el grupo, y producción es el ambiente
+que no se puede rehacer. Además, en producción la clase casi no se elige: la alarma de los
+niveles de alerta del log se arma sobre ese grupo, y la clase barata no la admite.
+
+⚠️ **Estos pendientes no tienen compuerta** —una comprobación que bloquea el merge—: el
+pipeline **no** se pone rojo por ellos. Si el marco llega a emitir una señal sobre ellos,
+la trae una versión nueva y el change —la propuesta escrita— que la decida. Hasta entonces
+se revisa a mano: `grep -rn PENDIENTE-INFRA infra infra-prod`.
 
 ## Lo que el CI **sí** mira desde el primer PR
 
@@ -52,8 +57,7 @@ terraform init -backend=false && terraform validate
 Las dos son **inertes**: `fmt` sólo lee texto, y `-backend=false` es lo que evita
 tocar el bucket del state — que es justamente el pendiente 1. No hacen falta
 cuenta, credenciales ni que este repositorio se despliegue, y por eso son
-exigibles desde el día uno aunque la compuerta de los pendientes todavía espere al
-change del despliegue.
+exigibles desde el día uno aunque los pendientes no tengan compuerta.
 
 Estrenan en **modo aviso hasta el 2026-09-30** y después se ponen rojas solas, sin
 que nadie toque el workflow: hasta hoy nada miraba estos archivos, así que la
@@ -72,11 +76,16 @@ pude verificar» se leería como «verifiqué y está bien». Mientras tanto, un
 
 ## El pendiente de alarmas no se puede copiar de nadie, y por eso está acá
 
-El marco exige que las alarmas **existan y avisen** al canal `{{CANAL_ALERTAS}}`.
-**No exige cuáles ni cuántas.** Un proyecto con tres alarmas bien elegidas cumple;
-uno con seis copiadas de otro negocio, no.
+Hay un **piso** que no se elige: producción tiene que avisar al canal
+`{{CANAL_ALERTAS}}` cuando el servicio deja de responder o responde con errores del
+servidor de forma sostenida, cuando el proceso se cae y se reinicia en bucle, y cuando el
+log registra los niveles de alerta. El marco exige esas tres por lo que detectan, no por
+el producto con que se arman.
 
-La vara son dos preguntas, y la segunda es la que importa:
+**Por encima del piso no exige cuáles ni cuántas.** Un proyecto con tres alarmas propias
+bien elegidas cumple; uno con seis copiadas de otro negocio, no.
+
+La vara para las que van por encima son dos preguntas, y la segunda es la que importa:
 
 1. **¿Qué se rompe que alguien tenga que ir a arreglar?** Eso es una alarma. Lo
    que se degrada y se recupera solo, no.

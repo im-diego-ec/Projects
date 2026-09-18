@@ -581,16 +581,19 @@ este proyecto no vaya a tener**, no llenarla.
 
 `infra/` y `infra-prod/` llegan con **lo que se deriva de tus valores ya funcionando** —el
 backend del state, el proveedor, la referencia a la base compartida del área, los dominios—
-y con **los pendientes de decisión**: seis en dev y siete en producción. El séptimo es el de
-**alarmas**, y existe solo en producción a propósito.
+y con **los pendientes de decisión**: siete en dev y ocho en producción. El que está solo en
+producción es el de **alarmas**, a propósito.
 
-Cada pendiente dice tres cosas: qué falta, **con qué criterio se decide**, y qué garantía del
-marco queda sin cumplir si no se hace. Están ahí para que no haga falta haber diseñado la
-infraestructura del área para poder resolverlos.
+Cada pendiente dice cuatro cosas: qué falta, **con qué criterio se decide**, **cuándo se
+resuelve**, y qué garantía del marco queda sin cumplir si no se hace. Están ahí para que no
+haga falta haber diseñado la infraestructura del área para poder resolverlos. El que no
+admite demora es el de **la retención y la clase del grupo de logs**: la clase se decide al
+crear el grupo y no se puede cambiar después.
 
-⚠️ **Y no gatean todavía**, así que no confundas: el primer CI rojo de la fase 5.1 **no**
-viene de acá. La compuerta llega cuando «este repositorio se despliega» sea verificable
-para la forma que tengas delante: hoy el andamio reparte pipeline de despliegue **sólo
+⚠️ **Y no gatean**, así que no confundas: el primer CI rojo de la fase 5.1 **no** viene de
+acá. Si alguna vez gatean —y si con un aviso o con un rojo— lo decide el marco cuando pueda
+medir que el repositorio llegó a su ambiente para la forma que tengas delante: hoy el
+andamio reparte pipeline de despliegue **sólo
 para la forma `sitio`** —que publica en Cloudflare Workers y no usa esta infraestructura—
 y para una aplicación todavía no hay ninguno. El tramo entero está en
 [10-publicar.md](10-publicar.md). Hasta entonces son disciplina, y se ven de un tirón:

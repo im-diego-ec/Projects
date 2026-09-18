@@ -1,30 +1,25 @@
 ---
 artefacto: tasks
 dri: Builder 1
-revisa: revision adversarial (desvio del marco: un solo mantenedor, ver AGENTS.md)
-estado: pendiente-de-revision
+aprueba: revision adversarial (desvio del marco: un solo mantenedor, ver AGENTS.md)
+estado: en-ejecucion
 ---
 
-> **Parte de este change YA está en el contrato canónico, y hay que saberlo antes de
-> archivar.** El 2026-08-24 se promovió a `openspec/specs/operacion-infra/spec.md` el
-> requirement **«El andamio entrega los huecos de decisión de infraestructura con su
-> criterio»**, que describe exactamente lo que este change ya reparte y ya hace fallar
-> solo (`plantilla/infra/pendientes.tf`, `plantilla/infra-prod/pendientes.tf` y
-> `pruebas/andamio/infra-pendientes.test.mjs`, que corre hoy en el CI del marco). Se
-> promovió porque una compuerta que ya enrojece a alguien sin requirement escrito es una
-> regla invisible: el consumidor no puede anticipar por qué su pipeline se pone rojo
-> leyendo `openspec/specs/`.
->
-> Lo que este change conserva es lo que TODAVÍA no existe: la compuerta que exige que el
-> hueco esté RESUELTO. Al archivarlo, su `ADDED` no colisiona por título, pero SÍ se
-> superpone: decidir en ese momento si el requirement nuevo **reemplaza** al promovido
-> (`MODIFIED` + `RENAMED`) o convive con él, y dejarlo escrito. Dos requirements que
-> dicen lo mismo con distinta fuerza es la forma en que un contrato empieza a mentir.
+> **La superposición con el spec vivo que esta nota advertía quedó resuelta en el bloque 4.**
+> El 2026-08-24 se promovió a `openspec/specs/operacion-infra/spec.md` el requirement «El
+> andamio entrega los huecos de decisión de infraestructura con su criterio», y esta nota
+> pedía decidir al archivar si el `ADDED` de este change lo reemplazaba o convivía con él.
+> Decidido (design, D10): **lo reemplaza**. El `ADDED` se retiró y su contenido se fundió en el
+> vivo por `RENAMED` + `MODIFIED`, reproduciendo sus cuatro escenarios. Dos requirements que
+> dicen lo mismo con distinta fuerza es la forma en que un contrato empieza a mentir, y además
+> decían lo contrario sobre si la verificación falla.
 
 # infra-exigible — Tasks
 
-Tres bloques. El 1 es el único que toca el andamio; el 2 verifica que la compuerta muerda de
-verdad; el 3 cierra la documentación. **Un sub-issue por bloque**, colgado del issue macro, y
+Cuatro bloques. El 1 es el único que toca el andamio de entrada; el 2 verifica que la guarda
+muerda de verdad; el 3 cierra la documentación; el 4 —el cierre del 2026-09-17, lote 12 del
+porte de Rigel— reformula el delta para que se pueda archivar y le suma lo que Rigel aprendió
+después sobre los mismos pendientes. **Un sub-issue por bloque**, colgado del issue macro, y
 un PR por bloque con `Closes #<sub-issue>` desde su creación.
 
 ---
@@ -70,7 +65,7 @@ un PR por bloque con `Closes #<sub-issue>` desde su creación.
       **vacío**. Solo `data`, `terraform`, `provider`, `variable`, `locals` y `output`.
       **RESULTADO**: vacío.
 
-## Bloque 2 — Que la compuerta muerda, y que sea inerte donde debe · **HECHO** (la 2.3 salió a issue propio)
+## Bloque 2 — Que la compuerta muerda, y que sea inerte donde debe · **HECHO** (la 2.3 no es ejecutable)
 
 - [x] **2.1** Prueba en `pruebas/andamio/` con el patrón que el banco ya usa: las
       comprobaciones se escriben una vez y se corren **contra el andamio real** (donde tienen
@@ -94,12 +89,20 @@ un PR por bloque con `Closes #<sub-issue>` desde su creación.
       por eso ese verde acredita la inertness y NO que la compuerta muerda — eso lo acreditan
       el banco de la 2.1 y la verificación contra el consumidor.
 
-- [ ] **2.3** **MOVIDA A ISSUE PROPIO (#73)**, y el motivo es que su compuerta no es técnica:
-      abre una rama temporal en un repo consumidor y eso exige el OK de @builder-uno, aunque
-      el PR sea borrador y no se mergee. Un bloque no se cierra con una tarea pendiente de un
-      gate humano adentro, y dejarla acá habría hecho que el PR del bloque 2 cerrara un issue
-      incompleto.
-      Sigue siendo obligatoria antes del archive del change.
+- [x] **2.3** **No ejecutable, declarado el 2026-09-17** (design, D15). La casilla va tildada
+      porque la decisión está tomada y escrita, no porque el trabajo se haya hecho — la misma
+      convención que `reglas-al-dia` usó para su bloque 6.
+      La tarea era abrir una rama temporal en un repositorio consumidor, con un PR en borrador,
+      para ver morder la compuerta. Decía «sigue siendo obligatoria antes del archive». Deja de
+      serlo por tres motivos, y cualquiera alcanza: (1) **su objeto no existe**: lo que tenía que
+      morder era la compuerta de pendientes sin resolver, y el bloque 4 la retira del
+      requirement; (2) **nada de este change corre en un consumidor**: toca scaffold, un spec
+      canónico y un banco del marco, y ningún workflow, action ni `input` cambia; (3) abrir una
+      rama en un consumidor desde una sesión de Projects es 🛑 en `AGENTS.md` — la prueba
+      contra un consumidor real es de la versión, antes del release
+      (`projects-validar-consumidor`), no de este change.
+      El `#73` que citaba es un número de la historia de origen de este change, no un issue de
+      este repositorio.
 
 ## Bloque 3 — Que el que llega mañana lo entienda · **HECHO**
 
@@ -150,19 +153,160 @@ un PR por bloque con `Closes #<sub-issue>` desde su creación.
       comando de revisión a mano.
       **Evidencia**: `grep -rniE "queda rojo|se queda .rojo" plantilla/infra*` sale vacío.
 
-- [ ] **La compuerta queda pendiente para el change del despliegue**, y este change NO se
-      archiva hasta que exista: su requirement pide compuerta y hoy hay disciplina
-      declarada. Está dicho en D8.
+- [x] **La compuerta ya no bloquea el archive, porque el requirement dejó de pedirla.**
+      Esta tarea decía: *«La compuerta queda pendiente para el change del despliegue, y este
+      change NO se archiva hasta que exista: su requirement pide compuerta y hoy hay
+      disciplina declarada»*. La premisa se disolvió en el bloque 4 (design, D9): la cláusula
+      «la verificación SHALL fallar mientras sobreviva un hueco sin resolver» sale del cuerpo,
+      del título y del escenario 1. Lo que la reemplaza **no es un aviso ya cableado** —en
+      Rigel sí lo era; acá no existe—: es una declaración explícita de que la forma de la señal
+      la decide el change que mida por plataforma la llegada al ambiente. Hasta entonces sigue
+      la disciplina declarada, y ahora el requirement la nombra en vez de prometer lo contrario.
+      **Evidencia**: `grep -n "SHALL fallar mientras" openspec/changes/infra-exigible/specs/operacion-infra/spec.md`
+      → sin salida; y el escenario «Un repositorio con todos sus huecos abiertos» del delta
+      dice que la verificación pasa.
+
+---
+
+## Bloque 4 — El cierre: el delta deja de contradecirse y los pendientes dicen cuándo · 2026-09-17
+
+Lote 12 del porte de Rigel. Origen: Rigel 1.9.0 (`dev-alcanzable`, `78c693c`), 1.10.0
+(`2026-08-29-infra-exigible`, `cb4cb13`, `160375e`, `462dc14`), 2.4.0 (`la-clase-del-log-group`,
+`125d228`), 2.5.0 (`el-ambiente-se-exige`, `6b91fef`) y el change sin publicar
+`2026-09-14-las-alarmas-no-se-contradicen` (`373f378`, `04166e8`). Toda la evidencia es del
+worktree de la rama del porte, corrida el 2026-09-17.
+
+### 4.a — La guarda primero, y vista en rojo
+
+- [x] **4.1** El banco pasa de tres partes a **cuatro** con una sola lista (`PARTES`) para los
+      dos tokens, y suma dos comprobaciones: `retencionDeLogsEnLosDosAmbientes` y
+      `pendientesDePlataformaConSusCuatroPartes` (con guarda de vacuidad: cero encabezados
+      `### PENDIENTE-PLATAFORMA` es rojo). Tres mutaciones nuevas, y la mordida se mide contra
+      el árbol real: una mutación tiene que dar **más** hallazgos que el árbol, no solo alguno.
+      **Evidencia**: `pruebas/andamio/infra-pendientes.test.mjs:87` (`PARTES`), `:226`, `:245`,
+      `:266`; mutaciones desde `:393`.
+
+- [x] **4.2** **Rojo antes del arreglo**, sobre el andamio sin tocar:
+      `node --test --test-reporter=tap pruebas/andamio/infra-pendientes.test.mjs` →
+      `# tests 21 · # pass 15 · # fail 6`. Rojas: `pendientesConSusCuatroPartes` (13
+      pendientes sin «CUÁNDO SE RESUELVE»: 6 de dev y 7 de producción),
+      `retencionDeLogsEnLosDosAmbientes` (falta en las dos raíces),
+      `pendientesDePlataformaConSusCuatroPartes` (ocho sin «CUÁNDO», y «el marco» sin «CÓMO
+      SE DECIDE»), y las tres mutaciones nuevas, que no tenían qué mutar.
+
+### 4.b — El andamio
+
+- [x] **4.3** «CUÁNDO SE RESUELVE» en los trece pendientes que había, con texto propio cada
+      uno (design, D12), y el párrafo del cómputo administrado en los dos dimensionamientos.
+      El bucket del state **sigue siendo pendiente** y no pasa a marcador.
+      **Evidencia**: `grep -c '^# CUÁNDO SE RESUELVE'` → 7 en `plantilla/infra/pendientes.tf`
+      y 8 en `plantilla/infra-prod/pendientes.tf`, igual que sus secciones numeradas; en `HEAD`
+      antes del lote, `grep -c CUÁNDO plantilla/infra/pendientes.tf` → 0.
+
+- [x] **4.4** El pendiente nuevo **«La retención y la clase del grupo de logs del servicio»**:
+      `plantilla/infra/pendientes.tf:245` (7) y `plantilla/infra-prod/pendientes.tf:209` (8),
+      con el criterio condicional en dev y la clase casi fija en producción (design, D13).
+      Medido contra la tabla «Supported features» de «Log classes» de la documentación de
+      CloudWatch Logs el 2026-09-17: `Metric filters` → No, `GetLogEvents`/`FilterLogEvents` →
+      «Not supported», y «After a log group is created, its log class can't be changed».
+      **Evidencia**: `grep -rnE 'log_group_class|INFREQUENT_ACCESS|retention_in_days' plantilla/`
+      → 4 líneas (antes, 0).
+
+- [x] **4.5** El pendiente de alarmas separa el **piso** por capacidad —tres detecciones,
+      citando el requirement— de lo que el negocio elige por encima, y ata la tercera al
+      pendiente 8. Los encabezados de los dos `pendientes.tf` pasan a «estos pendientes no
+      tienen compuerta» sin prometer que llega con el change del despliegue.
+      **Evidencia**: `plantilla/infra-prod/pendientes.tf:160` (alarmas) y los encabezados.
+
+- [x] **4.6** Los dos `README.md` cuentan siete y ocho, dicen las cuatro partes, nombran el
+      pendiente de logs y el piso de alarmas.
+      **Evidencia**: `pruebas/docs/lo-que-lee-el-consumidor.test.mjs` en verde (las
+      explicaciones declaradas de «compuerta» y «change» siguen en las páginas).
+
+- [x] **4.7** `plantilla/infra/adaptadores.md`: el encabezado anuncia cuatro partes, los ocho
+      `PENDIENTE-PLATAFORMA` dicen «CUÁNDO SE RESUELVE», «el marco» suma «CÓMO SE DECIDE», y
+      la lista de pendientes que viven en `pendientes.tf` suma el programador de tareas y los
+      logs.
+      **Evidencia**, sobre `plantilla/infra/adaptadores.md`: encabezados
+      `### PENDIENTE-PLATAFORMA` → 8; líneas que abren con `**CUÁNDO SE RESUELVE**` → 8; con
+      `**CÓMO SE DECIDE**` → 8.
+
+- [x] **4.8** Verde después del arreglo: el mismo comando → `# tests 21 · # pass 21 · # fail 0`.
+
+### 4.c — El contrato
+
+- [x] **4.9** El delta retira el `ADDED` y declara `RENAMED` + `MODIFIED` del requirement vivo
+      (design, D10) y `MODIFIED` de «Las caídas se detectan por alarma» por capacidad (D11).
+      **Verificado a mano**, porque el guardrail tiene un hueco conocido con los títulos:
+      el título de cada `MODIFIED` existe en el spec vivo —«Las caídas…» directo, y «La
+      infraestructura…» por el `FROM` del `RENAMED`, que existe (`openspec/specs/operacion-infra/spec.md:87`)—;
+      el `TO` no existe en el vivo; no queda ningún `ADDED`. Los seis escenarios vivos de los dos
+      requirements están en el delta con su título exacto (`grep -cF` → 1 cada uno); el delta
+      tiene 12.
+
+- [x] **4.10** `npx --yes --ignore-scripts @fission-ai/openspec@1.9.0 validate infra-exigible --strict`
+      → «Change 'infra-exigible' is valid». `node actions/guardrail-deltas/check-openspec-deltas.mjs`
+      → «22 requirement(s) comparados… ningún MODIFIED perdería escenarios» (eran 20: los dos
+      `MODIFIED` nuevos, el renombrado resuelto por el `RENAMED`).
+
+- [x] **4.11** Ensayo del archive sin escribir:
+      `node .claude/skills/projects-archive-change/aplicar-deltas.mjs infra-exigible --simulacro`
+      → «3 operacion(es) planificadas y NO escritas»: el `RENAMED` y los dos `MODIFIED`, en
+      `operacion-infra`.
+
+### 4.d — La documentación que decía otra cosa
+
+- [x] **4.12** `openspec/cobertura-de-requirements.md`: la fila de «Higiene operativa de logs y
+      TLS» decía «el pendiente correspondiente» sobre un pendiente que no existía; ahora nombra
+      la comprobación que lo exige en las dos raíces. Las filas del state, de las caídas y de
+      los huecos pasan a cuatro partes y a las anclas nuevas del banco (las viejas `:164`,
+      `:183`, `:201`, `:240`, `:284` caían sobre código cualquiera y el banco de la página no lo
+      podía ver). El párrafo de «parcial» deja de prometer la compuerta.
+      **Evidencia**: `openspec/cobertura-de-requirements.md:232-237`;
+      `pruebas/docs/cobertura-de-requirements.test.mjs` en verde.
+
+- [x] **4.13** `docs/05-arrancar-tecnico.md` (siete y ocho, cuatro partes, «no gatean» sin
+      «todavía») y las filas 22 y 23 de `docs/11-reglas-no-escritas.md`. La primera redacción
+      de la fila 22 citaba la cláusula retirada con su `SHALL`, y
+      `pruebas/docs/estandar-de-lectura.test.mjs` la puso roja (palabra del glosario sin
+      enlazar): se reescribió sin la palabra.
+      **Evidencia de cierre del bloque**: suite completa del marco
+      (`find actions pruebas -name '*.test.mjs' -print0 | xargs -0 node --test`) →
+      `# tests 1485 · # pass 1485 · # fail 0` (eran 1480: dos comprobaciones y tres mutaciones
+      nuevas); `openspec validate --all --strict` → «Totals: 30 passed, 0 failed».
+
+### 4.e — Lo que queda para la pasada final, y lo que no se hizo
+
+- [ ] **4.14** **La retención de logs de las plataformas que no son `aws`**, como
+      `PENDIENTE-PLATAFORMA` de cada adaptador. No se hizo: cada proveedor tiene su retención
+      y su forma de fijarla, y la regla `costo-declarado-con-techo` prohíbe escribir un límite
+      de plataforma sin medirlo contra la página del proveedor con su fecha. Destino: un
+      change propio, o la pieza del porte que mida la llegada al ambiente por plataforma.
+
+- [ ] **4.15** **Revisión adversarial** registrada en `revision-adversarial.md` de este change,
+      con al menos dos lentes y un veredicto. La pide el desvío de `AGENTS.md` antes de
+      archivar, y la hace la pasada final del porte, no el lote que escribió el cambio.
+
+- [ ] **4.16** **Archive**, con `projects-archive-change`. Al aplicarlo, en el mismo commit:
+      renombrar la fila de `openspec/cobertura-de-requirements.md` al título nuevo (el banco de
+      la página se pone rojo si no); y extender el `Purpose` de `operacion-infra`, que no nombra
+      que la infraestructura exista en el árbol ni que lo que falta decidir llegue escrito
+      (Rigel lo agregó en su archive, hallazgo 10 de su revisión). El conteo de requirements
+      de la capability queda en 6.
+
+- [ ] **4.17** **La entrada del CHANGELOG.** Escrita como fragmento en
+      `.porte/changelog/12-infra-exigible.md`; entra a `CHANGELOG.md` al integrar el porte.
 
 ## Lo que NO es tarea de este change, y está declarado
 
 El Terraform con recursos reales, el `deploy.yml`, `verificar-prod` como pieza referenciada,
 y las otras garantías operativas del tercer nivel. Cada una es su propio change; la
-justificación está en el `design.md` y en el issue #66.
+justificación está en el `design.md`. Tampoco lo es la señal —aviso o rojo— sobre los
+pendientes sin resolver, ni la compuerta del mínimo de alarmas (design, D9 y D11).
 
 ## Orden y dependencias
 
 El bloque 1 antes del 2 —no se puede probar una compuerta que no existe— y el 3 último,
-porque su tarea 3.1 cita el conteo real de huecos que deja el bloque 1. El 2.3 exige el OK de
-@builder-uno para abrir la rama temporal en el consumidor, aunque el PR sea borrador y no
-se mergee.
+porque su tarea 3.1 cita el conteo real de huecos que deja el bloque 1. En el 4, la guarda
+antes que el andamio (4.1–4.2 antes que 4.3–4.7), y el delta antes del archive: 4.15 y 4.16
+van en ese orden, en la pasada final.

@@ -47,9 +47,11 @@ Cada uno declara lo mismo, en el mismo orden:
 - **PLAN GRATUITO** — el límite real, **medido contra la página del proveedor y con la
   fecha de la medición**. Los planes gratuitos cambian sin aviso: una cifra sin fecha es
   una cifra que ya no se puede verificar.
-- **PENDIENTES** — lo que falta decidir, con la misma forma de tres partes que usa
-  `pendientes.tf`: **QUÉ FALTA**, **CÓMO SE DECIDE** y **SI NO SE HACE**. El del medio es
-  el que importa: sin criterio, un pendiente lo resuelve sólo quien ya sabía la respuesta.
+- **PENDIENTES** — lo que falta decidir, con la misma forma de cuatro partes que usa
+  `pendientes.tf`: **QUÉ FALTA**, **CÓMO SE DECIDE**, **CUÁNDO SE RESUELVE** y **SI NO SE
+  HACE**. La segunda es la que importa: sin criterio, un pendiente lo resuelve sólo quien ya
+  sabía la respuesta. Y la tercera es la que se olvida: un pendiente sin momento se lee como
+  trabajo futuro sin dueño, y el trabajo futuro sin dueño no se hace.
 
 Los pendientes de acá llevan el token `PENDIENTE-PLATAFORMA` y **no** `PENDIENTE-INFRA`, a
 propósito: son dos listas distintas y el grep de una no debe traer la otra.
@@ -82,6 +84,16 @@ publica en ningún lado.
 es la carpeta donde queda escrito, ANTES de programar, qué se va a cambiar y por qué; ése
 ya tiene sus decisiones tomadas (topología Local → DEV → PROD) y su tarea bloqueante
 escrita: medir si un container de Cloudflare puede abrir TCP saliente al 5432.
+
+**CÓMO SE DECIDE** — No lo decide este proyecto: lo decide el marco en ese change. Lo que
+sí le toca a este proyecto es no suponer que la clave ya le da despliegue: hasta que el
+marco lo publique, el despliegue de lo que no sea un sitio se escribe a mano, con el
+adaptador elegido como guía.
+
+**CUÁNDO SE RESUELVE** — Cuando el marco publique esa pieza: llega con una versión nueva,
+por el pull request que actualiza la versión del marco en este repositorio, y su CHANGELOG
+lo dice. Ese día este bloque se borra a mano, porque este archivo es del proyecto y ninguna
+actualización lo toca.
 
 **SI NO SE HACE** — La palabra sigue prometiendo más de lo que entrega: quien elige una
 plataforma esperando que su aplicación corra ahí recibe archivos, no despliegue.
@@ -140,6 +152,10 @@ orden es el que menos duele, y no cuánto tarda ni con qué se rompe.
 números: qué tardó, qué se rompió, qué había que saber antes. Un par medido vale más que
 cinco descritos.
 
+**CUÁNDO SE RESUELVE** — Durante la primera mudanza real, mientras se hace y no después:
+los tiempos y lo que se rompió se anotan el mismo día, porque reconstruirlos una semana
+más tarde da números que nadie puede verificar.
+
 **SI NO SE HACE** — «Después te mudás» sigue siendo una promesa sin fuente, que es
 exactamente lo que este repositorio prohíbe escribir en todo lo demás.
 
@@ -175,6 +191,11 @@ no sea quien lo desarrolla.
 **CÓMO SE DECIDE** — La pregunta es de negocio y tiene una sola forma: ¿hay alguien fuera
 del equipo que necesite entrar? El día que la respuesta sea sí, se vuelve a este archivo y
 se elige adaptador. Antes de ese día, elegir es adivinar.
+
+**CUÁNDO SE RESUELVE** — El día que alguien de fuera del equipo necesite entrar, y no
+antes. Hasta entonces este pendiente queda abierto a propósito y **no vence**: no desplegar
+es un estado legítimo, y los bloques que se terminen mientras tanto se declaran terminados
+en local y no cerrados.
 
 **SI NO SE HACE** — Nada. Ésta es la salida legítima, y por eso es de primera clase.
 
@@ -248,6 +269,10 @@ del pooler compartido, que es IPv4 en todos los planes.
 es teórico. Uno que se toca cada dos semanas se va a pausar, y el síntoma es una suite de
 pruebas que falla con un error de conexión que no dice «pausado». Si el proyecto va a tener
 rachas, el arreglo es un ping periódico o asumir la espera del despertar y escribirlo.
+
+**CUÁNDO SE RESUELVE** — Al crear el proyecto de dev en Supabase, antes de apuntarle el CI:
+la primera pausa llega a la semana sin actividad, y la decisión tiene que existir antes que
+el primer rojo inexplicable.
 
 **SI NO SE HACE** — El primer CI que corra después de una pausa sale rojo por un motivo que
 no está en el mensaje, y se busca en el código de la aplicación.
@@ -350,6 +375,10 @@ reloj, así que esperar a la base no cuenta y serializar un JSON grande sí. Una
 consulta y responde suele entrar; una que hace criptografía, comprime o procesa imágenes,
 no. Se prueba con la petición más pesada que el proyecto tenga, antes de comprometerse.
 
+**CUÁNDO SE RESUELVE** — Antes de comprometerse con Workers para (a), con la petición más
+pesada que el proyecto ya tenga. Y otra vez cada vez que se agregue una ruta que cifre,
+comprima o procese archivos: la medición vale para lo que se midió.
+
 **SI NO SE HACE** — La plataforma corta la petición al superar el presupuesto. El error
 aparece bajo carga y no en desarrollo, que es cuando más caro es diagnosticarlo.
 
@@ -383,6 +412,9 @@ queda con (a); la conexión sale a internet y eso hay que decidirlo con los ojos
 Si la base va a ser del mismo proveedor, deja de haber plan gratuito y **el costo se
 declara antes de crearla**, no después de la primera factura.
 
+**CUÁNDO SE RESUELVE** — Al elegir `gcp`, antes de crear cualquier base: es la decisión que
+fija el costo, y una base creada «para probar» ya es la decisión tomada por omisión.
+
 **SI NO SE HACE** — Se crea la base «para probar» y queda encendida. Es la forma más común
 de que un proyecto sin presupuesto tenga una factura.
 
@@ -394,6 +426,9 @@ de que un proyecto sin presupuesto tenga una factura.
 hasta donde aguante la tarjeta y el presupuesto se entera después. Se arranca por el
 escalón más chico que la aplicación tolere y se sube con evidencia; al revés no se puede,
 porque un servicio sobredimensionado nunca da señal de estarlo.
+
+**CUÁNDO SE RESUELVE** — En el mismo cambio que crea el servicio, no en uno posterior: un
+servicio sin techo está expuesto al pico desde su primer minuto.
 
 **SI NO SE HACE** — Queda sin cumplir la garantía del marco de que el gasto tiene
 presupuesto con aviso.
@@ -449,10 +484,13 @@ son apagar lo que no se use o presupuestar lo que sí; las dos son legítimas y 
 es es enterarse por la factura. Un aviso de presupuesto configurado el primer día cuesta
 nada y es lo único que convierte esto en una decisión.
 
+**CUÁNDO SE RESUELVE** — El mismo día que se crea la cuenta: la fecha se anota y el aviso
+de presupuesto se configura entonces, no cuando se acerca el vencimiento.
+
 **SI NO SE HACE** — El proyecto llega a la fecha sin haberlo mirado, y la primera señal es
 un cargo.
 
 Los pendientes de la infraestructura ya escrita —el bucket del estado, el clúster
-compartido, las subredes, el dimensionamiento, el certificado y las alarmas— **no están
-acá**: viven en `infra/pendientes.tf` y en `infra-prod/pendientes.tf`, que es donde se
-resuelven.
+compartido, las subredes, el dimensionamiento, el certificado, el programador de tareas,
+las alarmas y la retención y la clase del grupo de logs— **no están acá**: viven en
+`infra/pendientes.tf` y en `infra-prod/pendientes.tf`, que es donde se resuelven.

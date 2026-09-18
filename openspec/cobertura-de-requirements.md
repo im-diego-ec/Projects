@@ -229,12 +229,12 @@ sí, y eso es exactamente lo que hace la única fila con compuerta.
 
 | Requirement | Lo que lo hace fallar solo | Ruta y ancla (2026-08-31) |
 |---|---|---|
-| El state de la infraestructura vive en un backend remoto compartido | **parcial**: el pendiente del bucket del state viaja con sus tres partes obligatorias y el banco lo exige; el paso de Terraform del andamio corre `fmt -check` y `validate` sobre las raíces | `pruebas/andamio/infra-pendientes.test.mjs:164` (`pendientesConSusTresPartes`); paso «Formato y validez de las raices de Terraform», `plantilla/.github/workflows/ci.yml:262`, con banco en `pruebas/andamio/terraform-en-ci.test.mjs` |
-| Las caídas se detectan por alarma, no por reporte humano | **parcial**: el banco exige que el pendiente de las alarmas viva SOLO en la raíz de producción, no en la de desarrollo | `pruebas/andamio/infra-pendientes.test.mjs:183` (`alarmasSoloEnProd`) |
+| El state de la infraestructura vive en un backend remoto compartido | **parcial**: el pendiente del bucket del state viaja con sus cuatro partes obligatorias y el banco lo exige; el paso de Terraform del andamio corre `fmt -check` y `validate` sobre las raíces | `pruebas/andamio/infra-pendientes.test.mjs:226` (`pendientesConSusCuatroPartes`); paso «Formato y validez de las raices de Terraform», `plantilla/.github/workflows/ci.yml:262`, con banco en `pruebas/andamio/terraform-en-ci.test.mjs` |
+| Las caídas se detectan por alarma, no por reporte humano | **parcial**: el banco exige que el pendiente de las alarmas viva SOLO en la raíz de producción, no en la de desarrollo. Que producción tenga el mínimo que el requirement fija no lo verifica nada: el andamio no reparte alarmas | `pruebas/andamio/infra-pendientes.test.mjs:292` (`alarmasSoloEnProd`) |
 | El gasto tiene un presupuesto con alerta | **ninguno** | — |
 | Los datos de producción están protegidos contra pérdida | **ninguno** | — |
-| Higiene operativa de logs y TLS | **parcial**: el pendiente correspondiente entra en la misma guarda de las tres partes y en la de numeración correlativa | `pruebas/andamio/infra-pendientes.test.mjs:164` y `:240` |
-| El andamio entrega los huecos de decisión de infraestructura con su criterio | El banco de huecos de infraestructura: tres partes por hueco, numeración correlativa, punteros que resuelven, alarmas solo en producción — cada una con su mutación que la hace morder | `pruebas/andamio/infra-pendientes.test.mjs:164`, `:183`, `:201`, `:240`, y las mutaciones desde `:284` |
+| Higiene operativa de logs y TLS | **parcial**: el banco exige que el pendiente de la retención y la clase del grupo de logs exista en las DOS raíces, y ese pendiente y el del certificado entran en la guarda de las cuatro partes y en la de numeración correlativa. Que la retención quede declarada en la IaC y que la conexión valide el certificado no lo verifica nada: el andamio no reparte esos recursos. Esta fila decía «el pendiente correspondiente» hasta el 2026-09-17, cuando el de logs no existía | `pruebas/andamio/infra-pendientes.test.mjs:245` (`retencionDeLogsEnLosDosAmbientes`), `:226` y `:349` |
+| El andamio entrega los huecos de decisión de infraestructura con su criterio | El banco de huecos de infraestructura: cuatro partes por pendiente —los de infraestructura y los de plataforma del catálogo de adaptadores—, el pendiente de logs en los dos ambientes, numeración correlativa, punteros que resuelven, alarmas solo en producción — cada una con su mutación que la hace morder | `pruebas/andamio/infra-pendientes.test.mjs:226`, `:245`, `:266`, `:292`, `:310`, `:349`, y las mutaciones desde `:393` |
 
 **Qué significa «parcial» acá, y es un límite declarado del propio change
 `infra-exigible`.** Lo que hay hoy es que el andamio reparta la raíz de infraestructura
@@ -242,8 +242,9 @@ con cada decisión pendiente **escrita con su criterio**, y que un banco lo veri
 Lo que NO existe es la compuerta que exija que la decisión se haya TOMADO: los
 pendientes usan un token propio que el paso de marcadores no cuenta, a propósito —con
 el marcador gateado, un repositorio recién nacido pasaba de 3 marcadores a 21 y no
-podía llegar a verde el primer día—. Esa compuerta llega cuando «este repositorio se
-despliega» sea verificable.
+podía llegar a verde el primer día—. Y desde el cierre de ese change (2026-09-17) el
+requirement ya no la promete: qué forma tome una señal sobre los pendientes —aviso o
+rojo— la decide el change que mida por plataforma si un repositorio llegó a su ambiente.
 
 ---
 

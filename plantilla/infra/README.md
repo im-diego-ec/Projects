@@ -35,18 +35,23 @@ un lugar equivocado.
 del state, la región, el proveedor con sus etiquetas por defecto, la referencia a
 la base compartida y la referencia a la red. No hay que tocar nada de eso.
 
-**Sin resolver, en `pendientes.tf`**: seis. Cada uno dice qué falta, **con qué
-criterio se decide** y qué garantía del marco queda sin cumplir si no se hace.
+**Sin resolver, en `pendientes.tf`**: siete. Cada uno dice qué falta, **con qué
+criterio se decide**, **cuándo se resuelve** y qué garantía del marco queda sin cumplir
+si no se hace. El momento importa tanto como el criterio: un pendiente sin momento se lee
+como trabajo futuro sin dueño.
 
-⚠️ **Todavía no hay compuerta** —una comprobación que bloquea el merge—: el pipeline
-**no** se pone rojo por estos
-pendientes. Es a propósito —un token que cuenta desde el día uno pondría rojo a un
-repositorio recién nacido por decisiones que todavía no puede tomar— y la
-compuerta llega con el change —la propuesta escrita— del despliegue. Hasta entonces se
-revisa a mano:
+Uno de los siete tiene una ventana que se cierra sola: **la retención y la clase del grupo
+de logs del servicio** se deciden al crear el grupo, porque la clase no se puede cambiar
+después. Los demás se pueden corregir; ése, sólo recreando el grupo.
+
+⚠️ **Estos pendientes no tienen compuerta** —una comprobación que bloquea el merge—: el
+pipeline **no** se pone rojo por ellos. Es a propósito —un token que cuenta desde el día
+uno pondría rojo a un repositorio recién nacido por decisiones que todavía no puede
+tomar—. Si el marco llega a emitir una señal sobre ellos, la trae una versión nueva y el
+change —la propuesta escrita— que la decida. Hasta entonces se revisa a mano:
 `grep -rn PENDIENTE-INFRA infra infra-prod`.
 
-Dos de los seis —el bucket del state y el identificador del cluster— se parecen
+Dos de los siete —el bucket del state y el identificador del cluster— se parecen
 más a un **dato del área** que a una decisión de este proyecto. Están como
 pendiente porque el andamio hoy no los sustituye. Si te toca resolverlos a mano,
 anotalo: el arreglo de fondo es que pasen a ser valores y estos dos pendientes
@@ -66,8 +71,7 @@ terraform init -backend=false && terraform validate
 Las dos son **inertes**: `fmt` sólo lee texto, y `-backend=false` es lo que evita
 tocar el bucket del state — que es justamente el pendiente 1. No hacen falta
 cuenta, credenciales ni que este repositorio se despliegue, y por eso son
-exigibles desde el día uno aunque la compuerta de los pendientes todavía espere al
-change del despliegue.
+exigibles desde el día uno aunque los pendientes no tengan compuerta.
 
 Estrenan en **modo aviso hasta el 2026-09-30** y después se ponen rojas solas, sin
 que nadie toque el workflow: hasta hoy nada miraba estos archivos, así que la

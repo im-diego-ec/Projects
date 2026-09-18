@@ -172,6 +172,27 @@ mueve sobre un cambio incompatible.
   regla nueva. Subir el número sin reescribir la nota —diciendo «el presupuesto sube
   de X a N»— pone rojo el CI del marco. Para consumidores: nada.
 
+- **El requirement de los pendientes de infraestructura se reformula y absorbe al del change
+  `infra-exigible`, que se cierra** (`operacion-infra`, delta en vuelo: `RENAMED` +
+  `MODIFIED`). Pasa a llamarse «La infraestructura de un repositorio desplegable vive en su
+  árbol, entregada por el andamio», porque «huecos de decisión» ya nombraba en `calidad-codigo`
+  a los marcadores con la propiedad contraria. Sale la cláusula que pedía que la verificación
+  fallara mientras sobreviviera un pendiente —del cuerpo, del título y del escenario—: esa
+  compuerta nunca se construyó y el requirement vivo decía lo opuesto. Qué forma toma una
+  señal sobre los pendientes (aviso o rojo) la decide la pieza que mida por plataforma la
+  llegada al ambiente. Queda escrito que no desplegar es un estado legítimo y que la
+  verificación es inerte para quien no despliega. Para consumidores: nada; ningún check cambia.
+- **«Las caídas se detectan por alarma» se enuncia por capacidad.** El mínimo sigue siendo el
+  mismo —servicio que no responde o responde con errores sostenidos, proceso que se reinicia en
+  bucle, niveles de alerta en el log—, pero dicho por lo que detecta y no por el producto que
+  lo arma («instancias de cómputo», «filtro de métrica»), porque el marco ya no fija la nube.
+  El pendiente de alarmas del andamio separa ese piso de lo que el negocio elige por encima.
+  Para consumidores: nada; no es más estricto y ningún check lo mira.
+- **Los `PENDIENTE-PLATAFORMA` de `infra/adaptadores.md` tienen la misma forma de cuatro
+  partes**: los ocho suman «CUÁNDO SE RESUELVE» y el del marco suma «CÓMO SE DECIDE». El
+  catálogo decía «la misma forma de tres partes que usa `pendientes.tf`», que con cuatro partes
+  habría mentido en verde. Para consumidores: nada; es contenido del andamio.
+
 ### Corregido
 
 - **Cinco páginas seguían prometiendo una publicación automática que ya no ocurre**, y
@@ -258,6 +279,20 @@ mueve sobre un cambio incompatible.
   reescribía en su paso `pnpm format`, así que no ponía nada en rojo, pero cada
   proyecto nacía con una copia distinta de la del marco: ruido en la revisión de
   divergencia. Para consumidores: nada.
+
+- **Dos requirements vivos de `operacion-infra` se contradecían sobre las alarmas, y la 1.7.0
+  lo publicó.** Uno fija un mínimo; el otro decía que lo exigido de las alarmas «NO SHALL ser
+  cuáles ni cuántas», y la entrada de la 1.7.0 lo repitió: «Las alarmas se exigen como
+  propiedad y jamás como lista». Esa frase vale para lo que mira la verificación de los
+  pendientes, no para lo que tiene que vigilar producción: la cláusula se acota a su
+  verificación y dice que no debe leerse como que el marco no exige ninguna alarma. Porte de
+  `las-alarmas-no-se-contradicen` de Rigel, resuelto por capacidad porque acá no existe la
+  action que allá ya exigía alarmas concretas. Para consumidores: nada que cambiar; si tu
+  proyecto eligió sus alarmas leyendo «jamás como lista», revisá que cubra las tres del piso.
+- **`openspec/cobertura-de-requirements.md` daba como parcialmente cubierta la higiene de logs
+  por un pendiente que no existía**, y sus anclas al banco de pendientes caían sobre código
+  cualquiera. La fila nombra ahora la comprobación que exige el pendiente de logs en las dos
+  raíces, y las anclas se corrigieron. Para consumidores: nada.
 
 ### Añadido
 
@@ -724,6 +759,36 @@ mueve sobre un cambio incompatible.
   (`presupuesto-del-canonico.test.mjs`) y los residuos del renombrado en lo que viaja
   (`pruebas/andamio/residuos-del-renombrado.test.mjs`). Para consumidores: nada;
   corren en el CI de Projects.
+
+- **Los pendientes de infraestructura dicen CUÁNDO se resuelven.** Cada `PENDIENTE-INFRA`
+  de `infra/pendientes.tf` e `infra-prod/pendientes.tf` suma una cuarta parte, «CUÁNDO SE
+  RESUELVE», con texto propio: el certificado se empieza primero aunque se cierre último; el
+  programador de tareas se contesta antes de tocar infraestructura, porque lo contesta el PO
+  leyendo el spec; el dimensionamiento de producción se decide contra el uso esperado. Un
+  pendiente con criterio y sin momento se lee como trabajo futuro sin dueño: en Rigel, el
+  segundo consumidor llegó al bloque 7 de 14 con sus seis pendientes intactos (1.9.0,
+  `dev-alcanzable`). El bucket del state sigue siendo pendiente y no pasa a marcador: era un
+  dato del área de origen, no del marco. Para consumidores: nada obligatorio. Es contenido del
+  andamio y no viaja solo; un repositorio nacido con la plataforma `aws` puede copiar a mano
+  los párrafos «CUÁNDO SE RESUELVE» de la versión nueva de esos dos archivos.
+- **El pendiente de la retención y la clase del grupo de logs del servicio, en dev (7) y en
+  producción (8).** El contrato exige retención explícita en cualquier ambiente, y la clase de
+  un grupo de CloudWatch no se puede cambiar después de creado. Medido contra la documentación
+  del proveedor el 2026-09-17: la clase barata (`INFREQUENT_ACCESS`) no admite filtros de
+  métrica ni `GetLogEvents`/`FilterLogEvents`. En dev el pendiente da el criterio («qué va a
+  leer este grupo»); en producción la clase es `STANDARD`, porque la alarma de los niveles de
+  alerta del log se arma sobre ese grupo y el runbook investiga con `filter-log-events`. Rigel
+  tardó un release en ver que producción —el ambiente que no se puede rehacer— no lo tenía
+  (2.4.0 y 2.5.0). Para consumidores: si tu proyecto nació con `infra/` e `infra-prod/` y
+  todavía no creó el grupo de logs del servicio, copiá esas dos secciones antes de crearlo;
+  después, la clase ya no se puede corregir sin recrear el grupo.
+- **El banco del andamio exige las cuatro partes, el pendiente de logs en los dos ambientes y la
+  misma forma en los `PENDIENTE-PLATAFORMA` del catálogo de adaptadores**
+  (`pruebas/andamio/infra-pendientes.test.mjs`), con una sola lista de partes para los dos
+  tokens y una mutación por cada propiedad nueva. Visto en rojo sobre el andamio anterior
+  (21 pruebas, 6 rojas). Y la mordida se mide ahora contra el árbol real: una mutación tiene
+  que dar más hallazgos que el árbol, no solo alguno. Para consumidores: nada; corre en el CI
+  de Projects.
 
 ### Corregido
 
