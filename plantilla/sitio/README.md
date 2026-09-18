@@ -93,15 +93,40 @@ En [`dash.cloudflare.com/profile/api-tokens`](https://dash.cloudflare.com/profil
 > despliegue va a fallar por permisos, con un error que no dice cuál era el
 > correcto.
 
-### 4 · Guardar las dos cosas en GitHub · *2 minutos*
+### 4 · Guardar las dos cosas en GitHub · *5 minutos*
 
-En tu repositorio, **Settings → Secrets and variables → Actions → New repository
-secret**, dos veces:
+Van **adentro de dos environments**, `dev` y `produccion`, cada uno limitado a la
+rama `main`. En tu repositorio, **Settings → Environments → New environment**,
+dos veces —una con el nombre `dev` y otra con `produccion`—, y en cada uno:
+
+1. En **Deployment branches and tags**, elegí **Selected branches and tags** →
+   **Add deployment branch or tag rule** → `main`.
+2. En **Environment secrets → Add environment secret**, los dos:
 
 | Nombre | Valor |
 | --- | --- |
 | `CLOUDFLARE_API_TOKEN` | el que acabás de copiar |
 | `CLOUDFLARE_ACCOUNT_ID` | el identificador de tu cuenta |
+
+> **Por qué en un environment y no como secreto del repositorio.** Un secreto del
+> repositorio lo puede leer cualquier job de cualquier workflow de tu repo; el de
+> un environment limitado a `main` solo lo recibe un job que declara ese
+> environment y corre desde `main`. Este token **publica en producción**, así que
+> tiene que estar donde únicamente llega código que ya pasó por un pull request.
+>
+> **Y por qué también en `dev`:** Cloudflare no deja acotar un token a un solo
+> sitio —el permiso de Workers es de la cuenta entera—, así que la credencial de
+> la copia de prueba puede exactamente lo mismo que la de producción. Por eso las
+> dos van con la misma llave.
+
+> **Si tu repositorio es privado y tu cuenta está en el plan gratuito de GitHub**,
+> esa pantalla no te deja guardar secretos de environment: GitHub los ofrece en
+> repositorios privados solo en los planes pagos. Ahí el único lugar posible es
+> **Settings → Secrets and variables → Actions → New repository secret**, y el
+> workflow te lo va a recordar en amarillo en cada corrida: no es un error tuyo,
+> es la constancia de que en tu plan falta esa segunda llave. La primera —que el
+> despliegue solo corre con lo que ya está en `main` de este repositorio— vale en
+> cualquier plan.
 
 **No los pegues en ningún archivo del repositorio.** Un secreto en el código es
 un secreto público: cualquiera que clone el proyecto se lo lleva, y cambiarlo
@@ -110,8 +135,13 @@ después no borra el que ya se vio.
 ### 5 · Publicar por primera vez · *1 minuto*
 
 En la pestaña **Actions** de tu repositorio, elegí el workflow **desplegar** y
-apretá **Run workflow**. La primera vez conviene a mano; de ahí en adelante corre
-solo cada vez que las verificaciones quedan en verde sobre la rama principal.
+apretá **Run workflow**, con `main` elegida en **Use workflow from** —es la que
+viene puesta—. La primera vez conviene a mano; de ahí en adelante corre solo
+cada vez que las verificaciones quedan en verde sobre la rama principal.
+
+> **Desde otra rama no publica nada**, y lo dice en rojo: lo que llega a la
+> credencial es solo lo que ya está en `main`. Para probar una rama sin publicar
+> está el ensayo del final de esta página.
 
 **Cómo sabés que salió bien.** El paso de publicación imprime la dirección, y la
 primera vez tiene la forma `https://{{PROYECTO}}.<tu-subdominio>.workers.dev`.
@@ -160,7 +190,7 @@ Vienen de Cloudflare tal cual, sin traducir, y ninguno dice qué hacer. Esto sí
 
 | Lo que dice | Qué pasó | Cómo se arregla |
 | --- | --- | --- |
-| `Authentication failed (status: 400) [code: 9106]` | el token no vale: mal pegado, vencido, o revocado | creá otro con la plantilla «Edit Cloudflare Workers» y volvé a guardarlo en Secrets |
+| `Authentication failed (status: 400) [code: 9106]` | el token no vale: mal pegado, vencido, o revocado | creá otro con la plantilla «Edit Cloudflare Workers» y volvé a guardarlo en los dos environments del paso 4 |
 | `Invalid format for Authorization header [code: 6111]` | al pegarlo entró un espacio, un salto de línea o comillas | pegalo de nuevo, sin nada alrededor |
 | `you need to register a workers.dev subdomain` | tu cuenta todavía no tiene subdominio | elegí uno en el panel, en **Workers & Pages → Subdomain**. Es una vez y es gratis |
 

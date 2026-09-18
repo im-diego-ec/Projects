@@ -295,6 +295,17 @@ mueve sobre un cambio incompatible.
   cualquiera. La fila nombra ahora la comprobación que exige el pendiente de logs en las dos
   raíces, y las anclas se corrigieron. Para consumidores: nada.
 
+- **La versión que sube a DEV lleva el nombre del commit que se trajo, no el de la
+  punta de `main`.** Bajo `workflow_run`, `GITHUB_SHA` es la punta de `main` cuando
+  arranca la corrida, no lo que el CI midió: el job `dev` traía un commit y rotulaba
+  la versión con otro, y el resumen mandaba a promover el segundo. Si entraba otro
+  merge mientras el CI corría, la versión quedaba con el nombre de un commit y el
+  código de otro, en verde. Ahora un primer paso fija el commit una vez por corrida y
+  todo lo demás lo lee de ahí.
+
+  **Para consumidores: nada.** El workflow de dos ambientes todavía no salió en
+  ninguna versión publicada.
+
 ### Añadido
 
 - **Está medido que la API de este andamio corre en un Worker sin tocarla.** La ruta
@@ -1054,6 +1065,68 @@ mueve sobre un cambio incompatible.
   entera, así que la persona veía la misma pregunta otra vez **sin ninguna señal**
   de haberse equivocado. Medido en el callejón de AWS: cincuenta reintentos,
   cincuenta preguntas repetidas, el motivo perdido arriba cada vez.
+
+### Seguridad
+
+- **El despliegue del andamio ya no le da la credencial de Cloudflare al código de
+  un pull request desde un fork.** `desplegar.yml` se disparaba cuando terminaba el
+  CI, con `branches: [main]` como único filtro, y ese filtro compara el **nombre**
+  de la rama que corrió el CI: en un pull request desde un fork lo elige quien lo
+  abre. Con la rama del fork llamada `main` y su CI en verde, el job traía el código
+  del fork, corría su `pnpm install` y ejecutaba `wrangler` con
+  `CLOUDFLARE_API_TOKEN` en el entorno: un token de **toda la cuenta** de
+  Cloudflare, el mismo que publica en producción. De la 1.8.0 a la 1.9.6 ese mismo
+  job publicaba **directo a producción**.
+
+  **Cómo queda:** cada job exige que el CI lo haya disparado un `push` a `main` con
+  el commit en **este** repositorio; a mano, solo desde `main` —desde otra rama la
+  corrida termina en rojo diciendo por qué, en vez de quedar gris sin una palabra—;
+  la promoción solo acepta un commit completo de la historia de `main`, también con
+  el apartamiento `sin_pasar_por_dev`; ningún checkout deja el token del workflow en
+  `.git/config`; y la guía del sitio manda la credencial a dos environments, `dev` y
+  `produccion`, limitados a `main`, en vez de a los secretos del repositorio. Si el
+  token sigue como secreto del repositorio, cada corrida lo avisa en amarillo. Un
+  banco nuevo, `pruebas/andamio/la-llave-del-despliegue.test.mjs`, **evalúa** la
+  condición de cada job contra doce eventos simulados, con el rojo demostrado contra
+  las condiciones de la 1.9.6.
+
+  **Para consumidores: el arreglo NO viaja con el bump**, porque `desplegar.yml` es
+  scaffold. Si tu repositorio tiene `.github/workflows/desplegar.yml` generado con la
+  1.8.0 a la 1.9.6 —un solo job, `desplegar`, que hace `wrangler deploy`—, aplicá
+  esto a mano:
+
+  1. En el job `desplegar`, reemplazá el `if:` entero por:
+
+     ```yaml
+         if: >-
+           (github.event_name == 'workflow_run' &&
+            github.event.workflow_run.conclusion == 'success' &&
+            github.event.workflow_run.event == 'push' &&
+            github.event.workflow_run.head_branch == 'main' &&
+            github.event.workflow_run.head_repository.full_name == github.repository) ||
+           (github.event_name == 'workflow_dispatch' &&
+            github.ref == 'refs/heads/main')
+     ```
+
+  2. En el mismo job, debajo de `timeout-minutes: 10`, agregá la línea
+     `    environment: produccion`.
+  3. En el paso «Traer el arbol», debajo de `ref: ${{ github.event.workflow_run.head_sha }}`,
+     agregá `          persist-credentials: false`.
+  4. En GitHub: **Settings → Environments → New environment** `produccion` →
+     **Deployment branches and tags** → **Selected branches and tags** → `main`; y en
+     **Environment secrets** cargá `CLOUDFLARE_API_TOKEN` y `CLOUDFLARE_ACCOUNT_ID`.
+     Después borrá los dos de **Settings → Secrets and variables → Actions**. Si el
+     repositorio es privado y la cuenta está en el plan gratuito, no hay environments:
+     hacé los pasos 1 a 3 y dejá los secretos donde están.
+  5. En **Actions → desplegar**, mirá si alguna corrida la disparó el CI de un pull
+     request desde un fork (la corrida de CI que la disparó nombra el PR). Si hubo
+     alguna, **rotá el token** en `dash.cloudflare.com/profile/api-tokens` y cargá el
+     nuevo en el environment: un token que pudo verse se da por público.
+
+  Un proyecto nuevo generado desde acá ya nace con todo esto; su único costo es que
+  un disparo a mano desde una rama que no es `main` ya no sube a DEV. No es
+  incompatible para ningún consumidor: el scaffold no se reescribe en un repo que ya
+  existe.
 
 ## [1.9.6] — 2026-09-03
 

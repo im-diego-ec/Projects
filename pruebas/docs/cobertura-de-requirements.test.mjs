@@ -571,11 +571,18 @@ test("MUERDE: un ancla que apunta a un archivo que ya no existe se caza", () => 
 });
 
 test("MUERDE: un ancla que se pasa del final del archivo se caza", () => {
+  // EL ANCLA QUE SE MUTA SE TOMA DE LA PAGINA, no se escribe aca. Este caso
+  // mutaba la cadena fija `desplegar.test.mjs:35`, y el 2026-09-17 esa ancla se
+  // corrio a `:37` al crecer el banco del despliegue: el caso se puso rojo por
+  // «no se encontro el ancla», que no es el defecto que vigila. Cualquier ancla
+  // con linea de un banco sirve para probar lo mismo.
   const texto = pagina();
-  const mutado = texto.replace("`pruebas/andamio/desplegar.test.mjs:35`", "`pruebas/andamio/desplegar.test.mjs:99999`");
+  const ancla = /`(pruebas\/[\w./-]+\.mjs):(\d+)`/.exec(texto);
+  assert.ok(ancla, "la pagina no cita ningun banco con su linea: esta refutacion no tiene que mutar");
+  const mutado = texto.replace(ancla[0], `\`${ancla[1]}:99999\``);
   assert.ok(mutado !== texto, "no se encontro el ancla que esta refutacion muta");
   assert.ok(
-    problemasDeLasAnclas(mutado).some((m) => m.includes("desplegar.test.mjs:99999") && m.includes("lineas")),
+    problemasDeLasAnclas(mutado).some((m) => m.includes(`${ancla[1]}:99999`) && m.includes("lineas")),
     "una linea que se pasa del final tiene que ponerse roja",
   );
 });

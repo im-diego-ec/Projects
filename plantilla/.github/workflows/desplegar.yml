@@ -7,9 +7,30 @@
 # QUE NECESITA PARA FUNCIONAR, y son dos cosas que solo una persona puede hacer:
 #   1. Una cuenta de Cloudflare. Tiene plan gratuito; si pide o no tarjeta al
 #      registrarse NO esta comprobado por el marco, asi que no se promete aca.
-#   2. Dos secretos en Settings -> Secrets and variables -> Actions:
+#   2. Dos environments en Settings -> Environments, `dev` y `produccion`, cada
+#      uno limitado a la rama `main` (Deployment branches and tags), y en CADA
+#      UNO los dos secretos:
 #        CLOUDFLARE_API_TOKEN    con permiso "Edit Cloudflare Workers"
 #        CLOUDFLARE_ACCOUNT_ID   el identificador de tu cuenta
+#      NO como secretos del repositorio. Un secreto de repositorio lo resuelve
+#      cualquier job de cualquier workflow, y este token publica en produccion.
+#      Donde el plan no ofrece environments (repo privado en el plan gratuito de
+#      GitHub) el repositorio es el unico lugar posible, y el job `guardas` lo
+#      dice en amarillo en cada corrida.
+#
+# QUIEN LLEGA HASTA ESA CREDENCIAL, que es la regla que manda sobre todo lo
+# demas: SOLO codigo que ya esta en `main` de ESTE repositorio. El permiso
+# "Edit Cloudflare Workers" es de la cuenta entera -Cloudflare no deja acotar
+# un token a un solo Worker-, asi que la credencial de DEV puede lo mismo que la
+# de produccion, y DEV queda bajo la misma regla. Hasta el 2026-09-17 esto no se
+# cumplia: `branches: [main]` compara el NOMBRE de la rama que corrio el CI, y en
+# un pull request desde un fork ese nombre lo elige quien lo abre. Un fork con su
+# rama llamada `main` y el CI en verde hacia que este workflow trajera su codigo,
+# corriera su `pnpm install` y ejecutara `wrangler` con el token en el entorno.
+# La guarda de verdad son las condiciones de cada job, que miran el EVENTO que
+# disparo el CI y el REPOSITORIO del commit; el environment con politica de rama
+# `main` es la segunda llave. El banco `pruebas/andamio/la-llave-del-despliegue`
+# del marco evalua esas condiciones contra cada evento.
 #
 # EL PASO A PASO ESTA EN `{{PAQUETE_SITIO}}/README.md`. Mientras los secretos no
 # existan, este workflow NO se pone rojo: sale con un aviso diciendo que falta.
@@ -38,9 +59,14 @@ on:
     # hay de quedarse sin despliegue, porque no deja ni un rojo que mirar.
     workflows: ["CI"]
     types: [completed]
+    # ESTE FILTRO NO ES UNA GUARDA. Compara el nombre de la rama que corrio el CI,
+    # y en un pull request desde un fork ese nombre lo elige el fork. Sirve para
+    # no despertar el workflow por cada PR; lo que decide si algo se publica son
+    # las condiciones de los jobs.
     branches: [main]
   # A mano: para subir a DEV la primera vez, y para PROMOVER a produccion --que
-  # es el unico camino que publica--.
+  # es el unico camino que publica--. SIEMPRE DESDE `main`: un disparo desde otra
+  # rama no publica nada y el job `guardas` lo pone en rojo diciendo por que.
   workflow_dispatch:
     inputs:
       promover_a_produccion:
@@ -51,8 +77,8 @@ on:
         default: false
       version:
         description: >-
-          Qué versión promover: el commit que te dio DEV en su resumen. Vacío = la
-          punta de la rama desde la que disparás.
+          Qué versión promover: el commit completo que te dio DEV en su resumen, y
+          tiene que estar en la historia de main. Vacío = la punta de main.
         type: string
         required: false
         default: ""
@@ -98,10 +124,75 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  # ── GUARDAS: lo que tiene que sonar aunque no se publique nada. ─────────────
+  #
+  # NO TRAE EL ARBOL NI CORRE CODIGO DEL PROYECTO: solo dos comprobaciones sobre
+  # el evento y sobre donde vive la credencial. Por eso puede correr sin
+  # environment, y TIENE que correr sin el: es la unica forma de ver lo que ve
+  # cualquier otro job del repositorio.
+  #
+  # NO CORRE con el evento de un fork: ningun job de este workflow corre ahi, ni
+  # siquiera uno que no toca codigo ajeno. Es la propiedad que el banco del marco
+  # exige sin excepciones, y la mas facil de enunciar.
+  guardas:
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      github.event.workflow_run.head_repository.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    # Ningun permiso del token: no lee el arbol ni le pregunta nada a GitHub.
+    permissions: {}
+    steps:
+      # UN DISPARO A MANO DESDE OTRA RAMA NO PUBLICA NADA, y sin este paso
+      # terminaria GRIS y sin una palabra: `dev` y `produccion` quedan saltados y
+      # quien lo disparo creeria que subio. Se pone en rojo con el arreglo.
+      #
+      # OJO CON LO QUE ESTO NO ES: el archivo que corre en un disparo a mano es el
+      # de la rama elegida, asi que una rama que edite este workflow puede sacarse
+      # este paso. Contra eso no protege ninguna linea de aca: protege el
+      # environment con politica de rama `main`, que GitHub evalua contra la rama
+      # del disparo y no contra el archivo.
+      - name: Rechazar un disparo a mano desde otra rama
+        if: github.event_name == 'workflow_dispatch' && github.ref != 'refs/heads/main'
+        shell: bash
+        env:
+          RAMA: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          echo "::error::esta corrida se disparo desde \"${RAMA}\" y desplegar solo publica lo que ya esta en main de este repositorio: la credencial de Cloudflare es de toda la cuenta, asi que el codigo que la alcanza tiene que haber pasado por un PR. No se publico nada. Arreglo: volve a apretar Run workflow y en \"Use workflow from\" deja elegida la rama main. Para probar una rama sin publicar esta el ensayo corepack pnpm -C {{PAQUETE_SITIO}} run desplegar:prueba"
+          exit 1
+
+      # LA CREDENCIAL AL ALCANCE DE CUALQUIER JOB SE AVISA EN CADA CORRIDA. Este
+      # job no declara environment, asi que `secrets.CLOUDFLARE_API_TOKEN` aca
+      # resuelve SOLO el secreto de repositorio (o de organizacion): exactamente
+      # lo que cualquier otro job de cualquier otro workflow puede leer. Si hay
+      # algo, la segunda llave no existe.
+      #
+      # AMARILLO Y NO ROJO, a proposito: el arreglo es configuracion de GitHub,
+      # fuera del arbol del proyecto, y en un repo privado del plan gratuito no
+      # tiene arreglo -ahi no hay environments-. El valor no se imprime nunca:
+      # solo se pregunta si esta vacio.
+      - name: Avisar si la credencial esta al alcance de cualquier job
+        shell: bash
+        env:
+          CREDENCIAL_DEL_REPOSITORIO: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: |
+          set -euo pipefail
+          if [ -n "${CREDENCIAL_DEL_REPOSITORIO}" ]; then
+            echo "::warning::CLOUDFLARE_API_TOKEN esta guardado como secreto del REPOSITORIO: cualquier job de cualquier workflow de este repo lo puede leer, y ese token publica en produccion. Arreglo: guardalo en Settings -> Environments -> dev y -> produccion (cada uno limitado a la rama main) y borra el del repositorio en Settings -> Secrets and variables -> Actions. Si el repositorio es privado y la cuenta esta en el plan gratuito de GitHub, ahi no hay environments y este aviso es la constancia de que falta la segunda llave. El paso a paso esta en {{PAQUETE_SITIO}}/README.md"
+          fi
+
   # ── DEV: se sube la version y se mira. NO se publica. ──────────────────────
   dev:
-    # `workflow_run` dispara TAMBIEN cuando el workflow anterior fallo: sin este
-    # `if`, un CI rojo publicaria igual.
+    # QUIEN PUEDE SUBIR A DEV, y cada clausula frena un caso distinto:
+    #   - bajo `workflow_run`: el CI termino en VERDE (dispara tambien cuando
+    #     fallo), lo disparo un PUSH (no un pull request, que mide una mezcla que
+    #     todavia no esta en main), a `main`, y el commit es de ESTE repositorio
+    #     (no de un fork). El nombre de la rama solo no alcanza: en un PR desde un
+    #     fork lo elige el fork, y GitHub compara cadenas sin distinguir
+    #     mayusculas.
+    #   - a mano: desde `main`. La credencial de DEV puede lo mismo que la de
+    #     produccion, asi que codigo que no esta en main no la alcanza.
     #
     # Y NO CORRE CUANDO SE ESTA PROMOVIENDO. Promover es publicar una version que
     # se subio ANTES --dias antes, quiza-- y volver a subirla aca no promoveria
@@ -110,15 +201,26 @@ jobs:
     # distintos en dos momentos distintos.
     #
     # SE COMPARA CONTRA LA CADENA 'true' Y NO CONTRA EL BOOLEANO, a proposito:
-    # `github.event.inputs` trae los valores del disparo como TEXTO. Bajo
-    # `workflow_run` ese objeto no existe, asi que la comparacion da falso sola y
-    # no hace falta preguntar antes por el evento.
+    # `github.event.inputs` trae los valores del disparo como TEXTO.
     if: >-
-      github.event.workflow_run.conclusion == 'success' ||
+      (github.event_name == 'workflow_run' &&
+       github.event.workflow_run.conclusion == 'success' &&
+       github.event.workflow_run.event == 'push' &&
+       github.event.workflow_run.head_branch == 'main' &&
+       github.event.workflow_run.head_repository.full_name == github.repository) ||
       (github.event_name == 'workflow_dispatch' &&
+       github.ref == 'refs/heads/main' &&
        github.event.inputs.promover_a_produccion != 'true')
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    # LA SEGUNDA LLAVE. La credencial de DEV vive en este environment, limitado a
+    # `main`: un job que no lo declara no la resuelve, y uno que corre desde otra
+    # rama tampoco. Bajo `workflow_run` la rama del run es SIEMPRE la por defecto
+    # --lo dice la referencia de eventos de GitHub--, asi que esta llave no frena
+    # al fork: lo frena el `if` de arriba. Por eso hacen falta las dos.
+    environment:
+      name: dev
+      url: ${{ steps.publicar.outputs.url }}
     # Los permisos van tambien EN EL JOB, no solo arriba: el marco lo exige en
     # los dos arboles porque un job sin permisos propios hereda los del
     # repositorio, que pueden ser mas amplios de lo que este job necesita.
@@ -126,6 +228,26 @@ jobs:
       contents: read
       checks: read
     steps:
+      # UN SOLO COMMIT POR CORRIDA, y todos los pasos lo leen de aca. Bajo
+      # `workflow_run`, GITHUB_SHA es la punta de main EN ESTE MOMENTO y no lo
+      # que el CI midio: si entro otro merge mientras el CI corria, rotular con
+      # uno y traer el otro deja una version con el nombre de un commit y el
+      # codigo de otro. `head_sha` es lo que el CI midio; a mano no existe y
+      # queda la punta de la rama del disparo, que ya es `main`.
+      - name: Fijar el commit que se publica
+        id: version
+        shell: bash
+        env:
+          SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
+        run: |
+          set -euo pipefail
+          if ! printf '%s' "${SHA}" | grep -Eq '^[0-9a-f]{40}$'; then
+            echo "::error::no se pudo fijar el commit a publicar: salio \"${SHA}\" y tiene que ser un commit completo. No se publica nada. Es un defecto del workflow, no del proyecto: el evento no trajo head_sha ni sha"
+            exit 1
+          fi
+          echo "sha=${SHA}" >> "${GITHUB_OUTPUT}"
+          echo "se publica ${SHA}"
+
       # UNA CORRIDA A MANO NO SE SALTEA LA COMPUERTA, y hasta este cambio si lo
       # hacia: el `if` del job acepta `workflow_dispatch` sin mirar nada, y el
       # unico camino que la guia da para la PRIMERA publicacion es apretar «Run
@@ -141,7 +263,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           SIN_ESPERAR: ${{ inputs.sin_esperar_ci }}
-          SHA: ${{ github.sha }}
+          SHA: ${{ steps.version.outputs.sha }}
         run: |
           set -euo pipefail
           if [ "${SIN_ESPERAR}" = "true" ]; then
@@ -167,10 +289,11 @@ jobs:
           # exactamente lo que este marco existe para impedir, y ademas seria
           # silencioso: las dos corridas reportarian exito.
           #
-          # `head_sha` es el commit que el CI midio. En un disparo a mano
-          # (`workflow_dispatch`) ese campo no existe y queda vacio, que es como
-          # se le pide a checkout el comportamiento por defecto.
-          ref: ${{ github.event.workflow_run.head_sha }}
+          # El commit sale del paso que lo fijo, el mismo que rotula la version.
+          ref: ${{ steps.version.outputs.sha }}
+          # El paso siguiente corre `pnpm install` del arbol traido. Ese codigo
+          # no tiene por que encontrar el token del workflow en `.git/config`.
+          persist-credentials: false
 
       - name: Comprobar que la credencial existe, y NO fallar si no
         id: credencial
@@ -223,6 +346,7 @@ jobs:
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          SHA: ${{ steps.version.outputs.sha }}
         run: |
           set -euo pipefail
           # La salida se GUARDA ademas de imprimirse: de ella sale la direccion que
@@ -236,15 +360,17 @@ jobs:
           # promocion no tenga que adivinar nada: el job de produccion promueve
           # por `--version-tag` con este mismo sha, asi que publica EXACTAMENTE la
           # version que se miro aca. Sin etiqueta habria que raspar un id de la
-          # salida y confiar en que sea el correcto.
+          # salida y confiar en que sea el correcto. Es el commit FIJADO, el mismo
+          # que se trajo: hasta el 2026-09-17 aca decia GITHUB_SHA, que bajo
+          # `workflow_run` es la punta de main y no lo que el CI midio.
           #
           # `--preview-alias dev` le da ademas una direccion ESTABLE
           # --dev-<nombre>.<subdominio>.workers.dev-- en vez de una distinta por
           # version: quien mira DEV usa siempre el mismo enlace.
           corepack pnpm -C {{PAQUETE_SITIO}} exec wrangler versions upload \
-            --tag "${GITHUB_SHA}" \
+            --tag "${SHA}" \
             --preview-alias dev \
-            --message "DEV desde ${GITHUB_SHA}" 2>&1 | tee /tmp/wrangler.txt
+            --message "DEV desde ${SHA}" 2>&1 | tee /tmp/wrangler.txt
 
           # La direccion se lee ANCLADA AL ALIAS. La version anterior de este paso
           # tomaba "la ultima direccion que wrangler nombre", con un segundo grep
@@ -274,6 +400,7 @@ jobs:
         shell: bash
         env:
           URL: ${{ steps.publicar.outputs.url }}
+          SHA: ${{ steps.version.outputs.sha }}
         run: |
           set -uo pipefail
           if [ -z "${URL:-}" ]; then
@@ -312,7 +439,7 @@ jobs:
                 echo ""
                 echo "1. Pestaña **Actions** → workflow **desplegar** → botón **Run workflow**."
                 echo "2. Marcá **promover_a_produccion**."
-                echo "3. En **version**, pegá este commit: \`$GITHUB_SHA\`"
+                echo "3. En **version**, pegá este commit: \`$SHA\`"
                 echo ""
                 echo "Se publica **esta misma versión** --no se vuelve a compilar--, y queda escrito quién la publicó."
               } >> "$GITHUB_STEP_SUMMARY"
@@ -355,10 +482,15 @@ jobs:
   # formas que promueve un artefacto YA CONSTRUIDO.
   #
   # Lo unico que instala es wrangler, que es la herramienta que promueve.
+  #
+  # Y SOLO DESDE `main`. El environment `produccion` con politica de rama `main`
+  # lo impone del lado de GitHub donde el plan lo admite; esta clausula lo
+  # impone en TODOS los planes, y es la que el banco del marco evalua.
   produccion:
     if: >-
       github.event_name == 'workflow_dispatch' &&
-      github.event.inputs.promover_a_produccion == 'true'
+      github.event.inputs.promover_a_produccion == 'true' &&
+      github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     # EL SEGUNDO CANDADO, donde el repositorio lo admite. Si este environment
@@ -405,6 +537,15 @@ jobs:
       # FALLA CERRADO. Si la consulta no se puede hacer --sin red, sin permiso, la
       # corrida borrada por retencion-- esto NO sigue: la ausencia de datos no se
       # lee como exito. Para eso esta el apartamiento nombrado.
+      #
+      # Y ANTES QUE ESO, LA VERSION TIENE QUE ESTAR EN `main`. La casilla
+      # `version` la escribe una persona, y el paso de abajo trae ESE arbol y
+      # corre su `pnpm install` en el job que tiene la credencial de produccion.
+      # La politica de rama del environment mira la rama del DISPARO -que es
+      # main- y no el commit que se trae: sin esta comprobacion, un commit de
+      # cualquier rama llegaria hasta la credencial por la casilla. El
+      # apartamiento `sin_pasar_por_dev` NO salta esta regla: se aparta de DEV,
+      # no de main.
       # ──────────────────────────────────────────────────────────────────────
       - name: Comprobar que esta version paso por DEV, y en verde
         id: paso_por_dev
@@ -416,8 +557,33 @@ jobs:
         run: |
           set -uo pipefail
           SHA="${VERSION:-${GITHUB_SHA}}"
-          echo "sha=${SHA}" >> "${GITHUB_OUTPUT}"
           echo "version a promover: ${SHA}"
+
+          if ! printf '%s' "${SHA}" | grep -Eq '^[0-9a-f]{40}$'; then
+            echo "::error::\"${SHA}\" no es un commit completo, asi que NO se promueve. En la casilla version va el commit de 40 caracteres que DEV dejo en su resumen; ni una rama, ni un tag, ni un commit abreviado, porque este job trae ese arbol al lado de la credencial de produccion"
+            exit 1
+          fi
+
+          # `compare/<version>...<punta de main>` dice como se relaciona la
+          # version con main: `ahead` o `identical` quieren decir que la version
+          # esta en la historia de main. Cualquier otra cosa -`behind`,
+          # `diverged`- es un commit que main no tiene.
+          if [ "${SHA}" != "${GITHUB_SHA}" ]; then
+            if ! RELACION="$(gh api "repos/${GITHUB_REPOSITORY}/compare/${SHA}...${GITHUB_SHA}" --jq '.status' 2>&1)"; then
+              echo "${RELACION}"
+              echo "::error::no se pudo preguntarle a GitHub si ${SHA} está en la historia de main, así que NO se promueve. La ausencia de datos no se lee como éxito: mirá el mensaje de arriba --suele ser la red, un permiso, o un commit que este repositorio no tiene-- y volvé a disparar con el commit que DEV dejó en su resumen"
+              exit 1
+            fi
+            case "${RELACION}" in
+              ahead|identical) ;;
+              *)
+                echo "::error::${SHA} no está en la historia de main (GitHub dice \"${RELACION}\"), así que NO se promueve. A producción llega solo lo que ya pasó por un PR a main: la credencial es de toda la cuenta de Cloudflare. Si es el commit correcto, mergealo primero; si te equivocaste de commit, copiá el que DEV dejó en su resumen"
+                exit 1
+                ;;
+            esac
+          fi
+
+          echo "sha=${SHA}" >> "${GITHUB_OUTPUT}"
 
           if [ "${SIN_DEV}" = "true" ]; then
             echo "::warning::se pidio promover SIN comprobar que ${SHA} haya pasado por DEV. Queda escrito acá: lo pidió @${GITHUB_ACTOR}"
@@ -474,6 +640,9 @@ jobs:
           # entre que se miro DEV y se decide promover puede entrar otro merge, y
           # promover "lo ultimo" publicaria algo que nadie miro.
           ref: ${{ steps.paso_por_dev.outputs.sha }}
+          # El paso siguiente corre `pnpm install` del arbol traido: el token del
+          # workflow no se deja escrito en `.git/config`.
+          persist-credentials: false
 
       - name: Comprobar que la credencial existe, y NO fallar si no
         id: credencial

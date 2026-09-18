@@ -61,10 +61,15 @@ function scriptDeLaCompuerta() {
 /** Corre el script con un `gh` de mentira delante del PATH.
  *
  *  `corridas` es lo que devuelve la consulta de corridas (una lista de ids, una
- *  por linea; vacio = ninguna). `dev` es la conclusion del job `dev`. Cualquiera
- *  de los dos puede ser el objeto `{ falla: "mensaje" }`, que hace que ese `gh`
- *  salga distinto de cero — que es como se ve no tener red ni permiso. */
-async function correr({ script, corridas = "", dev = "success", entorno = {} }) {
+ *  por linea; vacio = ninguna). `dev` es la conclusion del job `dev`. `compara`
+ *  es lo que GitHub contesta sobre como se relaciona la version pedida con la
+ *  punta de main (`ahead` = esta en su historia). Cualquiera de los tres puede
+ *  ser el objeto `{ falla: "mensaje" }`, que hace que ese `gh` salga distinto de
+ *  cero — que es como se ve no tener red ni permiso.
+ *
+ *  Cada llamada a `gh` queda anotada en `llamadas.txt`: hay casos que tienen que
+ *  afirmar que NO se le pregunto nada a GitHub. */
+async function correr({ script, corridas = "", dev = "success", compara = "ahead", entorno = {} }) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "compuerta-prod-"));
   fs.writeFileSync(path.join(dir, "paso.sh"), script);
   const bin = path.join(dir, "bin");
@@ -90,8 +95,12 @@ async function correr({ script, corridas = "", dev = "success", entorno = {} }) 
   fs.writeFileSync(
     path.join(bin, "gh"),
     `#!/bin/sh
-# gh de mentira: contesta segun QUE se le pregunte.
+# gh de mentira: contesta segun QUE se le pregunte, y anota cada pregunta.
+echo "$*" >> "${dir}/llamadas.txt"
 case "$*" in
+  *"/compare/"*)
+${rama(compara)}
+    ;;
   *"/runs?head_sha="*)
 ${rama(corridas)}
     ;;
@@ -124,14 +133,21 @@ exit 0
         ...entorno,
       },
     });
-    return { codigo: 0, salida: `${stdout}${stderr}`, outputs: fs.readFileSync(salidaGh, "utf8") };
+    return { codigo: 0, salida: `${stdout}${stderr}`, outputs: fs.readFileSync(salidaGh, "utf8"), llamadas: llamadas(dir) };
   } catch (e) {
     return {
       codigo: e.code ?? -1,
       salida: `${e.stdout ?? ""}${e.stderr ?? ""}`,
       outputs: fs.readFileSync(salidaGh, "utf8"),
+      llamadas: llamadas(dir),
     };
   }
+}
+
+/** Las preguntas que el script le hizo a `gh`, una por linea. */
+function llamadas(dir) {
+  const f = path.join(dir, "llamadas.txt");
+  return fs.existsSync(f) ? fs.readFileSync(f, "utf8").split("\n").filter(Boolean) : [];
 }
 
 test(
@@ -226,9 +242,84 @@ test(
     const script = scriptDeLaCompuerta();
     const otra = "fedcba9876543210fedcba9876543210fedcba98";
     const r = await correr({ script, corridas: "101", dev: "success", entorno: { VERSION: otra } });
-    assert.equal(r.codigo, 0);
+    assert.equal(r.codigo, 0, `una version de la historia de main tendria que promoverse:\n${r.salida}`);
     assert.match(r.outputs, new RegExp(`sha=${otra}`), "eligio otra version que la que se le pidio");
     assert.ok(!r.outputs.includes(SHA), "eligio la punta de la rama teniendo una version pedida");
+    assert.ok(
+      r.llamadas.some((l) => l.includes(`/compare/${otra}...${SHA}`)),
+      `no le pregunto a GitHub si la version esta en la historia de main. Pregunto: ${r.llamadas.join(" / ")}`,
+    );
+  },
+);
+
+// ---------------------------------------------------------------------------
+// LA CASILLA `version` NO ES UNA PUERTA TRASERA A LA CREDENCIAL.
+//
+// EL HUECO (auditoria del 2026-09-17, el mismo change que cierra el fork): la
+// casilla la escribe una persona, y el paso siguiente trae ESE arbol y corre su
+// `pnpm install` en el job que tiene la credencial de produccion. La politica
+// de rama del environment mira la rama del DISPARO -main- y no el commit que se
+// trae. Sin esta comprobacion, cualquier commit de cualquier rama llegaba hasta
+// la credencial por la casilla, con `sin_pasar_por_dev` marcada.
+// ---------------------------------------------------------------------------
+
+test(
+  "una version que no es un commit completo no se promueve, y ni se le pregunta a GitHub",
+  async () => {
+    const script = scriptDeLaCompuerta();
+    for (const pedida of ["feat/otra-rama", "v1.2.3", "0123456", "0123456789abcdef0123456789abcdef0123456;x"]) {
+      const r = await correr({ script, corridas: "101", entorno: { VERSION: pedida } });
+      assert.notEqual(r.codigo, 0, `se acepto "${pedida}" como version: checkout la traeria al lado de la credencial`);
+      assert.match(r.salida, /no es un commit completo/, `el rechazo de "${pedida}" no dice por que`);
+      assert.deepEqual(r.llamadas, [], `con "${pedida}" se le pregunto algo a GitHub antes de validarla`);
+      assert.doesNotMatch(r.outputs, /sha=/, `"${pedida}" quedo publicada como la version a traer`);
+    }
+  },
+);
+
+test(
+  "una version que no esta en la historia de main no se promueve, ni con el apartamiento",
+  async () => {
+    const script = scriptDeLaCompuerta();
+    const deOtraRama = "abcdefabcdefabcdefabcdefabcdefabcdefabcd";
+    for (const relacion of ["diverged", "behind"]) {
+      for (const sinDev of ["false", "true"]) {
+        const r = await correr({ script, corridas: "101", compara: relacion, entorno: { VERSION: deOtraRama, SIN_DEV: sinDev } });
+        assert.notEqual(r.codigo, 0, `GitHub dice "${relacion}" (sin_pasar_por_dev=${sinDev}) y se promovio igual`);
+        assert.match(r.salida, /no está en la historia de main/, "el rechazo no dice por que");
+        assert.ok(r.salida.includes(deOtraRama), "el rechazo no nombra la version");
+        assert.doesNotMatch(r.outputs, /sha=/, "la version rechazada quedo publicada como la version a traer");
+      }
+    }
+  },
+);
+
+test(
+  "MUERDE: si no se puede preguntar si esta en main, NO se promueve",
+  async () => {
+    const script = scriptDeLaCompuerta();
+    const otra = "fedcba9876543210fedcba9876543210fedcba98";
+    const r = await correr({ script, corridas: "101", compara: { falla: "HTTP 404" }, entorno: { VERSION: otra } });
+    assert.notEqual(r.codigo, 0, "FAIL-OPEN: no se supo si la version esta en main y se promovio igual");
+    assert.match(r.salida, /no se lee como éxito/, "el mensaje no dice por que frena");
+  },
+);
+
+test(
+  "ROJO: el paso de antes de este cambio dejaba pasar una version de otra rama",
+  async () => {
+    // El caso rojo DEMOSTRADO, no supuesto: se le saca al script la comprobacion
+    // de la historia de main -el bloque entero, tal como se agrego- y la misma
+    // corrida que arriba se rechaza pasa a promover.
+    const script = scriptDeLaCompuerta();
+    const desde = script.indexOf("if ! printf '%s' \"${SHA}\" | grep -Eq");
+    const hasta = script.indexOf('echo "sha=${SHA}"');
+    assert.ok(desde !== -1 && hasta > desde, "no se encontro el bloque que valida la version: la refutacion no tiene que sacar");
+    const anterior = script.slice(0, desde) + script.slice(hasta);
+    const deOtraRama = "abcdefabcdefabcdefabcdefabcdefabcdefabcd";
+    const r = await correr({ script: anterior, corridas: "", compara: "diverged", entorno: { VERSION: deOtraRama, SIN_DEV: "true" } });
+    assert.equal(r.codigo, 0, `sin el bloque, el apartamiento tendria que dejar pasar la version de otra rama:\n${r.salida}`);
+    assert.match(r.outputs, new RegExp(`sha=${deOtraRama}`), "sin el bloque, la version de otra rama es la que se trae");
   },
 );
 

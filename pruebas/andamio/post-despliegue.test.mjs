@@ -13,6 +13,10 @@ import { fileURLToPath } from "node:url";
 const RAIZ = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 const WORKFLOW = path.join(RAIZ, "plantilla/.github/workflows/desplegar.yml");
 const SHA_DE_MENTIRA = "0123456789abcdef0123456789abcdef01234567";
+// La punta de main cuando arranca el despliegue, DISTINTA del commit fijado a
+// proposito: bajo `workflow_run` son dos commits distintos si entro otro merge
+// mientras el CI corria, y el resumen tiene que mandar a pegar el que se subio.
+const PUNTA_DE_MAIN = "fedcba9876543210fedcba9876543210fedcba98";
 
 // ---------------------------------------------------------------------------
 // QUE EL DESPLIEGUE HAYA SALIDO 0 NO ES QUE EL SITIO CONTESTE.
@@ -101,11 +105,16 @@ async function correr(script, url) {
         PATH: `${relojFalso}${path.delimiter}${process.env.PATH}`,
         URL: url,
         GITHUB_STEP_SUMMARY: path.join(dir, "resumen.md"),
-        // EL RUNNER SIEMPRE LO TRAE, y el script corre con `set -u`: sin esto el
-        // paso muere con "unbound variable" en el banco y en ningun otro lado.
-        // Va con un valor reconocible a proposito, para poder AFIRMAR que el
-        // resumen le dice a la persona QUE commit pegar para promover.
-        GITHUB_SHA: SHA_DE_MENTIRA,
+        // EL COMMIT FIJADO por el primer paso del job, que el workflow le pasa
+        // a este paso como SHA. El script corre con `set -u`: sin esto muere con
+        // "unbound variable" en el banco y en ningun otro lado. Va con un valor
+        // reconocible a proposito, para poder AFIRMAR que el resumen le dice a la
+        // persona QUE commit pegar para promover.
+        SHA: SHA_DE_MENTIRA,
+        // Y GITHUB_SHA, que el runner siempre trae, con OTRO valor: hasta el
+        // 2026-09-17 el resumen mandaba a pegar este, que bajo `workflow_run` es
+        // la punta de main y no lo que se subio (defecto OPS-04).
+        GITHUB_SHA: PUNTA_DE_MAIN,
       },
     });
     return { codigo: 0, salida, resumen: fs.readFileSync(path.join(dir, "resumen.md"), "utf8") };
@@ -136,6 +145,10 @@ test("una direccion que contesta 200 con contenido pasa, y queda dicha", async (
     // siempre, y el sintoma es que nadie publica nunca y nadie sabe por que.
     assert.match(r.resumen, /Producción no se publica sola/, "el resumen no dice que produccion no sale sola: la version se queda esperando sin que nadie sepa");
     assert.ok(r.resumen.includes(SHA_DE_MENTIRA), "el resumen no trae el commit que hay que pegar para promover");
+    assert.ok(
+      !r.resumen.includes(PUNTA_DE_MAIN),
+      "el resumen manda a pegar la punta de main (GITHUB_SHA) en vez del commit que se subio: promover eso publica algo que nunca paso por DEV",
+    );
     assert.match(r.resumen, /promover_a_produccion/, "el resumen no nombra la casilla que hay que marcar");
   });
 });

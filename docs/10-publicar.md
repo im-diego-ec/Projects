@@ -109,8 +109,22 @@ es de **R2** —que es almacenamiento de archivos— y no sirve para publicar.
 
 ### Ese token es un secreto de verdad
 
-Va en **Settings → Secrets and variables → Actions** de tu repositorio, y en
-ningún otro lado.
+Va **adentro de los environments `dev` y `produccion`** de tu repositorio, cada
+uno limitado a la rama `main` —el paso a paso está en el README del sitio—, y no
+como secreto del repositorio. La diferencia no es de orden: un secreto del
+repositorio lo lee cualquier job de cualquier workflow, y este token **publica en
+producción**. El de un environment limitado a `main` solo llega a un job que
+corre con código que ya pasó por un pull request.
+
+Hasta el 2026-09-17 el andamio lo mandaba a los secretos del repositorio, y el
+despliegue se podía disparar con el código de un pull request abierto desde un
+fork. Si tu sitio nació antes de esa fecha, el arreglo exacto está en el
+`CHANGELOG.md` del marco, en la entrada que lo cierra.
+
+> **La excepción, con su costo:** en un repositorio **privado** del plan gratuito
+> de GitHub no hay secretos de environment. Ahí el del repositorio es el único
+> lugar posible; el workflow lo avisa en amarillo en cada corrida, y la guarda que
+> impide que un fork llegue al token vale igual en cualquier plan.
 
 **No lo pegues en un archivo del repositorio, ni en un chat, ni en una captura
 de pantalla.** Un secreto que se vio una vez hay que darlo por público: borrarlo
