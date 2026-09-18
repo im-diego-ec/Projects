@@ -1,7 +1,7 @@
 ---
 artefacto: proposal
 dri: Builder 1
-aprueba: Builder 2 (builder par)  # change técnico del estándar de trabajo; el gate
+aprueba: revision adversarial (desvio del marco: un solo mantenedor, ver AGENTS.md)  # change técnico del estándar de trabajo; el gate
                               # del PO en este repo está acotado a la
                               # capability de gobernanza (.github/CODEOWNERS,
                               # últimas líneas)

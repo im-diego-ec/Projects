@@ -245,8 +245,9 @@ El `ci.yml` que el scaffold trae ya apunta a la **versión exacta** del marco y 
 lo único de CI que se copia: un llamador delgado. El proyecto nace consumiendo la
 mecánica del marco por referencia, no con una copia que se va a quedar vieja.
 
-> **Nunca `@v1` en el repo de un proyecto.** El tag existe, pero solo para una línea
-> interna del marco (ver `AGENTS.md`). Para un consumidor es una trampa: Dependabot no
+> **Nunca `@v1` en el repo de un proyecto.** El tag existe, pero solo porque las versiones
+> publicadas hasta la 1.9.6 lo llevan adentro (ver `AGENTS.md`); el marco de hoy no lo
+> invoca en ninguna línea. Para un consumidor es una trampa: Dependabot no
 > propone bump para un tag mayor —para él ya es la mayor vigente—, así que un repo pinado
 > así no recibe versiones nuevas por PR y **no aparece en el censo de consumidores**. Es
 > el modo de falla más callado de todo el bootstrap.
@@ -362,7 +363,7 @@ en las dos direcciones: una fila de menos y una fila de más son los dos un erro
 | `{{PAQUETE_WEB}}` | Carpeta del paquete de frontend. Si el proyecto no tiene frontend, el valor se pide igual y quedan los bloques `[FRONT]` de `eslint.config.mjs` **y sus imports**, que hay que borrar a mano | `web` |
 | `{{PAQUETE_E2E}}` | Carpeta de la suite end-to-end. Sin suite E2E, hay que borrar esa entrada del glob de Node **y** las dos excepciones de `ci.yml` | `e2e` |
 | `{{PAQUETE_SITIO}}` | Carpeta del sitio, cuando la forma elegida es «un sitio para leer». En la forma «aplicación» esa carpeta no viaja | `sitio` |
-| `{{GENERAR_CLIENTE_DATOS}}` | El comando que genera el cliente de la capa de datos, que el CI corre antes de compilar. Si el proyecto no genera ninguno, borrar el paso de `.github/workflows/ci.yml` **no alcanza**: el mismo valor viaja al script `datos` de `package.json` y al `build` de `api/package.json`, donde sin comando queda un `&&` colgando. `grep -rn GENERAR_CLIENTE_DATOS plantilla/` los enumera todos | `prisma generate` |
+| `{{GENERAR_CLIENTE_DATOS}}` | El comando que genera el cliente de la capa de datos, que el CI corre antes de compilar. Si el proyecto no genera ninguno, borrar el paso de `.github/workflows/ci.yml` **no alcanza**: el mismo valor viaja al script `datos` de `package.json`, al `build` de `api/package.json`, donde sin comando queda un `&&` colgando, y al `postinstall` de ese mismo paquete, donde sin comando el primer `pnpm install` sale rojo. `grep -rn GENERAR_CLIENTE_DATOS plantilla/` los enumera todos | `prisma generate` |
 | `{{EQUIPO_BUILDERS}}` | Slug del equipo de builders en la org (va en `CODEOWNERS`) | `builders` |
 | `{{EQUIPO_PO}}` | Slug del equipo del PO (va en `CODEOWNERS`) | `po` |
 | `{{BUILDER_1}}` | Handle del builder que sostiene la llave de producción | `@builder-uno` |
@@ -409,11 +410,13 @@ diff.
 ├── .gitignore             # el de Projects; el de los proyectos vive en plantilla/
 ├── .github/
 │   ├── CODEOWNERS         # review cruzado de builders + gate del PO sobre los specs
-│   ├── PULL_REQUEST_TEMPLATE.md   # pide distribución, impacto en consumidores y veredicto de breaking
+│   ├── PULL_REQUEST_TEMPLATE.md   # pide distribución, impacto en consumidores, veredicto de breaking
+│   │                      #   y evidencia con comando y exit code (y lo no medido)
 │   ├── proteccion-main.md # estado REAL del ruleset de main y los pasos para aplicarlo
 │   └── workflows/         # REFERENCIADO: marco-ci.yml (el reusable que consumen los proyectos)
 │                          #   + ci.yml (el CI propio, dogfooding) + aviso-version.yml (avisa cada
 │                          #   release a los consumidores) + claude.yml (el bot @claude, acotado)
+│                          #   + reproducir-intermitente.yml (repite un banco N veces, a mano)
 ├── actions/               # REFERENCIADO: composite actions (una carpeta por action, con su action.yml)
 │   └── README.md          #   catálogo: qué hace cada una, inputs/outputs y permisos mínimos
 ├── plantilla/             # SCAFFOLD: el árbol que se copia UNA vez al crear un proyecto,

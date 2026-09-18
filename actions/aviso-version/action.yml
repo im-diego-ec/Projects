@@ -31,21 +31,37 @@ author: la organización
 #     posible: un aviso vacio o inventado seria el formato paralelo que este
 #     diseno evita. El arreglo (agregar la entrada y re-disparar el boton) va
 #     en el mensaje de error.
-#   · Entrada sin seccion "Para consumidores" -> ::warning:: y se manda el
-#     cuerpo COMPLETO. Se manda de mas, no de menos, y se dice por que.
-#   · Mensaje mas largo que el limite -> ::warning:: y se recorta con el enlace
-#     al release. Un truncado en silencio es peor que un mensaje largo.
+#   · Dialecto desconocido en `formato` -> ROJO, sin payload. Un typo en la
+#     variable no puede mandar el aviso en un dialecto que nadie eligio.
+#   · Cada corrida -> ::notice:: con el dialecto usado, y si nadie lo declaro.
+#     Caer al default en silencio era el fail-open (Rigel, 2026-09-02).
+#   · Entrada sin seccion "Para consumidores" -> ::warning:: y el mensaje se
+#     ARMA con el cuerpo completo de la entrada. Se manda de mas, no de menos,
+#     y se dice por que. "Arma" y no "manda": ese cuerpo pasa por el mismo
+#     limite, y si no entra llega recortado — el aviso lo dice con el numero.
+#   · Mensaje mas largo que el limite -> ::warning:: con el largo al que se
+#     recorto y el enlace al release. Un truncado en silencio es peor que un
+#     mensaje largo. El arreglo depende de la rama: sin la seccion, ESCRIBIRLA;
+#     con la seccion, acortarla. Mandar a acortar una seccion que no existe era
+#     el consejo al reves.
 #   · Entrada con lineas BREAKING -> ::warning:: y el aviso las pone primero.
 #
 # LIMITES DECLARADOS
-#   · El mensaje viaja como Markdown, tal cual lo escribe el CHANGELOG. No hay
-#     traduccion al dialecto de ningun destino: hacerla seria cablear un
-#     proveedor, que es justo lo que el diseno no hace.
+#   · El mensaje viaja en el dialecto que declara `formato`: "markdown" (el
+#     default, tal cual lo escribe el CHANGELOG, para Teams y Discord) o
+#     "mrkdwn" (Slack). La conversion es de dialecto y no de proveedor: el
+#     destino sigue sin cablearse. mrkdwn no tiene tablas ni encabezados, asi
+#     que las tablas llegan como lista etiquetada y los encabezados en negrita;
+#     el codigo, cercado o en linea, no se toca nunca.
 #   · El payload es {"<campo>": "<mensaje>"} y nada mas. Sirve para Slack,
 #     Google Chat y Teams con campo "text", y para Discord con "content". Un
 #     destino que exija otra forma es un change del marco, no una config.
-#   · "Para consumidores" es una convencion del CHANGELOG, no un contrato que
-#     algo verifique al escribirlo: su ausencia se detecta al avisar, no antes.
+#   · "Para consumidores" es una convencion del CHANGELOG. En el marco SI se
+#     verifica al escribirla: herramientas/aviso-entra-en-el-mensaje.mjs corre
+#     en el CI propio y pone rojo el PR si falta, si el mensaje no entra, si el
+#     texto de fabrica del release quedo encima de cambios reales o si la
+#     seccion usa jerga de oficio. Un repo que use esta action sin esa
+#     compuerta la detecta recien al avisar.
 # ---------------------------------------------------------------------------
 
 inputs:
@@ -61,16 +77,31 @@ inputs:
   limite:
     description: >-
       Largo maximo del mensaje en caracteres. Por encima se recorta y se avisa.
-      El default entra en casi cualquier destino (Slack corta los bloques en
-      3000, Google Chat en 4096).
+      SIN default a proposito: vacio cae en LIMITE_POR_DEFECTO de
+      aviso-version.mjs, que es el mismo numero contra el que mide la compuerta
+      del marco (herramientas/aviso-entra-en-el-mensaje.mjs). Un numero, un
+      lugar: con un literal aca, mover la constante deja a la compuerta midiendo
+      contra un limite y al envio recortando en otro, en silencio. El banco de
+      la compuerta pone rojo un default reintroducido.
     required: false
-    default: "3500"
   campo:
     description: >-
       Campo de texto del payload JSON. "text" para Slack, Google Chat y Teams;
       "content" para Discord.
     required: false
     default: text
+  formato:
+    description: >-
+      Dialecto de texto del destino. "markdown" no traduce nada del CHANGELOG y
+      es lo que esperan Teams y Discord; "mrkdwn" traduce al de Slack (un
+      asterisco para negrita, una tilde para tachado, <url|texto> para enlaces,
+      tablas como lista) sin tocar el codigo. Cualquier otro valor es ROJO. SIN
+      default a proposito: vacio cae en FORMATO_POR_DEFECTO de aviso-version.mjs
+      ("markdown"), y ademas le dice al script que nadie lo declaro, que es lo
+      que el ::notice:: de cada corrida anuncia. Con un literal aca esa
+      distincion se pierde, que es como en Rigel un dialecto cargado en el lugar
+      equivocado cayo al default sin que nada lo dijera.
+    required: false
   salida:
     description: >-
       Ruta donde escribir el payload. Vacio = $RUNNER_TEMP/aviso-version.json.
@@ -110,6 +141,7 @@ runs:
         AVISO_CHANGELOG: ${{ inputs.changelog }}
         AVISO_LIMITE: ${{ inputs.limite }}
         AVISO_CAMPO: ${{ inputs.campo }}
+        AVISO_FORMATO: ${{ inputs.formato }}
         AVISO_SALIDA: ${{ inputs.salida }}
       # ESTA ACTION NO INSTALA NODE: corre en un workflow de release, donde el
       # unico paso previo es el checkout y agregar un setup-node seria pagarlo

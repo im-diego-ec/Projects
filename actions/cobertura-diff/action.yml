@@ -26,10 +26,11 @@ author: la organización
 #      reporter: sin eso, dos paquetes emiten "src/..." indistinguibles entre
 #      si e incomparables contra el diff.
 #   4. Para que el plano del TOTAL mida el codigo que ninguna prueba importa,
-#      la cobertura del paquete tiene que emitirse con `all: true`. Sin eso el
-#      reporte solo trae los archivos que alguna prueba toco y el total sale
-#      alto por omision. El scaffold reparte esa configuracion ya armada en
-#      `vitest.config.base.ts`.
+#      la cobertura del paquete tiene que declarar su alcance con
+#      `coverage.include`. Sin eso el reporte solo trae los archivos que alguna
+#      prueba toco y el total sale alto por omision. El scaffold reparte esa
+#      configuracion ya armada en `vitest.config.base.mjs`. (En vitest 2.x eso
+#      lo hacia `all: true`; la mayor 3 la retiro y la 5 la ignora sin aviso.)
 #
 # LOS DOS PLANOS Y SUS COMPUERTAS
 #   Plano del CAMBIO: las lineas que el diff agrega o modifica, contra `minimo`.

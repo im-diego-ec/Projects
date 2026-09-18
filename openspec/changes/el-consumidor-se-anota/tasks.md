@@ -1,7 +1,7 @@
 ---
 artefacto: tasks
 dri: Builder 1
-aprueba: Builder 2 (builder par)
+aprueba: revision adversarial (desvio del marco: un solo mantenedor, ver AGENTS.md)
 estado: pendiente-de-revision
 ---
 
@@ -46,3 +46,17 @@ estado: pendiente-de-revision
 - Que la skill `projects-adoptar` nombre el mismo registro para el camino de
   migración de un repo existente. **Destino:** change propio, porque toca el
   contrato de una skill y no la herramienta de arranque.
+
+## Cierre — 2026-09-17, bajo el desvío de revisión de `AGENTS.md`
+
+- [x] Revisión adversarial que reemplaza a la cruzada entre builders,
+      registrada en `revision-adversarial.md` de esta carpeta: cuatro lentes y
+      veredicto «revisado, espera al PO». Hallazgo principal: tres consumidores reales fuera del registro, y su ausencia habilita la excepción de «cero consumidores» del release.
+- [ ] Archive. **Motivo por el que queda abierto:** este change toca
+      `gobierno-contribucion`, y esa aprobación es del PO; el desvío de la
+      revisión cruzada no la alcanza (`AGENTS.md`, recuadro del desvío, «Lo que
+      no cambia»). Con el OK del PO —y, si el hallazgo lo pide, el delta
+      ajustado—, el archive es `aplicar-deltas.mjs el-consumidor-se-anota` y `git mv` a
+      `openspec/changes/archive/`, con `revision-adversarial.md` adentro, que es
+      lo que exige `pruebas/ci-del-marco/desvio-de-review-del-marco.test.mjs`.
+

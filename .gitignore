@@ -61,6 +61,9 @@ valores.json
 .projects-valores.json
 .projects-respuestas.json
 .projects-desvios.json
+# Y lo que el asistente anota de donde se trabo la persona, para que el arranque lo
+# lleve al registro de friccion. El arranque lo consume al terminar.
+.projects-friccion.json
 
 # Residuo de `desplegar.yml` cuando corre con RUNNER_TEMP sin definir: el paso
 # arma el cuerpo del aviso en "${RUNNER_TEMP:-.}/cuerpo-del-sitio.html", y con la

@@ -42,6 +42,16 @@
 - **Done** = spec cumplido · tests verdes · PR revisado · sin secrets · desplegado por
   la promoción y verificado.
 
+<!-- projects:regla id=terminado-en-local-y-no-cerrado -->
+
+- **Sin ambiente no se cumple la última cláusula, y eso se NOMBRA en vez de
+  descubrirse.** Lo que queda abierto es el **BLOQUE**, no sus tareas: las de
+  implementación se hicieron y siguen en `[x]`. El bloque se declara **terminado en
+  local y no cerrado** en el `tasks.md` de su change, con lo que falta escrito; si
+  lleva casilla, va `[~]`. No es «hecho» ni incumplimiento, y con plataforma
+  `ninguna` es legítimo y no vence. Tener ambiente no cierra los bloques que quedaron
+  atrás: hay que desplegarlos, y hasta entonces ningún archive los cuenta como hechos.
+
 **Ambientes**
 
 |            | dev (staging)               | producción                   |

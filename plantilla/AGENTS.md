@@ -56,10 +56,20 @@ pasó a ser público. Lo que queda es lo que de verdad necesita a una persona.
    (Settings → Advanced Security), y cargar los secretos para publicar
    (Settings → Secrets and variables → Actions). El último además es imposible en
    principio: esos valores solo los tenés vos.
-4. Borrar esta sección y este párrafo. **Recién ahí** corre la verificación final:
-   `grep -rnE "\{\{[A-Z0-9_]+\}\}" --exclude-dir=node_modules --exclude-dir=.git .` no debe
-   devolver nada (esta sección es la única que menciona la doble llave a propósito; el
-   patrón exige mayúsculas para no marcar las expresiones `${{ ... }}` de GitHub Actions).
+4. Borrar esta sección y este párrafo. **Recién ahí** corre la verificación final, que no
+   debe devolver nada:
+
+   ```bash
+   git grep --untracked -nE "\{\{[A-Z0-9_]+\}\}"
+   ```
+
+   Tres cosas del comando. `git grep` y no `grep -r`, porque viene con git: corre igual en
+   bash, en PowerShell y en cmd, y ya se saltea `node_modules` y todo lo que `.gitignore`
+   excluye. `--untracked`, porque sin esa bandera `git grep` solo mira lo que ya está
+   commiteado, y esta sección es justamente de **antes** del primer commit: sin ella el
+   comando dice que no queda nada aunque quede. Y el patrón exige mayúsculas para no marcar
+   las expresiones `${{ ... }}` de GitHub Actions. (Esta sección es la única que menciona la
+   doble llave a propósito.)
 
 ---
 
@@ -103,17 +113,17 @@ CLI no lo hace.
 > framework, ORM, base de datos o servicio que no esté acá es una decisión y no una
 > implementación — las fronteras del marco dicen cómo se pide.
 
-| Capa                        | Herramienta                                                           |
-| --------------------------- | --------------------------------------------------------------------- |
-| Frontend                    | **React + TypeScript + Vite + Tailwind + shadcn/ui**                  |
-| Backend                     | **Node + TypeScript + Express**                                       |
-| Datos                       | **PostgreSQL** vía **Prisma**                                         |
-| Auth                        | **Supabase Auth** (el SDK vive detrás de un contrato propio en `{{PAQUETE_WEB}}/src/auth.ts`; el API verifica el JWT offline con `jose`) |
-| Validación de input externo | **Zod**                                                               |
-| Plataforma                  | **La elige el proyecto**; la que eligió este está en `.projects-valores.json` |
+| Capa                        | Herramienta                                                                                                                                             |
+| --------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Frontend                    | **React + TypeScript + Vite + Tailwind + shadcn/ui**                                                                                                    |
+| Backend                     | **Node + TypeScript + Express**                                                                                                                         |
+| Datos                       | **PostgreSQL** vía **Prisma**                                                                                                                           |
+| Auth                        | **Supabase Auth** (el SDK vive detrás de un contrato propio en `web/src/auth.ts`; el API verifica el JWT offline con `jose`)                            |
+| Validación de input externo | **Zod**                                                                                                                                                 |
+| Plataforma                  | **La elige el proyecto**; la que eligió este está en `.projects-valores.json`                                                                           |
 | CI/CD                       | **GitHub Actions**, con los workflows del marco. La promoción por ambientes que la constitución declara todavía no se reparte: está anotada como desvío |
-| Package manager             | **pnpm** con workspaces (monorepo: web, api, e2e)                     |
-| Tests                       | **Vitest** (unit/integración) + **Playwright** (E2E contra dev)       |
+| Package manager             | **pnpm** con workspaces (monorepo: web, api, e2e)                                                                                                       |
+| Tests                       | **Vitest** (unit/integración) + **Playwright** (E2E contra dev)                                                                                         |
 
 Salvo la fila **Plataforma**, ninguna de estas filas es elección del proyecto: las fija el
 área y el andamio las entrega implementadas. Lo que el proyecto decide es lo que viene
@@ -126,6 +136,7 @@ y no fija el producto que las da. Los valores admitidos son `supabase`, `cloudfl
 `gcp`, `aws` y `ninguna`.
 
 <!-- projects:solo-si-hay-infra -->
+
 Qué cubre cada uno, qué cuesta y qué límite tiene su plan gratuito está en
 `infra/adaptadores.md`.
 
@@ -135,20 +146,20 @@ cierra sola a los 6 meses**, o antes si se agotan los créditos, y después AWS 
 datos 90 días y los borra—, así que si el objetivo es coste cero, el adaptador se lee
 **antes** de quedarse con ésta.
 
-**Si se quiere sacar Terraform de acá**, son cuatro pasos, en este orden:
+**Si se quiere sacar Terraform de acá**, son tres pasos, en este orden:
 
 1. borrar `infra/` e `infra-prod/` enteros, después de mover `infra/adaptadores.md` a la
    raíz del repositorio — es lo único de ahí que sigue valiendo sin Terraform;
 2. borrar del `.github/dependabot.yml` las dos entradas del ecosistema `terraform`, que si
    no van a abrir PRs para actualizar un provider que ya nadie usa;
-3. borrar el paso «Formato y validez de las raíces de Terraform» de
-   `.github/workflows/ci.yml` (opcional: sin las raíces ese paso ya sale verde solo, y
-   dejarlo puesto es lo que hace barato volver a Terraform el día que haga falta);
-4. poner `"plataforma": "ninguna"` en `.projects-valores.json`.
+3. poner `"plataforma": "ninguna"` en `.projects-valores.json`.
 
-Hasta que el paso 1 esté hecho, **el job de Terraform del CI sigue exigiendo el binario**:
-decide mirando si los directorios existen, no la clave. Una vez borrados lo dice con un
-`::notice::` y sale verde, y ya no hay ninguna ventana de gracia que pueda vencer.
+Hasta que el paso 1 esté hecho, **el job `terraform` del CI sigue exigiendo el binario**
+—es del workflow del marco que `.github/workflows/ci.yml` llama, y en la versión 1 del
+marco avisa sin bloquear; desde la 2 bloquea—: decide mirando si los directorios existen,
+no la clave. Una vez borrados lo dice con un `::notice::` y sale verde en cualquier
+versión, y no depende de ninguna fecha.
+
 <!-- projects:fin-solo-si-hay-infra -->
 
 Los nombres de la fila **Package manager** son DIRECTORIOS y están escritos literales a

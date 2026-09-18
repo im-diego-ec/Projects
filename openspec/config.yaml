@@ -13,8 +13,9 @@ context: |
     - Canónico: los specs de marco (`openspec/specs/`) viven SOLO en este repo;
       los proyectos adoptantes no los copian, los cumplen. Qué parte de ese
       contrato tiene compuerta que falla sola —una fila por requirement, con la
-      ruta y la línea del paso o del test, o «ninguno»— está medido en
-      `openspec/cobertura-de-requirements.md`.
+      ruta y la línea del paso o del test, o el estado declarado de su ausencia:
+      pendiente en un change vivo, no verificable, o sin destino hasta la
+      próxima versión— está medido en `openspec/cobertura-de-requirements.md`.
     - Regenerado: las skills y comandos de OpenSpec no se vendoran; el marco
       pina la versión del CLI y cada repo las regenera.
   Premisa dura: el cumplimiento del marco debe ser AUTOMÁTICO (CI, scaffolds,
@@ -49,14 +50,27 @@ rules:
       `pendiente-de-revision`, `aprobado-en-sesion`, `en-ejecucion`,
       `archivado`. Los campos opcionales que el marco ya usa son
       `experimental` (booleano) y `veredicto_antes_de` (fecha ISO), y van
-      juntos - un change experimental sin fecha de veredicto es permanente
-      por defecto"
+      juntos - el paso «Estado experimental con fecha de veredicto» del
+      workflow reusable pone rojo al change experimental sin fecha, y al que
+      llega al día siguiente de su fecha sin un artefacto que declare
+      `artefacto: veredicto`. Manda la fecha más temprana del change, así que
+      correrla es correrla en todos los artefactos que la declaran"
     - "`dri` y `aprueba` NO pueden nombrar a la misma persona. Un autor que
       se aprueba a sí mismo no es un review, y hoy nada lo detiene - el
       repositorio corre con `required_approving_review_count` en `0` y
       `require_code_owner_review` en `false`, así que CODEOWNERS sugiere
       revisores y no gatea. Mientras esa configuración siga así, este campo
       es la única constancia escrita de quién revisó"
+    - "Mientras rija el desvío `github-review-cruzado-automatizado` declarado
+      en `AGENTS.md` (una sola identidad con permiso de escritura), el
+      builder par no existe - `aprueba` y `revisa` de un artefacto que no toca
+      `gobierno-contribucion` valen `revision adversarial (desvio del marco: un
+      solo mantenedor, ver AGENTS.md)`, y esa revisión queda registrada en
+      `revision-adversarial.md` dentro del change antes de archivarlo. El
+      proposal y el spec que tocan `gobierno-contribucion` siguen diciendo
+      `PO` - el desvío no toca esa aprobación. Nombrar al builder par, o
+      archivar sin la revisión, pone rojo
+      `pruebas/ci-del-marco/desvio-de-review-del-marco.test.mjs`"
   specs:
     - Usar escenarios con viñetas WHEN / THEN bajo `#### Scenario:` (prosa en
       español, keywords en inglés). No usar Dado / Cuando / Entonces

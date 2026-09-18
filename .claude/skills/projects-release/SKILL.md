@@ -1,6 +1,6 @@
 ---
 name: projects-release
-description: Cortar y publicar una version del marco Projects — CHANGELOG, pines internos, PR de release, tag inmutable vX.Y.Z y notas del release en GitHub. Usar cuando haya que publicar una version del marco o cuando alguien pregunte como se saca una version de Projects. El tag movil v1 dejo de ser el canal de distribucion pero SIGUE EXISTIENDO por una razon estructural, y el paso 5 lo mueve.
+description: Cortar y publicar una version del marco Projects — CHANGELOG, pines internos, PR de release, tag inmutable vX.Y.Z y notas del release en GitHub. Usar cuando haya que publicar una version del marco o cuando alguien pregunte como se saca una version de Projects. El tag movil v1 dejo de ser el canal de distribucion y el marco ya no lo invoca en ninguna linea; sigue existiendo porque las versiones publicadas hasta la 1.9.6 lo llevan adentro, y el paso 5 NO lo mueve sin OK humano.
 # ALLOWLIST ACOTADO. `allowed-tools` es un allowlist de agente con el mismo poder
 # que el archivo de ajustes: `Bash(git:*)` autoriza `git push --force` y `Bash(gh:*)`
 # autoriza `gh pr merge`, `gh release create` y `gh api -X DELETE`. Un comodin en la
@@ -37,33 +37,37 @@ nuevo enrojecio a un consumidor que el dia anterior pasaba y nadie lo habia
 pedido: con el bump por PR, ese rojo aparece **dentro del PR**, que es donde se
 puede leer antes de mergear.
 
-**`v1` dejo de ser el canal, pero NO se pudo retirar.** El 2026-08-21 se descubrio
-que el tag tenia un segundo rol: `marco-ci.yml` referenciaba a sus PROPIAS actions
-hermanas por `@v1`, asi que un consumidor pinado a `marco-ci.yml@v1.4.1` recibia el
-workflow de la 1.4.1 y las actions de lo que `v1` apuntara en ese momento — el pin
-exacto era una **media verdad**.
+**`v1` dejo de ser el canal, y tardo en dejar de tener uso.** El 2026-08-21 se
+descubrio que el tag tenia un segundo rol: `marco-ci.yml` referenciaba a sus PROPIAS
+actions hermanas por `@v1`, asi que un consumidor pinado a `marco-ci.yml@v1.4.1`
+recibia el workflow de la 1.4.1 y las actions de lo que `v1` apuntara en ese momento —
+el pin exacto era una **media verdad**.
 
-Se intento pinar esas dos lineas a la version exacta, y el CI del PR de release
-1.4.2 lo refuto en el acto: *"Unable to resolve action ...@v1.4.2, unable to find
-version v1.4.2"*. **El tag se crea despues de mergear**, asi que una linea que pina
-la version que se esta cortando pone en rojo al PR que la corta. Es circular por
-construccion. Y no hay salida: GitHub no admite expresiones en `uses:`, asi que un
-workflow reusable no puede referenciar su propio ref, y una ruta local dentro de un
-reusable se resuelve contra el arbol de quien LLAMA.
+Se intento pinar esas lineas a la version exacta, y el CI del PR de release 1.4.2 lo
+refuto en el acto: *"Unable to resolve action ...@v1.4.2, unable to find version
+v1.4.2"*. **El tag se crea despues de mergear**, asi que una linea que pina la version
+que se esta cortando pone en rojo al PR que la corta, si esa linea se resuelve durante
+el CI del marco. GitHub no admite expresiones en `uses:`, asi que un reusable no puede
+referenciar su propio ref, y una ruta local dentro de un reusable se resuelve contra el
+arbol de quien LLAMA.
 
-Asi que `@v1` sobrevive en **una sola linea** —`actions/guardrail-deltas`, la unica
-invocacion interna cuyo ref se resuelve durante el CI del propio marco— y el **paso
-5 la mueve**. El banco del pinado la exceptua por lista exacta: archivo, ref y
-action, para que una segunda no herede la excepcion en silencio.
+La salida fue la particion: cada invocacion interna vive en un **job que se saltea en
+el repo del marco** (la sonda `needs.cambios.outputs.es_distribuidor`), y la misma pieza
+corre por ruta local en el `ci.yml` de Projects. Un job salteado no resuelve nada, asi
+que durante el PR de release esas lineas no se tocan y el pin exacto deja de ser
+circular. `actions/constitucion` nacio asi; `actions/guardrail-deltas` paso a ese
+esquema en la 1.8.0 y a la version exacta en el change
+`guardrail-deltas-por-version-exacta`. **Desde entonces ningun `uses:` del marco va por
+`@v1`**, y lo cobran dos bancos sin lista de excepciones: `pruebas/andamio/pinado.test.mjs`
+y `pruebas/andamio/refs-propias.test.mjs`.
 
-El resto de los pines SI son exactos, y el release tiene que moverlos. No depende de
+Todos los pines del marco son exactos, y el release tiene que moverlos. No depende de
 que nadie se acuerde: `pruebas/andamio/pinado.test.mjs` exige que todo `uses:` del
-marco —salvo esa excepcion nombrada— sea igual a la version mas alta del CHANGELOG.
+marco sea igual a la version mas alta del CHANGELOG.
 
-La version derivada, que dejaria morir a `v1`: aplicar al guardrail la misma
-particion que ya usa la constitucion —saltear el paso cuando el repo es el del marco,
-y correr la action por ruta local en el `ci.yml` de projects—. Toca la logica del
-veredicto agregado que heredan todos los consumidores, asi que no entro en la 1.4.2.
+`v1` **sigue existiendo y no se borra**: las versiones publicadas hasta la 1.9.6 lo
+llevan adentro de su `marco-ci.yml`. Lo que cambio es para que sirve moverlo, y eso esta
+en el paso 5.
 
 Todos los comandos se corren **desde la raiz del repo del marco**
 (`im-diego-ec/Projects`), sobre `main` actualizado, y **en Git Bash** (usan
@@ -73,19 +77,22 @@ Todos los comandos se corren **desde la raiz del repo del marco**
 
 ## Antes de empezar: dos precondiciones. Si falta una, PARA
 
-> **Eran tres.** La primera era el OK humano para mover `v1`, y desaparecio con el
-> tag: publicar una version ya no empuja nada a nadie. La compuerta humana no se
-> perdio, se movio de lugar — **el merge del PR de release a `main` exige el OK de
-> Builder 1**, como todo merge a main, y eso pasa ANTES de que exista el tag.
+> **Eran tres.** La primera era el OK humano para mover `v1`, cuando `v1` era el canal.
+> Publicar una version ya no empuja nada a nadie, siempre que el paso 5 no mueva el
+> tag: moverlo es la excepcion, y lleva su propio OK. La compuerta humana del release
+> no se perdio, se movio de lugar — **el merge del PR de release a `main` exige el OK
+> de Builder 1**, como todo merge a main, y eso pasa ANTES de que exista el tag.
 
 1. **El cambio ya se probo contra un consumidor real.** Publicar sin eso es una
    frontera 🛑 de `AGENTS.md`. El procedimiento esta en la skill
    `projects-validar-consumidor`; la evidencia es un id de corrida verde sobre el
    SHA que se va a taguear. Si no existe esa evidencia, para y consegui la.
 2. **El `CHANGELOG.md` ya tiene las entradas.** El changelog se escribe en el PR
-   que introduce cada cambio, no en el release. Si `## [No publicado]` dice
-   "Nada todavia", **no hay version que cortar**: lo que hay es un cambio que se
-   mergeo sin su entrada, y eso se arregla antes.
+   que introduce cada cambio, no en el release. Si `## [No publicado]` sigue en
+   su placeholder —su unica seccion es el `### Para consumidores` con el texto de
+   fabrica que dejo el paso 1 del release anterior—, **no hay version que
+   cortar**: lo que hay es un cambio que se mergeo sin su entrada, y eso se
+   arregla antes.
 
 Verificacion de la 2, antes de nada:
 
@@ -93,23 +100,41 @@ Verificacion de la 2, antes de nada:
 sed -n "/^## \[No publicado\]/,/^## \[/p" CHANGELOG.md
 ```
 
+**Leelo, no lo grepees contra una frase:** lo que miras es si hay subsecciones de
+cambios (`### Añadido`, `### Corregido`, …) o solo el anuncio de fabrica.
+
 ---
 
 ## Elegir el numero: X.Y.Z
 
 - **PATCH** — correccion de comportamiento dentro del contrato ya publicado.
 - **MINOR** — capacidad nueva compatible: un `input` opcional, un workflow o una
-  action nueva, un check adicional que no pone en rojo a nadie que hoy pasa.
-- **MAJOR** — cambio incompatible. **`v1` no se mueve**: se abre la linea `v2` y
-  los consumidores migran deliberadamente. Si dudas entre MINOR y MAJOR, **es
-  MAJOR**: mover `v1` sobre un cambio breaking rompe repos ajenos en silencio.
+  action nueva, **y tambien una compuerta nueva o endurecida cuyo arreglo cabe en el
+  repositorio del consumidor**, aunque su PR de bump nazca rojo. Su arreglo va escrito
+  en «Para consumidores», en palabras de quien no es tecnico.
+- **MAJOR** — un cambio de la lista cerrada de `AGENTS.md` («Que es BREAKING»). **`v1`
+  no se mueve**: se abre la linea `v2` y los consumidores migran deliberadamente. Si
+  dudas entre MINOR y MAJOR, **es MAJOR**: mover `v1` sobre un cambio breaking rompe
+  repos ajenos en silencio.
 
-Es breaking, entre otros: quitar o renombrar un `input`/`secret`/`output`,
-volver requerido uno opcional, cambiar un default de forma que cambie el
-comportamiento, **renombrar un job cuyo nombre publica un check** (le bloquea
-todos los PRs a quien lo tenga como check requerido, con un error que no
-menciona a Projects), exigir un permiso nuevo del token, o endurecer un check de
-modo que un repo que hoy pasa manana falle.
+**La lista no se copia aca, a proposito.** Vive en `AGENTS.md` y la plantilla de PR la
+repite frase por frase porque ahi se marca el caso; una tercera copia es la que se queda
+atras. A Rigel le paso exactamente eso: reescribio la regla el 2026-09-04 y esta skill,
+en su version, siguio diciendo la contraria hasta el 2026-09-06 (commit 9dfba86). Aca lo
+vigila `pruebas/ci-del-marco/que-es-breaking.test.mjs`.
+
+Lo que decide una compuerta nueva o endurecida es una sola pregunta: **puede el
+consumidor volver a verde con cambios propios dentro de su PR de bump?** Si puede, es
+MINOR aunque el PR nazca rojo en todos. Si el arreglo queda fuera de su repositorio
+—configuracion de GitHub, un secreto que carga quien administra, un acto de
+administrador—, es el caso 5 de la lista: se estrena en modo aviso o va a la linea
+mayor. Y un cambio de andamio no es breaking para nadie: no viaja por el PR de bump.
+
+> **Hasta el 2026-09-17 esta seccion clasificaba como breaking cualquier
+> endurecimiento**, por la regla que nacio del incidente del 2026-08-19, cuando el canal
+> era el tag movil y el rojo llegaba sin PR. Con el pin exacto, el rojo llega dentro de
+> un PR que el consumidor decide cuando mergear, y la regla sobrevivio a su causa. La
+> cambio la decision D1 del PO; el motivo largo esta en `AGENTS.md`, pegado a la lista.
 
 ---
 
@@ -195,11 +220,14 @@ declaracion pierde contra el check.
 
 **Y el canonico de la constitucion**, si el texto de `actions/constitucion/canonico/`
 cambio en esta version: `manifiesto.json` necesita una entrada nueva en `versiones`
-con `publicada` y `exigible_desde`, y lo normal es que las dos sean la MISMA fecha: un
-cambio del canonico es exigible el dia que se publica (la ventana de gracia obligatoria
-de 28 dias se retiro el 2026-08-22 — ver el change ventana-vencida). Poner un
-`exigible_desde` futuro sigue siendo posible y es una decision deliberada de estrenar
-con aviso, que se justifica en la seccion «Para consumidores». Sin esa entrada, el
+con `publicada` y `exigible_desde`, y las dos son SIEMPRE la misma fecha, la del
+release: un cambio del canonico es exigible el dia que se publica (la ventana de gracia
+de 28 dias se retiro el 2026-08-22 y el estreno con aviso el 2026-09-17 — ver el change
+ventana-vencida). Otra fecha pone rojo `actions/constitucion/pruebas/la-ventana-no-vuelve.test.mjs`,
+y tambien una fecha posterior a hoy: la fecha es la del dia en que el release sale, no la
+del dia en que se lo planea. Si la entrada ya existe porque el change que toco el canonico
+la agrego con el numero tentativo (y la fecha de ese dia), aca se corrige el numero y se
+refrescan las dos fechas. Sin esa entrada, el
 artefacto de los consumidores queda distinto del canonico y el check no puede decir por
 que.
 
@@ -215,16 +243,39 @@ En `CHANGELOG.md`:
 
 1. Renombrar el encabezado `## [No publicado]` a `## [X.Y.Z] — YYYY-MM-DD` con
    la fecha de hoy (raya larga y espacios, igual que las versiones anteriores).
-2. Insertar arriba un `## [No publicado]` nuevo y vacio, con el mismo separador
-   que usan las demas secciones:
+2. Insertar arriba un `## [No publicado]` nuevo, **con su `### Para
+   consumidores`**, con el mismo separador que usan las demas secciones:
 
 ```markdown
 ## [No publicado]
 
-Nada todavia.
+### Para consumidores
+
+Nada todavía: no hay ningún cambio sin publicar.
 
 ---
 ```
+
+> **Ese `### Para consumidores` no es decorativo, y el texto va LITERAL.** La
+> compuerta `herramientas/aviso-entra-en-el-mensaje.mjs` mide esta seccion en el CI
+> de este mismo PR, y su ausencia es rojo aunque el cuerpo entre en el limite: sin
+> ella el aviso cae al fail-open y arma el mensaje con la entrada ENTERA. Hasta que
+> existio la compuerta este bloque decia solo «Nada todavia.», o sea que aplicarlo
+> literal ponia rojo al PR de release — justo donde el texto ya es final. El texto es
+> la constante `PLACEHOLDER_SIN_CAMBIOS` de la compuerta, y
+> `pruebas/ci-del-marco/placeholder-del-release.test.mjs` extrae este bloque y exige
+> las dos cosas: que pase la compuerta y que el texto coincida.
+>
+> **La explicacion va aca y no adentro del bloque**, a proposito: el cuerpo de esa
+> seccion es exactamente lo que viaja al canal de los consumidores.
+
+> **Y el dia que escribas una entrada de verdad, ese texto se reemplaza.** El
+> centinela de la compuerta pone ROJO una seccion cuyo `Para consumidores` siga
+> siendo el texto de fabrica y que ya declare cambios —otras subsecciones
+> (`### Añadido`, `### Corregido`, …) o viñetas sueltas bajo el encabezado—: hay
+> cambios y el anuncio diria que no hay ninguno. Reconoce el texto aunque le falte el
+> punto, los acentos o le sobre una negrita: retocarlo no lo vuelve un resumen pensado.
+> Sin el centinela, el placeholder habria cambiado un rojo molesto por un verde mudo.
 
 **Verificacion del paso 1** — los dos encabezados, en este orden:
 
@@ -236,9 +287,35 @@ Tiene que mostrar `## [No publicado]` primero y `## [X.Y.Z] — YYYY-MM-DD`
 inmediatamente despues. Si la version nueva no aparece, o aparece sin fecha, el
 paso no esta hecho.
 
-Si el repo ya trae `actions/aviso-version/`, esta es la comprobacion barata de
-que la entrada existe y es la que van a recibir los consumidores (arma el
-mensaje y **no envia nada**, no necesita credenciales):
+**Ese `grep` no alcanza:** mira encabezados `## [` y nada mas, asi que da por bueno
+un arbol que la compuerta del aviso rechaza. La verificacion que cubre las dos cosas
+es la compuerta misma, y conviene correrla aca en vez de esperar el CI:
+
+```bash
+git show main:CHANGELOG.md > "${TMPDIR:-/tmp}/changelog-de-main.md"
+node herramientas/aviso-entra-en-el-mensaje.mjs CHANGELOG.md "${TMPDIR:-/tmp}/changelog-de-main.md"
+```
+
+Tiene que salir **0**. Mide `[No publicado]`, la version mas alta y —con el segundo
+argumento, el `CHANGELOG.md` de `main`— toda version cuyo aviso cambia en esta rama:
+la recien cortada **aunque no sea la mas alta**, que es el caso de un parche sobre una
+linea vieja. Sin el segundo argumento mide solo las dos primeras y lo dice con un
+`::notice::`; el CI se lo pasa siempre. Cobra cinco cosas:
+
+| Lo que cobra | Por que |
+|---|---|
+| Que cada una tenga su `### Para consumidores` | Sin ella el aviso manda la entrada entera, recortada si no entra |
+| Que esa seccion tenga texto (no vacia, ni solo un comentario) | Vacia, el aviso manda «Que tiene que hacer un consumidor:» y nada debajo |
+| Que el texto de fabrica no quede encima de cambios reales | El centinela del paso 1: hay cambios y el anuncio diria que no hay ninguno |
+| Que su `### Para consumidores` no use jerga de oficio (la lista y el tope de `pruebas/docs/lectura.mjs`: en la prosa, y entre backticks por encima del mismo tope que esas paginas) | Una compuerta nueva sale en rojo el dia que sale solo si su arreglo se entiende sin ser tecnico (`AGENTS.md`, «Que es BREAKING») |
+| Que el mensaje entre en el limite | El `::warning::` de la action llega DESPUES de mandar el mensaje recortado |
+
+Va como tabla para que agregar un cobro nuevo sea agregar una fila y no reescribir
+una frase.
+
+Si el repo ya trae `actions/aviso-version/`, esta es la comprobacion barata para
+**leer** el mensaje que van a recibir los consumidores (arma el mensaje y **no
+envia nada**, no necesita credenciales):
 
 ```bash
 AVISO_VERSION=X.Y.Z node actions/aviso-version/aviso-version.mjs
@@ -335,37 +412,55 @@ Los tags de este repo son **ligeros** (`v1.0.0`, `v1.1.0` y `v1.2.0` lo son:
 
 ---
 
-## Paso 5 — Mover `v1`, que existe para UNA linea
+## Paso 5 — `v1` NO se mueve sin un OK humano explicito
 
-`v1` ya no es el canal de distribucion: los consumidores pinan la version exacta y
-reciben el bump por PR de Dependabot. Sigue existiendo por el motivo estructural del
-preambulo, y lo consume **una sola linea del marco**:
-
-```bash
-grep -n 'guardrail-deltas@v1' .github/workflows/marco-ci.yml
-```
-
-Si no se mueve, esa action se congela en la version donde quedo el tag y el resto del
-marco avanza sin ella. **Ligero, sin `-m` y sin `-a`** (ver la trampa 2):
+**Que cambio.** Hasta el change `guardrail-deltas-por-version-exacta` este paso movia
+`v1` en cada release, porque `marco-ci.yml` invocaba `actions/guardrail-deltas` por ese
+tag. Desde ese change el arbol no lo resuelve en ninguna linea: esa invocacion va por
+version exacta y el paso 1 la mueve con las demas. Comprobalo, tiene que devolver
+**cero lineas**:
 
 ```bash
-git tag -f v1 <SHA>
-git push origin v1 --force
+grep -nE '^[[:space:]]*(-[[:space:]]+)?uses:.*Projects[^@[:space:]]*@v[0-9]+"?[[:space:]]*$' .github/workflows/*.yml
 ```
 
-**Verificacion del paso 5:**
+**Quien sigue resolviendo `v1`.** Las versiones publicadas hasta la 1.9.6: su
+`marco-ci.yml` trae la linea vieja, y un consumidor pinado a una de ellas la resuelve
+en cada corrida de su job `deltas-openspec`. Por eso el tag **no se borra**: borrarlo
+le rompe ese job con `Unable to resolve action`.
+
+**Por que moverlo pide OK.** Con el arbol limpio, el UNICO efecto de mover `v1` es
+empujar el `guardrail-deltas` de la version nueva a los consumidores que todavia pinan
+una 1.9.x o anterior, **sin PR**: exactamente lo que el modelo de version exacta
+prohibe. `AGENTS.md` lo lista en ⚠️ («Mover el tag `v1`»). Asi que:
+
+- **Por defecto, no se mueve.** El paso termina aca.
+- Si alguien lo pide, el OK humano va escrito en el PR del release, y antes se mira si
+  `actions/guardrail-deltas` cambio entre donde apunta `v1` y lo que se corta:
+
+  ```bash
+  git fetch --tags --force origin
+  git diff --stat "$(git rev-parse 'v1^{commit}')" <SHA> -- actions/guardrail-deltas ':!actions/guardrail-deltas/pruebas'
+  ```
+
+  Si ese diff no esta vacio, moverlo cambia lo que corre en repos que no mergearon
+  nada. Con el OK dado, se mueve **ligero, sin `-m` y sin `-a`** (ver la trampa 2):
+  `git tag -f v1 <SHA>` y `git push origin v1 --force`.
+
+**La decision pendiente, con su dato.** Medido el 2026-09-17 con
+`git ls-remote --tags origin v1`: `v1` apunta a la 1.8.0 desde el 2026-09-01, o sea que
+en la practica no se movio en ninguna de las siete versiones 1.9.x, y
+`actions/guardrail-deltas` tiene el mismo arbol en la 1.8.0 que en la 1.9.6, asi que
+nadie recibio nada distinto. Las dos salidas son congelarlo formalmente (se borra este
+paso y su linea del checklist) o volver a moverlo en cada release con su OK. Se decide
+junto con la apertura de la linea `v2`, que es donde el tag mayor vuelve a estar en
+juego.
+
+**Verificacion del paso 5** — si no hubo OK, el tag quedo donde estaba:
 
 ```bash
-git cat-file -t v1              # commit  (si dice "tag", ver trampa 2)
-git rev-parse v1                # <SHA>
-git rev-parse v1^{commit}       # el MISMO <SHA>
-git ls-remote --tags origin v1  # UNA sola linea refs/tags/v1
+git ls-remote --tags origin v1  # el MISMO SHA que antes de empezar el release
 ```
-
-No exige un OK aparte: a diferencia de cuando era el canal, moverlo ya no empuja
-comportamiento a ningun consumidor pinado. Mueve una action dentro de un workflow que
-el consumidor recibe recien cuando mergea su PR de bump. El OK vive en el merge del
-paso 3.
 
 ---
 
@@ -536,16 +631,16 @@ limpio.
 tercera se publicaron los tags y **no se publicaron las notas del release**.
 
 **Por que se olvida, y por que va a volver a pasar sin esta verificacion.** Los
-cinco pasos anteriores dejan rastro local: un diff, un commit, un merge, dos
-tags. El sexto ocurre entero del lado de GitHub y **no cambia una sola linea del
+cinco pasos anteriores dejan rastro local: un diff, un commit, un merge, un
+tag. El sexto ocurre entero del lado de GitHub y **no cambia una sola linea del
 arbol de trabajo**. Cuando el paso 5 termina, `git status` esta limpio, `git
 log` muestra el release y el repo se ve exactamente igual que si estuviera
 terminado. Nada te lo recuerda.
 
-**Sintoma exacto.** `git ls-remote --tags origin` muestra `vX.Y.Z` y `v1`
-apuntando al commit correcto, y `gh release list` **no lista la version**. Los
-consumidores ya estan recibiendo el codigo nuevo por `@v1` y no hay ninguna
-pagina que les diga que cambio.
+**Sintoma exacto.** `git ls-remote --tags origin` muestra `vX.Y.Z` apuntando al
+commit correcto, y `gh release list` **no lista la version**. Dependabot ya puede
+estar abriendo el PR de bump en cada consumidor, y no hay ninguna pagina que les
+diga que cambio.
 
 **Cierre.** El release no esta hecho hasta que `gh release list` muestre la
 version. Esa comprobacion es el final del procedimiento, no un adorno.
@@ -609,7 +704,9 @@ El orden 1 → 6 de esta skill es el orden. No se reordena por comodidad.
 
 - [ ] Evidencia de validacion contra un consumidor real (id de corrida verde)
 - [ ] `X.Y.Z` elegido con el criterio de semver
-- [ ] CHANGELOG cortado: `## [X.Y.Z] — YYYY-MM-DD` + `## [No publicado]` nuevo y vacio
+- [ ] CHANGELOG cortado: `## [X.Y.Z] — YYYY-MM-DD` + `## [No publicado]` nuevo con su
+      `### Para consumidores` de fabrica, y `node herramientas/aviso-entra-en-el-mensaje.mjs`
+      en 0 con el `CHANGELOG.md` de `main` como segundo argumento
 - [ ] **Pines internos movidos a `X.Y.Z`** y `node --test pruebas/andamio/pinado.test.mjs` en verde
 - [ ] Si el canonico de la constitucion cambio: entrada nueva en `manifiesto.json`
 - [ ] El ledger del canonico no declara una version que no existe: corrido el `node -e`
@@ -620,6 +717,6 @@ El orden 1 → 6 de esta skill es el orden. No se reordena por comodidad.
 - [ ] Merge a `main` y `<SHA>` anotado
 - [ ] `vX.Y.Z` creado y pusheado — `git cat-file -t` dice `commit`
 - [ ] `vX.Y.Z` creado **inmediatamente despues del merge**, no mañana (trampa 3)
-- [ ] `v1` movido LIGERO al mismo SHA — `git cat-file -t v1` dice `commit` y los dos `rev-parse` coinciden
+- [ ] `v1` NO movido (paso 5): `git ls-remote --tags origin v1` da el mismo SHA que antes del release, salvo OK humano escrito en el PR
 - [ ] `gh release list` **muestra la version**, `isDraft` es `false` y el cuerpo de las notas no esta vacio
 - [ ] Si existe el aviso de version: la corrida salio y no quedo en `::warning::`

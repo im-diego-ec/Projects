@@ -47,9 +47,11 @@ Cada uno declara lo mismo, en el mismo orden:
 - **PLAN GRATUITO** — el límite real, **medido contra la página del proveedor y con la
   fecha de la medición**. Los planes gratuitos cambian sin aviso: una cifra sin fecha es
   una cifra que ya no se puede verificar.
-- **PENDIENTES** — lo que falta decidir, con la misma forma de tres partes que usa
-  `pendientes.tf`: **QUÉ FALTA**, **CÓMO SE DECIDE** y **SI NO SE HACE**. El del medio es
-  el que importa: sin criterio, un pendiente lo resuelve sólo quien ya sabía la respuesta.
+- **PENDIENTES** — lo que falta decidir, con la misma forma de cuatro partes que usa
+  `pendientes.tf`: **QUÉ FALTA**, **CÓMO SE DECIDE**, **CUÁNDO SE RESUELVE** y **SI NO SE
+  HACE**. La segunda es la que importa: sin criterio, un pendiente lo resuelve sólo quien ya
+  sabía la respuesta. Y la tercera es la que se olvida: un pendiente sin momento se lee como
+  trabajo futuro sin dueño, y el trabajo futuro sin dueño no se hace.
 
 Los pendientes de acá llevan el token `PENDIENTE-PLATAFORMA` y **no** `PENDIENTE-INFRA`, a
 propósito: son dos listas distintas y el grep de una no debe traer la otra.
@@ -69,8 +71,8 @@ elegida. Y el valor **se valida**: uno que no existe detiene el arranque con `EX
 uno que la constitución admite pero la herramienta todavía no implementa —`cloudflare`,
 `gcp`— recibe un mensaje que lo dice y nombra dónde vive ese trabajo.
 
-Este bloque decía *«la clave todavía no la lee nadie»* y *«escribir `azure` o borrarla no
-produce ningún aviso»*. Las dos afirmaciones eran ciertas cuando se escribieron y dejaron
+Este bloque decía _«la clave todavía no la lee nadie»_ y _«escribir `azure` o borrarla no
+produce ningún aviso»_. Las dos afirmaciones eran ciertas cuando se escribieron y dejaron
 de serlo sin que nada lo notara — mandaba a sostener a mano una coherencia que la
 herramienta ya sostenía, y a borrar carpetas que ya no llegan.
 
@@ -82,6 +84,16 @@ publica en ningún lado.
 es la carpeta donde queda escrito, ANTES de programar, qué se va a cambiar y por qué; ése
 ya tiene sus decisiones tomadas (topología Local → DEV → PROD) y su tarea bloqueante
 escrita: medir si un container de Cloudflare puede abrir TCP saliente al 5432.
+
+**CÓMO SE DECIDE** — No lo decide este proyecto: lo decide el marco en ese change. Lo que
+sí le toca a este proyecto es no suponer que la clave ya le da despliegue: hasta que el
+marco lo publique, el despliegue de lo que no sea un sitio se escribe a mano, con el
+adaptador elegido como guía.
+
+**CUÁNDO SE RESUELVE** — Cuando el marco publique esa pieza: llega con una versión nueva,
+por el pull request que actualiza la versión del marco en este repositorio, y su CHANGELOG
+lo dice. Ese día este bloque se borra a mano, porque este archivo es del proyecto y ninguna
+actualización lo toca.
 
 **SI NO SE HACE** — La palabra sigue prometiendo más de lo que entrega: quien elige una
 plataforma esperando que su aplicación corra ahí recibe archivos, no despliegue.
@@ -101,12 +113,12 @@ El contrato de arriba es lo que la hace tratable: no te mudás «de Supabase a G
 mudás de **(a) cómputo**, de **(b) datos**, de **(c) secretos** y de **(d) despliegue**.
 Son cuatro decisiones con costos muy distintos, y se pueden mover **por separado**.
 
-| Capacidad | Qué cuesta moverla | Se puede a medias |
-| --- | --- | --- |
-| **(a) cómputo** | poco: es un contenedor o un proceso, y el código no cambia | sí — se puede correr en dos lados y mover tráfico de a poco |
-| **(b) datos** | **es la cara**: hay que copiar, verificar y cortar | **no** — o los datos están, o no |
-| **(c) secretos** | medio: cambia cómo llegan, no cuáles son | sí |
-| **(d) despliegue** | medio: es reescribir el workflow, con su verificación | sí |
+| Capacidad          | Qué cuesta moverla                                         | Se puede a medias                                           |
+| ------------------ | ---------------------------------------------------------- | ----------------------------------------------------------- |
+| **(a) cómputo**    | poco: es un contenedor o un proceso, y el código no cambia | sí — se puede correr en dos lados y mover tráfico de a poco |
+| **(b) datos**      | **es la cara**: hay que copiar, verificar y cortar         | **no** — o los datos están, o no                            |
+| **(c) secretos**   | medio: cambia cómo llegan, no cuáles son                   | sí                                                          |
+| **(d) despliegue** | medio: es reescribir el workflow, con su verificación      | sí                                                          |
 
 **El orden que menos duele, y el motivo de cada paso:**
 
@@ -140,6 +152,10 @@ orden es el que menos duele, y no cuánto tarda ni con qué se rompe.
 números: qué tardó, qué se rompió, qué había que saber antes. Un par medido vale más que
 cinco descritos.
 
+**CUÁNDO SE RESUELVE** — Durante la primera mudanza real, mientras se hace y no después:
+los tiempos y lo que se rompió se anotan el mismo día, porque reconstruirlos una semana
+más tarde da números que nadie puede verificar.
+
 **SI NO SE HACE** — «Después te mudás» sigue siendo una promesa sin fuente, que es
 exactamente lo que este repositorio prohíbe escribir en todo lo demás.
 
@@ -157,15 +173,13 @@ información del primer día, que es la peor que va a haber.
   aplica**: no hay nada desplegado que verificar.
 - **COSTO** — cero, y es cero de verdad y no cero hasta que caduque una promoción.
 - **PLAN GRATUITO** — no aplica.
-- **Qué hay que hacer en el repositorio** — cuatro pasos, y **hasta que estén hechos el CI
-  sigue exigiendo Terraform**, porque el job decide mirando si los directorios existen y no
-  la clave: (1) mover este archivo a la raíz y borrar `infra/` e `infra-prod/` enteros; (2)
-  borrar las dos entradas del ecosistema `terraform` de `.github/dependabot.yml`; (3)
-  opcionalmente borrar el paso «Formato y validez de las raíces de Terraform» del
-  `ci.yml` —sin raíces ya sale verde solo, y dejarlo puesto abarata volver a Terraform—; y
-  (4) poner `"plataforma": "ninguna"` en `.projects-valores.json`. Con el paso 1 hecho, ese
-  job dice `::notice::` y sale verde para siempre: no queda ninguna ventana que pueda
-  vencer.
+- **Qué hay que hacer en el repositorio** — tres pasos, y **hasta que estén hechos el CI
+  sigue exigiendo Terraform**, porque el job `terraform` del marco decide mirando si los
+  directorios existen y no la clave: (1) mover este archivo a la raíz y borrar `infra/` e
+  `infra-prod/` enteros; (2) borrar las dos entradas del ecosistema `terraform` de
+  `.github/dependabot.yml`; y (3) poner `"plataforma": "ninguna"` en
+  `.projects-valores.json`. Con el paso 1 hecho, ese job dice `::notice::` y sale verde
+  para siempre, en cualquier versión del marco: no depende de ninguna fecha.
 
 ### PENDIENTE-PLATAFORMA · ninguna · cuándo deja de alcanzar
 
@@ -175,6 +189,11 @@ no sea quien lo desarrolla.
 **CÓMO SE DECIDE** — La pregunta es de negocio y tiene una sola forma: ¿hay alguien fuera
 del equipo que necesite entrar? El día que la respuesta sea sí, se vuelve a este archivo y
 se elige adaptador. Antes de ese día, elegir es adivinar.
+
+**CUÁNDO SE RESUELVE** — El día que alguien de fuera del equipo necesite entrar, y no
+antes. Hasta entonces este pendiente queda abierto a propósito y **no vence**: no desplegar
+es un estado legítimo, y los bloques que se terminen mientras tanto se declaran terminados
+en local y no cerrados.
 
 **SI NO SE HACE** — Nada. Ésta es la salida legítima, y por eso es de primera clase.
 
@@ -207,14 +226,14 @@ este proyecto lo dice el proyecto, no este archivo.
 Consultados el **2026-09-10** en la página de precios de Supabase. Importan **antes**
 de empezar, no después:
 
-| | Plan gratuito |
-|---|---|
-| Proyectos activos | **2** |
-| Tamaño de base | 500 MB (CPU compartida, 500 MB de RAM) |
-| Tráfico de salida | 5 GB |
-| Conexiones | 60 directas, 200 clientes por el pooler |
-| Inactividad | **los proyectos se pausan a la semana** |
-| Escalón siguiente | desde 25 USD/mes |
+|                   | Plan gratuito                           |
+| ----------------- | --------------------------------------- |
+| Proyectos activos | **2**                                   |
+| Tamaño de base    | 500 MB (CPU compartida, 500 MB de RAM)  |
+| Tráfico de salida | 5 GB                                    |
+| Conexiones        | 60 directas, 200 clientes por el pooler |
+| Inactividad       | **los proyectos se pausan a la semana** |
+| Escalón siguiente | desde 25 USD/mes                        |
 
 **Dos consecuencias que cambian cómo se arma el proyecto:**
 
@@ -234,7 +253,7 @@ El cliente y las migraciones **no pueden** usar la misma cadena:
 
 - **El cliente va por el pooler.** Es lo que aguanta muchas conexiones cortas.
 - **Las migraciones van por la conexión directa.** El pooler en modo transacción
-  **no soporta *prepared statements***, y las migraciones los usan.
+  **no soporta _prepared statements_**, y las migraciones los usan.
 
 Y en el plan gratuito hay un detalle más: la conexión directa es **IPv6**. El add-on
 de IPv4 es de organizaciones Pro. Así que las migraciones salen por **session mode**
@@ -249,36 +268,40 @@ es teórico. Uno que se toca cada dos semanas se va a pausar, y el síntoma es u
 pruebas que falla con un error de conexión que no dice «pausado». Si el proyecto va a tener
 rachas, el arreglo es un ping periódico o asumir la espera del despertar y escribirlo.
 
+**CUÁNDO SE RESUELVE** — Al crear el proyecto de dev en Supabase, antes de apuntarle el CI:
+la primera pausa llega a la semana sin actividad, y la decisión tiene que existir antes que
+el primer rojo inexplicable.
+
 **SI NO SE HACE** — El primer CI que corra después de una pausa sale rojo por un motivo que
 no está en el mensaje, y se busca en el código de la aplicación.
 
 ### Quién cubre (a) y (d) cuando la base es Supabase — contestado, midiendo
 
-Esto era un pendiente abierto: *«dónde corre la API»*. Se midió el **2026-09-10** contra
+Esto era un pendiente abierto: _«dónde corre la API»_. Se midió el **2026-09-10** contra
 la documentación de Cloudflare, y la respuesta es **Worker + Hyperdrive**, con Supabase
 nombrado por la propia documentación de Cloudflare.
 
-| Capacidad | Quién la cubre | Por qué |
-|---|---|---|
-| **(a)** cómputo de la API | **Cloudflare Workers** | `connect()` de `cloudflare:sockets` abre TCP saliente, y la documentación usa el 5432 como ejemplo literal |
-| **(b)** base | **Supabase** | lo de siempre: PostgreSQL administrado con respaldos |
-| **(c)** secretos | **Supabase + las variables del proyecto** | sin cambios |
-| **(d)** despliegue y verificación | **Cloudflare Workers**, por versiones | se sube una versión, se mira, y se promueve **esa misma** sin recompilar |
+| Capacidad                         | Quién la cubre                            | Por qué                                                                                                    |
+| --------------------------------- | ----------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
+| **(a)** cómputo de la API         | **Cloudflare Workers**                    | `connect()` de `cloudflare:sockets` abre TCP saliente, y la documentación usa el 5432 como ejemplo literal |
+| **(b)** base                      | **Supabase**                              | lo de siempre: PostgreSQL administrado con respaldos                                                       |
+| **(c)** secretos                  | **Supabase + las variables del proyecto** | sin cambios                                                                                                |
+| **(d)** despliegue y verificación | **Cloudflare Workers**, por versiones     | se sube una versión, se mira, y se promueve **esa misma** sin recompilar                                   |
 
 **Y no hay que reescribir la aplicación**, que era el costo escondido que hacía temer
 esta ruta: Cloudflare implementó las APIs de `node:http` —cliente y servidor— y publicó
-`httpServerHandler`, anunciándolo como *«allowing developers to migrate existing Node.js
-applications with minimal code changes»*.
+`httpServerHandler`, anunciándolo como _«allowing developers to migrate existing Node.js
+applications with minimal code changes»_.
 
-**Cuesta 0 USD/mes**, y no «casi»: Hyperdrive *«is included in both the Free and Paid
-Workers plans»*, con 100 000 consultas por día.
+**Cuesta 0 USD/mes**, y no «casi»: Hyperdrive _«is included in both the Free and Paid
+Workers plans»_, con 100 000 consultas por día.
 
 > **Lo que sigue abierto es UNA cosa, y es mucho más barata que la pregunta original.**
-> No está confirmado que Hyperdrive alcance la cadena *Direct connection* de un proyecto
+> No está confirmado que Hyperdrive alcance la cadena _Direct connection_ de un proyecto
 > Supabase del plan gratuito, porque esa cadena es **IPv6** y el add-on de IPv4 es de
 > organizaciones Pro. **Si falla, no se cambia de proveedor: se cambia de cadena** — el
-> pooler compartido es IPv4 en todos los planes. O sea que la incógnita decide *cuál de
-> las dos cadenas* se escribe en el andamio, no quién cubre qué.
+> pooler compartido es IPv4 en todos los planes. O sea que la incógnita decide _cuál de
+> las dos cadenas_ se escribe en el andamio, no quién cubre qué.
 
 > **Y el techo de CPU de Workers pasa a aplicarte**, ahora que la API corre ahí. No se
 > repite acá: vive una sola vez, en el pendiente **«cloudflare · los 10 ms de CPU»** de la
@@ -309,6 +332,7 @@ front.
 > **La regla que queda:** ninguna cifra de costo de este marco se escribe sin decir **qué
 > incluye** y **con qué uso**. Un número sin las dos cosas no es una promesa de costo, es
 > un piso disfrazado de precio.
+
 - **PLAN GRATUITO** _(medido en developers.cloudflare.com el 2026-08-24)_:
   - Workers: **100 000 peticiones por día**, **10 ms de CPU por petición**, 50
     subpeticiones por invocación, 3 MB de tamaño comprimido del worker
@@ -320,13 +344,13 @@ front.
 Medido el **2026-09-10** corriendo el andamio dentro de **workerd** —el mismo runtime
 de Cloudflare— con `wrangler dev`, sin cuenta y sin desplegar:
 
-| Lo que se probó | Resultado |
-|---|---|
-| La app de Express entera | **200**, sin tocar una línea. Lo único nuevo son **cuatro líneas** de `worker.ts` con `httpServerHandler` |
-| El middleware de auth | **401** y falla cerrado, que es su razón de ser |
-| **El driver de Postgres** | `@prisma/adapter-pg` + `pg` cargaron y **abrieron un socket TCP**: la base contestó con su propio código de error |
-| El arranque completo (`server.ts`) | **200** también, con `dotenv/config` y los manejadores de señales adentro |
-| Tamaño del bundle | **1583 KiB comprimidos** contra un techo de **3 MB** |
+| Lo que se probó                    | Resultado                                                                                                         |
+| ---------------------------------- | ----------------------------------------------------------------------------------------------------------------- |
+| La app de Express entera           | **200**, sin tocar una línea. Lo único nuevo son **cuatro líneas** de `worker.ts` con `httpServerHandler`         |
+| El middleware de auth              | **401** y falla cerrado, que es su razón de ser                                                                   |
+| **El driver de Postgres**          | `@prisma/adapter-pg` + `pg` cargaron y **abrieron un socket TCP**: la base contestó con su propio código de error |
+| El arranque completo (`server.ts`) | **200** también, con `dotenv/config` y los manejadores de señales adentro                                         |
+| Tamaño del bundle                  | **1583 KiB comprimidos** contra un techo de **3 MB**                                                              |
 
 **Dos cosas que conviene saber antes de que sorprendan:**
 
@@ -349,6 +373,10 @@ de CPU del plan gratuito.
 reloj, así que esperar a la base no cuenta y serializar un JSON grande sí. Una API que
 consulta y responde suele entrar; una que hace criptografía, comprime o procesa imágenes,
 no. Se prueba con la petición más pesada que el proyecto tenga, antes de comprometerse.
+
+**CUÁNDO SE RESUELVE** — Antes de comprometerse con Workers para (a), con la petición más
+pesada que el proyecto ya tenga. Y otra vez cada vez que se agregue una ruta que cifre,
+comprima o procese archivos: la medición vale para lo que se midió.
 
 **SI NO SE HACE** — La plataforma corta la petición al superar el presupuesto. El error
 aparece bajo carga y no en desarrollo, que es cuando más caro es diagnosticarlo.
@@ -383,6 +411,9 @@ queda con (a); la conexión sale a internet y eso hay que decidirlo con los ojos
 Si la base va a ser del mismo proveedor, deja de haber plan gratuito y **el costo se
 declara antes de crearla**, no después de la primera factura.
 
+**CUÁNDO SE RESUELVE** — Al elegir `gcp`, antes de crear cualquier base: es la decisión que
+fija el costo, y una base creada «para probar» ya es la decisión tomada por omisión.
+
 **SI NO SE HACE** — Se crea la base «para probar» y queda encendida. Es la forma más común
 de que un proyecto sin presupuesto tenga una factura.
 
@@ -394,6 +425,9 @@ de que un proyecto sin presupuesto tenga una factura.
 hasta donde aguante la tarjeta y el presupuesto se entera después. Se arranca por el
 escalón más chico que la aplicación tolere y se sube con evidencia; al revés no se puede,
 porque un servicio sobredimensionado nunca da señal de estarlo.
+
+**CUÁNDO SE RESUELVE** — En el mismo cambio que crea el servicio, no en uno posterior: un
+servicio sin techo está expuesto al pico desde su primer minuto.
 
 **SI NO SE HACE** — Queda sin cumplir la garantía del marco de que el gasto tiene
 presupuesto con aviso.
@@ -449,10 +483,13 @@ son apagar lo que no se use o presupuestar lo que sí; las dos son legítimas y 
 es es enterarse por la factura. Un aviso de presupuesto configurado el primer día cuesta
 nada y es lo único que convierte esto en una decisión.
 
+**CUÁNDO SE RESUELVE** — El mismo día que se crea la cuenta: la fecha se anota y el aviso
+de presupuesto se configura entonces, no cuando se acerca el vencimiento.
+
 **SI NO SE HACE** — El proyecto llega a la fecha sin haberlo mirado, y la primera señal es
 un cargo.
 
 Los pendientes de la infraestructura ya escrita —el bucket del estado, el clúster
-compartido, las subredes, el dimensionamiento, el certificado y las alarmas— **no están
-acá**: viven en `infra/pendientes.tf` y en `infra-prod/pendientes.tf`, que es donde se
-resuelven.
+compartido, las subredes, el dimensionamiento, el certificado, el programador de tareas,
+las alarmas y la retención y la clase del grupo de logs— **no están acá**: viven en
+`infra/pendientes.tf` y en `infra-prod/pendientes.tf`, que es donde se resuelven.

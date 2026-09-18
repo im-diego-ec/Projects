@@ -256,6 +256,217 @@ function reemplazar(archivo, de, a) {
 }
 
 // ---------------------------------------------------------------------------
+// 2b · LA INTEGRACION LEVANTA EL MOTOR DE DATOS REAL, Y NOMBRA LA MISMA BASE
+//
+// QUE CIERRA, portado de Rigel (1.9.0, change `2026-08-29-pruebas-contra-base-
+// real`, commits 4bf260e y 755207b). El andamio repartia Postgres en el compose
+// del local y NADA en el CI: la suite corria con la capa de datos doblada, y un
+// doble devuelve lo que la prueba espera. En el segundo consumidor de Rigel
+// (2026-08-28) 51 pruebas verdes con dobles escondian tres defectos que Postgres
+// mostro en la primera corrida; y las migraciones no las ejercita ningun doble.
+//
+// LO QUE CAMBIA AL PORTARLO. Rigel escribe `{{PROYECTO}}` en el ci.yml. Aca un
+// workflow NO puede llevar un marcador que cambia por repositorio: llega por la
+// copia del template y el GITHUB_TOKEN no lo puede retocar despues
+// (pruebas/andamio/workflows-sin-marcadores-por-repo.test.mjs). El equivalente
+// que ese banco manda usar para `{{PROYECTO}}` es el nombre del repositorio, que
+// en los dos caminos de nacimiento ES el proyecto: la puerta web deriva PROYECTO
+// del nombre del repositorio, y el doble clic crea el repositorio con PROYECTO.
+//
+// Y EL SERVICIO VIAJA SOLO CON CAPA DE DATOS: va entre los centinelas
+// `projects:solo-si-hay-datos`, y el banco lo mide con la poda REAL.
+// ---------------------------------------------------------------------------
+
+/** El nombre de la base en un workflow: el de `{{PROYECTO}}` segun la convencion
+ *  de workflows-sin-marcadores-por-repo.test.mjs. */
+const BASE_EN_EL_WORKFLOW = "${{ github.event.repository.name }}";
+
+/** El texto de un job del ci.yml (de su linea `  <job>:` a la siguiente). */
+function textoDelJob(texto, job) {
+  const lineas = texto.split("\n");
+  const inicio = lineas.findIndex((l) => l === `  ${job}:`);
+  if (inicio === -1) return null;
+  let fin = lineas.length;
+  for (let i = inicio + 1; i < lineas.length; i += 1) {
+    if (/^ {2}[A-Za-z_][\w-]*:\s*$/.test(lineas[i]) || /^\S/.test(lineas[i])) {
+      fin = i;
+      break;
+    }
+  }
+  return lineas.slice(inicio, fin).join("\n");
+}
+
+const sinComillas = (v) => v.trim().replace(/^"(.*)"$/, "$1");
+
+/** Lo que el job que corre las pruebas declara sobre la base. */
+function baseDeLaIntegracion(texto) {
+  const job = textoDelJob(texto, "build_test");
+  if (job === null) return null;
+  const servicio = job.match(/^ {4}services:\n(?:.*\n)*? {6}postgres:\n((?: {8}.*\n| *#.*\n|\s*\n)*)/m)?.[1] ?? null;
+  const env = job.match(/^ {4}env:\n((?: {6}.*\n| *#.*\n)*)/m)?.[1] ?? null;
+  const urlCruda = env?.match(/^ {6}DATABASE_URL:[ \t]*(.+)$/m)?.[1] ?? null;
+  const url = urlCruda ? sinComillas(urlCruda) : null;
+  return {
+    imagen: servicio?.match(/^ {8}image:[ \t]*(\S+)/m)?.[1] ?? null,
+    base: servicio?.match(/^ {10}POSTGRES_DB:[ \t]*(.+)$/m)?.[1] ? sinComillas(servicio.match(/^ {10}POSTGRES_DB:[ \t]*(.+)$/m)[1]) : null,
+    salud: /--health-cmd[ \t]+pg_isready/.test(servicio ?? ""),
+    url,
+    baseDeLaUrl: url?.match(/^postgres(?:ql)?:\/\/[^/]+\/([^?]+)/)?.[1] ?? null,
+  };
+}
+
+async function problemasDeLaIntegracion(raizAndamio) {
+  const { podarPorForma } = await import("../../herramientas/projects-init.mjs");
+  const ci = fs.readFileSync(path.join(raizAndamio, ".github/workflows/ci.yml"), "utf8");
+  const compose = fs.readFileSync(path.join(raizAndamio, "docker-compose.yml"), "utf8");
+  const b = baseDeLaIntegracion(ci);
+  if (b === null) return ["el ci.yml del andamio no tiene el job build_test: este banco quedo sin sujeto"];
+  const problemas = [];
+  if (!b.imagen || !b.base) {
+    return [
+      "el job que corre las pruebas no levanta el motor de datos como servicio (services.postgres con POSTGRES_DB): la " +
+        "suite corre con la capa de datos doblada y un doble no contradice a la prueba. Arreglo: services.postgres en " +
+        "build_test, con la imagen del docker-compose.yml y healthcheck pg_isready",
+    ];
+  }
+  const imagenLocal = compose.match(/^\s*image:[ \t]*(\S+)/m)?.[1];
+  if (b.imagen !== imagenLocal) {
+    problemas.push(`la integracion levanta ${b.imagen} y el entorno local ${imagenLocal}: una prueba que pasa contra otro motor traslada el defecto en vez de cazarlo`);
+  }
+  if (!b.salud) {
+    problemas.push("el servicio de datos no declara healthcheck (--health-cmd pg_isready): la suite arranca antes que el motor y el rojo sale como una conexion intermitente");
+  }
+  if (!b.url) {
+    problemas.push("build_test no declara DATABASE_URL a nivel de JOB: la conexion declarada paso a paso se olvida en el paso siguiente que alguien agregue");
+  } else if (b.baseDeLaUrl !== b.base) {
+    problemas.push(
+      `el servicio crea la base "${b.base}" y DATABASE_URL apunta a "${b.baseDeLaUrl}": el cliente de datos crearia la que falta ` +
+        "EN SILENCIO y las pruebas correrian contra una base distinta de la que el servicio levanto",
+    );
+  }
+  if (b.base !== BASE_EN_EL_WORKFLOW) {
+    problemas.push(
+      `la base de la integracion se llama "${b.base}" y tiene que ser ${BASE_EN_EL_WORKFLOW}: es lo que un workflow usa en lugar ` +
+        "de {{PROYECTO}} (que no puede llevar), y lo que hace que la base de la integracion y la del local sean la del proyecto",
+    );
+  }
+  // La poda REAL: una aplicacion conserva el servicio, un sitio no lo recibe.
+  const app = podarPorForma(ci, ".github/workflows/ci.yml", "aplicacion");
+  const sitio = podarPorForma(ci, ".github/workflows/ci.yml", "sitio");
+  if (!/services:/.test(textoDelJob(app, "build_test") ?? "")) problemas.push("la poda de una aplicacion le saca el servicio de datos");
+  if (/POSTGRES_DB|DATABASE_URL:|^\s*services:/m.test(textoDelJob(sitio, "build_test") ?? "")) {
+    problemas.push("un sitio hereda el servicio de datos o su DATABASE_URL: tienen que ir entre los centinelas projects:solo-si-hay-datos");
+  }
+  return problemas;
+}
+
+test("andamio · la integracion levanta el motor de datos real y el servicio y la conexion nombran la misma base", async () => {
+  assert.deepEqual(await problemasDeLaIntegracion(ANDAMIO), []);
+});
+
+test("andamio · la comprobacion de la base de la integracion MUERDE", async () => {
+  const ci = ".github/workflows/ci.yml";
+  const mutaciones = [
+    { nombre: "sin servicio de datos", de: /^ {4}services:\n/m, a: "    servicios_sacados:\n" },
+    { nombre: "la conexion apunta a otra base", de: "5432/${{ github.event.repository.name }}", a: "5432/otra" },
+    { nombre: "el servicio vuelve a un literal", de: /(POSTGRES_DB:[ \t]*)"\$\{\{ github\.event\.repository\.name \}\}"/, a: '$1"appdb"' },
+    { nombre: "otra version del motor que la del local", de: /image: postgres:\S+/, a: "image: postgres:15" },
+    { nombre: "sin healthcheck", de: /--health-cmd pg_isready/, a: "--health-cmd true" },
+    // El centinela de nivel de JOB (cuatro espacios); el del paso va a seis.
+    { nombre: "fuera de los centinelas de datos", de: /^ {4}# projects:solo-si-hay-datos\n/m, a: "" },
+  ];
+  for (const m of mutaciones) {
+    await enTemporalAsync("integracion", async (tmp) => {
+      const copia = path.join(tmp, "plantilla");
+      fs.cpSync(ANDAMIO, copia, { recursive: true, filter: (s) => !s.split(path.sep).includes("node_modules") });
+      reemplazar(path.join(copia, ci), m.de, m.a);
+      assert.notDeepEqual(await problemasDeLaIntegracion(copia), [], `la mutacion "${m.nombre}" no fue detectada`);
+    });
+  }
+});
+
+async function enTemporalAsync(prefijo, fn) {
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), `projects-${prefijo}-`));
+  try {
+    return await fn(tmp);
+  } finally {
+    fs.rmSync(tmp, { recursive: true, force: true });
+  }
+}
+
+// ---------------------------------------------------------------------------
+// 2c · UNA SOLA BASE, POR DESCUBRIMIENTO Y NO POR LISTA
+//
+// Los lugares que nombran la base eran una lista escrita a mano, y la lista se
+// queda atras: en Rigel (2.4.0, commit b7d3201, issue #64) un quinto lugar —la
+// sonda de humo que la promocion usa como compuerta— nombraba otra base y el
+// banco daba 601/601 en verde. Aca el banco BARRE el andamio buscando cualquier
+// cosa con forma de nombre de base (una URL de Postgres o un POSTGRES_DB) y
+// exige que cada archivo este declarado: SITIO, si se compara arriba, o NO-SITIO
+// con el motivo de por que no nombra la base del proyecto.
+// ---------------------------------------------------------------------------
+
+const SITIOS_DE_LA_BASE = {
+  "docker-compose.yml": "la base del entorno local (seccion 2)",
+  "api/.env.example": "la conexion del API en el local (seccion 2)",
+  ".github/workflows/ci.yml": "el servicio de la integracion y la conexion de sus pruebas (seccion 2b)",
+};
+
+const NO_SITIOS_DE_LA_BASE = {
+  "api/src/lib/prisma.test.ts":
+    "doble: la URL de relleno (`/d`) solo prueba que el cableado pase la cadena al adaptador; ninguna base la sirve y ninguna prueba se conecta",
+};
+
+/** Los archivos del andamio con algo que tiene forma de nombre de base. */
+function lugaresConNombreDeBase(raiz) {
+  const salida = [];
+  (function caminar(rel) {
+    for (const e of fs.readdirSync(path.join(raiz, rel), { withFileTypes: true })) {
+      if (e.name === "node_modules" || e.name === ".git") continue;
+      const r = rel ? `${rel}/${e.name}` : e.name;
+      if (e.isDirectory()) caminar(r);
+      else if (/postgres(?:ql)?:\/\/|POSTGRES_DB[ \t]*[:=]/.test(fs.readFileSync(path.join(raiz, r), "utf8"))) salida.push(r);
+    }
+  })("");
+  return salida.sort();
+}
+
+function problemasDelDescubrimiento(raiz) {
+  const hallados = lugaresConNombreDeBase(raiz);
+  const problemas = [];
+  for (const h of hallados) {
+    if (!SITIOS_DE_LA_BASE[h] && !NO_SITIOS_DE_LA_BASE[h]) {
+      problemas.push(
+        `${h} nombra una base de datos y no esta declarado: si es la base del proyecto, agregalo a SITIOS_DE_LA_BASE y ` +
+          "compara su nombre con el de los demas; si no lo es, a NO_SITIOS_DE_LA_BASE con el motivo. Un lugar sin declarar " +
+          "es como un nombre desalineado sobrevive en verde",
+      );
+    }
+  }
+  for (const d of [...Object.keys(SITIOS_DE_LA_BASE), ...Object.keys(NO_SITIOS_DE_LA_BASE)]) {
+    if (!hallados.includes(d)) problemas.push(`${d} esta declarado y ya no nombra ninguna base: la declaracion quedo muerta`);
+  }
+  return problemas;
+}
+
+test("andamio · todo lugar que nombra una base esta declarado como sitio comparado o con su motivo", () => {
+  assert.deepEqual(problemasDelDescubrimiento(ANDAMIO), []);
+});
+
+test("andamio · el descubrimiento de lugares que nombran la base MUERDE", () => {
+  enTemporal("descubrimiento", (tmp) => {
+    const copia = path.join(tmp, "plantilla");
+    fs.cpSync(ANDAMIO, copia, { recursive: true, filter: (s) => !s.split(path.sep).includes("node_modules") });
+    fs.mkdirSync(path.join(copia, "api/scripts"), { recursive: true });
+    fs.writeFileSync(path.join(copia, "api/scripts/humo.ts"), 'const url = "postgresql://postgres:postgres@localhost:5432/otra_base";\n');
+    assert.ok(
+      problemasDelDescubrimiento(copia).some((p) => p.startsWith("api/scripts/humo.ts")),
+      "un quinto lugar que nombra otra base paso sin declarar",
+    );
+  });
+});
+
+// ---------------------------------------------------------------------------
 // 3 · LA IMAGEN DEL API NO ATIENDE HTTP COMO ROOT
 //
 // Es un escaneo de TEXTO del Dockerfile, y esta declarado: no construye la
@@ -591,7 +802,10 @@ test("andamio · la comprobacion del contrato MUERDE", () => {
   const mutaciones = [
     {
       nombre: "el API renombra un campo y el front se queda con el viejo",
-      mutar: (raiz) => reemplazar(path.join(raiz, "api/src/app.ts"), 'res.json({ estado: "ok"', 'res.json({ status: "ok"'),
+      // El ancla es la del objeto ABIERTO: la respuesta de /api/health va en
+      // varias lineas desde el change `el-andamio-nace-formateado`, para que el
+      // formateador la conserve con cualquier largo del nombre del proyecto.
+      mutar: (raiz) => reemplazar(path.join(raiz, "api/src/app.ts"), 'estado: "ok",\n      servicio', 'status: "ok",\n      servicio'),
     },
     {
       nombre: "el front vuelve a exigir el nombre en ingles",

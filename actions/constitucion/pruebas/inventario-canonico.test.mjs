@@ -180,3 +180,200 @@ test("la comprobación muerde: borrar una sección da rojo y nombra qué se pier
   // El canónico del repo no se tocó.
   assert.equal(inventarioCompleto(CANONICO), null);
 });
+
+// ---------------------------------------------------------------------------
+// LAS REGLAS DE `el-canonico-dice-como-se-trabaja`, POR ID Y POR LO QUE DICEN.
+//
+// POR QUE ACA. Ninguna de estas reglas describe una herramienta ni un pipeline:
+// describen como se conduce el trabajo, y su unico enforcement es LLEGAR al
+// contexto de cada sesion. Una regla que se cae del canonico no rompe nada —el
+// render sale mas corto, igual que con una seccion borrada—, asi que se verifica
+// como el inventario de secciones: nombrandola.
+//
+// POR QUE POR ID. El id es lo que un desvio nombra: si cambia, el
+// `.projects-desvios.json` de un consumidor deja de resolver y su pipeline sale
+// rojo por `desvio-muerto` sin que nadie de ese repo haya tocado nada.
+//
+// Y POR LO QUE DICEN, en las tres donde el texto ES la adaptacion:
+//   - la pregunta al PO nombra al rol por su placeholder (decision D8 del PO: los
+//     roles son roles y reasignarlos cuesta editar un solo lugar);
+//   - el estado «terminado en local y no cerrado» va pegado a la definicion de
+//     terminado, y dice que con plataforma `ninguna` es legitimo (decision D6: no
+//     desplegar es un estado legitimo);
+//   - el PR final LLEVA el enlace al issue macro desde que se crea. «Lo cierra» es
+//     un hecho posterior al merge, y enunciado asi la tarea que lo atestigua no se
+//     podia marcar en el PR que la cumple: en Rigel costo un PR de una linea en dos
+//     changes seguidos (5f47b28).
+//
+// La comprobacion es una FUNCION, para que la corran los dos clientes: el canonico
+// real y las copias mutadas de abajo. Una guarda que nadie vio fallar no es guarda.
+// ---------------------------------------------------------------------------
+
+const REGLAS_REVISION_CON_META = [
+  ["revision-declara-su-meta", "que una revisión declare su meta y que la meta pueda cerrar"],
+  ["hallazgo-se-clasifica-contra-la-meta", "que lo que no bloquea se anote y no se pregunte"],
+  ["pregunta-al-po-declara-que-desbloquea", "que una pregunta al PO diga qué desbloquea"],
+  ["change-congelado-contra-su-insumo", "que un change se congele contra su versión de insumo"],
+];
+
+/** El bloque crudo de cada regla (desde su marca hasta la marca siguiente, el
+ *  próximo encabezado o el próximo separador), por id. Es el mismo corte que usa
+ *  `insertarDesvios`, así que lo que se mira acá es lo que un desvío anularía. */
+function bloquesDeReglas(cuerpo) {
+  const bloques = new Map();
+  let actual = null;
+  for (const linea of cuerpo.split("\n")) {
+    const marca = linea.match(/^<!--\s*projects:regla\s+id=([a-z0-9-]+)\s*-->\s*$/);
+    if (marca) {
+      actual = marca[1];
+      bloques.set(actual, "");
+      continue;
+    }
+    if (/^#{1,6}\s/.test(linea) || /^(-{3,}|\*{3,}|_{3,})\s*$/.test(linea)) {
+      actual = null;
+      continue;
+    }
+    if (actual) bloques.set(actual, `${bloques.get(actual)}${linea}\n`);
+  }
+  return bloques;
+}
+
+/** Los problemas de las reglas de este change sobre un canónico. [] si está bien. */
+function reglasDeComoSeTrabaja(dir) {
+  const { cuerpo, ids } = leerCanonico(dir);
+  const bloques = bloquesDeReglas(cuerpo);
+  const problemas = [];
+
+  const faltan = REGLAS_REVISION_CON_META.filter(([id]) => !ids.includes(id));
+  if (faltan.length) {
+    problemas.push(
+      "faltan reglas de `revision-con-meta` en el canónico:\n  " +
+        faltan.map(([id, de_que]) => `${id} — ${de_que}`).join("\n  ") +
+        "\nSi se quitó a propósito, borrá su línea de REGLAS_REVISION_CON_META en el MISMO PR y explicá " +
+        "en el mensaje qué deja de llegar a cada sesión. Si no, esto es el aviso que el resto del marco no " +
+        "te iba a dar: el render simplemente sale más corto.",
+    );
+  }
+
+  const pregunta = bloques.get("pregunta-al-po-declara-que-desbloquea");
+  if (pregunta !== undefined && !pregunta.includes("{{PO}}")) {
+    problemas.push(
+      "`pregunta-al-po-declara-que-desbloquea` no nombra al rol por `{{PO}}`. Los roles del marco son " +
+        "placeholders (decisión D8): reasignar el PO a otra persona tiene que costar editar " +
+        "`.projects-valores.json`, no reescribir reglas. Arreglo: «Una pregunta a {{PO}} (PO) ...».",
+    );
+  }
+
+  const iDone = ids.indexOf("definicion-de-done");
+  const iLocal = ids.indexOf("terminado-en-local-y-no-cerrado");
+  if (iLocal === -1) {
+    problemas.push(
+      "falta `terminado-en-local-y-no-cerrado` en el canónico: sin ella, la definición de terminado se lee " +
+        "como un incumplimiento en todo repositorio que todavía no tiene ambiente —o que declaró plataforma " +
+        "`ninguna`, que es una respuesta legítima—.",
+    );
+  } else if (iDone === -1 || iLocal !== iDone + 1) {
+    problemas.push(
+      "`terminado-en-local-y-no-cerrado` tiene que ir INMEDIATAMENTE después de `definicion-de-done`: sola " +
+        "no significa nada, y la definición sin ella al lado vuelve a decir que un bloque verde en local sin " +
+        "desplegar no está hecho, sin la salida. Las dos viajan juntas.",
+    );
+  } else {
+    const local = bloques.get("terminado-en-local-y-no-cerrado");
+    for (const [re, que] of [
+      [/\[~\]/, "la marca `[~]` del bloque que lleva casilla"],
+      [/`ninguna`/, "que con plataforma `ninguna` el estado es legítimo (decisión D6)"],
+      [/BLOQUE/, "que lo que queda sin cerrar es el BLOQUE y no sus tareas"],
+    ]) {
+      if (!re.test(local)) problemas.push(`\`terminado-en-local-y-no-cerrado\` no dice ${que}.`);
+    }
+  }
+
+  for (const id of ["openspec-flujo", "github-closes-apunta-al-sub-issue"]) {
+    const texto = (bloques.get(id) ?? "").replace(/\s+/g, " ");
+    if (!texto) {
+      problemas.push(`falta la regla \`${id}\` en el canónico`);
+      continue;
+    }
+    if (/cierra el issue macro|lo cierra [uú]nicamente/i.test(texto)) {
+      problemas.push(
+        `\`${id}\` vuelve a decir que el PR final CIERRA el issue macro. Eso solo es verdad DESPUÉS del ` +
+          "merge, así que la tarea que lo atestigua no se puede marcar en el PR que la cumple. Arreglo: que " +
+          "el PR final LLEVA `Closes` al issue macro en su cuerpo desde que se crea.",
+      );
+    } else if (!/issue macro/.test(texto) || !/desde (que se crea|la creaci[oó]n|su creaci[oó]n)/.test(texto)) {
+      problemas.push(
+        `\`${id}\` no dice que el PR final lleva el enlace al issue macro en su cuerpo desde que se crea.`,
+      );
+    }
+  }
+  return problemas;
+}
+
+test("las reglas de cómo se trabaja llegan a cada repo, por id y con lo que dicen", () => {
+  assert.deepEqual(reglasDeComoSeTrabaja(CANONICO), []);
+});
+
+test("cada una de las cuatro de revisión con meta tiene su propio id, no uno compartido", () => {
+  // Un desvío anula la regla ENTERA. Agrupar las cuatro bajo un id obligaría a
+  // quien quiera apartarse de una a anular las cuatro.
+  const ids = new Set(REGLAS_REVISION_CON_META.map(([id]) => id));
+  assert.equal(ids.size, 4, "las cuatro reglas tienen que tener ids distintos");
+});
+
+test("la comprobación de cómo se trabaja muerde: cada mutación da su rojo", () => {
+  const casos = [
+    {
+      que: "borrar una de las cuatro de revisión con meta",
+      archivo: "40-fronteras.md",
+      mutar: (t) => t.replace("<!-- projects:regla id=hallazgo-se-clasifica-contra-la-meta -->", ""),
+      espera: /hallazgo-se-clasifica-contra-la-meta/,
+    },
+    {
+      que: "escribir el rol a mano en vez de su placeholder",
+      archivo: "40-fronteras.md",
+      mutar: (t) =>
+        t.replace(/(id=pregunta-al-po-declara-que-desbloquea -->[\s\S]*?)\{\{PO\}\}/, (_, antes) => `${antes}el PO`),
+      espera: /\{\{PO\}\}/,
+    },
+    {
+      que: "separar el estado transitorio de la definición de terminado",
+      archivo: "30-git-despliegue.md",
+      mutar: (t) =>
+        t.replace("<!-- projects:regla id=terminado-en-local-y-no-cerrado -->", "<!-- projects:regla id=otra-cosa -->"),
+      espera: /terminado-en-local-y-no-cerrado/,
+    },
+    {
+      que: "volver a decir que el PR final cierra el issue macro",
+      archivo: "80-github.md",
+      mutar: (t) =>
+        t.replace(
+          /(id=github-closes-apunta-al-sub-issue -->\s*\n\s*\n)[\s\S]*?(\n\s*\n<!--)/,
+          (_, a, b) =>
+            `${a}- \`Closes\` apunta solo al sub-issue 1:1; el issue macro del change lo cierra\n  únicamente el PR final del change.${b}`,
+        ),
+      espera: /github-closes-apunta-al-sub-issue.*CIERRA/s,
+    },
+  ];
+
+  for (const caso of casos) {
+    const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "projects-como-se-trabaja-"));
+    try {
+      const copia = path.join(tmp, "canonico");
+      fs.mkdirSync(copia);
+      for (const n of fs.readdirSync(CANONICO)) fs.copyFileSync(path.join(CANONICO, n), path.join(copia, n));
+      const ruta = path.join(copia, caso.archivo);
+      const antes = fs.readFileSync(ruta, "utf8");
+      const despues = caso.mutar(antes);
+      assert.notEqual(despues, antes, `la mutación «${caso.que}» no cambió nada: este caso mide aire`);
+      fs.writeFileSync(ruta, despues, "utf8");
+      const problemas = reglasDeComoSeTrabaja(copia).join("\n");
+      assert.match(problemas, caso.espera, `«${caso.que}» tenía que dar rojo y dio: ${problemas || "(nada)"}`);
+    } finally {
+      fs.rmSync(tmp, { recursive: true, force: true });
+    }
+  }
+
+  // El canónico del repo no se tocó.
+  assert.deepEqual(reglasDeComoSeTrabaja(CANONICO), []);
+});

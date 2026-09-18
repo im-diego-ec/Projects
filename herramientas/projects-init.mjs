@@ -255,10 +255,11 @@ export function seExcluyeDelCopiado(rel, plataforma = "aws", forma = "aplicacion
  *  ignora la eleccion.
  *
  *  POR QUE NO ALCANZA CON VACIAR LOS DIRECTORIOS. El paso de Terraform del
- *  pipeline decide con `[ -d "${D}" ]`, no con "hay .tf adentro" —medido en
- *  plantilla/.github/workflows/ci.yml—, asi que un `infra/` con un solo documento
- *  adentro sigue contando como raiz de Terraform. O no viaja el directorio, o el
- *  proyecto arranca verificando infraestructura que no tiene.
+ *  pipeline decide con `[ -d "${D}" ]`, no con "hay .tf adentro" —medido en el
+ *  job `terraform` de .github/workflows/marco-ci.yml, que el ci.yml del andamio
+ *  llama—, asi que un `infra/` con un solo documento adentro sigue contando como
+ *  raiz de Terraform. O no viaja el directorio, o el proyecto arranca
+ *  verificando infraestructura que no tiene.
  *
  *  `aws` es el valor por defecto A PROPOSITO: un archivo de valores viejo, escrito
  *  antes de que esta clave se leyera, describe un proyecto de AWS. Cambiar eso en
@@ -355,6 +356,8 @@ export const BANDERAS = [
   "--asistente",
   "--solo-valores",
   "--version-openspec",
+  "--repositorio",
+  "--sin-remoto",
   "--help",
 ];
 
@@ -562,11 +565,32 @@ export function lineasDeVistaPrevia(raizAndamio, destino, valores, opciones = {}
   for (const paso of pasosSegunElManifiesto(manifiestoPodado(raizAndamio, forma)).corren) {
     l.push(`    · ${paso.titulo}`);
   }
+  // CON --repositorio LA PROMESA DE "NO SE TOCA GITHUB" DEJA DE SER CIERTA, y no
+  // se puede seguir imprimiendo: la corrida termina OFRECIENDO crear el
+  // repositorio en la cuenta de la persona. Lo que si sigue siendo cierto --y es
+  // lo que se promete en su lugar-- es que eso no pasa sin un si escrito.
+  if (opciones.repositorio) {
+    l.push("    · la carpeta queda como repositorio git, en la rama main, con su primer guardado");
+    if (opciones.remoto !== false) {
+      l.push(`    · y te ofrezco crear ${valores?.ORG ?? "<cuenta>"}/${valores?.PROYECTO ?? "<proyecto>"} en GitHub y subirlo: eso, sólo si lo confirmás`);
+    }
+  }
   l.push("");
   l.push("  LO QUE NO VA A PASAR, y conviene saberlo:");
-  l.push("    · No se publica nada en internet. Nadie va a poder entrar todavía.");
+  if (opciones.repositorio && opciones.remoto !== false) {
+    // Un repositorio PUBLICO en GitHub es codigo que cualquiera puede leer: "no se
+    // publica nada en internet" dejaria de ser verdad justo si la persona dice que si.
+    l.push("    · No se publica el proyecto: nadie va a poder entrar todavía. El código sólo se puede leer");
+    l.push("      desde afuera si confirmás subirlo a un repositorio público.");
+  } else {
+    l.push("    · No se publica nada en internet. Nadie va a poder entrar todavía.");
+  }
   l.push("    · No se gasta un peso: nada de esto usa una cuenta paga.");
-  l.push("    · No se toca ninguna cuenta tuya ni ningún ajuste de GitHub.");
+  if (opciones.repositorio && opciones.remoto !== false) {
+    l.push("    · No se crea nada en GitHub sin preguntarte, ni se toca ningún ajuste de tu cuenta o del repositorio.");
+  } else {
+    l.push("    · No se toca ninguna cuenta tuya ni ningún ajuste de GitHub.");
+  }
   l.push("    · Fuera de esa carpeta no se escribe nada.");
   if (opciones.simulado) {
     l.push("");
@@ -639,6 +663,49 @@ export function abrirBitacora(consola = console) {
   };
 }
 
+/** Corre un programa CORTO del marco con su salida estandar por una tuberia y la
+ *  reimprime por la consola de esta herramienta, linea por linea. Devuelve
+ *  `{ codigo, error }`.
+ *
+ *  QUE DEFECTO CIERRA (revision adversarial del porte, FO-S17/H4, 2026-09-18). El
+ *  render de la constitucion corria con `stdio: "inherit"`: sus `::warning::` (un
+ *  sobrante en .projects/ al reintentar con --forzar, un allowlist ilegible) salian en
+ *  la terminal y no pasaban por la consola que miran la bitacora y el registro de
+ *  friccion, que despues decia «sin apartamientos». Reimprimiendo por `consola`, lo que
+ *  el programa dice entra a los dos sin que nadie lo anote.
+ *
+ *  SOLO LA SALIDA ESTANDAR, y alcanza: `constitucion.mjs` escribe TODO —sus avisos y sus
+ *  errores— con `console.log`. La de errores sigue heredada, para que una traza de Node
+ *  se vea en vivo y entera: `execFileSync` y no `spawnSync` —que este archivo no usa,
+ *  ver el banco de lo que llega a un proceso hijo—, y con la de errores por tuberia una
+ *  corrida que sale 0 la descartaria sin mostrarla.
+ *
+ *  SOLO PARA LO CORTO Y DEL MARCO. pnpm y openspec siguen con su salida en vivo, por el
+ *  motivo de la bitacora: sin una terminal del otro lado pnpm apaga su progreso. */
+export function correrProgramaDelMarco(script, { cwd, env = process.env, consola = console } = {}) {
+  const reimprimir = (texto) => {
+    const lineas = String(texto ?? "").split(/\r?\n/);
+    if (lineas.at(-1) === "") lineas.pop();
+    for (const l of lineas) consola.log(l);
+  };
+  try {
+    reimprimir(
+      execFileSync(process.execPath, [script], {
+        cwd,
+        env,
+        encoding: "utf8",
+        stdio: ["ignore", "pipe", "inherit"],
+        maxBuffer: 64 * 1024 * 1024,
+      }),
+    );
+    return { codigo: 0, error: null };
+  } catch (e) {
+    reimprimir(e?.stdout);
+    if (typeof e?.status === "number") return { codigo: e.status, error: null };
+    return { codigo: null, error: e?.signal ? `murio por la senal ${e.signal}` : String(e?.message ?? e) };
+  }
+}
+
 /** Los datos de la maquina que hacen falta para entender un rojo ajeno.
  *
  *  Cada uno esta porque un rojo real se explico con el: la version de Node
@@ -646,17 +713,7 @@ export function abrirBitacora(consola = console) {
  *  (para saber si el defecto ya esta arreglado) y las banderas (para saber si
  *  faltaba una). */
 export function encabezadoDeBitacora(argv, ahora) {
-  const version = (() => {
-    try {
-      return execFileSync("git", ["rev-parse", "--short", "HEAD"], {
-        cwd: ESTE_DIRECTORIO,
-        encoding: "utf-8",
-        stdio: ["ignore", "pipe", "ignore"],
-      }).trim();
-    } catch {
-      return "desconocida (esto no es un clon de git)";
-    }
-  })();
+  const version = versionDelMarco();
   return [
     "BITACORA DEL ARRANQUE",
     "",
@@ -677,6 +734,20 @@ export function encabezadoDeBitacora(argv, ahora) {
     "─".repeat(72),
     "",
   ];
+}
+
+/** La version del marco desde la que corre esta herramienta: el commit del clon. La
+ *  escriben la bitacora y el registro de friccion, y por eso vive en un solo lugar. */
+export function versionDelMarco() {
+  try {
+    return execFileSync("git", ["rev-parse", "--short", "HEAD"], {
+      cwd: ESTE_DIRECTORIO,
+      encoding: "utf-8",
+      stdio: ["ignore", "pipe", "ignore"],
+    }).trim();
+  } catch {
+    return "desconocida (esto no es un clon de git)";
+  }
 }
 
 /** Donde va la bitacora, que NO es el mismo lugar segun como haya salido.
@@ -782,6 +853,12 @@ export function problemasDeEleccion(valores) {
   for (const [clave, validas] of [
     ["forma", FORMAS],
     ["plataforma", PLATAFORMAS],
+    // TIPO_CUENTA ERA LA TERCERA, y con el mismo modo de falla (revision
+    // adversarial del porte, FO-S13/H3): `tipoDeCuentaDe` cae en "usuario" ante
+    // cualquier cosa que no sea "organizacion", y esta misma herramienta escribe
+    // «organización» con tilde en su prosa. Con ese valor una organizacion nacia
+    // con el CODEOWNERS de una cuenta personal, salida 0 y sin aviso.
+    ["TIPO_CUENTA", TIPOS_DE_CUENTA],
   ]) {
     const crudo = valores?.[clave];
     if (crudo === undefined || crudo === null || crudo === "") continue; // ausente: vale el default
@@ -809,11 +886,17 @@ export function problemasDeEleccion(valores) {
     }
     if (!validas.includes(v)) {
       const cerca = validas.find((x) => x.startsWith(v.slice(0, 4)) || v.startsWith(x.slice(0, 4)));
+      const queDecide =
+        clave === "TIPO_CUENTA"
+          ? `. Esta clave decide la forma de CODEOWNERS —personas en una cuenta de usuario, equipos en una ` +
+            `organizacion—, asi que un valor que no se reconoce no se puede asumir: una organizacion recibiria el ` +
+            `CODEOWNERS de una cuenta personal sin que nada lo diga`
+          : `. Esta clave decide QUE ARCHIVOS recibe tu proyecto, asi que un valor que no se reconoce no se puede ` +
+            `asumir: te daria un proyecto distinto del que pediste sin avisarte`;
       problemas.push(
         `${clave} = ${JSON.stringify(crudo)} no es una opcion. Las que hay: ${validas.join(", ")}` +
           (cerca ? `. ¿Quisiste decir "${cerca}"?` : "") +
-          `. Esta clave decide QUE ARCHIVOS recibe tu proyecto, asi que un valor que no se reconoce no se puede ` +
-          `asumir: te daria un proyecto distinto del que pediste sin avisarte`,
+          queDecide,
       );
     }
   }
@@ -873,7 +956,7 @@ export function podarPorForma(texto, rel, forma) {
     try {
       const j = JSON.parse(texto);
       j.forma = forma;
-      return `${JSON.stringify(j, null, 2)}\n`;
+      return jsonParaElArchivo(rel, j);
     } catch {
       return texto;
     }
@@ -939,7 +1022,7 @@ export function podarPorForma(texto, rel, forma) {
           .join(" && ");
       }
     }
-    return `${JSON.stringify(j, null, 2)}\n`;
+    return jsonParaElArchivo(rel, j);
   } catch {
     return texto;
   }
@@ -964,6 +1047,133 @@ export function sacarCentinelas(texto) {
     .replace(/^[ \t]*<!-- projects:(?:fin-)?solo-si-[a-z0-9-]+ -->[ \t]*\r?\n/gm, "");
 }
 
+/** COSE LAS COSTURAS QUE DEJAN LAS PODAS, y solo esas.
+ *
+ *  EL DEFECTO QUE CIERRA, medido el 2026-09-17 con prettier 3.9.6 sobre las
+ *  combinaciones de forma, plataforma y tipo de cuenta: el andamio pasa el
+ *  formateador —lo exige el paso «El andamio y lo que el init escribe pasan el
+ *  formateador» del CI del marco— y el repo recien nacido NO, porque sacar un
+ *  bloque `projects:solo-si-…` o solo sus lineas de centinela deja la linea en
+ *  blanco de antes pegada a la de despues. Dos lineas en blanco seguidas, o una
+ *  al final del archivo, son exactamente lo que el formateador corrige: el
+ *  primer `format:check` salia rojo en `AGENTS.md`, `README.md` y
+ *  `.github/dependabot.yml` por algo que escribio esta herramienta.
+ *
+ *  POR QUE NO SE ARREGLA EN CADA REGEX DE PODA. Son una docena, en cuatro
+ *  funciones, y cada una tendria que saber si el bloque que saca estaba rodeado
+ *  de blancos. Una sola pasada al final, solo sobre los archivos que alguna poda
+ *  toco, deja a las podas decir QUE se saca y a esta decir como queda cosido.
+ *
+ *  LO QUE HACE, y por que es seguro: colapsa las corridas de lineas en blanco a
+ *  una y deja el archivo terminado en un solo salto. Es lo que el formateador
+ *  haria, y solo se aplica a un texto que la poda cambio —un archivo del andamio
+ *  que ya pasa el formateador no tiene dos blancos seguidos que no vengan de una
+ *  costura—. En markdown respeta los bloques de codigo: adentro de un cerco, dos
+ *  lineas en blanco son contenido y el formateador no las toca. */
+export function coserCosturas(texto, rel = "") {
+  const esMd = /\.md$/i.test(rel);
+  const salida = [];
+  let enCodigo = false;
+  for (const linea of texto.split("\n")) {
+    if (esMd && /^\s*(```|~~~)/.test(linea)) enCodigo = !enCodigo;
+    const blanca = linea.trim() === "";
+    if (!enCodigo && blanca && salida.length > 0 && salida[salida.length - 1].trim() === "") continue;
+    salida.push(blanca && !enCodigo ? "" : linea);
+  }
+  while (salida.length > 0 && salida[0].trim() === "") salida.shift();
+  while (salida.length > 0 && salida[salida.length - 1] === "") salida.pop();
+  return `${salida.join("\n")}\n`;
+}
+
+/** El ancho de una cadena como lo cuenta el formateador, para lo que este
+ *  archivo escribe: los caracteres de control y las marcas combinantes no
+ *  ocupan columna; el resto, una. Los caracteres anchos de Asia oriental y los
+ *  emoji cuentan dos para el formateador y aca uno: no aparecen en ningun
+ *  arreglo de los JSON que escribe esta herramienta, y si algun dia aparecen,
+ *  el paso del CI del marco que corre el formateador de verdad lo marca. */
+function anchoDeColumnas(s) {
+  let ancho = 0;
+  for (const c of s) {
+    const cp = c.codePointAt(0);
+    if (cp <= 0x1f || (cp >= 0x7f && cp <= 0x9f) || (cp >= 0x300 && cp <= 0x36f)) continue;
+    ancho += 1;
+  }
+  return ancho;
+}
+
+/** EL JSON CON LA FORMA QUE LE DA EL FORMATEADOR DEL ANDAMIO, y no la de
+ *  `JSON.stringify(x, null, 2)`.
+ *
+ *  EL DEFECTO QUE CIERRA. `JSON.stringify` parte TODO arreglo en varias lineas;
+ *  prettier deja en una los que entran en el ancho (`printWidth` 100 en
+ *  `plantilla/.prettierrc`). `.projects-valores.json` trae uno —`"superficies":
+ *  ["claude-code", "cursor"]`— y tres podas distintas lo reserializaban: el
+ *  archivo del andamio pasaba `prettier --check` y el del repo nuevo no.
+ *
+ *  POR QUE IMITARLO Y NO INSERTAR CLAVES A MANO. Rigel lo cerro insertando la
+ *  clave sin reserializar, y alcanzaba porque escribia UNA clave. Aca escriben
+ *  cuatro lugares —tres podas y el asistente, que arma el archivo entero desde
+ *  cero—, asi que la unica forma que sirve a todos es serializar con las reglas
+ *  del formateador para JSON, que para estos datos son pocas y estan medidas:
+ *    - un objeto no vacio va abierto, una clave por linea (prettier conserva
+ *      abierto un objeto que ya viene abierto);
+ *    - un arreglo va en una linea si entra en el ancho CONTANDO la coma que lo
+ *      sigue; si no, un elemento por linea;
+ *    - un arreglo que contiene un objeto no vacio se abre siempre, y tambien uno
+ *      de dos o mas elementos que son todos arreglos u objetos de mas de uno.
+ *  Contrastado contra prettier 3.9.6 caso por caso, bordes de 100 y 101
+ *  columnas incluidos: pruebas/init/el-andamio-nace-formateado.test.mjs.
+ *
+ *  LIMITE DECLARADO: un arreglo SOLO de numeros que no entra en una linea,
+ *  prettier lo rellena de a varios por linea y esto no lo imita. Ningun JSON que
+ *  escribe esta herramienta tiene uno. */
+export function jsonComoElFormateador(valor, { ancho = 100, sangria = 2 } = {}) {
+  const esObjeto = (v) => v !== null && typeof v === "object" && !Array.isArray(v);
+  const cuantos = (v) => (Array.isArray(v) ? v.length : esObjeto(v) ? Object.keys(v).length : 0);
+  const enUnaLinea = (v) => {
+    if (Array.isArray(v)) {
+      const partes = v.map(enUnaLinea);
+      return partes.includes(null) ? null : `[${partes.join(", ")}]`;
+    }
+    if (esObjeto(v)) return cuantos(v) === 0 ? "{}" : null;
+    return JSON.stringify(v);
+  };
+  const imprimir = (v, nivel, prefijo, sufijo) => {
+    const pad = " ".repeat(nivel * sangria);
+    if (Array.isArray(v)) {
+      if (v.length === 0) return `${pad}${prefijo}[]${sufijo}`;
+      const abierto =
+        v.some((e) => esObjeto(e) && cuantos(e) > 0) ||
+        (v.length > 1 && v.every((e) => (Array.isArray(e) || esObjeto(e)) && cuantos(e) > 1));
+      const plano = abierto ? null : enUnaLinea(v);
+      if (plano !== null && anchoDeColumnas(`${pad}${prefijo}${plano}${sufijo}`) <= ancho) return `${pad}${prefijo}${plano}${sufijo}`;
+      const hijos = v.map((e, i) => imprimir(e, nivel + 1, "", i < v.length - 1 ? "," : ""));
+      return `${pad}${prefijo}[\n${hijos.join("\n")}\n${pad}]${sufijo}`;
+    }
+    if (esObjeto(v)) {
+      const claves = Object.keys(v);
+      if (claves.length === 0) return `${pad}${prefijo}{}${sufijo}`;
+      const hijos = claves.map((k, i) => imprimir(v[k], nivel + 1, `${JSON.stringify(k)}: `, i < claves.length - 1 ? "," : ""));
+      return `${pad}${prefijo}{\n${hijos.join("\n")}\n${pad}}${sufijo}`;
+    }
+    return `${pad}${prefijo}${JSON.stringify(v)}${sufijo}`;
+  };
+  return `${imprimir(valor, 0, "", "")}\n`;
+}
+
+/** El texto de un JSON que esta herramienta deja en el proyecto, con la forma
+ *  que el formateador del proyecto le va a exigir.
+ *
+ *  `package.json` es la excepcion, y no por gusto: prettier lo formatea con el
+ *  parser `json-stringify`, que abre TODO arreglo no vacio —o sea, exactamente
+ *  `JSON.stringify(x, null, 2)`—. Aplicarle las reglas del resto de los JSON lo
+ *  desformatearia justo en el manifiesto. */
+export function jsonParaElArchivo(rel, valor) {
+  const nombre = String(rel).split(/[\\/]/).pop();
+  if (["package.json", "package-lock.json", "composer.json"].includes(nombre)) return `${JSON.stringify(valor, null, 2)}\n`;
+  return jsonComoElFormateador(valor);
+}
+
 export function podarPorPlataforma(texto, rel, plataforma, forma = "aplicacion") {
   // Esta va ANTES del corte de abajo: la plataforma se declara en el archivo de
   // valores del proyecto SIEMPRE, tambien cuando es `aws`. Si solo se escribiera
@@ -973,7 +1183,7 @@ export function podarPorPlataforma(texto, rel, plataforma, forma = "aplicacion")
     try {
       const j = JSON.parse(texto);
       j.plataforma = plataforma;
-      return `${JSON.stringify(j, null, 2)}\n`;
+      return jsonParaElArchivo(rel, j);
     } catch {
       return texto;
     }
@@ -1033,7 +1243,7 @@ export function podarPorPlataforma(texto, rel, plataforma, forma = "aplicacion")
       if (j?.permissions?.allow) j.permissions.allow = filtrar(j.permissions.allow);
       if (j?.permissions?.ask) j.permissions.ask = filtrar(j.permissions.ask);
       if (j?.permissions?.deny) j.permissions.deny = filtrar(j.permissions.deny);
-      return `${JSON.stringify(j, null, 2)}\n`;
+      return jsonParaElArchivo(rel, j);
     } catch {
       // Un settings.json que no parsea es un problema del andamio y lo caza otro
       // banco. Aca se devuelve tal cual en vez de romper la corrida entera.
@@ -1173,6 +1383,11 @@ export function preguntarTipoDeCuenta(cuenta) {
   }
 }
 
+/** Los dos tipos de cuenta que decide la poda de CODEOWNERS. Existe como lista
+ *  para que quien recorra todas las combinaciones (el paso del CI del marco que
+ *  mide el formato de cada destino) la derive en vez de escribirla. */
+export const TIPOS_DE_CUENTA = ["usuario", "organizacion"];
+
 export function tipoDeCuentaDe(valores) {
   const v = valores?.TIPO_CUENTA;
   const t = typeof v === "string" ? v.trim().toLowerCase() : "";
@@ -1194,7 +1409,7 @@ export function podarPorTipoDeCuenta(texto, rel, tipo = "usuario") {
     try {
       const j = JSON.parse(texto);
       j.TIPO_CUENTA = tipo;
-      return `${JSON.stringify(j, null, 2)}\n`;
+      return jsonParaElArchivo(rel, j);
     } catch {
       return texto;
     }
@@ -1261,12 +1476,39 @@ export function derivar(v) {
   };
 }
 
-/** Los tres marcadores cuyo camino "si no existe" exige borrar bloques a mano. */
+/** Los marcadores cuyo camino "si no existe" pide trabajo a mano, y cual.
+ *
+ *  LOS DE FRONTEND Y E2E NOMBRAN TODOS SUS LUGARES, no uno. Decian solo "los
+ *  bloques [FRONT]" y "la entrada del glob y las EXCEPCIONES", y cada camino toca
+ *  seis: seguidos al pie de la letra, el repo quedaba en rojo por lo que no
+ *  nombraban. Las dos listas se recorrieron hasta verde el 2026-09-17 y viven
+ *  COMPLETAS en plantilla/README.md del marco, seccion 2; un banco exige que cada
+ *  lugar de esa lista aparezca aca (pruebas/andamio/caminos-sin-paquete.test.mjs). */
 export const CON_LIMPIEZA_MANUAL = {
-  PAQUETE_WEB: "si el proyecto no tiene frontend: borrar los bloques [FRONT] de eslint.config.mjs y sus imports",
-  PAQUETE_SITIO: "si el proyecto no es un sitio de contenido: borrar la carpeta sitio/ del andamio",
-  PAQUETE_E2E: "si el proyecto no tiene suite E2E: borrar esa entrada del glob de Node Y las dos entradas EXCEPCIONES de ci.yml (una excepcion que no corresponde a ningun paquete es roja, a proposito)",
-  GENERAR_CLIENTE_DATOS: "si el proyecto no genera cliente de datos: borrar el paso \"Generar el cliente de la capa de datos\" de .github/workflows/ci.yml",
+  PAQUETE_WEB:
+    "si el proyecto no tiene frontend, son seis lugares en el mismo PR: borrar web/; en eslint.config.mjs, cada " +
+    "bloque entre // [FRONT] y // [/FRONT] (las dos marcas incluidas) y los tres import marcados; en package.json, " +
+    "las tres devDependencies del front (y pnpm install); en .claude/settings.json, las cuatro entradas de " +
+    "--filter web; en comandos-levantar-servicios.txt, las dos lineas del .env de web; y en README.md, la fila " +
+    "web/. La lista, recorrida hasta verde: plantilla/README.md del marco, «Si el proyecto NO tiene frontend»",
+  PAQUETE_SITIO: "solo viaja con la forma sitio: en las demas formas la carpeta no llega al proyecto y no hay nada que borrar",
+  PAQUETE_E2E:
+    "si el proyecto no tiene suite E2E, son seis lugares en el mismo PR: borrar e2e/; en .github/workflows/ci.yml, " +
+    "las dos entradas de EXCEPCIONES (una excepcion que no corresponde a ningun paquete es roja, a proposito); en " +
+    "package.json, el script e2e y el --filter del script test; en eslint.config.mjs, la entrada e2e/**/*.mjs del " +
+    "entorno Node; en README.md, la fila e2e/; y pnpm format, porque el arreglo de globs queda corto y el " +
+    "formateador lo junta. La lista, recorrida hasta verde: plantilla/README.md del marco, «Si el proyecto NO tiene suite E2E»",
+  // TRES ARCHIVOS Y NO UNO. Decia solo el paso del ci.yml, cuando el comando
+  // viajaba tambien al script `datos` de la raiz y al `build` del paquete de
+  // datos; y desde el change `el-andamio-nace-instalable` viaja ademas al
+  // `postinstall`, que es el mas caro de olvidar: sin comando, el primer
+  // `pnpm install` sale rojo. Un banco deriva la lista del andamio y exige que
+  // cada archivo aparezca aca (pruebas/andamio/caminos-sin-paquete.test.mjs).
+  GENERAR_CLIENTE_DATOS:
+    "si el proyecto no genera cliente de datos, son tres archivos en el mismo PR: en .github/workflows/ci.yml, el paso " +
+    "\"Generar el cliente de la capa de datos\"; en package.json, el script datos y el `pnpm datos &&` de verificar; y en " +
+    "api/package.json, el postinstall (sin comando, el primer pnpm install sale rojo) y el comando del principio del build, " +
+    "hasta su &&",
 };
 
 /** LA FORMA QUE CADA VALOR PUEDE TENER, uno por uno.
@@ -1349,6 +1591,37 @@ function nombrarControl(v) {
   const c = v.charCodeAt(i);
   const nombre = { 10: "\\n (salto de linea)", 13: "\\r (retorno de carro)", 9: "\\t (tabulacion)" }[c];
   return `${nombre ?? `\\x${c.toString(16).padStart(2, "0")}`} en la posicion ${i}`;
+}
+
+/** Lee el archivo de valores TOLERANDO la marca de orden de bytes (BOM) que ponen
+ *  los shells de Windows, y lo devuelve parseado. Un JSON realmente roto sigue
+ *  tirando su SyntaxError: la tolerancia es de codificacion, no de contenido.
+ *
+ *  EL DEFECTO QUE CIERRA, medido el 2026-09-18 con el esqueleto de `--ejemplo`: con
+ *  EF BB BF adelante —lo que deja `>` o `Out-File -Encoding utf8` en Windows
+ *  PowerShell— esta herramienta salia 1 con `Unexpected token '﻿' ... is not
+ *  valid JSON`, y con UTF-16 LE —el `>` de Windows PowerShell 5.1— igual. El
+ *  archivo se ve perfecto en el editor, el comando que lo escribio no dio error, y
+ *  el mensaje se lee como si la persona lo hubiera llenado mal.
+ *
+ *  POR BYTES, Y LAS TRES. Rigel (1.14.0, commit d7e5e63) llego aca en su tercera
+ *  vuelta: primero le pidio a la guia un `file valores.json` que "tiene que decir
+ *  UTF-8", y el mismo `>` produjo UTF-8 CON BOM, `file` dijo UTF-8 y la herramienta
+ *  igual salio 1. Mirar la codificacion que se vio una vez deja roto el caso
+ *  siguiente; mirar los bytes cubre las tres BOM que un shell de Windows puede
+ *  poner. La BOM se SACA, no se decodifica: dejada adentro, la primera clave se
+ *  llamaria "﻿PROYECTO" y la herramienta diria `falta PROYECTO`. */
+export function leerValores(ruta) {
+  const b = fs.readFileSync(ruta);
+  let texto;
+  if (b.length >= 3 && b[0] === 0xef && b[1] === 0xbb && b[2] === 0xbf) texto = b.subarray(3).toString("utf8");
+  else if (b.length >= 2 && b[0] === 0xff && b[1] === 0xfe) texto = b.subarray(2).toString("utf16le");
+  else if (b.length >= 2 && b[0] === 0xfe && b[1] === 0xff) {
+    // swap16 exige un largo par; un byte suelto al final es un archivo roto, y el
+    // JSON.parse de abajo lo dice con su propio error en vez de un RangeError.
+    texto = Buffer.from(b.subarray(2, b.length - ((b.length - 2) % 2))).swap16().toString("utf16le");
+  } else texto = b.toString("utf8");
+  return JSON.parse(texto);
 }
 
 export function validarValores(crudos) {
@@ -1592,13 +1865,14 @@ export function instanciar({ raizAndamio, destino, valores }) {
       // Se poda ANTES de sustituir: lo que se saca puede tener marcadores
       // adentro —`{{PERFIL_DEV}}` vivia en el bloque de permisos de AWS— y
       // sustituirlos primero solo escribiria un relleno que despues se borra.
-      const texto = sacarCentinelas(
-        podarPorTipoDeCuenta(
-          podarPorForma(podarPorPlataforma(fs.readFileSync(origen, "utf8"), rel, plataforma, forma), rel, forma),
-          rel,
-          tipoDeCuenta,
-        ),
+      const crudo = fs.readFileSync(origen, "utf8");
+      const podado = sacarCentinelas(
+        podarPorTipoDeCuenta(podarPorForma(podarPorPlataforma(crudo, rel, plataforma, forma), rel, forma), rel, tipoDeCuenta),
       );
+      // Solo se cose lo que alguna poda toco: un archivo que llega intacto ya
+      // tiene la forma que el formateador le exige, y reescribirlo arriesga
+      // cambiarsela. Ver coserCosturas.
+      const texto = podado === crudo ? crudo : coserCosturas(podado, rel);
       const r = sustituir(texto, valores);
       total += r.cuenta;
       for (const f of r.faltantes) faltantes.add(f);
@@ -1881,6 +2155,21 @@ export function pinDelMarcoEnDestino(destino) {
 }
 
 
+/** EL LARGO DE NOMBRE DE PROYECTO PARA EL QUE EL ANDAMIO NACE FORMATEADO, medido.
+ *
+ *  El formateador parte una linea de codigo que no entra en 100 columnas, y el
+ *  nombre del proyecto llega por un marcador a lineas de codigo del esqueleto
+ *  (la respuesta de /api/health, el nombre en la portada, el log de arranque).
+ *  Hay un largo a partir del cual alguna de esas lineas deja de entrar: medido
+ *  el 2026-09-17 con prettier 3.9.6, la primera en partirse es la de
+ *  `web/src/App.tsx` que declara el nombre, a los 70 caracteres. Hasta este
+ *  largo el repo nace con `format:check` en verde SIN correr el formateador; es
+ *  el largo con el que el paso del CI del marco instancia el andamio para
+ *  medirlo, asi que una linea nueva que se parta antes lo pone rojo. Por encima
+ *  (GitHub admite nombres de hasta 100), el paso `formateado` del arranque lo
+ *  resuelve, y con `--sin-arranque` la herramienta lo AVISA en vez de callarlo. */
+export const LARGO_DE_NOMBRE_MEDIDO = 60;
+
 export const PASOS_DEL_ARRANQUE = [
   {
     clave: "instalado",
@@ -1915,9 +2204,15 @@ export const PASOS_DEL_ARRANQUE = [
     titulo: "formatear el arbol",
     args: ["run", "format"],
     necesitaRed: false,
+    // YA NO ES LO QUE PONE AL REPO EN FORMATO, y el motivo de abajo lo dice. El
+    // andamio llega formateado y la herramienta escribe con la forma del
+    // formateador (change `el-andamio-nace-formateado`); lo unico que puede
+    // quedar afuera es una linea de codigo que un nombre de proyecto muy largo
+    // no deja entrar en el ancho. Esta pasada se conserva para ese caso.
     porQue:
-      "al sustituir los marcadores cambian los anchos del texto y el formateador alinea las tablas de markdown por " +
-      "ancho: sin esta pasada el repo nace desalineado y `format:check` sale rojo por una razon que no es de nadie",
+      `el andamio ya nace formateado, pero con un nombre de proyecto de mas de ${LARGO_DE_NOMBRE_MEDIDO} caracteres ` +
+      "alguna linea de codigo del esqueleto deja de entrar en el ancho y el formateador la parte: esta pasada lo " +
+      "resuelve antes de que `format:check` lo marque en el primer CI",
     // Este era el mas circular de los cuatro: decia SOLO "corre `pnpm format`",
     // que es exactamente lo que acababa de fallar, y nada mas.
     arreglo:
@@ -2950,7 +3245,16 @@ export function insertarProteccionMedida(texto, { lineas: bloque, frase, compuer
   //    esto no escribe nada — describirle una promocion a un proyecto que no la
   //    tiene es el defecto que el change `promocion-por-ambientes` existe para
   //    cerrar.
-  if (compuertaDeProd.length) lineas.push(...compuertaDeProd, "");
+  //
+  //    El bloque llega con su propia linea en blanco adelante, y el agregado de
+  //    arriba ya termina en una: pegarlos tal cual dejaba DOS seguidas, que el
+  //    formateador corrige, y el sitio recien nacido salia con `format:check` en
+  //    rojo por esta pagina. Se sacan las del principio del bloque.
+  if (compuertaDeProd.length) {
+    const bloque = [...compuertaDeProd];
+    while (bloque.length > 0 && bloque[0].trim() === "") bloque.shift();
+    lineas.push(...bloque, "");
+  }
 
   return { texto: lineas.join("\n"), avisos };
 }
@@ -2978,6 +3282,206 @@ export function escribirProteccionMedida(destino, medido) {
     return { ok: false, error: `no pude escribir ${RUTA_PROTECCION} en el destino (${e.code ? `${e.code} — ` : ""}${e.message})`, avisos: r.avisos };
   }
   return { ok: true, error: null, avisos: r.avisos };
+}
+
+// ───────────── El PO que CODEOWNERS nombra, contra los equipos ─────────────
+//
+// EL DEFECTO QUE ESTE BLOQUE CIERRA. En una organizacion, el CODEOWNERS del
+// andamio le da proposal y specs al equipo EQUIPO_PO, y todo lo demas al equipo
+// EQUIPO_BUILDERS. Ese cableado falla EN SILENCIO de cuatro formas, y ninguna
+// produce un error en GitHub: el equipo del PO vacio (no se le pide el review a
+// nadie); todos sus miembros tambien builders (un builder satisface el gate del
+// PO desde el otro rol, que es lo que el propio CODEOWNERS dice que no puede
+// pasar); mas de una persona fuera de builders (no hay UN PO, y el valor PO que
+// nombran el README y las reglas no dice cual); o la unica de afuera no es la
+// que el proyecto declara. Hasta este bloque, esta herramienta escribia ese
+// CODEOWNERS sin preguntarle nada a GitHub.
+//
+// LA PROPIEDAD, y no la derivacion. Rigel (1.14.0, commit b8836af) DERIVA su PO
+// como "equipo po menos builders" y se planta si no es exactamente uno. Projects
+// no deriva el PO: lo declara el archivo de valores. Asi que lo que se comprueba
+// es que lo declarado y lo que GitHub tiene coincidan, con la misma regla de
+// "exactamente uno".
+//
+// AVISO Y NO ROJO, a proposito: el arreglo vive fuera del arbol del proyecto —es
+// la configuracion de los equipos de la organizacion— y cuando eso pasa el marco
+// avisa (decision D1). Pero nunca calla: "no pude mirar" sale con su motivo y con
+// el comando para mirarlo a mano, igual que la sonda de proteccion de arriba.
+//
+// SOLO LECTURA Y SOLO EN ORGANIZACIONES. En una cuenta personal los equipos no
+// existen y el CODEOWNERS del andamio usa handles: no hay nada que preguntar.
+
+/** Los estados en que la consulta MIDIO y encontro un cableado que no sostiene el
+ *  gate del PO. Es una lista para que quien decide el codigo de salida
+ *  (projects-doctor) no tenga que repetirla. */
+export const EQUIPOS_CON_PROBLEMA = new Set(["vacio", "solo-builders", "varios", "otro"]);
+
+/** Que dice la composicion de los dos equipos sobre el PO declarado. Pura: recibe
+ *  las listas de logins y no mide nada. Los handles se comparan sin mayusculas,
+ *  que es como los compara GitHub. */
+export function clasificarEquiposDelPO({ po, miembrosPo, miembrosBuilders }) {
+  const norm = (h) => String(h ?? "").toLowerCase();
+  const builders = new Set((miembrosBuilders ?? []).map(norm));
+  const soloPo = (miembrosPo ?? []).filter((m) => !builders.has(norm(m)));
+  const poEnBuilders = builders.has(norm(po));
+  let estado = "bien";
+  if (!(miembrosPo ?? []).length) estado = "vacio";
+  else if (soloPo.length === 0) estado = "solo-builders";
+  else if (soloPo.length > 1) estado = "varios";
+  else if (norm(soloPo[0]) !== norm(po)) estado = "otro";
+  return { estado, soloPo, poEnBuilders };
+}
+
+/** Que dijo `gh api orgs/<org>/teams/<equipo>/members --jq '.[].login'`.
+ *
+ *  Medido el 2026-09-18 contra la API: un equipo o una organizacion que no
+ *  existen salen 1 con `{"message":"Not Found",...,"status":"404"}` por stdout y
+ *  `gh: Not Found (HTTP 404)` por stderr. Un 404 NO se afirma como "el equipo no
+ *  existe": tambien es lo que contesta GitHub cuando tu cuenta no lo ve. */
+export function clasificarSondaDeEquipo({ presente = true, codigo = null, stdout = "", stderr = "", error = null } = {}) {
+  if (!presente) return { estado: "sin-gh", detalle: "no encontre el ejecutable `gh` en el PATH" };
+  const salida = String(stdout ?? "");
+  const err = String(stderr ?? "");
+  const todo = `${salida}\n${err}`;
+  if (codigo === 0) {
+    const miembros = salida
+      .split(/\r?\n/)
+      .map((l) => l.trim())
+      .filter(Boolean);
+    if (miembros.every((m) => FORMATOS.PO.patron.test(m))) return { estado: "medido", miembros, detalle: `${miembros.length} miembro(s)` };
+    return { estado: "no-se-sabe", detalle: "la consulta salio 0 y lo que contesto no son logins de GitHub" };
+  }
+  if (/"status"\s*:\s*"?404/.test(salida) || /\(HTTP 404\)/.test(todo)) return { estado: "sin-equipo", detalle: "GitHub contesto 404" };
+  if (/"status"\s*:\s*"?401/.test(salida) || /\(HTTP 401\)/.test(todo) || /gh auth login|GH_TOKEN environment variable|authentication token/i.test(todo)) {
+    return { estado: "sin-auth", detalle: err.trim().split("\n")[0] || "gh no esta autenticado" };
+  }
+  if (error || salida.trim() === "") return { estado: "sin-red", detalle: error || err.trim().split("\n")[0] || `la consulta salio ${codigo} sin cuerpo` };
+  return { estado: "no-se-sabe", detalle: `la consulta salio ${codigo}: ${(err.trim() || salida.trim()).split("\n")[0]}` };
+}
+
+/** El GET de los miembros de un equipo, y nada mas.
+ *
+ *  Mismo criterio que correrGh: `shell: false` —asi los valores no pasan nunca por
+ *  cmd.exe— y los dos que se interpolan ya se validaron contra FORMATOS en
+ *  comprobarEquiposDelPO, que no admite ni un metacaracter de shell. */
+function correrGhEquipo({ org, equipo }) {
+  try {
+    const stdout = execFileSync("gh", ["api", `orgs/${org}/teams/${equipo}/members`, "--paginate", "--jq", ".[].login"], {
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "pipe"],
+      timeout: TIMEOUT_DE_LA_SONDA,
+      shell: false,
+    });
+    return { presente: true, codigo: 0, stdout, stderr: "", error: null };
+  } catch (e) {
+    if (e?.code === "ENOENT") return { presente: false, codigo: null, stdout: "", stderr: "", error: "ENOENT" };
+    const vencio = e?.killed === true;
+    return {
+      presente: true,
+      codigo: typeof e?.status === "number" ? e.status : null,
+      stdout: String(e?.stdout ?? ""),
+      stderr: String(e?.stderr ?? ""),
+      error: vencio ? `la consulta no contesto en ${TIMEOUT_DE_LA_SONDA} ms` : typeof e?.status === "number" ? null : (e?.message ?? "fallo"),
+    };
+  }
+}
+
+/** Mide los dos equipos y clasifica. En una cuenta personal no pregunta nada.
+ *  Si el primer equipo no se pudo mirar, no pregunta el segundo: no cambiaria el
+ *  veredicto y es otra espera de red. */
+export function comprobarEquiposDelPO(valores, correr = correrGhEquipo) {
+  if (tipoDeCuentaDe(valores) !== "organizacion") return { estado: "no-aplica" };
+  for (const k of ["ORG", "EQUIPO_PO", "EQUIPO_BUILDERS"]) {
+    if (!FORMATOS[k].patron.test(String(valores?.[k] ?? ""))) {
+      return { estado: "no-se-sabe", detalle: `no se consulto: ${k} = ${JSON.stringify(valores?.[k])} no tiene la forma de ${FORMATOS[k].que}` };
+    }
+  }
+  const org = valores.ORG;
+  const miembros = {};
+  for (const equipo of [valores.EQUIPO_PO, valores.EQUIPO_BUILDERS]) {
+    if (miembros[equipo]) continue;
+    const s = clasificarSondaDeEquipo(correr({ org, equipo }));
+    if (s.estado !== "medido") return { ...s, equipo };
+    miembros[equipo] = s.miembros;
+  }
+  const miembrosPo = miembros[valores.EQUIPO_PO];
+  const miembrosBuilders = miembros[valores.EQUIPO_BUILDERS];
+  return { ...clasificarEquiposDelPO({ po: valores.PO, miembrosPo, miembrosBuilders }), miembrosPo, miembrosBuilders };
+}
+
+/** Lo que se imprime. `aviso` dice si hay algo que la persona tiene que mirar;
+ *  cada linea de aviso lleva `::warning::` y el arreglo escrito adentro. */
+export function lineasDeEquiposDelPO(r, valores) {
+  if (!r || r.estado === "no-aplica") return { aviso: false, lineas: [] };
+  const org = valores?.ORG;
+  const po = valores?.PO;
+  const eqPo = `${org}/${valores?.EQUIPO_PO}`;
+  const eqB = `${org}/${valores?.EQUIPO_BUILDERS}`;
+  const mirar = `gh api orgs/${org}/teams/${valores?.EQUIPO_PO}/members --jq '.[].login'`;
+  const lista = (xs) => (xs ?? []).join(", ");
+  const pre = "::warning::PO DE CODEOWNERS:";
+  const cierre =
+    ` Arreglarlo es un acto de quien administra la organizacion; esta herramienta no toca equipos. ` +
+    `Para mirarlo a mano: ${mirar}`;
+  switch (r.estado) {
+    case "bien":
+      return { aviso: false, lineas: [`PO de CODEOWNERS: medido — en ${eqPo} la unica persona que no es de ${eqB} es ${po}, el PO que declara el proyecto`] };
+    case "vacio":
+      return {
+        aviso: true,
+        lineas: [
+          `${pre} medido — el equipo ${eqPo} no tiene miembros. CODEOWNERS le da a ese equipo proposal y specs, y un ` +
+            `equipo vacio no le pide el review a nadie: el gate del PO no existe y GitHub no lo dice. Arreglo: agregar ` +
+            `a ${po} a ${eqPo}, y a nadie que sea de ${eqB}.${cierre}`,
+        ],
+      };
+    case "solo-builders":
+      return {
+        aviso: true,
+        lineas: [
+          `${pre} medido — todas las personas de ${eqPo} (${lista(r.miembrosPo ?? r.soloPo)}) son tambien de ${eqB}, ` +
+            `asi que un builder satisface el gate del PO desde el otro rol. Arreglo: que en ${eqPo} este ${po} y ` +
+            `nadie de ${eqB}.${cierre}`,
+        ],
+      };
+    case "varios":
+      return {
+        aviso: true,
+        lineas: [
+          `${pre} medido — en ${eqPo} hay ${r.soloPo.length} personas que no son de ${eqB} (${lista(r.soloPo)}), y el ` +
+            `proyecto declara UN PO, ${po}. Cualquiera de ellas satisface el gate, y esta herramienta no elige la ` +
+            `primera. Arreglo: dejar en ${eqPo} solo a quien es el PO, o corregir el valor PO del proyecto.${cierre}`,
+        ],
+      };
+    case "otro":
+      return {
+        aviso: true,
+        lineas: [
+          `${pre} medido — la unica persona de ${eqPo} que no es de ${eqB} es ${lista(r.soloPo)}, y el proyecto ` +
+            `declara PO = ${po}${r.poEnBuilders ? `, que ademas esta en ${eqB}` : ""}. El gate lo satisface ` +
+            `${lista(r.soloPo)}; el README y las reglas del proyecto nombran a ${po}. Arreglo: corregir el valor PO ` +
+            `del proyecto (en el archivo de valores y en .projects-valores.json), o corregir el equipo.${cierre}`,
+        ],
+      };
+    default: {
+      const comoSeDestraba = {
+        "sin-gh": "Instala GitHub CLI (https://cli.github.com) y corre",
+        "sin-auth": "Corre `gh auth login` y despues",
+        "sin-red": "Es un problema de red, no del equipo. Desde una maquina con salida a api.github.com, corre",
+        "sin-equipo":
+          `GitHub contesto 404 sobre ${org}/${r.equipo}: o ese slug no existe —y entonces CODEOWNERS nombra a un ` +
+          `equipo que no asigna a nadie—, o tu cuenta no lo ve. Revisa el slug en https://github.com/orgs/${org}/teams y corre`,
+        "no-se-sabe": "Si fue un 403, a la sesion de gh le puede faltar el permiso read:org (`gh auth refresh -s read:org`). Despues corre",
+      }[r.estado] ?? "Corre";
+      return {
+        aviso: true,
+        lineas: [
+          `${pre} no se pudo comprobar (${r.estado}: ${r.detalle ?? "sin detalle"}). «No pude mirar» no es «esta bien»: ` +
+            `nadie comprobo que ${eqPo} tenga exactamente a ${po} fuera de ${eqB}. ${comoSeDestraba}: ${mirar}`,
+        ],
+      };
+    }
+  }
 }
 
 // ─────────────────────────── El programa ───────────────────────────
@@ -3056,7 +3560,7 @@ function valorDeBandera(argv, i, bandera) {
 }
 
 function argumentos(argv) {
-  const o = { herramientas: true, arranque: true, forzar: false };
+  const o = { herramientas: true, arranque: true, forzar: false, repositorio: false, remoto: true };
   for (let i = 0; i < argv.length; i++) {
     if (argv[i] === "--valores") o.valores = valorDeBandera(argv, ++i, "--valores");
     else if (argv[i] === "--destino") o.destino = valorDeBandera(argv, ++i, "--destino");
@@ -3068,6 +3572,17 @@ function argumentos(argv) {
     else if (argv[i] === "--asistente") o.asistente = true;
     else if (argv[i] === "--solo-valores") o.soloValores = valorDeBandera(argv, ++i, "--solo-valores");
     else if (argv[i] === "--version-openspec") o.versionOpenspec = valorDeBandera(argv, ++i, "--version-openspec");
+    // EL REPOSITORIO ES OPT-IN, y lo piden los lanzadores. El camino a mano de
+    // docs/04 crea el repositorio ANTES (Paso 2) y escribe adentro: prenderlo por
+    // defecto le cambiaria el comportamiento a quien ya lo usa asi. Ver
+    // herramientas/projects-repositorio.mjs.
+    else if (argv[i] === "--repositorio") o.repositorio = true;
+    // --sin-remoto IMPLICA --repositorio: es "el repositorio, pero solo en esta
+    // computadora". Sin esa implicacion seria una bandera que no hace nada sola.
+    else if (argv[i] === "--sin-remoto") {
+      o.repositorio = true;
+      o.remoto = false;
+    }
     // `--help` y `-h` son lo PRIMERO que tipea cualquiera frente a una
     // herramienta que no conoce, y hasta este cambio caian en el `throw` de
     // abajo: la respuesta a la pregunta mas basica era un error. Ahora imprimen
@@ -3109,6 +3624,11 @@ function lineasDeUso() {
     "  --version-openspec <x.y.z> pin del CLI de OpenSpec cuando no se puede leer del default de",
     "                             `version_openspec` en marco-ci.yml. Version EXACTA (0.9.4), no",
     "                             un rango: el valor se concatena en la linea de comandos de npx",
+    "  --repositorio              al final deja el destino como repositorio git (rama main) con su",
+    "                             primer guardado, y OFRECE crearlo en GitHub y subirlo: eso se hace",
+    "                             solo si lo confirmas en la terminal. Es lo que piden los lanzadores",
+    "  --sin-remoto               como --repositorio, pero sin tocar GitHub: el repositorio queda solo",
+    "                             en esta computadora y se imprime el comando para subirlo despues",
   ];
 }
 
@@ -3170,7 +3690,169 @@ export function rutasDelRender(textoDeOutputs) {
     .filter(Boolean);
 }
 
+/** CON QUE ACTION SE RENDERIZA LA CONSTITUCION DEL PROYECTO NUEVO: la del tag que
+ *  su `ci.yml` pina, no la del clon.
+ *
+ *  EL DEFECTO QUE ESTO CIERRA, medido el 2026-09-18 (revision adversarial del
+ *  porte, RV-L3L11-01). El render usaba la action DEL CLON y el CI del proyecto la
+ *  verifica con la DEL TAG. Con un clon de main que lleva un canonico que ningun
+ *  release publico todavia —la 1.10.0 contra un andamio que pina v1.9.6, cuyo
+ *  canonico termina en la 1.7.0— el proyecto nacia con dos `::error::` («declara
+ *  la version 1.10.0 y esta copia del marco es la 1.7.0»), `ci-ok` en rojo y el
+ *  despliegue sin dispararse. Es lo que `herramientas/plantilla-repos/personalizar.yml`
+ *  ya resolvia para las plantillas trayendo el marco en la version que declara el
+ *  `ci.yml` del proyecto, «no `main`».
+ *
+ *  Por eso: el pin se lee del `ci.yml` YA INSTANCIADO del destino —el mismo que va
+ *  a correr el CI, sin una segunda declaracion que pueda divergir— y, si el clon
+ *  tiene ese tag, la action se extrae de el con git (`ls-tree` + `cat-file`: sin
+ *  `tar`, que no es igual en los tres sistemas) a un directorio temporal.
+ *
+ *  Sin el tag (una descarga en ZIP, un clon sin tags) NO se corta el camino: se
+ *  renderiza con la del clon. Y se AVISA solo cuando el aviso es verdad: si el
+ *  canonico del clon declara una version MAYOR que el pin, ningun release la
+ *  publico todavia (la version del canonico es la del release que la publica,
+ *  `actions/constitucion/canonico/manifiesto.json`), y el primer CI va a ser rojo.
+ *  Si no es mayor, el clon y el tag dicen lo mismo —la huella del canonico no
+ *  deja cambiar el texto sin agregar una version— y avisar seria ruido para
+ *  quien arranca con doble clic. */
+export function accionDeConstitucion(raizMarco, destino, git = gitDelMarco) {
+  const delClon = path.join(raizMarco, "actions", "constitucion", "constitucion.mjs");
+  const ci = path.join(destino, ".github", "workflows", "ci.yml");
+  const pin = /\/actions\/constitucion@(v\d+\.\d+\.\d+)\b/.exec(fs.existsSync(ci) ? fs.readFileSync(ci, "utf8") : "")?.[1];
+  if (!pin) return { script: delClon, pin: null, desde: "clon", limpiar: () => {} };
+
+  let blobs = null;
+  try {
+    blobs = git(raizMarco, ["ls-tree", "-r", "-z", `${pin}^{commit}`, "--", "actions/constitucion"])
+      .toString("utf8")
+      .split("\0")
+      .filter(Boolean)
+      .map((linea) => {
+        const [meta, ruta] = linea.split("\t");
+        const [, tipo, sha] = meta.split(" ");
+        return { tipo, sha, ruta };
+      })
+      .filter((e) => e.tipo === "blob");
+  } catch {
+    blobs = null;
+  }
+  if (blobs?.some((b) => b.ruta === "actions/constitucion/constitucion.mjs")) {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "projects-init-constitucion-"));
+    try {
+      for (const b of blobs) {
+        const abs = path.join(dir, ...b.ruta.split("/"));
+        fs.mkdirSync(path.dirname(abs), { recursive: true });
+        fs.writeFileSync(abs, git(raizMarco, ["cat-file", "blob", b.sha]));
+      }
+    } catch (e) {
+      fs.rmSync(dir, { recursive: true, force: true });
+      return delClonConAviso(delClon, raizMarco, pin, `no pude extraer la action de ${pin} (${e.message})`);
+    }
+    return {
+      script: path.join(dir, "actions", "constitucion", "constitucion.mjs"),
+      pin,
+      desde: "tag",
+      limpiar: () => fs.rmSync(dir, { recursive: true, force: true }),
+    };
+  }
+  return delClonConAviso(delClon, raizMarco, pin, `el tag ${pin} no esta en el clon`);
+}
+
+function delClonConAviso(delClon, raizMarco, pin, motivo) {
+  const salida = { script: delClon, pin, desde: "clon", limpiar: () => {} };
+  let version = null;
+  try {
+    const m = JSON.parse(fs.readFileSync(path.join(raizMarco, "actions", "constitucion", "canonico", "manifiesto.json"), "utf8"));
+    version = m.versiones?.at(-1)?.version ?? null;
+  } catch {
+    // Sin manifiesto legible no se puede afirmar que el primer CI sea rojo: se dice igual.
+    return {
+      ...salida,
+      aviso:
+        `::warning::${motivo}, y no pude leer que version del canonico trae el clon del marco ` +
+        `(actions/constitucion/canonico/manifiesto.json), asi que no se si la porcion del marco que se renderiza ` +
+        `con la action del clon coincide con la que el CI del proyecto verifica con ${pin}. Si no coincide, el job ` +
+        `\`constitucion\` va a dar rojo en el primer push. Arreglo: \`git -C "${raizMarco}" fetch --tags\` y volver ` +
+        `a correr con --forzar.`,
+    };
+  }
+  if (!version || compararVersiones(version, pin.slice(1)) <= 0) return salida;
+  return {
+    ...salida,
+    aviso:
+      `::warning::el CI del proyecto verifica la constitucion con actions/constitucion@${pin} y ${motivo}, asi que la ` +
+      `porcion del marco se renderizo con la action del clon, que trae el canonico ${version}: una version que ` +
+      `${pin} no publica. El proyecto va a nacer con el job \`constitucion\` en ROJO («declara la version ${version} y ` +
+      `esta copia del marco es la …»), y con el \`ci-ok\` y el despliegue detras. Pasa con un clon de main entre un ` +
+      `cambio del canonico y el release que lo publica, o con una descarga en ZIP, que no trae tags. Arreglo: ` +
+      `\`git -C "${raizMarco}" fetch --tags\` y volver a correr con --forzar; si el marco se bajo en ZIP, bajar ` +
+      `el de la version ${pin} (la pagina de releases del marco) en vez del de main, y correr desde ese.`,
+  };
+}
+
+function gitDelMarco(raizMarco, args) {
+  return execFileSync("git", args, { cwd: raizMarco, stdio: ["ignore", "pipe", "ignore"], maxBuffer: 64 * 1024 * 1024 });
+}
+
+/** UNA pregunta por la terminal, y nada mas. La usa el paso del repositorio para
+ *  la unica confirmacion que se ve desde afuera: crear el repositorio en GitHub.
+ *
+ *  EL FIN DE LA ENTRADA ES UN NO. `rl.question` no llama a su callback cuando la
+ *  entrada se cierra (el mismo defecto medido en el asistente, mas arriba): sin
+ *  el `close`, la promesa quedaba colgada y node salia 0 a mitad de la corrida.
+ *  Aca un cierre contesta "" --que no es un si-- y no se crea nada afuera. */
+function preguntarEnLaTerminal(texto) {
+  return new Promise((resolver) => {
+    const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
+    let contestada = false;
+    rl.question(texto, (respuesta) => {
+      contestada = true;
+      rl.close();
+      resolver(respuesta);
+    });
+    rl.on("close", () => {
+      if (!contestada) resolver("");
+    });
+  });
+}
+
+/** LA CORRIDA, ENVUELTA POR SU REGISTRO DE FRICCION.
+ *
+ *  El registro se abre ANTES de todo y mira la consola hasta el final: cada
+ *  `::warning::` de la corrida --cada vez que esta herramienta siguio por el camino
+ *  conservador-- entra solo, sin una llamada al lado de cada aviso que alguien
+ *  tenga que acordarse de escribir. Ver herramientas/registro-de-friccion.mjs.
+ *  Se suelta en el `finally`: un banco que la importe no puede quedarse con la
+ *  consola tocada, igual que con la bitacora.
+ *
+ *  EL MODULO SE CARGA CUANDO HACE FALTA, como projects-repositorio y registro-npm,
+ *  y por el mismo motivo: esta herramienta tiene que poder correr copiada sola
+ *  fuera de su arbol (hay bancos que lo hacen). Medido: con un import estatico,
+ *  un modulo que no esta al lado mata el proceso ANTES de la primera linea, sin
+ *  `::error::` y sin bitacora. Si falta, la corrida sigue y lo dice fuerte al
+ *  final, donde iba el registro. */
 async function main(argv) {
+  let modulo = null;
+  let porQueNo = null;
+  try {
+    modulo = await import("./registro-de-friccion.mjs");
+  } catch (e) {
+    porQueNo = e?.message ?? String(e);
+  }
+  const friccion = modulo
+    ? modulo.crearRegistro({ fase: "el comienzo" })
+    : { fase: "", apartamientos: [], anotar() {}, enFase() {} };
+  const vigia = modulo ? modulo.vigilarAvisos(friccion) : { soltar() {} };
+  try {
+    return await correrLaHerramienta(argv, friccion, { modulo, porQueNo });
+  } finally {
+    vigia.soltar();
+  }
+}
+
+async function correrLaHerramienta(argv, friccion, registroDeFriccion) {
+  const friccionMod = registroDeFriccion.modulo;
   // ── El piso de Node, antes de tocar NADA ──
   // El aviso sale por stderr a proposito: `--ejemplo` escribe el JSON en stdout y
   // normalmente se redirige a un archivo. Una linea de aviso ahi lo corrompe.
@@ -3207,7 +3889,10 @@ async function main(argv) {
   // escribiste. Este pregunta y ESCRIBE ESE MISMO ARCHIVO — no es una segunda
   // puerta al motor, es un generador de la entrada que el motor ya acepta. Todo
   // lo que sigue mas abajo corre igual para los dos.
+  // Lo que dice el registro del camino cuando el asistente corre en ESTE proceso.
+  let caminoDelAsistente = null;
   if (o.asistente) {
+    friccion.enFase("el asistente");
     const asis = await import("./projects-asistente.mjs");
     const versiones = await import("./projects-versiones.mjs");
 
@@ -3282,7 +3967,7 @@ async function main(argv) {
     let previos = {};
     if (fs.existsSync(rutaDeRespuestas)) {
       try {
-        previos = JSON.parse(fs.readFileSync(rutaDeRespuestas, "utf-8"));
+        previos = leerValores(rutaDeRespuestas);
         process.stdout.write(`Retomando lo que contestaste antes (${rutaDeRespuestas}). Enter mantiene cada respuesta.\n`);
       } catch {
         // Un archivo ilegible no es motivo para no dejar arrancar: se pregunta
@@ -3292,7 +3977,7 @@ async function main(argv) {
     } else if (o.valores && fs.existsSync(o.valores)) {
       // Compatibilidad con quien ya tiene un archivo de valores escrito a mano:
       // las claves que coinciden con una pregunta se ofrecen igual.
-      previos = JSON.parse(fs.readFileSync(o.valores, "utf-8"));
+      previos = leerValores(o.valores);
     }
     const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
 
@@ -3342,6 +4027,7 @@ async function main(argv) {
         return 1;
       }
       resultado = await asis.correrAsistente(preguntarPorTeclado, previos, FORMATOS, (linea) => process.stdout.write(`${linea}\n`), { ORG_MARCO: marco });
+      for (const t of resultado.tropiezos ?? []) friccion.anotar(t);
       // EL TIPO DE CUENTA SE MIDE, NO SE PREGUNTA. Decide que forma de
       // CODEOWNERS viaja, y en una cuenta de usuario los equipos de GitHub NO
       // EXISTEN: `@cuenta/equipo` no asigna a nadie, nunca, sin decir una
@@ -3397,8 +4083,12 @@ async function main(argv) {
     }
 
     const salida = rutaDeValores;
-    fs.writeFileSync(salida, `${JSON.stringify(resultado.valores, null, 2)}\n`);
-    fs.writeFileSync(rutaDeRespuestas, `${JSON.stringify(resultado.respuestas, null, 2)}\n`);
+    // CON LA FORMA DEL FORMATEADOR, no la de JSON.stringify: estos tres archivos
+    // quedan en el repo del proyecto (el copiado no los pisa, ver
+    // LO_QUE_ESCRIBE_EL_ASISTENTE), y con `superficies` partido en cuatro lineas
+    // el primer `format:check` salia rojo por algo que escribio esta herramienta.
+    fs.writeFileSync(salida, jsonParaElArchivo(salida, resultado.valores));
+    fs.writeFileSync(rutaDeRespuestas, jsonParaElArchivo(rutaDeRespuestas, resultado.respuestas));
     process.stdout.write(`\nEscrito: ${salida}\n`);
     process.stdout.write(`Escrito: ${rutaDeRespuestas}  (para que volver a correrlo no te haga contestar todo de nuevo)\n`);
     if (resultado.desvios.length) {
@@ -3408,8 +4098,28 @@ async function main(argv) {
       // con una lista pelada veia CERO desvios y no decia nada. La persona
       // declaraba cuatro apartamientos de las reglas del marco y la constitucion
       // de su proyecto salia como si no hubiera ninguno.
-      fs.writeFileSync(rutaDesvios, `${JSON.stringify({ desvios: resultado.desvios }, null, 2)}\n`);
+      fs.writeFileSync(rutaDesvios, jsonParaElArchivo(rutaDesvios, { desvios: resultado.desvios }));
       process.stdout.write(`Escrito: ${rutaDesvios}  (${resultado.desvios.length} desvio(s) declarado(s))\n`);
+    }
+
+    // LO QUE EL ASISTENTE ANOTO, para el proceso del arranque. Los lanzadores
+    // corren este paso y el arranque en DOS procesos (`--solo-valores` y despues
+    // `--valores`), asi que sin este archivo lo anotado se perdia aca. Vive al
+    // lado de los otros tres, lo ignoran el .gitignore del marco y el del
+    // andamio, y el arranque lo consume cuando deja el registro.
+    caminoDelAsistente = { reparto: asis.reparto(resultado.respuestas, REQUERIDOS) };
+    try {
+      if (!friccionMod) throw new Error(`falta herramientas/registro-de-friccion.mjs: ${registroDeFriccion.porQueNo}`);
+      friccionMod.escribirPendiente(path.dirname(path.resolve(salida)), {
+        fecha: new Date().toISOString(),
+        reparto: caminoDelAsistente.reparto,
+        apartamientos: friccion.apartamientos.filter((a) => a.punto.startsWith("el asistente")),
+      });
+    } catch (e) {
+      console.error(
+        `::warning::no pude dejar anotado lo que el asistente registro (${e.message}). El registro de friccion ` +
+          "del arranque va a salir sin las preguntas donde te trabaste; nada mas cambia.",
+      );
     }
 
     // `--solo-valores` es el gemelo interactivo de `--ejemplo`: deja el archivo
@@ -3499,9 +4209,12 @@ async function main(argv) {
   }
 
   // ── Valores ──
+  friccion.enFase("los valores y la copia");
   let crudos;
   try {
-    crudos = JSON.parse(fs.readFileSync(o.valores, "utf8"));
+    // Con leerValores y no con JSON.parse a secas: un archivo escrito desde
+    // Windows PowerShell trae BOM, y eso no es un error de la persona.
+    crudos = leerValores(o.valores);
   } catch (e) {
     console.error(`::error::no pude leer ${o.valores}: ${e.message}`);
     return 1;
@@ -3543,7 +4256,9 @@ async function main(argv) {
   // ocupada, que es justo cuando mas sirve --es la que contesta "¿y esto que me
   // va a hacer?"--. Por eso el aviso de la carpeta ocupada lo da ella misma.
   if (o.vistaPrevia) {
-    for (const linea of lineasDeVistaPrevia(raizAndamio, o.destino, valores, { simulado: true })) console.log(linea);
+    for (const linea of lineasDeVistaPrevia(raizAndamio, o.destino, valores, { simulado: true, repositorio: o.repositorio, remoto: o.remoto })) {
+      console.log(linea);
+    }
     return 0;
   }
 
@@ -3703,6 +4418,7 @@ async function main(argv) {
   // arranque sale rojo, main() vuelve con 1 y no imprime las tareas humanas —
   // pero el documento ya quedo con el estado REAL, que es justo lo que hay que
   // leer despues de un rojo. Ver el bloque de arriba para el defecto que cierra.
+  friccion.enFase("la proteccion de main");
   const proteccion = sondarProteccion({ org: valores.ORG, proyecto: valores.PROYECTO });
   const escrituraDeProteccion = escribirProteccionMedida(o.destino, { ...proteccion, org: valores.ORG, proyecto: valores.PROYECTO, forma: formaDe(valores) });
   if (!escrituraDeProteccion.ok) {
@@ -3721,7 +4437,20 @@ async function main(argv) {
     else console.log(linea);
   }
 
+  // ── El PO que CODEOWNERS nombra, contra los equipos de la organizacion ──
+  //
+  // Aca y no antes por el mismo motivo que la proteccion: CODEOWNERS ya quedo
+  // escrito con esos equipos, y es ahora cuando hay algo concreto que contrastar.
+  // Solo avisa —el arreglo es de quien administra la organizacion— y en una cuenta
+  // personal no pregunta nada. Ver el bloque de clasificarEquiposDelPO.
+  friccion.enFase("los equipos del PO");
+  for (const linea of lineasDeEquiposDelPO(comprobarEquiposDelPO(valores), valores).lineas) {
+    if (linea.startsWith("::warning::")) console.error(linea);
+    else console.log(linea);
+  }
+
   // ── Las dos herramientas que el andamio no puede traer ──
+  friccion.enFase("OpenSpec y la constitucion");
   if (o.herramientas) {
     // El guard de mas arriba ya exigio que el archivo EXISTA antes de escribir
     // nada; esto cubre lo que existsSync no cubre —permisos, un directorio con
@@ -3830,21 +4559,30 @@ async function main(argv) {
     const salidaDelRender = path.join(bandeja, "outputs.txt");
     fs.writeFileSync(salidaDelRender, "", "utf8");
     let artefactos;
+    // La action del tag que pina el `ci.yml` del destino, no la del clon: ver
+    // accionDeConstitucion.
+    const accion = accionDeConstitucion(raizMarco, o.destino);
     try {
-      console.log("render de la porcion del marco de la constitucion");
-      try {
-        execFileSync(process.execPath, [path.join(raizMarco, "actions/constitucion/constitucion.mjs")], {
-          cwd: o.destino,
-          stdio: "inherit",
-          env: { ...process.env, CONSTITUCION_MODO: "escribir", GITHUB_OUTPUT: salidaDelRender },
-        });
-      } catch (e) {
-        console.error(`::error::el render de la constitucion fallo: ${e.message}`);
+      console.log(
+        accion.desde === "tag"
+          ? `render de la porcion del marco de la constitucion (con la action de ${accion.pin}, la que verifica el CI del proyecto)`
+          : "render de la porcion del marco de la constitucion",
+      );
+      if (accion.aviso) console.error(accion.aviso);
+      // Por tuberia y reimpreso, no heredado: sus `::warning::` tienen que llegar al
+      // registro de friccion y a la bitacora. Ver correrProgramaDelMarco.
+      const render = correrProgramaDelMarco(accion.script, {
+        cwd: o.destino,
+        env: { ...process.env, CONSTITUCION_MODO: "escribir", GITHUB_OUTPUT: salidaDelRender },
+      });
+      if (render.error || render.codigo !== 0) {
+        console.error(`::error::el render de la constitucion fallo: ${render.error ?? `salio ${render.codigo}`}`);
         return 1;
       }
       artefactos = rutasDelRender(fs.readFileSync(salidaDelRender, "utf8"));
     } finally {
       fs.rmSync(bandeja, { recursive: true, force: true });
+      accion.limpiar();
     }
     if (artefactos.length === 0) {
       console.error(
@@ -3889,6 +4627,7 @@ async function main(argv) {
   //     paso, como se arregla, y exit 1. Un rojo aca es un rojo REAL: es el
   //     mismo que daria el CI en el primer push, adelantado a la maquina donde
   //     se arregla en un minuto.
+  friccion.enFase("el arranque (instalar, formatear, verificar)");
   let arranque = null;
   // Los pasos salen del manifiesto que se acaba de escribir, no de una lista
   // fija: un sitio no tiene `datos` que generar y mandarselo lo mataba en 2/4.
@@ -3901,7 +4640,20 @@ async function main(argv) {
   }
   if (!o.arranque) {
     console.error("");
-    console.error("::warning::se pidio --sin-arranque: el repo quedo ESCRITO pero sin instalar, sin formatear y sin verificar.");
+    console.error("::warning::se pidio --sin-arranque: el repo quedo ESCRITO pero sin instalar y sin verificar.");
+    // EL FORMATO YA NO ESTA EN ESA LISTA, y decirlo importa: el repo nace con
+    // `format:check` en verde sin correr el formateador (medido en el CI del
+    // marco). La unica excepcion conocida es un nombre de proyecto mas largo que
+    // el medido, y esa se avisa con el comando, porque callarla dejaria un rojo
+    // en el primer CI que nadie anuncio.
+    const nombre = String(valores.PROYECTO ?? "");
+    if (nombre.length > LARGO_DE_NOMBRE_MEDIDO) {
+      console.error(
+        `::warning::el nombre del proyecto tiene ${nombre.length} caracteres y el andamio nace formateado hasta ` +
+          `${LARGO_DE_NOMBRE_MEDIDO}: alguna linea de codigo no va a entrar en el ancho y \`format:check\` saldria rojo. ` +
+          "Arreglo: `pnpm format` en la raiz del destino, antes del primer push.",
+      );
+    }
     console.error("Antes del primer push hay que correr, en la raiz del destino:");
     for (const paso of pasosDeEsteDestino) console.error(`  pnpm ${paso.args.join(" ")}`);
     console.error("Sin el install no hay lockfile, y el CI corre con --frozen-lockfile: el primer push moriria ahi.");
@@ -3964,6 +4716,38 @@ async function main(argv) {
         else console.log(linea);
       }
       if (rojo) {
+        // CON --repositorio, EL ROJO TAMBIEN DEJA EL REPOSITORIO (revision adversarial
+        // del porte, RV-H1). Devolver 1 aca, antes del bloque del repositorio, dejaba
+        // una CARPETA sin aviso ni comandos, y en el camino del doble clic no habia
+        // vuelta: reabrir el lanzador choca con la guarda del destino ocupado. El
+        // requirement pide el repositorio en main igual, y sin primer guardado --un
+        // proyecto en rojo guardado y subido estrena el CI en rojo--, con el motivo y
+        // los comandos para despues. No se consulta ni se crea nada afuera.
+        if (o.repositorio) {
+          friccion.enFase("el repositorio");
+          const fallo = hechos.find((h) => !h.ok);
+          let repoMod = null;
+          try {
+            repoMod = await import("./projects-repositorio.mjs");
+          } catch (e) {
+            console.error(
+              `::warning::no pude cargar herramientas/projects-repositorio.mjs (${e.message}). Se pidio --repositorio y ` +
+                "NO se hizo: la carpeta no quedo como repositorio git.",
+            );
+          }
+          if (repoMod) {
+            await repoMod.dejarElRepositorio({
+              destino: o.destino,
+              org: valores.ORG,
+              proyecto: valores.PROYECTO,
+              visibilidad: repoMod.visibilidadDeLasRespuestas(o.valores),
+              remoto: o.remoto,
+              listoParaGuardar: false,
+              motivoSinGuardar: `el arranque salio rojo en «${fallo?.paso?.titulo ?? "un paso"}» (${fallo?.error ?? "sin detalle"}), y un proyecto que no quedo en verde no se guarda ni se sube`,
+              preguntar: null,
+            });
+          }
+        }
         console.error("");
         console.error("Lo que sigue —las tareas humanas— NO se imprime: primero hay que dejar el proyecto en verde.");
         return 1;
@@ -3975,6 +4759,76 @@ async function main(argv) {
     }
   }
 
+  // ── El repositorio: la carpeta armada pasa a ser uno, y con un si, uno en GitHub ──
+  //
+  // EL DEFECTO QUE CIERRA. El lanzador de doble clic dejaba una CARPETA: el unico
+  // `init` de la cadena era el de OpenSpec. Y la lista de abajo afirmaba «el
+  // bootstrap va a main por PUSH DIRECTO» sin haber mirado si habia un main o un
+  // remoto. Ahora, con --repositorio, se deja el repositorio; y SIEMPRE --con la
+  // bandera o sin ella-- lo que se dice del primer envio sale de MEDIR el destino.
+  //
+  // El modulo se carga aca y no arriba: importa de este archivo, y un import
+  // estatico en las dos direcciones evalua uno antes que el otro.
+  friccion.enFase("el repositorio");
+  let repoMod = null;
+  try {
+    repoMod = await import("./projects-repositorio.mjs");
+  } catch (e) {
+    console.error(
+      `::warning::no pude cargar herramientas/projects-repositorio.mjs (${e.message}). ` +
+        (o.repositorio
+          ? "Se pidio --repositorio y NO se hizo: la carpeta no quedo como repositorio git. "
+          : "") +
+        "Lo que sigue sobre el primer envio NO esta medido: mira `git status` en el destino antes de creerle.",
+    );
+  }
+  const visibilidad = repoMod ? repoMod.visibilidadDeLasRespuestas(o.valores) : null;
+  let estadoGit = null;
+  if (repoMod && o.repositorio) {
+    // EL PRIMER GUARDADO ES DE UN PROYECTO EN VERDE, o no es. Sin el arranque no
+    // hay lockfile y el CI corre con --frozen-lockfile; sin openspec/ el marco
+    // sale rojo en su primer paso. Guardar y subir eso seria estrenar el repo en
+    // rojo por una razon que esta misma corrida ya conoce.
+    const motivoSinGuardar = !o.herramientas
+      ? "se pidio --sin-herramientas, y sin `openspec init` el primer CI sale rojo en el paso que exige openspec/"
+      : !arranque
+        ? "el arranque no corrio (ver el aviso de arriba), y sin el install no hay lockfile"
+        : null;
+    estadoGit = await repoMod.dejarElRepositorio({
+      destino: o.destino,
+      org: valores.ORG,
+      proyecto: valores.PROYECTO,
+      visibilidad,
+      remoto: o.remoto,
+      listoParaGuardar: motivoSinGuardar === null,
+      motivoSinGuardar,
+      preguntar: process.stdin.isTTY ? preguntarEnLaTerminal : null,
+    });
+  } else if (repoMod) {
+    estadoGit = repoMod.medirRepositorio(o.destino);
+  }
+
+  // ── El registro de friccion: la condicion de termino ──
+  //
+  // VA ACA, ANTES DE «LISTO», y no es un paso mas. La corrida ya termino --el
+  // repositorio incluido, que es de donde salen los ultimos avisos-- y lo que
+  // todavia no se dijo es que tuvo que rodear para llegar. Si esto fuera un paso
+  // opcional al final, se omitiria; va antes de la linea que declara el exito
+  // para que no haya LISTO sin registro. Ver dejarElRegistroDeFriccion.
+  await dejarElRegistroDeFriccion({
+    friccion,
+    registroDeFriccion,
+    argv,
+    destino: o.destino,
+    rutaDeValores: o.valores,
+    valores,
+    forma,
+    plataforma,
+    raizMarco,
+    repoMod,
+    caminoDelAsistente,
+  });
+
   // ── Lo que queda, y es humano ──
   console.log("");
   console.log(
@@ -3983,24 +4837,14 @@ async function main(argv) {
       : "LISTO. Lo que sigue NO lo puede hacer esta herramienta:",
   );
   console.log("");
-  console.log("  EL ORDEN IMPORTA. Lo medido: el bootstrap va a main por PUSH DIRECTO y la");
-  console.log("  proteccion se aplica DESPUES. El plano del cambio de la compuerta de cobertura");
-  console.log("  mide las lineas que un PR agrega sin pruebas, y el commit fundacional agrega");
-  console.log("  el esqueleto entero: por PR sale rojo, por push a main sale `NO APLICABLE`.");
-  console.log("  Ademas `ci-ok` no aparece en la lista de checks del ruleset hasta que el CI");
-  console.log("  haya corrido una vez. Push -> CI verde -> recien ahi el ruleset -> y desde");
-  console.log("  ese momento todo por PR.");
-  console.log("");
-  console.log("  1. ANTES DEL PRIMER PUSH — llenar `README.md`:");
-  console.log("     El andamio deja un README con la estructura puesta y los valores ya");
-  console.log("     sustituidos, y con huecos marcados RELLENAR donde van las respuestas");
-  console.log("     que ninguna herramienta puede inventar: que hace el proyecto, su");
-  console.log("     alcance, que dispara cada despliegue, y el runbook de sus alarmas.");
-  console.log("     Es lo unico que GitHub renderiza en la portada del repo, o sea lo");
-  console.log("     primero que lee quien llega — y un README que quedo con los rotulos");
-  console.log("     del andamio no pone nada en rojo: se lee como si el proyecto no");
-  console.log("     tuviera la respuesta. Cuantos quedan lo dice el grep, no esta lista:");
-  console.log("          grep -n RELLENAR README.md");
+  // EL ORDEN DEL PRIMER ENVIO, segun lo medido: subido por esta corrida,
+  // repositorio sin remoto, carpeta sin git, o el camino a mano (con remoto y sin
+  // enviar). Sin el modulo --que ya aviso arriba-- queda solo la tarea de la
+  // portada, sin afirmar nada sobre un envio que no se pudo medir.
+  const primerEnvio = repoMod
+    ? repoMod.lineasDelPrimerEnvio(estadoGit, { destino: o.destino, org: valores.ORG, proyecto: valores.PROYECTO, visibilidad })
+    : ["  1. ANTES DEL PRIMER ENVIO — llenar `README.md`, los huecos marcados RELLENAR:", "          grep -n RELLENAR README.md"];
+  for (const linea of primerEnvio) console.log(linea);
   console.log("");
   // Esta linea decia "las 4 reglas probadas, no las 8" sobre CUALQUIER repo, sin
   // haber mirado ninguno. En la cuenta que hospeda el marco esas cuatro no
@@ -4110,6 +4954,156 @@ async function main(argv) {
   console.log(`     node <clon-del-marco>/herramientas/projects-versiones.mjs --raiz ${citarRuta(o.destino)}`);
   console.log("Sin terminal (en CI) solo imprime el informe y sale 0: nunca pregunta ni escribe.");
   return 0;
+}
+
+/** Las rutas que el registro tapa, con el nombre que las reemplaza. Van las dos
+ *  formas de cada una --la escrita y la resuelta--: en macOS la carpeta temporal
+ *  cuelga de un enlace (/var -> /private/var) y un aviso puede imprimir cualquiera
+ *  de las dos. */
+function rutasQueSeTapan({ destino, dirValores, raizMarco }) {
+  const con = (ruta, como) => {
+    const salida = [];
+    if (!ruta) return salida;
+    const abs = path.resolve(ruta);
+    salida.push({ ruta: abs, como });
+    try {
+      salida.push({ ruta: fs.realpathSync(abs), como });
+    } catch {
+      // Si no se puede resolver, queda la forma escrita.
+    }
+    return salida;
+  };
+  return [
+    ...con(destino, "<destino>"),
+    ...con(dirValores, "<carpeta-de-valores>"),
+    ...con(raizMarco, "<clon-del-marco>"),
+    ...con(os.tmpdir(), "<temporal>"),
+    ...con(os.homedir(), "~"),
+  ];
+}
+
+/** DEJA EL REGISTRO DE FRICCION DE ESTA CORRIDA, y ofrece mandarlo al marco.
+ *
+ *  QUE DEFECTO CIERRA. El registro de friccion era una plantilla en blanco
+ *  (docs/plantillas/registro-de-friccion.md) que alguien tenia que acordarse de
+ *  llenar mientras corria la guia. Lo que esta herramienta ya sabia --cada aviso
+ *  de un camino conservador, cada pregunta del asistente rechazada-- se imprimia y
+ *  se perdia, y la guia quedaba PARECIENDO sana. Viene de Rigel 1.14.0 (change
+ *  2026-09-01-arranque-ejecutable), adaptado en herramientas/registro-de-friccion.mjs.
+ *
+ *  LA CONDICION DE TERMINO ES EL ARCHIVO. Se escribe siempre --tambien sin
+ *  apartamientos, porque «no hubo nada que rodear» tiene que distinguirse de
+ *  «nadie miro»-- en el proyecto, al lado de la bitacora; si ahi no se puede, en
+ *  la carpeta temporal; y si tampoco, entero por pantalla, que la bitacora copia.
+ *  Mandarlo como issue al repositorio del marco se OFRECE y se confirma: es
+ *  visible desde afuera, igual que crear el repositorio del proyecto.
+ *
+ *  SOLO LAS CORRIDAS QUE TERMINAN. Una que falla ya tiene su rojo y su bitacora, y
+ *  lo que el asistente anoto queda sin consumir para el reintento. */
+async function dejarElRegistroDeFriccion({
+  friccion,
+  registroDeFriccion,
+  argv,
+  destino,
+  rutaDeValores,
+  valores,
+  forma,
+  plataforma,
+  raizMarco,
+  repoMod,
+  caminoDelAsistente,
+}) {
+  const m = registroDeFriccion.modulo;
+  if (!m) {
+    console.log("");
+    console.error(
+      `::warning::no pude cargar herramientas/registro-de-friccion.mjs (${registroDeFriccion.porQueNo}), asi que ` +
+        "esta corrida NO deja su registro de friccion: lo que tuvo que rodear esta solo en la bitacora. Pasa cuando " +
+        "esta herramienta corre copiada fuera de su clon; desde un clon completo del marco no falta.",
+    );
+    return;
+  }
+  friccion.enFase("el cierre");
+  const dirValores = path.dirname(path.resolve(rutaDeValores));
+  let reparto = caminoDelAsistente?.reparto ?? null;
+  let delAsistente = Boolean(caminoDelAsistente);
+  if (!caminoDelAsistente) {
+    const pendiente = m.leerPendiente(dirValores);
+    if (pendiente.existe && pendiente.ok) {
+      delAsistente = true;
+      reparto = pendiente.datos.reparto ?? null;
+      friccion.apartamientos.unshift(...pendiente.datos.apartamientos);
+    } else if (pendiente.existe) {
+      console.error(
+        `::warning::no pude leer ${pendiente.ruta} (${pendiente.error}), que es lo que el asistente anoto en su ` +
+          "corrida: el registro sale sin las preguntas donde te trabaste.",
+      );
+    }
+  }
+  const camino = !delAsistente
+    ? "un archivo de valores escrito sin el asistente"
+    : reparto
+      ? `el asistente: ${reparto.preguntas} preguntas; de los ${reparto.total} valores del archivo, ${reparto.derivados} ` +
+        "los derivo el asistente sin preguntarlos"
+      : "el asistente";
+  const apartamientos = friccion.apartamientos;
+  const texto = m.redactar(
+    m.cuerpo({
+      procedimiento: "arranque",
+      apartamientos,
+      contexto: {
+        fecha: new Date().toISOString(),
+        camino,
+        forma,
+        plataforma,
+        marco: versionDelMarco(),
+        maquina: `${process.platform} ${process.arch} · node ${process.version}`,
+        // Las banderas y no la invocacion entera: la invocacion lleva rutas.
+        banderas: argv.filter((a) => a.startsWith("--")).join(" ") || "ninguna",
+      },
+    }),
+    { valores, rutas: rutasQueSeTapan({ destino, dirValores, raizMarco }) },
+  );
+  const titulo = m.tituloDelRegistro("arranque", apartamientos.length);
+  // ABSOLUTA: la ruta viaja al comando `gh issue create --body-file` que se imprime
+  // para despues, y ese comando se pega desde cualquier carpeta.
+  const ruta = m.escribirRegistro(baseDeBitacora(path.resolve(destino), 0), texto);
+
+  console.log("");
+  console.log("── EL REGISTRO DE FRICCION ──");
+  if (apartamientos.length === 0) {
+    console.log("Esta corrida no se aparto de lo escrito en ningun punto, y eso tambien queda registrado:");
+  } else {
+    console.log(
+      `ESTA CORRIDA SE APARTO DE LO ESCRITO EN ${apartamientos.length} PUNTO(S). El proyecto quedo armado, pero NO es ` +
+        "un exito limpio: quien siga este mismo camino se va a chocar con lo mismo. Esta todo en:",
+    );
+  }
+  if (!ruta) {
+    console.error(
+      "::warning::no pude escribir el registro de friccion ni en el proyecto ni en la carpeta temporal. Va entero " +
+        "aca abajo, y queda tambien en la bitacora: copialo de ahi.",
+    );
+    console.log(texto);
+  } else {
+    console.log(`  ${ruta}`);
+  }
+  // Absorbido: si quedara, la proxima corrida lo contaria dos veces.
+  m.consumirPendiente(dirValores);
+  if (!ruta) return;
+
+  await m.ofrecerElIssue({
+    repo: m.repoDelRemoto(leerRemoto(raizMarco)),
+    titulo,
+    ruta,
+    preguntar: process.stdin.isTTY ? preguntarEnLaTerminal : null,
+    ejecutar: repoMod?.ejecutarDeVerdad
+      ? (programa, args, { timeout } = {}) => repoMod.ejecutarDeVerdad(programa, args, { timeout })
+      : undefined,
+    haySesion: repoMod?.haySesion
+      ? () => repoMod.haySesion((args, t) => repoMod.ejecutarDeVerdad("gh", args, { timeout: t }))
+      : undefined,
+  });
 }
 
 /** "Me invocaron a MI?", resuelto por realpath en los dos lados.

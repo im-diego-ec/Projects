@@ -1,11 +1,11 @@
 ---
 artefacto: tasks
 dri: Builder 1
-aprueba: Builder 2 (builder par)  # el delta lo gatea además PO (PO) por CODEOWNERS
+aprueba: revision adversarial (desvio del marco: un solo mantenedor, ver AGENTS.md)  # el delta lo gatea además PO (PO) por CODEOWNERS
 informado: PO
 estado: pendiente-de-revision
 experimental: true
-veredicto_antes_de: 2026-09-21
+veredicto_antes_de: 2026-10-15  # era 2026-09-21; la corrio el PO el 2026-09-17 (D3), motivo en proposal.md
 ---
 
 > ## ⚠️ Lo que cambió el 2026-08-22: el lunes no es un experimento
@@ -25,7 +25,11 @@ veredicto_antes_de: 2026-09-21
 > | **0. Pre-registro** | Se cumple con `observacion.md` commiteado antes de la primera hora. Deja de ser una puerta —no hay veredicto que proteger— pero sigue siendo lo que separa una observación de una impresión |
 >
 > **El bloque 4 (caducidad del estado experimental) SÍ aplica**: es independiente del
-> veredicto por diseño, y su fecha (`veredicto_antes_de: 2026-09-21`) sigue corriendo.
+> veredicto por diseño. **Desde el 2026-09-17 sus tareas 4.1 a 4.5 viven en el change
+> `el-experimental-caduca`** (ver el bloque 4), y la fecha de este change se corrió del
+> 2026-09-21 al **2026-10-15** por decisión del PO, con el motivo en `proposal.md`
+> («Por qué se corrió la fecha del veredicto»). Y la fecha ya no vence en silencio: si
+> llega el 2026-10-16 sin veredicto escrito, el CI de Projects se pone rojo.
 >
 > **Lo que sigue pendiente y de verdad puede tumbar el lunes** no es ninguno de los
 > anteriores: es la fila de la decisión 1.4 que dice que **no está medido que la herramienta
@@ -292,36 +296,20 @@ pre-registro: acá están las que quedan por tomar y su evidencia.
 Este bloque **no** depende del piloto: es lo que vuelve honesto el estado
 experimental de cualquier change, incluido este.
 
-- [ ] 4.1 Paso nuevo en el job de marco: un change que declara ser experimental
-      sin fecha de veredicto es rojo; y uno cuya fecha pasó sin veredicto
-      registrado es rojo. **Inerte** para los changes que no se declaran
-      experimentales, y por eso MINOR y no breaking. Evidencia: los tres casos —sin
-      fecha, fecha vencida, change normal— con su veredicto esperado, por código
-      de salida.
-- [ ] 4.2 Dogfooding real: el check corre en el CI de Projects y su primer sujeto es
-      **este mismo change**. Evidencia: la corrida de Projects en verde con
-      `veredicto_antes_de: 2026-09-21` vigente, y en rojo con una fecha vencida a
-      propósito.
-- [ ] 4.3 Auditoría **acción por acción** de los permisos del token del paso nuevo
-      antes del estreno — lección repetida tres veces, y el paso corre en el
-      pipeline de todos los consumidores. Evidencia: la tabla acción → permiso, y
-      el `permissions:` declarado al mínimo.
-- [ ] 4.4 Entrada del `CHANGELOG.md` en el mismo PR que estrena el paso, con la
-      sección «para consumidores» diciendo lo que tienen que hacer: **nada**,
-      mientras no declaren un change experimental. Evidencia: la entrada escrita.
-- [ ] 4.5 Check nuevo en el CI de **Projects**: si el cuerpo del canónico cambia y el
-      `manifiesto.json` no gana una entrada de versión, es rojo. Salió de una
-      medición del 2026-08-21 (D11) y no de una intuición: con una regla nueva en el
-      canónico y el manifiesto intacto, `node --test
-      actions/constitucion/pruebas/*.test.mjs` devuelve **0** con 203 pruebas en
-      verde, el presupuesto de líneas tampoco lo caza (600 de 700), y el consumidor
-      al día con la 1.3.0 devuelve **1** con `::error::` «difiere del texto que el
-      marco publica para la version 1.3.0». O sea que el rojo cae río abajo, en el
-      pipeline de repos que no hicieron nada. Es dogfoodeable sin consumidor:
-      compara dos archivos de este repo. **No depende del veredicto del piloto.**
-      Evidencia: los tres casos —canónico tocado sin versión nueva, canónico tocado
-      con versión nueva, canónico intacto— con su veredicto esperado, por código de
-      salida.
+> **Las tareas 4.1 a 4.5 salieron de este change el 2026-09-17** y se hicieron en el
+> change `el-experimental-caduca`, que es donde viven ahora su requirement, su
+> evidencia y su entrada de CHANGELOG. Salieron **antes** del veredicto a propósito:
+> dependían de este change solo por historia, y un descarte del piloto se las habría
+> llevado con el directorio. Lo que eran:
+>
+> | Tarea | Qué pedía | Dónde quedó |
+> |---|---|---|
+> | 4.1 | Paso que pone rojo a un change experimental sin fecha o vencido sin veredicto, inerte para el resto | paso «Estado experimental con fecha de veredicto» del job `openspec` de `.github/workflows/marco-ci.yml`, banco `pruebas/marco-ci/caducidad-experimental.test.mjs` |
+> | 4.2 | Dogfooding real, con este change como primer sujeto | el mismo banco, con dos casos que derivan los sujetos del árbol |
+> | 4.3 | Auditoría acción por acción de los permisos | la tabla del comentario del job `openspec` de `marco-ci.yml` |
+> | 4.4 | Entrada de CHANGELOG con «para consumidores» | la de `el-experimental-caduca` |
+> | 4.5 | El canónico que cambia gana versión | job `canonico-versionado` de `.github/workflows/ci.yml`, banco `pruebas/ci-del-marco/canonico-versionado.test.mjs`, adaptado a la huella que Projects ya tenía |
+
 - [ ] 4.6 Cortar la versión del canónico que publica la mitad **operativa** de D11
       («el descubrimiento se produce fuera del repositorio y entra como insumo al
       inicio de la sesión»), con el texto que D11 ya trae escrito, y con
@@ -411,9 +399,10 @@ verde. Adelantarlo compra costo hundido y el costo hundido decide veredictos.
       PO —sin requirement, sin huella en el scaffold y sin check—, diciendo
       explícitamente que no es requisito del marco. Evidencia: el documento, y
       cero cambios en `openspec/specs/` y en `plantilla/`.
-- [ ] 6.3 Rescatar el requirement de caducidad (bloque 4) a un **change propio** y
-      archivarlo por separado (D7). Evidencia: el change nuevo, con su delta y su
-      archive.
+- [x] 6.3 Rescatar el requirement de caducidad (bloque 4) a un **change propio** y
+      archivarlo por separado (D7). **Hecho antes del veredicto, el 2026-09-17**: el
+      requirement y su delta viven en `openspec/changes/el-experimental-caduca/`, y el
+      delta de este change ya no lo trae. Su archive va con ese change, no con este.
 - [ ] 6.4 Rescatar, al mismo change propio del 6.3 o a uno aparte, el requirement
       de **D11**: el descubrimiento se produce fuera del repositorio y entra como
       insumo al inicio de la sesión. Es el **segundo** ítem de este change que vale

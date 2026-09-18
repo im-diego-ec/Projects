@@ -6,12 +6,12 @@ una en su carpeta. Está en [`.projects/AGENTS-marco.md`](../.projects/AGENTS-ma
 existían**, así que la primera vez que hacía falta una había que inventar dónde
 ponerla.
 
-| Carpeta | Qué va acá | Cuándo se escribe |
-| --- | --- | --- |
-| [`adr/`](adr/) | **ADR**: una decisión estructural escrita con lo que se descartó | cuando una decisión cambia la forma del sistema |
-| [`postmortems/`](postmortems/) | Qué pasó en un incidente, sin culpas | dentro de las 48 h de un incidente |
-| [`runbooks/`](runbooks/) | Qué hago cuando suena esta alarma | cuando una alarma existe y alguien la va a atender |
-| [`plantillas/`](plantillas/) | Los esqueletos para empezar cada uno | — |
+| Carpeta                        | Qué va acá                                                       | Cuándo se escribe                                  |
+| ------------------------------ | ---------------------------------------------------------------- | -------------------------------------------------- |
+| [`adr/`](adr/)                 | **ADR**: una decisión estructural escrita con lo que se descartó | cuando una decisión cambia la forma del sistema    |
+| [`postmortems/`](postmortems/) | Qué pasó en un incidente, sin culpas                             | dentro de las 48 h de un incidente                 |
+| [`runbooks/`](runbooks/)       | Qué hago cuando suena esta alarma                                | cuando una alarma existe y alguien la va a atender |
+| [`plantillas/`](plantillas/)   | Los esqueletos para empezar cada uno                             | —                                                  |
 
 **Ninguna de las tres se llena por adelantado.** Un ADR escrito antes de tomar la
 decisión es una suposición; un runbook escrito antes de que exista la alarma es

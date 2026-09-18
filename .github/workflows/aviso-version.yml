@@ -1,5 +1,14 @@
 name: Aviso de version a consumidores
 
+# EL NOMBRE DE LA CORRIDA DICE SI ENVIA, y es lo unico visible sin abrir el log.
+# Con `simulacro` marcado la corrida sale verde sin mandar nada; el ::warning:: de
+# adentro lo dice, pero hay que entrar a leerlo. Esto lo pone en la lista de
+# corridas. Lo fija pruebas/ci-del-marco/el-simulacro-avisa.test.mjs.
+run-name: >-
+  ${{ github.event_name == 'release' && format('Aviso de {0}', github.event.release.tag_name)
+  || (inputs.simulacro && format('SIMULACRO (no envia) de {0}', inputs.version)
+  || format('Aviso de {0}', inputs.version)) }}
+
 # ---------------------------------------------------------------------------
 # QUE ES ESTO
 #
@@ -12,8 +21,8 @@ name: Aviso de version a consumidores
 #
 # EL EVENTO ES LA VERSION, NO EL PUSH. Se dispara al publicar un release, no en
 # cada push a main: un consumidor no necesita enterarse de cada commit del marco,
-# necesita enterarse de lo que le llega por @v1, y eso ocurre exactamente cuando
-# se publica una version.
+# necesita enterarse de lo que le va a llegar en su PR de bump, y eso ocurre
+# exactamente cuando se publica una version.
 #
 # EL CONTENIDO NO SE ESCRIBE DOS VECES. Sale del CHANGELOG.md, que ya se
 # mantiene por version diciendo que tiene que hacer un consumidor (seccion
@@ -29,6 +38,13 @@ name: Aviso de version a consumidores
 #   var     AVISO_VERSION_CAMPO     campo de texto del payload JSON. Default
 #                                   "text" (Slack, Google Chat, Teams);
 #                                   "content" para Discord.
+#   var     AVISO_VERSION_FORMATO   dialecto del destino. Vacio = "markdown"
+#                                   (Teams, Discord); "mrkdwn" para Slack. Es
+#                                   VARIABLE y no secret: vars.* no ve
+#                                   secretos, y cargarla en la pestana
+#                                   equivocada hace caer al default. El paso
+#                                   "Revisar donde esta declarado el dialecto"
+#                                   lo denuncia si pasa.
 #
 # Ni el canal ni la URL aparecen en este archivo, y el valor del secreto no entra
 # al log: el paso de envio omite cualquier texto que lo contenga, incluso dentro
@@ -106,14 +122,42 @@ jobs:
       # arreglar una entrada faltante se dispara desde main.
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
+      # EL DIALECTO SE LEE DE VARIABLES, y cargarlo como secret es un error que ya
+      # paso: en Rigel, el 2026-09-02, la preferencia quedo en la pestana Secrets,
+      # vars.* no la vio, el aviso cayo al default y llego a Slack con los
+      # asteriscos a la vista. La action no puede verlo -no recibe secretos, a
+      # proposito-, pero este workflow SI puede preguntar si existe un secret con
+      # ese nombre sin leer su valor: la comparacion con '' da true o false, y eso
+      # es lo unico que entra al entorno. No detiene el aviso: el release ya salio
+      # y el mensaje igual se manda, en el dialecto de la variable o el default.
+      - name: Revisar donde esta declarado el dialecto
+        shell: bash
+        env:
+          DIALECTO_EN_SECRETS: ${{ secrets.AVISO_VERSION_FORMATO != '' }}
+          DIALECTO_EN_VARS: ${{ vars.AVISO_VERSION_FORMATO }}
+        run: |
+          set -euo pipefail
+          if [ "${DIALECTO_EN_SECRETS}" = "true" ]; then
+            if [ -n "${DIALECTO_EN_VARS}" ]; then
+              CUAL="'${DIALECTO_EN_VARS}', el de la variable, asi que el secret sobra"
+            else
+              CUAL="'markdown', el default, porque no hay variable"
+            fi
+            echo "::warning::AVISO_VERSION_FORMATO esta cargado como SECRET, y vars.* no ve secretos: el aviso se arma con el dialecto ${CUAL}. Arreglo: Settings -> Secrets and variables -> Actions -> pestana Variables -> New repository variable AVISO_VERSION_FORMATO con el dialecto del destino (mrkdwn para Slack), y borrar el secret: el dialecto no es un secreto"
+          fi
+
       # Local a proposito (./actions/...), no @v1: cada PR prueba la version del
       # aviso que ESE PR propone, no la ya publicada. Mismo criterio que ci.yml.
+      #
+      # `formato` va SIN `|| 'markdown'`: vacio le dice a la action que nadie lo
+      # declaro, y su ::notice:: lo anuncia. Un default aca borraria esa diferencia.
       - name: Armar el mensaje desde el CHANGELOG
         id: mensaje
         uses: ./actions/aviso-version
         with:
           version: ${{ github.event.release.tag_name || inputs.version }}
           campo: ${{ vars.AVISO_VERSION_CAMPO || 'text' }}
+          formato: ${{ vars.AVISO_VERSION_FORMATO }}
 
       # El unico paso que ve el secreto. Deliberadamente chico y sin logica de
       # formato: todo lo que se puede probar sin credenciales vive en la action.
@@ -153,7 +197,21 @@ jobs:
           }
 
           if [ "${SIMULACRO}" = "true" ]; then
-            echo "::notice::simulacro: el mensaje quedo armado y NO se envio. Esta completo en el resumen de esta corrida"
+            # ::warning:: Y NO ::notice::, y el motivo es la lectura y no el tono. Este
+            # workflow existe para ENVIAR. Un ::notice:: no cambia ningun color: la
+            # corrida sale success, la lista de corridas dice success, y la diferencia
+            # entre "envie" y "no envie" queda solo en el cuerpo del log.
+            #
+            # Medido en Rigel (el marco del que Projects se bifurco) el 2026-09-12,
+            # reenviando el aviso de su 2.5.0: se disparo sin desmarcar `simulacro`
+            # —que por defecto es true, y ESO ESTA BIEN: protege de mandarle un mensaje
+            # al canal de todos los consumidores por un dispatch descuidado—. La
+            # corrida salio verde sin enviar nada y quien la miro leyo el color.
+            #
+            # AGENTS.md pide hacer ruidoso todo camino que termine en verde sin haber
+            # hecho el trabajo. Un simulacro no es un fail-open, pero produce la misma
+            # lectura: verde sobre cero envio.
+            echo "::warning::SIMULACRO: el mensaje quedo armado y NO SE ENVIO A NADIE. Esta completo en el resumen de esta corrida. Para mandarlo de verdad: volver a disparar el boton con 'simulacro' DESMARCADO"
             echo "== payload que se habria enviado =="
             cat "${PAYLOAD}"
             resumen "### Envio: NO — simulacro" "" \

@@ -679,14 +679,16 @@ test("una superficie que el marco no sabe emitir es roja, no un silencio", () =>
 });
 
 // ---------------------------------------------------------------------------
-// LA VENTANA DE GRACIA ES OPT-IN, NO OBLIGATORIA (change ventana-vencida).
+// LA VENTANA DE GRACIA SE RETIRO (change ventana-vencida).
 //
 // Hasta el 2026-08-22 habia un piso de 28 dias y una puerta `urgente` para
-// saltarselo. Se retiro la POLITICA y quedo el MECANISMO: una version que quiera
-// estrenarse con aviso declara un `exigible_desde` futuro, y eso lo fijan las
-// pruebas de mas arriba (VERSIONES_UNA_EN_VENTANA + DENTRO_DE_LA_VENTANA), que
-// siguen siendo la propiedad correcta. Lo que estas tres fijan es el default
-// nuevo y sus dos bordes.
+// saltarselo. Se retiro la POLITICA y quedo el MECANISMO: `hallazgoPorFecha` sabe
+// avisar hasta un `exigible_desde` futuro, y las pruebas de mas arriba
+// (VERSIONES_UNA_EN_VENTANA + DENTRO_DE_LA_VENTANA) fijan que ese mecanismo funciona
+// mientras siga en el codigo, que es hasta v2. Que ninguna version PUBLICADA lo use
+// —la version exigible es la publicada, desde el 2026-09-17— lo fija
+// `la-ventana-no-vuelve.test.mjs` sobre el manifiesto real. Lo que estas fijan es el
+// default y sus dos bordes.
 // ---------------------------------------------------------------------------
 
 test("cero dias de gracia es lo NORMAL: exigible el dia que se publica", () => {
@@ -948,10 +950,10 @@ test("modo escribir con un desvio muerto no escribe nada", () => {
 // rojo seco el primer día para el repo que todavía no adoptó: un endurecimiento
 // estrenado sin modo aviso, que es la regla que el propio `AGENTS.md` de Projects
 // impone. La propiedad correcta es asimétrica y las dos mitades están en
-// `pruebas/regresiones-auditoria.test.mjs`: en verificar la ausencia entra por la
-// ventana de gracia (aviso, después rojo) y en escribir sigue siendo rojo porque no
-// hay con qué renderizar. Acá queda la mitad de escribir, que es la que este archivo
-// venía cubriendo.
+// `pruebas/regresiones-auditoria.test.mjs`: en verificar la ausencia es rojo con el
+// arreglo de ADOPTAR (hasta el 2026-08-22 era aviso, por la ventana de gracia) y en
+// escribir es rojo porque no hay con qué renderizar. Acá queda la mitad de escribir,
+// que es la que este archivo venía cubriendo.
 test("sin el archivo de valores no hay render: el modo escribir es rojo con el arreglo escrito", () => {
   const raiz = temporal("projects-repo-vacio-");
   const corrida = spawnSync(process.execPath, [SCRIPT], {

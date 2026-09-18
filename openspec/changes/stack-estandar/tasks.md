@@ -1,7 +1,7 @@
 ---
 artefacto: tasks
 dri: Builder 1
-aprueba: Builder 2 (builder par)
+aprueba: revision adversarial (desvio del marco: un solo mantenedor, ver AGENTS.md)
 informado: PO / Builder 2
 estado: pendiente-de-revision
 ---

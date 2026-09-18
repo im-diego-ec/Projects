@@ -23,8 +23,33 @@
 #
 # NO HACE MAGIA: corre el comprobador de requisitos y despues el asistente, los
 # dos que ya existen. Lo unico que agrega es saber donde esta parado.
+#
+# Y DEJA UN REPOSITORIO, no una carpeta. Hasta el 2026-09-17 el unico `init` de
+# toda la cadena era el de OpenSpec: la persona terminaba con una carpeta sin git
+# y una lista de tareas que suponia un `main` y un remoto. Ahora el Paso 2 le pide
+# a la herramienta el repositorio (--repositorio): git con la rama main, el
+# primer guardado, y --solo si la persona lo confirma escribiendo que si-- el
+# repositorio en GitHub con el proyecto subido. Toda esa logica vive en Node
+# (herramientas/projects-repositorio.mjs) para que sea UNA en los tres sistemas.
+#
+# UNA SOLA OPCION: `--sin-remoto`, para dejar el repositorio solo en esta
+# computadora. El doble clic no pasa ninguna; desde una terminal se escribe
+# `./arrancar.sh --sin-remoto`.
 # ---------------------------------------------------------------------------
 set -uo pipefail
+
+# Lo que el Paso 2 le pide a la herramienta sobre el repositorio. Cualquier otra
+# opcion se rechaza ANTES de preguntar nada: descubrirlo al final seria peor.
+MODO_REPO="--repositorio"
+for opcion in "$@"; do
+  case "$opcion" in
+    --sin-remoto) MODO_REPO="--sin-remoto" ;;
+    *)
+      printf '\n  No conozco la opcion %s. La unica que acepta este archivo es --sin-remoto.\n\n' "$opcion"
+      exit 2
+      ;;
+  esac
+done
 
 # La raiz del clon es donde vive ESTE archivo. Asi no hay ruta que rellenar y no
 # importa desde donde se lo abra: Finder abre la terminal en el HOME, no aca.
@@ -114,13 +139,13 @@ printf '  ───────────────────────�
 printf '  Esto tarda unos minutos y va a escribir mucho en pantalla. Es normal.\n\n'
 
 mkdir -p "$DESTINO"
-node "$AQUI/herramientas/projects-init.mjs" --valores "$AQUI/valores.json" --destino "$DESTINO"
+node "$AQUI/herramientas/projects-init.mjs" --valores "$AQUI/valores.json" --destino "$DESTINO" "$MODO_REPO"
 CODIGO=$?
 
 printf '\n'
 if [ "$CODIGO" -eq 0 ]; then
   printf '  LISTO. Tu proyecto esta en: %s\n' "$DESTINO"
-  printf '  Arriba dice como verlo andando y que queda por hacer.\n'
+  printf '  Arriba dice si quedo subido a GitHub, como verlo andando y que queda por hacer.\n'
 else
   printf '  Se corto en el paso 2. Arriba dice por que, y como se arregla.\n'
   printf '  Lo que contestaste quedo guardado: volver a abrir este archivo no te\n'

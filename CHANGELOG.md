@@ -19,9 +19,15 @@ Hasta la 1.3.0 el canal era el tag móvil `v1`, que empujaba el cambio a todos a
 la vez. `v1` sigue existiendo, pero ya no es el canal de distribución.
 
 Convención de secciones: `Añadido`, `Cambiado`, `Obsoleto`, `Eliminado`,
-`Corregido`, `Seguridad`. Todo lo que sea **BREAKING para `@v1`** se marca en
-mayúsculas al inicio de la línea y obliga a abrir línea mayor nueva: `v1` no se
-mueve sobre un cambio incompatible.
+`Corregido`, `Seguridad`, y en cada versión un `### Para consumidores` con lo que un
+consumidor tiene que hacer, escrito para quien no es técnico. Todo lo **BREAKING** se
+marca en mayúsculas al inicio de la línea y obliga a abrir línea mayor nueva. Qué es
+breaking es una lista **cerrada** que vive en `AGENTS.md` («Qué es BREAKING»): el
+contrato publicado de una pieza referenciada, y lo que solo se arregla fuera del
+repositorio del consumidor. Una compuerta nueva o endurecida cuyo arreglo cabe en su
+repositorio **no** es breaking, aunque su PR de bump nazca rojo: se arregla ahí mismo,
+con el arreglo escrito en «Para consumidores». Un cambio de andamio tampoco: no viaja
+por ese PR.
 
 > Nota: en los **proyectos** el changelog es el archive de OpenSpec y no se
 > mantiene un archivo aparte. Projects es la excepción deliberada porque tiene
@@ -40,6 +46,49 @@ mueve sobre un cambio incompatible.
 ---
 
 ## [No publicado]
+
+### Para consumidores
+
+**Antes del 2026-10-01, aunque no actualices.** Tu versión actual (hasta la 1.9.6)
+trae esa fecha adentro: ese día la cobertura pasa a rojo si un paquete está por debajo
+del mínimo sin deuda declarada, y la verificación de `infra/` e `infra-prod/` pasa a
+detener. Arreglo: agregar pruebas o declarar la deuda con su motivo y su fecha. Si tu
+repositorio nació entre la 1.8.0 y la 1.9.6, borrá además de tu `ci.yml` el paso que
+trae `VENTANA_TERRAFORM` (ver «Cambiado» y «Eliminado»).
+
+**Tu PR de actualización a esta versión llega en rojo en la constitución**, porque su
+parte del marco sube a la 1.10.0. Se arregla en ese mismo PR, regenerándola con el
+comando de «Cambiado». Si declarás un change experimental, agregale la fecha
+`veredicto_antes_de`. Y puede aparecer **un aviso nuevo** si tu `.projects-desvios.json`
+tiene un desvío incompleto o una fecha imposible; completalo ahora, porque en la línea
+mayor siguiente el desvío incompleto deja de absorber.
+
+**Si tenés un sitio generado con `desplegar.yml` (de la 1.8.0 a la 1.9.6)**, el código
+de un fork podía correr con la credencial que publica. El arreglo no llega solo:
+aplicalo a mano (ver «Seguridad»). Hasta que copies el archivo nuevo, su producción se
+sigue publicando cada vez que se integra un cambio a `main`.
+
+**Si usás `actions/aviso-version` para anunciar tus propias versiones**, el mensaje
+cambia aunque no toques nada: el primer párrafo cambia de redacción, las dos líneas de
+encuadre pasan de `*…*` a `**…**` y cada cambio incompatible llega entero en vez de
+cortado. Si tu destino es Slack, declará el dato nuevo `formato: mrkdwn`; en una copia
+del archivo de aviso del marco va como la variable de repositorio
+`AVISO_VERSION_FORMATO`, en la pestaña Variables y no en Secrets. Teams y Discord no
+necesitan nada. Si no la usás, nada de esto te toca.
+
+**Desde esta versión, una compuerta nueva puede llegar en rojo dentro de tu PR de
+actualización**, con lo que tenés que cambiar escrito en esta sección. Solo lo que se
+arregla fuera de tu repositorio —un ajuste de GitHub, un permiso de quien lo
+administra— sigue llegando primero como aviso.
+
+**Lo demás es andamio y no te llega solo**: un proyecto nuevo nace con la promoción a
+producción manual, desvíos más precisos y documentos al día; uno ya creado conserva la
+copia que recibió. Si tu repositorio nació con la 1.9.6 o antes, en el paso que sube
+`constitucion-al-dia` cambiá `if-no-files-found: warn` por las dos líneas de
+«Corregido». Y si fijás `@v1`, pasá a la versión exacta para volver a recibir estos
+avisos. Si tu sitio nació antes de esta versión, agregá a `sitio/package.json` las dos
+exclusiones de `plantilla/sitio/package.json` (ver «Corregido»); y si tu proyecto nació
+sin `pnpm-lock.yaml`, corré `corepack pnpm install` y guardá ese archivo.
 
 ### Cambiado
 
@@ -71,10 +120,385 @@ mueve sobre un cambio incompatible.
   quien genere un sitio desde acá: su producción deja de publicarse sola, que es lo
   que el marco venía prometiendo por escrito sin cumplir.
 
-- **BREAKING para quien ya tuviera un sitio generado** —hoy, nadie—: `produccion`
-  ya no se dispara por `workflow_run`. Un merge que antes publicaba, ahora sube a DEV
-  y espera. Se dice acá porque el criterio del repo es que endurecer un check que un
-  repo verde ya pasaba es incompatible aunque no rompa ningún archivo.
+- **Un sitio ya generado no cambia solo, y esto no es BREAKING.** `desplegar.yml` es
+  andamio: se copió una vez y no viaja por el PR de bump, así que en un repo que ya lo
+  tiene `produccion` se sigue disparando por `workflow_run` y cada merge sigue
+  publicando. Quien quiera la promoción manual copia el archivo nuevo. Hasta el
+  2026-09-17 esta viñeta se declaraba incompatible «para quien ya tuviera un sitio
+  generado —hoy, nadie—», y las dos mitades estaban mal: un cambio de andamio no le
+  llega a ningún consumidor (`AGENTS.md`, «Qué es BREAKING»), y sí había un
+  consumidor con un sitio generado.
+
+- **El marco declara que tiene un solo mantenedor, y deja de esperar una revisión
+  que no puede llegar.** `AGENTS.md` pedía que lo que escribe un builder lo revise
+  el otro, y en este repositorio hay una sola identidad con permiso de escritura:
+  GitHub pide la revisión a los dueños excepto al autor, así que la revisión
+  cruzada no estaba debilitada, no existía. El costo era medible: 58 artefactos de
+  22 changes nombraban como aprobador a un «Builder 2 (builder par)» que no está,
+  y once changes terminados esperaban en `pendiente-de-revision` sin salida.
+  Ahora `AGENTS.md` lo declara como desvío (`github-review-cruzado-automatizado`),
+  pegado al flujo que anula: la revisión cruzada se reemplaza por una **revisión
+  adversarial con lentes independientes, registrada dentro de cada change**; se
+  retira el día que haya un segundo handle con escritura, con el comando que lo
+  mide; y **no alcanza a la aprobación del PO** sobre `gobierno-contribucion`. Es
+  el desvío que Rigel declaró en su 1.10.0 (commit `e48860d`), con una diferencia:
+  allá quedó escrito, acá lo sostiene un banco. No vive en `.projects-desvios.json`
+  porque esa ruta de la raíz es la que el asistente usa para el proyecto que arma
+  con doble clic. Para consumidores: nada; es el gobierno del repositorio del
+  marco y no viaja.
+
+- **`reglas-al-dia` pasó de marcar 2/41 a 38/41, y las casillas nuevas describen el
+  árbol, no trabajo de hoy.** El change que convirtió la porción común de la
+  constitución en un artefacto generado y verificado estaba casi entero en el árbol:
+  llegó por los changes que vinieron después y ninguno volvió a tildarlo. Un
+  `tasks.md` que dice 2/41 sobre un change terminado empuja a rehacer lo hecho, y un
+  change cuyas casillas no describen el árbol no se puede cerrar. Cada tarea se
+  auditó contra el árbol, con su ruta y su línea o con el comando y su salida, en
+  una sección nueva del propio `tasks.md`; donde la tarea pedía una corrida, se
+  corrió sobre un repositorio de juguete armado desde el andamio. Es el porte de la
+  misma auditoría que Rigel hizo sobre su copia en la 1.11.0 (`ccb4c8a` y
+  `9f8fec7`). Las citas por línea de esa auditoría se rehicieron contra el árbol
+  final del porte, después de que otros lotes movieran los archivos citados. Para
+  consumidores: nada; no cambia una línea que un repositorio ejecute ni reciba.
+- **El bloque de estreno de ese change ya no manda a mover `v1`.** Se escribió
+  cuando el tag móvil era el canal y había que amortiguar el estreno con una ventana
+  de gracia; las dos premisas caducaron antes de esta auditoría (versión exacta desde
+  el 2026-08-21, ventana retirada en la 1.6.0). Se reescribió con el canal que rige:
+  cada versión llega por el PR de bump y el rojo aparece adentro. Para consumidores:
+  nada.
+
+- **La porción del marco de la constitución sube a una versión nueva (1.10.0, número
+  tentativo que corrige el release), y el PR de bump que la trae LLEGA ROJO.** La regla
+  `marco-artefacto-al-dia`, que cada proyecto carga en cada sesión, decía que un
+  artefacto atrasado «avisa primero y falla desde la fecha que el propio aviso imprime».
+  Es falso desde la 1.6.0: el atraso es rojo el día que la versión se publica. Un agente
+  que lee lo contrario trata el rojo del PR de bump como algo que puede esperar. Ahora
+  dice que el artefacto atrasado es **rojo** desde el PR de bump que lo deja atrás. El
+  cambio de una frase es una versión nueva del canónico, y no una corrección sobre la
+  1.7.0, a propósito: pisar la huella de la 1.7.0 haría que dos textos distintos se
+  llamen igual, y un artefacto en 1.7.0 se reportaría como «editado a mano».
+  Para consumidores: **EL PR DE BUMP A ESTA VERSIÓN LLEGA CON EL JOB `constitucion` EN
+  ROJO** si tu artefacto declara la 1.7.0 (medido sobre un repo de juguete: `exit=1`, dos
+  `::error::` «le faltan reglas»). Se arregla dentro de ese mismo PR, sin escribir nada a
+  mano: en la rama del PR, parado en la raíz del repo, correr
+  `gh repo clone im-diego-ec/Projects /tmp/projects-marco -- --depth 1 --branch vX.Y.Z`
+  y `CONSTITUCION_MODO=escribir node /tmp/projects-marco/actions/constitucion/constitucion.mjs`
+  (con la `vX.Y.Z` del bump), y commitear los archivos que imprime, uno por superficie.
+  La otra salida que nombra el mensaje del rojo, bajar el artifact `constitucion-al-dia`,
+  sale vacía en los repos nacidos hasta la 1.9.6 hasta que su `ci.yml` suba archivos
+  ocultos. No cambia ningún nombre de job, `input`, `output` ni permiso: un repo que no
+  mergea el bump no cambia de color.
+- **La versión exigible es la publicada, sin excepción.** Lo que quedaba de la ventana
+  de gracia era la posibilidad de que una versión declarara un `exigible_desde`
+  posterior a su publicación y se estrenara en amarillo. Se retira como política: con
+  pin exacto, el aviso previo ya es el PR de bump, y el arreglo —regenerar el
+  artefacto— está en el árbol del propio repo. El output `exigible_desde` sigue
+  existiendo, siempre con la misma fecha que la publicación, y se retira en v2. Para
+  consumidores: nada; ninguna versión publicada usó nunca una fecha distinta.
+
+- **La porción del marco de la constitución suma estas reglas a la misma 1.10.0 que
+  abrió el cierre de la ventana de gracia** (número tentativo, lo corrige el
+  release). Juntas cuestan un rojo por consumidor en vez de dos. Para consumidores:
+  **el PR de bump a esta versión llega con el job `constitucion` en ROJO**, el mismo
+  rojo que ya anuncia la entrada de la ventana, y se arregla igual —regenerando el
+  artefacto con el modo `escribir` de la versión nueva, en ese mismo PR—. Ningún id
+  de regla cambió ni desapareció, así que ningún desvío declarado deja de resolver;
+  ni jobs, ni `inputs`, ni `outputs`, ni permisos cambian. **Y mientras esta versión
+  viva en `main` sin su release**, un proyecto armado desde una descarga en ZIP de
+  `main` nace con ese mismo rojo: ver la entrada de `projects-init` en el fragmento
+  de `ventana-vencida`, que dice cómo evitarlo.
+- **El PR final de un change LLEVA `Closes` al issue macro en su cuerpo desde que se
+  crea**, en vez de «cerrarlo» (`openspec-flujo` y
+  `github-closes-apunta-al-sub-issue`, con sus ids intactos). «Cierra» sólo es verdad
+  después del merge, así que la tarea que lo atestigua no se podía marcar en el PR
+  que la cumple: en Rigel costó un PR de una línea en dos changes seguidos. Las dos
+  copias de la skill `projects-archive-change` suman los dos `Closes` en el ejemplo y
+  la verificación previa al merge con
+  `gh pr view <n> --json closingIssuesReferences`. Para consumidores: nada
+  obligatorio; un proyecto ya nacido conserva su copia de la skill y puede copiar a
+  mano las dos líneas nuevas del checklist.
+- **El presupuesto de líneas de la constitución sube de 700 a 738, y el manifiesto
+  dice por fin cómo se mide** (`presupuesto_nota`). El check no cuenta `wc -l`:
+  cuenta el cuerpo que arma `leerCanonico()`, que pega las secciones con una línea en
+  blanco entre cada par. Medido antes de tocarlo: `wc -l` daba 687 y el check 696,
+  o sea cuatro líneas de margen y no trece. Quedan 733 usadas: las 37 nuevas son
+  reglas, y las cinco que sobran son colchón de mantenimiento que no alcanza para una
+  regla nueva. Subir el número sin reescribir la nota —diciendo «el presupuesto sube
+  de X a N»— pone rojo el CI del marco. Para consumidores: nada.
+
+- **El requirement de los pendientes de infraestructura se reformula y absorbe al del change
+  `infra-exigible`, que se cierra** (`operacion-infra`, delta en vuelo: `RENAMED` +
+  `MODIFIED`). Pasa a llamarse «La infraestructura de un repositorio desplegable vive en su
+  árbol, entregada por el andamio», porque «huecos de decisión» ya nombraba en `calidad-codigo`
+  a los marcadores con la propiedad contraria. Sale la cláusula que pedía que la verificación
+  fallara mientras sobreviviera un pendiente —del cuerpo, del título y del escenario—: esa
+  compuerta nunca se construyó y el requirement vivo decía lo opuesto. Qué forma toma una
+  señal sobre los pendientes (aviso o rojo) la decide la pieza que mida por plataforma la
+  llegada al ambiente. Queda escrito que no desplegar es un estado legítimo y que la
+  verificación es inerte para quien no despliega. Para consumidores: nada; ningún check cambia.
+- **«Las caídas se detectan por alarma» se enuncia por capacidad.** El mínimo sigue siendo el
+  mismo —servicio que no responde o responde con errores sostenidos, proceso que se reinicia en
+  bucle, niveles de alerta en el log—, pero dicho por lo que detecta y no por el producto que
+  lo arma («instancias de cómputo», «filtro de métrica»), porque el marco ya no fija la nube.
+  El pendiente de alarmas del andamio separa ese piso de lo que el negocio elige por encima.
+  Para consumidores: nada; no es más estricto y ningún check lo mira.
+- **Los `PENDIENTE-PLATAFORMA` de `infra/adaptadores.md` tienen la misma forma de cuatro
+  partes**: los ocho suman «CUÁNDO SE RESUELVE» y el del marco suma «CÓMO SE DECIDE». El
+  catálogo decía «la misma forma de tres partes que usa `pendientes.tf`», que con cuatro partes
+  habría mentido en verde. Para consumidores: nada; es contenido del andamio.
+
+- **El release deja de mover `v1` por defecto.** Con el marco sin ninguna invocación
+  por `@v1`, el único efecto de moverlo era empujar código sin pull request a quien
+  pine una versión publicada hasta la 1.9.6. La skill del release decía que moverlo no
+  pedía OK aparte, contra `AGENTS.md`, que lo lista entre lo que pide OK humano; ahora
+  el paso para, con el comando que mide si moverlo cambiaría algo. Medido el
+  2026-09-17: `v1` apunta a la 1.8.0 desde el 2026-09-01, así que en la práctica no se
+  movió en ninguna 1.9.x. Si se congela formalmente o se vuelve a mover queda como
+  decisión pendiente para la línea `v2`. El tag **no se borra**: las versiones hasta la
+  1.9.6 lo resuelven por dentro.
+
+  **Para consumidores: nada.**
+
+- **La partición que hace posible el pin exacto tiene compuerta propia.** Un banco
+  nuevo, `pruebas/andamio/refs-propias.test.mjs`, **evalúa** la condición de todo job
+  del marco que invoca una pieza propia por referencia remota, y se pone rojo si ese
+  job corre en el repositorio del marco —donde el pull request que corta una versión
+  lo mataría— o si no corre en ningún lado; y exige que cada pieza salteada corra por
+  ruta local en el CI del marco. Hasta hoy, un tercer job sin partición o una condición
+  `always() || <partición>` pasaban el banco entero en verde. `pinado.test.mjs` pierde
+  su lista de excepciones: una invocación interna nueva por tag móvil es roja, y el
+  arreglo es particionar su job. Viene de Rigel 2.4.0, con la condición evaluada en vez
+  de buscada como texto.
+
+  **Para consumidores: nada**; son bancos del repositorio del marco.
+
+- **En el CI del marco, una versión publicada del canónico ya no se puede reescribir.**
+  El banco de la huella ataba el texto de la constitución a la última versión del
+  manifiesto, pero no veía el atajo que su propio mensaje prohibía: pegar la huella
+  nueva sobre la entrada de una versión que ya salió. Medido: con una regla nueva en
+  el canónico y la huella pegada sobre la 1.7.0, los 418 casos de `actions/` daban
+  verde, y el rojo habría caído en el CI de un consumidor al día con esa versión. Un
+  job nuevo del `ci.yml` del marco, `canonico-versionado`, compara el manifiesto de
+  la base del PR con el de la cabeza: una versión que el CHANGELOG ya publicó no
+  cambia de huella, de número ni desaparece. La entrada pendiente del próximo release
+  sí se puede corregir. Viene de Rigel 1.14.0, adaptado a la huella que Projects ya
+  tenía.
+
+  **Para consumidores: nada.** El job vive en el repositorio del marco y no viaja; lo
+  que te protege es que el texto de la versión que pinás no puede cambiar bajo el
+  mismo número.
+
+- **`cobertura-diff` ya no tiene ventana de gracia: el total de un paquete no mira la
+  fecha de la corrida.** Hasta la 1.9.6, tres veredictos pasaban en amarillo hasta el
+  2026-09-30 y en rojo desde el 2026-10-01: un paquete por debajo del mínimo **sin deuda
+  declarada**, una métrica que el reporte lcov **no midió** (cero ítems y ningún
+  `FNF:`/`BRF:` declarado) y un **denominador más corto** que el que el propio reporte
+  declara. Los tres son rojos desde esta versión, cualquier día; la única fecha que la
+  action mira es la que el paquete declara en su deuda. La ventana existía porque el
+  marco se consumía por el tag móvil `v1`; desde la versión exacta, el aviso previo es el
+  PR de bump. Viene de Rigel 2.0.0 (commit `771ba2c`), y la cerró la decisión D9 del PO.
+
+  **Para consumidores — y esto te toca aunque no actualices:** tu pin `@v1.9.6` ya trae
+  la fecha adentro, así que **el 2026-10-01 esos tres veredictos se ponen rojos solos en
+  tu CI**, sin PR de por medio. Si ningún paquete tuyo está bajo el 80% sin deuda
+  declarada, no pasa nada. Si alguno lo está, el arreglo es el mismo con tu pin actual o
+  con esta versión: agregar pruebas hasta el mínimo, o declarar la deuda con su motivo y
+  su fecha en el `package.json` del paquete (`projects.cobertura.deuda = { "motivo": "…",
+  "fecha": "AAAA-MM-DD" }`); y si el rojo es de «no medida», que el reporter emita la
+  métrica (o declare `FNF:0`/`BRF:0` si de verdad no hay nada). Si esta versión se publica
+  antes del 2026-10-01, ese rojo se adelanta a tu PR de bump, que es donde se puede leer.
+
+- **El job `terraform` de `marco-ci.yml` avisa en toda la línea 1 y detiene desde v2: su
+  gravedad dejó de depender de una fecha.** Hasta la 1.9.6 un archivo sin formato, una
+  raíz que no valida o un runner sin el binario de `terraform` avisaban hasta el día que
+  decía el input `ventana_terraform` (default `2026-09-30`) y detenían desde el siguiente.
+  Uno de esos tres —el binario ausente— se arregla en el marco (le falta un
+  `hashicorp/setup-terraform` pinado), no en tu repo, así que por la decisión D9 del PO el
+  endurecimiento queda **anunciado para v2**, que se abre una sola vez con todos los
+  breaking. Un banco del marco impide publicar la 2.0.0 sin endurecerlo. El input
+  `ventana_terraform` sigue aceptándose **sin efecto**, con default vacío.
+
+  **Para consumidores — también te toca antes de actualizar:** con tu pin `@v1.9.6`, **el
+  2026-10-01 el job `terraform` pasa a detener**. Si tu repo no tiene `infra/` ni
+  `infra-prod/` (ni las raíces que declares en `raices_terraform`), no pasa nada. Si las
+  tiene, tenés tres salidas: arreglar lo que el job reporta hoy en su log (formato:
+  `terraform fmt -recursive <raíces>`; validez: `terraform init -backend=false &&
+  terraform validate` en cada raíz); **o** subir a esta versión, donde el job avisa hasta
+  v2; **o**, si todavía no podés subir, pasar `ventana_terraform: "<una fecha posterior>"`
+  en el `with:` del `uses:` de `marco-ci.yml` (en la 1.9.6 ese input sí tiene efecto). Si
+  el rojo es «este runner no trae el binario», el defecto es del marco y cualquiera de las
+  dos últimas lo evita. **Después de subir**, sacá `ventana_terraform` de tu `with:`: un
+  `::notice::` te lo recuerda en cada corrida, y en v2 el input se quita y pasarlo hace
+  fallar la corrida entera.
+
+  **Cambio de contrato dentro de la línea 1, decidido por el PO (D9):** el default de
+  `ventana_terraform` pasa de `"2026-09-30"` a `""` y el input deja de tener efecto. Por
+  la regla del marco eso es un cambio de comportamiento por un default, y va escrito acá
+  para que no te sorprenda: para un repo que sube a esta versión **después** del
+  2026-10-01, el job **afloja** (de rojo en la 1.9.6 a aviso) hasta v2, y si pasabas una
+  fecha ya vencida para que te detuviera antes, también pasa a aviso. Los hallazgos
+  siguen saliendo como `::warning::` en el resumen de la corrida; si querés que te
+  detengan antes de v2, arreglalos con los comandos de arriba.
+
+- **Las plantillas de pull request piden el comando y su código de salida, y un campo «No
+  medido».** Las dos: la del marco y la que el andamio reparte (esta, en lenguaje para
+  quien no programa). Contar líneas de salida o pegar un pedazo del log no demuestra nada:
+  una herramienta que no llegó a arrancar muestra lo mismo que una que no encontró nada. Es
+  el defecto que midió la auditoría de cierre de la v1 (13 de 20 afirmaciones falsas). La
+  regla no tiene compuerta automática, por decisión escrita en el change `rojo-primero`.
+  Viene de Rigel (ac628ab).
+
+  **Para consumidores: nada que hacer.** Es scaffold: un proyecto que ya existe no la
+  recibe. Si querés la sección nueva, copiala de `plantilla/.github/PULL_REQUEST_TEMPLATE.md`
+  a tu `.github/PULL_REQUEST_TEMPLATE.md`.
+
+- **Las excepciones que existen por una ventana vencen con la versión.** La de
+  `carril-docs` en `pruebas/andamio/actions-alcanzables.test.mjs` declara la versión en
+  que se decidió, y se pone roja en el pull request del release que corte otra. Hay dos
+  salidas: cerrar lo que la excepción tapaba, o mover la versión, que es una decisión
+  firmada. La de `@v1` de `pruebas/andamio/pinado.test.mjs` ya no existe: la retiró el
+  pin exacto del guardrail de deltas (entrada de arriba). Viene de Rigel (2.5.0).
+  **Para consumidores: nada** (bancos del marco).
+
+- **El límite del aviso vive en un solo lugar.** El input `limite` de
+  `actions/aviso-version` deja de declarar `default: "3500"`: un vacío cae en la
+  constante `LIMITE_POR_DEFECTO` del script, que es la misma contra la que mide la
+  compuerta. El valor efectivo no cambia. En Rigel los dos números se separaron y la
+  compuerta midió contra uno mientras el envío recortaba en otro. **Para
+  consumidores: nada** — quien no pasa `limite` sigue con el mismo número, y quien lo
+  pasa, con el suyo.
+- **El preámbulo del aviso deriva el tag móvil de la versión** en vez de escribir `v1`,
+  y un banco ata el canal que nombra (Dependabot) a la configuración que reparte el
+  andamio: si el andamio deja de recibir el marco por Dependabot, el banco se pone rojo
+  en vez de dejar la frase vieja. **Para consumidores:** nada si no invocás la action.
+  Si la invocás, el primer párrafo del mensaje cambia de redacción: ya no dice que el
+  tag móvil «sigue existiendo y ya no es el canal», sino que no es el canal y para qué
+  existe.
+- **El paso 1 de la skill de release escribe `[No publicado]` con su `### Para
+  consumidores` de fábrica**, que es lo que la compuerta nueva acepta; un banco extrae
+  ese bloque de la skill y lo pasa por la misma compuerta. **Para consumidores: nada.**
+
+- **La compuerta del aviso mide cada dialecto que la action acepta**, porque la
+  traducción cambia el largo, y el `::error::` nombra el dialecto que no entra. **Para
+  consumidores: nada** — corre en el CI del marco.
+
+- **Una compuerta nueva o endurecida deja de ser incompatible por sí misma, y lo
+  incompatible pasa a ser una lista cerrada.** `AGENTS.md` decía que endurecer un check
+  era breaking y que «se estrena en modo aviso» hasta la versión mayor siguiente: una
+  regla nacida del incidente del 2026-08-19, cuando el canal era el tag móvil y el rojo
+  llegaba sin PR. Desde el 2026-08-21 el canal es el pin exacto y el rojo llega dentro
+  del PR de bump, así que la regla sobrevivió a su causa. La decisión D1 del PO
+  (2026-09-17) la reemplaza: lo incompatible son **cinco casos** —los cuatro de contrato
+  de siempre y uno nuevo, **exigir algo que solo se arregla fuera del repositorio del
+  consumidor** (configuración de GitHub, un acto de administrador), que se estrena
+  avisando o va a la línea mayor—. Una compuerta cuyo arreglo cabe en el repositorio
+  sale exigible el día que sale, en un MINOR, con el arreglo escrito en «Para
+  consumidores». Un cambio de andamio no es incompatible para nadie. La plantilla de PR,
+  la skill del release, el glosario y `docs/11-reglas-no-escritas.md` dicen lo mismo.
+  Portado de Rigel (2.0.0, change `linea-v2`), con el quinto caso que su lista no tenía.
+  **Para consumidores: nada hoy.** Desde la próxima versión, una compuerta nueva puede
+  llegar en rojo dentro de tu PR de actualización, con lo que tenés que cambiar escrito
+  en «Para consumidores».
+
+- **El andamio pina prettier exacto: `"prettier": "3.9.6"`, no `"^3.9.6"`.** Con el
+  rango, cada proyecto instalaba la versión que hubiera salido el día que nacía
+  (medido: un destino del 2026-09-17 resolvió 3.9.7) y ninguna medición del marco
+  podía afirmar nada sobre ella. Para consumidores: llega a los proyectos nuevos. Un
+  proyecto existente que quiera el mismo pin cambia la línea en su `package.json`,
+  corre `pnpm install` y `pnpm format`, y commitea el resultado; subirlo después es
+  un PR de Dependabot como cualquier dependencia.
+- **`projects init` escribe sus archivos con la forma del formateador.** El archivo
+  de valores, las respuestas y los desvíos (también los que escribe la puerta web)
+  salen con `jsonParaElArchivo`, que deja en una línea los arreglos cortos como hace
+  prettier (`package.json`, que prettier trata como `JSON.stringify`, queda igual);
+  y las podas por forma, plataforma y tipo de cuenta cosen la costura que dejan
+  (`coserCosturas`), sin dos líneas en blanco seguidas ni una al final. El paso
+  `formateado` del arranque se conserva solo para un nombre de proyecto de más de 60
+  caracteres (`LARGO_DE_NOMBRE_MEDIDO`), y con `--sin-arranque` ese caso se avisa con
+  el comando. Viene de Rigel 1.13.0 (commit c8b4fff). Para consumidores: nada; es
+  herramienta del marco y los archivos que escribe tienen las mismas claves.
+- **La guía del andamio (`plantilla/README.md`) describe lo que el andamio trae.**
+  La sección 4 decía que no traía `package.json`, `pnpm-workspace.yaml`, despliegue
+  ni `infra/`, y los trae; ahora es una tabla por entrada de la raíz, con cuándo
+  llega cada una, que un banco compara contra lo que `projects init` reparte. Los
+  caminos «sin frontend» y «sin E2E» traen sus seis lugares cada uno, recorridos
+  hasta `pnpm verificar` en verde, y la salida de `projects init` nombra los mismos.
+  `{{PAQUETES}}` figura como derivado, no como un valor a llenar. Para
+  consumidores: nada.
+
+- **El cliente de datos se genera al instalar.** `plantilla/api/package.json` gana
+  `"postinstall": "{{GENERAR_CLIENTE_DATOS}}"`: quien clona y corre `pnpm install && pnpm lint`
+  ya no ve 8 errores de tipos y un `TS2305` que no son suyos (medido el 2026-09-17; Rigel
+  2.6.0, commit 4d0bd19). El paso explícito del CI y el script `datos` se conservan. La
+  salida de `projects init` para un proyecto sin cliente de datos nombra ahora los **tres**
+  archivos donde viaja el comando (antes, uno), y un banco la deriva del andamio. Para
+  consumidores: llega a las aplicaciones nuevas. **Una existente NO lo recibe** y sigue
+  necesitando `pnpm datos` antes de `pnpm lint`; el requirement que lo pide se enuncia
+  para lo que nace desde esta versión. Para adoptarlo agrega la línea `postinstall` con
+  el mismo comando que su script `datos`; si el proyecto no genera cliente de datos, no
+  la agrega.
+- **vitest y `@vitest/coverage-v8` pasan a `^5.0.1`, como par, en `api`, `web` y `sitio`.**
+  El sitio venía con `^4.0.18`, un piso por debajo del de los otros dos (`^4.1.11`), y
+  ningún banco exigía que el proveedor de cobertura fuera del mismo rango que el
+  corredor, que lo exige en su misma versión exacta. Medido en las dos formas:
+  `pnpm verificar` en verde, el `include` sigue metiendo al total los archivos que
+  ninguna prueba importa y el umbral sigue mordiendo. La tabla `text` de la 5 oculta los
+  archivos al 100%: lo que decide es el lcov. Viene de Rigel 1.13.0 (commit 1bd6dc0) y
+  2.6.0 (commit fabe1e6). Para consumidores: llega a los proyectos nuevos. Uno existente
+  que quiera subir lo hace en un solo PR con los dos paquetes al mismo rango, y corre
+  `pnpm install` y `pnpm verificar`.
+
+- **La verificación final del bootstrap es `git grep --untracked -nE "..."`**
+  (`plantilla/AGENTS.md`, «Antes del primer commit»). El `grep -rnE ... --exclude-dir=...`
+  anterior no corre en PowerShell ni en cmd; y `git grep` a secas —la forma de Rigel 1.8.0,
+  commit 0629661— solo mira lo commiteado, así que antes del primer commit decía que no
+  quedaba nada aunque quedara (medido). Para consumidores: llega a los proyectos nuevos; en
+  uno existente esa sección ya la borró quien terminó el bootstrap.
+- **`plantilla/.github/proteccion-main.md`: los comandos de contraste encadenan el id solos y
+  declaran su shell, y las reglas diferidas dicen qué condición las reactiva.** El id se busca
+  por el nombre del ruleset (`main-protegida`) en vez de copiar un `<id>` a mano —en bash ni
+  siquiera es un argumento—, y la nota avisa que en PowerShell `gh` parte `--jq` por los
+  espacios (`accepts 1 arg(s), received 3`). La tabla de diferidas suma la columna
+  «Condición que la reactiva», que el requirement «Branch protection documentada como paso
+  manual» ya exigía, y marca la aprobación requerida como la primera a encender: con 0
+  aprobaciones el gate del PO que `CODEOWNERS` cablea no se exige. Viene de Rigel 1.8.0
+  (commits 0629661 y 7886e79). Para consumidores: llega a los proyectos nuevos; uno existente
+  que lo quiera copia la tabla de diferidas y la sección «Contrastar lo escrito» de
+  `plantilla/.github/proteccion-main.md`.
+- **`docs/05-arrancar-tecnico.md`, fase 1, deja de describir otra organización.** Decía que el
+  equipo `po` estaba vacío (`--jq 'length'   # hoy: 0`), nombraba un project «Roadmap del
+  área» y handles de terceros: residuo del fork. Ahora comprueba según el tipo de cuenta,
+  lista logins en vez de contar contra una cifra escrita y remite al control automático. Para
+  consumidores: nada.
+
+- **`plantilla/.gitignore` ignora `registro-de-friccion.md` y `.projects-friccion.json`.** Los
+  deja `projects init` en la raíz del proyecto y son de esa corrida, no del proyecto; sin la
+  línea, la puerta web —que copia el proyecto armado y hace `git add -A`— guardaba el registro
+  en el repositorio de la persona. Para consumidores: llega a los proyectos nuevos; uno
+  existente no tiene esos archivos y no necesita la línea.
+- **La plantilla del registro de fricción dice qué parte ya no se llena a mano** (la que ve la
+  herramienta) y cuál sí (el reloj, los ajustes de GitHub, el primer change); `docs/05`,
+  `docs/04` y el índice de `docs/` lo dicen también. Para consumidores: nada.
+
+### Eliminado
+
+- **El andamio ya no trae su propia copia del paso «Formato y validez de las raices de
+  Terraform».** Vivía inline en el job `build_test` de `plantilla/.github/workflows/ci.yml`
+  con su propia fecha (`VENTANA_TERRAFORM: "2026-09-30"`), ya divergida de la del marco y
+  salteada justo en los PRs que sólo tocan `infra/` (que son carril de docs). El `ci.yml`
+  del andamio ya llama a `marco-ci.yml`, cuyo job `terraform` mira `infra` e `infra-prod`
+  por default. `plantilla/AGENTS.md`, `plantilla/infra/README.md`,
+  `plantilla/infra-prod/README.md` y `plantilla/infra/adaptadores.md` lo dicen así.
+
+  **Para consumidores — parche manual, porque el andamio no viaja con el bump:** si tu
+  repo nació del andamio entre la 1.8.0 y la 1.9.6, su `.github/workflows/ci.yml` trae ese
+  paso con `VENTANA_TERRAFORM: "2026-09-30"`, y **el 2026-10-01 se endurece solo**, con
+  cualquier versión del marco que pines. Borrá el paso entero (desde el comentario «LA
+  INFRAESTRUCTURA TAMBIEN SE VERIFICA» hasta su último `fi`): el job `terraform` del
+  reusable hace la misma verificación y además corre en los PRs que sólo tocan `infra/`.
+  Si tus raíces se llaman distinto, declaralas en el input `raices_terraform` del
+  `uses:`. Para verificar: `grep -n "VENTANA_TERRAFORM" .github/workflows/ci.yml` no
+  devuelve nada.
 
 ### Corregido
 
@@ -92,6 +516,367 @@ mueve sobre un cambio incompatible.
   si producción sale sola y lo contrasta contra las cuatro páginas, en los dos sentidos.
   Si mañana la promoción vuelve a ser automática, se pone roja hasta que las páginas lo
   digan.
+
+- **La introducción se contradecía sobre qué publica el marco.** Arriba decía que
+  el marco no publica en internet y la sección 6 dice que un sitio para leer sí se
+  publica. Ahora dice lo que es: la aplicación todavía no, el sitio sí. Para
+  consumidores: nada.
+- **Un escenario del contrato fijaba un hecho con fecha.** El de la introducción
+  exigía declarar «que el marco todavía no publica la aplicación», que el día que
+  la publique habría obligado a declarar algo falso. Ahora exige declarar cada
+  tramo que el marco todavía no cubre para la forma elegida. Para consumidores:
+  nada.
+- **Un caso del banco del piso de permisos decía «exactamente» y comprobaba «al
+  menos».** Se renombró a lo que comprueba. Para consumidores: nada.
+
+- **El contrato de `reglas-al-dia` prometía dos cosas que el marco no hace, y se
+  habrían archivado así.** El delta de `gobierno-contribucion` decía que un
+  artefacto atrasado **avisa sin bloquear** durante una ventana y que la puesta al
+  día llega como un **pull request con el artefacto regenerado**. Desde la 1.6.0 el
+  atraso es rojo el día que la versión se publica, y el pull request que llega solo
+  es el del bump de Dependabot, sin el artefacto adentro. El delta ahora dice lo que
+  se sostiene: la versión llega en un pull request que nadie tuvo que abrir, el rojo
+  aparece dentro de ese pull request y la rama de integración no cambia de veredicto
+  mientras no se integre. Queda pendiente la aprobación del PO, porque la capability
+  es suya. Para consumidores: nada; el delta todavía no está en el contrato vivo.
+- **Un change del marco presentaba como consumidor de Projects a un repositorio que
+  no lo es.** El bloque de migración de `reglas-al-dia`, y el documento con su diff
+  (`migracion-intranet.md`), eran de dos repositorios del linaje anterior a la
+  bifurcación; uno figuraba con un nombre de esta cuenta que era un renombrado
+  mecánico. El documento se retiró y el bloque quedó declarado no aplicable, con lo
+  que cada tarea protegía nombrado al lado. Para consumidores: nada.
+
+- **Un proyecto recién armado desde un clon del marco podía nacer con el job
+  `constitucion` en rojo.** `projects-init` renderizaba la porción del marco con la
+  action del clon, y el CI del proyecto la verifica con la del tag que pina su
+  `ci.yml`. Con un canónico que el clon trae y ningún release publicó todavía —la
+  1.10.0 de esta versión, mientras el andamio pina la anterior—, el proyecto nacía con
+  dos `::error::`, `ci-ok` en rojo y el despliegue sin dispararse. Ahora, si el clon
+  tiene el tag del pin, la constitución se renderiza con la action de ese tag. Si no lo
+  tiene (una descarga en ZIP no trae tags) y el canónico del clon va adelante del pin,
+  la herramienta lo avisa con el arreglo: `git -C <clon> fetch --tags` y volver a
+  correr con `--forzar`. Para consumidores: nada que hacer en un repo ya creado. **Si
+  armás un proyecto desde una descarga en ZIP de `main` antes de que salga el release
+  que publica este canónico, va a nacer con ese rojo**: bajá el ZIP de la versión que
+  pina su `ci.yml` (la página de releases del marco) en vez del de `main`, o regenerá la
+  porción con el comando de la primera entrada de «Cambiado», con esa versión.
+
+- **La documentación de `actions/constitucion` prometía una ventana de gracia que ya no
+  existe.** El encabezado de `action.yml` decía, en presente, «la ventana de gracia es
+  para reglas nuevas, no para ediciones a mano»; la descripción del output
+  `exigible_desde` ofrecía «un estreno con aviso»; nueve pasajes de `constitucion.mjs`
+  y uno de `cableado.mjs` describían avisos que la action ya no da; el README de las
+  actions y la skill del release ofrecían el estreno con aviso como opción de quien
+  publica; y el encabezado del `actualizar-marco.yml` del andamio hablaba de un check
+  que «pasa de aviso a rojo». Todo en prosa: la action verifica exactamente lo
+  mismo que antes. Para consumidores: nada. Un repo nacido del andamio conserva su copia
+  del comentario de `actualizar-marco.yml`, que es prosa y no cambia nada que corra.
+
+- **La constitución y el andamio arrastraban residuos del renombrado que separó al
+  marco de su origen.** `90-marca` mandaba a buscar el manual de marca en una skill
+  cuyo nombre había roto el reemplazo —y que no existe con ese nombre en ningún
+  lado—, dejaba un artículo doble delante de «consumidor» y nombraba el símbolo de
+  otra marca; el comentario de `plantilla/eslint.config.mjs` repetía la skill
+  inexistente. Se reescribieron sin cambiar lo que exige ninguna regla ni ningún id,
+  y un banco nuevo caza esas formas en todo lo que viaja. Para consumidores: el texto
+  corregido llega con la regeneración de «Cambiado»; el comentario de ESLint sólo
+  en proyectos nuevos.
+- **La copia de la skill `projects-archive-change` que reparte el andamio no pasaba
+  el formateador del andamio** (un bloque de cita pegado a una lista). El arranque la
+  reescribía en su paso `pnpm format`, así que no ponía nada en rojo, pero cada
+  proyecto nacía con una copia distinta de la del marco: ruido en la revisión de
+  divergencia. Para consumidores: nada.
+
+- **Dos requirements vivos de `operacion-infra` se contradecían sobre las alarmas, y la 1.7.0
+  lo publicó.** Uno fija un mínimo; el otro decía que lo exigido de las alarmas «NO SHALL ser
+  cuáles ni cuántas», y la entrada de la 1.7.0 lo repitió: «Las alarmas se exigen como
+  propiedad y jamás como lista». Esa frase vale para lo que mira la verificación de los
+  pendientes, no para lo que tiene que vigilar producción: la cláusula se acota a su
+  verificación y dice que no debe leerse como que el marco no exige ninguna alarma. Porte de
+  `las-alarmas-no-se-contradicen` de Rigel, resuelto por capacidad porque acá no existe la
+  action que allá ya exigía alarmas concretas. Para consumidores: nada que cambiar; si tu
+  proyecto eligió sus alarmas leyendo «jamás como lista», revisá que cubra las tres del piso.
+- **`openspec/cobertura-de-requirements.md` daba como parcialmente cubierta la higiene de logs
+  por un pendiente que no existía**, y sus anclas al banco de pendientes caían sobre código
+  cualquiera. La fila nombra ahora la comprobación que exige el pendiente de logs en las dos
+  raíces, y las anclas se corrigieron. Para consumidores: nada.
+
+- **La versión que sube a DEV lleva el nombre del commit que se trajo, no el de la
+  punta de `main`.** Bajo `workflow_run`, `GITHUB_SHA` es la punta de `main` cuando
+  arranca la corrida, no lo que el CI midió: el job `dev` traía un commit y rotulaba
+  la versión con otro, y el resumen mandaba a promover el segundo. Si entraba otro
+  merge mientras el CI corría, la versión quedaba con el nombre de un commit y el
+  código de otro, en verde. Ahora un primer paso fija el commit una vez por corrida y
+  todo lo demás lo lee de ahí.
+
+  **Para consumidores: nada.** El workflow de dos ambientes todavía no salió en
+  ninguna versión publicada.
+
+- **El guardrail de deltas ya no viaja por el tag móvil `v1`: tu pin exacto es
+  verdad entera.** Tu `ci.yml` pina `marco-ci.yml@vX.Y.Z`, pero adentro el job
+  `deltas-openspec` invocaba `actions/guardrail-deltas@v1`: cada vez que el release
+  movía `v1`, el guardrail nuevo corría en tu repositorio sin ningún pull request. Era
+  la «media verdad» que `AGENTS.md` ya reconocía, y el motivo del `@v1` —que pinar la
+  versión que se corta ponía en rojo al pull request que la corta— había desaparecido
+  en la 1.8.0, cuando el guardrail pasó a un job que se saltea en el repositorio del
+  marco. Ahora esa línea va por versión exacta, como todas las demás, y el release la
+  mueve con el resto de los pines. El job, el nombre del check, sus permisos y su
+  resultado no cambian. Viene de Rigel 2.3.0, donde el mismo tag le llevó a sus
+  consumidores un guardrail endurecido sin pull request.
+
+  **Para consumidores: nada.** Mientras sigas en una versión hasta la 1.9.6, tu
+  `marco-ci.yml` sigue resolviendo `v1`, que apunta a la 1.8.0 y tiene el mismo
+  guardrail que la 1.9.6; el tag no se mueve más sin un OK humano explícito, así que
+  nada cambia bajo tus pies sin un pull request. Si mantenés un fork del marco, el tag
+  que tiene que existir en el fork es el de la versión exacta (`docs/15-forkear-el-marco.md`).
+
+- **La salida de emergencia del bump no existía: el artifact `constitucion-al-dia`
+  se subía vacío.** Es lo que el ADR 005 manda a bajar y commitear sobre el PR de
+  Dependabot cuando nace rojo por el artefacto viejo. `upload-artifact` excluye los
+  archivos ocultos desde su v4.4, todo lo que la action deja ahí vive en `.projects/`
+  o `.cursor/`, y con `if-no-files-found: warn` el único rastro era un aviso que
+  nadie lee. El `ci.yml` del andamio ahora sube los ocultos y es rojo si no sube nada;
+  un banco corre la action y comprueba que una corrida verde también deja el
+  directorio lleno. Viene de Rigel 1.9.0.
+
+  **Para consumidores:** esto es scaffold y no te llega con el bump. Si tu repo nació
+  con la 1.9.6 o antes, en el job `constitucion` de tu `.github/workflows/ci.yml`,
+  en el paso que sube `constitucion-al-dia`, cambiá `if-no-files-found: warn` por
+  estas dos líneas:
+
+  ```yaml
+          include-hidden-files: true
+          if-no-files-found: error
+  ```
+
+- **`cobertura-diff` te mandaba a agregar `all: true`, una opción que vitest ya no
+  lee.** vitest 3 retiró `coverage.all` y la 5 la ignora sin aviso, así que seguir el
+  consejo agregaba una línea inerte y el archivo que ninguna prueba importa seguía sin
+  medirse. Los siete mensajes de arreglo, la cabecera del `action.yml` y el README de
+  las actions nombran ahora `coverage.include`; la forma vieja aparece solo como
+  historia. Viene de Rigel 2.6.0.
+
+  **Para consumidores: nada.** Si seguiste el consejo viejo, el `all: true` que
+  agregaste no hace nada y lo podés borrar; lo que tiene que estar es el `include`.
+
+- **Un script de CI bajo `.github/` ya no pone rojo `cobertura-diff`.** Un
+  `.github/scripts/*.mjs` sin datos de cobertura era rojo sin prueba posible que lo
+  apagara —corre en el runner, no en la suite de ningún paquete—, mientras el censo de
+  fuentes lo daba verde. Ahora no se mide, figura en el resumen como fuera de la
+  medición y la corrida lo nombra en un `::notice::`. La exención es por la ruta y no
+  por «fuera de todo paquete», que con un `package.json` en la raíz quedaba inerte.
+  Viene de Rigel 1.11.0.
+
+  **Para consumidores: nada.** Un rojo que pasa a verde; el código de aplicación sin
+  datos sigue siendo rojo.
+
+- **El piso de permisos decía que sin `pull-requests: read` la detección caía al
+  fail-open. Es peor: la corrida no arranca.** El reusable declara ese permiso, y
+  cuando un reusable declara un alcance que su llamador no concede, GitHub rechaza la
+  corrida entera —`startup_failure`, cero jobs, cero checks, un mensaje que no nombra
+  el permiso— (medido en Rigel, corrida 33971175258). Corregido en el ejemplo de
+  `marco-ci.yml`, en el `ci.yml` del andamio y en el del marco, con un banco que lo
+  sostiene.
+
+  **Para consumidores: nada que cambiar en la configuración.** Si tu `ci.yml` tiene el
+  comentario viejo arriba de `permissions:`, lo podés corregir; lo que importa es no
+  recortar `pull-requests: read`, ni en el encabezado ni en el bloque del job que
+  llama a `marco-ci.yml`.
+
+- **`actions/README.md` decía que `@v1` es un puntero que avanza solo y que un
+  arreglo llega a todos sin PR.** Es falso desde el 2026-08-21: el canal es la versión
+  exacta más el PR de Dependabot, y `v1` existe pero no avanza con cada release. Era la
+  superficie donde un consumidor decide cómo pinar. Corregido ahí, en los encabezados
+  de `marco-ci.yml` y del `ci.yml` del andamio y en la skill de archivado del andamio,
+  con las frases vencidas en un banco. Viene de Rigel 2.4.0.
+
+  **Para consumidores: nada,** salvo que tu repo pine `@v1`: pasá a la versión exacta
+  para volver a recibir PRs de bump.
+
+- **La constitución del marco mandaba a revisar a mano lo que el guardrail de deltas
+  ya caza, y callaba su hueco real.** El guardrail sí reporta un `MODIFIED` cuyo
+  título no existe en el spec vigente (sale 1). Lo que no caza —ni `openspec validate
+  --strict`, medido con el CLI 1.9.0— es un `ADDED` cuyo título ya existe: lo frena
+  recién el archive. `AGENTS.md`, la skill `projects-archive-change` (la del marco y la
+  del andamio) y el README de las actions lo dicen ahora así, y un banco corre el
+  guardrail para derivar qué puede decir la prosa. Viene de Rigel 2.3.0 y 2.4.0.
+
+  **Para consumidores:** la skill de archivado es scaffold; si querés la versión
+  corregida, copiá de `plantilla/.claude/skills/projects-archive-change/SKILL.md` el
+  párrafo del paso 1 y las dos filas de la tabla de trampas.
+
+- **El logger del andamio prometía un filtro que nadie corre.** `log.ts` decía que
+  «el filtro» buscaba una subcadena de nivel: ninguna pieza del marco lee ese campo, y
+  el spec de observabilidad exige leer el campo, no una subcadena. El comentario dice
+  ahora eso. Viene de Rigel 2.5.0.
+
+  **Para consumidores: nada.** Es un comentario de scaffold.
+
+- **Un check del marco daba verde leyendo un comentario.** El paso que verifica que
+  el andamio reparta el umbral de cobertura exigía la cadena `all: true`, que solo
+  sobrevivía en el comentario que explica que la opción ya no existe. Ahora lee
+  `include:` y las cuatro métricas en el código —sin comentarios de línea ni de bloque
+  y sin el texto de un template string—, y exige que el `include` tenga al menos un
+  patrón: `include: []` también es rojo. Lee el archivo como texto, sin ejecutarlo.
+  Solo actúa en el repositorio que distribuye el andamio.
+
+  **Para consumidores: nada.** En tu repo ese paso se omite, como antes.
+
+- **El aviso sobre un desvío de permiso incompleto dejó de afirmar un error que la
+  action no da.** El paso «Permisos del agente sin escritura» de `marco-ci.yml`
+  exigía que la fecha de un desvío **existiera**, y creía que así validaba «como la
+  action». La action no lo hace: `esFecha` acepta el 30 de febrero. Con
+  `"fecha": "2026-02-30"`, el paso avisaba *«la action de la constitución ya lo da por
+  ERROR»* sobre un desvío que la action aceptaba. Ahora el paso usa el mismo predicado.
+  Lo encontró el banco nuevo que ata los dos lectores comparando su comportamiento, que
+  pone rojo la próxima divergencia. Exigir que la fecha exista, en los dos lectores a la
+  vez, es un endurecimiento y queda para v2.
+
+  **Para consumidores: nada.** Ningún veredicto cambia. Si un desvío tuyo tenía una fecha
+  así, deja de salir el aviso.
+
+- **Un desvío que nombra a la vez una `regla` y un `permiso` ya no pasa en silencio, ni
+  anula nada.** La action lo rechaza (`desvio-ambiguo`), y el paso de permisos lo absorbía
+  sin decir nada: era rojo por un camino y verde por el otro. Ahora el paso **avisa**
+  (`Desvio de permiso ambiguo`) y **no lo toma**: el permiso que nombraba queda como un
+  hallazgo sin desvío, en rojo si está en el archivo de ajustes del agente.
+
+  **Para consumidores:** si tu `.projects-desvios.json` tiene una entrada con `regla` y
+  `permiso` a la vez, partila en dos: una con la regla y otra con el permiso, cada una con
+  su motivo. Un repo que hoy pasa en verde no la tiene: el job de la constitución ya la da
+  por error.
+
+- **El extractor de pasos de los bancos devolvía el script del paso de al lado.** Cortaba
+  solo en `- name:`. Al pedir un paso sin `run:` seguido de uno que arranca con `- id:` o
+  `- uses:`, o al pedir el último paso de un job, devolvía un script ajeno y el banco medía
+  otra cosa en verde. Estaba latente. Viene de Rigel (c12f831). **Para consumidores: nada**
+  (banco del marco).
+
+- **Los bancos no dependen de la configuración git de quien los corre.** El repo de
+  juguete apagaba la firma de commits y no la de tags. En una máquina que firma tags, un
+  `git tag` moría con `fatal: no tag message?`. En Rigel costó trece rojos (c38e542); acá
+  estaba latente. **Para consumidores: nada** (banco del marco).
+
+- **El paso «El andamio reparte el umbral del total del marco» de `marco-ci.yml` pasaba
+  por un comentario.** Exigía el texto `all: true` en la configuración de cobertura del
+  andamio. vitest retiró esa opción en su mayor 4 y el andamio la sacó, pero el comentario
+  que explica el retiro la nombra dos veces, y con eso el paso seguía en verde. Ahora
+  exige el alcance que la reemplaza (`include:`) y las cuatro métricas **dentro del objeto
+  `coverage`**, atadas al mínimo que se le pasa: ni un comentario, ni un texto, ni una
+  clave de otro objeto (`test.include`) cuentan, y un archivo que no parsea es rojo. Lee
+  el archivo como código **sin ejecutarlo** —`node --check` para ver que parsea, y el
+  lector de la entrada anterior para el resto—: el paso corre sobre el head de un PR y el
+  marco promete leer ese código, no ejecutarlo. Lo encontró el banco nuevo del paso en su
+  primer caso rojo.
+
+  **Para consumidores: nada.** En un consumidor el paso sale antes por su camino inerte
+  («no distribuye el comparador») con el mismo `::notice::`, y ningún veredicto cambia.
+
+- **Nueve filas de la página de cobertura decían `ninguno` sobre compuertas que ya
+  existían.** Seis eran del contrato: la plantilla de PR, la protección de la rama, el log
+  en JSON, el deploy reproducible y reversible, el deploy a dev que se verifica y
+  producción, que solo recibe lo que dev aprobó. Tres eran de capabilities en vuelo. Cinco
+  llegaron con el despliegue de dos ambientes y la promoción, y las otras cuatro eran bancos
+  que ya existían; nadie los había cruzado con la página. Ahora
+  figuran como parciales, con lo que cubren y lo que no: 30 de 41 requirements del
+  contrato con compuerta (antes se contaban 24). **Para consumidores: nada.**
+
+- **El aviso de versión cortaba la viñeta BREAKING a mitad de frase.** Filtraba líneas
+  físicas, así que la única viñeta BREAKING de `[No publicado]`, envuelta en cuatro
+  líneas, iba a salir como «…—hoy, nadie—: `produccion`» y nada más. Ahora pega las
+  líneas de continuación hasta la viñeta siguiente, un encabezado o una línea vacía.
+  **Para consumidores:** nada si no invocás la action; si la invocás, tus viñetas
+  BREAKING envueltas llegan enteras.
+- **El aviso de versión advierte una sección «Para consumidores» vacía.** Un
+  encabezado sin texto —o sólo con comentarios— pasaba como presente: el mensaje salía
+  con «Qué tiene que hacer un consumidor:» y nada debajo, sin ninguna advertencia.
+  Ahora la corrida emite `::warning::` con el arreglo y su resumen la declara vacía. Lo
+  que el mensaje manda en ese caso no cambia. **Para consumidores:** nada si no invocás
+  la action; si la invocás, puede aparecer esa advertencia nueva.
+- **El emisor del aviso daba el consejo al revés.** Sin «Para consumidores» y con el
+  mensaje recortado, mandaba a «acortar la sección Para consumidores» —que no existía—
+  y afirmaba que el aviso salía «con el cuerpo completo» mientras lo recortaba. Ahora
+  dice a cuánto se recortó y, según la rama, manda a escribir la sección o a acortarla.
+  **Para consumidores: nada** — cambia el texto de dos `::warning::`.
+
+- **El mensaje del aviso mezclaba dos dialectos**: su encuadre usaba el de Slack (`*`)
+  y el cuerpo del CHANGELOG el de Markdown (`**`), así que ningún destino lo mostraba
+  entero bien. Ahora el mensaje entero habla el dialecto declarado. **Para
+  consumidores:** si invocás la action y **no** declarás `formato`, las dos líneas de
+  encuadre —«Qué tiene que hacer un consumidor:» y, cuando falta esa sección, «La
+  entrada de esta versión no trae la sección…»— pasan de `*…*` a `**…**`. Es el único
+  cambio que este arreglo le hace al mensaje por default (medido sobre todo el
+  CHANGELOG contra el script anterior a él). No es el único de la versión: el primer
+  párrafo cambia de redacción y las viñetas BREAKING llegan enteras, y eso lo cuenta la
+  entrada de «El aviso de la próxima versión se mide en el PR que lo escribe». Si tu
+  destino es Slack, declarar `formato: mrkdwn` arregla el encuadre y el cuerpo.
+
+- **La lista de lo que sigue deja de suponer un «PUSH DIRECTO» que no existe.**
+  `projects-init.mjs` afirmaba «el bootstrap va a main por PUSH DIRECTO» sobre
+  cualquier destino, incluida una carpeta sin git ni remoto. Ahora dice lo que
+  midió: carpeta sin repositorio (con los comandos para crearlo, guardarlo y
+  subirlo), repositorio sin remoto (con el `gh repo create` exacto), subido por esa
+  misma corrida (y cómo mandar la portada), o el camino a mano con su remoto, que
+  conserva el texto de siempre. Un checkout con el andamio sin guardar no se da por
+  enviado. La vista previa con `--repositorio` deja de prometer «no se toca
+  GitHub».
+  Para consumidores: nada.
+- **`docs/04-arrancar-acompanado.md` deja de contradecirse entre el doble clic y el
+  camino a mano.** Decía que el doble clic «arma el proyecto entero» y, en el
+  Paso 2, mandaba a clonar con `gh repo create --clone` sobre la carpeta que el
+  lanzador ya había llenado; remitía a un `cd ..` de un bloque que no existe; y
+  afirmaba sin condición que la herramienta «no crea repositorios». Ahora la guía
+  se parte en «Dos caminos desde acá»: el del doble clic salta los Pasos 2 a 5 y el
+  primer envío del 9, y el a mano los recorre, sin esas tres contradicciones. Un
+  banco nuevo (`pruebas/init/el-doble-clic-deja-un-repo.test.mjs`, con git de
+  verdad y `gh` simulado) exige `.git`, rama `main` y `origin`, y conserva el caso
+  rojo de la invocación de antes.
+  Para consumidores: nada.
+
+- **El andamio pasa su propio formateador, y lo que nace de él también.** Se
+  formatearon los 15 archivos de `plantilla/` que no pasaban `prettier --check`; las
+  tablas de la portada del proyecto y de `AGENTS.md` dejan de llevar marcadores (el
+  ancho de la celda cambiaba al sustituirlos) y los centinelas de poda de la portada
+  dejan de estar adentro de tablas y citas (el formateador partía la tabla). Para
+  consumidores: nada; un proyecto existente no recibe el scaffold.
+- **La línea de `/api/health` y su doble dejan de romper el formato con un nombre de
+  proyecto largo.** `plantilla/api/src/app.ts` y `plantilla/web/src/App.test.tsx`
+  abren sus objetos en varias líneas, y el log de arranque de
+  `plantilla/api/src/server.ts` toma el nombre de una constante: antes se partían
+  con nombres de 22 y 17 caracteres; ahora la primera línea que se parte lo hace a
+  los 70 (Rigel 2.6.0, commit 4d0bd19). Para consumidores: si su proyecto tiene un
+  nombre largo y `format:check` en rojo por esas líneas, `pnpm format` lo resuelve;
+  si no, nada.
+- **Cada bloque `[FRONT]` de `eslint.config.mjs` marca su cierre con `// [/FRONT]`.**
+  Los bloques no tienen todos la misma forma, y borrarlos deduciendo dónde terminaba
+  cada uno rompía el archivo (Rigel 1.13.0, commit 1bd6dc0). Para consumidores:
+  nada; un proyecto existente sin frontend que todavía tenga los bloques puede
+  agregar las marcas a mano antes de borrarlos.
+
+- **Un sitio recién nacido tenía el censo de fuentes en rojo.** `sitio/astro.config.mjs`
+  y `sitio/vitest.config.ts` quedaban fuera del alcance —el linter los ignora por
+  `**/*.config.*` y `sitio/tsconfig.json` los deja afuera a propósito— sin exclusión
+  declarada: `censo-fuentes` salía 1 en cada corrida, y `cobertura-diff` los marcaría
+  sin datos en el primer PR que los toque (medido el 2026-09-17). `sitio/package.json`
+  los declara en `projects.cobertura.excluidos` con su motivo, como ya lo hacían `api/`
+  y `web/`. Para consumidores: un sitio nacido antes de esta versión (como
+  `plantilla-sitio`) agrega a su `sitio/package.json` el bloque
+  `"projects": { "cobertura": { "excluidos": [...] } }` con esas dos entradas, copiado
+  de `plantilla/sitio/package.json`.
+- **Fe de erratas de la 1.7.0**: su entrada decía que `middleware/requestId.ts` entró
+  «con su prueba», y no la tenía; la tiene desde esta versión. Para consumidores: nada.
+
+- **`projects init` lee el archivo de valores escrito desde Windows PowerShell.** Con la BOM
+  que deja `Out-File -Encoding utf8` (o el UTF-16 de `>` en PowerShell 5.1) salía 1 con
+  `Unexpected token ... is not valid JSON`, y el mensaje se leía como si el archivo estuviera
+  mal llenado (medido el 2026-09-18). Ahora saca por bytes cualquiera de las tres BOM de
+  Windows; un JSON roto sigue fallando con su error. `docs/05` deja de decir que 5.1 rompe ese
+  paso. Viene de Rigel 1.14.0 (commit d7e5e63). Para consumidores: nada.
+
+- **`docs/12-upgrade-openspec.md` ya no afirma que la skill `projects-archive-change` lee el
+  pin de OpenSpec con su mismo comando**: hace rato que lo lee con `aplicar-deltas.mjs
+  --pin-openspec`. Nadie comparaba los dos textos; ahora el par que sí comparte el comando
+  (con `projects-adoptar`) tiene compuerta. Para consumidores: nada.
 
 ### Añadido
 
@@ -482,6 +1267,487 @@ mueve sobre un cambio incompatible.
   por ellas—, y lo ya contestado se conserva: se vuelve, se corrige, y de ahí en
   adelante se avanza con Enter sin reescribir nada.
 
+- **Un banco que sostiene el desvío en seis direcciones.**
+  `pruebas/ci-del-marco/desvio-de-review-del-marco.test.mjs` se pone rojo si hay un
+  solo dueño en `CODEOWNERS` y el desvío falta o está incompleto; si hay dos y el
+  desvío sigue puesto; si el `aprueba:` de un change activo no es uno de los
+  valores que el desvío admite (una lista cerrada, no una lista de nombres
+  prohibidos), o si sigue nombrando el desvío después de retirado; si un change
+  se archiva sin su `revision-adversarial.md` o con una que tiene los
+  encabezados y no el contenido; si un change que toca `gobierno-contribucion` no
+  empieza su `aprueba:` por el PO; y si uno de esos se archiva sin la constancia
+  `aprobado_por_po:` en su proposal. Para consumidores: nada; corre solo en el CI
+  del marco.
+- **Seis changes terminados pasan al contrato vivo.** Revisados bajo el desvío y
+  archivados: `el-andamio-dice-la-verdad`, `el-comando-que-se-pega-funciona`,
+  `el-piso-del-reusable-se-mide`, `los-changes-citan-lo-que-existe`,
+  `orden-de-lectura` y `una-sola-lista-de-plataformas`. Ocho requirements nuevos:
+  cuatro en `calidad-codigo`, y nacen `base-tecnologica` y
+  `documentacion-del-marco`. El contrato vivo pasa de 41 a 49 requirements. Los
+  seis que tocan `gobierno-contribucion` quedan revisados y esperando el OK del
+  PO. Para consumidores: nada que hacer; lo que esos changes cambiaron ya está en
+  las entradas de arriba, y archivarlos no cambia comportamiento.
+
+- **La deuda que deja la constitución distribuida, escrita.** `docs/11-reglas-no-escritas.md`
+  anota que la regla ya es automática y los cuatro huecos que el mecanismo no
+  cierra: que el `AGENTS.md` de un proyecto contradiga al artefacto no lo caza
+  nada; un consumidor que saca los `uses:` del marco deja de recibir reglas sin que
+  Projects lo vea; lo que un proyecto aprende y debería subir al marco sigue siendo
+  manual; y nada limita cuántos desvíos declara un proyecto. Para consumidores:
+  nada.
+
+- **Un banco que impide que la ventana de gracia vuelva:**
+  `actions/constitucion/pruebas/la-ventana-no-vuelve.test.mjs`. Pone rojo el PR del
+  marco que declare dos fechas distintas para una versión del canónico, que vuelva a
+  escribir una de las seis redacciones que ya prometieron la ventana, o que deje la
+  regla `marco-artefacto-al-dia` sin decir que el atraso es rojo. Nació rojo: sobre el
+  árbol anterior encontró nueve líneas. Límite declarado: caza esas redacciones, no una
+  nueva de la misma promesa. Es el porte del cierre que Rigel hizo a mano en su 1.10.0
+  (`794bbaf`), donde la frase sobrevivió una semana porque «contar menciones no
+  distingue la nota histórica del texto que sigue prometiendo». Para consumidores:
+  nada; corre en el CI de Projects.
+
+- **Una versión del canónico tampoco puede declarar una fecha futura.** El banco de la
+  ventana pedía las dos fechas iguales y no miraba cuáles: una entrada con las dos en el
+  futuro lo pasaba, y un repo atrasado habría quedado en `exit 0` con un aviso hasta esa
+  fecha. Ahora el PR del marco que lo intente da rojo, medido contra el día más
+  adelantado del planeta (UTC+14). Para consumidores: nada; ninguna versión publicada
+  usó una fecha futura.
+
+- **Cuatro reglas nuevas en la constitución para que una revisión no gire en
+  círculo: `revision-declara-su-meta`, `hallazgo-se-clasifica-contra-la-meta`,
+  `pregunta-al-po-declara-que-desbloquea` y `change-congelado-contra-su-insumo`**
+  (`40-fronteras`, ✅ Siempre, más una remisión en el flujo de `10-openspec`). Toda
+  revisión declara antes de empezar una meta que se pueda cerrar; lo que no la
+  bloquea se anota en los pendientes del change y no se pregunta; una pregunta al PO
+  dice qué desbloquea; y un change se congela contra la versión del insumo con que se
+  escribió. Es el porte de `revision-con-meta` de Rigel (1.8.0), nacido de una
+  adopción que gastó 40 horas y diez documentos del PO en cuatro días para terminar
+  con seis bloqueantes que no tocaban ninguno de los 24 escenarios. Cada una tiene su
+  propio id, y la del PO lo nombra por `{{PO}}`, que ya era obligatorio. Para
+  consumidores: nada más que regenerar el artefacto (ver «Cambiado»); ningún
+  marcador nuevo.
+- **La regla `terminado-en-local-y-no-cerrado`, pegada a la definición de
+  terminado** (`30-git-despliegue`). Done exige «desplegado y verificado», y un
+  repositorio sin ambiente —o con plataforma `ninguna`, que es legítima— no puede
+  cumplirlo: ahora el estado tiene nombre. Lo abierto es el **bloque**, no sus
+  tareas; si el bloque lleva casilla, va `[~]`; con `ninguna` no vence; y tener
+  ambiente no cierra los bloques que quedaron atrás. La guía (`docs/09`, §9.d)
+  muestra las formas. Porte de `dev-alcanzable` de Rigel (1.9.0), con su corrección
+  de bloque contra tarea. Para consumidores: si tenés bloques implementados y sin
+  desplegar, ahora hay cómo declararlos en vez de elegir entre un `[x]` que miente y
+  quedar en falta.
+- **Tres bancos del marco que se ponen rojos solos**, los tres vistos en rojo sobre
+  el árbol anterior: las reglas nuevas por id y por lo que dicen
+  (`inventario-canonico.test.mjs`), el presupuesto y su nota
+  (`presupuesto-del-canonico.test.mjs`) y los residuos del renombrado en lo que viaja
+  (`pruebas/andamio/residuos-del-renombrado.test.mjs`). Para consumidores: nada;
+  corren en el CI de Projects.
+
+- **Los pendientes de infraestructura dicen CUÁNDO se resuelven.** Cada `PENDIENTE-INFRA`
+  de `infra/pendientes.tf` e `infra-prod/pendientes.tf` suma una cuarta parte, «CUÁNDO SE
+  RESUELVE», con texto propio: el certificado se empieza primero aunque se cierre último; el
+  programador de tareas se contesta antes de tocar infraestructura, porque lo contesta el PO
+  leyendo el spec; el dimensionamiento de producción se decide contra el uso esperado. Un
+  pendiente con criterio y sin momento se lee como trabajo futuro sin dueño: en Rigel, el
+  segundo consumidor llegó al bloque 7 de 14 con sus seis pendientes intactos (1.9.0,
+  `dev-alcanzable`). El bucket del state sigue siendo pendiente y no pasa a marcador: era un
+  dato del área de origen, no del marco. Por eso los pendientes del bucket y del cluster dejan
+  de afirmar que «el área» tiene uno por cuenta: si la organización ya lo tiene, se pide el
+  dato; si no, crearlo es infraestructura base y se pregunta antes. Y el «cuándo» nombra el
+  rol que contesta («el PO», «Builder 1»), no su handle. Para consumidores: nada obligatorio. Es contenido del
+  andamio y no viaja solo; un repositorio nacido con la plataforma `aws` puede copiar a mano
+  los párrafos «CUÁNDO SE RESUELVE» de la versión nueva de esos dos archivos.
+- **El pendiente de la retención y la clase del grupo de logs del servicio, en dev (7) y en
+  producción (8).** El contrato exige retención explícita en cualquier ambiente, y la clase de
+  un grupo de CloudWatch no se puede cambiar después de creado. Medido contra la documentación
+  del proveedor el 2026-09-17: la clase barata (`INFREQUENT_ACCESS`) no admite filtros de
+  métrica ni `GetLogEvents`/`FilterLogEvents`. En dev el pendiente da el criterio («qué va a
+  leer este grupo»); en producción la clase es `STANDARD`, porque la alarma de los niveles de
+  alerta del log se arma sobre ese grupo y el runbook investiga con `filter-log-events`. Rigel
+  tardó un release en ver que producción —el ambiente que no se puede rehacer— no lo tenía
+  (2.4.0 y 2.5.0). Para consumidores: si tu proyecto nació con `infra/` e `infra-prod/` y
+  todavía no creó el grupo de logs del servicio, copiá esas dos secciones antes de crearlo;
+  después, la clase ya no se puede corregir sin recrear el grupo.
+- **El banco del andamio exige las cuatro partes, el pendiente de logs en los dos ambientes y la
+  misma forma en los `PENDIENTE-PLATAFORMA` del catálogo de adaptadores**
+  (`pruebas/andamio/infra-pendientes.test.mjs`), con una sola lista de partes para los dos
+  tokens y una mutación por cada propiedad nueva. Visto en rojo sobre el andamio anterior
+  (21 pruebas, 6 rojas). Y la mordida se mide ahora contra el árbol real: una mutación tiene
+  que dar más hallazgos que el árbol, no solo alguno. Para consumidores: nada; corre en el CI
+  de Projects.
+
+- **Un PR del carril rápido que toca la definición del pipeline ahora lo dice.** El
+  default de `rutas_carril_docs` exime `^\.github/` entero, así que un PR que toca solo
+  un workflow saltea tu `build-test` y sale verde sin haber ejecutado lo que cambió
+  (en Rigel: 9 PRs mergeados así, 3 tocando el workflow de despliegue). Ahora el job
+  `cambios` emite un `::warning::` que nombra esos archivos —los no-markdown de un
+  subdirectorio de `.github/`— con el arreglo. El default **no cambia** en esta
+  versión: cambiarlo es incompatible y va con la línea `v2`. El paso que decide el
+  carril tiene ahora nombre («Detectar el carril de docs»); su `id` y el nombre del
+  check no cambian.
+
+  **Para consumidores: nada obligatorio.** Si querés cerrar el hueco ya, pasale
+  `rutas_carril_docs` al job que llama a `marco-ci.yml`, con la lista del default y
+  `^\.github/[^/]*$` en lugar de `^\.github/`.
+
+- **Un change que se declara experimental caduca por fecha, y el pipeline lo cobra.**
+  Paso nuevo en el job `openspec` de `marco-ci.yml`, «Estado experimental con fecha de
+  veredicto»: un change activo que declara `experimental: true` en cualquiera de sus
+  artefactos tiene que declarar también `veredicto_antes_de: AAAA-MM-DD`, y es rojo si
+  no la declara, si no es una fecha que exista o si ya pasó sin un artefacto con
+  `artefacto: veredicto`. La fecha vence al terminar el día declarado, manda la más
+  temprana del change y el `archive/` no se mira. Existe contra el zombi: el change
+  que nadie confirma ni descarta y que al año nadie sabe si es promesa o resto. El
+  primer sujeto fue el propio marco: `capa-descubrimiento` declaraba una fecha que
+  ningún workflow leía y que vencía el 2026-09-21. Viene de Rigel 1.14.0, con el
+  lector de frontmatter adaptado: descarta los comentarios de YAML, que con el lector
+  original apagaban la declaración en silencio, y lee la clave sin distinguir
+  mayúsculas ni comillas (`Experimental: true` y `"experimental": true` también
+  declaran; la misma clave dos veces con valores distintos es rojo). No agrega
+  permisos: el job sigue con `contents: read`, auditado acción por acción.
+
+  **Para consumidores: nada**, mientras no declares un change experimental. Si no hay
+  ninguno, el paso imprime «el paso es inerte» y sale 0. Si declarás
+  `experimental: true` en algún artefacto de un change —con esa grafía o cualquier
+  otra de la clave—, agregá en el mismo frontmatter `veredicto_antes_de: AAAA-MM-DD`;
+  si el rojo aparece en tu PR de bump, el mensaje trae el change, la fecha y las tres
+  salidas: escribir el veredicto, correr la fecha con el motivo escrito o descartar el
+  change.
+
+- **Ninguna versión del marco se concede una ventana de gracia por datos.** Banco nuevo
+  `pruebas/ci-del-marco/sin-exigibilidad-futura.test.mjs` (de Rigel 2.0.0): ninguna
+  entrada del manifiesto del canónico declara `exigible_desde` posterior a `publicada`.
+  El mecanismo sigue disponible en la action `constitucion`; lo que el banco afirma es
+  que el marco no lo usa para sí.
+
+  **Para consumidores: nada.** Es un banco del repositorio del marco.
+
+- **La compuerta de fechas con dueño mira también el andamio y la asignación YAML de una
+  línea** (`VENTANA_X: "AAAA-MM-DD"`, también comentada), que era la forma exacta de la
+  fecha del andamio y la que no veía. Y deja de fiarse del nombre: cuenta toda fecha
+  AAAA-MM-DD escrita en una línea de código del marco o del andamio (también `.ts` y los
+  `run:` de los workflows), con las citas exceptuadas una por una y con su motivo. Su
+  anti-vacuidad corre sobre un árbol fabricado, porque en el marco ya no queda ninguna
+  fecha de gracia.
+
+  **Para consumidores: nada.** Es un banco del repositorio del marco.
+
+- **Las aserciones que tapan su evidencia dejan de entrar.** `assert.match` y
+  `assert.doesNotMatch` con mensaje imprimen **solo** el mensaje y pierden el input, así
+  que el día que caen en CI dicen el motivo y se callan lo que pasó. Se agrega
+  `pruebas/porque.mjs`, con `porque(motivo, evidencia)`, y un job nuevo de `ci.yml`,
+  `aserciones-con-evidencia`. Ese job pone rojo el PR que deja una aserción así en un
+  banco que toca, y la anota con archivo y línea. Cuenta como ciego todo mensaje que no lee
+  ningún valor del programa, no solo la cadena suelta: una constante que vale una cadena,
+  una concatenación de literales o un `porque("motivo")` sin su segundo argumento también
+  tapan el input. La deuda del resto del árbol (285) se publica en cada corrida y no
+  bloquea. Viene de Rigel (d71c40c). **Y la herramienta de Rigel tenía acá un falso negativo
+  del 14%**, medido contra el AST de un parser: una regex con comillas le escondía las
+  aserciones que venían después. Se arregló antes de cablearla. **Para consumidores: nada**
+  (CI del marco).
+
+- **Un instrumento para reproducir un banco intermitente**:
+  `.github/workflows/reproducir-intermitente.yml`, que se dispara a mano. Repite un banco
+  N veces en la misma invocación con que lo corre `ci.yml`. Antes de contar, corre una
+  vuelta de línea de base: si ya está roja, dice que mide su propio entorno. Deja una línea
+  por vuelta con el acumulado, así que una corrida cortada sigue siendo una medición, y un
+  verde dice que es una cota y no una ausencia. Acepta de 1 a 99999 vueltas y compara las
+  que corrió con las pedidas antes de dar el veredicto. Viene de Rigel (b047c16, c38e542 y el
+  PR #540 todavía abierto, 0448928). Reusa el `upload-artifact` que el andamio ya pina.
+  **Para consumidores: nada** (CI del marco).
+
+- **Las continuaciones de línea cortadas por un comentario o una línea vacía ponen rojo el
+  banco de sintaxis**, y también una barra final seguida de espacios, que parece continuar
+  y no continúa. Es shell válido que corre el comando sin sus argumentos, y `bash -n` no lo
+  ve. Viene de Rigel (cffa81f). **Para consumidores: nada** (banco del marco).
+
+- **Once compuertas que nadie había visto fallar ganan banco, y cada una se vio morder.**
+  Cinco de `marco-ci.yml`: «Exigir OpenSpec en el repo», «Validacion estricta de changes y
+  specs», «Definiciones de pipeline validas», «Censo de fuentes cableado» y el umbral del
+  andamio. Seis del andamio y del CI del marco: «El arbol arranca limpio», «Todo paquete
+  declara los scripts de verificacion», «Verificar cada paquete», el «Veredicto» del
+  andamio (el check que exige el ruleset de cada proyecto nacido de él) y «Verificar que el
+  bot esta configurado», en sus dos copias. Dos de la deuda vieja decían que no se podían
+  probar sin red: se prueban sin red, con un `curl` y un `npm` de mentira. Cada banco corre
+  el script real extraído del YAML, y se lo saboteó para verlo caer. Viene de Rigel (1.11.0
+  y 2.0.0, changes `rojo-primero` y `censo-honesto`). **Para consumidores: nada** (bancos
+  del marco).
+
+- **El censo de pasos sin banco mira todo lo que el marco escribe, y separa la deuda de lo
+  que no puede fallar.** Miraba 17 pasos de `marco-ci.yml`; ahora mira 112, en los
+  workflows del marco, en los que reparte el andamio y en las actions. Cada paso tiene
+  banco, o está declarado como deuda (sale por `::warning::` en cada corrida), o como «sin
+  rojo propio» con su tipo y motivo. Una action ajena se declara una vez. Una cita cuenta
+  solo si es una cadena literal, y un nombre repetido en dos archivos necesita que el banco
+  diga cuál: así el paso de Terraform de `marco-ci.yml` dejó de figurar con el banco de su
+  homónimo del andamio. La deuda llega al runner como anotación: el CI del marco corre sus
+  bancos con `--test-reporter=spec`, porque con el TAP que Node 22 usa en el runner las
+  anotaciones de un banco quedaban como comentarios. Y el censo no cuenta los pasos de un
+  repositorio anidado (un worktree dentro del checkout), que hacían depender el veredicto de
+  la máquina. **Para consumidores: nada** (banco y CI del marco).
+
+- **Un paso con `continue-on-error` no cuenta como compuerta.** Si lleva el modificador
+  —en el paso o en su job, con cualquier valor que no sea `false`— el censo de pasos exige
+  declararlo sin rojo, y la página de cobertura de requirements no lo puede citar como la
+  compuerta de un requirement. Hoy ningún paso del marco lo usa. Viene de Rigel (2.4.0,
+  change `el-numero-del-censo`). **Para consumidores: nada** (banco del marco).
+
+- **La ausencia de compuerta dejó de ser gratis en la página de cobertura.** En
+  `openspec/cobertura-de-requirements.md`, 25 filas decían `**ninguno**` y nada más, sin
+  la propiedad que impide verificarlas ni dónde vive el trabajo que falta. Ahora toda fila
+  sin compuerta declara uno de tres estados, y el banco de la página mide lo que cada uno
+  afirma: **pendiente** en un change vivo (el change existe y nombra al requirement),
+  **no verificable** por una propiedad del requirement (un motivo de esfuerzo no cuenta),
+  o **sin destino**, con la versión en que se decidió. Esta última **vence** al cortar la
+  versión siguiente. Un `**ninguno**` pelado es rojo, y también cualquier otra forma de
+  escribir la ausencia («Ninguno», «nada», «sin compuerta»...): antes contaban como
+  compuerta. Viene de Rigel (2.0.0 `censo-honesto`
+  y 2.4.0 `el-numero-del-censo`); el tercer estado es de este marco, porque acá el destino
+  tiene que poder comprobarse sin red. **Para consumidores: nada** (página y banco del
+  marco).
+
+- **La página publica cuántas compuertas son solo parciales.** Cada encabezado y el resumen
+  dicen cuántas de las compuertas cubren solo una parte, como subconjunto y no como una
+  bolsa aparte: hoy 15 de las 30. Viene de Rigel (2.4.0, issue #376 de allá). **Para
+  consumidores: nada.**
+
+- **Una compuerta que no corre no cuenta, y toda action publicada tiene que correr en
+  algún lado.** Hay un banco nuevo, `pruebas/andamio/actions-alcanzables.test.mjs`: toda
+  action de `actions/` tiene que estar invocada por la clave `uses:` de un paso de un
+  workflow que GitHub ejecuta (los del marco y los del andamio), o declarada con su motivo:
+  un `uses:` dentro de un heredoc, del texto de un input o de un workflow de ejemplo no
+  cuenta. La página de cobertura no puede citar como compuerta nada de
+  una action que nadie invoca. Los dos bancos usan el mismo lector del alcance. El caso
+  existía: **`actions/carril-docs` no la invoca ningún workflow del árbol**. Se declara,
+  no se cablea, porque `marco-ci.yml` trae la misma detección inline. Viene de Rigel
+  (2.2.0 y 2.6.0, issues #375 y #457 de allá). **Para consumidores: nada**; si usás
+  `carril-docs` por `uses:`, sigue igual.
+
+- **El aviso de la próxima versión se mide en el PR que lo escribe, no después de
+  mandarlo.** `herramientas/aviso-entra-en-el-mensaje.mjs` corre en el job
+  `changelog-en-el-pr` del `ci.yml` del marco y pone **rojo** el PR, cada causa con su
+  arreglo escrito: que la entrada no traiga `### Para consumidores` o la traiga vacía,
+  que el texto de fábrica del release quede encima de cambios reales (aunque se le haya
+  tocado la puntuación, o los cambios estén sueltos bajo el encabezado), o que el
+  mensaje no entre en el límite. Mide `[No publicado]`, la versión más alta y —con el
+  `CHANGELOG.md` del commit base del PR— toda versión cuyo aviso cambia en ese PR, como
+  el corte de una línea vieja; lo hace con las mismas funciones de la action, y no con
+  una estimación. Un banco corre el paso del CI por su nombre. Medido el
+  2026-09-17: el `[No publicado]` tenía 40488 caracteres y ninguna sección para
+  consumidores, así que el próximo aviso iba a armar 41091 y entregar 3451 recortados,
+  sin decirle a nadie qué hacer. Portado de Rigel en su forma corregida (1.17.3 y 2.4.0).
+  **Para consumidores: nada** — la compuerta corre en el CI del marco.
+- **La corrida del aviso que no envía nada ya no sale verde en silencio.** En
+  `aviso-version.yml`, el simulacro emite `::warning::` en vez de `::notice::` y el
+  nombre de la corrida dice «SIMULACRO (no envia)». `simulacro` sigue marcado por
+  defecto, a propósito. **Para consumidores: nada** — es el workflow propio del marco.
+
+- **`actions/aviso-version` acepta el dialecto del destino: input opcional `formato`,
+  `markdown` o `mrkdwn`.** `markdown` (lo que se usa sin declarar nada) manda el
+  `CHANGELOG.md` tal cual, para Teams y Discord; `mrkdwn` lo traduce al de Slack
+  —negrita con un asterisco, tachado, enlaces, encabezados, tablas como lista
+  etiquetada, párrafos y viñetas cortados en una sola línea— sin tocar el código, y con
+  la negrita que envuelve código emparejada. Un valor distinto es **rojo**, sin
+  payload y con el arreglo. El input no tiene default en `action.yml`, así que cada
+  corrida dice con un `::notice::` qué dialecto usó y si alguien lo declaró. Medido el
+  2026-09-17: el aviso de 18 de las 19 secciones del CHANGELOG llegaría a Slack con 870
+  `**` a la vista; en `mrkdwn`, ninguna. Portado de Rigel (1.16.0 y 2.4.0), con la
+  continuación de las viñetas que Rigel dejó sin juntar. **Para consumidores: nada**
+  si no invocás la action (ninguno de los consumidores medidos la invoca). Si la
+  invocás y tu destino es Slack, agregá `formato: mrkdwn`; en un workflow copiado del
+  marco va como **variable** de repositorio `AVISO_VERSION_FORMATO` —pestaña
+  Variables, no Secrets: `vars.*` no ve secretos y el aviso cae al default.
+- **El workflow del aviso del marco advierte si el dialecto quedó cargado como
+  secret.** Compara `secrets.AVISO_VERSION_FORMATO` con vacío —sin leer su valor— y
+  emite `::warning::` con el arreglo; no detiene el envío. **Para consumidores: nada**
+  — es el workflow propio del marco.
+
+- **«Para consumidores» se escribe para quien no es técnico, y el PR que la escribe en
+  jerga sale rojo.** `herramientas/aviso-entra-en-el-mensaje.mjs` suma una causa: una
+  sección que la compuerta mide usa la jerga de oficio que tienen prohibida las páginas
+  como `docs/01-introduccion.md`, en la prosa o entre backticks por encima del mismo
+  tope que esas páginas. La lista y el tope no se copian: se importan de
+  `pruebas/docs/lectura.mjs`. Es la otra mitad de la
+  regla de arriba: exigir una compuerta el día que sale solo es justo si quien recibe el
+  PR de bump entiende el arreglo. **Para consumidores: nada** — corre en el CI del marco.
+- **Un banco ata la definición de incompatible a sus copias.**
+  `pruebas/ci-del-marco/que-es-breaking.test.mjs` exige que la plantilla de PR ofrezca
+  exactamente la lista cerrada de `AGENTS.md`, con la misma frase, y que ninguna
+  superficie que dicta la regla vuelva a decir la vieja. A Rigel le pasó: su skill de
+  release contradijo su `AGENTS.md` dos días sin que nada se pusiera rojo. Recorre
+  también los specs vivos; la premisa vieja que sigue en el de la cobertura queda
+  eximida solo mientras el change que cierra esa ventana esté activo. **Para
+  consumidores: nada.**
+
+- **El doble clic deja un repositorio, no una carpeta.** Los tres lanzadores
+  (`arrancar.sh`, `arrancar.command`, `arrancar.cmd`) armaban el proyecto en
+  `../<PROYECTO>` y el único `init` de toda la cadena era el de OpenSpec: la
+  persona terminaba con una carpeta sin git. Ahora el Paso 2 le pide a
+  `projects-init.mjs` la bandera nueva `--repositorio`, que deja el destino como
+  repositorio en la rama `main` con su primer guardado —solo si la identidad de git
+  está configurada (sin ella, git inventa una con el nombre de la máquina, medido) y
+  el proyecto quedó en verde— y **ofrece** crearlo en GitHub y subirlo con
+  `gh repo create <cuenta>/<proyecto> --source=. --remote=origin --push`. Eso último
+  pasa solo si hay `gh` con sesión, el nombre está libre y la persona escribe «si»:
+  Enter, cualquier otra respuesta o la falta de terminal no crean nada. La
+  visibilidad sale de la respuesta que el asistente ya guardó. Lo publicado se
+  comprueba en el disco (`origin` y `origin/main` igual a `HEAD`), no por el código
+  de salida de `gh`. Todo lo que no se pudo hacer sale como `::warning::` con los
+  comandos exactos, también cuando el arranque sale rojo: el destino queda repositorio
+  en `main` sin primer guardado, con el motivo y los comandos para después, en vez de
+  una carpeta que reabrir el lanzador ya no puede tocar (el destino está ocupado).
+  `--sin-remoto` (en `projects-init.mjs` y en los lanzadores) deja
+  el repositorio solo en la máquina. La lógica vive en un módulo nuevo,
+  `herramientas/projects-repositorio.mjs`, sin shell en ningún sistema.
+  Para consumidores: nada. Es herramienta del marco que corre desde el clon y no
+  viaja al proyecto; la invocación sin la bandera escribe lo mismo que antes.
+
+- **El CI del marco corre el formateador sobre el andamio y sobre cada repo que
+  nace de él.** Paso nuevo «El andamio y lo que el init escribe pasan el
+  formateador» en el job `higiene` de `.github/workflows/ci.yml`: instala la versión
+  de prettier que declara `plantilla/package.json` —derivada, no escrita en el paso,
+  y en rojo si es un rango—, corre `prettier --check .` en `plantilla/` y en el
+  destino de cada combinación de forma, plataforma y tipo de cuenta, con los nombres
+  del ejemplo y con nombres largos, instanciado con `--sin-arranque` para que nadie
+  formatee después. Medido el 2026-09-17 antes del arreglo: 15 archivos del andamio
+  en rojo y 24 de 24 destinos en rojo. Viene de Rigel 1.13.0 (commits 7ceb40e y
+  40a7bce), extendido al destino porque acá las podas cambian el texto. Para
+  consumidores: nada; el paso vive en el CI del marco y no viaja.
+- **El `ci.yml` del andamio corre el formato en los dos carriles.** `format:check`
+  sale de `build_test` —que el carril de docs omite— a un job propio, `formato`, sin
+  condición ni dependencias, que instala con `--ignore-scripts`; `ci-ok` lo exige en
+  `success` y un `skipped` es rojo. Un PR de solo documentación ya no mete una tabla
+  desalineada en `main` para que detone en el PR de otra persona (Rigel 1.13.0,
+  commit d1c6380). Para consumidores: llega a los proyectos que nacen desde esta
+  versión, con un check nuevo, `formato`; `ci-ok` sigue siendo el único requerido.
+  **Un proyecto existente NO lo recibe y conserva el agujero**: su carril de docs
+  sigue sin mirar el formato, el requirement de `calidad-codigo` que lo exige se
+  enuncia para lo que nace desde esta versión, y nada del marco lo verifica en un
+  repositorio que ya existía (una compuerta en `marco-ci.yml` que lo exija queda como
+  decisión para la v2). Para cerrarlo: copia el job `formato` y su línea en el
+  `Veredicto` de `ci-ok` desde `plantilla/.github/workflows/ci.yml`, y saca
+  `- run: pnpm format:check` de `build_test`.
+
+- **La vía sin programas deja el lockfile que el primer CI exige.** `personalizar.yml`
+  —la puerta de los repositorios plantilla— armaba el proyecto con `--sin-arranque` y lo
+  guardaba **sin `pnpm-lock.yaml`**; el `ci.yml` del proyecto instala con
+  `--frozen-lockfile` y el primer push moría con `ERR_PNPM_NO_LOCKFILE` (medido el
+  2026-09-17). Paso nuevo «Dejar el lockfile que el primer CI exige»:
+  `corepack pnpm install --lockfile-only --ignore-scripts` sobre el proyecto recién
+  armado —resuelve versiones sin bajar el árbol ni ejecutar scripts de dependencias, en
+  un job cuyo token puede escribir— y rojo con el arreglo escrito si no queda el archivo,
+  antes de guardar nada. Viene de Rigel 2.6.0 (commit 4d0bd19), que versiona un lockfile
+  en el andamio; acá el andamio se poda por forma y plataforma, así que se porta la
+  propiedad y no el archivo. Para consumidores: los repositorios plantilla
+  (`plantilla-sitio`, `plantilla-aplicacion`) lo reciben cuando se regeneran desde el
+  marco; hasta entonces su vía sin programas sigue naciendo sin lockfile. Un proyecto ya
+  nacido por esa vía y sin lockfile lo arregla con `corepack pnpm install` en la raíz y
+  un commit de `pnpm-lock.yaml`.
+- **La integración del andamio levanta Postgres de verdad.** El job `build_test` del
+  `ci.yml` del andamio declara `services.postgres` con la misma imagen que el
+  `docker-compose.yml` (`postgres:16`), healthcheck `pg_isready` y `DATABASE_URL` a nivel
+  de job; la base se llama como el repositorio (`${{ github.event.repository.name }}`,
+  porque un workflow no puede llevar `{{PROYECTO}}`). Solo viaja con capa de datos: un
+  sitio no lo recibe. Medido contra un Postgres 16 real: la suite del API 53/53 y
+  `prisma migrate deploy` en 0; y el motivo de nombrar una sola base, también medido —
+  `prisma migrate deploy` contra una base que no existe **la crea en silencio** y sale 0.
+  Viene de Rigel 1.9.0 (commits 4bf260e y 755207b) y 2.4.0 (commit b7d3201: los lugares
+  que nombran la base se descubren en vez de listarse). Para consumidores: llega a las
+  aplicaciones que nacen desde esta versión; no es un check nuevo y `ci-ok` sigue siendo
+  el único requerido. **Una aplicación existente NO lo recibe**: sus pruebas siguen
+  corriendo sin el motor real, y el requirement que lo pide se enuncia para lo que nace
+  desde esta versión, así que nada del marco lo verifica en ella. Para adoptarlo copia el bloque entre
+  `# projects:solo-si-hay-datos` y `# projects:fin-solo-si-hay-datos` de nivel de job
+  (`services:` y `env:`) desde `plantilla/.github/workflows/ci.yml`. La imagen va por
+  tag (`postgres:16`), no por digest, igual que en el `docker-compose.yml`: el pin está
+  pendiente de decisión porque el Dependabot del andamio no actualiza ninguno de los dos
+  lugares.
+- **`requestId.ts` del andamio trae su prueba.** Cinco casos en
+  `plantilla/api/src/middleware/requestId.test.ts`: el trace del balanceador, el header
+  `X-Request-Id`, el contexto de log leído desde el handler, el id `local-` y que dos
+  requests locales no lo compartan. Hasta ahora se ejercía de rebote desde otras pruebas
+  (Rigel 1.13.0, commit f6fc798). Para consumidores: llega a los proyectos nuevos; uno
+  existente puede copiar el archivo tal cual.
+- **Tres bancos nuevos que fallan solos**: `pruebas/andamio/todo-camino-deja-el-lockfile.test.mjs`
+  (corre el paso de `personalizar.yml` con un `corepack` falso en sus cuatro caminos y
+  la copia real contra el `.gitignore` del andamio), `pruebas/andamio/fuentes-cubribles.test.mjs`
+  (cada fuente del andamio excluida con motivo, importada por una prueba de su paquete, o
+  juzgada por `medir-cobertura-diff.mjs` corriendo de verdad; exclusiones muertas en rojo)
+  y las secciones 2b y 2c de `pruebas/andamio/acoples-del-andamio.test.mjs`. Para
+  consumidores: nada; viven en el CI del marco.
+
+- **`projects init` contrasta el PO contra los equipos de la organización.** En una
+  organización, el `CODEOWNERS` del andamio le da proposal y specs al equipo `EQUIPO_PO`, y
+  ese cableado fallaba en silencio si el equipo estaba vacío, si todos sus miembros eran
+  también builders, si tenía más de una persona fuera de builders o si la única no era el
+  `PO` declarado: GitHub no asigna a nadie, o deja que un builder satisfaga el gate del PO, y
+  no lo dice. Al terminar, la herramienta lista los dos equipos en solo lectura y avisa con el
+  arreglo y el comando para mirarlo; «no pude mirar» se dice con su motivo, y en una cuenta
+  personal no consulta nada. Es aviso y no rojo porque el arreglo es de quien administra la
+  organización. `TIPO_CUENTA` se valida como `forma` y `plataforma`: ausente vale `usuario`,
+  y un valor que no es `usuario` ni `organizacion` —«organización» con tilde, por ejemplo— es
+  error con la sugerencia, en vez de caer en `usuario` y armar una organización con el
+  CODEOWNERS de una cuenta personal. El mismo control, a pedido: `node herramientas/projects-doctor.mjs --valores
+  <archivo>` (ahí un problema medido sale 1). Viene de Rigel 1.14.0 (commit b8836af), que
+  deriva el PO de sus equipos; acá se porta la propiedad, no la derivación. Para
+  consumidores: nada; es de la herramienta de arranque.
+- **`herramientas/actionlint-local.mjs`: actionlint con el pin del CI, en tu máquina.** Lee
+  la versión del `default` de `version_actionlint` en `marco-ci.yml`, verifica el checksum
+  contra el mismo release y usa el shellcheck del `PATH` pasado explícito. El binario queda
+  en una caché **del usuario** (no en el `/tmp` compartido), y su sha se vuelve a comparar
+  en **cada** corrida: si falta o no coincide, la caché se descarta y se baja y verifica de
+  nuevo; si otro usuario puede escribirla, no se usa y lo dice. Sin shellcheck,
+  actionlint deja de revisar los bloques `run:` **sin avisar** (medido: un SC2016 sale 0), así
+  que la herramienta lo anuncia y no llama «válido» a ese verde; en Windows apaga la
+  integración que se cuelga, y tiene techo de tiempo. El hook `pre-push` la usa en vez del
+  binario del `PATH` (hallazgos bloquean; «no pude correr» avisa y deja empujar), y el
+  `::error::` del paso de actionlint de `marco-ci.yml` la nombra. No baja shellcheck: su
+  release no publica checksums. Viene de Rigel 2.7.0 (commit 218e5f6). Para consumidores:
+  nada en el pipeline; el texto del rojo de actionlint cambia. Un consumidor puede reproducir
+  ese rojo con `node <clon-de-Projects>/herramientas/actionlint-local.mjs` desde su repo.
+- **Regla 11 de `docs/11-reglas-no-escritas.md`: un cero de `grep` sobre prosa con tildes no
+  es una verificación.** Medido: `LC_ALL=C git grep -c 'revisi.n trimestral'` da 0 sobre un
+  archivo que lo dice dos veces, y con un locale UTF-8 da 2. No se puede volver check y así se
+  declara, con su fila en el backlog; `pruebas/docs/grep-y-tildes.test.mjs` mide la
+  afirmación para que no envejezca. Viene de Rigel 2.5.0 (commit 89e89c7), corregida: el cero
+  falso depende del locale. Para consumidores: nada.
+
+- **`projects init` no dice `LISTO` sin dejar su registro de fricción.** Al terminar bien, y
+  antes de la línea `LISTO`, escribe `registro-de-friccion.md` en la raíz del proyecto —al lado
+  de la bitácora— con lo que la corrida tuvo que rodear: cada `::warning::` que emitió al
+  seguir por el camino conservador (entra solo, sin que nadie lo anote) y cada respuesta del
+  asistente que se rechazó o hizo volver atrás (sin lo que la persona escribió, y aunque el
+  asistente y el arranque corran en dos procesos, como los corren los lanzadores). Seis clases
+  cerradas —las cinco de Rigel más `PREGUNTA`—, cada apartamiento con su punto exacto; sin
+  apartamientos, lo dice en vez de no existir, y con ellos la pantalla dice que no es un éxito
+  limpio. Los avisos del render de la constitución —un programa corto del marco que la
+  herramienta invoca— entran también: su salida pasa por la consola que se vigila. Los de
+  pnpm, openspec y los pasos del arranque no, porque corren con su salida en vivo, y el
+  registro lo declara (en el caso vacío y en «Lo que este registro no ve») en vez de afirmar
+  una corrida sin apartamientos que no observó. No lleva el nombre del proyecto, la cuenta ni rutas de la máquina. Hasta ahora el
+  registro era una plantilla que había que acordarse de llenar, y su única instancia era de
+  otra organización; en su primera corrida encontró dos defectos que nadie había visto (la
+  protección de `main` se mide antes de que el repositorio exista en el camino del doble clic,
+  y el aviso del tipo de cuenta culpa a una sesión de `gh` que sí está abierta). Viene de
+  Rigel 1.14.0 (change `2026-09-01-arranque-ejecutable`, commit 8b24629), adaptado: allá lo
+  abre una skill paralela a la guía; acá lo deja la herramienta que ya ejecuta el arranque.
+  Para consumidores: nada; es de la herramienta de arranque, que no corre en su pipeline.
+- **El registro se ofrece al marco y se manda solo con un `si`.** Con terminal, la
+  herramienta propone abrirlo como issue en el repositorio del marco del que salió el clon (un
+  fork lo manda a su fork); Enter es «no», y sin terminal no llama a `gh`. Si no se manda,
+  queda impreso `gh issue create … --body-file <ruta>` para hacerlo después; un envío que falla
+  es `::warning::` con ese comando. Rigel sale 1 si no puede abrirlo: acá el proyecto ya está
+  armado, y un rojo mandaría a reabrir el lanzador contra un destino ocupado. Para
+  consumidores: nada.
+- **`herramientas/comandos-compartidos.mjs`: el comando que una guía y una skill dicen
+  compartir se escribe igual en las dos.** Compara byte a byte los bloques marcados con
+  `<!-- projects:comando <id> -->` (el fin de línea no cuenta; sin marcas, un lado ausente o
+  una marca sin bloque es rojo), sobre el único par real de hoy: `docs/12-upgrade-openspec.md`
+  y la skill `projects-adoptar`, que leen el pin de OpenSpec con el mismo comando. El banco del
+  marco lo corre en cada PR. Viene de Rigel 1.14.0 (commits 4565182, d7e5e63 y 6e9574f). Para
+  consumidores: nada.
+
 ### Corregido
 
 - **Un proceso muerto por señal se reportaba como un código de salida raro.** Los
@@ -743,6 +2009,68 @@ mueve sobre un cambio incompatible.
   de haberse equivocado. Medido en el callejón de AWS: cincuenta reintentos,
   cincuenta preguntas repetidas, el motivo perdido arriba cada vez.
 
+### Seguridad
+
+- **El despliegue del andamio ya no le da la credencial de Cloudflare al código de
+  un pull request desde un fork.** `desplegar.yml` se disparaba cuando terminaba el
+  CI, con `branches: [main]` como único filtro, y ese filtro compara el **nombre**
+  de la rama que corrió el CI: en un pull request desde un fork lo elige quien lo
+  abre. Con la rama del fork llamada `main` y su CI en verde, el job traía el código
+  del fork, corría su `pnpm install` y ejecutaba `wrangler` con
+  `CLOUDFLARE_API_TOKEN` en el entorno: un token de **toda la cuenta** de
+  Cloudflare, el mismo que publica en producción. De la 1.8.0 a la 1.9.6 ese mismo
+  job publicaba **directo a producción**.
+
+  **Cómo queda:** cada job exige que el CI lo haya disparado un `push` a `main` con
+  el commit en **este** repositorio; a mano, solo desde `main` —desde otra rama la
+  corrida termina en rojo diciendo por qué, en vez de quedar gris sin una palabra—;
+  la promoción solo acepta un commit completo de la historia de `main`, también con
+  el apartamiento `sin_pasar_por_dev`; ningún checkout deja el token del workflow en
+  `.git/config`; y la guía del sitio manda la credencial a dos environments, `dev` y
+  `produccion`, limitados a `main`, en vez de a los secretos del repositorio. Si el
+  token sigue como secreto del repositorio, cada corrida lo avisa en amarillo. Un
+  banco nuevo, `pruebas/andamio/la-llave-del-despliegue.test.mjs`, **evalúa** la
+  condición de cada job contra doce eventos simulados, con el rojo demostrado contra
+  las condiciones de la 1.9.6.
+
+  **Para consumidores: el arreglo NO viaja con el bump**, porque `desplegar.yml` es
+  scaffold. Si tu repositorio tiene `.github/workflows/desplegar.yml` generado con la
+  1.8.0 a la 1.9.6 —un solo job, `desplegar`, que hace `wrangler deploy`—, aplicá
+  esto a mano:
+
+  1. En el job `desplegar`, reemplazá el `if:` entero por:
+
+     ```yaml
+         if: >-
+           (github.event_name == 'workflow_run' &&
+            github.event.workflow_run.conclusion == 'success' &&
+            github.event.workflow_run.event == 'push' &&
+            github.event.workflow_run.head_branch == 'main' &&
+            github.event.workflow_run.head_repository.full_name == github.repository) ||
+           (github.event_name == 'workflow_dispatch' &&
+            github.ref == 'refs/heads/main')
+     ```
+
+  2. En el mismo job, debajo de `timeout-minutes: 10`, agregá la línea
+     `    environment: produccion`.
+  3. En el paso «Traer el arbol», debajo de `ref: ${{ github.event.workflow_run.head_sha }}`,
+     agregá `          persist-credentials: false`.
+  4. En GitHub: **Settings → Environments → New environment** `produccion` →
+     **Deployment branches and tags** → **Selected branches and tags** → `main`; y en
+     **Environment secrets** cargá `CLOUDFLARE_API_TOKEN` y `CLOUDFLARE_ACCOUNT_ID`.
+     Después borrá los dos de **Settings → Secrets and variables → Actions**. Si el
+     repositorio es privado y la cuenta está en el plan gratuito, no hay environments:
+     hacé los pasos 1 a 3 y dejá los secretos donde están.
+  5. En **Actions → desplegar**, mirá si alguna corrida la disparó el CI de un pull
+     request desde un fork (la corrida de CI que la disparó nombra el PR). Si hubo
+     alguna, **rotá el token** en `dash.cloudflare.com/profile/api-tokens` y cargá el
+     nuevo en el environment: un token que pudo verse se da por público.
+
+  Un proyecto nuevo generado desde acá ya nace con todo esto; su único costo es que
+  un disparo a mano desde una rama que no es `main` ya no sube a DEV. No es
+  incompatible para ningún consumidor: el scaffold no se reescribe en un repo que ya
+  existe.
+
 ## [1.9.6] — 2026-09-03
 
 ### Corregido
@@ -766,6 +2094,11 @@ mueve sobre un cambio incompatible.
   eso y concluía que se había roto algo; y un rojo que no se entiende entrena a
   ignorar el rojo. Ahora son dos mensajes y la condición elige.
 
+### Para consumidores
+
+**Nada que hacer.** Un proyecto nuevo nace con la constitución al día; el rojo del
+arranque cambia de redacción, no de veredicto.
+
 ## [1.9.5] — 2026-09-03
 
 ### Cambiado
@@ -783,6 +2116,12 @@ mueve sobre un cambio incompatible.
   reservado y **avisa**. Los dos greps son el mismo patrón, uno negado, y hay una
   comprobación que lo exige. **Qué tiene que hacer un consumidor: nada.**
 
+### Para consumidores
+
+**Nada que hacer.** Con el bump, un proyecto que estaba rojo solo por un lugar
+reservado en una cita pasa a verde con un aviso; una sección entera pendiente sigue
+siendo rojo.
+
 ## [1.9.4] — 2026-09-03
 
 ### Corregido
@@ -797,6 +2136,11 @@ mueve sobre un cambio incompatible.
   dónde está la casilla, y sale **verde**, porque su trabajo sí se hizo.
 - **Las etiquetas de área nacían con la descripción duplicada** — *«Area:
   area:backend»*.
+
+### Para consumidores
+
+**Nada que hacer en tus verificaciones.** Los dos arreglos son del andamio: un proyecto
+nuevo los trae, y uno ya creado conserva su copia de `actualizar-marco.yml`.
 
 ## [1.9.3] — 2026-09-03
 
@@ -820,6 +2164,11 @@ mueve sobre un cambio incompatible.
   workflow puede pedir. El último además es imposible en principio: esos valores
   sólo los tiene la persona.
 
+### Para consumidores
+
+**Nada que hacer.** Cambia lo que hace el arranque de un proyecto nuevo; uno ya
+creado no cambia.
+
 ## [1.9.2] — 2026-09-03
 
 ### Corregido
@@ -830,6 +2179,10 @@ mueve sobre un cambio incompatible.
   default y le cambiaba la forma sola. Es el mismo defecto que ya mordió con
   `forma`: el archivo que declara el proyecto no declaraba una de las cosas que
   deciden cómo se arma. **Qué tiene que hacer un consumidor: nada.**
+
+### Para consumidores
+
+**Nada que hacer.** El cambio es de la herramienta que arma el proyecto.
 
 ## [1.9.1] — 2026-09-03
 
@@ -851,6 +2204,8 @@ mueve sobre un cambio incompatible.
   invocación lleva `shell` en Windows y ahí los argumentos van concatenados sin
   escapar; el nombre de cuenta ahora se valida contra el patrón de un handle
   **antes** de interpolarse. Lo cazó el propio banco de seguridad del marco.
+
+### Para consumidores
 
 **Qué tiene que hacer un consumidor: nada** — pero un proyecto creado antes bajo
 una cuenta personal tiene un CODEOWNERS que no asigna a nadie. Se arregla
@@ -1002,6 +2357,12 @@ regenerándolo, o cambiando los `@cuenta/equipo` por los handles de las personas
   Lleva una lista `VERIFICADAS` vacía a propósito: el día que alguien dé de alta
   las cuentas reales sin cargar tarjeta y anote la constancia, la frase vuelve
   sola a todos lados. **Consumidor: nada** — es un banco del marco.
+
+### Para consumidores
+
+**Nada que hacer.** Todo lo de esta versión es del asistente, la puerta web, los
+lanzadores y el andamio: lo recibe un proyecto nuevo, y uno ya creado no cambia. Quien
+quiera el `AGENTS.md` corregido lo recibe regenerando.
 
 ## [1.8.0] — 2026-09-01
 

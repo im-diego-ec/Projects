@@ -40,6 +40,29 @@
   de salir a buscarlo. El CI del marco lo verifica solo (check _Ejecutores de paquetes
   pinados_), incluido el allowlist de `.claude/settings.json`.
 
+<!-- projects:regla id=revision-declara-su-meta -->
+
+- Toda revisión declara su meta antes de empezar, y la meta es un **artefacto que se
+  puede cerrar** —«el change X mergeado»—, nunca un estado como «sin pendientes».
+
+<!-- projects:regla id=hallazgo-se-clasifica-contra-la-meta -->
+
+- Todo hallazgo se clasifica contra esa meta **antes** de reportarse. Lo que no la
+  bloquea se anota en los pendientes del change y **no se pregunta**: anotar no es
+  descartar, y espera al trabajo que sí lo necesite.
+
+<!-- projects:regla id=pregunta-al-po-declara-que-desbloquea -->
+
+- Una pregunta a {{PO}} (PO) dice **qué desbloquea**; la que no desbloquea nada de la
+  meta en curso no se formula todavía. Sus horas son el recurso más escaso del área y
+  el único que ningún pipeline mide.
+
+<!-- projects:regla id=change-congelado-contra-su-insumo -->
+
+- Un change declara **contra qué versión del insumo** se escribió. Lo que llegue
+  después alimenta al change siguiente, salvo que **contradiga** lo ya especificado:
+  un texto desactualizado se actualiza, uno contradicho respalda construir lo que no va.
+
 **⚠️ Pregunta primero (requiere OK humano)**
 
 <!-- projects:regla id=dependencia-nueva -->

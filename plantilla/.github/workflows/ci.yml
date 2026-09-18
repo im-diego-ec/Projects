@@ -5,17 +5,17 @@ name: CI
 # copia: es un llamador delgado. La MECANICA del marco (deteccion del carril
 # de docs, guardrail de deltas de OpenSpec, validacion estricta) NO vive aca —
 # se consume por referencia desde Projects, asi un arreglo alla llega a este repo
-# sin abrir un PR aca.
+# como PR de bump de Dependabot sobre la version exacta de abajo, sin copiar nada.
 #
 # Regla dura del marco: este repo NO copia el workflow reusable para editarlo.
 # Si le falta algo, o es un input que hay que agregar en Projects, o es un change
 # de OpenSpec en Projects. Ver AGENTS.md.
 #
 # HUECO A LLENAR AL CREAR EL PROYECTO: los pasos de build_test son del
-# producto. Estan escritos con los scripts que el marco da por hechos —lint y
-# format:check UNA vez desde la raiz; typecheck, test y build en CADA
-# paquete—; ajustalos al stack fijado en AGENTS.md y borra este parrafo
-# cuando quede hecho.
+# producto. Estan escritos con los scripts que el marco da por hechos —lint UNA
+# vez desde la raiz; typecheck, test y build en CADA paquete; format:check en su
+# job propio, `formato`—; ajustalos al stack fijado en AGENTS.md y borra este
+# parrafo cuando quede hecho.
 # ---------------------------------------------------------------------------
 
 on:
@@ -24,9 +24,11 @@ on:
   pull_request:
 
 # OBLIGATORIO y no decorativo: un workflow reusable NUNCA recibe mas permisos
-# que los que le concede quien lo llama. Sin pull-requests:read el job de
-# deteccion del carril de docs no puede listar los archivos del PR, cae al
-# fail-open y el carril rapido no actua nunca (incidente del 2026-08-05).
+# que los que le concede quien lo llama, y el del marco DECLARA
+# pull-requests: read (lo usa para listar los archivos del PR). Si aca no se
+# concede, GitHub rechaza la corrida ENTERA: startup_failure, cero jobs, cero
+# checks y un mensaje que no nombra el permiso. No es un fail-open: es un PR
+# sin checks, y con ci-ok como check requerido, un PR que no se puede mergear.
 permissions:
   contents: read
   pull-requests: read
@@ -55,8 +57,10 @@ jobs:
     # visible el techo en el mismo lugar donde se lee el uses:, en vez de tener
     # que subir al encabezado para saberlo.
     #
-    # pull-requests: read NO se puede recortar: sin el, el job que detecta el
-    # carril de docs no puede listar los archivos del PR y cae al fail-open.
+    # pull-requests: read NO se puede recortar: el reusable lo declara, y un
+    # bloque de job REEMPLAZA al del encabezado, asi que si falta aca la corrida
+    # no arranca (startup_failure, sin un solo check), aunque el encabezado lo
+    # conceda.
     permissions:
       contents: read
       pull-requests: read
@@ -119,12 +123,65 @@ jobs:
       # un repo sin el workflow semanal de actualizacion lo baja de aca y lo aplica
       # a mano, y esa es la salida que el mensaje de fallo promete. Sin
       # if: !cancelled() no se subiria justo en la corrida que lo necesita.
+      #
+      # include-hidden-files: true NO es opcional: upload-artifact excluye los
+      # archivos ocultos desde su v4.4, y TODO lo que la action deja en ese
+      # directorio cuelga de uno (.projects/, .cursor/). Sin esta linea el
+      # artifact salia vacio y la salida de emergencia no existia.
+      # if-no-files-found: error por lo mismo: un artifact prometido que no se
+      # sube es un fail-open, y con warn nadie lo leia. En una corrida verde el
+      # directorio tampoco queda vacio: la action lo escribe siempre, y un banco
+      # del marco lo mide corriendo la action sobre un repo al dia.
       - if: "!cancelled()"
         uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5
         with:
           name: constitucion-al-dia
           path: ${{ steps.marco_constitucion.outputs.corregidos }}
-          if-no-files-found: warn
+          include-hidden-files: true
+          if-no-files-found: error
+
+  # EL FORMATO CORRE EN LOS DOS CARRILES, Y ES UN JOB PROPIO POR ESO.
+  #
+  # Vivia dentro de `build_test`, que el carril de docs OMITE, y el
+  # .prettierignore de este repo SI formatea markdown. Consecuencia medida en el
+  # marco hermano del que viene este arreglo: una tabla mal formateada entro a
+  # `main` con el PR en verde —era de solo docs— y detono en el PR de OTRA
+  # persona, con una causa que no nombra al PR que la introdujo. Es el peor
+  # reparto posible de un rojo: lo paga quien no lo produjo.
+  #
+  # De todo lo que corre `build_test`, el formateador es lo unico que aplica
+  # igual a un cambio de solo documentacion: `prettier --check .` mira el arbol
+  # entero, `openspec/` y `docs/` incluidos. El lint NO se muda aca: necesita el
+  # cliente de datos generado, y sin el sale rojo por tipos que no resuelven.
+  # Medido: con `--ignore-scripts`, `pnpm format:check` sale 0 y `pnpm lint` 1.
+  #
+  # SIN `if:` Y SIN `needs:`, a proposito: cualquiera de los dos devuelve el
+  # agujero en una linea. Un banco del marco lo vigila
+  # (pruebas/andamio/formato-en-los-dos-carriles.test.mjs, en el repo del marco).
+  formato:
+    name: formato
+    # Instala sin scripts y corre un solo comando que solo lee archivos: el
+    # doble de lo que tarda cuando anda bien, como el resto de este archivo.
+    timeout-minutes: 10
+    runs-on: ubuntu-latest
+    # MINIMO REAL Y DECLARADO: clona el arbol y lee archivos. No llama a
+    # ninguna API de GitHub.
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      # corepack y no una action de terceros, igual que en build_test: menos
+      # superficie que auditar y una dependencia menos que pinear.
+      - run: corepack enable
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        with:
+          node-version: "24"
+      # `--ignore-scripts` no es un atajo: el formateador no necesita nada de lo
+      # que ejecutan los scripts de instalacion (motores del ORM, binarios
+      # nativos), y asi este job no ejecuta codigo de dependencias que nadie
+      # leyo. Mismo motivo que el setup-node de arriba va sin cache.
+      - run: pnpm install --frozen-lockfile --ignore-scripts
+      - run: pnpm format:check
 
   # Lo del producto. Se omite cuando el cambio no altera lo que se sirve.
   build_test:
@@ -144,6 +201,55 @@ jobs:
     # necesita el job de arriba; aca no se usa para nada y no se concede.
     permissions:
       contents: read
+    # projects:solo-si-hay-datos
+    # LAS PRUEBAS TIENEN EL MOTOR DE DATOS REAL A MANO, NO SOLO UN DOBLE.
+    #
+    # Un doble devuelve exactamente lo que la prueba espera: no puede
+    # contradecirla. Lo que eso deja pasar esta medido en el marco hermano del
+    # que viene este bloque (2026-08-28): 51 pruebas verdes con dobles, y contra
+    # Postgres aparecieron tres defectos que ninguna veia --un error de
+    # restriccion que salia como 500 en vez de 422, ese camino registrado en
+    # nivel error siendo un rechazo rutinario, y un mensaje de "cuenta inactiva"
+    # con la cuenta activa--. Y hay una familia que ningun doble alcanza: las
+    # migraciones.
+    #
+    # LA MISMA IMAGEN QUE EL docker-compose.yml DEL LOCAL: una prueba que pasa
+    # contra otro motor traslada el defecto en vez de cazarlo.
+    #
+    # EL NOMBRE DE LA BASE ES EL DEL REPOSITORIO, no un literal ni el marcador
+    # del proyecto: este workflow llega por la copia del template y nadie lo
+    # puede retocar despues, asi que lo que cambia por repositorio sale del
+    # contexto. En los dos caminos de nacimiento el repositorio se llama como el
+    # proyecto, que es el nombre de la base del docker-compose.yml y del
+    # api/.env.example. El servicio y DATABASE_URL tienen que decir lo mismo: si
+    # divergen, el cliente de datos crea la base que falta EN SILENCIO y las
+    # pruebas corren contra algo distinto de lo que el servicio levanto. Lo
+    # vigila pruebas/andamio/acoples-del-andamio.test.mjs en el repo del marco.
+    #
+    # Viaja SOLO con capa de datos, entre estos centinelas: un sitio no tiene
+    # base que levantar.
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: "${{ github.event.repository.name }}"
+        ports:
+          - 5432:5432
+        # Sin healthcheck el job arranca antes de que Postgres acepte conexiones
+        # y el rojo sale como una conexion intermitente, que es el defecto mas
+        # caro de diagnosticar y el mas facil de atribuirle a la prueba.
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    # A nivel de JOB y no de paso: una conexion declarada paso a paso se olvida
+    # en el paso siguiente que alguien agregue.
+    env:
+      DATABASE_URL: "postgresql://postgres:postgres@localhost:5432/${{ github.event.repository.name }}"
+    # projects:fin-solo-si-hay-datos
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       # corepack en vez de una action de terceros: menos superficie que auditar
@@ -193,137 +299,46 @@ jobs:
       # despliegue solo corre con el CI en verde, ese rojo se lleva tambien la
       # publicacion, en silencio. Medido antes de gatearlo.
       # projects:solo-si-hay-datos
+      # El `postinstall` del paquete de datos ya lo genero en el install de
+      # arriba, y este paso se CONSERVA igual: deja escrito en el pipeline que
+      # el cliente existe antes del lint, en vez de depender de un script de
+      # instalacion que un `--ignore-scripts` saltea sin avisar.
       - name: Generar el cliente de la capa de datos
         run: pnpm --filter {{PAQUETE_API}} --fail-if-no-match exec {{GENERAR_CLIENTE_DATOS}}
       # projects:fin-solo-si-hay-datos
 
-      # Lint y formato corren UNA vez desde la raiz sobre todo el arbol
-      # (eslint . / prettier --check .), no por paquete: asi los archivos que
-      # viven FUERA de los paquetes —configuracion, scripts sueltos, los
-      # workflows mismos— tambien quedan dentro del alcance. Aca no hay salteo
-      # posible: si la raiz no declara el script, `pnpm <script>` sale 1.
+      # Lint corre UNA vez desde la raiz sobre todo el arbol (eslint .), no por
+      # paquete: asi los archivos que viven FUERA de los paquetes
+      # —configuracion, scripts sueltos, los workflows mismos— tambien quedan
+      # dentro del alcance. Aca no hay salteo posible: si la raiz no declara el
+      # script, `pnpm <script>` sale 1.
+      #
+      # EL FORMATO NO ESTA ACA, y es a proposito: vive en el job `formato`, que
+      # corre en los DOS carriles. El lint se queda porque necesita el cliente
+      # de datos generado; el formateador solo lee archivos.
       - run: pnpm lint
-      - run: pnpm format:check
 
       # -------------------------------------------------------------------
-      # LA INFRAESTRUCTURA TAMBIEN SE VERIFICA
+      # LA INFRAESTRUCTURA SE VERIFICA, Y NO ACA
       #
-      # Este repositorio reparte dos raices de Terraform (infra/ e infra-prod/)
-      # y un .github/dependabot.yml con dos entradas del ecosistema terraform:
-      # van a llegar PRs que suben el provider. Sin este paso, ese PR se puede
-      # mergear en verde sin que nadie haya corrido `terraform validate` una
-      # sola vez, y la unica compuerta seria que alguien se acuerde — que no
-      # cuenta como compuerta. Ni el linter ni el formateador ni el censo de
-      # fuentes alcanzan un .tf: lo que no esta aca, no lo mira nadie.
+      # Formato y validez de infra/ e infra-prod/ (`terraform fmt -check` y
+      # `terraform init -backend=false && terraform validate`) los corre el job
+      # `terraform` del workflow del marco que este archivo llama arriba
+      # (marco-ci.yml), que mira esas dos raices por default y corre en CADA
+      # PR, tambien en los que solo tocan infra/ —este job build_test no corre
+      # en esos, porque ^infra/ es carril de docs—.
       #
-      # POR QUE ES EXIGIBLE DESDE EL DIA UNO, que es lo que lo separa de los
-      # PENDIENTE-INFRA: las dos comprobaciones son INERTES. `fmt -check` solo
-      # lee texto. `init -backend=false` no toca el bucket del state —que hoy es
-      # el PENDIENTE-INFRA 1 y a proposito no resuelve— ni pide credenciales de
-      # ninguna cuenta. No hace falta que este repositorio se despliegue, ni que
-      # exista la infraestructura que el codigo referencia.
+      # Hasta la 1.9.6 el andamio traia aca una copia inline del mismo paso,
+      # con su propia fecha de gracia (2026-09-30). Se retiro: dos copias ya
+      # habian divergido, y la de aca no tenia version del marco que la
+      # endureciera. Si tu raiz de Terraform se llama distinto, declarala en
+      # el input raices_terraform del uses: de arriba. Si este proyecto no usa
+      # Terraform, borra infra/ e infra-prod/ y el job lo dice y sale verde.
       #
-      # VENTANA DE GRACIA HASTA EL 2026-09-30, y despues rojo sin que nadie
-      # toque nada. Hasta esa fecha un fallo AVISA en vez de detener. El motivo
-      # es que hasta hoy nada miro estos archivos, asi que la primera corrida es
-      # tambien la primera medicion: la ventana es el plazo para arreglar lo que
-      # reporte. La fecha esta comparada mas abajo contra el reloj, no anotada en
-      # un checklist, justamente para que el vencimiento no dependa de nadie.
-      #
-      # SI ESTE PROYECTO NO USA TERRAFORM, borra este paso junto con infra/,
-      # infra-prod/ y las dos entradas de terraform del dependabot.yml. Mientras
-      # los directorios no existan el paso no verifica nada y lo dice, en vez de
-      # pasar en un silencio indistinguible de haber verificado.
-      #
-      # EL BINARIO AUSENTE ES UN CASO DE FALLO, NO UN CASO NEUTRO, y sigue la
-      # MISMA ventana que los otros dos. El binario sale hoy de la imagen del
-      # runner: falta el `uses:` pinado por SHA que lo garantice. Mientras la
-      # ventana corre, no encontrarlo AVISA; vencida la ventana, no encontrarlo
-      # es ROJO. El motivo es que la alternativa —avisar para siempre— convierte
-      # este paso en un aviso perpetuo que se lee como compuerta: bastaria con
-      # que la imagen del runner dejara de traer terraform para que el paso
-      # pasara en verde sin haber verificado nada, indefinidamente y sin que
-      # nadie se entere. "No pude verificar" no es "verifique y esta bien".
-      # Para cerrar el limite de raiz, agregar antes de este paso
-      # `uses: hashicorp/setup-terraform@<sha> # v<x.y.z>` con el SHA
-      # resuelto, nunca copiado de memoria:
-      #   curl -sS https://api.github.com/repos/hashicorp/setup-terraform/git/ref/tags/v3
-      #   curl -sS https://api.github.com/repos/hashicorp/setup-terraform/git/tags/<sha-del-objeto-tag>
-      # el object.sha del segundo llamado es el commit que va en el uses: y el
-      # campo message dice la version exacta que va en el comentario de al lado.
-      #
-      # ESTE PASO SE EJECUTA EN UN BANCO, no solo se lee: el marco extrae este
-      # mismo bloque `run:` del YAML y lo corre contra arboles fabricados con un
-      # `terraform` falso, en los cinco caminos que tiene (sin raices; sin
-      # binario dentro y fuera de la ventana; fmt y validate en rojo dentro y
-      # fuera). Vive en pruebas/andamio/terraform-en-ci.test.mjs del repo del
-      # marco, y si este paso se borra o se renombra, ese banco se pone rojo.
+      # GRAVEDAD, por version y no por fecha: en toda la linea 1 del marco un
+      # hallazgo AVISA; desde v2 detiene. Lo anuncia el CHANGELOG del marco,
+      # que es lo que el PR de bump de Dependabot pone adelante.
       # -------------------------------------------------------------------
-      - name: Formato y validez de las raices de Terraform
-        shell: bash
-        env:
-          # Hasta este dia inclusive un fallo avisa; a partir del siguiente es
-          # rojo. Moverla es una decision que se escribe, no un default.
-          VENTANA_TERRAFORM: "2026-09-30"
-        run: |
-          set -euo pipefail
-
-          # Array y no cadena: sin comillas una raiz con espacio se parte, y con
-          # comillas se pasarian todas como UN argumento. El array es lo unico que
-          # no obliga a elegir entre los dos fallos. Mismo arreglo que marco-ci.yml.
-          RAICES=()
-          for D in infra infra-prod; do
-            if [ -d "${D}" ]; then RAICES+=("${D}"); fi
-          done
-
-          if [ ${#RAICES[@]} -eq 0 ]; then
-            echo "::notice::no hay raices de Terraform en este repositorio (ni infra/ ni infra-prod/): no se verifico infraestructura porque no hay ninguna. Si el proyecto tampoco las va a tener, borra este paso y las entradas de terraform de .github/dependabot.yml"
-            exit 0
-          fi
-          echo "raices de Terraform encontradas: ${RAICES[*]}"
-
-          # La gravedad se DERIVA del reloj, y se deriva ANTES de mirar si hay
-          # binario: el binario ausente comparte la ventana con los otros dos
-          # fallos, no queda fuera de ella.  Las dos fechas son ISO, asi que la
-          # comparacion de texto ordena igual que la de calendario.
-          HOY="$(date -u +%F)"
-          if [ "${HOY}" \> "${VENTANA_TERRAFORM}" ]; then
-            GRAVEDAD="error"
-          else
-            GRAVEDAD="warning"
-            echo "::notice::verificacion de Terraform en modo aviso hasta el ${VENTANA_TERRAFORM} (hoy es ${HOY}). Despues de esa fecha un fallo de fmt, de validate o la ausencia del binario detienen el CI sin que nadie toque este archivo"
-          fi
-
-          if ! command -v terraform >/dev/null 2>&1; then
-            echo "::${GRAVEDAD}::hay raices de Terraform (${RAICES[*]}) y este runner no trae el binario, asi que NO se verifico formato ni validez. Arreglo: agregar antes de este paso hashicorp/setup-terraform pinado por SHA — el encabezado de este paso trae los dos comandos que resuelven el SHA sin inventarlo"
-            if [ "${GRAVEDAD}" = "error" ]; then exit 1; fi
-            exit 0
-          fi
-          terraform version
-
-          HUBO_FALLO=0
-
-          # 1. FORMATO. Solo lee texto: ni providers, ni red, ni credenciales.
-          if ! terraform fmt -check -recursive -no-color "${RAICES[@]}"; then
-            echo "::${GRAVEDAD}::hay archivos de Terraform sin formatear (la lista esta arriba, un archivo por linea). Arreglo: corre 'terraform fmt -recursive ${RAICES[*]}' y commitea el resultado"
-            HUBO_FALLO=1
-          fi
-
-          # 2. VALIDEZ, raiz por raiz. El -backend=false es lo que la vuelve
-          # inerte: init resuelve providers y modulos y NO inicializa el state
-          # remoto, asi que el marcador del bucket no estorba.
-          for D in "${RAICES[@]}"; do
-            echo "::group::${D}: terraform init -backend=false && terraform validate"
-            if ! ( cd "${D}" && terraform init -backend=false -input=false -no-color && terraform validate -no-color ); then
-              echo "::endgroup::"
-              echo "::${GRAVEDAD}::terraform validate fallo en '${D}'. Reproducilo local con: cd ${D} && terraform init -backend=false && terraform validate"
-              HUBO_FALLO=1
-              continue
-            fi
-            echo "::endgroup::"
-          done
-
-          if [ "${HUBO_FALLO}" -eq 1 ] && [ "${GRAVEDAD}" = "error" ]; then exit 1; fi
 
       # -------------------------------------------------------------------
       # POR QUE NO HAY `pnpm -r typecheck` / `-r test` / `-r build` ACA
@@ -562,11 +577,11 @@ jobs:
       #      paso NO abre esa compuerta: sobre el total, el 80 del marco es
       #      piso duro y el umbral local solo puede subirlo.
       #
-      #      Este plano se estrena con VENTANA DE GRACIA hasta el 2026-09-30:
-      #      hasta ese dia, un paquete por debajo del minimo SIN declaracion
-      #      avisa en vez de detener, y la corrida grita la fecha. Despues es
-      #      rojo sin que nadie toque nada. Si este repo ya tiene un paquete en
-      #      deuda, ese es el plazo real para subirlo o declararla.
+      #      Este plano NO tiene ventana de gracia: un paquete por debajo del
+      #      minimo SIN declaracion es rojo desde el primer PR, cualquier dia.
+      #      Si este repo ya tiene un paquete en deuda, el arreglo es subirlo o
+      #      declarar la deuda con su motivo y su fecha en el package.json del
+      #      paquete; la corrida lo dice con esas palabras.
       #
       # El piso es TRANSICION, no destino, y por eso lleva plazo: sin plazo
       # escrito el piso termina siendo el minimo de hecho. Paso de verdad,
@@ -591,7 +606,7 @@ jobs:
   # gracias a if: always().
   ci_ok:
     name: ci-ok
-    needs: [marco, constitucion, build_test]
+    needs: [marco, constitucion, formato, build_test]
     if: always()
     # 5 minutos: no hace checkout ni toca la red, solo lee los resultados de sus
     # needs, que vienen del contexto.
@@ -613,6 +628,10 @@ jobs:
           # cualquier resultado que no sea success es un fallo. Un "skipped" aca
           # significaria que alguien le puso un if, y eso es apagarla.
           [ "${{ needs.constitucion.result }}" = "success" ] || { echo "::error::la verificacion de la constitucion del marco termino en '${{ needs.constitucion.result }}'"; exit 1; }
+          # El formato tampoco tiene carril rapido, y esa es toda la razon de que
+          # sea un job aparte: un "skipped" aca significaria que volvio a quedar
+          # detras de un `if`.
+          [ "${{ needs.formato.result }}" = "success" ] || { echo "::error::el formateador termino en '${{ needs.formato.result }}'. Corre en LOS DOS carriles a proposito: si dice 'skipped', alguien le puso una condicion al job y el carril de docs volvio a quedar sin mirar el formato. Si dice 'failure', el arreglo es correr 'pnpm format' en la raiz y commitear el resultado"; exit 1; }
           if [ "${{ needs.build_test.result }}" = "success" ]; then exit 0; fi
           if [ "${{ needs.build_test.result }}" = "skipped" ] && [ "${{ needs.marco.outputs.solo_docs }}" = "true" ]; then
             echo "solo docs: build-test omitido a proposito"; exit 0

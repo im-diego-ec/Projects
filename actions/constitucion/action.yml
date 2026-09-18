@@ -21,8 +21,9 @@ author: la organización
 # POR QUE EL CANONICO VIAJA ADENTRO. El GITHUB_TOKEN de un consumidor no lee otro
 # repositorio: si el texto viviera en Projects y el consumidor tuviera que ir a
 # buscarlo, haria falta un token con acceso cruzado. Con GITHUB_ACTION_PATH el
-# texto llega con la action, en la misma resolucion de @v1 que ya ocurre. Es el
-# mismo transporte de guardrail-deltas y por la misma razon.
+# texto llega con la action, en la misma resolucion del `uses:` que ya ocurre: la
+# version exacta que el consumidor pina. Es el mismo transporte de guardrail-deltas
+# y por la misma razon.
 #
 # POR QUE ESTA ACTION LLEVA PLACEHOLDERS Y LAS OTRAS NO. actions/README.md dice
 # que las actions no llevan {{...}} porque una pieza referenciada es la misma para
@@ -48,10 +49,12 @@ author: la organización
 #   · artefacto ausente o atrasado -> ::error:: desde el dia que la version se
 #     publica. NUNCA verde mudo: no hay rama de "este repo no aplica", porque el
 #     repo que no lo tiene es exactamente el que hay que avisar; y desde el
-#     2026-08-22 tampoco hay ventana en la que estar atrasado sea verde. Una
-#     version PUEDE declarar un exigible_desde futuro y entonces avisa hasta esa
-#     fecha, pero es opt-in de quien publica y no el trato por defecto: con
-#     distribucion por version exacta, el aviso previo ya lo da el PR de bump.
+#     2026-08-22 tampoco hay ventana en la que estar atrasado sea verde. El
+#     codigo todavia sabe avisar hasta un exigible_desde posterior a la
+#     publicacion, pero el manifiesto que viaja aca declara siempre las dos fechas
+#     iguales y nunca futuras, y el banco del marco (pruebas/la-ventana-no-vuelve.test.mjs)
+#     pone rojo cualquier otra: con distribucion por version exacta, el aviso previo ya
+#     lo da el PR de bump. El campo y el output se retiran en v2.
 #   · .projects-valores.json ausente -> ::error:: en los dos modos. Es un atraso de
 #     adopcion y no una manipulacion, pero desde que la ventana de gracia se retiro
 #     (2026-08-22) no hay estado intermedio: un repo que consume el marco sin declarar
@@ -63,7 +66,9 @@ author: la organización
 #     cual) no cuenta como valor: medido, antes de este arreglo el artefacto salia con
 #     27 lineas de dobles llaves y exit 0 en los dos modos.
 #   · cuerpo distinto del re-render de su version -> ::error:: siempre, con el
-#     diff. La ventana de gracia es para reglas nuevas, no para ediciones a mano.
+#     diff. Y no hay excepcion posible: la ventana de gracia servia para reglas
+#     nuevas y NO para ediciones a mano, y desde el 2026-08-22 no existe ni para
+#     aquellas (change ventana-vencida).
 #   · cadena de carga rota (el archivo existe y ningun agente lo importa) ->
 #     ::error::. Un import que no resuelve no emite ninguna senal por si mismo.
 #   · desvio sin motivo, o cuya regla ya no existe -> ::error:: (desvio muerto,
@@ -235,8 +240,10 @@ outputs:
     value: ${{ steps.constitucion.outputs.version }}
   exigible_desde:
     description: >-
-      Fecha desde la cual esa version es exigible. Normalmente es la de su
-      publicacion; solo difiere si quien publico declaro un estreno con aviso.
+      Fecha desde la cual esa version es exigible. Es siempre la de su
+      publicacion, y nunca futura: el banco del marco rechaza un manifiesto que
+      declare otra.
+      Se conserva por compatibilidad y se retira en v2.
     value: ${{ steps.constitucion.outputs.exigible_desde }}
   superficies:
     description: Superficies efectivamente emitidas, separadas por comas.

@@ -57,6 +57,39 @@ una sorpresa?** Si la respuesta es sí, era un change.
 6. **Verify + archive** → cierra cuando los specs vivos validan `--strict`, las
    tareas tienen evidencia y el `CHANGELOG.md` refleja el cambio.
 
+> ⚠️ **DESVÍO DECLARADO — `github-review-cruzado-automatizado`.** Los puntos 1, 2, 3
+> y 5 piden que lo que escribe un builder lo revise el otro, y «GitHub y estilo» pide
+> review cruzado en cada PR. **En este repositorio hay una sola identidad con permiso
+> de escritura**, y ocupa los tres roles —PO, Builder 1 y Builder 2—: la revisión
+> cruzada no está debilitada, no tiene de dónde salir. Rige desde el 2026-09-17,
+> aprobado por el PO en la sesión que decidió el porte de Rigel (change
+> `el-marco-declara-su-desvio-de-review`).
+>
+> **Lo que la reemplaza:** una **revisión adversarial con lentes independientes** —cada
+> lente con su pregunta y su evidencia, y un veredicto—, registrada **dentro del
+> change** en `revision-adversarial.md` antes de archivarlo. Mientras rija, el
+> `aprueba:` de un artefacto que no toca `gobierno-contribucion` dice
+> `revision adversarial (desvio del marco: un solo mantenedor, ver AGENTS.md)`.
+>
+> **Por qué vive acá y no en `.projects-desvios.json`:** esa ruta de la raíz es la que
+> el asistente usa para el proyecto que arma cuando se lo abre con doble clic
+> (`.gitignore` la ignora por eso), y el marco no renderiza su propia porción de la
+> constitución: este archivo es lo único que el agente carga sin buscarlo.
+>
+> **Se retira** el día que haya un segundo handle con permiso de escritura
+> (`gh api "repos/{owner}/{repo}/collaborators" --jq '.[] | "\(.login): \(.role_name)"'`
+> hoy devuelve uno solo) y `.github/CODEOWNERS` lo nombre. Ese día este recuadro se
+> borra y los `aprueba:` vuelven al builder par; mientras siga puesto con dos dueños,
+> o mientras un `aprueba:` siga nombrando el desvío sin el recuadro,
+> `pruebas/ci-del-marco/desvio-de-review-del-marco.test.mjs` está en rojo.
+>
+> Lo que **no** cambia: la aprobación del PO sobre los proposals y specs que tocan
+> `gobierno-contribucion`, que ningún builder —ni ninguna revisión adversarial— puede
+> dar por él, y que queda escrita antes del archive (`aprobado_por_po: AAAA-MM-DD` en
+> el proposal: sin esa constancia, el mismo banco no deja archivarlo); los roles siguen siendo roles (reasignarlos es editar
+> `.github/CODEOWNERS`, un solo lugar); y todo cambio sigue entrando por PR con el
+> veredicto agregado de CI en verde.
+
 **Por qué acá el PO no aprueba proposals y specs, y en un proyecto sí.** En un
 repo de producto esos artefactos son el QUE y el POR QUÉ del negocio, y el PO es
 su dueño. En Projects no hay producto: **todo** change es técnico del estándar de
@@ -79,9 +112,13 @@ relectura de coherencia entre proposal/specs/design/tasks antes de commitear.
 change que pasó `validate --strict` y el guardrail de deltas en verde
 y aun así tenía dos bloqueantes que solo cazó una revisión adversarial con
 lentes independientes. Un delta `MODIFIED` debe reproducir **todos** los
-escenarios vigentes del requirement o el archive los borra en silencio; y el
-guardrail tiene un hueco conocido: si el **título de un requirement** del delta
-no existe en el spec vigente, no avisa. Verificarlo a mano, siempre.
+escenarios vigentes del requirement o el archive los borra en silencio; el
+guardrail de deltas caza eso, y también un `MODIFIED` cuyo título no existe en el
+spec vigente (sale 1). Su hueco real es el simétrico: **un `ADDED` cuyo título ya
+existe** en el spec vigente pasa el guardrail y `validate --strict` en verde
+(medido con el CLI 1.9.0), y recién lo frena el archive. Antes de escribir un
+`ADDED`, `git grep -n "^### Requirement: <título>" -- openspec/specs/`: eso sí, a
+mano, siempre.
 
 ---
 
@@ -117,8 +154,8 @@ nueva como **PR de Dependabot en su propio repo**. Nada del marco cambia en un
 consumidor sin que exista un PR que alguien pueda leer y mergear: si una versión
 trae un check nuevo, el rojo aparece **dentro de ese PR**.
 
-> **El tag mayor móvil `v1` dejó de ser el canal el 2026-08-21, y sobrevive en una sola
-> línea.** Hasta la 1.3.0 era el canal:
+> **El tag mayor móvil `v1` dejó de ser el canal el 2026-08-21, y el marco ya no lo
+> invoca en ninguna línea.** Hasta la 1.3.0 era el canal:
 > apuntaba al último release de la 1.x y los consumidores recibían todo sin tocar
 > nada. Cambió porque el 2026-08-19 un check nuevo enrojeció un repo que el día
 > anterior pasaba, y nadie lo había pedido. Y **no se pudo retirar** cuando se midió
@@ -126,21 +163,38 @@ trae un check nuevo, el rojo aparece **dentro de ese PR**.
 > actions hermanas por `@v1`. El pin exacto del consumidor era una **media
 > verdad**.
 >
-> Se intentó pinarlas por versión exacta y el CI del release 1.4.2 lo refutó: el tag se
-> crea **después** del merge, así que la línea pone en rojo al PR que la corta, y GitHub
-> no admite expresiones en `uses:` para que un reusable referencie su propio ref. Así que
-> `@v1` sobrevive en **una** línea (`actions/guardrail-deltas`), exceptuada por lista
-> exacta en `pruebas/andamio/pinado.test.mjs`, y el paso 5 del release la mueve. **No la
-> uses para nada más**: una segunda `@v1` pone rojo el banco, a propósito.
+> Pinarlas por versión exacta chocaba con el release, y el CI del 1.4.2 lo midió: el tag
+> se crea **después** del merge, así que una línea que pina la versión que se está
+> cortando pone en rojo al PR que la corta, y GitHub no admite expresiones en `uses:`
+> para que un reusable referencie su propio ref. Lo que destrabó el nudo fue sacar cada
+> invocación interna a un **job que se saltea en el repo del marco** —la última,
+> `actions/guardrail-deltas`, desde la 1.8.0— y correr la misma pieza por ruta local en
+> el `ci.yml` del marco. Un job salteado no resuelve nada, así que el pin exacto dejó de
+> ser circular, y desde el change `guardrail-deltas-por-version-exacta` todas van por
+> versión exacta. Lo cobran dos bancos, sin lista de excepciones:
+> `pruebas/andamio/pinado.test.mjs` (ningún `uses:` del marco por tag móvil) y
+> `pruebas/andamio/refs-propias.test.mjs` (toda referencia remota propia vive en un job
+> particionado, y la partición se evalúa, no se busca como texto). **Una invocación
+> interna nueva no se exime: se particiona.**
+>
+> **El tag sigue existiendo y no se borra**: las versiones publicadas hasta la 1.9.6 lo
+> llevan adentro de su `marco-ci.yml`, y un consumidor pinado a una de ellas lo resuelve
+> en cada corrida. Moverlo ya no le sirve a ninguna línea del árbol: su único efecto es
+> empujar el `guardrail-deltas` nuevo, **sin PR**, a esos consumidores. Por eso el paso 5
+> del release no lo mueve sin OK humano (⚠️ abajo), y si se congela del todo o se sigue
+> moviendo es una decisión pendiente, que va con la apertura de la línea `v2`.
 
 - Cada release lleva un tag inmutable `vX.Y.Z`, y **el release mueve los pines
   internos** del marco a esa versión. No depende de que nadie se acuerde:
   `pruebas/andamio/pinado.test.mjs` los compara contra el CHANGELOG.
-- **MAJOR** (`v2`): cambio incompatible. Los consumidores migran deliberadamente,
-  guiados por una nota de migración en `docs/`, y el PR de bump del major es donde
-  cada uno decide cuándo.
-- **MINOR**: capacidad nueva compatible (un `input` opcional, un workflow
-  nuevo, un check adicional que no rompe lo verde de nadie).
+- **MAJOR** (`v2`): un cambio de la lista cerrada de «Qué es BREAKING», abajo. Los
+  consumidores migran deliberadamente, guiados por una nota de migración en `docs/`, y
+  el PR de bump del major es donde cada uno decide cuándo.
+- **MINOR**: capacidad nueva compatible (un `input` opcional, un workflow nuevo) **y
+  también una compuerta nueva o endurecida cuyo arreglo cabe en el repositorio del
+  consumidor**, aunque ponga en rojo su PR de bump. Eso no rompe a nadie: el consumidor
+  pina la versión exacta, así que publicar no le mueve nada, y el rojo aparece dentro de
+  un PR que él decide cuándo mergear, con el arreglo escrito en «Para consumidores».
 - **PATCH**: corrección de comportamiento dentro del contrato.
 - **El `CHANGELOG.md` es obligatorio en el PR que introduce el cambio**, no en
   el release. Es la única superficie por la que un consumidor se entera de qué
@@ -148,25 +202,72 @@ trae un check nuevo, el rojo aparece **dentro de ese PR**.
 
 ### Qué es BREAKING
 
-Un cambio es breaking si un repo consumidor **que mergea el PR de bump sin leerlo**
-puede quedar roto, o —peor— seguir en verde haciendo algo distinto. El bump por PR
-da la oportunidad de leer; no obliga a nadie a usarla, así que la vara no baja:
+Un cambio es breaking si está en esta lista, y la lista es **cerrada**: lo que no está
+acá no es breaking, y sumarle un caso es un change de este repo, no el criterio de
+quien clasifica un PR.
 
-- Quitar o renombrar un `input`, `secret` u `output` de un workflow reusable, o
-  volver requerido uno que era opcional.
-- Cambiar un valor por defecto de forma que cambie el comportamiento.
-- **Renombrar un job cuyo nombre publica un check.** Si un consumidor tiene ese
-  nombre como check requerido en su ruleset, el renombrado le bloquea todos los
-  PRs y el error no menciona a Projects por ningún lado. Es el breaking más caro y
-  el más fácil de cometer sin darse cuenta.
-- Exigir un permiso nuevo del token, o un runtime/herramienta de versión mayor.
-- Endurecer un check de modo que un repo que hoy pasa mañana falle. Si el
-  endurecimiento es el objetivo, se estrena en modo aviso y el endurecimiento
-  va en el major siguiente.
+1. **Quitar o renombrar un `input`, `secret` u `output` de un workflow reusable, o
+   volver requerido uno que era opcional.**
+2. **Cambiar un valor por defecto de forma que cambie el comportamiento.** Es el más
+   traicionero para quien no lee: el consumidor sigue en verde haciendo otra cosa.
+3. **Renombrar un job cuyo nombre publica un check.** Si un consumidor tiene ese
+   nombre como check requerido en su ruleset, el renombrado le bloquea todos los
+   PRs y el error no menciona a Projects por ningún lado. Es el breaking más caro y
+   el más fácil de cometer sin darse cuenta.
+4. **Exigir un permiso nuevo del token, o un runtime/herramienta de versión mayor.**
+5. **Exigir algo que solo se arregla fuera del repositorio del consumidor.** Una
+   compuerta nueva o endurecida cuyo arreglo es una configuración de GitHub (el
+   ruleset, un ajuste de la organización), un secreto o una variable que carga quien
+   administra el repo, o un acto de administrador: nada que se commitee en el PR de
+   bump la pone verde. Tiene dos salidas y solo dos: se estrena en **modo aviso**
+   —ruidoso, con el arreglo escrito en el `::warning::` y en «Para consumidores»— y
+   se endurece en la línea mayor siguiente, o va directo a esa línea como breaking.
 
-Ante la duda: **es breaking**. Se nombra en la sección «Para consumidores» del
-CHANGELOG con lo que hay que hacer, que es la superficie que el PR de bump pone
-adelante.
+Las cuatro primeras son el **contrato publicado** de una pieza referenciada, y son
+incompatibles aunque alguna se pueda arreglar editando el propio `ci.yml`: un contrato
+que cambia sin versión mayor deja de ser un contrato. La quinta es la frontera de las
+compuertas, y la decide una sola pregunta: **¿puede el consumidor volver a verde con
+cambios propios dentro de su PR de bump?**
+
+- **Si puede, NO es breaking**, aunque el PR nazca rojo en todos los consumidores: la
+  compuerta sale **exigible el día que sale**, en un MINOR. A cambio, su arreglo va
+  escrito en la sección «Para consumidores» del CHANGELOG **en el lenguaje de las
+  páginas para quien no es técnico** (`docs/01-introduccion.md`), porque quien recibe
+  el PR de bump puede no saber leer un `::error::`. La compuerta del aviso
+  (`herramientas/aviso-entra-en-el-mensaje.mjs`, en el CI de este repo) pone rojo el PR
+  que escribe esa sección con la jerga de oficio que esas páginas tienen prohibida. Que
+  el arreglo **esté** escrito no lo verifica ninguna máquina: lo pregunta la plantilla
+  de PR.
+- **Si no puede, es el caso 5.**
+
+**Un cambio de andamio no es breaking para nadie.** `plantilla/` se copia una vez y no
+viaja por el PR de bump, así que no le cambia nada a un consumidor que ya existe. Se
+anuncia igual en «Para consumidores», con lo que hay que copiar a mano para quien lo
+quiera.
+
+> **Esta regla cambió el 2026-09-17 (decisión D1 del PO), y el motivo importa más que
+> la regla.** Hasta entonces endurecer cualquier check contaba como breaking, y la
+> salida escrita era estrenarlo avisando y dejar el rojo para la línea mayor
+> siguiente. Esa regla nació del incidente del 2026-08-19, cuando un check nuevo
+> enrojeció a un consumidor **sin que mediara ningún PR**, porque el canal era el tag
+> móvil `v1`. El 2026-08-21 el canal pasó a ser el pin exacto: desde ahí el rojo llega
+> dentro de un PR que nadie está obligado a mergear, y la regla sobrevivió a su causa.
+> Lo que costaba: compuertas que existían y no se le exigían a nadie, y cada compuerta
+> portada desde Rigel volviendo a ser breaking.
+>
+> Rigel —el marco del que Projects se bifurcó— hizo el mismo cambio en su 2.0.0
+> (change `linea-v2`, 2026-09-04) con una lista cerrada de cuatro casos, sin el
+> quinto: no decía qué pasa cuando el arreglo no cabe en el PR. Y dos días después
+> encontró su skill de release todavía con la regla vieja. Por eso acá
+> `pruebas/ci-del-marco/que-es-breaking.test.mjs` exige que la plantilla de PR ofrezca
+> exactamente esta lista y que ninguna superficie que dicta la regla vuelva a decir la
+> vieja.
+
+Ante la duda: **es breaking**, con la duda entendida así —¿puede el consumidor volver
+a verde con cambios suyos dentro de su PR de bump, sin quedar en verde haciendo otra
+cosa?—. Si no lo sabés, es breaking. Sea o no breaking, se nombra en la sección «Para
+consumidores» del CHANGELOG con lo que hay que hacer, que es la superficie que el PR
+de bump pone adelante.
 
 ### Antes de publicar una versión
 

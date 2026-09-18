@@ -1165,8 +1165,18 @@ test("la unica entrada que puede llegar a un shell es el pin, y esta acotada", (
         "si no calza. Un `;` o un backtick no llegan al shell",
     ],
     [
-      "path.join(raizMarco)",
-      "la ruta del script de la constitucion dentro del clon del marco; ademas esa invocacion no lleva shell",
+      "script",
+      "la ruta del programa corto del marco que corre correrProgramaDelMarco. Su unica llamada le pasa " +
+        "accion.script: la ruta del script de la constitucion dentro del clon del marco, o la que " +
+        "accionDeConstitucion extrae del tag del pin a un directorio temporal que ella misma crea con mkdtemp. " +
+        "Ninguna de las dos sale de una entrada de la persona, y esa invocacion no lleva shell",
+    ],
+    [
+      "`orgs/${org}/teams/${equipo}/members`",
+      "la ruta del equipo en la consulta de los equipos del PO. comprobarEquiposDelPO valida ORG, EQUIPO_PO y " +
+        "EQUIPO_BUILDERS contra FORMATOS inmediatamente antes —alfanumerico con guiones, sin un solo metacaracter " +
+        "de shell— y devuelve «no-se-sabe» sin invocar nada si no calzan; y esa invocacion va con shell: false. " +
+        "pruebas/init/equipos-del-po.test.mjs lo comprueba con un slug que trae un `;`",
     ],
     [
       "`repos/${org}/${proyecto}/rulesets`",
@@ -1176,7 +1186,12 @@ test("la unica entrada que puede llegar a un shell es el pin, y esta acotada", (
         "sistema operativo. El caso de mas abajo lo comprueba sobre los VALORES",
     ],
   ]);
-  const invocaciones = [...codigo.matchAll(/execFileSync\(([^,]+),\s*\[([^\]]*)\]/g)];
+  // EL VECTOR SE LEE SALTANDO LOS LITERALES, no hasta el primer `]`. Con
+  // `[^\]]*` un argumento literal que lleva un corchete —el `".[].login"` que
+  // la consulta de equipos le pasa a `--jq`— cortaba la lectura a mitad de la
+  // cadena y dejaba un residuo que no existe (`".[`). Aca un literal entre
+  // comillas o entre acentos graves se consume entero, con lo que tenga adentro.
+  const invocaciones = [...codigo.matchAll(/execFileSync\(([^,]+),\s*\[((?:"(?:[^"\\]|\\.)*"|`(?:[^`\\]|\\.)*`|[^\]"`])*)\]/g)];
   assert.ok(
     invocaciones.length >= 3,
     `solo ${invocaciones.length} invocacion(es) de execFileSync: si cambiaron de forma, este control dejo de mirar lo que cree que mira`,

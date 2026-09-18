@@ -3,7 +3,7 @@ artefacto: bitacora
 dri: quien esté corriendo la sesión
 informado: Builder 1, Builder 2, PO
 experimental: true
-veredicto_antes_de: 2026-09-21
+veredicto_antes_de: 2026-10-15  # era 2026-09-21; la corrio el PO el 2026-09-17 (D3), motivo en proposal.md
 ---
 
 # Bitácora de G5: los puntos que dependieron de que alguien se acordara

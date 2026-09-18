@@ -30,9 +30,11 @@ on:
   pull_request:
 
 # OBLIGATORIO y no decorativo: un workflow reusable nunca puede pedir mas
-# permisos que los que le concede quien lo llama. Sin pull-requests:read, el
-# job "cambios" no puede listar los archivos del PR, cae al fail-open y el
-# carril rapido no actua nunca (incidente del 2026-08-05).
+# permisos que los que le concede quien lo llama, y marco-ci.yml DECLARA
+# pull-requests: read. Si aca no se concede, la corrida entera sale
+# startup_failure: cero jobs, cero checks y un mensaje que no nombra el
+# permiso. No es un fail-open (medido en el upstream de este marco, corrida
+# 33971175258 del 2026-09-05, tambien con el reusable llamado por ruta local).
 permissions:
   contents: read
   pull-requests: read
@@ -54,9 +56,8 @@ jobs:
     # exacto del bloque que lleva este mismo job en el scaffold
     # (plantilla/.github/workflows/ci.yml).
     #
-    # pull-requests: read NO se puede recortar: sin el, el job "cambios" de
-    # marco-ci.yml no puede listar los archivos del PR, cae al fail-open y el
-    # carril rapido no actua nunca (incidente del 2026-08-05).
+    # pull-requests: read NO se puede recortar: marco-ci.yml lo declara, y sin
+    # el esta corrida no arranca (startup_failure, sin un solo check).
     permissions:
       contents: read
       pull-requests: read
@@ -124,7 +125,7 @@ jobs:
           done
 
           if [ ${#SIN_BANCO[@]} -gt 0 ]; then
-            echo "::warning::estas actions traen script propio y ningun banco de pruebas: ${SIN_BANCO[*]}. Su codigo llega a todos los consumidores de @v1 sin haberse ejecutado nunca sobre un caso controlado. Arreglo: agregar <action>/pruebas/<nombre>.test.mjs, que el paso siguiente recoge solo"
+            echo "::warning::estas actions traen script propio y ningun banco de pruebas: ${SIN_BANCO[*]}. Su codigo llega a todos los consumidores en la version siguiente sin haberse ejecutado nunca sobre un caso controlado. Arreglo: agregar <action>/pruebas/<nombre>.test.mjs, que el paso siguiente recoge solo"
           else
             echo "toda action con script propio trae su banco de pruebas"
           fi
@@ -133,6 +134,14 @@ jobs:
       # el resto del marco. Los archivos se pasan uno por uno a proposito:
       # `node --test <directorio>` no resuelve el patron en las versiones nuevas
       # de Node y el job quedaria rojo por una razon que no es la suya.
+      #
+      # --test-reporter=spec EN LAS TRES INVOCACIONES, y no por estetica. Con la
+      # salida que no es una terminal —la del runner—, Node 22 usa TAP, que le
+      # antepone "# " a todo lo que imprime un banco. El runner solo reconoce un
+      # comando que empieza con "::", asi que las anotaciones que un banco emite
+      # (la deuda del censo de pasos, los avisos de refutaciones-ronda-3) quedaban
+      # como comentarios perdidos en el log. Lo exige
+      # pruebas/marco-ci/cobertura-de-los-pasos.test.mjs.
       - name: Casos sinteticos de las composite actions
         shell: bash
         run: |
@@ -153,7 +162,7 @@ jobs:
           echo "== bancos de pruebas encontrados (node $(node --version)) =="
           printf '%s\n' "${PRUEBAS[@]}"
 
-          node --test "${PRUEBAS[@]}"
+          node --test --test-reporter=spec "${PRUEBAS[@]}"
 
       # Banco de los pasos INLINE de marco-ci.yml.
       #
@@ -220,7 +229,7 @@ jobs:
           echo "== bancos de los pasos inline encontrados (sin pruebas/init/, que corre en la matriz) =="
           printf '%s\n' "${PRUEBAS[@]}"
 
-          node --test "${PRUEBAS[@]}"
+          node --test --test-reporter=spec "${PRUEBAS[@]}"
 
   # LA HERRAMIENTA DE INIT, EN LOS TRES SISTEMAS OPERATIVOS Y EN LAS DOS VERSIONES
   # DE NODE QUE ELLA MISMA DECLARA.
@@ -395,7 +404,7 @@ jobs:
           # cuelgue de verdad ocurra. Lo que se corrige es el motivo escrito: un
           # comentario que atribuye un arreglo a una causa que despues se midio falsa
           # es peor que no tenerlo, porque el que venga lo va a creer.
-          if node --test --test-timeout=120000 "${PRUEBAS[@]}"; then
+          if node --test --test-reporter=spec --test-timeout=120000 "${PRUEBAS[@]}"; then
             echo "el banco de init pasa entero en $(uname -s) con node $(node --version)"
             exit 0
           fi
@@ -504,7 +513,9 @@ jobs:
       # tercera, actions/upload-artifact, no se invoca en .github/workflows y su
       # unica linea vive en el andamio; su SHA para el tag v5 es
       # 330a01c490aca151604b8cf639adc76d48f6c5d4, resuelto contra la API publica y
-      # anotado aca para que ese cambio tampoco necesite red.
+      # anotado aca para que ese cambio tampoco necesite red. (Foto del 2026-08-25:
+      # desde el 2026-09-17 reproducir-intermitente.yml tambien la invoca, con ese
+      # mismo SHA.)
       #
       # Lo que NO mira, declarado: no juzga si el SHA apunta a un commit real ni
       # si la version es la ultima. Eso es de Dependabot (.github/dependabot.yml),
@@ -700,6 +711,195 @@ jobs:
             fi
           done
           echo "el pipeline del andamio pasa actionlint en todas las formas"
+
+      # EL ANDAMIO Y LO QUE EL INIT ESCRIBE ENCIMA PASAN EL FORMATEADOR QUE EL
+      # PROYECTO SE EXIGE, con la version que el proyecto instala.
+      #
+      # QUE CIERRA. Hasta este paso ningun CI del marco corria el formateador sobre
+      # plantilla/, y el andamio pinaba un RANGO de prettier. Medido el 2026-09-17
+      # con prettier 3.9.6: 15 archivos de plantilla/ no pasaban `prettier --check`,
+      # y un repo instanciado con `--sin-arranque` —la via de personalizar.yml, la
+      # puerta de quien no programa— nacia con `format:check` en ROJO en las 24
+      # combinaciones de forma, plataforma, tipo de cuenta y largo de nombres. El
+      # paso `formateado` del arranque lo tapaba en la otra via, y ese era el
+      # problema: tapaba, y el primer commit de cada proyecto traia reformateados
+      # archivos que publica el marco.
+      #
+      # DOS SUJETOS, y los dos hacen falta. `plantilla/` tal cual (con plantilla/
+      # como CWD, para que apliquen su .prettierrc y su .prettierignore, que son
+      # los que el proyecto hereda) y el DESTINO instanciado de cada combinacion,
+      # porque `projects init` poda bloques, sustituye marcadores y reescribe el
+      # archivo de valores: un andamio limpio no garantiza un repo limpio. Se
+      # instancia con los valores del ejemplo (nombres mas cortos que sus
+      # marcadores: una linea que se achica puede juntarse) y con valores largos
+      # (el nombre del proyecto con LARGO_DE_NOMBRE_MEDIDO caracteres: una linea que
+      # crece puede partirse). Las listas de formas, plataformas y tipos de cuenta
+      # se DERIVAN de la herramienta: una forma nueva entra sola.
+      #
+      # LA VERSION SE DERIVA DEL MANIFIESTO DEL ANDAMIO Y TIENE QUE SER EXACTA, que
+      # es la leccion que Rigel pago primero (su 1.13.0): media con una version
+      # escrita a mano mientras el proyecto resolvia otra desde un rango, y dos
+      # versiones de prettier no formatean igual. Un rango aca es ROJO: el
+      # andamio no trae lockfile y el primer install de cada proyecto resolveria
+      # la que hubiera salido ese dia, que este paso nunca midio.
+      #
+      # SE INSTALA CON EL REGISTRO EXPLICITO Y FUERA DEL ARBOL: npm lee el .npmrc
+      # del directorio donde corre, y un .npmrc en el arbol de un PR decidiria de
+      # donde baja lo que este paso ejecuta.
+      #
+      # EL BANCO QUE LO EJERCITA con un npm y un prettier falsos, rojos incluidos:
+      # pruebas/ci-del-marco/formato-del-andamio.test.mjs.
+      - name: El andamio y lo que el init escribe pasan el formateador
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          VERSION_PRETTIER="$(node -p 'require("./plantilla/package.json").devDependencies?.prettier ?? ""')"
+          if [ -z "${VERSION_PRETTIER}" ]; then
+            echo "::error::plantilla/package.json no declara prettier en devDependencies. Sin esa version este paso mediria con una arbitraria, asi que falla en vez de adivinar. Arreglo: declarar \"prettier\": \"<x.y.z>\", exacto, en las devDependencies de plantilla/package.json"
+            exit 1
+          fi
+          if ! [[ "${VERSION_PRETTIER}" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::el andamio declara prettier como \"${VERSION_PRETTIER}\", que no es una version exacta. Un rango deja que cada proyecto nuevo instale la version que haya salido el dia que nace, que este paso nunca midio, y dos versiones de prettier no formatean igual. Arreglo: pinala exacta en plantilla/package.json, sin ^ ni ~"
+            exit 1
+          fi
+          echo "== formateador: prettier@${VERSION_PRETTIER} (leido de plantilla/package.json) =="
+
+          FORMATEADOR="${RUNNER_TEMP}/formateador"
+          mkdir -p "${FORMATEADOR}"
+          ( cd "${FORMATEADOR}" && npm install --no-save --no-audit --no-fund --ignore-scripts \
+              --registry=https://registry.npmjs.org/ --prefix "${FORMATEADOR}" "prettier@${VERSION_PRETTIER}" )
+          PRETTIER="${FORMATEADOR}/node_modules/.bin/prettier"
+          if [ ! -x "${PRETTIER}" ]; then
+            echo "::error::npm termino y no dejo el binario de prettier en ${PRETTIER}. Este paso no se declara verde sin haber medido"
+            exit 1
+          fi
+          INSTALADA="$("${PRETTIER}" --version)"
+          if [ "${INSTALADA}" != "${VERSION_PRETTIER}" ]; then
+            echo "::error::se pidio prettier@${VERSION_PRETTIER} y quedo instalado ${INSTALADA}. Medir con otra version que la que el proyecto instala es el defecto que este paso existe para impedir"
+            exit 1
+          fi
+
+          HUBO_FALLO=0
+
+          # 1. EL ANDAMIO TAL CUAL.
+          echo "::group::plantilla/ tal cual"
+          if ( cd plantilla && "${PRETTIER}" --check . ); then
+            echo "::endgroup::"
+          else
+            echo "::endgroup::"
+            echo "::error::el ANDAMIO no pasa el formateador que su propio ci.yml le exige al proyecto (pnpm format:check), con la version que el proyecto instala. Un proyecto nuevo nace con el job formato en rojo por archivos que no escribio. Arreglo: cd plantilla && npx --yes prettier@${VERSION_PRETTIER} --write . , y revisar que ningun marcador de doble llave en posicion de valor YAML haya quedado reescrito con espacios adentro: la forma que sobrevive al formateador es la citada"
+            HUBO_FALLO=1
+          fi
+
+          # 2. LO QUE NACE: cada combinacion, instanciada sin arranque (el arranque
+          # formatea, y entonces este paso mediria al formateador y no al andamio).
+          cat > "${RUNNER_TEMP}/formato-de-los-destinos.mjs" <<'FIN'
+          import { spawnSync } from "node:child_process";
+          import fs from "node:fs";
+          import path from "node:path";
+          import { pathToFileURL } from "node:url";
+
+          const raiz = process.cwd();
+          const herramienta = path.join(raiz, "herramientas", "projects-init.mjs");
+          const init = await import(pathToFileURL(herramienta).href);
+          const prettier = process.env.PRETTIER;
+          const tmp = process.env.RUNNER_TEMP;
+
+          const listas = { FORMAS: init.FORMAS, PLATAFORMAS: init.PLATAFORMAS, TIPOS_DE_CUENTA: init.TIPOS_DE_CUENTA };
+          for (const [nombre, lista] of Object.entries(listas)) {
+            if (!Array.isArray(lista) || lista.length === 0) {
+              console.log("::error::herramientas/projects-init.mjs no exporta " + nombre + " como una lista con algo adentro: sin ella este paso no sabe que combinaciones medir, y no se declara verde");
+              process.exit(1);
+            }
+          }
+          const largo = init.LARGO_DE_NOMBRE_MEDIDO;
+          if (!Number.isInteger(largo) || largo < 1) {
+            console.log("::error::herramientas/projects-init.mjs no exporta LARGO_DE_NOMBRE_MEDIDO: sin el, este paso no sabe con que largo de nombre medir");
+            process.exit(1);
+          }
+
+          const pedido = spawnSync(process.execPath, [herramienta, "--ejemplo"], { encoding: "utf8" });
+          if (pedido.status !== 0) {
+            console.log("::error::projects init --ejemplo fallo (salida " + pedido.status + "): " + (pedido.stderr || "").trim());
+            process.exit(1);
+          }
+          const ejemplo = JSON.parse(pedido.stdout);
+
+          // LOS VALORES LARGOS: cada uno cerca del maximo que admite su forma
+          // (GitHub corta los handles y las organizaciones en 39), y el nombre del
+          // proyecto con el largo exacto que la herramienta declara medido.
+          const hasta = (base, n) => (base + "x".repeat(200)).slice(0, n);
+          const largos = {
+            PROYECTO: hasta("proyecto-con-un-nombre-largo-", largo),
+            ORG: hasta("Organizacion-Con-Un-Nombre-", 39),
+            BUILDER_1: hasta("builder-uno-con-un-handle-", 39),
+            BUILDER_2: hasta("builder-dos-con-un-handle-", 39),
+            PO: hasta("product-owner-con-un-handle-", 39),
+            EQUIPO_BUILDERS: hasta("equipo-de-builders-", 39),
+            EQUIPO_PO: hasta("equipo-del-po-", 39),
+            PREFIJO_RECURSOS: hasta("prefijo-de-recursos-", 40),
+            PERFIL_DEV: hasta("perfil-de-desarrollo-", 40),
+            PERFIL_PROD: hasta("perfil-de-produccion-", 40),
+            CANAL_ALERTAS: hasta("#alertas-de-produccion-", 40),
+            DOMINIO_DEV: "reservas-del-area-norte-dev.una-organizacion-con-nombre-largo.example.com",
+            DOMINIO_PROD: "reservas-del-area-norte.una-organizacion-con-nombre-largo.example.com",
+          };
+
+          const rojos = [];
+          let medidos = 0;
+          for (const forma of init.FORMAS) {
+            for (const plataforma of init.PLATAFORMAS) {
+              for (const cuenta of init.TIPOS_DE_CUENTA) {
+                for (const nombres of ["cortos", "largos"]) {
+                  const combinacion = forma + "/" + plataforma + "/" + cuenta + "/nombres " + nombres;
+                  const dir = fs.mkdtempSync(path.join(tmp, "destino-"));
+                  const destino = path.join(dir, "repo");
+                  fs.mkdirSync(destino);
+                  const rutaValores = path.join(dir, "valores.json");
+                  const valores = { ...ejemplo, ...(nombres === "largos" ? largos : {}), forma, plataforma, TIPO_CUENTA: cuenta };
+                  fs.writeFileSync(rutaValores, JSON.stringify(valores, null, 2));
+                  const armado = spawnSync(
+                    process.execPath,
+                    [herramienta, "--valores", rutaValores, "--destino", destino, "--sin-herramientas", "--sin-arranque"],
+                    { encoding: "utf8" },
+                  );
+                  if (armado.status !== 0) {
+                    console.log("::error::projects init fallo con " + combinacion + " (salida " + armado.status + "), asi que ese destino no se pudo medir y este paso no se declara verde. Lo ultimo que dijo: " + (armado.stderr || armado.stdout || "").trim().split("\n").slice(-3).join(" | "));
+                    rojos.push(combinacion + ": projects init fallo");
+                    continue;
+                  }
+                  const p = spawnSync(prettier, ["--check", "."], { cwd: destino, encoding: "utf8" });
+                  const salida = ((p.stdout || "") + (p.stderr || "")).trim();
+                  console.log("::group::" + combinacion);
+                  console.log(salida);
+                  console.log("::endgroup::");
+                  medidos += 1;
+                  if (p.status !== 0 || !/All matched files use Prettier code style!/.test(salida)) {
+                    const archivos = salida.split("\n").filter((l) => l.startsWith("[warn] ") && !/Code style issues/.test(l)).map((l) => l.slice(7));
+                    console.log("::error::el repo que nace con " + combinacion + " no pasa el formateador sin correrlo: " + (archivos.join(", ") || "(la salida de arriba)") + ". Arreglo: si el archivo llega tal cual del andamio, formatealo en plantilla/; si lo escribe projects init (el archivo de valores, una costura de las podas, la pagina de la proteccion de main), el arreglo va en herramientas/projects-init.mjs (jsonParaElArchivo, coserCosturas); si solo falla con nombres largos, una linea de codigo con el nombre del proyecto no entra en el ancho: abrila en varias lineas (un objeto abierto o una constante propia) o baja LARGO_DE_NOMBRE_MEDIDO con el motivo escrito. Reproducilo con --sin-arranque y prettier@" + (process.env.VERSION_PRETTIER || "<version>") + " --check . en el destino");
+                    rojos.push(combinacion);
+                  }
+                }
+              }
+            }
+          }
+          if (rojos.length > 0) {
+            console.log("== destinos en rojo: " + rojos.length + " ==");
+            for (const r of rojos) console.log("  " + r);
+            process.exit(1);
+          }
+          if (medidos === 0) {
+            console.log("::error::no se midio ningun destino: este paso no se declara verde sin haber medido");
+            process.exit(1);
+          }
+          console.log(medidos + " destino(s) nacen formateados sin correr el formateador, con los nombres del ejemplo y con nombres de " + largo + " caracteres");
+          FIN
+          if ! PRETTIER="${PRETTIER}" VERSION_PRETTIER="${VERSION_PRETTIER}" node "${RUNNER_TEMP}/formato-de-los-destinos.mjs"; then
+            HUBO_FALLO=1
+          fi
+
+          exit "${HUBO_FALLO}"
 
       # EL MARCO NO SE AUTO-IDENTIFICA POR UN LITERAL DE SU CUENTA.
       #
@@ -923,10 +1123,13 @@ jobs:
   # el ci.yml de Projects, no viaja a ningun consumidor. Los unicos afectados son los
   # builders que lo estan agregando, y un aviso dirigido a quien lo escribio no avisa.
   #
-  # LO QUE MIRA Y LO QUE NO. Mira que el PR TOQUE el CHANGELOG. NO puede juzgar si lo
-  # que escribiste es bueno ni si esta en la seccion correcta: eso es del review. La
-  # frontera esta ahi a proposito — un check que intenta leer la calidad de una
-  # entrada se pone rojo con entradas buenas, y eso ensena a ignorarlo.
+  # LO QUE MIRA Y LO QUE NO. El primer paso mira que el PR TOQUE el CHANGELOG. NO
+  # puede juzgar si lo que escribiste es bueno ni si esta en la seccion correcta: eso
+  # es del review. La frontera esta ahi a proposito — un check que intenta leer la
+  # calidad de una entrada se pone rojo con entradas buenas, y eso ensena a ignorarlo.
+  # El segundo paso tampoco juzga calidad: mide PROPIEDADES del aviso que el CHANGELOG
+  # va a producir (que exista el resumen para consumidores, que no quede el texto de
+  # fabrica encima de cambios reales y que el mensaje entre sin recortarse).
   changelog:
     name: changelog-en-el-pr
     # Solo en PRs: en un push a main el PR ya se mergeo y no hay diff que mirar.
@@ -1003,9 +1206,357 @@ jobs:
           echo "::error::este PR cambia el marco (${TOCA_MARCO# }) y NO toca CHANGELOG.md. El CHANGELOG es la unica superficie por la que un consumidor se entera de que el marco se movio bajo sus pies, y se escribe en el PR que introduce el cambio, no al cortar la version. Arreglo: agrega tu entrada en la seccion '## [No publicado]', diciendo que tiene que hacer un consumidor (normalmente: nada)"
           exit 1
 
+      # EL AVISO DE LA PROXIMA VERSION SE MIDE EN EL PR QUE LO ESCRIBE, no despues de
+      # mandarlo. La action del aviso ya avisa cuando el mensaje se recorta o cuando la
+      # entrada no trae "### Para consumidores", pero lo hace en la corrida del release,
+      # o sea DESPUES de que el mensaje salio. Medido el 2026-09-17 sobre este repo: el
+      # [No publicado] tenia 40488 caracteres y ningun "Para consumidores"; el aviso del
+      # proximo release iba a armar 41091 y entregar 3451 recortados, el principio de la
+      # entrada y un enlace, sin decirle a nadie que hacer. La 1.9.0 ya se armo asi, y
+      # no le llego a nadie solo porque el destino del aviso nunca se configuro.
+      #
+      # Cobra CUATRO causas de rojo, y el nombre del paso las nombra porque es lo que
+      # alguien lee cuando su PR se pone rojo: que falte el resumen para consumidores,
+      # que el texto de fabrica del paso 1 del release quede encima de cambios reales,
+      # que el resumen use jerga de oficio que quien no es tecnico no lee, y que el
+      # mensaje no entre en el limite. La jerga se cobra desde el lote 10 del porte
+      # (que-es-breaking): una compuerta nueva sale en rojo el dia que sale solo si su
+      # arreglo llega escrito en palabras que entiende quien recibe el PR de bump.
+      #
+      # Mide [No publicado], la version mas alta y, con el CHANGELOG del commit base
+      # del PR, toda version cuyo aviso cambia en este PR. La tercera es la del PR de
+      # release de una linea vieja (cortar la 1.9.7 cuando ya existe la 2.0.0): no es
+      # la mas alta y su texto sale igual apenas se publique el tag. La revision
+      # adversarial del porte (2026-09-17) la midio verde sin resumen.
+      #
+      # EL PASO TIENE BANCO POR SU NOMBRE: aviso-entra-en-el-mensaje.test.mjs lo extrae
+      # con scriptDelPaso y lo corre sobre un repositorio de prueba. Renombrarlo, o
+      # cambiar su run por otra cosa, es rojo en ese banco.
+      #
+      # ROJO Y NO AVISO, por la misma razon que el paso de arriba: vive en el ci.yml de
+      # Projects y no viaja a ningun consumidor; los unicos afectados son quienes
+      # escriben el CHANGELOG. Banco: pruebas/ci-del-marco/aviso-entra-en-el-mensaje.test.mjs
+      # y pruebas/ci-del-marco/placeholder-del-release.test.mjs.
+      #
+      # Node explicito: hasta este paso el job solo corria git. Mismo pin que el resto
+      # de este archivo, sin action nueva.
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        with: { node-version: "22" }
+
+      - name: El aviso de la proxima version dice que hacer, sin jerga, y entra sin recortarse
+        shell: bash
+        env:
+          BASE: ${{ github.event.pull_request.base.sha }}
+        run: |
+          set -euo pipefail
+
+          # Sin el commit base no hay como saber que versiones cambia este PR, y medir
+          # solo las dos de siempre seria el verde a medias que este paso existe para
+          # evitar. Mismo arreglo que el paso de arriba.
+          if ! git cat-file -e "${BASE}^{commit}" 2>/dev/null; then
+            echo "::error::no pude resolver el commit base del PR (${BASE}), asi que no se puede saber que versiones del CHANGELOG cambia este PR. Este check NO se declara verde por no haber podido medir. Arreglo: el checkout de este job necesita fetch-depth: 0"
+            exit 1
+          fi
+
+          DE_LA_BASE="${RUNNER_TEMP:-/tmp}/changelog-de-la-base.md"
+          if git cat-file -e "${BASE}:CHANGELOG.md" 2>/dev/null; then
+            git show "${BASE}:CHANGELOG.md" > "${DE_LA_BASE}"
+          else
+            # Una base sin CHANGELOG hace nueva a toda version: se miden todas, y se dice.
+            echo "::notice::el commit base del PR no tiene CHANGELOG.md: toda version cuenta como nueva y se mide"
+            : > "${DE_LA_BASE}"
+          fi
+
+          node herramientas/aviso-entra-en-el-mensaje.mjs CHANGELOG.md "${DE_LA_BASE}"
+
+  # UNA VERSION PUBLICADA DEL CANONICO NO SE REESCRIBE, Y ESTE ES EL UNICO LUGAR DONDE
+  # ESO SE PUEDE CAZAR A TIEMPO.
+  #
+  # EL HUECO. actions/constitucion/pruebas/huella-del-canonico.test.mjs ata el texto del
+  # canonico a su numero: la ultima entrada de versiones[] del manifiesto lleva el sha256
+  # de los .md que publica. Caza "cambio el texto y nadie movio la version", incluso un
+  # renombrado. No caza el atajo que su propio mensaje pide no tomar: PEGAR la huella
+  # nueva sobre la entrada de una version que ya salio. Ahi todo el CI del marco sale
+  # verde y el rojo cae RIO ABAJO: un consumidor al dia con esa version recibe el texto
+  # nuevo bajo el numero viejo, y su job constitucion falla con "difiere del texto que
+  # el marco publica para la version X.Y.Z", en un repositorio que no hizo nada. Lo paga
+  # quien no cometio el error y no lo puede arreglar.
+  #
+  # LA REGLA. Toda entrada de versiones[] del ancestro comun del PR que ya esta
+  # publicada (su numero no es mayor que la version mas alta del CHANGELOG de la base
+  # del PR, tal como la trae el evento) sigue en la cabeza con la misma huella_canonico,
+  # o con la misma ausencia de huella. O sea que la unica forma de mover el canonico despues de publicar es agregar
+  # una entrada: versiones[] crece. La entrada PENDIENTE (numero mayor que el ultimo
+  # publicado) si se reescribe, porque todavia no la recibio nadie, y el release corrige
+  # su numero en su mismo PR, como dice la nota del manifiesto. El porque del ancestro
+  # comun esta en el comentario del paso.
+  #
+  # DE DONDE VIENE. Rigel 1.14.0 (commit 08f3b2e) cerro la misma clase con un job del
+  # mismo nombre que exige que versiones[] crezca cada vez que el cuerpo cambia. Projects
+  # conserva su huella, que es mas fuerte que el diff (ve renombrados y no depende de la
+  # base), y le agrega la mitad que le faltaba en el change el-experimental-caduca.
+  #
+  # NO VIAJA: compara dos commits de este repo, y es dogfoodeable sin consumidor.
+  # Banco: pruebas/ci-del-marco/canonico-versionado.test.mjs.
+  canonico:
+    name: canonico-versionado
+    # Mismo motivo que el job del CHANGELOG: en un push a main el PR ya se mergeo y no
+    # hay diff que mirar. ci_ok trata el salteo con la misma asimetria.
+    if: github.event_name == 'pull_request'
+    # 5 minutos: un checkout con historia y dos lecturas de JSON.
+    timeout-minutes: 5
+    runs-on: ubuntu-latest
+    # AUDITADO accion por accion antes del estreno:
+    #   checkout con fetch-depth 0         -> contents: read
+    #   setup-node                         -> ninguno: cache del runner o descarga publica
+    #   git cat-file, git diff, git show   -> ninguno: leen el clon local
+    #   node -e sobre tres archivos        -> ninguno
+    # No hay llamada a ninguna API de GitHub ni escritura: contents: read y nada mas.
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          # La base del PR tiene que estar en el clon, y con el default (1) no esta.
+          fetch-depth: 0
+          persist-credentials: false
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        with: { node-version: "22" }
+
+      - name: Una version publicada del canonico no se reescribe
+        shell: bash
+        env:
+          BASE: ${{ github.event.pull_request.base.sha }}
+          CABEZA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+
+          MANIFIESTO="actions/constitucion/canonico/manifiesto.json"
+
+          resolver() {
+            if ! git cat-file -e "$2^{commit}" 2>/dev/null; then
+              echo "::error::no pude resolver el commit $1 del PR ($2). Sin el no hay nada que comparar, y este check NO se declara verde por no haber podido medir. Arreglo: el checkout de este job necesita fetch-depth: 0"
+              exit 1
+            fi
+          }
+          resolver base "${BASE}"
+          resolver cabeza "${CABEZA}"
+
+          # LO QUE CAMBIA ESTE PR se mide desde el ancestro comun, no desde la base:
+          # con una rama atrasada, la base trae versiones que main publico despues, y
+          # comparar contra ella culparia al PR de "sacarlas". Lo que SI se lee de la
+          # base es el CHANGELOG, porque es lo mas nuevo que el evento sabe de que
+          # salio: si main publico una version antes del ultimo push del PR, reescribirla
+          # aca tambien es rojo.
+          #
+          # LIMITE DECLARADO (hallazgo FO-H5 de la revision adversarial del porte). La
+          # base es la del PAYLOAD del evento (pull_request.base.sha), no la punta de
+          # main al momento de mergear. Si main publica una version DESPUES del ultimo
+          # push del PR, el verde de este check queda rancio: juzgo con un tope viejo, y
+          # re-correrlo reusa el mismo payload. En la practica lo tapa que el release
+          # edita la misma entrada del manifiesto (conflicto de merge que obliga a
+          # actualizar la rama). Lo que lo cierra del todo es que el ruleset de main
+          # exija ramas al dia, y eso es configuracion de GitHub, no de este archivo:
+          # pendiente en el tasks.md del change el-experimental-caduca.
+          if ! DESDE="$(git merge-base "${BASE}" "${CABEZA}" 2>/dev/null)"; then
+            echo "::error::no pude calcular el ancestro comun entre la base (${BASE}) y la cabeza (${CABEZA}) del PR. Sin el no se puede separar lo que cambia este PR de lo que cambio main despues, y este check NO se declara verde por no haber podido medir. Arreglo: el checkout de este job necesita fetch-depth: 0"
+            exit 1
+          fi
+
+          if git diff --quiet "${DESDE}" "${CABEZA}" -- "${MANIFIESTO}"; then
+            echo "este PR no toca ${MANIFIESTO}: ninguna version publicada del canonico se pudo reescribir. Si toca el cuerpo del canonico, el que exige la version nueva es actions/constitucion/pruebas/huella-del-canonico.test.mjs"
+            exit 0
+          fi
+
+          DIR="${RUNNER_TEMP}/canonico-versionado"
+          rm -rf "${DIR}"
+          mkdir -p "${DIR}"
+
+          git show "${DESDE}:${MANIFIESTO}" > "${DIR}/base.json" 2>/dev/null || : > "${DIR}/base.json"
+          git show "${CABEZA}:${MANIFIESTO}" > "${DIR}/cabeza.json" 2>/dev/null || : > "${DIR}/cabeza.json"
+          # Un CHANGELOG ilegible no apaga el check: el programa lo trata como "no se
+          # sabe que salio" y congela todas las versiones, con un ::warning::.
+          git show "${BASE}:CHANGELOG.md" > "${DIR}/changelog.md" 2>/dev/null || : > "${DIR}/changelog.md"
+
+          # El programa va inline por el mismo motivo que los pasos de marco-ci.yml, y
+          # entre comillas SIMPLES: adentro no hay ninguna comilla simple literal.
+          # shellcheck disable=SC2016
+          node -e '
+            const { readFileSync } = require("node:fs");
+            const [rutaBase, rutaCabeza, rutaChangelog, manifiesto] = process.argv.slice(1);
+
+            const escapar = (valor) =>
+              String(valor).replace(/%/g, "%25").replace(/\r/g, "%0D").replace(/\n/g, "%0A");
+            const error = (m) => console.log("::error title=Canonico versionado::" + escapar(m));
+
+            function versiones(ruta, lado) {
+              try {
+                const m = JSON.parse(readFileSync(ruta, "utf8"));
+                if (!Array.isArray(m.versiones)) throw new Error("versiones no es una lista");
+                return m.versiones;
+              } catch (e) {
+                error("no pude leer versiones[] de " + manifiesto + " en la " + lado + " del PR (" + e.message + "). " +
+                  "Lo no verificable es rojo, nunca exito mudo. Arreglo: el manifiesto tiene que existir y ser JSON " +
+                  "valido con una lista versiones");
+                process.exit(1);
+              }
+            }
+
+            const semver = (v) => {
+              const m = /^([0-9]+)\.([0-9]+)\.([0-9]+)$/.exec(String(v));
+              return m ? m.slice(1).map(Number) : null;
+            };
+            const cmp = (a, b) => a[0] - b[0] || a[1] - b[1] || a[2] - b[2];
+
+            const antes = versiones(rutaBase, "base");
+            const despues = versiones(rutaCabeza, "cabeza");
+
+            // Publicada = numero no mayor que la version mas alta del CHANGELOG de la
+            // base. No "la nombra el CHANGELOG": si el release olvida corregir el numero
+            // previsto de una entrada, esa entrada quedaria reescribible para siempre.
+            const publicadas = [...readFileSync(rutaChangelog, "utf8").matchAll(/^## \[([0-9]+\.[0-9]+\.[0-9]+)\]/gm)]
+              .map((m) => semver(m[1]))
+              .sort(cmp);
+            const tope = publicadas.length ? publicadas[publicadas.length - 1] : null;
+            if (!tope) {
+              console.log("::warning title=Canonico versionado::" + escapar(
+                "el CHANGELOG.md de la base no nombra ninguna version publicada (## [X.Y.Z]), asi que no se puede " +
+                "saber que salio. Camino conservador: TODAS las entradas del manifiesto cuentan como publicadas"));
+            }
+
+            // Si main publico esa version DESPUES de que la rama salio, el arreglo es otro.
+            const ATRASADA = ". Si tu rama salio antes de que main publicara esa version, actualizala con main y " +
+              "volve a mirar: el cambio que hiciste sobre la entrada pendiente ahora cae sobre una publicada";
+
+            const problemas = [];
+            const pendientes = [];
+            for (const v of antes) {
+              const s = semver(v.version);
+              if (!s) {
+                problemas.push("la entrada " + JSON.stringify(v.version) + " del manifiesto de la base no tiene la forma " +
+                  "X.Y.Z, y sin numero no se puede decidir si ya se publico");
+                continue;
+              }
+              if (tope && cmp(s, tope) > 0) {
+                pendientes.push(v.version);
+                continue;
+              }
+              const ahora = despues.find((d) => d.version === v.version);
+              if (!ahora) {
+                problemas.push("la version " + v.version + " ya se publico y este PR la saca del manifiesto (o le cambia " +
+                  "el numero). Un consumidor pinado a esa version sigue verificando su constitucion contra ella. Arreglo: " +
+                  "devolve la entrada " + v.version + " tal como estaba, y si el canonico cambio, agrega una version " +
+                  "nueva al final de versiones[]" + ATRASADA);
+                continue;
+              }
+              const eraHuella = v.huella_canonico === undefined ? "(sin huella)" : v.huella_canonico;
+              const esHuella = ahora.huella_canonico === undefined ? "(sin huella)" : ahora.huella_canonico;
+              if (eraHuella !== esHuella) {
+                problemas.push("la version " + v.version + " ya se publico con huella_canonico " + eraHuella + " y este " +
+                  "PR se la cambia a " + esHuella + ". Dos textos distintos pasarian a llamarse " + v.version + ", y el " +
+                  "rojo cae rio abajo: un consumidor al dia con esa version falla con \"difiere del texto que el marco " +
+                  "publica para la version " + v.version + "\" sin haber hecho nada. Arreglo: devolvele a " + v.version +
+                  " su huella y agrega una version NUEVA al final de versiones[] con la huella de hoy (versiones[] " +
+                  "tiene que crecer); el release corrige su numero si sale con otro" + ATRASADA);
+              }
+            }
+
+            if (problemas.length) {
+              for (const p of problemas) error(p);
+              process.exit(1);
+            }
+
+            const intactas = antes.length - pendientes.length;
+            console.log(
+              intactas + " version(es) publicada(s) del canonico intacta(s) (tope del CHANGELOG de la base: " +
+                (tope ? tope.join(".") : "ninguno") + "); versiones[] paso de " + antes.length + " -> " + despues.length +
+                " entradas" + (pendientes.length ? "; pendiente(s) que se pueden reescribir: " + pendientes.join(", ") : "")
+            );
+          ' "${DIR}/base.json" "${DIR}/cabeza.json" "${DIR}/changelog.md" "${MANIFIESTO}"
+
+  # LAS ASERCIONES QUE TAPAN SU EVIDENCIA, SOLO EN LOS BANCOS QUE ESTE PR TOCA.
+  #
+  # `assert.match` y `assert.doesNotMatch` SIN mensaje imprimen el regex Y EL INPUT.
+  # Con mensaje imprimen solo el mensaje: el input se pierde. O sea que agregar un
+  # mensaje —el reflejo correcto en casi cualquier otro assert— EMPEORA el
+  # diagnostico de esos dos, y se paga el dia que caen en CI: el log dice el motivo y
+  # se calla lo que paso. El arreglo es `porque(motivo, evidencia)` de
+  # pruebas/porque.mjs. Viene del porte de Rigel (commit d71c40c, issue #491 de alla).
+  #
+  # MIRA EL DIFF Y NO EL ARBOL, y eso es la decision de la pieza y no una comodidad.
+  # El arbol ya tiene cientos (la herramienta imprime el numero en cada corrida). Un
+  # banco repo-wide NACERIA ROJO sobre todas, y un rojo que no se puede cerrar se
+  # destraba escribiendo con apuro. Mirando el diff, la puerta se cierra sin pedir la
+  # barrida: el banco que un PR toca sale limpio ENTERO, y la deuda baja por area.
+  #
+  # TRES PUNTOS EN EL DIFF, no dos: lo que cuenta es lo que el PR cambio desde que se
+  # separo de main (`BASE...CABEZA`, desde la base comun). Con dos puntos, un banco que
+  # entro a main DESPUES de abrir el PR apareceria como tocado por este, y el rojo
+  # caeria sobre deuda ajena.
+  #
+  # POR QUE ES ROJO Y NO AVISO: por lo mismo que el job del CHANGELOG. Este check vive
+  # en el ci.yml de Projects y no viaja a ningun consumidor; los unicos afectados son
+  # quienes tocan un banco del marco, y un aviso dirigido a quien lo escribio no avisa.
+  aserciones:
+    name: aserciones-con-evidencia
+    # Solo en PRs: en un push a main no hay diff de PR que acotar.
+    if: github.event_name == 'pull_request'
+    timeout-minutes: 10
+    runs-on: ubuntu-latest
+    # Clona el arbol y lee su historia local; no llama a ninguna API de GitHub, asi
+    # que pull-requests: read no se le concede.
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          # La base comun del PR tiene que estar en el clon, y con el default (1) no
+          # esta.
+          fetch-depth: 0
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        with: { node-version: "22" }
+
+      - name: Las aserciones que este PR toca no tapan su evidencia
+        shell: bash
+        env:
+          BASE: ${{ github.event.pull_request.base.sha }}
+          CABEZA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+
+          if ! git cat-file -e "${BASE}^{commit}" 2>/dev/null || ! git cat-file -e "${CABEZA}^{commit}" 2>/dev/null; then
+            echo "::error::no pude resolver la base (${BASE}) o la cabeza (${CABEZA}) del PR. Sin las dos no hay diff que mirar, y este check NO se declara verde por no haber podido medir. Arreglo: el checkout de este job necesita fetch-depth: 0"
+            exit 1
+          fi
+
+          # A un archivo y no a una sustitucion de proceso, a proposito: el codigo de
+          # salida de un `< <(git diff ...)` se pierde, y un diff que fallo daria una
+          # lista vacia que se leeria como "este PR no toca bancos". Asi, un fallo de git
+          # mata el paso por `set -e` con su propio mensaje. Los borrados quedan fuera
+          # (--diff-filter=d): un banco que el PR elimina no tiene aserciones que juzgar.
+          LISTA="${RUNNER_TEMP}/bancos-tocados"
+          git -c core.quotePath=false diff -z --name-only --diff-filter=d "${BASE}...${CABEZA}" -- '*.test.mjs' > "${LISTA}"
+
+          TOCADOS=()
+          while IFS= read -r -d '' F; do
+            TOCADOS+=("${F}")
+          done < "${LISTA}"
+
+          if [ ${#TOCADOS[@]} -eq 0 ]; then
+            echo "::notice::este PR no toca ningun banco (*.test.mjs), asi que no hay aserciones que mirar. La deuda del arbol, como referencia:"
+            node pruebas/aserciones-con-evidencia.mjs
+            exit 0
+          fi
+
+          echo "== bancos que toca este PR =="
+          printf '%s\n' "${TOCADOS[@]}"
+          node pruebas/aserciones-con-evidencia.mjs "${TOCADOS[@]}"
+
   ci_ok:
     name: ci-ok
-    needs: [marco, pruebas_actions, pruebas_init, higiene, constitucion, deltas, changelog]
+    needs: [marco, pruebas_actions, pruebas_init, higiene, constitucion, deltas, changelog, canonico, aserciones]
     if: always()
     # 5 minutos: no hace checkout ni toca la red, solo lee los resultados de sus needs.
     timeout-minutes: 5
@@ -1069,7 +1620,7 @@ jobs:
           # if al job, y eso es apagarlo.
           if [ "${{ github.event_name }}" = "pull_request" ]; then
             [ "${{ needs.changelog.result }}" = "success" ] || {
-              echo "::error::el check del CHANGELOG en el PR termino en '${{ needs.changelog.result }}'"
+              echo "::error::el check del CHANGELOG en el PR termino en '${{ needs.changelog.result }}'. Mira cual de sus dos pasos: 'El PR que cambia el marco toca el CHANGELOG' (falta la entrada) o 'El aviso de la proxima version dice que hacer, sin jerga, y entra sin recortarse' (falta el resumen para consumidores, quedo el texto de fabrica encima de cambios, el resumen usa jerga de oficio, o el mensaje no entra); cada uno deja su arreglo escrito"
               exit 1
             }
           else
@@ -1077,6 +1628,40 @@ jobs:
               success | skipped) ;;
               *)
                 echo "::error::el check del CHANGELOG termino en '${{ needs.changelog.result }}'"
+                exit 1
+                ;;
+            esac
+          fi
+          # Misma asimetria que el job del CHANGELOG, y por el mismo motivo: los dos
+          # necesitan el diff del PR y se saltean a proposito en un push a main. Se
+          # escribe entera para cada uno en vez de agruparlos: el dia que uno de los dos
+          # cambie de carril, agruparlos habria movido a los dos.
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            [ "${{ needs.canonico.result }}" = "success" ] || {
+              echo "::error::el check de las versiones publicadas del canonico en el PR termino en '${{ needs.canonico.result }}'"
+              exit 1
+            }
+          else
+            case "${{ needs.canonico.result }}" in
+              success | skipped) ;;
+              *)
+                echo "::error::el check de las versiones publicadas del canonico termino en '${{ needs.canonico.result }}'"
+                exit 1
+                ;;
+            esac
+          fi
+          # El de las aserciones sigue la misma regla y por el mismo motivo: tambien
+          # mira el diff del PR, asi que en un push a main se saltea a proposito.
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            [ "${{ needs.aserciones.result }}" = "success" ] || {
+              echo "::error::el check de las aserciones con evidencia termino en '${{ needs.aserciones.result }}'. Si es un rojo, el paso anoto cada asercion ciega con su archivo y su linea: el arreglo es envolver el mensaje con porque() de pruebas/porque.mjs"
+              exit 1
+            }
+          else
+            case "${{ needs.aserciones.result }}" in
+              success | skipped) ;;
+              *)
+                echo "::error::el check de las aserciones con evidencia termino en '${{ needs.aserciones.result }}'"
                 exit 1
                 ;;
             esac

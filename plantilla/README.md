@@ -4,12 +4,12 @@ Esto es lo que se copia **UNA vez** al crear un proyecto nuevo. Desde la copia, 
 archivo es del proyecto: si el proyecto necesita cambiarlo, lo cambia y no le debe nada a
 Projects. Eso lo distingue de las otras piezas del marco:
 
-| Pieza | Cómo evoluciona |
-|---|---|
-| **Scaffold** (esto) | Se copia una vez. Después es del proyecto. Un cambio acá NO llega a los repos ya creados. |
-| **Referenciado** (workflows reusables, composite actions) | Se consume por `uses: {{ORG_MARCO}}/Projects/...@v1.9.6`, **por versión exacta**. Una versión nueva llega como PR de Dependabot, no empujada. |
-| **Canónico** (specs del marco) | Viven solo en Projects. Nadie los copia. |
-| **Regenerado** (skills y comandos de OpenSpec, y la porción del marco de la constitución) | No se vendoran: el marco pina la herramienta o publica el texto, y cada repo lo regenera. |
+| Pieza                                                                                     | Cómo evoluciona                                                                                                                               |
+| ----------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Scaffold** (esto)                                                                       | Se copia una vez. Después es del proyecto. Un cambio acá NO llega a los repos ya creados.                                                     |
+| **Referenciado** (workflows reusables, composite actions)                                 | Se consume por `uses: {{ORG_MARCO}}/Projects/...@v1.9.6`, **por versión exacta**. Una versión nueva llega como PR de Dependabot, no empujada. |
+| **Canónico** (specs del marco)                                                            | Viven solo en Projects. Nadie los copia.                                                                                                      |
+| **Regenerado** (skills y comandos de OpenSpec, y la porción del marco de la constitución) | No se vendoran: el marco pina la herramienta o publica el texto, y cada repo lo regenera.                                                     |
 
 Corolario práctico: **nada que deba cambiar para todos los proyectos a la vez va acá.**
 Si al editar un archivo del scaffold pensás "esto habría que propagarlo a los repos
@@ -116,30 +116,75 @@ vez**, al crear el repo, con un buscar-y-reemplazar sobre todo el árbol.
 
 ### Identidad del proyecto
 
-| Placeholder | Qué poner | Ejemplo |
-|---|---|---|
-| `{{PROYECTO}}` | Nombre del repo, kebab-case | `people-agenda` |
-| `{{ORG}}` | Org de GitHub: el handle de la organización, no un equipo dentro de ella. Se interpola en `uses: {{ORG_MARCO}}/Projects/...`, o sea en la coordenada con la que GitHub resuelve el marco | `Ejemplo-Org` |
-| `{{ORG_MARCO}}` | La cuenta de GitHub donde vive **el marco**, que NO es la de tu proyecto. La herramienta la deriva sola del clon desde el que corre, así que un fork del marco produce proyectos que apuntan al fork | `im-diego-ec` | Nada: no se contesta a mano |
-| `{{PAQUETES}}` | Paquetes del monorepo, lista legible | `web, api, e2e` |
+| Placeholder     | Qué poner                                                                                                                                                                                                                                                                                                                                           | Ejemplo         |
+| --------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------- |
+| `{{PROYECTO}}`  | Nombre del repo, kebab-case. Con hasta 60 caracteres el repo nace con `format:check` en verde sin correr el formateador (medido en el CI del marco); con uno más largo, alguna línea de código del esqueleto no entra en el ancho y hay que correr `pnpm format` una vez —el arranque lo hace solo, y con `--sin-arranque` la herramienta lo avisa— | `people-agenda` |
+| `{{ORG}}`       | Org de GitHub: el handle de la organización, no un equipo dentro de ella. Se interpola en `uses: {{ORG_MARCO}}/Projects/...`, o sea en la coordenada con la que GitHub resuelve el marco                                                                                                                                                            | `Ejemplo-Org`   |
+| `{{ORG_MARCO}}` | La cuenta de GitHub donde vive **el marco**, que NO es la de tu proyecto. La herramienta la deriva sola del clon desde el que corre, así que un fork del marco produce proyectos que apuntan al fork. No se contesta a mano                                                                                                                         | `im-diego-ec`   |
+| `{{PAQUETES}}`  | **No se llena: lo deriva la herramienta** de los paquetes de la tabla de abajo. Escribir la lista aparte de sus elementos es una segunda declaración que puede divergir; si igual lo ponés en `valores.json`, el tuyo gana, así que la única forma de que quede mal es escribirlo                                                                   | `web, api, e2e` |
 
-### Paquetes (derivados de `{{PAQUETES}}`, uno por rol)
+### Paquetes, uno por rol
 
 Los necesitan los globs de lint y la config de Dependabot: la herramienta tiene que saber
-cuál paquete corre en Node y cuál en el navegador.
+cuál paquete corre en Node y cuál en el navegador. Son **carpetas**, y fijas: la herramienta
+exige que cada uno valga el nombre de la carpeta que el andamio reparte, porque copia las rutas
+tal cual y los marcadores viajan a globs y a rutas.
 
-| Placeholder | Qué poner | Ejemplo | Si no existe |
-|---|---|---|---|
-| `{{PAQUETE_API}}` | Carpeta del backend | `api` | — |
-| `{{PAQUETE_WEB}}` | Carpeta del frontend | `web` | Borrar los bloques `[FRONT]` de `eslint.config.mjs` y sus imports |
+| Placeholder         | Qué poner                      | Ejemplo | Si no existe                                                                                                                                 |
+| ------------------- | ------------------------------ | ------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
+| `{{PAQUETE_API}}`   | Carpeta del backend            | `api`   | —                                                                                                                                            |
+| `{{PAQUETE_WEB}}`   | Carpeta del frontend           | `web`   | Los seis lugares de [«Si el proyecto NO tiene frontend»](#si-el-proyecto-no-tiene-frontend), abajo                                           |
 | `{{PAQUETE_SITIO}}` | Carpeta del sitio de contenido | `sitio` | Solo viaja cuando la forma elegida es «un sitio para leer». En las demás formas la carpeta no llega al proyecto, y este valor queda sin usar |
-| `{{PAQUETE_E2E}}` | Carpeta de la suite E2E | `e2e` | Borrar esa entrada del glob de Node **y las dos entradas `EXCEPCIONES` de `ci.yml`** (una excepción que no corresponde a ningún paquete es roja, a propósito) |
+| `{{PAQUETE_E2E}}`   | Carpeta de la suite E2E        | `e2e`   | Los seis lugares de [«Si el proyecto NO tiene suite E2E»](#si-el-proyecto-no-tiene-suite-e2e), abajo                                         |
+
+Las dos listas de abajo se **recorrieron hasta verde** el 2026-09-17 sobre un repo recién
+instanciado (aplicación con AWS): con cada una aplicada, `pnpm install` y `pnpm verificar`
+salen 0, y el paso «Todo paquete declara los scripts de verificacion» del `ci.yml` también.
+Están completas a propósito: dejar un lugar afuera no da un error que hable de paquetes, da un
+rojo tres pasos después. Van todas en el mismo PR.
+
+#### Si el proyecto NO tiene frontend
+
+1. Borrar `web/`.
+2. `eslint.config.mjs`: borrar todo lo que va entre cada `// [FRONT]` y su `// [/FRONT]`,
+   **las dos marcas incluidas**, más los tres `import` marcados `// [FRONT]` al final de la
+   línea. El cierre está marcado porque los bloques no tienen todos la misma forma —uno es un
+   objeto `{ … },` y otro un spread `...pluginQuery…map(…)` seguido de un objeto que usa ese
+   plugin—, y deducir dónde termina cada uno rompía el archivo.
+3. `package.json` de la raíz: sacar de `devDependencies` `eslint-plugin-react-hooks`,
+   `eslint-plugin-react-refresh` y `@tanstack/eslint-plugin-query`, y correr `pnpm install`
+   para que el lockfile lo refleje.
+4. `.claude/settings.json`: borrar las cuatro entradas `pnpm --filter web …`.
+5. `comandos-levantar-servicios.txt`: borrar las dos líneas que copian `web/.env.example`.
+6. `README.md` del proyecto: borrar la fila `web/` de «Estructura».
+
+`pnpm-workspace.yaml` no se toca: declara los paquetes con un glob (`"*"`), que enumera lo que
+hay. Y la suite E2E recorre la portada del frontend: sin frontend, lo que corresponde es el
+camino de abajo también.
+
+#### Si el proyecto NO tiene suite E2E
+
+1. Borrar `e2e/`.
+2. `.github/workflows/ci.yml`: borrar **las dos entradas de `EXCEPCIONES`** del paso «Todo
+   paquete declara los scripts de verificacion». Una excepción que no corresponde a ningún
+   paquete del workspace es **roja a propósito**: medido, dejarlas da «estas excepciones no
+   corresponden a ningun paquete del workspace».
+3. `package.json` de la raíz: borrar el script `e2e` y sacar el `--filter '!e2e'` del script
+   `test`.
+4. `eslint.config.mjs`: borrar la entrada `e2e/**/*.mjs` del entorno Node.
+5. `README.md` del proyecto: borrar la fila `e2e/` de «Estructura».
+6. `pnpm format`, y commitear lo que cambie. **No es opcional**: sacar la entrada del paso 4
+   deja corto el arreglo de globs, y el formateador lo quiere en una sola línea. Medido: sin
+   este paso, `pnpm verificar` sale 1 en `format:check`.
+
+`comandos-levantar-servicios.txt` explica cómo correr la suite: esas líneas se borran o se
+dejan como nota, pero no rompen nada.
 
 ### Generación de código previa a la verificación
 
-| Placeholder | Qué poner | Ejemplo | Si no existe |
-|---|---|---|---|
-| `{{GENERAR_CLIENTE_DATOS}}` | Comando que genera el cliente de la capa de datos, tal como se invoca **dentro** del paquete de backend | `prisma generate` | Borrar el paso "Generar el cliente de la capa de datos" de `.github/workflows/ci.yml` |
+| Placeholder                 | Qué poner                                                                                               | Ejemplo           | Si no existe                                                                                                                                                                                                                          |
+| --------------------------- | ------------------------------------------------------------------------------------------------------- | ----------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `{{GENERAR_CLIENTE_DATOS}}` | Comando que genera el cliente de la capa de datos, tal como se invoca **dentro** del paquete de backend | `prisma generate` | Tres archivos: el paso "Generar el cliente de la capa de datos" de `.github/workflows/ci.yml`, el script `datos` (y su eslabón en `verificar`) de `package.json`, y el `postinstall` y el principio del `build` de `api/package.json` |
 
 El paso existe y va **antes** del lint por una razón concreta: el código de acceso a datos
 está tipado contra el cliente generado, así que si el cliente no está, las reglas
@@ -148,15 +193,23 @@ el lint pasa en verde sin haber verificado nada. Vale para cualquier artefacto g
 que dependa el tipado, no solo para el cliente de datos: si el proyecto tiene otro, se
 agrega junto a este.
 
+Y el mismo comando corre en el **`postinstall`** del paquete de backend: `pnpm install`
+deja el cliente generado, así que quien clona y corre `pnpm lint` o `pnpm typecheck` a
+secas ya no ve los 8 errores de tipos y el `TS2305` que salían sin él (medido el
+2026-09-17). El paso del CI y el script `datos` se conservan: el orden se lee en el
+pipeline y no depende de un script de instalación. Si el proyecto no genera cliente de
+datos, el `postinstall` es el lugar **más caro de olvidar**: sin comando, el primer
+`pnpm install` sale rojo.
+
 ### Personas, por ROL (nunca nombres propios en la prosa)
 
-| Placeholder | Qué poner | Ejemplo |
-|---|---|---|
-| `{{EQUIPO_BUILDERS}}` | Slug del **equipo** de builders en la organización: el de la URL del equipo, **en minúsculas**, no su nombre para mostrar. Se usa en `CODEOWNERS` | `builders` |
-| `{{EQUIPO_PO}}` | Slug del **equipo** del PO, con la misma regla. Se usa en `CODEOWNERS` | `po` |
-| `{{BUILDER_1}}` | Handle de GitHub del builder que sostiene **la llave de producción**: su OK explícito es obligatorio para toda escritura en prod. **Sin la arroba**: el scaffold la pone donde va | `handle-del-builder-1` |
-| `{{BUILDER_2}}` | Handle del otro builder, sin arroba (el review cruzado es simétrico entre ambos) | `handle-del-builder-2` |
-| `{{PO}}` | Handle del PO, sin arroba: dueño de proposals y specs | `handle-del-po` |
+| Placeholder           | Qué poner                                                                                                                                                                         | Ejemplo                |
+| --------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------- |
+| `{{EQUIPO_BUILDERS}}` | Slug del **equipo** de builders en la organización: el de la URL del equipo, **en minúsculas**, no su nombre para mostrar. Se usa en `CODEOWNERS`                                 | `builders`             |
+| `{{EQUIPO_PO}}`       | Slug del **equipo** del PO, con la misma regla. Se usa en `CODEOWNERS`                                                                                                            | `po`                   |
+| `{{BUILDER_1}}`       | Handle de GitHub del builder que sostiene **la llave de producción**: su OK explícito es obligatorio para toda escritura en prod. **Sin la arroba**: el scaffold la pone donde va | `handle-del-builder-1` |
+| `{{BUILDER_2}}`       | Handle del otro builder, sin arroba (el review cruzado es simétrico entre ambos)                                                                                                  | `handle-del-builder-2` |
+| `{{PO}}`              | Handle del PO, sin arroba: dueño de proposals y specs                                                                                                                             | `handle-del-po`        |
 
 **Equipos en `CODEOWNERS`, handles en la prosa**, y la distinción tiene motivo. La
 asignación automática de reviewers va por equipo: sobrevive a que un rol cambie de persona
@@ -179,14 +232,14 @@ persona, se cambia el handle en `AGENTS.md` y en `.github/PULL_REQUEST_TEMPLATE.
 
 ### AWS
 
-| Placeholder | Qué poner | Ejemplo |
-|---|---|---|
-| `{{CUENTA_DEV}}` | ID de cuenta AWS de dev (12 dígitos) | `111111111111` |
-| `{{CUENTA_PROD}}` | ID de cuenta AWS de producción | `222222222222` |
-| `{{REGION}}` | Región | `us-east-1` |
-| `{{PERFIL_DEV}}` | Nombre del perfil de la CLI para dev. **Sin espacios**: viaja dentro del patrón `Bash(AWS_PROFILE={{PERFIL_DEV}} terraform plan *)` de la allowlist de `.claude/settings.json`, donde un espacio no rompe el JSON, rompe el patrón — y una entrada de allowlist que no matchea nada no avisa | `ejemplo-dev` |
-| `{{PERFIL_PROD}}` | Ídem, para producción | `ejemplo-prod` |
-| `{{PREFIJO_RECURSOS}}` | Prefijo de nombres de recursos AWS **y** raíz de las rutas de SSM (`/{{PREFIJO_RECURSOS}}/<env>/<NOMBRE>`). Sin em dashes | `agenda` |
+| Placeholder            | Qué poner                                                                                                                                                                                                                                                                                    | Ejemplo        |
+| ---------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------- |
+| `{{CUENTA_DEV}}`       | ID de cuenta AWS de dev (12 dígitos)                                                                                                                                                                                                                                                         | `111111111111` |
+| `{{CUENTA_PROD}}`      | ID de cuenta AWS de producción                                                                                                                                                                                                                                                               | `222222222222` |
+| `{{REGION}}`           | Región                                                                                                                                                                                                                                                                                       | `us-east-1`    |
+| `{{PERFIL_DEV}}`       | Nombre del perfil de la CLI para dev. **Sin espacios**: viaja dentro del patrón `Bash(AWS_PROFILE={{PERFIL_DEV}} terraform plan *)` de la allowlist de `.claude/settings.json`, donde un espacio no rompe el JSON, rompe el patrón — y una entrada de allowlist que no matchea nada no avisa | `ejemplo-dev`  |
+| `{{PERFIL_PROD}}`      | Ídem, para producción                                                                                                                                                                                                                                                                        | `ejemplo-prod` |
+| `{{PREFIJO_RECURSOS}}` | Prefijo de nombres de recursos AWS **y** raíz de las rutas de SSM (`/{{PREFIJO_RECURSOS}}/<env>/<NOMBRE>`). Sin em dashes                                                                                                                                                                    | `agenda`       |
 
 > Los IDs de cuenta y los dominios de esta tabla son **de ejemplo, inventados**. Los reales
 > de cada proyecto se ponen al sustituir, y nunca se escriben en el marco: la plantilla de PR
@@ -194,12 +247,12 @@ persona, se cambia el handle en `AGENTS.md` y en `.github/PULL_REQUEST_TEMPLATE.
 
 ### Operación
 
-| Placeholder | Qué poner | Ejemplo |
-|---|---|---|
-| `{{DOMINIO_DEV}}` | Host del frontend de dev, sin esquema | `agenda-dev.ejemplo.com` |
-| `{{DOMINIO_PROD}}` | Host del frontend de producción, sin esquema | `agenda.ejemplo.com` |
-| `{{CANAL_ALERTAS}}` | Canal donde caen las alarmas de producción | `#alertas-prod` |
-| `{{ID_MCP_SLACK}}` | ID del servidor MCP de Slack, tal como aparece en el nombre de sus tools: `mcp__<id>__slack_read_channel`. Alfanumérico y guiones, **sin guiones bajos**: uno acá corre el separador `__` y la entrada deja de matchear. Si el equipo no usa Slack, borrá esas cinco entradas de `.claude/settings.json` | `00000000-0000-0000-0000-000000000000` |
+| Placeholder         | Qué poner                                                                                                                                                                                                                                                                                                | Ejemplo                                |
+| ------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------- |
+| `{{DOMINIO_DEV}}`   | Host del frontend de dev, sin esquema                                                                                                                                                                                                                                                                    | `agenda-dev.ejemplo.com`               |
+| `{{DOMINIO_PROD}}`  | Host del frontend de producción, sin esquema                                                                                                                                                                                                                                                             | `agenda.ejemplo.com`                   |
+| `{{CANAL_ALERTAS}}` | Canal donde caen las alarmas de producción                                                                                                                                                                                                                                                               | `#alertas-prod`                        |
+| `{{ID_MCP_SLACK}}`  | ID del servidor MCP de Slack, tal como aparece en el nombre de sus tools: `mcp__<id>__slack_read_channel`. Alfanumérico y guiones, **sin guiones bajos**: uno acá corre el separador `__` y la entrada deja de matchear. Si el equipo no usa Slack, borrá esas cinco entradas de `.claude/settings.json` | `00000000-0000-0000-0000-000000000000` |
 
 ### Verificar que no quedó ninguno
 
@@ -230,12 +283,12 @@ solas. Eso arregla el problema que este mecanismo existe para arreglar: una cons
 copiada a mano llega incompleta la primera vez y envejece a partir de ahí, y cada proyecto
 termina con una versión distinta de la misma regla.
 
-| Archivo | Qué es | Quién lo escribe |
-|---|---|---|
+| Archivo                     | Qué es                                                                                                                                                   | Quién lo escribe                                                                                                                                                                            |
+| --------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `.projects/AGENTS-marco.md` | La porción del marco, renderizada con los valores de este repo. Abre con un sello de una línea (comentario HTML con la versión y el `sha256` del cuerpo) | **El marco.** No se edita a mano: el CI compara el cuerpo contra ese sello —eso caza la edición a mano— y la action del marco, que tiene el texto canónico a mano, hace el diff byte a byte |
-| `.projects-valores.json` | Los valores del proyecto con los que se renderiza | El proyecto, una vez, en el bootstrap |
-| `.projects-desvios.json` | Los desvíos declarados: reglas del marco de las que este repo se aparta | El proyecto, cuando hace falta, con motivo escrito |
-| `AGENTS.md` | Lo del proyecto: stack, ambientes, sus reglas propias. Y la línea que carga el artefacto | El proyecto |
+| `.projects-valores.json`    | Los valores del proyecto con los que se renderiza                                                                                                        | El proyecto, una vez, en el bootstrap                                                                                                                                                       |
+| `.projects-desvios.json`    | Los desvíos declarados: reglas del marco de las que este repo se aparta                                                                                  | El proyecto, cuando hace falta, con motivo escrito                                                                                                                                          |
+| `AGENTS.md`                 | Lo del proyecto: stack, ambientes, sus reglas propias. Y la línea que carga el artefacto                                                                 | El proyecto                                                                                                                                                                                 |
 
 **Las entradas viven en la raíz y no dentro de `.projects/` a propósito**: ese directorio es
 del marco y es desechable —el modo escribir puede borrarlo y re-emitirlo entero—, así que
@@ -356,7 +409,7 @@ Un buscar-y-reemplazar no los resuelve: son decisiones.
 
   **Nada que escriba, y la asimetría es deliberada**: un permiso de más es un riesgo, uno de
   menos es fricción. Por eso no hay `terraform apply`, ni `git push`, ni `gh pr merge`. Y
-  esto **ya tiene check**: el paso *Permisos del agente sin escritura* del job `higiene` lee
+  esto **ya tiene check**: el paso _Permisos del agente sin escritura_ del job `higiene` lee
   la forma de cada entrada y se pone rojo con dos cosas — un **verbo que escribe** (`apply`,
   `push`, `merge`, `create-*`, `put-*`, `-X DELETE`…) y un **comodín en la posición del
   subcomando** (`Bash(terraform *)` autoriza todos los subcomandos de terraform, `apply`
@@ -364,7 +417,7 @@ Un buscar-y-reemplazar no los resuelve: son decisiones.
   desvío de permiso en `.projects-desvios.json`, con motivo, y el check lo absorbe de ahí y
   reimprime el motivo en cada corrida.
 
-  Sobre el **perfil de producción**: el marco autoriza expresamente *leer* producción por
+  Sobre el **perfil de producción**: el marco autoriza expresamente _leer_ producción por
   CLI (`validate`, `plan`, `describe-*`), así que una entrada con ese perfil no es un
   hallazgo — el check la imprime como `::notice::` en cada corrida para que esté a la vista,
   y lo que sí exige es que el subcomando esté clavado. El scaffold trae solo el `plan` con
@@ -377,8 +430,8 @@ Un buscar-y-reemplazar no los resuelve: son decisiones.
   entero, no el verbo que uno tenía en la cabeza.
 
   La otra es **un ejecutor sin versión exacta**, y esa tampoco depende ya de que alguien se
-  acuerde: el check *Ejecutores de paquetes
-  pinados* del job `higiene` lee todos los archivos rastreados del repo (menos los `.md`,
+  acuerde: el check _Ejecutores de paquetes
+  pinados_ del job `higiene` lee todos los archivos rastreados del repo (menos los `.md`,
   que son prosa) y se pone rojo si un `npx`, `bunx`, `npm exec`, `npm x`, `pnpm dlx`,
   `yarn dlx` o `bun x` corre un paquete sin versión exacta. No lo decide con un regex de
   línea: **tokeniza** respetando comillas simples, comillas dobles y escapes, así que un
@@ -389,6 +442,7 @@ Un buscar-y-reemplazar no los resuelve: son decisiones.
   vez de salir a buscar a npm un nombre que puede ser de otro. **Un repo que ignore
   `.claude` entero en su `.gitignore` esconde de ese check justo este archivo** — por eso
   el `.gitignore` del scaffold ignora `settings.local.json` y no el directorio.
+
 - **`.claude/skills/` y `.claude/agents/` → nada que llenar, pero conviene saber qué son.**
   El scaffold trae dos piezas escritas a mano por el marco, que no las genera ningún CLI:
   la skill `projects-archive-change` (archivar un change de OpenSpec sin el CLI de archive, que
@@ -401,59 +455,53 @@ Un buscar-y-reemplazar no los resuelve: son decisiones.
 
 ---
 
-## 4. Lo que el scaffold NO trae (y de dónde sale)
+## 4. Lo que el scaffold trae, y lo que no
 
-| Falta | De dónde sale |
-|---|---|
-| `package.json`, `pnpm-workspace.yaml` | Del proyecto: dependen del stack elegido. Ver el snippet de abajo para la parte de lint/format, que sí es del marco. |
-| El resto de `.github/workflows/*` (deploy, verificación, cron) | Del proyecto: dependen de su topología de infraestructura. La MECANICA del marco no se copia nunca: `ci.yml` ya la consume por `uses: ...@<versión>`. |
-| Las skills y comandos **de OpenSpec** (`.claude/skills/openspec-*`, `.claude/commands/`) | **Regenerado**: los genera el CLI de OpenSpec en la versión que pina el marco. No se vendoran ni se editan a mano. Lo que sí llega en el scaffold son las dos piezas escritas a mano del marco (sección 3), que ningún CLI regenera. |
-| `.projects/AGENTS-marco.md` | **Generado por el marco** en el repo nuevo: lo escribe `actualizar-marco.yml` (sección 2.5). Las entradas del render sí llegan en el scaffold. |
-| `openspec/` | Lo inicializa el CLI de OpenSpec en el repo nuevo, con la versión que pina el marco: `npx --yes @fission-ai/openspec@1.9.0 init --tools claude`. **No es opcional**: el job de OpenSpec del marco hace `[ -d openspec ] \|\| exit 1`, así que sin este paso el primer PR sale rojo. La misma corrida genera las skills y comandos de la fila de arriba. Los specs del MARCO son canónicos y viven en Projects. |
-| `infra/`, `infra-prod/` | Terraform del proyecto. El marco fija que la IaC es Terraform y los nombres de esas dos carpetas (`dependabot.yml` y `AGENTS.md` ya los asumen). |
-| `README.md` del proyecto | Se escribe a mano: qué hace la app, ambientes, correr en local, verificar, pipeline, estructura. |
-| `docs/adr/`, `docs/runbooks/`, `docs/postmortems/`, `docs/accesos.md` | Carpetas vacías al inicio; `AGENTS.md` ya las nombra como destino de ADRs, runbooks, post-mortems y matriz de accesos. Las plantillas de post-mortem y runbook están en `docs/plantillas/` de Projects: se copian cuando hace falta la primera, no al crear el repo. |
+Esta sección decía que el andamio **no** traía `package.json`, `pnpm-workspace.yaml`, el
+despliegue ni `infra/`, y los cuatro llegan: mandaba a buscar o escribir a mano cosas que ya
+estaban. Ahora la tabla la sostiene un banco (`pruebas/andamio/lo-que-trae-el-andamio.test.mjs`
+en el repo del marco): cada entrada de la raíz de `plantilla/` tiene su fila, y la columna
+«Llega» se compara contra lo que `projects init` reparte de verdad para cada forma y cada
+plataforma. Los valores de esa columna son cuatro: **siempre**, **solo aplicación**, **solo
+sitio** y **según plataforma**; **no viaja** marca lo que se queda en el marco.
 
-### Snippet para el `package.json` de la raíz
+| Qué                                                                      | Llega            | Para qué                                                                                                                                                                                                                                                                  |
+| ------------------------------------------------------------------------ | ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `README.md`                                                              | no viaja         | Esta guía.                                                                                                                                                                                                                                                                |
+| `README-del-proyecto.md`                                                 | siempre          | La portada del proyecto. Aterriza renombrada como `README.md`, con la estructura puesta y los huecos `RELLENAR` (sección 1).                                                                                                                                              |
+| `AGENTS.md`, `CLAUDE.md`                                                 | siempre          | La constitución del proyecto y el puente que la carga en Claude Code. La porción común del marco no vive acá: llega regenerada (sección 2.5).                                                                                                                             |
+| `.projects-valores.json`, `.projects-desvios.json`                       | siempre          | Las entradas del render de la constitución: los valores del proyecto y los desvíos que declara, con su motivo.                                                                                                                                                            |
+| `.claude`                                                                | siempre          | El allowlist del equipo, la skill `projects-archive-change` y el agente `cazador-fail-open` (sección 3). Las skills de OpenSpec NO: se regeneran (tabla de abajo).                                                                                                        |
+| `.github`                                                                | siempre          | El pipeline (`workflows/`: el llamador del marco y los workflows que escriben en el repo; un sitio recibe además el de despliegue), Dependabot, `CODEOWNERS`, la plantilla de PR y `proteccion-main.md`.                                                                  |
+| `.gitignore`, `.gitattributes`, `.prettierrc`, `.prettierignore`         | siempre          | Lo que no se versiona, el fin de línea (el marco compara byte a byte) y el formateador con su lista de lo que no mira.                                                                                                                                                    |
+| `package.json`, `pnpm-workspace.yaml`                                    | siempre          | El manifiesto de la raíz —los scripts que el CI invoca (`lint`, `format:check`, `verificar`…), el linter y el formateador, con prettier pinado **exacto**— y la única declaración del workspace.                                                                          |
+| `eslint.config.mjs`, `tsconfig.base.json`, `vitest.config.base.mjs`      | siempre          | La política de lint (los bloques `[FRONT]` se borran si no hay frontend, sección 2), la base de TypeScript y el umbral de cobertura del marco.                                                                                                                            |
+| `docs`                                                                   | siempre          | El índice y los destinos de ADRs, runbooks y post-mortems, la matriz de accesos y la plantilla de change.                                                                                                                                                                 |
+| `api`, `web`, `e2e`                                                      | solo aplicación  | El esqueleto: backend Express con Prisma, frontend React con Vite, y la suite Playwright contra un ambiente desplegado. Cada uno con sus pruebas.                                                                                                                         |
+| `docker-compose.yml`, `comandos-levantar-servicios.txt`, `.dockerignore` | solo aplicación  | La base local, los comandos para levantarla en cada sistema operativo y lo que no entra en la imagen del API.                                                                                                                                                             |
+| `sitio`                                                                  | solo sitio       | El sitio de contenido (Astro sobre Cloudflare Workers), con su `README.md` de los actos humanos de la publicación.                                                                                                                                                        |
+| `infra`, `infra-prod`                                                    | según plataforma | Terraform, un root por ambiente, con los huecos de decisión en `pendientes.tf`. Llegan enteras solo con `aws` y la forma aplicación. Con otra plataforma, de `infra/` llega solo `adaptadores.md`, en la raíz y renombrado a `PLATAFORMAS.md`, para decidir con criterio. |
 
-Los scripts y devDependencies que `eslint.config.mjs`, `.prettierrc` y el CI del marco dan
-por hechos. `--max-warnings=0` no es opcional: es lo que hace que no exista el "warning
-tolerado".
+Y lo que **no** está en el andamio, con de dónde sale:
 
-```json
-{
-  "name": "{{PROYECTO}}",
-  "private": true,
-  "scripts": {
-    "lint": "eslint . --max-warnings=0",
-    "format": "prettier --write .",
-    "format:check": "prettier --check ."
-  },
-  "devDependencies": {
-    "@eslint/js": "^9.17.0",
-    "eslint": "^9.17.0",
-    "eslint-config-prettier": "^9.1.0",
-    "globals": "^15.14.0",
-    "prettier": "^3.4.2",
-    "typescript-eslint": "^8.19.0"
-  }
-}
-```
+| Falta                                                                                    | De dónde sale                                                                                                                                                                                                                                                                                                                                                                                                  |
+| ---------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `pnpm-lock.yaml`                                                                         | Lo escribe el nacimiento del proyecto, por los dos caminos: el `pnpm install` del arranque de `projects init`, o `pnpm install --lockfile-only` en `personalizar.yml` (la vía sin programas). No se versiona acá porque el andamio se poda por forma y plataforma: un único lockfile no coincidiría con el workspace de todas las formas.                                                                      |
+| Las skills y comandos **de OpenSpec** (`.claude/skills/openspec-*`, `.claude/commands/`) | **Regenerado**: los genera el CLI de OpenSpec en la versión que pina el marco. No se vendoran ni se editan a mano. Lo que sí llega en el scaffold son las dos piezas escritas a mano del marco (sección 3), que ningún CLI regenera.                                                                                                                                                                           |
+| `.projects/AGENTS-marco.md`                                                              | **Generado por el marco** en el repo nuevo (sección 2.5). Las entradas del render sí llegan en el scaffold.                                                                                                                                                                                                                                                                                                    |
+| `openspec/`                                                                              | Lo inicializa el CLI de OpenSpec en el repo nuevo, con la versión que pina el marco: `npx --yes @fission-ai/openspec@1.9.0 init --tools claude`. **No es opcional**: el job de OpenSpec del marco hace `[ -d openspec ] \|\| exit 1`, así que sin este paso el primer PR sale rojo. La misma corrida genera las skills y comandos de la fila de arriba. Los specs del MARCO son canónicos y viven en Projects. |
 
-**`typecheck`, `test` y `build` NO van en la raíz: los declara cada paquete.** El CI se los
-exige uno por uno y falla nombrando el `package.json` que no los tenga, así que un paquete
-nuevo queda cubierto sin que nadie lo agregue a ninguna lista. Y en la raíz no hay
-`"test": "pnpm -r test"` ni `"build": "pnpm -r build"` **a propósito**: `pnpm -r <script>`
-saltea en silencio todo paquete que no declara ese script —imprime `Scope: N of M workspace
-projects` y sale 0— y, en el caso de `test`, además dispararía la suite E2E con navegadores.
-Un agregador que miente en verde es peor que no tener agregador. Para correr una
-verificación local se usa la del paquete: `cd <paquete> && pnpm run typecheck`.
+### Los scripts de la raíz y los de cada paquete
 
-Con frontend React, agregar además: `eslint-plugin-react-hooks`,
-`eslint-plugin-react-refresh` y —solo si se usa TanStack Query—
-`@tanstack/eslint-plugin-query`. Sin esos paquetes instalados, los bloques `[FRONT]` de
-`eslint.config.mjs` rompen el arranque de ESLint: o se instalan, o se borran junto a sus
-imports.
+`--max-warnings=0` en el `lint` de la raíz no es opcional: es lo que hace que no exista el
+"warning tolerado".
+
+La raíz trae agregadores (`typecheck`, `test` y `build` con `pnpm -r`) para correr todo en
+local de una vez, pero **el CI no se apoya en ellos para verificar**: le exige cada script a
+cada paquete, uno por uno, y falla nombrando el `package.json` que no lo tenga. La razón es
+que `pnpm -r <script>` saltea en silencio todo paquete que no declara ese script —imprime
+`Scope: N of M workspace projects` y sale 0—, así que un paquete nuevo sin `test` quedaría
+"verificado" por omisión. Para iterar sobre un solo paquete: `cd <paquete> && pnpm run typecheck`.
 
 ---
 
@@ -479,8 +527,8 @@ vez**; después ninguno pide que alguien se acuerde de nada.
       **Generalo en LOCAL**, que tarda un segundo y no pide ningún permiso:
       `CONSTITUCION_MODO=escribir node <clon-del-marco>/actions/constitucion/constitucion.mjs`
       desde la raíz de este repo. El `gh workflow run actualizar-marco.yml` hace lo mismo
-      por PR y de forma recurrente, pero exige que la organización tenga habilitado *Allow
-      GitHub Actions to create and approve pull requests*: al 2026-08-21 está **apagado**, y
+      por PR y de forma recurrente, pero exige que la organización tenga habilitado _Allow
+      GitHub Actions to create and approve pull requests_: al 2026-08-21 está **apagado**, y
       con eso apagado ese camino devuelve **403** con un error que no nombra el permiso. Que
       el workflow quede cableado sigue siendo lo que hace que el artefacto no dependa de que
       alguien se acuerde — pero el primer commit no tiene que esperarlo
@@ -498,8 +546,8 @@ vez**; después ninguno pide que alguien se acuerde de nada.
       nombrando el `package.json` incompleto
 - [ ] `.github/workflows/ci.yml`: el job `build_test` refleja el stack real y el job `marco`
       apunta a `<org>/Projects/.github/workflows/marco-ci.yml@<versión exacta>` (nunca
-        `@v1`: un tag móvil no produce PR de Dependabot, y sin ese PR este repo no
-        aparece en el censo de consumidores del marco)
+      `@v1`: un tag móvil no produce PR de Dependabot, y sin ese PR este repo no
+      aparece en el censo de consumidores del marco)
 - [ ] Los tres handles de `.github/CODEOWNERS` existen en la org y tienen acceso de escritura
       al repo (un handle mal escrito no falla: GitHub simplemente **no asigna a nadie**, y el
       review cruzado deja de existir sin avisar)

@@ -10,6 +10,17 @@ import { authConfigInsegura } from "./middleware/auth.js";
 export const PUERTO_POR_DEFECTO = 3000;
 
 /**
+ * El nombre con que el servicio se presenta en el log. Vive en una constante y
+ * no adentro del llamado a `log.info` porque el nombre del proyecto llega por
+ * un marcador, y metido en la linea del llamado la volvia fragil: con un nombre
+ * de mas de 57 caracteres el formateador la partia en cuatro, asi que el
+ * andamio pasaba `format:check` y el repo recien nacido no. Aca la linea aguanta
+ * cualquier nombre que el marco mide (ver LARGO_DE_NOMBRE_MEDIDO en
+ * herramientas/projects-init.mjs del marco).
+ */
+const SERVICIO = "{{PROYECTO}}-api";
+
+/**
  * Tope del drenaje. Tiene que ser MENOR que el stopTimeout de la plataforma
  * (30s en ECS por defecto): si lo excede, la plataforma mata el proceso a la
  * mitad del apagado y el orden no sirvio de nada.
@@ -115,7 +126,7 @@ export function iniciar(opciones: OpcionesDeArranque = {}): Server | undefined {
 
   const puerto = opciones.puerto ?? resolverPuerto();
   const servidor = createApp().listen(puerto, () => {
-    log.info("{{PROYECTO}}-api escuchando", { puerto });
+    log.info(`${SERVICIO} escuchando`, { puerto });
   });
   registrarApagado(servidor, { salir });
   return servidor;

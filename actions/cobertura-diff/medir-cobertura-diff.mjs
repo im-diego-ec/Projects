@@ -60,9 +60,9 @@
 //   projects.cobertura.deuda      { motivo, fecha } — por que todavia no llega al
 //                              minimo y el dia en que llega
 //
-// VENTANA DE ESTRENO: hasta la fecha de VENTANA_DE_GRACIA_HASTA, un paquete por
-// debajo del minimo SIN declaracion avisa en vez de detener, gritando el dia en
-// que sera rojo. Se cierra sola. Ver el comentario de esa constante.
+// Un paquete por debajo del minimo SIN declaracion es ROJO, y lo es el mismo dia
+// en que la version se publica. No hay ventana de estreno: la hubo hasta el
+// 2026-09-30 y la borro el change la-ventana-se-cierra.
 //
 // Salidas (GITHUB_OUTPUT): porcentaje, lineas_medidas, lineas_sin_cubrir,
 // lineas_fuera_de_medicion, paquetes_medidos, paquetes_bajo_minimo,
@@ -98,33 +98,39 @@ const MINIMO_DEL_MARCO = 80;
 // Comparaciones de porcentajes: 79.999999999 no es "por debajo de 80".
 const EPSILON = 1e-9;
 
-// VENTANA DE GRACIA DEL ESTRENO DEL PLANO DEL TOTAL.
+// LA VENTANA DE GRACIA DEL ESTRENO SE BORRO (change la-ventana-se-cierra), y
+// conviene saber por que antes de volver a ponerla. Vivio hasta el 2026-09-30 y
+// aflojaba TRES veredictos, no uno: un paquete por debajo del minimo que NO
+// declaraba deuda (`sin-plazo`), una metrica que el reporte no midio
+// (`no-medida`) y un denominador mas corto que el declarado
+// (`denominador-corto`). Los tres salian AMARILLOS gritando el dia en que
+// pasaban a rojo. El tercero, ademas, era una amnistia que el contrato no
+// nombraba.
 //
-// La constitucion del marco manda estrenar en modo aviso todo check que
-// endurezca, y este endurece: `v1` es un tag MOVIL, asi que el dia en que esto
-// se publica la compuerta aparece en el pipeline de cada consumidor sin que
-// nadie la haya leido. Ya paso el 2026-08-19, al mover `v1` la primera vez.
+// Su justificacion estaba escrita —«`v1` es un tag MOVIL, asi que el dia en que
+// esto se publica la compuerta aparece en el pipeline de cada consumidor sin que
+// nadie la haya leido»— y CADUCO el 2026-08-21, cuando la distribucion paso a
+// version exacta. Desde entonces nada aparece en el pipeline de nadie: llega
+// dentro de un PR de bump de Dependabot que nadie esta obligado a mergear, con
+// su arreglo escrito al lado. El «modo aviso» ERA el PR.
 //
-// Medido, y es la razon por la que la ventana existe en vez de ser un parrafo:
-// contra un espejo de un consumidor real (su main, con sus dos reportes lcov
-// del 2026-08-20) el plano del total da ROJO — `web` esta en 70,70% de
-// funciones, 9,30 puntos por debajo del minimo. Su arreglo existe y
-// esta medido, pero vive en una rama sin mergear (`feat/cobertura-web-funciones-80`,
-// con umbrales de 93,6 en funciones), asi que el orden importa: si la compuerta
-// aterriza antes que esa rama, el consumidor amanece rojo por un cambio del
-// marco y no por un defecto propio.
+// Lo que costo, medido: contra un espejo de un consumidor real (su main, con sus
+// reportes lcov del 2026-08-20) el plano del total daba ROJO —`web` a 70,70% de
+// funciones, 9,30 puntos por debajo del minimo— y la ventana lo dejaba pasar en
+// amarillo. Ese mismo paquete ahora enrojece dentro de su PR de bump, que es
+// donde se puede leer y arreglar.
 //
-// QUE AFLOJA, y solo eso: un paquete por debajo del minimo que NO declara
-// deuda sale AMARILLO en vez de rojo, gritando la fecha en que pasa a rojo. NO
-// afloja una deuda declarada y vencida (el paquete hizo una promesa y la
-// rompio), ni un retroceso por debajo del piso, ni una declaracion invalida:
-// esos tres exigen que alguien haya escrito algo, y lo escrito se sostiene.
-//
-// SE CIERRA SOLA. Pasada la fecha, la comparacion es roja sin que nadie toque
-// una linea: una ventana que hay que acordarse de cerrar no se cierra nunca.
-// Cuando pase, esta constante y su rama en `veredictoDePaquete` se borran en un
-// PR de limpieza, no porque el comportamiento cambie.
-const VENTANA_DE_GRACIA_HASTA = "2026-09-30";
+// QUE IMPIDE QUE VUELVA. Tres bancos, y ninguno depende de que alguien se
+// acuerde: actions/cobertura-diff/pruebas/cobertura-total.test.mjs («el
+// comparador no tiene ninguna amnistia con fecha») exige que ninguna linea de
+// codigo de este archivo escriba una fecha AAAA-MM-DD;
+// pruebas/ci-del-marco/ventanas-con-dueno.test.mjs exige un change dueno para
+// toda fecha AAAA-MM-DD escrita en una linea de codigo del marco o del andamio,
+// salvo las citas que exceptua una por una con su motivo; y
+// pruebas/ci-del-marco/sin-exigibilidad-futura.test.mjs cierra la puerta de los
+// DATOS (el manifiesto del canonico). Ninguno mira el nombre de la variable, y
+// ninguno ve una fecha armada en tiempo de ejecucion: ese limite esta escrito en
+// pruebas/ci-del-marco/fechas-en-codigo.mjs.
 
 // ---------------------------------------------------------------- resumen ---
 
@@ -741,12 +747,8 @@ export function veredictoDePaquete({
   deuda = null,
   minimo,
   hoy,
-  ventanaHasta = VENTANA_DE_GRACIA_HASTA,
 }) {
   const vencida = deuda ? diasEntre(hoy, deuda.fecha) < 0 : false;
-  // La ventana de gracia del estreno: mientras dura, la falta de declaracion
-  // avisa en vez de detener. Ver VENTANA_DE_GRACIA_HASTA.
-  const enVentana = ventanaHasta ? diasEntre(hoy, ventanaHasta) >= 0 : false;
   const filas = [];
   let rojo = false;
   let amarillo = false;
@@ -763,8 +765,8 @@ export function veredictoDePaquete({
       // "n/a" no es una metrica que no aplica: es un ratchet que se quedo sin
       // nada contra lo que comparar. Salia EXIT 0, con la fila impresa como
       // n/a y sin un solo ::warning::, asi que apagar la ganancia acumulada de
-      // un paquete costaba lo mismo que cambiar el reporter o apagar
-      // `all: true`. El arreglo es una linea de diff bajo review —borrar el
+      // un paquete costaba lo mismo que cambiar el reporter o recortar el
+      // `coverage.include`. El arreglo es una linea de diff bajo review —borrar el
       // piso con su motivo, o arreglar el reporter— y por eso esto es ROJO y no
       // un aviso: un aviso lo habria tapado igual que antes.
       const pisoHuerfano = typeof piso[clave] === "number" ? piso[clave] : null;
@@ -796,10 +798,8 @@ export function veredictoDePaquete({
           declaradas: m.declaradas,
           sinContador: m.sinContador,
           faltante: m.faltante ?? null,
-          enGracia: enVentana,
         });
-        if (enVentana) amarillo = true;
-        else rojo = true;
+        rojo = true;
         continue;
       }
       filas.push({ clave, etiqueta, medible: false });
@@ -831,9 +831,7 @@ export function veredictoDePaquete({
       fila.veredicto = "denominador-corto";
       fila.faltante = m.faltante ?? null;
       fila.declaradas = m.declaradas;
-      fila.enGracia = enVentana;
-      if (enVentana) amarillo = true;
-      else rojo = true;
+      rojo = true;
       filas.push(fila);
       continue;
     }
@@ -843,13 +841,8 @@ export function veredictoDePaquete({
     } else if (pct + EPSILON < minimo) {
       fila.falta = minimo - pct;
       if (!deuda) {
-        if (enVentana) {
-          fila.veredicto = "sin-plazo-en-gracia";
-          amarillo = true;
-        } else {
-          fila.veredicto = "sin-plazo";
-          rojo = true;
-        }
+        fila.veredicto = "sin-plazo";
+        rojo = true;
       } else if (vencida) {
         fila.veredicto = "plazo-vencido";
         rojo = true;
@@ -864,9 +857,6 @@ export function veredictoDePaquete({
   return {
     filas,
     vencida,
-    enVentana,
-    ventanaHasta,
-    diasDeVentana: ventanaHasta ? diasEntre(hoy, ventanaHasta) : null,
     diasDePlazo: deuda ? diasEntre(hoy, deuda.fecha) : null,
     estado: rojo ? "rojo" : amarillo ? "amarillo" : "verde",
   };
@@ -1085,11 +1075,11 @@ function compuertaDelTotal({ paquetes, exclusionDe, cobertura, minimoLocal, ambi
     // del diff ya enrojece cuando hay lineas agregadas sin datos, y en un push
     // a main sin cobertura emitida no hay nada que verificar. Pero se dice.
     console.error(
-      `::warning::ningun reporte de cobertura reclama archivos de un paquete versionado: el total por paquete NO se pudo medir en esta corrida. Arreglo: corre las pruebas con cobertura (y con 'all: true') antes de este paso`
+      `::warning::ningun reporte de cobertura reclama archivos de un paquete versionado: el total por paquete NO se pudo medir en esta corrida. Arreglo: corre las pruebas con cobertura y con su alcance declarado (coverage.include; en vitest 2.x era 'all: true') antes de este paso`
     );
     RT("**No medido** — ningun reporte de cobertura reclama archivos de algun paquete.");
     RT("");
-    RT("Arreglo: corre las pruebas **con cobertura** y con `all: true` antes de este paso.");
+    RT("Arreglo: corre las pruebas **con cobertura** y con su alcance declarado (`coverage.include`; en vitest 2.x era `all: true`) antes de este paso.");
     return 0;
   }
 
@@ -1126,19 +1116,15 @@ function compuertaDelTotal({ paquetes, exclusionDe, cobertura, minimoLocal, ambi
     verde: "OK",
     retroceso: "ROJO · retroceso",
     "sin-plazo": "ROJO · sin plazo",
-    "sin-plazo-en-gracia": "AMARILLO · ventana de estreno",
     "plazo-vencido": "ROJO · plazo vencido",
     "en-plazo": "AMARILLO · en plazo",
     "piso-sin-datos": "ROJO · piso sin datos",
     "no-medida": "ROJO · no medida",
     "denominador-corto": "ROJO · denominador corto",
   };
-  // Un veredicto que la ventana de estreno afloja no puede imprimirse como
-  // ROJO: la fila y el codigo de salida tienen que decir lo mismo.
-  const etiqueta = (fila) =>
-    fila.enGracia
-      ? `AMARILLO · ${fila.veredicto === "no-medida" ? "no medida" : "denominador corto"} (ventana de estreno)`
-      : etiquetaDeEstado[fila.veredicto];
+  // La fila y el codigo de salida tienen que decir lo mismo: no hay veredicto que
+  // se imprima en un color y se cobre en otro.
+  const etiqueta = (fila) => etiquetaDeEstado[fila.veredicto];
   for (const { paq, veredicto } of veredictos) {
     for (const fila of veredicto.filas) {
       const nombre = `\`${paq.dir || "."}\``;
@@ -1190,10 +1176,6 @@ function compuertaDelTotal({ paquetes, exclusionDe, cobertura, minimoLocal, ambi
           ? `plazo VENCIDO hace ${Math.abs(dias)} dia(s) (${paq.deuda.fecha})`
           : `quedan ${dias} dia(s) de plazo (${paq.deuda.fecha})`;
         RT(`- \`${paq.dir || "."}\`: ${detalle} — ${plazo}. Motivo declarado: ${paq.deuda.motivo}`);
-      } else if (veredicto.enVentana) {
-        RT(
-          `- \`${paq.dir || "."}\`: ${detalle} — **sin deuda declarada** en \`${paq.manifiesto}\`. Pasa por la ventana de estreno de esta compuerta, que se cierra el **${veredicto.ventanaHasta}** (quedan ${veredicto.diasDeVentana} dia(s)): desde ese dia esto es rojo.`
-        );
       } else {
         RT(`- \`${paq.dir || "."}\`: ${detalle} — **sin deuda declarada** en \`${paq.manifiesto}\``);
       }
@@ -1207,20 +1189,15 @@ function compuertaDelTotal({ paquetes, exclusionDe, cobertura, minimoLocal, ambi
     const sinPlazo = veredicto.filas.filter((f) => f.veredicto === "sin-plazo");
     const vencidos = veredicto.filas.filter((f) => f.veredicto === "plazo-vencido");
     const enPlazo = veredicto.filas.filter((f) => f.veredicto === "en-plazo");
-    const enGracia = veredicto.filas.filter((f) => f.veredicto === "sin-plazo-en-gracia");
     const pisosHuerfanos = veredicto.filas.filter((f) => f.veredicto === "piso-sin-datos");
     const noMedidas = veredicto.filas.filter((f) => f.veredicto === "no-medida");
     const cortos = veredicto.filas.filter((f) => f.veredicto === "denominador-corto");
     const parciales = veredicto.filas.filter((f) => f.medible && (f.sinContador ?? 0) > 0);
 
-    // UNA METRICA QUE EL REPORTE NO MIDIO. El nivel lo decide la ventana de
-    // estreno, igual que la falta de declaracion: un rojo nuevo del marco llega
-    // por un tag movil y no puede aterrizar sin aviso. Lo que ya NO es es mudo.
+    // UNA METRICA QUE EL REPORTE NO MIDIO. Es ROJO, y lo es desde el dia en que la
+    // version se publica: no hay ventana que lo afloje. Lo que ya no es es mudo.
     for (const f of noMedidas) {
       const dato = METRICAS_DE_COBERTURA.find((m) => m.clave === f.clave)?.contador ?? "?";
-      const cola = f.enGracia
-        ? ` Esta corrida PASA por la ventana de estreno, que se cierra el ${veredicto.ventanaHasta} (quedan ${veredicto.diasDeVentana} dia(s)); desde ese dia el mismo estado es ROJO.`
-        : "";
       // DOS DIAGNOSTICOS DISTINTOS, y decir el que no es vale menos que callarse.
       // Si el reporte DECLARO un denominador y no llego ni un item, el reporter
       // midio y esta action no supo leer lo que emitio (es el caso de lcov 2.x,
@@ -1231,9 +1208,9 @@ function compuertaDelTotal({ paquetes, exclusionDe, cobertura, minimoLocal, ambi
       const causa =
         f.declaradas > 0
           ? `sus reportes DECLARAN ${f.declaradas} item(s) de ${f.etiqueta} (${dato}:) y no llego ninguno: el reporter la midio y esta action no supo leer el formato en que la emitio. La causa conocida es lcov 2.x, que emite FNL:/FNA: donde antes iba FN:/FNDA:. Arreglo: esto se corrige en el marco (issue o change en Projects), NO en ${paq.manifiesto}`
-          : `no aporto un solo item de ${f.etiqueta} y ninguno de sus ${f.sinContador} registro(s) declaro el contador ${dato}: el reporte no la midio. Arreglo: que el reporter emita ${f.etiqueta} (y corra con 'all: true'); si de verdad no aplica a este paquete, declara la exclusion con su motivo en ${paq.manifiesto}`;
+          : `no aporto un solo item de ${f.etiqueta} y ninguno de sus ${f.sinContador} registro(s) declaro el contador ${dato}: el reporte no la midio. Arreglo: que el reporter emita ${f.etiqueta} (y que la cobertura declare su alcance con coverage.include); si de verdad no aplica a este paquete, declara la exclusion con su motivo en ${paq.manifiesto}`;
       console.error(
-        `::${f.enGracia ? "warning" : "error"} file=${paq.manifiesto}::el total de ${f.etiqueta} del paquete "${nombre}" no se pudo medir: ${causa}. No medir una metrica no es lo mismo que no tenerla, y la diferencia esta en el propio formato: ${dato}:0 es el reporter diciendo que midio y no habia nada, y eso si pasa como n/a. Sin esa distincion, apagar la metrica que enrojece cuesta una linea de configuracion del reporter.${cola}`
+        `::error file=${paq.manifiesto}::el total de ${f.etiqueta} del paquete "${nombre}" no se pudo medir: ${causa}. No medir una metrica no es lo mismo que no tenerla, y la diferencia esta en el propio formato: ${dato}:0 es el reporter diciendo que midio y no habia nada, y eso si pasa como n/a. Sin esa distincion, apagar la metrica que enrojece cuesta una linea de configuracion del reporter.`
       );
     }
 
@@ -1241,11 +1218,8 @@ function compuertaDelTotal({ paquetes, exclusionDe, cobertura, minimoLocal, ambi
     for (const f of cortos) {
       const dato = METRICAS_DE_COBERTURA.find((m) => m.clave === f.clave)?.contador ?? "?";
       const ej = f.faltante;
-      const cola = f.enGracia
-        ? ` Esta corrida PASA por la ventana de estreno, que se cierra el ${veredicto.ventanaHasta} (quedan ${veredicto.diasDeVentana} dia(s)); desde ese dia el mismo estado es ROJO.`
-        : "";
       console.error(
-        `::${f.enGracia ? "warning" : "error"} file=${paq.manifiesto}::el total de ${f.etiqueta} del paquete "${nombre}" se calculo sobre ${f.encontradas} item(s) y sus propios reportes declaran ${f.declaradas}: el denominador llego CORTO en ${f.cortos ?? 1} registro(s)${ej ? ` (el peor, ${ej.archivo}: declara ${dato}:${ej.declarado} y llegaron ${ej.contados})` : ""}. Los items que faltan no estan "sin cubrir": estan fuera del denominador, y un denominador corto INFLA el porcentaje — el ${pct(f.pct)} de esta fila esta calculado de menos. Arreglo: revisa el reporter lcov del paquete; si actualizo a un formato de funciones distinto (lcov 2.x emite FNL:/FNA: en vez de FN:/FNDA:), esta action todavia no lo lee y hay que arreglarla en el marco antes que en el proyecto.${cola}`
+        `::error file=${paq.manifiesto}::el total de ${f.etiqueta} del paquete "${nombre}" se calculo sobre ${f.encontradas} item(s) y sus propios reportes declaran ${f.declaradas}: el denominador llego CORTO en ${f.cortos ?? 1} registro(s)${ej ? ` (el peor, ${ej.archivo}: declara ${dato}:${ej.declarado} y llegaron ${ej.contados})` : ""}. Los items que faltan no estan "sin cubrir": estan fuera del denominador, y un denominador corto INFLA el porcentaje — el ${pct(f.pct)} de esta fila esta calculado de menos. Arreglo: revisa el reporter lcov del paquete; si actualizo a un formato de funciones distinto (lcov 2.x emite FNL:/FNA: en vez de FN:/FNDA:), esta action todavia no lo lee y hay que arreglarla en el marco antes que en el proyecto.`
       );
     }
 
@@ -1266,7 +1240,7 @@ function compuertaDelTotal({ paquetes, exclusionDe, cobertura, minimoLocal, ambi
     // DESAPARECIO, que es la unica informacion util.
     for (const f of pisosHuerfanos) {
       console.error(
-        `::error file=${paq.manifiesto}::el paquete "${nombre}" declara un piso de ${f.etiqueta} de ${f.pisoDeclarado}% y su cobertura llego sin un solo dato de esa metrica: el piso no se pudo comparar contra nada y dejo de proteger la ganancia acumulada. Un piso que no compara es una compuerta apagada en verde. Arreglo: revisa el reporter de cobertura del paquete (que emita esa metrica, y con 'all: true'); si esa metrica de verdad no aplica a este paquete, saca projects.cobertura.piso.${f.clave} de ${paq.manifiesto} en una linea de diff con su motivo escrito`
+        `::error file=${paq.manifiesto}::el paquete "${nombre}" declara un piso de ${f.etiqueta} de ${f.pisoDeclarado}% y su cobertura llego sin un solo dato de esa metrica: el piso no se pudo comparar contra nada y dejo de proteger la ganancia acumulada. Un piso que no compara es una compuerta apagada en verde. Arreglo: revisa el reporter de cobertura del paquete (que emita esa metrica, y que la cobertura declare su alcance con coverage.include); si esa metrica de verdad no aplica a este paquete, saca projects.cobertura.piso.${f.clave} de ${paq.manifiesto} en una linea de diff con su motivo escrito`
       );
     }
 
@@ -1290,15 +1264,6 @@ function compuertaDelTotal({ paquetes, exclusionDe, cobertura, minimoLocal, ambi
         `::warning file=${paq.manifiesto}::el paquete "${nombre}" esta ${f.falta.toFixed(2)} puntos por debajo del minimo de ${minimo}% en ${f.etiqueta} (${pct(f.pct)}) y le quedan ${veredicto.diasDePlazo} dia(s) de plazo (${paq.deuda.fecha}). Motivo declarado: ${paq.deuda.motivo}`
       );
     }
-    // La ventana de estreno NO puede ser un verde discreto: si el consumidor no
-    // se entera de que esto va a ser rojo, la ventana no le sirvio de nada y el
-    // rojo lo cobra el que pasa por ahi el dia que se cierra.
-    for (const f of enGracia) {
-      console.error(
-        `::warning file=${paq.manifiesto}::el total de ${f.etiqueta} del paquete "${nombre}" es ${pct(f.pct)} y el minimo del marco es ${minimo}%: faltan ${f.falta.toFixed(2)} puntos y el paquete no declara ni motivo ni fecha. Esta corrida PASA por la ventana de estreno de esta compuerta, que se cierra el ${veredicto.ventanaHasta} (quedan ${veredicto.diasDeVentana} dia(s)); desde ese dia el mismo estado es ROJO. Arreglo: agrega pruebas hasta el minimo, o declara la deuda en ${paq.manifiesto} con projects.cobertura.deuda = { "motivo": "<por que>", "fecha": "AAAA-MM-DD" }`
-      );
-    }
-
     if (veredicto.estado === "rojo") codigo = 1;
     if (veredicto.estado === "verde") {
       const medibles = veredicto.filas.filter((f) => f.medible);
@@ -1351,7 +1316,7 @@ function compuertaDelTotal({ paquetes, exclusionDe, cobertura, minimoLocal, ambi
     if (clavesDePiso.length) {
       codigo = 1;
       console.error(
-        `::error file=${p.manifiesto}::el paquete "${p.dir || "."}" declara un piso de cobertura (${clavesDePiso.join(", ")}) y no aporto ninguna metrica medible en esta corrida: ${razon}. El piso no se pudo comparar contra nada, asi que dejo de proteger la ganancia acumulada. Arreglo: revisa que las pruebas de este paquete emitan cobertura (con 'all: true') y que el projectRoot del reporter lcov apunte a la raiz del repositorio; si el paquete ya no se mide, saca projects.cobertura.piso de ${p.manifiesto} en una linea de diff con su motivo escrito`
+        `::error file=${p.manifiesto}::el paquete "${p.dir || "."}" declara un piso de cobertura (${clavesDePiso.join(", ")}) y no aporto ninguna metrica medible en esta corrida: ${razon}. El piso no se pudo comparar contra nada, asi que dejo de proteger la ganancia acumulada. Arreglo: revisa que las pruebas de este paquete emitan cobertura (con su alcance declarado en coverage.include) y que el projectRoot del reporter lcov apunte a la raiz del repositorio; si el paquete ya no se mide, saca projects.cobertura.piso de ${p.manifiesto} en una linea de diff con su motivo escrito`
       );
       RT(
         `- \`${p.manifiesto}\`: piso declarado (${clavesDePiso.join(", ")}) sobre un paquete sin ninguna metrica medible en esta corrida.`
@@ -1359,7 +1324,7 @@ function compuertaDelTotal({ paquetes, exclusionDe, cobertura, minimoLocal, ambi
       continue;
     }
     console.error(
-      `::warning file=${p.manifiesto}::el paquete "${p.dir || "."}" declara una deuda de cobertura (${p.deuda.fecha}: ${p.deuda.motivo}) y no aporto ninguna metrica medible en esta corrida: ${razon}, asi que la deuda no esta excusando nada. Arreglo: si el paquete ya no necesita el plazo, borra projects.cobertura.deuda de ${p.manifiesto}; si deberia estar midiendose, revisa que sus pruebas emitan cobertura con 'all: true'`
+      `::warning file=${p.manifiesto}::el paquete "${p.dir || "."}" declara una deuda de cobertura (${p.deuda.fecha}: ${p.deuda.motivo}) y no aporto ninguna metrica medible en esta corrida: ${razon}, asi que la deuda no esta excusando nada. Arreglo: si el paquete ya no necesita el plazo, borra projects.cobertura.deuda de ${p.manifiesto}; si deberia estar midiendose, revisa que sus pruebas emitan cobertura con su alcance declarado en coverage.include`
     );
     RT(
       `- \`${p.manifiesto}\`: deuda declarada (${p.deuda.fecha}) sobre un paquete sin ninguna metrica medible en esta corrida.`
@@ -1391,16 +1356,11 @@ function compuertaDelTotal({ paquetes, exclusionDe, cobertura, minimoLocal, ambi
     }
   }
 
-  const porLaVentana = veredictos.filter((v) =>
-    v.veredicto.filas.some((f) => f.veredicto === "sin-plazo-en-gracia")
-  );
   RT(
     codigo === 0
-      ? porLaVentana.length
-        ? `**Pasa por la ventana de estreno** — ${porLaVentana.length} paquete(s) por debajo del minimo sin deuda declarada. La ventana se cierra el **${VENTANA_DE_GRACIA_HASTA}** y desde ese dia esto es rojo.`
-        : enFalta.length
-          ? `**Pasa con deuda** — ${enFalta.length} paquete(s) por debajo del minimo, todos con plazo declarado y vigente.`
-          : `**Pasa** — los ${porPaquete.size} paquete(s) medidos estan en o por encima del minimo del marco.`
+      ? enFalta.length
+        ? `**Pasa con deuda** — ${enFalta.length} paquete(s) por debajo del minimo, todos con plazo declarado y vigente.`
+        : `**Pasa** — los ${porPaquete.size} paquete(s) medidos estan en o por encima del minimo del marco.`
       : "**Fallo** — hay paquetes cuyo total incumple el minimo del marco (detalle arriba)."
   );
   return codigo;
@@ -1721,6 +1681,7 @@ function principal() {
   const detallePorArchivo = [];
   const descubiertas = [];
   const noReclamados = [];
+  const deConfiguracionDeCI = []; // fuente bajo .github/: no se le exige cobertura, se nombra
   const sospechosos = [];
   const sinDato = []; // fuente del cambio que ningun reporte reclama: ROJO
   const rancios = []; // reclamado, pero el reporte es anterior al cambio: ROJO
@@ -1760,6 +1721,24 @@ function principal() {
       // era circular—, sino la lista de extensiones de fuente del censo.
       noReclamados.push(archivo);
       if (!esFuente(archivo) || esArchivoDePrueba(archivo)) continue;
+      // `.github/` NUNCA ES FUENTE DE APLICACION. Es configuracion del proveedor
+      // de CI por definicion de la plataforma: ningun paquete la compila, ninguna
+      // suite la importa y ningun reporter va a emitir DA: para ella, asi que
+      // exigirle cobertura es un rojo que nadie puede apagar. Caso real en el
+      // upstream (Rigel 1.11.0): un `.github/scripts/*.mjs` salia rojo por «sin
+      // datos» mientras el Censo de fuentes del mismo pipeline lo daba verde.
+      //
+      // POR QUE LA RUTA Y NO «FUERA DE TODO PAQUETE», que fue el primer intento
+      // alla y quedo INERTE: los consumidores tienen un package.json en la RAIZ,
+      // asi que todo archivo cae en algun paquete. Lo cazo la validacion contra el
+      // consumidor real, no el banco; el banco de aca declara ese paquete raiz.
+      //
+      // No desaparece en silencio: ya quedo en noReclamados (el resumen lo lista
+      // como fuera de la medicion) y se nombra en un ::notice:: mas abajo.
+      if (archivo === ".github" || archivo.startsWith(".github/")) {
+        deConfiguracionDeCI.push(archivo);
+        continue;
+      }
       const contenido = lineasConContenido(archivo, lineas);
       lineasFueraDelDenominador += contenido.length;
       const exclusion = exclusionDe(archivo);
@@ -1819,6 +1798,15 @@ function principal() {
     for (const l of sinCubrirAqui) descubiertas.push({ archivo, linea: l });
   }
 
+  // La exencion de `.github/` se DICE, antes de cualquier salida temprana: un
+  // archivo fuente que la compuerta deja de mirar sin nombrarlo es exactamente la
+  // clase de silencio que este script existe para no tener.
+  if (deConfiguracionDeCI.length) {
+    console.error(
+      `::notice::${deConfiguracionDeCI.length} archivo(s) fuente del cambio viven bajo .github/ y no se les exige cobertura: son configuracion del proveedor de CI, ningun paquete los compila y ninguna suite los importa (${deConfiguracionDeCI.slice(0, 5).join(", ")}${deConfiguracionDeCI.length > 5 ? ", ..." : ""})`
+    );
+  }
+
   // 8) Un archivo del cambio con el mismo nombre que una ruta SF: que no
   //    resolvio es la firma exacta del cableado torcido. Rojo.
   if (sospechosos.length) {
@@ -1860,7 +1848,7 @@ function principal() {
     if (sinDato.length) {
       const cuantas = sinDato.reduce((a, x) => a + x.lineas, 0);
       console.error(
-        `::error::${sinDato.length} archivo(s) fuente del cambio (${cuantas} linea(s) agregadas) no los reclama ningun reporte de cobertura: no hay con que medirlos, y "sin datos" no es "cubierto". Arreglo: corre las pruebas con cobertura sobre esos archivos —revisa 'all: true' en la configuracion de cobertura del paquete para que el reporte incluya los que ninguna prueba importa— o declara la exclusion con su motivo en projects.cobertura.excluidos del package.json de su paquete`
+        `::error::${sinDato.length} archivo(s) fuente del cambio (${cuantas} linea(s) agregadas) no los reclama ningun reporte de cobertura: no hay con que medirlos, y "sin datos" no es "cubierto". Arreglo: corre las pruebas con cobertura sobre esos archivos —revisa el coverage.include de la configuracion de cobertura del paquete para que el reporte incluya los que ninguna prueba importa; en vitest 2.x eso lo hacia 'all: true', que la mayor 3 retiro— o declara la exclusion con su motivo en projects.cobertura.excluidos del package.json de su paquete`
       );
       for (const x of sinDato.slice(0, MAX_ANOTACIONES)) {
         console.error(

@@ -265,11 +265,78 @@ const COMPROBACIONES = {
       } else if (!configs.some((c) => c.includes("coberturaDelMarco"))) {
         problemas.push(
           `ninguna config de "${m.nombre}" extiende coberturaDelMarco(): sin eso se pierden el ` +
-            "`all: true` y el projectRoot del monorepo, y la medicion sale por rutas ambiguas",
+            "`include` que mete todo src/ al calculo y el projectRoot del monorepo, y la medicion sale por rutas ambiguas",
         );
       }
     }
     return problemas.length ? problemas.join("\n  ") : null;
+  },
+
+  // EL PAR. vitest exige que su proveedor de cobertura sea de SU MISMA version
+  // exacta (vitest 5.0.0 declara el peer "@vitest/coverage-v8": "5.0.0"). Dos
+  // rangos distintos resuelven versiones distintas el dia que sale una, y el
+  // `--coverage` del script test deja de arrancar. Rigel lo cazo con un pin
+  // exacto contra un rango (1.13.0, 2026-08-31) y despues con dos PRs de
+  // Dependabot incompatibles entre si (2.6.0, 2026-09-13). Y UN SOLO RANGO EN
+  // TODO EL ANDAMIO: los paquetes comparten vitest.config.base.mjs, y el sitio
+  // venia con un piso (^4.0.18) por debajo del de los otros dos (^4.1.11).
+  "vitest y su proveedor de cobertura se declaran como un par, con un solo rango en todo el andamio": (raiz) => {
+    const problemas = [];
+    const rangos = new Map();
+    for (const m of manifiestos(raiz)) {
+      const deps = { ...(m.json.dependencies ?? {}), ...(m.json.devDependencies ?? {}) };
+      if (!deps.vitest) continue;
+      const proveedor = deps["@vitest/coverage-v8"];
+      if (!proveedor) {
+        problemas.push(
+          `"${m.nombre}" declara vitest ${deps.vitest} y no declara @vitest/coverage-v8: su script test corre con ` +
+            "--coverage y sin el proveedor no arranca. Arreglo: agregarlo con el MISMO rango que vitest",
+        );
+      } else if (proveedor !== deps.vitest) {
+        problemas.push(
+          `"${m.nombre}" declara vitest ${deps.vitest} y @vitest/coverage-v8 ${proveedor}: vitest exige su proveedor en la ` +
+            "misma version exacta, y dos rangos distintos resuelven versiones distintas. Arreglo: el mismo rango en los dos, " +
+            "movidos en el mismo cambio",
+        );
+      }
+      rangos.set(deps.vitest, [...(rangos.get(deps.vitest) ?? []), m.nombre]);
+    }
+    if (rangos.size === 0) return "ningun manifiesto del andamio declara vitest: esta comprobacion quedo sin sujeto";
+    if (rangos.size > 1) {
+      problemas.push(
+        `los paquetes declaran vitest con rangos distintos (${[...rangos].map(([r, ps]) => `${ps.join(", ")}: ${r}`).join("; ")}). ` +
+          "Comparten vitest.config.base.mjs, y un piso distinto por paquete hace que la misma configuracion corra en " +
+          "versiones que nadie midio juntas. Arreglo: un solo rango en todos",
+      );
+    }
+    return problemas.length ? problemas.join("\n  ") : null;
+  },
+
+  // EL CLIENTE DE DATOS NACE CON EL INSTALL. Quien clona y corre `pnpm install
+  // && pnpm lint` sin el paso `datos` veia 8 errores de tipos y un TS2305 que no
+  // eran suyos (medido el 2026-09-17 sobre una aplicacion instanciada; Rigel lo
+  // midio igual el 2026-09-13). El `postinstall` del paquete que el script
+  // `datos` filtra lo genera con el MISMO comando, sin un paso que recordar.
+  "el paquete con capa de datos genera su cliente al instalar, con el mismo comando que `datos`": (raiz) => {
+    const ms = manifiestos(raiz);
+    const datos = ms.find((m) => m.nombre === "(raiz)")?.json.scripts?.datos;
+    const partes = /--filter\s+(\S+)[^]*?\bexec\s+(.+)$/.exec(String(datos ?? ""));
+    if (!partes) {
+      return 'la raiz no declara un script "datos" con la forma `pnpm --filter <paquete> ... exec <comando>`: esta ' +
+        "comprobacion quedo sin sujeto y hay que revisarla, no borrarla";
+    }
+    const [, paquete, comando] = partes;
+    const conDatos = ms.find((m) => m.nombre !== "(raiz)" && m.json.name === paquete);
+    if (!conDatos) return `el script "datos" filtra el paquete ${paquete} y ningun manifiesto del andamio se llama asi`;
+    const post = conDatos.json.scripts?.postinstall;
+    if (post !== comando.trim()) {
+      return (
+        `"${conDatos.nombre}" ${post === undefined ? "no declara postinstall" : `declara postinstall "${post}"`} y el script ` +
+        `"datos" genera el cliente con "${comando.trim()}". Sin el postinstall, \`pnpm install && pnpm lint\` sale rojo por ` +
+        `tipos que no resuelven. Arreglo: "postinstall": "${comando.trim()}" en ${conDatos.nombre}/package.json`
+      );
+    }
+    return null;
   },
 
   "ningun marcador vive en una RUTA del andamio": (raiz, renombrar = destinoDe) => {
@@ -388,6 +455,36 @@ const MUTACIONES = [
       const p = path.join(raiz, "api/vitest.config.ts");
       fs.writeFileSync(p, fs.readFileSync(p, "utf8").split("coberturaDelMarco").join("otraCosa"), "utf8");
     },
+  },
+  {
+    nombre: "el proveedor de cobertura del front vuelve a un pin exacto contra el rango del runner",
+    rompe: "vitest y su proveedor de cobertura se declaran como un par, con un solo rango en todo el andamio",
+    mutar: (raiz) =>
+      editarJson(raiz, "web/package.json", (j) => (j.devDependencies["@vitest/coverage-v8"] = j.devDependencies.vitest.replace(/^\^/, ""))),
+  },
+  {
+    nombre: "un paquete se queda sin proveedor de cobertura",
+    rompe: "vitest y su proveedor de cobertura se declaran como un par, con un solo rango en todo el andamio",
+    mutar: (raiz) => editarJson(raiz, "api/package.json", (j) => delete j.devDependencies["@vitest/coverage-v8"]),
+  },
+  {
+    nombre: "el sitio vuelve a un piso de vitest distinto del de los demas paquetes",
+    rompe: "vitest y su proveedor de cobertura se declaran como un par, con un solo rango en todo el andamio",
+    mutar: (raiz) =>
+      editarJson(raiz, "sitio/package.json", (j) => {
+        j.devDependencies.vitest = "^4.0.18";
+        j.devDependencies["@vitest/coverage-v8"] = "^4.0.18";
+      }),
+  },
+  {
+    nombre: "el paquete de datos pierde el postinstall",
+    rompe: "el paquete con capa de datos genera su cliente al instalar, con el mismo comando que `datos`",
+    mutar: (raiz) => editarJson(raiz, "api/package.json", (j) => delete j.scripts.postinstall),
+  },
+  {
+    nombre: "el postinstall genera con un comando distinto del de `datos`",
+    rompe: "el paquete con capa de datos genera su cliente al instalar, con el mismo comando que `datos`",
+    mutar: (raiz) => editarJson(raiz, "api/package.json", (j) => (j.scripts.postinstall = "prisma generate --no-engine")),
   },
   {
     nombre: "un marcador se cuela en el nombre de un directorio",

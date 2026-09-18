@@ -13,9 +13,18 @@
 //   4. `prettier` va SIEMPRE al final: apaga las reglas de formato que
 //      colisionan con el formateador.
 //
-// ADAPTAR AL PROYECTO: los globs usan los paquetes de este repo. Los bloques
-// marcados [FRONT] aplican solo si hay frontend React — si no lo hay, borralos
-// junto a sus imports y a sus devDependencies.
+// ADAPTAR AL PROYECTO: los globs usan los paquetes de este repo. Lo que solo
+// aplica si hay frontend React va marcado de dos formas, y las dos son
+// mecanicas de borrar:
+//   - un import de UNA linea lleva `// [FRONT]` al final: se borra la linea;
+//   - un bloque de configuracion va entre una linea `// [FRONT] ...` y una
+//     linea `// [/FRONT]`: se borra todo lo que hay entre las dos, LAS DOS
+//     MARCAS INCLUIDAS.
+// El cierre va marcado a proposito, y no por prolijidad: los bloques no tienen
+// todos la misma forma --uno es un objeto `{ ... },`, otro un spread
+// `...pluginQuery...map(...)` seguido de un objeto que usa ese plugin-- y
+// deducir donde termina cada uno rompia el archivo. Despues del borrado quedan
+// sus devDependencies en package.json, que se sacan en el mismo PR.
 import js from "@eslint/js";
 import tseslint from "typescript-eslint";
 import globals from "globals";
@@ -128,6 +137,7 @@ export default tseslint.config(
       "react-refresh/only-export-components": ["error", { allowConstantExport: true }],
     },
   },
+  // [/FRONT]
 
   // [FRONT] TanStack Query: reglas recomendadas, acotadas al frontend.
   ...pluginQuery.configs["flat/recommended"].map((c) => ({
@@ -141,6 +151,7 @@ export default tseslint.config(
       "@tanstack/query/exhaustive-deps": "error",
     },
   },
+  // [/FRONT]
 
   // [FRONT] Promesas en el front: recommendedTypeChecked ya deja
   // no-floating-promises en ERROR (los fire-and-forget intencionales llevan
@@ -158,6 +169,7 @@ export default tseslint.config(
       ],
     },
   },
+  // [/FRONT]
 
   // Tests: la familia no-unsafe-* y no-explicit-any quedan OFF — DECISION, no
   // deuda: el `.body` de un cliente HTTP de test es `any` por la libreria, y la
@@ -184,7 +196,7 @@ export default tseslint.config(
 
   // [FRONT] IDENTIDAD VISUAL DEL AREA. Solo las reglas de marca que un ARBOL DE
   // SINTAXIS puede decidir por si solo. El manual completo (tokens, componentes,
-  // tipografia, data viz) es la skill `la organización-design` de la organizacion; lo que
+  // tipografia, data viz) es el sistema de diseno de la organizacion; lo que
   // no se negocia vive en la constitucion del marco, seccion "Identidad visual y
   // el idioma del producto".
   //
@@ -327,6 +339,7 @@ export default tseslint.config(
       ],
     },
   },
+  // [/FRONT]
 
   // Debe ir al final: apaga reglas de formato que colisionan con Prettier.
   prettier

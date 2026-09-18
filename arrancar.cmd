@@ -10,9 +10,27 @@ REM la herramienta puede atajar, porque la herramienta ni llego a arrancar.
 REM
 REM %~dp0 es la carpeta de ESTE archivo, con la barra final. Asi no hay ruta que
 REM rellenar y no importa desde donde se lo abra.
+REM
+REM Y DEJA UN REPOSITORIO, no una carpeta: el Paso 2 le pide a la herramienta
+REM --repositorio (git con la rama main, el primer guardado y, solo si la persona
+REM lo confirma escribiendo que si, el repositorio en GitHub con el proyecto
+REM subido). La logica vive en Node, en herramientas\projects-repositorio.mjs,
+REM para que sea UNA en los tres sistemas y no una copia en cmd que nadie prueba.
+REM
+REM UNA SOLA OPCION: --sin-remoto, para dejar el repositorio solo en esta
+REM computadora. El doble clic no pasa ninguna.
 REM ---------------------------------------------------------------------------
 setlocal
 cd /d "%~dp0"
+
+set MODO_REPO=--repositorio
+if /i "%~1"=="--sin-remoto" set MODO_REPO=--sin-remoto
+if not "%~1"=="" if /i not "%~1"=="--sin-remoto" (
+  echo.
+  echo   No conozco la opcion %~1. La unica que acepta este archivo es --sin-remoto.
+  echo.
+  exit /b 2
+)
 
 echo.
 echo   Marco de proyectos
@@ -105,13 +123,13 @@ echo   Esto tarda unos minutos y va a escribir mucho en pantalla. Es normal.
 echo.
 
 if not exist "%DESTINO%" mkdir "%DESTINO%"
-node "%~dp0herramientas\projects-init.mjs" --valores "%~dp0valores.json" --destino "%DESTINO%"
+node "%~dp0herramientas\projects-init.mjs" --valores "%~dp0valores.json" --destino "%DESTINO%" %MODO_REPO%
 set CODIGO=%errorlevel%
 
 echo.
 if "%CODIGO%"=="0" (
   echo   LISTO. Tu proyecto esta en: %DESTINO%
-  echo   Arriba dice como verlo andando y que queda por hacer.
+  echo   Arriba dice si quedo subido a GitHub, como verlo andando y que queda por hacer.
 ) else (
   echo   Se corto en el paso 2. Arriba dice por que, y como se arregla.
   echo   Lo que contestaste quedo guardado: volver a abrir este archivo no te

@@ -1,8 +1,8 @@
 ## Identidad visual y el idioma del producto
 
 Las aplicaciones del área son mayormente interfaz, así que la marca es parte del
-contrato. El manual completo —tokens, componentes, tipografía, data viz— es la skill
-**`la organización-design`** de la organización. Acá viven solo las reglas que un agente tiene
+contrato. El manual completo —tokens, componentes, tipografía, data viz— es el
+sistema de diseño de la organización. Acá viven solo las reglas que un agente tiene
 que conocer **sin haber invocado nada**.
 
 <!-- projects:regla id=marca-idioma-castellano -->
@@ -17,8 +17,8 @@ que conocer **sin haber invocado nada**.
 
 - **Texto oscuro sobre el naranja de marca, nunca blanco.** El blanco da 2.9:1 y **falla
   WCAG AA**; el oscuro da 6.7:1. Es la más fácil de romper sin darse cuenta —el blanco
-  «se ve bien»— y la que más veces se rompió: cinco casos en el un consumidor al 2026-08-22, uno en la variante primaria de su botón, o sea en toda la
-  aplicación.
+  «se ve bien»— y la que más veces se rompió: cinco casos en un consumidor al
+  2026-08-22, uno en la variante primaria de su botón, o sea en toda la aplicación.
 
 <!-- projects:regla id=marca-solo-tokens -->
 
@@ -29,10 +29,10 @@ que conocer **sin haber invocado nada**.
 
 <!-- projects:regla id=marca-el-logo-no-se-redibuja -->
 
-- **El logo y la Estrella de la organización no se redibujan.** Se usan los archivos del sistema o
-  su componente. Un SVG hecho a mano «que se parece» es otra marca con el mismo nombre:
-  pasó tres veces en el consumidor, con una estrella de líneas rectas donde la oficial
-  tiene curvas.
+- **El logo y los símbolos de la marca no se redibujan.** Se usan los archivos del
+  sistema o su componente. Un SVG hecho a mano «que se parece» es otra marca con el
+  mismo nombre: pasó tres veces en un consumidor, con un símbolo de líneas rectas donde
+  el oficial tiene curvas.
 
 <!-- projects:regla id=marca-tema-y-foco -->
 

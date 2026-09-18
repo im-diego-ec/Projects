@@ -3,6 +3,8 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
 
+import { versionPublicada as versionDelChangelog } from "../vigencia.mjs";
+
 // ─────────────────────────────────────────────────────────────────────────────
 // EL ANDAMIO NO SE QUEDA ATRAS DE LA VERSION PUBLICADA.
 //
@@ -72,48 +74,39 @@ const PIN = /projects(\/[^\s"'`]*)?@([^\s"'`,)\]]+)/i;
 const VERSION_EXACTA = /^v\d+\.\d+\.\d+$/;
 const MAYOR_MOVIL = /^v\d+$/;
 
-// LA UNICA EXCEPCION, por lista y no por regla. `marco-ci.yml` es un workflow
-// reusable y GitHub no le permite referenciar su propio ref (`uses:` no admite
-// expresiones), asi que una linea que pine la version que se esta cortando pone en
-// rojo al PR que la corta: medido el 2026-08-22 con "Unable to resolve action
-// ...@v1.4.2". El motivo largo esta en el comentario de esa linea.
+// CERO EXCEPCIONES, y la que habia se fue por una razon que conviene saber.
 //
-// Va por lista exacta a proposito: si manana aparece una segunda invocacion interna
-// con @v1, esto se pone ROJO en vez de dejarla heredar la excepcion. Es la
-// diferencia entre una excepcion declarada y un agujero.
+// Hasta el change `guardrail-deltas-por-version-exacta` este banco eximia, por lista
+// exacta de archivo, ref y action, UNA invocacion: `marco-ci.yml` ->
+// `actions/guardrail-deltas@v1`. El motivo escrito era cierto mientras esa action fue
+// un PASO del job `openspec`: GitHub resuelve las actions de un job en «Set up job»,
+// antes de evaluar el `if` de cualquier paso, asi que en el CI del propio marco la ref
+// se resolvia siempre, y pinar la version que se estaba cortando ponia en rojo al PR
+// que la cortaba (medido el 2026-08-22: "Unable to resolve action ...@v1.4.2").
 //
-// EL ARCHIVO CAMBIO PERO LA EXCEPCION NO. Desde que `actions/guardrail-deltas` se
-// mudo del job `openspec` a su propio job `deltas` —que se saltea en el repo que
-// distribuye el marco—, esa ref ya no se resuelve durante el CI de Projects, asi que
-// la circularidad que hacia IMPOSIBLE el pin exacto desaparecio. Lo que no
-// desaparecio es la otra mitad: retirar el ultimo `@v1` vivo del marco es una
-// decision de DISTRIBUCION (el paso del release que mueve el tag, y las cinco
-// superficies de prosa que dicen que v1 sigue vivo, incluida la asercion de mas
-// abajo), no un efecto colateral de mover un paso de job. Por eso la excepcion sigue
-// declarada y con el motivo actualizado en vez de borrarse de paso.
-const EXCEPCIONES = [
-  { archivo: ".github/workflows/marco-ci.yml", ref: "v1", accion: "actions/guardrail-deltas" },
-];
-function esExcepcion(p) {
-  // Se compara TAMBIEN la action. Un primer intento comparaba solo archivo y ref, y
-  // el control lo refuto en el acto: una segunda invocacion interna con @v1 en el
-  // MISMO archivo quedaba exenta sin declararse. Una excepcion que no nombra que
-  // exime no es una excepcion, es un agujero con comentario.
-  return EXCEPCIONES.some((e) => e.archivo === p.archivo && e.ref === p.ref && e.accion === p.accion);
-}
+// Desde la 1.8.0 esa action vive en su propio job `deltas`, salteado en el repo que
+// distribuye el marco por la misma sonda que `constitucion_cableada`. Un job salteado
+// no descarga nada, asi que la circularidad desaparecio y la excepcion quedo sin
+// motivo: era reducible. Se mato pinando la linea a la version exacta, y lo que la
+// hace posible —que toda referencia remota propia viva en un job particionado— ya no
+// depende de que alguien se acuerde: lo cobra `pruebas/andamio/refs-propias.test.mjs`.
+//
+// Si manana hace falta otra, el camino NO es volver a abrir una lista: es partir la
+// pieza en un job con la particion. Una excepcion que se puede reducir y no se reduce
+// es el pin exacto del consumidor convertido otra vez en una media verdad.
 // Marcadores legitimos DENTRO de un `uses:`: el `{{ORG}}` del andamio lo
 // sustituye la adopcion, `<SHA-COMPLETO>` es el hueco que rellena el ensayo
 // contra un consumidor real, y `vX.Y.Z` es como la documentacion escribe «una
 // version» cuando cita un `uses:` sin comprometerse con un numero.
 const MARCADOR = /^(<|\{\{|vX\.Y\.Z$)/;
 
+// La primera entrada con numero del CHANGELOG (`## [1.4.1] — 2026-08-21`), con la `v`
+// delante. El lector es el UNICO del marco (`pruebas/vigencia.mjs`): el mismo que vence las
+// excepciones de `actions-alcanzables.test.mjs` (este archivo no tiene ninguna desde el change
+// `guardrail-deltas-por-version-exacta`). Una copia aca podria vencer una excepcion con un
+// CHANGELOG y comparar los pines con otro.
 function versionPublicada() {
-  const ch = fs.readFileSync(path.join(RAIZ, "CHANGELOG.md"), "utf8");
-  // La primera entrada con numero: `## [1.4.1] — 2026-08-21`. `[No publicado]`
-  // no matchea a proposito.
-  const m = ch.match(/^## \[(\d+\.\d+\.\d+)\]/m);
-  assert.ok(m, "CHANGELOG.md no tiene ninguna entrada `## [X.Y.Z]`: sin eso no hay con que comparar");
-  return `v${m[1]}`;
+  return `v${versionDelChangelog(RAIZ)}`;
 }
 
 function archivosDe(dir) {
@@ -149,8 +142,8 @@ function pinesDeUses(patron = PIN) {
         const m = lineas[i].match(patron);
         if (!m) continue;
         // m[1] es la ruta dentro del repo del marco ("/actions/guardrail-deltas" o
-        // "/.github/workflows/marco-ci.yml"), sin la barra inicial. La necesita la
-        // lista de excepciones para nombrar QUE exime.
+        // "/.github/workflows/marco-ci.yml"), sin la barra inicial. Hoy ningun caso la
+        // lee: la usaba la lista de excepciones, que ya no existe.
         pines.push({ archivo: rel, linea: i + 1, ref: m[2], accion: (m[1] ?? "").slice(1) });
       }
     }
@@ -200,14 +193,17 @@ test("la `i` del regex de pines no es cosmetica: sin ella este banco no ve casi 
   );
 });
 
-test("ningun `uses:` del marco apunta al tag mayor movil (@v1), salvo la excepcion declarada", () => {
-  const moviles = pinesDeUses().filter((p) => MAYOR_MOVIL.test(p.ref) && !esExcepcion(p));
+test("ningun `uses:` del marco apunta a un tag mayor movil (@v1), sin excepciones", () => {
+  const moviles = pinesDeUses().filter((p) => MAYOR_MOVIL.test(p.ref));
   assert.deepEqual(
     moviles.map((p) => `${p.archivo}:${p.linea} → @${p.ref}`),
     [],
     "hay `uses:` al tag mayor movil. Dependabot no propone bump para `@v1` (para el ya es la " +
       "mayor vigente), asi que ese repo no recibe versiones nuevas por PR y no aparece en el " +
-      "censo de consumidores del marco. Pinar la version exacta `vX.Y.Z`",
+      "censo de consumidores del marco. Pinar la version exacta `vX.Y.Z`. Si la linea es una " +
+      "invocacion interna de un workflow del marco, su job va particionado por " +
+      "`needs.cambios.outputs.es_distribuidor` (ver pruebas/andamio/refs-propias.test.mjs) y " +
+      "entonces el pin exacto es posible: no hay lista de excepciones que la exima",
   );
 });
 
@@ -226,9 +222,7 @@ test("todo `uses:` con version exacta apunta a la version publicada mas alta", (
 });
 
 test("todo ref de un `uses:` del marco es una version exacta o un marcador", () => {
-  const raros = pinesDeUses().filter(
-    (p) => !VERSION_EXACTA.test(p.ref) && !MARCADOR.test(p.ref) && !esExcepcion(p),
-  );
+  const raros = pinesDeUses().filter((p) => !VERSION_EXACTA.test(p.ref) && !MARCADOR.test(p.ref));
   assert.deepEqual(
     raros.map((p) => `${p.archivo}:${p.linea} → @${p.ref}`),
     [],
@@ -241,17 +235,23 @@ test("todo ref de un `uses:` del marco es una version exacta o un marcador", () 
 // LA CLASE «v1 SE RETIRO», y por que esta guarda vive aca.
 //
 // El tag movil `v1` dejo de ser el CANAL de distribucion el 2026-08-21 pero NO se
-// pudo retirar: sobrevive porque marco-ci.yml referencia a una action hermana
-// (guardrail-deltas) por @v1, y un pin a la version que se esta cortando pone en
-// rojo al PR que la corta. Ese hecho quedo escrito en varios archivos, y la
-// afirmacion FALSA de que el tag «se retiro» aparecio CINCO veces en archivos
+// puede borrar, y el motivo cambio con el tiempo. Hasta la 1.9.6, `marco-ci.yml`
+// invocaba a una action hermana (guardrail-deltas) por @v1; desde el change
+// `guardrail-deltas-por-version-exacta` el arbol ya no lo resuelve en ninguna linea,
+// pero las versiones PUBLICADAS hasta la 1.9.6 si: su `marco-ci.yml` lo lleva adentro,
+// y un consumidor pinado a una de ellas resuelve `v1` en cada corrida de su job
+// `deltas-openspec`. Borrar el tag le rompe ese job con "Unable to resolve action".
+//
+// La afirmacion FALSA de que el tag «se retiro» aparecio CINCO veces en archivos
 // distintos: se arreglaba en uno y sobrevivia en otro (la skill del release,
 // AGENTS.md, README, claude.yml y —cazada por la auditoria adversarial del release
 // 1.6.0— actions/aviso-version/aviso-version.mjs, donde ademas era una REGRESION:
-// un commit reemplazo un texto correcto por uno falso).
+// un commit reemplazo un texto correcto por uno falso). Y la afirmacion contraria —que
+// el marco lo sigue usando en una linea— paso a ser falsa el dia que esa linea se pino,
+// en seis superficies a la vez.
 //
-// Estas dos aserciones convierten esa disciplina en un check. La primera es
-// completamente decidible; la segunda declara su limite.
+// Las aserciones de abajo convierten esa disciplina en un check. La primera es
+// completamente decidible; las dos de prosa declaran su limite.
 // ---------------------------------------------------------------------------
 
 const SUPERFICIES_DE_PROSA = [
@@ -265,22 +265,55 @@ const SUPERFICIES_DE_PROSA = [
   "openspec/specs",
 ];
 
-test("v1 sigue vivo donde el marco dice que vive: EXACTAMENTE una invocacion interna", () => {
-  const marcoCi = fs.readFileSync(path.join(RAIZ, ".github/workflows/marco-ci.yml"), "utf8");
-  const porV1 = [...marcoCi.matchAll(/uses:\s*\S+@v1\s*$/gm)];
-  assert.equal(
-    porV1.length,
-    1,
-    "marco-ci.yml tiene que tener EXACTAMENTE una invocacion por @v1. Cero significa " +
-      "que alguien lo retiro y el paso 5 del release quedo moviendo un tag que nadie " +
-      "usa; dos o mas significa que la excepcion se extendio sin decidirlo",
+// El archive queda fuera: ahi el texto viejo es historia inmutable. El CHANGELOG
+// tampoco se escanea (no esta en las superficies) y con razon: sus entradas CITAN
+// estas frases justamente para explicar que se arreglaron.
+const EXENTOS = [path.sep + "archive" + path.sep];
+
+function candidatosDeProsa() {
+  const candidatos = [
+    ...SUPERFICIES_DE_PROSA.flatMap(archivosDe),
+    path.join(RAIZ, "AGENTS.md"),
+    path.join(RAIZ, "README.md"),
+  ];
+  // Cero candidatos seria un banco roto, no un arbol limpio.
+  assert.ok(candidatos.length > 50, `solo ${candidatos.length} archivos escaneados: el recorrido se rompio`);
+  return candidatos.filter((abs) => fs.existsSync(abs) && !EXENTOS.some((e) => abs.includes(e)));
+}
+
+test("marco-ci.yml no invoca ninguna pieza propia por un tag mayor movil", () => {
+  // Esto afirmaba lo contrario —«EXACTAMENTE una invocacion por @v1»— hasta el change
+  // `guardrail-deltas-por-version-exacta`. Aquella asercion protegia que el paso 5 del
+  // release no quedara moviendo un tag que nadie usa; la de hoy protege la propiedad
+  // que ese paso encubria: un consumidor pinado a `marco-ci.yml@vX.Y.Z` recibia ESE
+  // workflow y la action hermana de donde apuntara el tag en ese momento, sin PR.
+  //
+  // Cualquier mayor movil y no `v1` literal: una regla escrita contra la linea vigente
+  // deja de proteger en la siguiente, que es justo cuando vuelve a hacer falta. Y
+  // acotado a las piezas del MARCO: `actions/checkout` y sus hermanas son de terceros y
+  // las gobierna el censo de pines ajenos del ci.yml del marco.
+  const lineas = fs.readFileSync(path.join(RAIZ, ".github/workflows/marco-ci.yml"), "utf8").split(/\r?\n/);
+  // Solo `uses:` de verdad: un comentario que cuenta la historia de `@v1` tiene que
+  // poder escribirlo, y un `echo "uses: ..."` dentro de un run no resuelve nada.
+  const propias = lineas
+    .map((texto, i) => ({ texto: texto.trim(), linea: i + 1 }))
+    .filter((l) => /^(?:-\s+)?uses:\s*["']?[^\s"'/]+\/Projects\//i.test(l.texto));
+  // «No encontre ninguna» no es verde: es el banco mirando otra cosa.
+  assert.ok(
+    propias.length >= 1,
+    "no encontre ninguna invocacion de una pieza propia en marco-ci.yml: o el workflow dejo de " +
+      "invocar actions del marco, o el patron de este caso dejo de matchear. Revisalo antes de creerle al verde",
   );
-  assert.match(
-    porV1[0][0],
-    /guardrail-deltas@v1/,
-    "la unica invocacion por @v1 tiene que ser guardrail-deltas: es la unica cuyo ref " +
-      "se resuelve durante el CI del propio marco, que es lo que vuelve circular al " +
-      "pin exacto",
+  const porMovil = propias.filter((l) => /@v\d+["']?(?:\s+#.*)?$/.test(l.texto));
+  assert.deepEqual(
+    porMovil.map((l) => `.github/workflows/marco-ci.yml:${l.linea} → ${l.texto}`),
+    [],
+    "el workflow reusable invoca una pieza propia por un tag mayor movil. Un consumidor pinado a " +
+      "`marco-ci.yml@vX.Y.Z` recibiria ESE workflow y esta pieza de donde apunte el tag hoy, sin PR: su " +
+      "pin exacto seria una media verdad y el no tiene forma de arreglarlo, porque la linea no vive en su " +
+      "arbol. Arreglo: pinar la version exacta (la mas alta del CHANGELOG) y, si el job corre en el repo " +
+      "del marco, particionarlo por `needs.cambios.outputs.es_distribuidor` como los jobs `deltas` y " +
+      "`constitucion_cableada`. No se agrega a ninguna lista de excepciones",
   );
 });
 
@@ -301,23 +334,8 @@ test("ningun archivo del marco afirma que v1 se retiro", () => {
     "el tag mayor se retira",
     "se retiró del todo cuando",
   ];
-  // El archive queda fuera: ahi el texto viejo es historia inmutable. El CHANGELOG
-  // tampoco se escanea (no esta en las superficies) y con razon: la entrada de la
-  // 1.6.0 CITA estas frases justamente para explicar que se arreglaron.
-  const EXENTOS = [path.sep + "archive" + path.sep];
-
-  const candidatos = [
-    ...SUPERFICIES_DE_PROSA.flatMap(archivosDe),
-    path.join(RAIZ, "AGENTS.md"),
-    path.join(RAIZ, "README.md"),
-  ];
-
-  // Cero candidatos seria un banco roto, no un arbol limpio.
-  assert.ok(candidatos.length > 50, `solo ${candidatos.length} archivos escaneados: el recorrido se rompio`);
-
   const encontradas = [];
-  for (const abs of candidatos) {
-    if (!fs.existsSync(abs) || EXENTOS.some((e) => abs.includes(e))) continue;
+  for (const abs of candidatosDeProsa()) {
     const texto = fs.readFileSync(abs, "utf8");
     for (const f of FALSAS) {
       if (texto.includes(f)) {
@@ -328,7 +346,152 @@ test("ningun archivo del marco afirma que v1 se retiro", () => {
   assert.deepEqual(
     encontradas,
     [],
-    "v1 NO se retiro: sobrevive en una linea de marco-ci.yml y el paso 5 del release lo " +
-      "mueve. Lo correcto es decir que dejo de ser el CANAL de distribucion",
+    "v1 NO se retiro: las versiones publicadas hasta la 1.9.6 lo resuelven dentro de su " +
+      "marco-ci.yml, y un consumidor pinado a una de ellas depende de que el tag exista. Lo " +
+      "correcto es decir que dejo de ser el CANAL de distribucion",
+  );
+});
+
+test("ningun archivo del marco afirma que marco-ci.yml sigue invocando una pieza propia por v1", () => {
+  // LA MISMA CLASE, DEL OTRO LADO. Mientras `marco-ci.yml` invocaba guardrail-deltas por
+  // `@v1`, seis superficies lo decian con estas palabras. El dia que esa linea se pino a
+  // la version exacta, las seis pasaron a afirmar algo falso a la vez, y una sola que
+  // sobreviva le dice a quien corta un release que mueva `v1` «porque el marco lo usa».
+  //
+  // LIMITE DECLARADO, el mismo del caso de arriba: son las formas EXACTAS que existieron,
+  // no un detector de la idea. Se compara sobre el texto NORMALIZADO —los saltos de
+  // linea con su marca de cita o de comentario (`>`, `#`, `//`, `*`) se aplanan a un
+  // espacio— porque tres de las seis estaban partidas en dos lineas, y un `includes`
+  // literal no las habria visto nunca.
+  const FALSAS_DEL_ROL_INTERNO = [
+    "sobrevive en **una** línea",
+    "sobrevive en **una sola linea**",
+    "lo consume **una sola linea del marco**",
+    "referencia a una de sus propias actions hermanas (guardrail-deltas) por @v1",
+    "referencia a una de sus propias actions hermanas por `@v1`",
+    "El tag existe, pero solo para una línea interna del marco",
+    "ULTIMO `@v1` vivo del marco",
+    "por una razon estructural, y el paso 5 lo mueve",
+    // Hallazgo RV-H6 de la revision adversarial del porte: la action de la
+    // constitucion decia que su texto llegaba en la resolucion de `@v1` que ya
+    // ocurria. Desde guardrail-deltas-por-version-exacta no ocurre ninguna.
+    "en la misma resolucion de @v1 que ya ocurre",
+  ];
+  const aplanar = (t) => t.replace(/\r?\n[ \t]*(?:>|#|\/\/|\*)?[ \t]*/g, " ").replace(/[ \t]+/g, " ");
+
+  // El control de que la normalizacion no es un no-op: una frase partida en dos lineas
+  // de cita tiene que aparecer entera despues de aplanar.
+  assert.ok(
+    aplanar("> El tag existe, pero solo para una línea\n> interna del marco").includes(FALSAS_DEL_ROL_INTERNO[5]),
+    "la normalizacion dejo de unir las lineas partidas: este caso volvio a ser un `includes` literal",
+  );
+
+  const encontradas = [];
+  for (const abs of candidatosDeProsa()) {
+    const texto = aplanar(fs.readFileSync(abs, "utf8"));
+    for (const f of FALSAS_DEL_ROL_INTERNO) {
+      if (texto.includes(f)) encontradas.push(`${path.relative(RAIZ, abs).replace(/\\/g, "/")}: "${f}"`);
+    }
+  }
+  assert.deepEqual(
+    encontradas,
+    [],
+    "marco-ci.yml ya no invoca ninguna pieza propia por `@v1`: guardrail-deltas va por version exacta " +
+      "desde el change `guardrail-deltas-por-version-exacta`. Lo que sigue resolviendo `v1` son las " +
+      "versiones PUBLICADAS hasta la 1.9.6, y si el paso 5 del release lo mueve es una decision pendiente " +
+      "(ver ese paso). Reescribi la frase con eso",
+  );
+});
+
+test("ningun archivo del marco afirma que `@v1` es el canal, ni que un arreglo llega sin PR", () => {
+  // LA TERCERA CARA DE LA MISMA CLASE, y la peor ubicada. actions/README.md es la
+  // superficie donde un consumidor decide COMO pinar, y su seccion Versionado seguia
+  // diciendo que `@v1` apunta al ultimo commit compatible de la 1.x y que un arreglo
+  // llega a todos en el proximo run, sin PR. Es falso desde el 2026-08-21: el canal es
+  // la version exacta mas el PR de Dependabot, y `v1` no avanza con cada release. Al
+  // consumidor lo dejaba pinado a un arbol que no se mueve, creyendo que recibia los
+  // arreglos. El upstream de este marco lo encontro como la octava copia vencida del
+  // mismo hecho (Rigel 2.4.0, commit 3ce8fde); aca estaba igual, y tambien en el
+  // encabezado del ci.yml del andamio y en el de marco-ci.yml.
+  //
+  // LIMITE DECLARADO, el de los dos casos de arriba: formas EXACTAS, sobre texto
+  // aplanado. Una redaccion nueva de la misma idea no la ve; la ve el review.
+  const FALSAS_DEL_CANAL = [
+    "`@v1` es un tag móvil: apunta al último commit compatible",
+    "Antes de mover `v1`, la action nueva se prueba",
+    "La ventana existe porque `v1` es un tag móvil",
+    "Con `v1` móvil, un consumidor recibe comportamiento nuevo",
+    "Un arreglo acá llega a todos los repos en su próximo run, sin PR en cada uno",
+    "asi un arreglo alla llega a este repo sin abrir un PR aca",
+    "Un arreglo aca arregla el CI de todos los repos a la vez",
+    "por eso una subida del pin llega sola",
+    // Hallazgo RV-H6 de la revision adversarial del porte: un traspaso entre lotes
+    // se perdio y estas sobrevivieron en un workflow del marco y en el mensaje de un
+    // paso de su CI. Las de los bancos las cobra el caso de abajo.
+    "necesita enterarse de lo que le llega por @v1",
+    "llega a todos los consumidores de @v1",
+  ];
+  const aplanar = (t) => t.replace(/\r?\n[ \t]*(?:>|#|\/\/|\*)?[ \t]*/g, " ").replace(/[ \t]+/g, " ");
+  assert.ok(
+    aplanar("# se consume por referencia desde Projects, asi un arreglo alla llega a este repo\n# sin abrir un PR aca.").includes(FALSAS_DEL_CANAL[5]),
+    "la normalizacion dejo de unir las lineas partidas: este caso volvio a ser un `includes` literal",
+  );
+
+  const encontradas = [];
+  for (const abs of candidatosDeProsa()) {
+    const texto = aplanar(fs.readFileSync(abs, "utf8"));
+    for (const f of FALSAS_DEL_CANAL) {
+      if (texto.includes(f)) encontradas.push(`${path.relative(RAIZ, abs).replace(/\\/g, "/")}: "${f}"`);
+    }
+  }
+  assert.deepEqual(
+    encontradas,
+    [],
+    "el canal de distribucion es la version exacta mas el PR de bump de Dependabot: un arreglo del marco llega a " +
+      "cada consumidor como un PR que alguien lee y mergea, y `v1` no avanza con cada release. Reescribi la " +
+      "frase con eso; si citas la forma vieja para explicar que se corrigio, parafraseala",
+  );
+});
+
+test("ningun banco del marco afirma en su prosa que su arreglo viaja por `@v1`", () => {
+  // LA MISMA CLASE, DENTRO DE LOS BANCOS. Los casos de arriba no leen `pruebas/`: sus
+  // fixtures usan `@v1` a proposito, porque lo que prueban es el parseo de un ref. Pero
+  // un MENSAJE de asercion es prosa que alguien lee cuando el banco se pone rojo, y el
+  // de actions/constitucion/pruebas/regresiones-auditoria.test.mjs decia que el
+  // guardrail de deltas le llegaba a todos los consumidores por el tag movil: falso
+  // desde que el canal es la version exacta, y un traspaso entre lotes lo dejo vivo
+  // (hallazgo RV-H6 de la revision adversarial del porte). Son frases, no refs: ningun
+  // fixture las contiene. LIMITE, el de los casos de arriba: formas exactas.
+  const FALSAS_EN_BANCOS = [
+    "viaja por @v1 a todos los consumidores",
+    "viaja por `@v1` a todos los consumidores",
+    "llega a todos los consumidores por `@v1`",
+  ];
+  const aplanar = (t) => t.replace(/\r?\n[ \t]*(?:>|#|\/\/|\*)?[ \t]*/g, " ").replace(/[ \t]+/g, " ");
+  const bancos = [];
+  const recorrer = (dir) => {
+    if (!fs.existsSync(dir)) return;
+    for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
+      const p = path.join(dir, e.name);
+      if (e.isDirectory()) {
+        if (e.name !== "node_modules") recorrer(p);
+      } else if (/\.test\.mjs$/.test(e.name) && p !== import.meta.filename) bancos.push(p);
+    }
+  };
+  recorrer(path.join(RAIZ, "actions"));
+  recorrer(path.join(RAIZ, "pruebas"));
+  assert.ok(bancos.length > 40, `solo ${bancos.length} bancos leidos: el recorrido se rompio`);
+  const encontradas = [];
+  for (const abs of bancos) {
+    const texto = aplanar(fs.readFileSync(abs, "utf8"));
+    for (const f of FALSAS_EN_BANCOS) {
+      if (texto.includes(f)) encontradas.push(`${path.relative(RAIZ, abs).replace(/\\/g, "/")}: "${f}"`);
+    }
+  }
+  assert.deepEqual(
+    encontradas,
+    [],
+    "un banco dice que lo que protege le llega a los consumidores por `@v1`. El canal es la version exacta mas el " +
+      "PR de bump: reescribi el mensaje con eso",
   );
 });

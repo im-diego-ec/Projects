@@ -97,6 +97,15 @@ export function coberturaDelMarco(minimo = MINIMO_DEL_MARCO) {
       // la declara load-bearing es peor que no tenerla: el proximo que la lea va
       // a creer que la compuerta la sostiene ella.
       //
+      // Y SE VOLVIO A MEDIR AL SUBIR A LA 5 (vitest y @vitest/coverage-v8 5.0.1,
+      // el 2026-09-17, change `el-andamio-nace-instalable`): el mismo huerfano
+      // entra al lcov con su `SF:` y `FNH:0`, y baja las lineas del paquete de
+      // 100% a 98,76%. El umbral sigue vivo: con MINIMO_DEL_MARCO en 99 el
+      // paquete del API sale 1 con `ERROR: Coverage for ... does not meet global
+      // threshold (99%)`. OJO CON LA TABLA `text` DE LA 5: ya no imprime los
+      // archivos al 100%, asi que se ve mas corta y parece que la cobertura se
+      // encogio. Lo que decide es el lcov, que es lo que lee la compuerta.
+      //
       // src y nada mas: la config, los scripts y los generados no son codigo que
       // a este paquete le corresponda probar. Lo que se saca a proposito se
       // declara en projects.cobertura.excluidos del package.json, con su motivo

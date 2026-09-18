@@ -185,3 +185,126 @@ test("MUERDE: el error que motivo este banco se caza, y `bash -n` NO alcanza", (
   );
   fs.rmSync(tmp, { recursive: true, force: true });
 });
+
+// ---------------------------------------------------------------------------
+// NINGUNA CONTINUACION DE LINEA QUEDA CORTADA, y es el tercer control, distinto de los dos de
+// arriba: lo que caza es shell VALIDO que hace otra cosa.
+//
+// EL CASO QUE LO TRAJO, de Rigel (1.12.0, commit cffa81f de alla, 2026-08-31). Un arreglo dejo
+// comentarios ENTRE `node script.mjs \` y la linea de sus argumentos. Es bash valido —`bash -n`
+// no dice nada— y el efecto es que el comando corre SIN sus argumentos: el script recibio
+// `undefined` como ruta y murio con ERR_INVALID_ARG_TYPE en el runner de un consumidor.
+//
+// POR QUE NINGUN CONTROL LO VE. El de sintaxis no, porque parsea. Y un banco que busque que la
+// invocacion pase sus argumentos tampoco: la linea de argumentos SIGUE AHI, solo que huerfana. Un
+// control de presencia no distingue una linea conectada de una desconectada. Aca no hay ninguna
+// hoy (medido el 2026-09-17 sobre los mismos workflows que recorren los dos controles de arriba);
+// esto es para que la primera no llegue al runner.
+// ---------------------------------------------------------------------------
+
+/** Las continuaciones cortadas de un bloque: una linea que termina en `\` seguida de un
+ *  comentario o de una linea vacia, y una que termina en `\` seguida de espacios.
+ *
+ *  Dos cosas NO son continuacion, y contarlas enseniaria a ignorar el control: una linea que es
+ *  ella misma un COMENTARIO (en bash la barra final de un comentario es texto), y una que
+ *  termina en un numero PAR de barras (`\\` es una barra escapada, no una continuacion).
+ *
+ *  Y UNA BARRA SEGUIDA DE ESPACIOS TAMPOCO ES CONTINUACION, y por eso se caza: la barra escapa
+ *  el primer espacio y la linea de abajo corre como un comando aparte. Se mira ANTES de recortar
+ *  el final de la linea; la primera version recortaba primero y la daba por sana. */
+export function continuacionesCortadas(cuerpo) {
+  const l = cuerpo.split("\n");
+  const cortadas = [];
+  for (let i = 0; i < l.length - 1; i += 1) {
+    if (/^\s*#/.test(l[i])) continue;
+    if (/(^|[^\\])(\\\\)*\\[ \t]+$/.test(l[i])) {
+      cortadas.push({ indice: i, texto: l[i].trim() });
+      continue;
+    }
+    const actual = l[i].trimEnd();
+    const barras = actual.match(/\\+$/);
+    if (!barras || barras[0].length % 2 === 0) continue;
+    const siguiente = l[i + 1].trim();
+    if (siguiente === "" || siguiente.startsWith("#")) cortadas.push({ indice: i, texto: actual.trim() });
+  }
+  return cortadas;
+}
+
+test("ninguna continuacion de linea de un `run:` queda cortada por un comentario o una linea vacia", () => {
+  const malos = [];
+  let continuaciones = 0;
+  for (const f of workflows()) {
+    for (const b of bloquesRun(fs.readFileSync(path.join(RAIZ, f), "utf-8"))) {
+      continuaciones += b.cuerpo.split("\n").filter((l) => /(^|[^\\])(\\\\)*\\$/.test(l.trimEnd()) && !/^\s*#/.test(l)).length;
+      for (const c of continuacionesCortadas(b.cuerpo)) {
+        malos.push(`${f}: run: de la linea ${b.linea}, linea ${b.linea + 1 + c.indice}  "${c.texto.slice(0, 60)}"`);
+      }
+    }
+  }
+  // Anti-vacuidad: el marco usa continuaciones (el paso de ejecutores del consumidor, las
+  // sondas del distribuidor). Si este conteo cae a cero, el recorrido dejo de verlas.
+  assert.ok(continuaciones >= 5, `solo se vieron ${continuaciones} continuaciones de linea: el recorrido dejo de verlas`);
+  assert.deepEqual(
+    malos,
+    [],
+    "una linea que termina en barra invertida seguida de un comentario o de una linea vacia —o en una barra seguida " +
+      "de espacios, que no continua— deja el comando SIN los argumentos que venian abajo, y bash no se queja: es " +
+      "sintacticamente valido. Arreglo: sacar el comentario de entre las dos lineas (arriba del comando, no en el " +
+      `medio), borrar la linea vacia, o borrar los espacios que siguen a la barra:\n  ${malos.join("\n  ")}`,
+  );
+});
+
+test("MUERDE: la continuacion cortada se caza, `bash -n` NO la ve, y lo correcto no se marca", () => {
+  // El caso exacto de Rigel: comentarios entre el comando y sus argumentos.
+  const cortada = ["node script.mjs \\", "  # el expectedHeadOid va abajo", '  "${CABEZA}" "${SALIDA}"'].join("\n");
+  const conVacia = ["node script.mjs \\", "", '  "${CABEZA}"'].join("\n");
+
+  // PRIMERO LA PREMISA: `bash -n` sale 0 sobre esto. Por eso el control existe aparte.
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "run-continuacion-"));
+  const guion = path.join(tmp, "malo.sh");
+  fs.writeFileSync(guion, `${cortada}\n`);
+  const sintaxis = spawnSync("bash", ["-n", guion], { encoding: "utf-8" });
+  fs.rmSync(tmp, { recursive: true, force: true });
+  assert.equal(sintaxis.status, 0, "si `bash -n` empezara a cazarlo, este control sobra y conviene saberlo");
+
+  assert.equal(continuacionesCortadas(cortada).length, 1, "tiene que ver el comentario en el medio");
+  assert.equal(continuacionesCortadas(conVacia).length, 1, "y la linea vacia en el medio");
+
+  // Lo correcto, que no se puede marcar.
+  assert.deepEqual(continuacionesCortadas(["node script.mjs \\", '  "${CABEZA}"'].join("\n")), [], "una continuacion sana");
+  assert.deepEqual(
+    continuacionesCortadas(["# un comentario que termina en barra \\", "", "echo ok"].join("\n")),
+    [],
+    "la barra final de un comentario es texto, no continuacion",
+  );
+  assert.deepEqual(
+    continuacionesCortadas(["printf '%s' a\\\\", "", "echo ok"].join("\n")),
+    [],
+    "dos barras son una barra escapada, no una continuacion",
+  );
+});
+
+test("MUERDE: una barra final seguida de un ESPACIO no continua, y se caza", () => {
+  // Lo encontro la revision adversarial del porte (2026-09-18). `\ ` al final de la linea no es
+  // una continuacion: la barra escapa el espacio, y la linea de abajo corre como un comando
+  // aparte. `bash -n` no dice nada, y el control lo daba por sano porque recortaba el espacio
+  // ANTES de buscar la barra. Es la misma clase: shell valido que hace otra cosa.
+  const cuerpo = ["echo inicio", 'printf "[%s]" uno \\ ', "  dos"].join("\n");
+
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "run-barra-espacio-"));
+  const guion = path.join(tmp, "malo.sh");
+  fs.writeFileSync(guion, `${cuerpo}\n`);
+  const sintaxis = spawnSync("bash", ["-n", guion], { encoding: "utf-8" });
+  const corrida = spawnSync("bash", [guion], { encoding: "utf-8" });
+  fs.rmSync(tmp, { recursive: true, force: true });
+  assert.equal(sintaxis.status, 0, "la premisa: `bash -n` no lo ve");
+  assert.notEqual(corrida.status, 0, `la premisa: la linea de abajo corre sola y falla. Salida: ${corrida.stdout}${corrida.stderr}`);
+
+  assert.equal(continuacionesCortadas(cuerpo).length, 1, "la barra seguida de un espacio tiene que cazarse");
+  assert.equal(continuacionesCortadas(["cmd \\\t", "  arg"].join("\n")).length, 1, "y seguida de un tab");
+
+  // Lo que no se puede marcar.
+  assert.deepEqual(continuacionesCortadas(["cmd \\", "  arg"].join("\n")), [], "una continuacion sana");
+  assert.deepEqual(continuacionesCortadas(["cmd a\\\\ ", "echo ok"].join("\n")), [], "dos barras y un espacio: ni continuacion ni escape");
+  assert.deepEqual(continuacionesCortadas(["# comentario con barra \\ ", "echo ok"].join("\n")), [], "una barra en un comentario es texto");
+});

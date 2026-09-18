@@ -1,7 +1,9 @@
 # Composite actions del marco
 
 Piezas **referenciadas**: los proyectos no las copian, las consumen con `uses:`.
-Un arreglo acá llega a todos los repos en su próximo run, sin PR en cada uno.
+Un arreglo acá llega a cada repo como **PR de bump de Dependabot** sobre la versión
+exacta que pina: nadie lo copia, y nada cambia en un consumidor sin un PR que alguien
+pueda leer y mergear.
 
 ```yaml
 uses: im-diego-ec/Projects/actions/<nombre>@v1.9.6
@@ -27,13 +29,28 @@ acá: va por `vars` y `secrets` del repo consumidor.
 
 ## Versionado
 
-`@v1` es un tag móvil: apunta al último commit compatible de la línea 1.x.
-Un proyecto con requisitos de auditoría puede pinear el SHA
-(`@a1b2c3d4...`), a costa de perder los arreglos automáticos.
+**Se consume la versión exacta (`@vX.Y.Z`), y ese es todo el canal.** Cada versión
+nueva llega como **PR de Dependabot** en el repo consumidor: si trae una compuerta
+nueva, el rojo aparece **dentro de ese PR**, que es donde alguien lo puede leer antes
+de mergear.
 
-Antes de mover `v1`, la action nueva se prueba en un repo consumidor apuntando
-a la rama (`@nombre-de-rama`). Si cambia el nombre o el significado de un input
-o de un output, es `v2`, no `v1`.
+> **Hasta el change `el-marco-deja-de-afirmar-lo-que-no-hace`, esta sección describía
+> a `@v1` como un puntero que avanzaba solo con cada versión compatible de la 1.x.**
+> Dejó de ser cierto el 2026-08-21, cuando el canal pasó a ser la versión exacta, y
+> este era el peor lugar para seguir diciéndolo: es donde un consumidor decide cómo
+> pinar. `v1` **sigue existiendo** —las versiones publicadas hasta la 1.9.6 lo
+> resuelven dentro de su `marco-ci.yml`— pero **no avanza con cada release**: el paso
+> 5 del release no lo mueve sin OK humano, y si se congela del todo es una decisión
+> que va con la línea `v2` (ver `AGENTS.md`). El 2026-09-17 apuntaba a la `v1.8.0`.
+> Un repo pinado a `@v1` no recibe PR de bump ni aparece en el censo de consumidores.
+
+Un proyecto con requisitos de auditoría puede pinear el SHA (`@a1b2c3d4...`), a costa
+de quedar fuera del PR de bump.
+
+Antes de publicar la versión, la action nueva se prueba en un repo consumidor
+apuntando al **SHA** del commit (skill `projects-validar-consumidor`), y ese pin se
+revierte en el mismo PR que lo introdujo. Si cambia el nombre o el significado de un
+input o de un output, es breaking: va en la línea `v2`, no en una `1.x`.
 
 ---
 
@@ -82,6 +99,12 @@ Si el job ya hizo su propio `setup-node`, pasá `instalar-node: "false"`.
 
 El chequeo se limita al bloque `MODIFIED`: los requirements de `ADDED`
 legítimamente todavía no viven en el spec vigente.
+
+**Hueco conocido, el simétrico:** un `ADDED` cuyo título ya existe en el spec vigente
+**no** se caza acá, y tampoco lo caza `openspec validate --strict` (medido con el CLI
+1.9.0: los dos en verde). Lo frena recién el archive —el paso 2 de la skill
+`projects-archive-change` sale 1—, o sea al final del change. Antes de escribir un
+`ADDED`: `git grep -n "^### Requirement: <título>" -- openspec/specs/`.
 
 ### Correrlo en local
 
@@ -410,15 +433,16 @@ nada obliga a nadie mientras nadie lo toque.
 > y manda a arreglarlo **en el marco**, no en el manifiesto del proyecto: el
 > denominador declarado prueba que el reporter sí midió.
 
-> **Ventana de estreno, hasta el 2026-09-30.** Mientras dure, los dos veredictos
-> que **nadie escribió** —un paquete por debajo del mínimo que no declara deuda, y
-> una métrica que el reporte no midió— pasan en amarillo con un `::warning::` que
-> nombra el día en que serán rojos. La ventana existe porque `v1` es un tag móvil:
-> sin ella, la compuerta aparece en el pipeline de cada consumidor sin que nadie la
-> haya leído. No afloja lo que un paquete escribió y rompió —deuda vencida,
-> retroceso, piso sin datos, declaración inválida—, y se cierra sola: pasada la
-> fecha, el mismo estado es rojo sin que nadie toque una línea. La línea que separa
-> las dos mitades es la autoría del caso, no su gravedad.
+> **No hay ventana de estreno, y el día de la corrida no decide nada.** Hasta la
+> 1.9.6 los tres veredictos que **nadie escribió** —un paquete por debajo del mínimo
+> que no declara deuda, una métrica que el reporte no midió y un denominador más
+> corto que el declarado— pasaban en amarillo hasta el 2026-09-30. La ventana nació
+> cuando el canal era el tag móvil `v1`, que ponía la compuerta en el pipeline de
+> cada consumidor sin que nadie la hubiera leído; con la versión exacta ese aviso
+> previo es el PR de bump, así que se borró (change `la-ventana-se-cierra`). Los
+> tres son **rojos** desde la versión que la borró, igual que lo que un paquete
+> escribió y rompió. La única fecha que esta action mira es la que el propio
+> paquete declara en su deuda.
 
 El piso es el mecanismo de **transición** hacia el mínimo, no un sustituto de él,
 y por eso lleva plazo. Sin fecha, el piso termina siendo el mínimo de hecho, y eso
@@ -455,9 +479,11 @@ abren, porque este plano recalcula el total desde el `lcov` en vez de creerle a 
 configuración del paquete.
 
 **Requisito para que el plano 2 mida lo que dice medir**: la cobertura del paquete
-tiene que emitirse con `all: true`. Sin eso, el reporte solo trae los archivos que
-alguna prueba importó y el total sale alto por omisión. El scaffold reparte esa
-configuración ya armada en `vitest.config.base.mjs`.
+tiene que declarar su alcance con `coverage.include`. Sin eso, el reporte solo trae
+los archivos que alguna prueba importó y el total sale alto por omisión. El scaffold
+reparte esa configuración ya armada en `vitest.config.base.mjs`. En vitest 2.x eso lo
+hacía `all: true`: la mayor 3 retiró la opción y la 5 la ignora sin aviso, así que
+agregarla hoy es una línea inerte.
 
 ```yaml
 jobs:
@@ -517,19 +543,28 @@ e incomparables contra el diff. En vitest:
 ```ts
 coverage: {
   reporter: [["lcov", { projectRoot: fileURLToPath(new URL("..", import.meta.url)) }]],
-  all: true,
+  include: ["src/**/*.{ts,tsx,mts,cts,js,jsx,mjs,cjs}"],
 }
 ```
 
-`all: true` importa igual: un archivo sin ninguna prueba tiene que aparecer en el
-reporte con sus líneas en cero. Con `all: false` desaparece del reporte, la
-compuerta lo contaría como "no medido" y el archivo menos probado del repo
-terminaría siendo justo el que no molesta a nadie. Por eso un **archivo fuente**
+El `include` importa igual: un archivo sin ninguna prueba tiene que aparecer en el
+reporte con sus líneas en cero. Si el alcance no lo nombra, desaparece del reporte,
+la compuerta lo contaría como "no medido" y el archivo menos probado del repo
+terminaría siendo justo el que no molesta a nadie. (En vitest 2.x esto lo pedía
+`all: true`; desde la mayor 3 lo fija el `include` y nada más.) Por eso un **archivo fuente**
 del cambio que ningún reporte reclama es **rojo**, y qué cuenta como fuente sale
 de la lista de extensiones del censo —no de las extensiones que casualmente
 traen los reportes presentes, que era circular: un repo que mide `.ts` no decía
 una palabra sobre un `.tsx` nuevo sin pruebas—. La salida es declarar la
 exclusión con su motivo en `projects.cobertura.excluidos`.
+
+**Salvo bajo `.github/`.** Un script de CI (`.github/scripts/*.mjs` y parecidos) corre en
+el runner y no en la suite de ningún paquete: ningún reporter va a emitir datos para
+él, así que exigirle cobertura era un rojo que ninguna prueba podía apagar —mientras el
+censo de fuentes del mismo pipeline lo daba verde—. Esos archivos no se miden, figuran
+en el resumen como fuera de la medición y la corrida los nombra en un `::notice::`. La
+exención es por la **ruta** y no por «fuera de todo paquete»: con un `package.json` en
+la raíz, todo archivo cae en algún paquete y esa otra regla quedaría inerte.
 
 ### Qué pasa en cada caso
 
@@ -593,7 +628,6 @@ saltea el job entero.
 | El `minimo` del paso es menor que el del marco | El total se sigue comparando contra el del marco |
 | Ningún reporte reclama archivos de un paquete | **No medido**, con `::warning::`. El plano del diff ya enrojece si hay líneas agregadas |
 | Todo lo que los reportes reclaman está excluido con su motivo | Pasa, y los motivos quedan escritos en el resumen |
-| Un paquete sin declaración, dentro de la ventana de estreno | Pasa en amarillo, nombrando el día en que será rojo |
 | `FNDA:` que no se pudieron emparejar con sus `FN:` | Pasa, con `::warning::`: el total de funciones se publica como aproximado, no como exacto |
 
 ### Límites declarados
@@ -603,7 +637,7 @@ saltea el job entero.
 - **El total se calcula sobre lo que los reportes reclaman.** Un archivo fuente
   que ningún `lcov` menciona no entra al denominador del total; lo caza el plano
   del diff cuando el cambio lo toca, y el censo de fuentes cuando queda fuera del
-  alcance de las herramientas. Es el motivo por el que `all: true` no es
+  alcance de las herramientas. Es el motivo por el que el `coverage.include` no es
   opcional: sin eso, el archivo menos probado del repo es justo el que no molesta
   a nadie.
 - **Las métricas del total salen de los registros por ítem del `lcov`** (`DA`,
@@ -667,19 +701,21 @@ enrojecido.
 node --test "actions/cobertura-diff/pruebas/*.test.mjs"
 ```
 
-El banco del total corre con la ventana de estreno **cerrada**
-(`COBERTURA_HOY` en una fecha posterior) porque lo que hay que fijar es el régimen
-permanente; la ventana tiene sus dos pruebas propias, una a cada lado de la fecha.
+El banco del total fija `COBERTURA_HOY` en un día fijo para que los plazos de las
+deudas declaradas no dependan del calendario de quien lo corre. El veredicto de un
+paquete **sin** declaración no depende de ningún día: un caso lo corre en los tres
+días que la ventana de estreno retirada distinguía y exige rojo en los tres.
 
 ---
 
 ## `aviso-version`
 
 El `CHANGELOG.md` y la página del release son superficie de **consulta**, y
-nadie consulta a tiempo. Con `v1` móvil, un consumidor recibe comportamiento
-nuevo —incluido un check que lo pone en rojo— sin haber leído nada; pasó el
-2026-08-19, al mover `v1` la primera vez. Esta action convierte la publicación
-de una versión en una **notificación**.
+nadie consulta a tiempo. Cuando el canal era el tag móvil `v1`, un consumidor
+recibía comportamiento nuevo —incluido un check que lo ponía en rojo— sin haber
+leído nada; pasó el 2026-08-19, al mover `v1` la primera vez. Con la versión exacta
+el cambio llega en un PR de bump, pero ese PR nombra la versión y no lo que cambia.
+Esta action convierte la publicación de una versión en una **notificación**.
 
 **Arma el mensaje y no lo envía.** No conoce el destino, no lee ningún secret y
 no toca la red: lee el `CHANGELOG.md` del checkout, devuelve texto y escribe un
@@ -716,6 +752,9 @@ jobs:
         uses: im-diego-ec/Projects/actions/aviso-version@v1.9.6
         with:
           version: ${{ github.event.release.tag_name }}
+          # Solo si el destino es Slack. Es VARIABLE de repositorio, no secret:
+          # vars.* no ve secretos, y el aviso caeria al default sin poder notarlo.
+          formato: ${{ vars.AVISO_VERSION_FORMATO }}
       - shell: bash
         env:
           DESTINO: ${{ secrets.AVISO_VERSION_DESTINO }}
@@ -726,14 +765,25 @@ jobs:
 En el evento `release` el checkout cae en el commit del tag publicado, así que
 el changelog que se lee es el de **esa** versión.
 
+**El mensaje habla el dialecto del destino.** El `CHANGELOG.md` está escrito en
+Markdown, que es lo que renderizan Teams y Discord; Slack habla **mrkdwn**, donde la
+negrita lleva **un** asterisco. Sin declarar nada, el aviso sale en `markdown` —el
+cuerpo tal cual y el encuadre también en markdown—; con `formato: mrkdwn` se traduce
+entero: negrita, tachado, enlaces y encabezados, las tablas como lista etiquetada y
+los párrafos y viñetas cortados a 80 columnas en una sola línea, porque Slack no
+renderiza una negrita que cruce un salto de línea. El código, cercado o en línea, no
+se toca nunca: es lo que el consumidor va a copiar y pegar. Cada corrida dice con un
+`::notice::` qué dialecto usó y si alguien lo declaró.
+
 ### Inputs
 
 | Input | Default | Para qué |
 | --- | --- | --- |
 | `version` | (obligatorio) | Versión a avisar, con o sin la `v` del tag (`1.2.0` o `v1.2.0`) |
 | `changelog` | `CHANGELOG.md` | Ruta del changelog, relativa al working directory |
-| `limite` | `3500` | Largo máximo del mensaje; por encima recorta y lo dice |
+| `limite` | la constante `LIMITE_POR_DEFECTO` del script | Largo máximo del mensaje; por encima recorta y lo dice. Sin default en `action.yml` a propósito: el número vive en un solo lugar |
 | `campo` | `text` | Campo de texto del payload JSON (`content` para Discord) |
+| `formato` | la constante `FORMATO_POR_DEFECTO` del script (`markdown`) | Dialecto del destino: `markdown` (Teams, Discord) o `mrkdwn` (Slack). Otro valor es **rojo**. Sin default en `action.yml` a propósito: vacío le dice al script que nadie lo declaró, y el `::notice::` lo anuncia |
 | `salida` | `$RUNNER_TEMP/aviso-version.json` | Dónde escribir el payload |
 
 ### Outputs
@@ -751,9 +801,12 @@ el changelog que se lee es el de **esa** versión.
 | Situación | Veredicto |
 | --- | --- |
 | Entrada con su sección «Para consumidores» | Mensaje completo, con los dos enlaces |
-| Entrada **sin** esa sección | `::warning::` y va el **cuerpo completo** de la versión: se manda de más, no de menos |
-| Entrada con líneas `BREAKING` | `::warning::` y el mensaje las pone **primero** |
-| Mensaje más largo que el límite | `::warning::`, recorta por línea y deja el enlace al release |
+| Cualquier corrida | `::notice::` con el dialecto que usó y si lo declaró alguien o cayó al default |
+| `formato` con un valor que no es `markdown` ni `mrkdwn` | **Rojo**, sin payload, nombrando los dos valores válidos |
+| Entrada **sin** esa sección | `::warning::` y el mensaje se **arma con el cuerpo completo** de la versión: se manda de más, no de menos. Si ese cuerpo no entra en el límite, llega recortado y el aviso dice a cuánto |
+| Entrada con esa sección **vacía** (sin texto, o sólo comentarios) | `::warning::` con el arreglo y el resumen de la corrida la declara vacía. El mensaje sale igual, con «Qué tiene que hacer un consumidor:» y nada debajo: la salida `sin_para_consumidores` sigue en `"false"` |
+| Entrada con líneas `BREAKING` | `::warning::` y el mensaje las pone **primero**, cada viñeta entera aunque venga envuelta en varias líneas |
+| Mensaje más largo que el límite | `::warning::` con el largo al que recortó, deja el enlace al release y da el arreglo **de su rama**: sin la sección, escribirla; con la sección, acortarla |
 | **No hay entrada para esa versión** | **Rojo**, con el arreglo: agregar la entrada y re-disparar el botón |
 | No se puede leer el changelog | **Rojo**: falta el `checkout` |
 
@@ -764,18 +817,30 @@ caro posible, porque le diría a un consumidor que haga algo que no corresponde.
 
 ### Límites declarados
 
-- **El mensaje viaja como Markdown, tal cual lo escribe el CHANGELOG.** No hay
-  traducción al dialecto de ningún destino (Slack no renderiza `**negrita**`
-  igual que GitHub): hacerla sería cablear un proveedor, que es justo lo que
-  este diseño no hace. Lo que se gana es que el aviso y el changelog son el
-  mismo texto, verificable carácter por carácter.
+- **Dos dialectos, y el destino sigue sin cablearse.** `markdown` es el changelog
+  tal cual; `mrkdwn` es la única traducción, y es de dialecto, no de proveedor.
+  Google Chat entiende la negrita de mrkdwn; un destino que hable un tercer
+  dialecto es un change del marco, no una configuración. En `mrkdwn` la tabla
+  pierde la alineación en columnas (no la información: cada valor viaja con su
+  encabezado) y un encabezado pierde su nivel.
+- **La pieza no puede saber si el dialecto quedó en el lugar equivocado.** Sabe si
+  el input llegó vacío, y lo dice; no sabe por qué. El workflow del propio marco
+  agrega lo que sí puede ver: si existe un **secret** `AVISO_VERSION_FORMATO`
+  —el error de cargarlo en la pestaña equivocada—, y lo advierte sin leer su valor.
 - **El payload es `{"<campo>": "<mensaje>"}` y nada más.** Sirve para Slack,
   Google Chat y Teams con `text`, y para Discord con `content`. Un destino que
   exija otra forma es un change del marco, no una configuración.
-- **«Para consumidores» es una convención del changelog, no un contrato que algo
-  verifique al escribirlo.** Su ausencia se detecta al avisar —cuando la versión
-  ya está publicada—, no en el PR que la introdujo. Cerrar ese hueco es otro
-  check y otra fila del backlog.
+- **«Para consumidores» es una convención del changelog, y en el marco se verifica
+  al escribirla.** `herramientas/aviso-entra-en-el-mensaje.mjs` corre en el CI
+  propio de Projects (job `changelog-en-el-pr`) y pone rojo el PR si falta la
+  sección o está vacía, si el texto de fábrica del release quedó encima de cambios reales, si
+  la sección usa la jerga de oficio que las páginas para quien no es técnico tienen
+  prohibida (en la prosa, o entre backticks por encima del tope que tienen esas
+  páginas) o si el mensaje no entra en el límite en **alguno
+  de los dos dialectos**; mide
+  `[No publicado]`, la versión más alta y toda versión cuyo aviso cambia en el PR
+  (con el `CHANGELOG.md` de su base), con las mismas funciones de esta action. Un repo que use la action sin esa
+  compuerta la detecta recién al avisar, cuando la versión ya está publicada.
 - **Esta action no envía nada, así que no puede garantizar que el aviso llegue.**
   Lo que el workflow que la consuma no puede hacer es callarse: sin destino
   configurado, `::warning::` y el mensaje al resumen de la corrida.
@@ -786,7 +851,7 @@ Es **referenciada**, y hoy tiene un solo consumidor: el propio Projects. Vive ac
 no como un script suelto del repo por dos razones que se sostienen solas —el
 banco de pruebas del CI descubre `actions/*/pruebas/` sin que nadie cablee nada,
 y "changelog + versión → mensaje" es genérico para cualquier repo que publique
-releases—. La contrapartida es honesta: al publicarse bajo `@v1`, sus `inputs` y
+releases—. La contrapartida es honesta: al publicarse con versión, sus `inputs` y
 `outputs` son contrato, y cambiarlos sigue las mismas reglas que el resto.
 
 ---
@@ -848,12 +913,15 @@ distribución pasó a versión exacta. Con pin exacto, el aviso previo **es el P
 bump**, y lo único que la ventana seguía produciendo era un repo atrasado y verde
 durante cuatro semanas.
 
-El estreno con aviso **sigue siendo posible y es opt-in de quien publica**: una versión
-que declara un `exigible_desde` posterior a su `publicada` avisa hasta esa fecha, y la
-corrida nombra el día desde el cual el mismo estado es rojo. Si el consumidor acumuló
-varias versiones sin adoptar, manda la fecha de la **más vieja pendiente**. Lo que
-**no** existe es rama silenciosa de "este repo no aplica": el repo sin artefacto es
-exactamente el que hay que avisar.
+**La versión exigible es la publicada, sin excepción.** Hasta el 2026-09-17 una versión
+podía declarar un `exigible_desde` posterior a su `publicada` y estrenarse con aviso;
+desde la decisión D1 del PO —una compuerta cuyo arreglo está en el árbol del consumidor
+se exige en rojo el día que sale, y regenerar este artefacto lo está— el banco
+`constitucion/pruebas/la-ventana-no-vuelve.test.mjs` pone rojo el PR del marco que
+declare otra fecha. El campo y el output `exigible_desde` siguen existiendo, con la
+misma fecha que `publicada`, y se retiran en v2. Lo que **no** existe es rama
+silenciosa de "este repo no aplica": el repo sin artefacto es exactamente el que hay
+que avisar.
 
 Límites declarados, en el encabezado del `action.yml` y acá: esto garantiza que el
 **texto** llegue íntegro y al día a la superficie que el agente carga, **no** que
@@ -862,7 +930,7 @@ distribución, no el de comportamiento. Solo cubre las superficies que el
 repositorio **declara**. Y Projects **no puede dogfoodear** este mecanismo: su
 `AGENTS.md` es la constitución del marco, no la de un proyecto, así que la
 evidencia son el banco de pruebas de `constitucion/pruebas/` —que sí corre en el
-CI de Projects— y la validación contra un consumidor real antes de mover `v1`.
+CI de Projects— y la validación contra un consumidor real antes de publicar la versión.
 
 ---
 
@@ -966,7 +1034,7 @@ corre en cada PR con `node --test` (Node 22, cero dependencias, como todo acá).
 no puede dogfoodear los checks que interrogan manifiestos de paquete: Projects no
 tiene ninguno, así que sobre este repo el censo de fuentes no verifica nada — el
 mismo límite declarado que el check de marcadores del scaffold. Sin ese banco,
-código no trivial llegaría a todos los consumidores de `@v1` sin haberse
+código no trivial llegaría a todos los consumidores sin haberse
 ejecutado nunca sobre un caso controlado.
 
 El job **deriva** qué corre del árbol: una action nueva con pruebas queda

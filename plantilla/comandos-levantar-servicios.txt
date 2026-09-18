@@ -30,10 +30,12 @@ donde conseguirlo: el lector se quedaba con el "command not found" y sin salida.
 PRIMERA VEZ EN ESTA MAQUINA (una sola vez por clon)
 ------------------------------------------------------------
 
-0. Instalar dependencias. Esto es lo que CREA pnpm-lock.yaml, que el andamio no
-   trae a proposito: un lockfile fija versiones exactas y no puede convivir con
-   los marcadores del andamio. Sale de aca, y desde el primer commit se
-   versiona (el CI corre `pnpm install --frozen-lockfile` y sin lockfile falla).
+0. Instalar dependencias. Respeta el pnpm-lock.yaml que el proyecto versiona
+   desde su primer commit: lo escribio su nacimiento, sea el arranque de
+   `projects init` o el paso de `personalizar.yml`, y el CI corre
+   `pnpm install --frozen-lockfile`, que sin el falla. De paso genera el
+   cliente de la capa de datos (el `postinstall` de api/package.json), asi que
+   `pnpm lint` y `pnpm typecheck` ya tienen los tipos que leen.
 
 pnpm install
 

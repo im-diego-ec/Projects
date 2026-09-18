@@ -175,19 +175,48 @@ function pathSinNode() {
   return bin;
 }
 
+/** El paso que trae el guard, ubicado por su propio nombre en el YAML: el ultimo `- name:`
+ *  antes de la primera linea con `command -v node`. */
+function pasoDelGuard(nombre) {
+  const lineas = readFileSync(join(DIR_ACTIONS, nombre, "action.yml"), "utf8").split(/\r?\n/);
+  return lineas
+    .slice(0, lineas.findIndex((l) => /command -v node/.test(l)))
+    .reverse()
+    .find((l) => /^\s*- name: /.test(l))
+    ?.replace(/^\s*- name: /, "");
+}
+
+// LOS PASOS QUE ESTE BANCO CORRE, POR SU NOMBRE. El caso de abajo los descubre solo —deriva
+// de cada action.yml el paso que trae el guard—, y por eso nunca los escribia: el censo de
+// pasos sin banco (`pruebas/marco-ci/cobertura-de-los-pasos.test.mjs`) busca el nombre de
+// cada paso como cadena literal en algun banco, y no encontraba estos cinco aunque este banco
+// los CORRE. La lista no reemplaza al descubrimiento: lo verifica. Si una action nueva trae
+// un guard, o uno se renombra, el caso siguiente se pone rojo hasta que la lista lo diga.
+const PASOS_CON_GUARD = {
+  "aviso-version": "Armar el mensaje desde el CHANGELOG",
+  "censo-fuentes": "Ningun archivo fuente fuera del alcance de la verificacion",
+  "cobertura-diff": "Cobertura de las lineas del cambio",
+  constitucion: "Constitucion del marco",
+  "guardrail-deltas": "Deltas de OpenSpec sin perdida de escenarios",
+};
+
+test("actions · el banco nombra cada paso con guard que corre, y son exactamente los que el arbol trae", () => {
+  const descubiertos = Object.fromEntries(
+    ACTIONS.filter((nombre) => comoResuelveNode(nombre) === "comprueba").map((nombre) => [nombre, pasoDelGuard(nombre)]),
+  );
+  assert.deepEqual(
+    descubiertos,
+    PASOS_CON_GUARD,
+    "los pasos con guard de node que el arbol trae no son los que PASOS_CON_GUARD nombra. Arreglo: actualiza la lista de este archivo con la action y el nombre exacto de su paso —es lo que le permite al censo de pasos saber que este banco lo corre—",
+  );
+});
+
 test("actions · el guard de node se pone rojo de verdad cuando node no esta", () => {
   const bin = pathSinNode();
   const conGuard = ACTIONS.filter((nombre) => comoResuelveNode(nombre) === "comprueba");
   for (const nombre of conGuard) {
     const ruta = join(DIR_ACTIONS, nombre, "action.yml");
-    const texto = readFileSync(ruta, "utf8");
-    // El paso que trae el guard, ubicado por su propio nombre en el YAML.
-    const paso = texto
-      .split(/\r?\n/)
-      .slice(0, texto.split(/\r?\n/).findIndex((l) => /command -v node/.test(l)))
-      .reverse()
-      .find((l) => /^\s*- name: /.test(l))
-      ?.replace(/^\s*- name: /, "");
+    const paso = pasoDelGuard(nombre);
     assert.ok(paso, `${nombre}: el paso que trae el guard no tiene name:, asi que no se puede extraer`);
     const script = scriptDelPaso(paso, ruta);
     const { exit, salida } = correrBash(script, {

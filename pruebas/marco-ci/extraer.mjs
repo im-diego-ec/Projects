@@ -15,7 +15,7 @@
 // eso el extractor tambien falla ruidoso: si un paso se renombra o pierde su
 // bloque "run:", esto tira y el banco se pone rojo en vez de dejar de probar en
 // silencio.
-import { readFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -32,10 +32,33 @@ export function scriptDelPaso(nombre, ruta = RUTA_WORKFLOW) {
     throw new Error(`no existe ningun paso llamado "${nombre}" en ${ruta}`);
   }
 
+  // La sangria del guion del paso pedido: es la de TODOS los pasos de su lista.
+  const sangriaDelPaso = lineas[inicio].length - lineas[inicio].replace(/^\s+/, "").length;
+
   let sangria = -1;
   let indiceRun = -1;
   for (let i = inicio + 1; i < lineas.length; i += 1) {
-    if (/^\s*- name: /.test(lineas[i])) break;
+    // EL LIMITE ES CUALQUIER PASO, CON NOMBRE O SIN EL, y la diferencia no es teorica. Cortar
+    // solo en `- name: ` se pasaba de largo cuando el paso siguiente arranca con `- id:`,
+    // `- uses:`, `- if:` o cualquier otra clave, y entonces este extractor devolvia el `run:` DEL
+    // SIGUIENTE como si fuera del paso pedido: el banco que lo pidio media el script de otro y
+    // salia verde. Lo midio Rigel el 2026-09-03 (commit c12f831 de alla); aca estaba latente
+    // porque ningun paso nombrado sin `run:` queda justo antes de uno sin nombre con `run:`.
+    //
+    // Y EL FIN DE LA LISTA TAMBIEN ES LIMITE: una linea con MENOS sangria que el guion (el job
+    // siguiente, otra clave del job) cierra la lista de pasos. Sin eso, el ultimo paso de un job
+    // sin `run:` se llevaba el primero del job de abajo. Los comentarios no cuentan: en YAML no
+    // cierran nada, y el encabezado de un job puede tener comentarios a cualquier sangria.
+    //
+    // La sangria se toma del propio paso pedido y no se fija en un numero: el mismo extractor
+    // lee marco-ci.yml, ci.yml y los workflows del andamio, y no tienen por que coincidir. Lo
+    // fija pruebas/marco-ci/extraer.test.mjs.
+    const linea = lineas[i];
+    if (linea.trim() !== "" && !/^\s*#/.test(linea)) {
+      const propia = linea.length - linea.replace(/^\s+/, "").length;
+      if (propia < sangriaDelPaso) break;
+      if (propia === sangriaDelPaso && /^\s*- /.test(linea)) break;
+    }
     const marca = lineas[i].match(/^(\s*)run: \|\s*$/);
     if (marca) {
       sangria = marca[1].length;
@@ -151,4 +174,208 @@ export function alfabetoDelPaso(programa, nombrePaso = "(programa)") {
     });
   if (pares.length === 0) throw new Error("el ALFABETO quedo vacio");
   return pares;
+}
+
+// ---------------------------------------------------------------------------
+// LOS PASOS DE UN ARCHIVO, TODOS, Y DONDE VIVEN LOS ARCHIVOS.
+//
+// POR QUE ESTO VIVE EN EL EXTRACTOR Y NO EN CADA BANCO QUE LO NECESITA. Dos bancos preguntan
+// por los pasos de los workflows: `cobertura-de-los-pasos.test.mjs` —cual tiene banco, cual es
+// deuda y cual no puede fallar— y `pruebas/docs/cobertura-de-requirements.test.mjs` —si un paso
+// que la pagina de cobertura publica como compuerta puede de verdad ponerse rojo—. Con un lector
+// en cada uno, el dia que discrepen una compuerta estaria "cubierta" para uno y "sin rojo" para
+// el otro. Es la doctrina del marco: el mismo predicado no se copia.
+//
+// Y POR QUE HACIA FALTA UN LECTOR NUEVO. El recorrido que tenia `cobertura-de-los-pasos` partia
+// de `run: |` y solo miraba marco-ci.yml: un paso `uses:`, un `run:` de una linea y cualquier
+// archivo que no fuera ese quedaban afuera sin que nada lo dijera (change `rojo-primero`).
+// ---------------------------------------------------------------------------
+
+const sangriaDe = (linea) => linea.length - linea.replace(/^\s+/, "").length;
+const esRelleno = (linea) => linea.trim() === "" || /^\s*#/.test(linea);
+/** Un escalar de YAML sin sus comillas y sin el comentario de cola. */
+const escalar = (valor) => {
+  const v = valor.trim();
+  if (/^".*"$|^'.*'$/.test(v)) return v.slice(1, -1);
+  return v.replace(/\s+#.*$/, "");
+};
+
+/**
+ * `continue-on-error` del JOB que contiene una lista `steps:`: es una clave HERMANA de `steps:`,
+ * con su misma sangria y dentro del mismo bloque. Con el modificador en el job, ningun paso del
+ * job puede poner la corrida en rojo, aunque ninguno lo declare.
+ */
+function continueOnErrorDelJob(lineas, indiceSteps, sangriaSteps) {
+  const buscar = (desde, paso) => {
+    for (let i = desde; i >= 0 && i < lineas.length; i += paso) {
+      if (esRelleno(lineas[i])) continue;
+      const propia = sangriaDe(lineas[i]);
+      if (propia < sangriaSteps) return null;
+      if (propia > sangriaSteps) continue;
+      const m = lineas[i].match(/^\s*continue-on-error:\s*(.+?)\s*$/);
+      if (m) return escalar(m[1]) === "false" ? null : { valor: escalar(m[1]), linea: i + 1, delJob: true };
+    }
+    return null;
+  };
+  return buscar(indiceSteps - 1, -1) ?? buscar(indiceSteps + 1, 1);
+}
+
+/**
+ * Todos los pasos de un workflow o de un `action.yml`, en el orden del archivo.
+ *
+ * Cada paso sale con:
+ *   linea            -> la linea (desde 1) del guion que lo abre
+ *   nombre, id       -> sus claves, o null
+ *   condicion        -> su `if:`, o null
+ *   run              -> "bloque" (`run: |`, `run: >`...), "linea" (`run: <comando>`) o null
+ *   textoRun         -> el comando, si el `run:` es de una linea
+ *   largo            -> las lineas no vacias del bloque `run:`
+ *   uses             -> la referencia sin comillas ni comentario, o null
+ *   continueOnError  -> { valor, linea, delJob } si el paso o su job lo declaran con un valor
+ *                       distinto de `false`; null si no. Una expresion `${{ }}` cuenta: puede
+ *                       valer true, y "puede no fallar" no es una compuerta
+ *   extraible        -> si `scriptDelPaso(nombre, ruta)` devuelve ESTE paso: nombre en la linea
+ *                       del guion, bloque `run:` y primera aparicion de ese nombre en el archivo
+ *                       (el extractor busca por nombre y se queda con la primera)
+ *
+ * SE RECORRE CADA LISTA `steps:` POR SANGRIA, no buscando `- name:`: un paso sin nombre —con
+ * solo `id:`, `uses:` o `run:`— es un paso igual, y un recorrido que arranca en los nombres no
+ * lo ve. Los comentarios no abren ni cierran nada.
+ */
+export function pasosDe(ruta) {
+  const lineas = readFileSync(ruta, "utf8").split(/\r?\n/);
+  const pasos = [];
+  for (let i = 0; i < lineas.length; i += 1) {
+    // EL CUERPO DE UN ESCALAR DE BLOQUE NO ES YAML: un `run: |` o un `description: |` pueden
+    // traer texto con forma de `steps:` y `- uses:` —un heredoc que imprime un workflow, un
+    // snippet para pegar— y eso no es un paso de nadie. Se saltea entero: todas las lineas con
+    // mas sangria que la clave que lo abre.
+    const bloque = lineas[i].match(/^(\s*)(-\s+)?[A-Za-z_][\w-]*:\s*[|>][-+0-9]*\s*(#.*)?$/);
+    if (bloque) {
+      const columna = bloque[1].length + (bloque[2] ?? "").length;
+      while (i + 1 < lineas.length && (lineas[i + 1].trim() === "" || sangriaDe(lineas[i + 1]) > columna)) i += 1;
+      continue;
+    }
+    const marca = lineas[i].match(/^(\s*)steps:\s*(#.*)?$/);
+    if (!marca) continue;
+    const sangriaSteps = marca[1].length;
+    const delJob = continueOnErrorDelJob(lineas, i, sangriaSteps);
+
+    // La sangria del guion la fija el primer item: YAML admite el guion a la misma columna que
+    // `steps:` o mas adentro, y los dos estilos existen.
+    let sangriaItem = -1;
+    let actual = null;
+    const cerrar = () => {
+      if (actual) pasos.push(actual);
+      actual = null;
+    };
+    for (let j = i + 1; j < lineas.length; j += 1) {
+      const linea = lineas[j];
+      if (esRelleno(linea)) continue;
+      const propia = sangriaDe(linea);
+      if (sangriaItem === -1) {
+        if (propia < sangriaSteps || !/^\s*- /.test(linea)) break;
+        sangriaItem = propia;
+      }
+      if (propia < sangriaItem) break;
+      let clave = null;
+      if (propia === sangriaItem) {
+        if (!/^\s*- /.test(linea)) break;
+        cerrar();
+        actual = {
+          linea: j + 1,
+          nombre: null,
+          id: null,
+          condicion: null,
+          run: null,
+          textoRun: null,
+          largo: 0,
+          uses: null,
+          lineaUses: null,
+          continueOnError: delJob,
+          lineaNombre: null,
+        };
+        clave = linea.slice(sangriaItem + 2).match(/^([A-Za-z_-]+):\s*(.*)$/);
+      } else if (propia === sangriaItem + 2) {
+        clave = linea.slice(propia).match(/^([A-Za-z_-]+):\s*(.*)$/);
+      }
+      if (!actual || !clave) continue;
+      const [, k, crudo] = clave;
+      if (k === "name") {
+        actual.nombre = escalar(crudo);
+        actual.lineaNombre = j + 1;
+      } else if (k === "id") actual.id = escalar(crudo);
+      else if (k === "if") actual.condicion = escalar(crudo);
+      else if (k === "uses") {
+        actual.uses = escalar(crudo);
+        actual.lineaUses = j + 1;
+      }
+      else if (k === "continue-on-error") {
+        const valor = escalar(crudo);
+        actual.continueOnError = valor === "false" ? null : { valor, linea: j + 1, delJob: false };
+      } else if (k === "run") {
+        const valor = escalar(crudo);
+        if (/^[|>][-+0-9]*$/.test(valor)) {
+          actual.run = "bloque";
+          for (let k2 = j + 1; k2 < lineas.length; k2 += 1) {
+            if (lineas[k2].trim() === "") continue;
+            if (sangriaDe(lineas[k2]) <= propia) break;
+            actual.largo += 1;
+          }
+        } else {
+          actual.run = "linea";
+          actual.textoRun = valor;
+          actual.largo = 1;
+        }
+      }
+    }
+    cerrar();
+  }
+
+  // Extraible: exactamente lo que `scriptDelPaso` va a encontrar si se le pide ese nombre.
+  for (const paso of pasos) {
+    const primera = paso.nombre === null ? -1 : lineas.findIndex((l) => l.trim() === `- name: ${paso.nombre}`);
+    paso.extraible = paso.run === "bloque" && primera === paso.linea - 1;
+  }
+  return pasos;
+}
+
+/**
+ * Los archivos donde puede vivir un paso: todo workflow bajo un `.github/workflows/` y todo
+ * `action.yml` del arbol, con la ruta relativa a la raiz y en `/`.
+ *
+ * SE DERIVAN RECORRIENDO EL ARBOL, NO DE UNA LISTA. La lista vieja era un solo archivo
+ * —marco-ci.yml—, y lo que el marco reparte en `plantilla/` y corre en cada consumidor no lo
+ * miraba nadie. Un workflow nuevo, o una action nueva, entran solos.
+ *
+ * Se saltean `.git`, `node_modules` y toda carpeta `pruebas/`: ahi viven FIXTURES —workflows y
+ * actions de juguete que los bancos escriben a proposito rotos— y censarlos seria exigirle banco
+ * a un caso de prueba.
+ *
+ * Y NO SE ENTRA A OTRO REPOSITORIO. Un worktree dentro del checkout (`.claude/worktrees/<rama>/`,
+ * que el .gitignore del marco ya contempla) trae una copia entera de los workflows: el censo de
+ * pasos sumaba los suyos y el veredicto dependia de la maquina (medido en la revision adversarial
+ * del porte: 63 pasos «sin estado» que no eran de este arbol). Es el UNICO recorrido del arbol
+ * que usan el censo de pasos y el lector del alcance de las actions
+ * (`pruebas/alcance-de-las-actions.mjs`), para que los dos no puedan discrepar sobre que arbol
+ * miran.
+ */
+export const esOtroRepositorio = (abs) => existsSync(join(abs, ".git"));
+
+export function superficies(raiz = RAIZ) {
+  const encontradas = [];
+  const recorrer = (relativa) => {
+    for (const entrada of readdirSync(join(raiz, relativa), { withFileTypes: true })) {
+      const hija = relativa === "" ? entrada.name : `${relativa}/${entrada.name}`;
+      if (entrada.isDirectory()) {
+        if ([".git", "node_modules", "pruebas"].includes(entrada.name)) continue;
+        if (esOtroRepositorio(join(raiz, hija))) continue;
+        recorrer(hija);
+      } else if (/(^|\/)action\.ya?ml$/.test(hija) || /(^|\/)\.github\/workflows\/[^/]+\.ya?ml$/.test(hija)) {
+        encontradas.push(hija);
+      }
+    }
+  };
+  recorrer("");
+  return encontradas.sort();
 }

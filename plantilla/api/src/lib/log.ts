@@ -7,10 +7,15 @@ import { AsyncLocalStorage } from "node:async_hooks";
  * raiz), y eso no es estetica: un log que no se puede filtrar por campo no
  * sirve para diagnosticar con el equipo despierto a las 3am.
  *
- * CONTRATO del que dependen las alarmas y la verificacion post-deploy:
- * - `nivel` y `msg` son reservados y siempre exactos: el filtro busca la
- *   subcadena "nivel":"fatal" / "nivel":"error" (JSON.stringify jamas mete
- *   espacios), asi que un contexto NO puede pisarlos — se asignan al final.
+ * CONTRATO para las alarmas y la verificacion post-deploy:
+ * - `nivel` y `msg` son reservados y siempre exactos: un contexto NO puede
+ *   pisarlos — se asignan al final.
+ *   HOY NINGUNA PIEZA LEE ESTE CAMPO: las alarmas y la verificacion posterior
+ *   al despliegue que lo leerian todavia no existen. Cuando existan, tienen que
+ *   leer el CAMPO `nivel` del JSON y NO buscar una subcadena: lo fija el
+ *   requirement «La verificación post-deploy entiende el formato del log» del
+ *   spec de observabilidad del marco, porque una subcadena cuenta como error a
+ *   una linea `info` cuyo mensaje dice "error".
  * - `fatal` se RESERVA para condiciones que matan el proceso; `error` alerta;
  *   lo rutinario (auth fallida, un servicio externo caido) es `warn`. La
  *   semantica de niveles es un contrato, no una preferencia de quien escribe.

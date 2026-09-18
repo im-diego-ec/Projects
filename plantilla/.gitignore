@@ -107,6 +107,14 @@ divergentes.txt
 # asi que no es del proyecto y no viaja en el primer commit.
 bitacora-del-arranque.txt
 
+# LO QUE LA CORRIDA TUVO QUE RODEAR. `projects init` deja registro-de-friccion.md
+# al lado de la bitacora, y por lo mismo: es de esa corrida, no del proyecto, y su
+# destino es el repositorio del marco (lo ofrece mandar como issue). El segundo es
+# lo que el asistente anota para el arranque cuando corren en dos pasos; el
+# arranque lo consume, y si una corrida falla queda para el reintento.
+registro-de-friccion.md
+.projects-friccion.json
+
 # Lockfile espurio: en un workspace pnpm el unico lockfile valido es el de la
 # raiz. Uno dentro de un paquete lo genera un `pnpm install` corrido ahi y hace
 # que local y CI resuelvan dependencias distinto. Se ignora en cualquier nivel

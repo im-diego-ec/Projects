@@ -39,8 +39,9 @@ name: Marco CI (reusable)
 #                   distribuye el marco, y terraform no se puede saltear porque no
 #                   tiene `if:`
 #
-# El proyecto consumidor NO copia estos jobs: los referencia. Un arreglo aca
-# arregla el CI de todos los repos a la vez.
+# El proyecto consumidor NO copia estos jobs: los referencia por version exacta.
+# Un arreglo aca le llega a cada repo como PR de bump de Dependabot, sin que
+# nadie copie nada: un solo arreglo, un PR por consumidor que alguien lee.
 #
 # ---------------------------------------------------------------------------
 # COMO LO CONSUME UN PROYECTO
@@ -54,9 +55,15 @@ name: Marco CI (reusable)
 #     pull_request:
 #
 #   # OBLIGATORIO. Un workflow reusable NUNCA puede pedir mas permisos que los
-#   # que le concede quien lo llama: si aca falta pull-requests:read, el job
-#   # "cambios" no puede listar los archivos del PR, cae al fail-open y el
-#   # carril rapido no actua nunca (incidente real del 2026-08-05).
+#   # que le concede quien lo llama, y este reusable DECLARA pull-requests: read
+#   # (en su encabezado y en el job "cambios"). Si el llamador no lo concede,
+#   # GitHub rechaza la corrida ENTERA: startup_failure, cero jobs, cero checks
+#   # y un mensaje que no nombra el permiso. No es un fail-open: es un PR sin
+#   # checks, y con ci-ok como check requerido, un PR que no se puede mergear.
+#   # (Medido en el upstream de este marco, corrida 33971175258 del 2026-09-05,
+#   # con un alcance declarado en el encabezado del reusable. El incidente del
+#   # 2026-08-05, anterior a este repo, si fue un fail-open; un reusable que
+#   # declara el permiso, como este desde su primer commit, ya no cae ahi.)
 #   permissions:
 #     contents: read
 #     pull-requests: read
@@ -73,10 +80,8 @@ name: Marco CI (reusable)
 #       #   # default: el job lo mide igual y lo imprime en un ::notice::. Declarado,
 #       #   # un arbol distinto es rojo. Se copia de esa corrida, no se inventa.
 #       #   huella_openspec: ""
-#       #   # Raices de Terraform de ESTE repo, separadas por espacios, y el ultimo
-#       #   # dia en que un hallazgo avisa en vez de detener.
+#       #   # Raices de Terraform de ESTE repo, separadas por espacios.
 #       #   raices_terraform: "infra infra-prod"
-#       #   ventana_terraform: "2026-09-30"
 #
 #     build_test:
 #       name: build-test
@@ -255,18 +260,19 @@ on:
         default: "infra infra-prod"
       ventana_terraform:
         description: >-
-          Ultimo dia (ISO, YYYY-MM-DD) en que un hallazgo del job `terraform`
-          AVISA en vez de detener. A partir del dia siguiente el mismo hallazgo
-          es rojo, sin que nadie toque este archivo: la gravedad se deriva del
-          reloj y no de un checklist. La ventana existe porque para casi todo
-          consumidor la primera corrida de este job es tambien la primera vez
-          que alguien mira sus .tf, asi que el plazo es para arreglar lo que
-          reporte, no para decidir si se mira. Moverla hacia adelante es
-          declarar una postergacion: queda escrita en el ci.yml del consumidor,
-          con autor y fecha, en vez de vivir en la cabeza de alguien.
+          SIN EFECTO, y se quita en v2. Hasta la 1.9.6 era el ultimo dia (ISO)
+          en que un hallazgo del job `terraform` avisaba en vez de detener, con
+          default 2026-09-30. La gravedad de ese job dejo de depender del reloj
+          (change la-ventana-se-cierra, decision D9 del PO): en toda la linea 1
+          un hallazgo AVISA, y desde v2 detiene, sin fecha. Sigue declarado solo
+          para no romper la llamada de quien lo pasa en su with:, porque pasar
+          un input que el reusable no declara es un error de la corrida entera.
+          Si llega con valor, el job lo dice con un ::notice:: y no hace nada
+          mas con el. Arreglo para el consumidor: sacarlo del with: antes de
+          subir a v2.
         type: string
         required: false
-        default: "2026-09-30"
+        default: ""
       runner:
         description: >-
           Runner para todos los jobs de marco. TIENE que ser Linux x86-64, y el
@@ -422,9 +428,13 @@ jobs:
     runs-on: ${{ inputs.runner }}
     # EL UNICO JOB DE ESTE ARCHIVO QUE PIDE MAS QUE contents: read, y lo pide por
     # job y no heredado del encabezado. pull-requests: read es lo que le permite
-    # LISTAR los archivos del PR por API; sin el la deteccion cae al fail-open y
-    # el carril rapido no actua nunca (incidente del 2026-08-05). contents: read
-    # es para el checkout del carril de push.
+    # LISTAR los archivos del PR por API; si ESTE bloque no lo pidiera (y el
+    # encabezado tampoco), la deteccion caeria al fail-open y el carril rapido no
+    # actuaria nunca (incidente del 2026-08-05). OJO, que es otro caso: si lo que
+    # falta es la CONCESION del llamador, no hay fail-open, hay startup_failure
+    # -la corrida entera no arranca-, porque este bloque lo declara. Ver el
+    # bloque OBLIGATORIO del encabezado. contents: read es para el checkout del
+    # carril de push.
     #
     # En un workflow REUSABLE este bloque es un techo de segunda instancia: lo que
     # llega no puede superar lo que concede el job que hace el `uses:` en el
@@ -546,7 +556,12 @@ jobs:
           echo "   (repositorio: ${GITHUB_REPOSITORY:-<sin GITHUB_REPOSITORY>} — el nombre no interviene en esta decision)"
           echo "es_distribuidor=${ES}" >> "${GITHUB_OUTPUT}"
 
-      - id: detectar
+      # CON NOMBRE, y no por prolijidad: el extractor del banco ubica los pasos por
+      # su linea "- name:", asi que sin nombre ningun banco podia correr el texto
+      # que decide el carril de cada consumidor. El id no cambia: las salidas del
+      # job lo leen por id. Banco: pruebas/marco-ci/deteccion-del-carril.test.mjs.
+      - name: Detectar el carril de docs
+        id: detectar
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
@@ -627,6 +642,26 @@ jobs:
             fi
           fi
 
+          # EL CARRIL EXIME A LA DEFINICION DEL PIPELINE, Y POR AHORA SOLO SE DICE.
+          # El default de rutas_carril_docs trae ^\.github/ entero, asi que un
+          # cambio que toca SOLO un workflow (o una action propia, o un script de
+          # CI) va por el carril rapido: el build-test del consumidor queda skipped
+          # y el check agregado sale verde sin haber ejecutado lo que el cambio
+          # modifica. Medido en el upstream de este marco: 9 PRs mergeados asi, 3
+          # tocando el workflow de despliegue. Cambiar el default cambia un
+          # comportamiento que nadie pidio y va con la linea v2; lo compatible es
+          # que el hueco deje de ser mudo, con el arreglo que el consumidor ya
+          # puede aplicar en su arbol. Se nombran los archivos NO markdown de un
+          # SUBDIRECTORIO de .github/: los sueltos de la raiz (CODEOWNERS,
+          # dependabot.yml) y la documentacion no definen la verificacion.
+          if [ "${SOLO_DOCS}" = "true" ]; then
+            { grep -E '^\.github/[^/]+/' files.txt || true; } | { grep -vE '\.md$' || true; } > pipeline-eximido.txt
+            if [ -s pipeline-eximido.txt ]; then
+              EXIMIDOS="$(head -n 5 pipeline-eximido.txt | paste -sd ',' - | sed 's/,/, /g')"
+              echo "::warning::este cambio va por el carril rapido (solo_docs=true) y toca archivos que definen el propio pipeline: ${EXIMIDOS}. El build-test de este repo se omite y el check agregado sale verde sin haber ejecutado lo que el cambio modifica. El default de rutas_carril_docs exime ^\.github/ entero, y cambiarlo va en la proxima version mayor del marco. Arreglo hoy, en tu ci.yml: pasale rutas_carril_docs al job que llama a marco-ci.yml con la lista del default, cambiando ^\.github/ por ^\.github/[^/]*$ (asi solo quedan en el carril los archivos sueltos de .github/)"
+            fi
+          fi
+
           echo "solo_docs=${SOLO_DOCS}" >> "$GITHUB_OUTPUT"
           echo "confiable=${CONFIABLE}" >> "$GITHUB_OUTPUT"
           echo "solo_docs=${SOLO_DOCS} confiable=${CONFIABLE}"
@@ -645,6 +680,26 @@ jobs:
     # Minimo real por job: clona el arbol del consumidor y corre dos lectores de
     # specs. No consulta ninguna API de GitHub, asi que no recibe el
     # pull-requests: read que si necesita el job "cambios".
+    #
+    # RE-AUDITADO el 2026-09-17 antes de estrenar "Estado experimental con fecha de
+    # veredicto", accion por accion y no por parecido con los pasos hermanos:
+    #
+    #   | accion del paso                            | permiso que necesita         |
+    #   | ------------------------------------------ | ---------------------------- |
+    #   | `[ -d openspec/changes ]`                  | contents: read (el checkout) |
+    #   | `readdirSync` de openspec/changes/         | contents: read (el checkout) |
+    #   | `readFileSync` de cada `.md` de un change  | contents: read (el checkout) |
+    #   | comparar dos cadenas de fecha              | ninguno                      |
+    #   | `console.log` de `::error::`               | ninguno: protocolo del runner |
+    #
+    # No hay llamada de red, no lee GITHUB_TOKEN, no invoca gh ni git y no escribe
+    # nada: el paso no agrega un solo permiso. La auditoria se escribe igual siendo el
+    # resultado "no hace falta nada", porque la leccion se repitio tres veces y las
+    # tres fue el mismo razonamiento ("este paso se parece al de al lado") sobre
+    # codigo que corre en el pipeline de todos los consumidores. Si maniana un paso
+    # de este job pide un permiso nuevo, pruebas/andamio/piso-del-reusable.test.mjs
+    # exige que el piso que el marco declara en sus tres archivos lo nombre, y
+    # pruebas/andamio/permisos-por-job.test.mjs que el bloque siga escrito.
     permissions:
       contents: read
     steps:
@@ -897,6 +952,208 @@ jobs:
           ls -la "${CLI}/node_modules/.bin" || true
           npx --yes --ignore-scripts "@fission-ai/openspec@${VERSION_OPENSPEC}" validate --all --strict
 
+      # UN CHANGE ACTIVO Y SIN ARCHIVAR *ES* EL ESTADO EXPERIMENTAL DEL MARCO: la
+      # propuesta existe, esta revisada, es citable y no es contrato. El mecanismo es
+      # correcto y tiene un modo de falla obvio, el ZOMBI: un change que nadie archiva
+      # ni descarta se queda ahi, envejece, y al anio siguiente nadie sabe si es una
+      # promesa o basura.
+      #
+      # Entonces un change que declara `experimental: true` declara TAMBIEN
+      # `veredicto_antes_de: AAAA-MM-DD`. Dos rojos y no uno: declararse experimental
+      # SIN fecha tambien falla, porque si no la puerta de escape es no poner la fecha.
+      # La fecha vence al TERMINAR el dia declarado: ese dia todavia es verde.
+      #
+      # ES INERTE PARA TODO LO DEMAS, y por eso es MINOR y no breaking: un change que
+      # no se declara experimental no ve este paso. Ningun repositorio que hoy pasa
+      # falla maniana por esta linea.
+      #
+      # Y ES DOGFOODEABLE SIN CONSUMIDOR: corre sobre `openspec/changes/` de cualquier
+      # repo, incluido el del marco, que lo ejecuta por ruta local en cada PR. Su
+      # primer sujeto fue `capa-descubrimiento`, que declaraba la fecha 2026-09-21 y
+      # ningun workflow la leia. Viene de Rigel 1.14.0 (commit 08f3b2e), adaptado en el
+      # change `el-experimental-caduca`: el lector de frontmatter descarta los
+      # comentarios de YAML, que en este repo van al final de los valores y con el
+      # lector original apagaban la declaracion en silencio. Banco:
+      # pruebas/marco-ci/caducidad-experimental.test.mjs.
+      - name: Estado experimental con fecha de veredicto
+        shell: bash
+        run: |
+          [ -d openspec/changes ] || {
+            echo "el repo no tiene openspec/changes/: nada que caducar"
+            exit 0
+          }
+
+          # El programa va inline por el mismo motivo que los pasos hermanos (un
+          # heredoc no puede cerrar dentro de un bloque de YAML indentado) y viaja
+          # entre comillas SIMPLES de shell: adentro no hay ni una comilla simple
+          # literal (se escribe \x27), y los $ de sus expresiones regulares son del
+          # lenguaje.
+          # shellcheck disable=SC2016
+          node -e '
+            const { readFileSync, readdirSync } = require("node:fs");
+            const { join } = require("node:path");
+
+            const escapar = (valor) =>
+              String(valor).replace(/%/g, "%25").replace(/\r/g, "%0D").replace(/\n/g, "%0A");
+
+            /** AAAA-MM-DD y ademas un dia que existe: 2026-13-01 tiene la forma y no la fecha. */
+            function esFecha(texto) {
+              if (!/^[0-9]{4}-[0-9]{2}-[0-9]{2}$/.test(texto)) return false;
+              const d = new Date(texto + "T00:00:00Z");
+              return !Number.isNaN(d.getTime()) && d.toISOString().slice(0, 10) === texto;
+            }
+
+            // La fecha entra por el entorno para que el banco sea determinista. El
+            // workflow NO la setea, asi que en una corrida real es el dia de hoy en UTC,
+            // el reloj del runner: un check de caducidad cuyo banco dependa del
+            // calendario se pone rojo solo, un martes cualquiera, por un motivo que no
+            // es el suyo.
+            const HOY = process.env.HOY_ISO || new Date().toISOString().slice(0, 10);
+            if (!esFecha(HOY)) {
+              console.log("::error title=Caducidad experimental::" + escapar("HOY_ISO no es una fecha AAAA-MM-DD: " + HOY));
+              process.exit(1);
+            }
+
+            /** El frontmatter de un .md, sin dependencias: el primer bloque entre ---.
+             *  Solo las claves de primer nivel. Las lineas de comentario se saltean y el
+             *  comentario al final de un valor se descarta: en este marco los
+             *  frontmatter los llevan, y tomar el valor crudo convertia
+             *  `experimental: true  # ver ...` en algo que no es `true`.
+             *
+             *  LA CLAVE SE NORMALIZA: sin comillas y en minusculas. La regla de abajo
+             *  -un valor que no se puede leer no se toma por falso en silencio- valia
+             *  para el valor y no para la clave, y `Experimental: true` o
+             *  `"experimental": true` (YAML valido los dos) dejaban el change leido
+             *  como NO experimental: no caducaba nunca y el paso decia que era inerte.
+             *  Y si la misma clave normalizada aparece dos veces con valores
+             *  distintos, los dos quedan juntos: el valor resultante no es ni un
+             *  booleano ni una fecha, y eso es rojo en vez de una eleccion a ciegas. */
+            function frontmatter(texto) {
+              const lineas = texto.replace(/^\uFEFF/, "").split(/\r?\n/);
+              if (lineas[0].trim() !== "---") return {};
+              let fin = -1;
+              for (let i = 1; i < lineas.length; i += 1) {
+                if (lineas[i].trim() === "---") { fin = i; break; }
+              }
+              if (fin < 0) return {};
+              const campos = {};
+              for (const linea of lineas.slice(1, fin)) {
+                if (/^\s*(#|$)/.test(linea)) continue;
+                const m = linea.match(/^(["\x27]?)([A-Za-z_][A-Za-z0-9_-]*)\1\s*:(.*)$/);
+                if (!m) continue;
+                const clave = m[2].toLowerCase();
+                const valor = m[3].replace(/\s+#.*$/, "").trim().replace(/^(["\x27])(.*)\1$/, "$2");
+                if (campos[clave] !== undefined && campos[clave] !== valor) {
+                  campos[clave] = campos[clave] + " y tambien " + valor;
+                } else {
+                  campos[clave] = valor;
+                }
+              }
+              return campos;
+            }
+
+            /** Los .md de un change, recursivo. Los enlaces simbolicos no se siguen. */
+            function artefactosDe(dir) {
+              const salida = [];
+              for (const entrada of readdirSync(dir, { withFileTypes: true })) {
+                const ruta = join(dir, entrada.name);
+                if (entrada.isDirectory()) salida.push(...artefactosDe(ruta));
+                else if (entrada.isFile() && entrada.name.endsWith(".md")) {
+                  salida.push({ ruta, campos: frontmatter(readFileSync(ruta, "utf8")) });
+                }
+              }
+              return salida;
+            }
+
+            const RAIZ = join("openspec", "changes");
+            // El archive/ no se mira: es historia inmutable, y mirarlo dejaria rojo
+            // para siempre a todo repo con un experimento cerrado.
+            const activos = readdirSync(RAIZ, { withFileTypes: true })
+              .filter((e) => e.isDirectory() && e.name !== "archive")
+              .map((e) => e.name)
+              .sort();
+
+            const problemas = [];
+            const vigentes = [];
+
+            for (const change of activos) {
+              const artefactos = artefactosDe(join(RAIZ, change));
+
+              // Un `experimental:` que no es booleano es rojo y no un salteo:
+              // `experimental: si` es alguien declarando el estado con otra palabra.
+              const raros = artefactos.filter(
+                (a) => a.campos.experimental !== undefined && !/^(true|false)$/i.test(a.campos.experimental)
+              );
+              if (raros.length) {
+                problemas.push(
+                  change + " declara experimental: " + raros[0].campos.experimental + " (" + raros[0].ruta + "), que no es un " +
+                    "booleano. Un valor que no se puede leer no se toma por falso en silencio. Arreglo: experimental: true " +
+                    "o experimental: false"
+                );
+                continue;
+              }
+
+              // Un change es experimental si CUALQUIERA de sus artefactos lo declara.
+              // No se exige que lo digan todos: el estado es del change, no del archivo.
+              const declara = artefactos.filter((a) => String(a.campos.experimental).toLowerCase() === "true");
+              if (declara.length === 0) continue;
+
+              const conFecha = artefactos.filter((a) => a.campos.veredicto_antes_de);
+              if (conFecha.length === 0) {
+                problemas.push(
+                  change + " se declara experimental (" + declara[0].ruta + ") y ningun artefacto suyo declara " +
+                    "veredicto_antes_de. Sin fecha el estado experimental no caduca nunca, que es como un change " +
+                    "se vuelve un zombi: nadie sabe si es una promesa o basura. Arreglo: agregar " +
+                    "veredicto_antes_de: AAAA-MM-DD al frontmatter, con la fecha en que el experimento tiene que " +
+                    "tener veredicto"
+                );
+                continue;
+              }
+
+              const malas = conFecha.filter((a) => !esFecha(a.campos.veredicto_antes_de));
+              if (malas.length) {
+                problemas.push(
+                  change + " declara veredicto_antes_de: " + malas[0].campos.veredicto_antes_de + " (" + malas[0].ruta +
+                    "), que no es una fecha AAAA-MM-DD que exista. Una fecha que no se puede comparar no caduca, y " +
+                    "lo no verificable es rojo y nunca exito mudo. Arreglo: escribirla como AAAA-MM-DD"
+                );
+                continue;
+              }
+
+              // La MAS TEMPRANA manda. Si dos artefactos discrepan, tomar la mas lejana
+              // dejaria que agregar un archivo con fecha nueva corriera el vencimiento
+              // sin que nadie lo decidiera. Correr la fecha es correrla en TODOS.
+              const vence = conFecha.map((a) => a.campos.veredicto_antes_de).sort()[0];
+              const tieneVeredicto = artefactos.some((a) => String(a.campos.artefacto).toLowerCase() === "veredicto");
+
+              if (tieneVeredicto) {
+                vigentes.push(change + " (veredicto escrito)");
+              } else if (vence < HOY) {
+                problemas.push(
+                  change + " se declaro experimental con veredicto_antes_de: " + vence + ", esa fecha ya paso (hoy " +
+                    HOY + ") y ningun artefacto suyo declara artefacto: veredicto. El experimento vencio sin " +
+                    "conclusion. Arreglo, y las tres salidas son legitimas: escribir el veredicto (un .md del change " +
+                    "con artefacto: veredicto en el frontmatter), correr la fecha con el motivo escrito en el " +
+                    "proposal y en TODOS los artefactos que la declaran, o descartar el change"
+                );
+              } else {
+                vigentes.push(change + " (vence " + vence + ")");
+              }
+            }
+
+            if (problemas.length) {
+              for (const p of problemas) console.log("::error title=Caducidad experimental::" + escapar(p));
+              process.exit(1);
+            }
+
+            if (vigentes.length === 0) {
+              console.log("ningun change activo se declara experimental: el paso es inerte");
+            } else {
+              console.log(vigentes.length + " change(s) experimental(es) con fecha de veredicto vigente o con veredicto escrito (hoy " + HOY + "):");
+              for (const v of vigentes) console.log("  " + v);
+            }
+          '
+
   # ---------------------------------------------------------------------------
   # EL GUARDRAIL DE DELTAS, EN SU PROPIO JOB Y CON LA MISMA PARTICION QUE LA
   # CONSTITUCION.
@@ -919,27 +1176,30 @@ jobs:
   # con la misma sonda —`cambios.outputs.es_distribuidor`, que mira ARCHIVOS y no
   # nombres— y la otra mitad de las dos vive en el ci.yml del marco, por ruta local.
   #
-  # EL @v1 DE ABAJO SIGUE SIENDO @v1, Y AHORA SE SABE POR QUE. El comentario viejo lo
-  # defendia con un motivo cierto MIENTRAS el paso corriera en el repo del marco: pinar
-  # la version que se esta cortando pone en rojo al propio PR que la corta, porque el
-  # tag se crea despues del merge (medido el 2026-08-22: "Unable to resolve action
-  # ...@v1.4.2"). Con el job salteado en el distribuidor esa ref ya no se resuelve
-  # nunca durante el CI del marco, asi que ESA imposibilidad desaparecio: el pin exacto
-  # ya es tecnicamente posible, igual que en actions/constitucion.
+  # VERSION EXACTA, COMO TODAS LAS DEMAS, y por que tardo. Esta linea fue la ultima
+  # invocacion interna del marco por el tag mayor movil. Mientras la action fue un PASO
+  # del job openspec, el pin exacto era imposible: pinar la version que se esta cortando
+  # ponia en rojo al propio PR que la corta, porque el tag se crea despues del merge
+  # (medido el 2026-08-22: "Unable to resolve action ...@v1.4.2"). Desde la 1.8.0 es
+  # este job, salteado en el distribuidor, asi que durante el CI del marco esta ref no
+  # se resuelve NUNCA y el pin exacto es posible, igual que en actions/constitucion. Se
+  # hizo en el change guardrail-deltas-por-version-exacta.
   #
-  # No se hace aca porque lo que queda no es un problema de este archivo: este es el
-  # ULTIMO `@v1` vivo del marco, y retirarlo es una decision de DISTRIBUCION —el paso
-  # del release que mueve el tag, los consumidores que todavia pinan @v1, y las
-  # superficies de prosa que afirman que v1 sigue vivo, entre ellas la asercion
-  # "v1 sigue vivo donde el marco dice que vive" de pruebas/andamio/pinado.test.mjs,
-  # que se pone ROJA si esta linea se pina—. Mover un paso de job no autoriza a retirar
-  # un canal de distribucion de paso.
+  # LO QUE CERRO: un consumidor pinado a marco-ci.yml@vX.Y.Z recibia este workflow en
+  # X.Y.Z y esta action de donde apuntara el tag movil, sin PR. Su pin exacto era una
+  # media verdad y el no podia arreglarlo: la linea no vive en su arbol. Desde este
+  # cambio, lo que corre es exactamente lo que el pin dice.
   #
-  # EL RESIDUO QUE SIGUE VIVO, dicho entero: un consumidor pinado a marco-ci.yml@vX.Y.Z
-  # recibe ESTE workflow en X.Y.Z y esta action en la ultima 1.x. Esta acotado a UNA
-  # action —un verificador de deltas, no logica de producto— y el banco del pinado lo
-  # exceptua por lista, con nombre y archivo, para que una segunda invocacion interna
-  # no herede la excepcion en silencio.
+  # LO QUE NO CERRO, dicho entero: las versiones YA PUBLICADAS hasta la 1.9.6 llevan
+  # adentro la linea vieja, y un consumidor pinado a una de ellas sigue resolviendo el
+  # tag movil hasta que mergee su PR de bump. Si el release lo sigue moviendo o no es
+  # una decision de distribucion que queda escrita en el paso 5 de la skill del release.
+  #
+  # Y LA PARTICION QUE LO HACE POSIBLE NO DEPENDE DE QUE ALGUIEN SE ACUERDE:
+  # pruebas/andamio/refs-propias.test.mjs EVALUA el `if` de todo job con un `uses:`
+  # remoto propio y se pone rojo si corre en el repo del marco; y
+  # pruebas/andamio/pinado.test.mjs exige que esta linea sea la version mas alta del
+  # CHANGELOG, asi que el paso 1 del release la mueve junto con las demas.
   #
   # EL COSTO, declarado: un job mas por corrida en cada consumidor (un checkout, un
   # setup-node y un lector de specs; el techo son 10 minutos). Se paga a cambio de que
@@ -951,11 +1211,10 @@ jobs:
   # El script viaja DENTRO de la action, asi que ningun proyecto vendora una copia que
   # se pueda quedar vieja.
   #
-  # Y EL RESTO DE LOS `uses:` DEL MARCO NO DEPENDEN DE QUE ALGUIEN SE ACUERDE:
+  # Y NINGUN `uses:` DEL MARCO DEPENDE DE QUE ALGUIEN SE ACUERDE:
   # pruebas/andamio/pinado.test.mjs exige que todo `uses:` del marco sea igual a la
-  # version mas alta del CHANGELOG, y la unica excepcion es esta linea, declarada por
-  # lista con archivo y action — una segunda invocacion interna con @v1 pone rojo ese
-  # banco en vez de heredar la excepcion.
+  # version mas alta del CHANGELOG, sin lista de excepciones: una invocacion interna
+  # por tag movil pone rojo ese banco, y el arreglo es particionar su job, no eximirla.
   # ---------------------------------------------------------------------------
   deltas:
     name: deltas-openspec
@@ -987,7 +1246,7 @@ jobs:
         with: { node-version: "${{ inputs.version_node }}" }
 
       - name: Deltas de OpenSpec sin perdida de escenarios
-        uses: im-diego-ec/Projects/actions/guardrail-deltas@v1
+        uses: im-diego-ec/Projects/actions/guardrail-deltas@v1.9.6
         with:
           instalar-node: "false"
 
@@ -1284,7 +1543,7 @@ jobs:
 
           "${TMP}/actionlint" --version
           if ! "${TMP}/actionlint" -color; then
-            echo "::error::las definiciones de pipeline no pasan la validacion (archivo y linea, arriba). Reproducilo local instalando actionlint ${VERSION_ACTIONLINT} y corriendolo en la raiz del repo"
+            echo "::error::las definiciones de pipeline no pasan la validacion (archivo y linea, arriba). Reproducilo local con la misma version (${VERSION_ACTIONLINT}): desde la raiz del repo, node <clon-de-Projects>/herramientas/actionlint-local.mjs baja la version que declara ese clon, verifica su checksum y la corre con el shellcheck de tu PATH (sin shellcheck no revisa los bloques run:, y lo dice). En el repo del marco: node herramientas/actionlint-local.mjs"
             exit 1
           fi
           echo "definiciones de pipeline validas"
@@ -2558,15 +2817,132 @@ jobs:
             exit 1
           fi
 
-          # Las cuatro metricas y all:true. Sin all:true el reporte solo trae
-          # los archivos que alguna prueba importo y el total sube por omision:
-          # el umbral quedaria puesto sin medir el codigo que a nadie molesta.
-          FALTAN=()
-          for CLAVE in "lines: minimo" "functions: minimo" "branches: minimo" "statements: minimo" "all: true"; do
-            if ! grep -qF "${CLAVE}" "${BASE_VITEST}"; then FALTAN+=("${CLAVE}"); fi
-          done
-          if [ ${#FALTAN[@]} -gt 0 ]; then
-            echo "::error file=${BASE_VITEST}::a la configuracion de cobertura del andamio le falta: ${FALTAN[*]}. Las cuatro metricas y all:true son lo que hace que el umbral mida algo"
+          # Las cuatro metricas y el ALCANCE declarado (include:). Sin alcance el
+          # reporte solo trae los archivos que alguna prueba importo y el total
+          # sube por omision: el umbral quedaria puesto sin medir el codigo que a
+          # nadie molesta.
+          #
+          # SE LEEN EN CODIGO, NO EN COMENTARIOS, y esa fue la primera correccion.
+          # Este paso exigia la cadena "all: true" con un grep sobre el archivo
+          # entero. vitest 3 retiro coverage.all (la 5 la ignora sin aviso) y el
+          # andamio la saco de su config; desde entonces la cadena aparecia SOLO en
+          # el comentario que explica que la opcion ya no existe, asi que el paso
+          # daba VERDE leyendo prosa. Borrar el include: -lo que de verdad sostiene
+          # el total- lo dejaba verde igual. Ver pruebas/marco-ci/umbral-del-andamio.test.mjs
+          # y pruebas/marco-ci/compuertas-de-estructura.test.mjs (change rojo-primero).
+          #
+          # Y EL ALCANCE TIENE QUE TENER ALGO ADENTRO, que fue la segunda (hallazgo
+          # FO-H2 de la revision adversarial del porte). El filtro era por linea y
+          # buscaba "include: [": lo cumplian una lista VACIA, la misma cadena dentro
+          # de un template string y cualquier linea en medio de un comentario de
+          # bloque sin asteriscos. Ahora un lector de node recorre el archivo como
+          # JavaScript: saca los comentarios de linea y de bloque, reemplaza el
+          # contenido de cada template string por un marcador, y recien ahi exige
+          # las cuatro metricas atadas a `minimo` y un include cuyo primer elemento
+          # sea una cadena no vacia.
+          #
+          # Y TIENE QUE SER EL DE `coverage`, que fue la tercera (hallazgo FO-S8 de
+          # la revision adversarial del carril rojo-primero). `test.include` elige
+          # que pruebas corren, no que codigo entra al calculo, y el texto
+          # `include:` lo tenia igual. El lector aisla el objeto `coverage: { ... }`
+          # y busca las metricas adentro y el include en su primer nivel; un numero
+          # fijo en una metrica (`branches: 80`) no esta atado al minimo que se le
+          # pasa, cumple el de hoy y no sube cuando un paquete pide mas.
+          #
+          # SE LEE, NO SE IMPORTA. Importar la config daria el valor efectivo, pero
+          # EJECUTARIA codigo del arbol, y bajo pull_request_target este job trae el
+          # head del PR: el marco lee el codigo del repo, no lo ejecuta (ver el
+          # encabezado del job cambios). El carril rojo-primero propuso cargar el
+          # modulo y mirar lo que coberturaDelMarco() devuelve; la integracion del
+          # porte se quedo con el lector por esa promesa, y de aquella propuesta
+          # conserva el rojo de "una base que no carga": node --check PARSEA el
+          # archivo sin ejecutarlo. Limite declarado del lector: no entiende
+          # expresiones regulares literales; una que contenga una comilla o un //
+          # desalinea la lectura. El andamio no escribe ninguna en este archivo.
+          if ! command -v node > /dev/null 2>&1; then
+            echo "::error::no hay 'node' en el PATH y sin el no se puede leer la configuracion de cobertura del andamio. Esto es un fallo DEL MARCO, no de tu repo: el job higiene de marco-ci.yml instala node con actions/setup-node y la version que declara el input version_node, asi que si falta es que ese paso no corrio"
+            exit 1
+          fi
+          if ! CARGA="$(node --check "${BASE_VITEST}" 2>&1)"; then
+            echo "::error file=${BASE_VITEST}::no se pudo cargar ${BASE_VITEST} para leer lo que declara: $(printf '%s\n' "${CARGA}" | head -n 3 | tr '\n' ' '). Un archivo que no carga no reparte ningun umbral. Arreglo: que el modulo sea JavaScript valido (se comprueba con node --check, que lo parsea sin ejecutarlo)"
+            exit 1
+          fi
+          # shellcheck disable=SC2016
+          if ! FALTAN="$(node -e '
+            const { readFileSync } = require("node:fs");
+            const ruta = process.argv[1];
+            let fuente;
+            try {
+              fuente = readFileSync(ruta, "utf8");
+            } catch (e) {
+              console.log("no se pudo leer " + ruta + " (" + e.message + ")");
+              process.exit(1);
+            }
+            // La comilla simple va como \u0027: el programa viaja entre comillas
+            // simples de shell. El contenido de cada cadena se tapa con x (los
+            // espacios quedan): asi una llave o un "coverage:" escritos DENTRO de
+            // una cadena no se leen como codigo, y una cadena vacia o de puros
+            // espacios se sigue distinguiendo de una con algo adentro.
+            const SIMPLE = "\u0027";
+            let codigo = "";
+            for (let i = 0; i < fuente.length; ) {
+              const c = fuente[i];
+              const d = fuente[i + 1];
+              if (c === "/" && d === "/") {
+                while (i < fuente.length && fuente[i] !== "\n") i += 1;
+                continue;
+              }
+              if (c === "/" && d === "*") {
+                const cierre = fuente.indexOf("*/", i + 2);
+                const hasta = cierre < 0 ? fuente.length : cierre + 2;
+                codigo += fuente.slice(i, hasta).replace(/[^\n]/g, " ");
+                i = hasta;
+                continue;
+              }
+              if (c === "\"" || c === SIMPLE) {
+                let j = i + 1;
+                while (j < fuente.length && fuente[j] !== c && fuente[j] !== "\n") j += fuente[j] === "\\" ? 2 : 1;
+                codigo += c + fuente.slice(i + 1, j).replace(/\S/g, "x") + fuente.slice(j, j + 1);
+                i = j + 1;
+                continue;
+              }
+              if (c === "`") {
+                let j = i + 1;
+                while (j < fuente.length && fuente[j] !== "`") j += fuente[j] === "\\" ? 2 : 1;
+                codigo += j > i + 1 ? "\"T\"" : "\"\"";
+                i = j + 1;
+                continue;
+              }
+              codigo += c;
+              i += 1;
+            }
+            // El objeto coverage: todo lo que cuelga de el, y aparte su primer
+            // nivel (con los objetos anidados tapados), que es donde vive include.
+            let cobertura = "";
+            let primerNivel = "";
+            const abre = /\bcoverage\s*:\s*\{/.exec(codigo);
+            if (abre) {
+              let prof = 0;
+              for (let i = abre.index + abre[0].length; i < codigo.length; i += 1) {
+                const c = codigo[i];
+                if (c === "}" && prof === 0) break;
+                if (c === "{") prof += 1;
+                if (c === "}") prof -= 1;
+                cobertura += c;
+                primerNivel += prof === 0 && c !== "}" ? c : " ";
+              }
+            }
+            const faltan = [];
+            for (const metrica of ["lines", "functions", "branches", "statements"]) {
+              if (!new RegExp("\\b" + metrica + "\\s*:\\s*minimo\\b").test(cobertura)) faltan.push(metrica + ": minimo");
+            }
+            if (!/\binclude\s*:\s*\[\s*(["\x27])\s*[xT]/.test(primerNivel)) faltan.push("include:");
+            if (faltan.length) {
+              console.log(faltan.join(" "));
+              process.exit(1);
+            }
+          ' "${BASE_VITEST}")"; then
+            echo "::error file=${BASE_VITEST}::a la configuracion de cobertura del andamio le falta: ${FALTAN}. Tiene que estar en el objeto coverage y en codigo, no en comentarios ni en texto: las cuatro metricas atadas al minimo que se le pasa y el alcance declarado (coverage.include, con al menos un patron) son lo que hace que el umbral mida algo; un include de otra clave, como test.include, elige pruebas y no codigo. La opcion all: true NO es el arreglo: vitest 3 la retiro y la 5 la ignora sin aviso"
             exit 1
           fi
 
@@ -3482,6 +3858,31 @@ jobs:
                 const quien = cruda && typeof cruda.aprobado_por === "string" ? cruda.aprobado_por.trim() : "";
                 const fecha = cruda && typeof cruda.fecha === "string" ? cruda.fecha.trim() : "";
                 if (!permiso || !motivo) continue;
+                // UNA ENTRADA ANULA UNA SOLA COSA. Si nombra ademas una `regla`, la
+                // action la rechaza (desvio-ambiguo) y este paso la absorbia en
+                // silencio: el mismo "rojo por un camino y verde por el otro" que este
+                // bloque vino a cerrar, sin aviso. Lo encontro el banco que ata los dos
+                // lectores, el 2026-09-17.
+                //
+                // Y NO ABSORBE, desde el dia que sale. El arreglo cabe en el repo del
+                // consumidor (partir la entrada en dos), asi que por la politica de
+                // compuertas del marco no se estrena avisando. Y no le cambia el color a
+                // ningun repo que hoy pase: la action de la constitucion ya da esta
+                // entrada por ERROR. El permiso queda sin desvio y sale como cualquier
+                // hallazgo, con la severidad de su fuente.
+                const regla = cruda && typeof cruda.regla === "string" ? cruda.regla.trim() : "";
+                if (regla) {
+                  console.log(
+                    "::warning file=" + escapar(RUTA_DESVIOS) + ",title=Desvio de permiso ambiguo::" +
+                      escapar(
+                        "el desvio de \"" + permiso + "\" nombra ademas la regla \"" + regla + "\", y una entrada anula UNA cosa: " +
+                          "si no, el motivo escrito deja de decir de que es. La action de la constitucion ya lo da por ERROR " +
+                          "(desvio-ambiguo), y este paso tampoco lo toma: NO absorbe, asi que el permiso sale abajo como " +
+                          "hallazgo sin desvio. Arreglo: partilo en dos entradas, una con la regla y otra con el permiso."
+                      )
+                  );
+                  continue;
+                }
                 // DOS LECTORES DEL MISMO ARCHIVO, Y HASTA ACA PEDIAN COSAS DISTINTAS.
                 // `actions/constitucion/constitucion.mjs` exige motivo + aprobado_por +
                 // fecha AAAA-MM-DD y emite ::error:: si falta cualquiera. Este paso
@@ -3496,23 +3897,28 @@ jobs:
                 // saldria rojo sin haberlo pedido: por la regla de AGENTS.md eso se
                 // estrena avisando y se endurece en la mayor siguiente. El desvio
                 // SIGUE absorbiendo; lo que cambia es que ahora se ve.
-                // LA FECHA SE VALIDA COMO LA VALIDA LA ACTION, no solo por su forma.
-                // `constitucion.mjs` usa `esFecha`, que ademas exige que la fecha
-                // EXISTA. Con la forma sola, "2026-13-45" daba ::error:: por un
-                // camino y pasaba MUDO por este: los dos lectores seguian
-                // divergiendo justo en el caso que este aviso vino a cerrar.
-                const fechaReal =
-                  /^[0-9]{4}-[0-9]{2}-[0-9]{2}$/.test(fecha) &&
-                  !Number.isNaN(Date.parse(fecha)) &&
-                  new Date(fecha).toISOString().slice(0, 10) === fecha;
-                if (!quien || !fechaReal) {
+                // LA FECHA SE VALIDA COMO LA VALIDA LA ACTION, y ahora es literal: el
+                // mismo predicado que `esFecha` de `constitucion.mjs` (forma AAAA-MM-DD
+                // y que Date.parse no de NaN). Con la forma sola, "2026-13-45" daba
+                // ::error:: por un camino y pasaba MUDO por este. Y la correccion de
+                // eso se paso de largo: exigia ademas que la fecha EXISTIERA, creyendo
+                // que eso hacia la action, y la action no lo hace (Date.parse acepta el
+                // 30 de febrero). Con "2026-02-30" este aviso decia "la action ya lo da
+                // por ERROR" y la action no daba nada. Lo encontro el banco que ata los
+                // dos lectores por comportamiento
+                // (pruebas/marco-ci/desvio-de-permiso-una-sola-norma.test.mjs), que es
+                // el que pone rojo la proxima divergencia. Exigir que la fecha exista es
+                // un endurecimiento de los DOS lectores a la vez, y va con la mayor
+                // siguiente.
+                const fechaValida = /^[0-9]{4}-[0-9]{2}-[0-9]{2}$/.test(fecha) && !Number.isNaN(Date.parse(fecha + "T00:00:00Z"));
+                if (!quien || !fechaValida) {
                   // SE NOMBRAN LAS DOS FALTAS CUANDO FALTAN LAS DOS. Decia solo la
                   // primera, asi que quien completaba el aprobador volvia a recibir
                   // el mismo aviso por la fecha: dos viajes de CI para un arreglo
                   // que se podia hacer de una.
                   const faltantes = [];
                   if (!quien) faltantes.push("no dice quien lo aprobo");
-                  if (!fechaReal) faltantes.push("no tiene fecha AAAA-MM-DD valida");
+                  if (!fechaValida) faltantes.push("no tiene fecha AAAA-MM-DD valida");
                   const falta = faltantes.join(" y ");
                   console.log(
                     "::warning file=" + escapar(RUTA_DESVIOS) + ",title=Desvio de permiso incompleto::" +
@@ -3896,7 +4302,7 @@ jobs:
         # La version que el consumidor pidio, no la que traiga la imagen del runner:
         # este job leia manifiestos con un node que nadie eligio.
         with: { node-version: "${{ inputs.version_node }}" }
-      # Version exacta, no @v1: ver el motivo largo en el paso de deltas de OpenSpec.
+      # Version exacta, como la de guardrail-deltas: ver el motivo largo en el job deltas.
       - name: Constitucion del marco cableada
         uses: im-diego-ec/Projects/actions/constitucion@v1.9.6
         with:
@@ -3949,16 +4355,29 @@ jobs:
   # ::notice:: en vez de dejar el hueco callado. Ver la rama por evento del paso
   # de abajo y el bloque PULL_REQUEST_TARGET del encabezado del job cambios.
   #
-  # VENTANA DE GRACIA, derivada del reloj y no de un checklist: hasta el dia que
-  # diga el input `ventana_terraform` un hallazgo AVISA; a partir del siguiente
-  # detiene. Es lo que hace que este job entre en modo aviso para todo el mundo sin
-  # depender de que alguien lo apague despues.
+  # LA GRAVEDAD SALE DE LA LINEA MAYOR, NO DEL RELOJ. Hasta la 1.9.6 se derivaba
+  # comparando el dia de la corrida con el input `ventana_terraform` (default
+  # 2026-09-30): avisaba hasta esa fecha y detenia desde el dia siguiente, en el
+  # pipeline de cada consumidor y sin PR de bump de por medio. La decision D9 del
+  # PO (change la-ventana-se-cierra) la cambio: en TODA la linea 1 un hallazgo
+  # AVISA, el endurecimiento queda anunciado para v2 y el input queda sin efecto
+  # hasta que v2 lo quite. El motivo tiene nombre: uno de los tres hallazgos, el
+  # binario ausente, NO se arregla en el arbol del consumidor (lo arregla el
+  # setup-terraform pinado que este job todavia no lleva, ver abajo), y la
+  # decision D1 manda que un arreglo fuera del arbol del consumidor vaya en aviso
+  # o se trate como breaking.
+  #
+  # La gravedad la fija el env GRAVEDAD_TERRAFORM del paso. NO es un input: la
+  # decide la version que el consumidor pina, no el consumidor. Y lo que evita que
+  # el aviso sea perpetuo no es una fecha sino un banco:
+  # pruebas/andamio/terraform-en-ci.test.mjs la ata al CHANGELOG, asi que el PR
+  # que publique la 2.0.0 se pone rojo si este paso sigue en `warning` o si
+  # `ventana_terraform` sigue declarado. Y en la linea 1 se pone rojo al reves: si
+  # alguien lo endurece antes (breaking) o quita el input (breaking).
   #
   # EL BINARIO AUSENTE ES UN CASO DE FALLO, NO UN CASO NEUTRO, y comparte la misma
-  # ventana. "No pude verificar" no es "verifique y esta bien": avisar para siempre
-  # cuando falta el binario convierte este job en un verde perpetuo, y bastaria con
-  # que la imagen del runner dejara de traer terraform para que dejara de verificar
-  # sin que nadie se entere.
+  # gravedad. "No pude verificar" no es "verifique y esta bien": en la linea 1 se
+  # anuncia con un ::warning:: que dice de quien es el defecto, y desde v2 detiene.
   #
   # LO QUE FALTA PARA CERRAR EL LIMITE DE RAIZ, y ya NO es el SHA: el binario sale
   # HOY de la imagen del runner. Lo que lo garantiza es un
@@ -3983,33 +4402,25 @@ jobs:
   # el SHA de arriba ya resuelto. Mientras ese paso no exista, la rama "no hay
   # binario" de abajo es la que sostiene la promesa, y por eso no es neutra.
   #
-  # LA COPIA DEL ANDAMIO SIGUE EN PIE, A PROPOSITO Y NO POR OLVIDO. El mismo paso
-  # vive todavia inline en plantilla/.github/workflows/ci.yml, y su banco
-  # (pruebas/andamio/terraform-en-ci.test.mjs) lo EXTRAE de ahi por nombre: borrarlo
-  # sin tocar el banco lo pone rojo. Retirarlo es un cambio de dos archivos que no
-  # es este, y el comando que dice exactamente que hay que mover es:
-  #   grep -n 'Formato y validez de las raices de Terraform' plantilla/.github/workflows/ci.yml pruebas/andamio/terraform-en-ci.test.mjs
-  # Mientras las dos copias convivan, un repo del andamio verifica sus raices dos
-  # veces: cuesta segundos y no cambia ningun veredicto.
+  # LA COPIA DEL ANDAMIO SE RETIRO (change la-ventana-se-cierra). El mismo paso
+  # vivia inline en el job build_test de plantilla/.github/workflows/ci.yml, con
+  # su propia fecha (VENTANA_TERRAFORM: "2026-09-30" en su env) y ya divergido de
+  # este: sin la guarda de raices vacias, sin el recorte bajo pull_request_target,
+  # y salteado justo en los PRs que solo tocan infra/ (build_test no corre en el
+  # carril de docs). Su gravedad, ademas, no tenia linea mayor que la endureciera:
+  # el andamio se copia una vez y despues es del proyecto. El ci.yml del andamio
+  # llama a este reusable, y este job mira las mismas raices por default. El banco
+  # impide que la copia vuelva (caso «el andamio NO trae una segunda copia»).
   #
-  # ESTE PASO TODAVIA NO TIENE BANCO PROPIO, Y EL CHECK QUE VIGILA ESO LO DA POR
-  # CUBIERTO POR COLISION DE NOMBRE. Queda escrito aca porque es lo unico que se
-  # puede hacer desde este archivo, y porque un hueco que no esta escrito se
-  # redescubre a mano una auditoria por vez.
-  # `pruebas/marco-ci/cobertura-de-los-pasos.test.mjs` pregunta si ALGUN banco
-  # MENCIONA el nombre del paso; el banco de la copia del andamio menciona este
-  # mismo nombre porque la copia se llama igual, pero extrae su texto de
-  # plantilla/.github/workflows/ci.yml, que es otro archivo. O sea que el verde
-  # que hoy trae este paso lo compro esa coincidencia y no un caso que lo haya
-  # corrido: ninguna de sus ramas —ventana con forma invalida, raices declaradas
-  # vacias, sin raices en el arbol, sin binario, fmt rojo, validate rojo, el
-  # recorte por `pull_request_target`, y las dos gravedades de cada una— la
-  # ejercita un caso commiteado. La forma de verlo, sin creerle a este comentario:
-  #   node --test pruebas/marco-ci/cobertura-de-los-pasos.test.mjs
-  #   grep -n 'Formato y validez de las raices de Terraform' pruebas/andamio/terraform-en-ci.test.mjs
-  # y el arreglo es un banco propio en pruebas/marco-ci/ que extraiga ESTE paso de
-  # ESTE archivo —pruebas/marco-ci/extraer.mjs ya extrae por nombre sobre
-  # RUTA_WORKFLOW— y le corra las ramas con un `terraform` falso en el PATH.
+  # ESTE PASO TIENE BANCO, Y ES ESTE: pruebas/andamio/terraform-en-ci.test.mjs
+  # extrae ESTE paso de ESTE archivo (scriptDelPaso sobre RUTA_WORKFLOW) y le corre
+  # todas sus ramas con un `terraform` falso en el PATH y las dos gravedades: sin
+  # raices, raices declaradas vacias, sin binario, fmt rojo, validate rojo, el
+  # recorte por `pull_request_target`, el input ventana_terraform sin efecto, una
+  # gravedad invalida y el dia de la corrida. Hasta el change la-ventana-se-cierra
+  # ese banco extraia la copia del andamio, y el censo de
+  # pruebas/marco-ci/cobertura-de-los-pasos.test.mjs daba este paso por cubierto por
+  # COLISION de nombre: la mencion era de otro archivo. Ya no.
   # ---------------------------------------------------------------------------
   terraform:
     name: terraform
@@ -4039,22 +4450,41 @@ jobs:
         shell: bash
         env:
           RAICES_DECLARADAS: ${{ inputs.raices_terraform }}
+          # SIN EFECTO en la linea 1: se lee solo para avisarle a quien lo pasa que
+          # sobra. Se quita en v2.
           VENTANA_TERRAFORM: ${{ inputs.ventana_terraform }}
+          # La gravedad de un hallazgo, por LINEA MAYOR y no por reloj: `warning` en
+          # toda la 1.x (decision D9), `error` desde v2. No es un input. La ata al
+          # CHANGELOG pruebas/andamio/terraform-en-ci.test.mjs: el PR que publique la
+          # 2.0.0 se pone rojo si esto sigue en warning.
+          GRAVEDAD_TERRAFORM: warning
           EVENTO: ${{ github.event_name }}
         run: |
           set -euo pipefail
 
-          # La ventana se valida ANTES de usarse. Comparar fechas ISO como texto
-          # ordena igual que el calendario, pero solo si las dos SON fechas ISO: un
-          # valor con cualquier otra forma haria que la comparacion decidiera al azar
-          # y el job quedara clavado en aviso sin que nadie lo note.
-          if ! printf '%s' "${VENTANA_TERRAFORM}" | grep -qE '^[0-9]{4}-[0-9]{2}-[0-9]{2}$'; then
-            echo "::error::el input ventana_terraform llego como '${VENTANA_TERRAFORM}', que no es una fecha ISO YYYY-MM-DD. La gravedad de este job se decide comparando esa fecha con el reloj, asi que un valor con otra forma dejaria la compuerta clavada en un lado sin decir cual. Arreglo: escribi la fecha en el 'with:' del uses: de marco-ci.yml en tu ci.yml, o saca el input y deja el default"
-            exit 1
+          # EL INPUT ventana_terraform YA NO DECIDE NADA. Hasta la 1.9.6 fijaba el
+          # ultimo dia de aviso; la gravedad dejo de depender del reloj y el input
+          # quedo declarado solo para no romper la llamada de quien lo pasa. Se
+          # avisa ANTES de mirar raices, para que tambien se entere un repo sin
+          # infraestructura: el dia que v2 lo quite, su with: rompe la corrida.
+          if [ -n "${VENTANA_TERRAFORM}" ]; then
+            echo "::notice::el input ventana_terraform llego como '${VENTANA_TERRAFORM}' y ya no tiene efecto: la gravedad de este job dejo de depender de una fecha. En toda la linea 1 del marco un hallazgo AVISA y no detiene, y desde v2 detiene, sin fecha. El input se quita en v2, y pasar un input que el reusable no declara hace fallar la corrida entera. Arreglo: sacalo del 'with:' del uses: de marco-ci.yml en tu ci.yml"
           fi
 
-          # Y LA LISTA DE RAICES SE VALIDA IGUAL, por simetria y porque el fallo
-          # que evita es peor que el de la ventana. Sin esta guarda,
+          # LA GRAVEDAD SE VALIDA ANTES DE USARSE. La fija el env de este paso y no
+          # el consumidor, asi que un valor desconocido es un defecto del marco; y
+          # usarlo sin validar dejaria la compuerta clavada en un lado sin decir cual.
+          case "${GRAVEDAD_TERRAFORM}" in
+            warning | error) ;;
+            *)
+              echo "::error::GRAVEDAD_TERRAFORM vale '${GRAVEDAD_TERRAFORM}' y solo admite warning o error. Es un defecto DEL MARCO y no de tu repo: esa variable la fija el paso 'Formato y validez de las raices de Terraform' de marco-ci.yml y ningun consumidor la puede pasar. Arreglo: reportalo en el repositorio del marco; mientras tanto, pinar la version anterior del marco devuelve el job a un estado conocido"
+              exit 1
+              ;;
+          esac
+          GRAVEDAD="${GRAVEDAD_TERRAFORM}"
+
+          # Y LA LISTA DE RAICES SE VALIDA IGUAL, por simetria con la gravedad y
+          # porque el fallo que evita es el peor de los dos. Sin esta guarda,
           # `raices_terraform: ""` en el `with:` de un consumidor dejaba el bucle
           # de abajo sin nada que recorrer, el job salia VERDE en segundos y el
           # ::notice:: afirmaba "no hay raices de Terraform en este repositorio"
@@ -4082,15 +4512,11 @@ jobs:
           fi
           echo "raices de Terraform encontradas: ${RAICES[*]}"
 
-          # La gravedad se DERIVA del reloj, y se deriva ANTES de mirar si hay
-          # binario: el binario ausente comparte la ventana con los otros dos
-          # fallos, no queda fuera de ella.
-          HOY="$(date -u +%F)"
-          if [ "${HOY}" \> "${VENTANA_TERRAFORM}" ]; then
-            GRAVEDAD="error"
-          else
-            GRAVEDAD="warning"
-            echo "::notice::verificacion de Terraform en modo aviso hasta el ${VENTANA_TERRAFORM} (hoy es ${HOY}). Despues de esa fecha un fallo de fmt, de validate o la ausencia del binario detienen el CI sin que nadie toque ningun archivo"
+          # El modo aviso se ANUNCIA, y se anuncia ANTES de mirar si hay binario:
+          # el binario ausente comparte la gravedad con los otros dos fallos, no
+          # queda fuera de ella. Un aviso que no dice que es aviso se lee como verde.
+          if [ "${GRAVEDAD}" = "warning" ]; then
+            echo "::notice::verificacion de Terraform en modo aviso en toda la linea 1 del marco: un fallo de fmt, de validate o la ausencia del binario se anuncian como warning y no detienen el CI. Desde v2 detienen, sin fecha (anunciado en el CHANGELOG del marco, decision D9). El dia de la corrida no cambia nada"
           fi
 
           if ! command -v terraform >/dev/null 2>&1; then
@@ -4171,11 +4597,11 @@ jobs:
           # distribuidor no le compra ningun salteo. "skipped" aca significa que alguien
           # le puso un `if:`, y eso es apagarlo — la doc de GitHub dice que un job
           # salteado reporta Success, asi que esta linea es la que convierte el salteo
-          # en rojo. Mientras la ventana del input ventana_terraform siga abierta sus
-          # hallazgos avisan y el job termina en success igual, o sea que un rojo suyo
-          # antes de esa fecha significa que no pudo medir, no que encontro algo.
+          # en rojo. En toda la linea 1 sus hallazgos avisan y el job termina en
+          # success igual, o sea que un rojo suyo significa que no pudo medir (raices
+          # declaradas vacias, o una gravedad invalida), no que encontro algo.
           [ "${{ needs.terraform.result }}" = "success" ] || {
-            echo "::error::la verificacion de las raices de Terraform termino en '${{ needs.terraform.result }}'. Ese job corre siempre y no se puede saltear: si dice 'skipped' es que alguien le agrego un if:, y si dice 'failure' mira su log — dentro de la ventana de gracia sus hallazgos solo avisan, asi que un rojo ahi adentro es que NO PUDO medir"
+            echo "::error::la verificacion de las raices de Terraform termino en '${{ needs.terraform.result }}'. Ese job corre siempre y no se puede saltear: si dice 'skipped' es que alguien le agrego un if:, y si dice 'failure' mira su log — en la linea 1 del marco sus hallazgos solo avisan, asi que un rojo suyo es que NO PUDO medir"
             exit 1
           }
 

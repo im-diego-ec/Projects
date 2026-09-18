@@ -7,7 +7,9 @@
 //   node --test actions/cobertura-diff/pruebas/
 import test, { after } from "node:test";
 import assert from "node:assert/strict";
-import { commit, copiarFixture, correr, escribir, fixture, git, limpiar, repoConBase, repoNuevo } from "./ayuda.mjs";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+import { AQUI, commit, copiarFixture, correr, escribir, fixture, git, limpiar, repoConBase, repoNuevo } from "./ayuda.mjs";
 import {
   esArchivoDePrueba,
   globARegExp,
@@ -264,8 +266,12 @@ test("un archivo fuente que ningun reporte reclama es ROJO, no un aviso", () => 
 
   assert.equal(r.codigo, 1, r.todo);
   assert.match(r.stderr, /nuevo-sin-medir\.ts/);
-  // El mensaje trae las DOS salidas legitimas, no solo el diagnostico.
-  assert.match(r.stderr, /all: true/);
+  // El mensaje trae las DOS salidas legitimas, no solo el diagnostico. Y la
+  // primera nombra la opcion que la herramienta VIGENTE lee: hasta el change
+  // el-marco-deja-de-afirmar-lo-que-no-hace este caso exigia `all: true`, o sea
+  // fijaba como correcto un consejo que vitest 3 retiro y la 5 ignora sin aviso.
+  assert.match(r.stderr, /coverage\.include/);
+  assert.doesNotMatch(r.stderr, /revisa 'all: true'/);
   assert.match(r.stderr, /projects\.cobertura\.excluidos/);
 });
 
@@ -634,9 +640,10 @@ test("colision de rutas en monorepo: un SF: relativo que tambien resuelve dentro
 
   assert.equal(r.codigo, 1, r.todo);
   assert.match(r.stderr, /projectRoot/);
-  // El diagnostico EQUIVOCADO: sugerir all: true cuando el problema es que la
-  // ruta del reporte no dice a que archivo corresponde.
-  assert.doesNotMatch(r.stderr, /all: true/);
+  // El diagnostico EQUIVOCADO: mandar a revisar el alcance de la cobertura
+  // (coverage.include, que en vitest 2.x era all: true) cuando el problema es
+  // que la ruta del reporte no dice a que archivo corresponde.
+  assert.doesNotMatch(r.stderr, /all: true|coverage\.include/);
 });
 
 // 6. El minimo no tiene piso: un consumidor puede pasar minimo: '0' y el gate
@@ -653,4 +660,138 @@ test("un minimo por debajo del minimo del marco avisa fuerte", () => {
   // silencio: el marco dice cual es su minimo.
   assert.equal(r.codigo, 0, r.todo);
   assert.match(r.stderr, /::warning::.*minimo del marco/);
+});
+
+// ── `.github/` es configuracion del proveedor de CI, no fuente de aplicacion ──
+//
+// EL CASO REAL, en el upstream de este marco (Rigel 1.11.0, commits 7f780be y
+// ff79b34, 2026-08-31): un consumidor versiono un script de CI en
+// `.github/scripts/*.mjs`. Es `.mjs`, asi que `esFuente()` —que mira solo la
+// extension— lo declaro fuente; ningun reporte lcov lo reclama, porque ningun
+// paquete lo compila ni lo ejecuta; y el plano del diff lo puso ROJO con «sin
+// datos no es cubierto». No hay prueba que pueda apagar ese rojo: el archivo corre
+// en el runner, no en la suite de ningun paquete. Y el Censo de fuentes del MISMO
+// pipeline lo daba verde: dos compuertas del marco discrepaban sobre que es fuente.
+//
+// EL PAQUETE RAIZ ES LA TRAMPA, y va a proposito en los dos casos. El primer
+// arreglo de alla eximia «lo que ningun paquete reclama», y quedo INERTE: los
+// consumidores tienen un `package.json` en la raiz, asi que ese archivo siempre
+// cae en algun paquete. Paso los bancos y fallo contra el consumidor real, porque
+// los bancos no declaraban el paquete raiz. Con el, el caso distingue el arreglo
+// bueno (la ruta `.github/`) del roto (el alcance del paquete).
+test("un archivo bajo `.github/` no exige cobertura: nadie puede cubrirlo", () => {
+  const { dir, base } = repoConBase();
+  escribir(dir, "package.json", '{ "name": "raiz", "version": "0.0.0" }\n');
+  escribir(dir, "web/package.json", '{ "name": "web", "version": "0.0.0" }\n');
+  escribir(
+    dir,
+    ".github/scripts/armar-algo.mjs",
+    "/* global process, console */\n" +
+      "// Un script de CI: corre en el runner, no en la suite de ningun paquete.\n" +
+      "const [, , entrada] = process.argv;\n" +
+      "if (!entrada) {\n  console.error('falta la entrada');\n  process.exit(1);\n}\n" +
+      "console.log(`procesando ${entrada}`);\n"
+  );
+  commit(dir, "agrega un script de CI que ningun paquete compila");
+  copiarFixture(dir, "lcov-cubierto-windows.info", "web/coverage/lcov.info");
+
+  const r = correr(dir, { COBERTURA_BASE: base });
+
+  assert.equal(r.codigo, 0, `un script de CI no puede enrojecer la cobertura:\n${r.todo}`);
+  assert.doesNotMatch(r.stderr, /sin ningun dato de cobertura/, r.todo);
+  // Tampoco entra al denominador por la puerta de atras...
+  assert.equal(r.salidas.lineas_fuera_de_medicion, "0", r.todo);
+  // ...y no desaparece en silencio: la corrida lo nombra como fuera de la medicion.
+  assert.match(r.resumen, /\.github\/scripts\/armar-algo\.mjs/, r.todo);
+  assert.match(r.stderr, /::notice::.*\.github\/scripts\/armar-algo\.mjs/, r.todo);
+});
+
+test("y un archivo de aplicacion sigue siendo rojo sin datos, con paquete raiz y todo", () => {
+  // El control de la regla anterior. Sin este caso, aflojar la compuerta para los
+  // archivos de CI podria aflojarla para todos sin que nada lo dijera.
+  const { dir, base } = repoConBase();
+  escribir(dir, "package.json", '{ "name": "raiz", "version": "0.0.0" }\n');
+  escribir(dir, "web/package.json", '{ "name": "web", "version": "0.0.0" }\n');
+  escribir(dir, "web/src/sin-pruebas.ts", "export function sumar(a: number, b: number) {\n  return a + b;\n}\n");
+  // Un directorio que SE PARECE a `.github/` y no lo es: la exencion es por la
+  // ruta exacta del proveedor, no por un prefijo de texto.
+  escribir(dir, "web/src/.github-no/copia.ts", "export const copia = () => 1;\n");
+  commit(dir, "agrega codigo de aplicacion sin pruebas");
+  copiarFixture(dir, "lcov-cubierto-windows.info", "web/coverage/lcov.info");
+
+  const r = correr(dir, { COBERTURA_BASE: base });
+
+  assert.equal(r.codigo, 1, `codigo de aplicacion sin datos tiene que seguir en rojo:\n${r.todo}`);
+  assert.match(r.stderr, /web\/src\/sin-pruebas\.ts,line=\d+::archivo fuente del cambio sin ningun dato de cobertura/, r.todo);
+  assert.match(r.stderr, /web\/src\/\.github-no\/copia\.ts,line=\d+::archivo fuente del cambio sin ningun dato/, r.todo);
+});
+
+// ── Lo que la action le dicta al consumidor existe en la herramienta vigente ──
+//
+// EL DEFECTO, medido el 2026-09-13 en el upstream (Rigel 2.6.0, commit fabe1e6) y
+// presente aca: siete mensajes de arreglo de esta action, la cabecera de su
+// action.yml y cuatro pasajes de actions/README.md le decian al consumidor «corre
+// con `all: true`». vitest 3 retiro `coverage.all` y la mayor 5 la IGNORA SIN UN
+// AVISO; el andamio ya lo habia medido en 4.1.11 (ver el bloque de `include` de
+// plantilla/vitest.config.base.mjs). O sea que el rojo mandaba a agregar una linea
+// inerte, y el archivo que ninguna prueba importa seguia sin medirse. El scaffold
+// y la action se contradecian.
+//
+// LA REGLA: `all: true` puede aparecer solo como HISTORIA —en la misma unidad de
+// texto que dice «vitest 2»—, nunca como el arreglo. La unidad es la LINEA en el
+// .mjs (cada mensaje vive en una) y el PARRAFO en el action.yml y el README, que
+// parten las frases en varias lineas. LIMITE DECLARADO: esto caza la opcion
+// retirada que ya se escribio; no sabe si la proxima mayor de vitest retira otra.
+const ALL_TRUE = /\ball:\s*true\b/;
+const COMO_HISTORIA = /vitest 2/;
+
+function unidades(texto, porParrafo) {
+  const lineas = texto.replace(/\r\n/g, "\n").split("\n");
+  if (!porParrafo) return lineas.map((t, i) => ({ texto: t, linea: i + 1 }));
+  const salida = [];
+  let actual = null;
+  lineas.forEach((t, i) => {
+    // Una linea en blanco o de puro marcador de comentario corta el parrafo.
+    if (/^\s*(#|>|\/\/)?\s*$/.test(t)) {
+      actual = null;
+      return;
+    }
+    if (!actual) {
+      actual = { texto: "", linea: i + 1 };
+      salida.push(actual);
+    }
+    actual.texto += ` ${t}`;
+  });
+  return salida;
+}
+
+function dictados(rel, porParrafo) {
+  const texto = readFileSync(join(AQUI, "..", "..", "..", rel), "utf8");
+  return unidades(texto, porParrafo)
+    .filter((u) => ALL_TRUE.test(u.texto) && !COMO_HISTORIA.test(u.texto))
+    .map((u) => `${rel}:${u.linea}`);
+}
+
+test("el detector de consejos vencidos distingue el consejo de la historia", () => {
+  // El control: sin el, un regex roto deja el caso de abajo en verde mirando aire.
+  const consejo = unidades("Arreglo: corre las pruebas con cobertura (y con 'all: true')", false);
+  const historia = unidades("revisa coverage.include; en vitest 2.x era 'all: true'", false);
+  assert.equal(consejo.filter((u) => ALL_TRUE.test(u.texto) && !COMO_HISTORIA.test(u.texto)).length, 1);
+  assert.equal(historia.filter((u) => ALL_TRUE.test(u.texto) && !COMO_HISTORIA.test(u.texto)).length, 0);
+});
+
+test("ningun texto que lee el consumidor le dicta `all: true`, una opcion que vitest ya no lee", () => {
+  const encontrados = [
+    ...dictados("actions/cobertura-diff/medir-cobertura-diff.mjs", false),
+    ...dictados("actions/cobertura-diff/action.yml", true),
+    ...dictados("actions/README.md", true),
+  ];
+  assert.deepEqual(
+    encontrados,
+    [],
+    "estos lugares le indican al consumidor `all: true` como arreglo. vitest 3 retiro coverage.all y la 5 la " +
+      "ignora sin aviso: seguir el consejo agrega una linea inerte y deja sin medir el archivo que ninguna " +
+      "prueba importa. Arreglo: nombrar coverage.include (el alcance declarado), y si hace falta citar la forma " +
+      "vieja, en la misma frase y como historia («en vitest 2.x era all: true»)",
+  );
 });

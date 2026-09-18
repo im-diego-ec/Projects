@@ -6,7 +6,7 @@ aprueba: PO (PO)          # es su modelo operativo de trabajo, y el delta cae
 informado: Builder 2
 estado: pendiente-de-revision
 experimental: true           # ver "El estado experimental" al final
-veredicto_antes_de: 2026-09-21
+veredicto_antes_de: 2026-10-15  # era 2026-09-21; la corrio el PO el 2026-09-17 (D3), motivo en proposal.md
 ---
 
 # capa-descubrimiento — Proposal
@@ -82,10 +82,12 @@ convierte esa conclusión en un mecanismo con gate.
   resolver queda marcado como abierto, y un supuesto abierto **impide el
   archive**: se puede proponer y diseñar con dudas; no se puede convertirlas en
   contrato por omisión.
-- **El estado experimental caduca por fecha.** Un change que declara ser
-  experimental declara también su fecha de veredicto, y el pipeline se pone rojo
-  cuando esa fecha pasa sin veredicto. Sin esto, «change activo y sin archivar»
-  es una frase, y las frases no cuentan como enforcement en este repo.
+- ~~**El estado experimental caduca por fecha.**~~ **Salió de este change el
+  2026-09-17** y vive en el change `el-experimental-caduca`, con su requirement, su
+  paso en el job `openspec` de `marco-ci.yml` y su banco. Era la única pieza de acá
+  que valía con independencia del veredicto, y mientras dependiera de este change
+  un descarte del piloto se la llevaba puesta. Este change sigue siendo su primer
+  sujeto.
 
 Lo que este change **no** hace hoy: no mueve `v1`, no agrega un check al
 pipeline de nadie, no toca `plantilla/` y no instala nada en ningún repositorio.
@@ -95,23 +97,29 @@ Toda la maquinaria está condicionada al veredicto del piloto.
 
 ### Modified Capabilities
 
-- `gobierno-contribucion`: **tres requirements nuevos** — (1) el descubrimiento
-  llega al contrato con procedencia y no lo reemplaza; (2) el estado experimental
-  de un change caduca por fecha; (3) el descubrimiento se produce fuera del
-  repositorio y entra como insumo al inicio de la sesión que lo consume. Los tres
-  requirements vigentes de la capability **no se tocan** (el delta es solo `ADDED`,
-  así que el hueco conocido del guardrail de deltas —un `MODIFIED` cuyo título no
-  existe en el spec vivo no avisa— no aplica acá).
+- `gobierno-contribucion`: **dos requirements nuevos** — (1) el descubrimiento
+  llega al contrato con procedencia y no lo reemplaza; (2) el descubrimiento se
+  produce fuera del repositorio y entra como insumo al inicio de la sesión que lo
+  consume. Los requirements vigentes de la capability **no se tocan** (el delta es
+  solo `ADDED`, así que el hueco conocido del guardrail de deltas —un `MODIFIED`
+  cuyo título no existe en el spec vivo no avisa— no aplica acá).
 
-El tercero lo agregó una aclaración del Builder 1 del 2026-08-21: el descubrimiento se
-produce **fuera** del repositorio y entra como insumo al inicio de la sesión, sea
-de un proyecto nuevo, de un deploy o de un agregado a un proyecto existente. Lo
-enunció como regla general del área y no como excepción de este proyecto, así que
-no podía quedarse solo en el piloto. Va en este delta porque es la única ruta que
-conserva el gate del PO, y **vale con independencia del veredicto**: si el piloto
-sale rojo o amarillo se rescata a un change propio, igual que el requirement de
-caducidad. El razonamiento completo, con la medición que por hoy descartó el
-canónico, está en `design.md` D11.
+  Hasta el 2026-09-17 eran tres: el del medio era «El estado experimental de un
+  change caduca por fecha», y se rescató al change `el-experimental-caduca` antes
+  del veredicto y no después, que es lo que este mismo proposal preveía para los
+  desenlaces amarillo y rojo. Esperar al desenlace era apostar a que la compuerta
+  sobreviviera a un descarte.
+
+El segundo (el tercero hasta el 2026-09-17) lo agregó una aclaración del Builder 1
+del 2026-08-21: el descubrimiento se produce **fuera** del repositorio y entra como
+insumo al inicio de la sesión, sea de un proyecto nuevo, de un deploy o de un
+agregado a un proyecto existente. Lo enunció como regla general del área y no como
+excepción de este proyecto, así que no podía quedarse solo en el piloto. Va en este
+delta porque es la única ruta que conserva el gate del PO, y **vale con
+independencia del veredicto**: si el piloto sale rojo o amarillo se rescata a un
+change propio, que es lo que ya se hizo con el requirement de caducidad. El
+razonamiento completo, con la medición que por hoy descartó el canónico, está en
+`design.md` D11.
 
 `reglas-al-dia` también agrega un requirement a esta capability. Los títulos no
 colisionan, y el `## Purpose` —que los deltas no transportan— lo amplía el
@@ -122,9 +130,10 @@ archive de cada change: el que archive segundo relee lo que dejó el primero.
 **Distribución.** Hoy este change toca **solo lo canónico** (el delta) y
 `docs/`. Si las **dos** rebanadas del piloto dan verde, la tanda de implementación
 toca además:
-*referenciado* (los cuatro checks viajan en el workflow reusable y llegan a todo
-consumidor de `@v1`, **inertes** hasta que un repositorio declara material de
-descubrimiento o un change se declara experimental), *scaffold* (el directorio
+*referenciado* (los tres checks viajan en el workflow reusable y llegan a todo
+consumidor, **inertes** hasta que un repositorio declara material de
+descubrimiento; el cuarto, el de caducidad, ya no espera al piloto: salió con
+`el-experimental-caduca`), *scaffold* (el directorio
 declarado, su entrada en CODEOWNERS del rol de producto y la exclusión del
 formateador) y *regenerado* (el pin de la herramienta de descubrimiento: se pina
 la versión y cada repo la instala; no se vendora, igual que el CLI de OpenSpec).
@@ -179,17 +188,21 @@ verde**: la primera con el orden A → B y la segunda con el orden invertido.
   quedó como historia del diseño viejo, de cuando el insumo eran transcripciones y
   el descubrimiento todavía no estaba hecho; donde las dos difieran, manda el
   pre-registro.
-- **La fecha de veredicto es el 2026-09-21** (28 días desde el arranque, la misma
-  ventana que el marco ya usa para estrenar en modo aviso). El campo
-  `veredicto_antes_de` del frontmatter no es decorativo: el requirement 2 de este
-  delta lo vuelve rojo cuando vence.
+- **La fecha de veredicto era el 2026-09-21** (28 días desde el arranque, la misma
+  ventana que el marco usaba para estrenar en modo aviso) **y desde el 2026-09-17 es
+  el 2026-10-15**; el motivo está en la sección siguiente. El campo
+  `veredicto_antes_de` del frontmatter no es decorativo: el paso «Estado experimental
+  con fecha de veredicto» del job `openspec` de `marco-ci.yml` (change
+  `el-experimental-caduca`) lo vuelve rojo al día siguiente de la fecha si no hay un
+  artefacto con `artefacto: veredicto`. Manda la fecha **más temprana** de todos los
+  artefactos del change, así que correrla es correrla en los seis que la declaran.
 - **Los veredictos, con su desenlace escrito de antemano** en D8 y en la sección 2
   del pre-registro: verde → **segunda rebanada con el orden invertido**; verde y
   después verde → archive; amarillo → herramienta del PO documentada en `docs/`,
   sin requirement y sin huella en el scaffold; rojo → ADR de rechazo con las
-  mediciones. En los dos últimos casos el requirement de caducidad se rescata a
-  un change propio: es el único ítem de acá que vale con independencia del
-  piloto.
+  mediciones. El requirement de caducidad, que era el único ítem de acá que valía
+  con independencia del piloto, ya se rescató a un change propio
+  (`el-experimental-caduca`), así que ningún desenlace se lo lleva.
 - **Un verde de la primera rebanada significa «no se refutó que ayude», no
   «ayuda».** Lo decidió Builder 1 el 2026-08-21 y es la lectura correcta del
   instrumento: la misma persona corre los dos brazos, así que llega al brazo B con
@@ -201,3 +214,38 @@ verde**: la primera con el orden A → B y la segunda con el orden invertido.
   acotan el efecto real, una lo infla y la otra lo deprime. El archive, el estreno
   de los checks y el pin en el carril de los consumidores esperan esa segunda
   corrida.
+
+## Por qué se corrió la fecha del veredicto (2026-09-17)
+
+**La fecha era el 2026-09-21 y ahora es el 2026-10-15. La corrió el PO (decisión D3
+del porte de Rigel a Projects, 2026-09-17)**, en el mismo change que estrena la
+compuerta que la hace cumplir (`el-experimental-caduca`). Correrla con el motivo
+escrito es una de las tres salidas legítimas que esa compuerta ofrece; las otras dos
+son escribir el veredicto o descartar el change.
+
+**Por qué no se podía dejar vencer.** Hasta el 2026-09-17 ningún workflow leía
+`veredicto_antes_de` (la tarea 4.1 de este change estaba abierta y
+`docs/16-auditoria-cierre-v1.md` ya lo había señalado), así que la fecha iba a vencer
+en silencio. Y con la compuerta estrenada y la fecha vieja, el CI de Projects habría
+quedado en rojo desde el 2026-09-22 (medido: el paso sobre estos artefactos con
+`HOY_ISO=2026-09-22` sale 1).
+
+**Por qué no hay veredicto que escribir hoy.** Este repositorio nunca corrió el
+piloto: el 2026-08-22 el arranque pasó a ser una observación sin brazos ni veredicto
+(ver el encabezado de `tasks.md`) y acá no hay `piloto/veredicto.md`. El piloto sí se
+corrió en Rigel, el marco del que Projects se bifurcó, con un veredicto VERDE
+(Rigel 1.8.0), pero sobre un corpus de otra organización: sus datos no se copian y su
+conclusión no se adopta sin leerla.
+
+**Qué se decide el 2026-10-15, y quién.** El PO elige entre dos desenlaces: **adoptar
+el veredicto de Rigel** —citándolo, sin copiar su corpus— y seguir el camino del
+verde, o **descartar el change con un ADR** que deje escrito por qué. Si llega la fecha
+sin ninguna de las dos, el paso «Estado experimental con fecha de veredicto» pone en
+rojo el CI de Projects al día siguiente, que es exactamente para lo que existe.
+
+**Lo que se tocó para correrla.** La fecha vive en seis artefactos de este change
+(`proposal.md`, `design.md`, `tasks.md` y tres de `piloto/`) y la compuerta toma la
+más temprana, así que se corrió en los seis, con un comentario en la misma línea que
+apunta acá. En `piloto/pre-registro.md` se tocó **solo esa línea del frontmatter**: los
+umbrales pre-registrados no cambian, y el commit original sigue siendo la evidencia de
+que se escribieron antes de correr.

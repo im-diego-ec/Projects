@@ -23,8 +23,12 @@ operativa se mantiene: **toda escritura en producción exige el OK explícito de
 5. **Implementar** → TDD (rojo evidenciado en LOCAL), un PR por bloque, **review
    cruzado entre builders** de cada diff.
 6. **Verify + archive** → el change cierra solo cuando los specs vivos validan
-   `--strict` y las tareas tienen evidencia; el PR final cierra el issue macro vía
-   `Closes`.
+   `--strict` y las tareas tienen evidencia; el PR final **lleva** `Closes` al issue
+   macro en su cuerpo desde que se crea, así la tarea se marca antes del merge.
+
+- **Un change se congela contra una versión de su insumo** (frontera ✅
+  `change-congelado-contra-su-insumo`): lo que {{PO}} entregue después alimenta al
+  change siguiente, salvo que contradiga lo ya especificado.
 
 <!-- projects:regla id=openspec-validar-tras-editar -->
 

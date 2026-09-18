@@ -17,6 +17,12 @@
 //              (el asistente             (sin tocar)      (sin tocar)
 //               termina aca)
 //
+// Y DEJA ANOTADO DONDE SE TRABO LA PERSONA (`tropiezos`, en el resultado de
+// correrAsistente): una respuesta rechazada, una vuelta atras. Es la parte del
+// registro de friccion que solo el asistente ve --ver herramientas/registro-de-
+// friccion.mjs--, y se anota SIN lo que la persona escribio: puede ser un correo,
+// y el registro puede terminar en un issue publico.
+//
 // Dos caminos con el mismo destino, como la documentacion tiene el acompanado y
 // el tecnico: el PO contesta preguntas en castellano, el builder escribe el JSON.
 // Nadie valida distinto que el otro —se usa `validarValores`, el de siempre—; lo
@@ -796,6 +802,14 @@ function envolver(texto, ancho) {
 export async function correrAsistente(preguntar, previos = {}, formatos = {}, emitir = () => {}, derivados = {}) {
   const respuestas = { ...derivados, ...previos };
   const dicho = [];
+  // DONDE SE TRABO LA PERSONA, para el registro de friccion. Se anota la pregunta y
+  // el MOTIVO del rechazo, nunca lo que la persona escribio.
+  const tropiezos = [];
+  // Objetos planos y no `apartamiento()` de registro-de-friccion.mjs: este modulo no
+  // depende de otro para correr. Las clases son las de ese archivo, y se validan
+  // cuando el arranque las anota (`anotar` pasa por `apartamiento`).
+  const tropezo = (p, esperado, real) =>
+    tropiezos.push({ clase: "PREGUNTA", punto: `el asistente, pregunta ${p.id}`, esperado, real, nota: null });
 
   // SE EMITE EN EL MOMENTO Y ADEMAS SE GUARDA, y las dos mitades hacen falta.
   // La primera version solo guardaba y quien llamaba imprimia al final: la
@@ -903,6 +917,11 @@ export async function correrAsistente(preguntar, previos = {}, formatos = {}, em
         const elegida = p.opciones[Number(cruda) - 1];
         if (!elegida) {
           decir(`  ✗ "${cruda}" no es una de las opciones. Escribí un número del 1 al ${p.opciones.length}.`);
+          tropezo(
+            p,
+            `el numero de una opcion, del 1 al ${p.opciones.length}`,
+            /^\d+$/.test(cruda) ? "un numero que no esta en la lista" : "otra cosa en vez del numero (lo escrito no se guarda)",
+          );
           continue;
         }
         respuestas[p.id] = elegida.valor;
@@ -920,6 +939,7 @@ export async function correrAsistente(preguntar, previos = {}, formatos = {}, em
       const valor = cruda ? (p.normaliza ? p.normaliza(cruda) : cruda) : previo;
       if (!valor) {
         decir("  ✗ Esta no tiene valor por defecto: hay que contestarla.");
+        tropezo(p, "una respuesta: esta pregunta no tiene valor por defecto", "la dejo vacia");
         continue;
       }
       // Se valida CON EL PATRON DE SIEMPRE y en el momento. Dos validaciones
@@ -940,6 +960,7 @@ export async function correrAsistente(preguntar, previos = {}, formatos = {}, em
         // `que` siempre esta --es lo que el validador de siempre ya usa para el
         // mismo mensaje en projects-init-- asi que el ?? no puede quedar corto.
         decir(`  ✗ "${valor}" no tiene la forma que corresponde: ${formato.espera ?? formato.que}`);
+        tropezo(p, formato.espera ?? formato.que, "una respuesta con otra forma (lo escrito no se guarda)");
         continue;
       }
       respuestas[p.id] = valor;
@@ -948,6 +969,15 @@ export async function correrAsistente(preguntar, previos = {}, formatos = {}, em
     }
 
     if (volviendo) {
+      // Volver es friccion de ORDEN: la persona vio una pregunta y se dio cuenta de
+      // que una anterior estaba mal, o no la habia entendido hasta ver la siguiente.
+      tropiezos.push({
+        clase: "ORDEN",
+        punto: `el asistente, de la pregunta ${p.id} a la ${PREGUNTAS[anterior].id}`,
+        esperado: null,
+        real: "volvio a la pregunta anterior",
+        nota: null,
+      });
       if (++vueltas > 200) {
         throw new Error(
           "se volvio atras 200 veces sin terminar de contestar. Si esto salio en un banco, el preguntador " +
@@ -968,7 +998,26 @@ export async function correrAsistente(preguntar, previos = {}, formatos = {}, em
     i += 1;
   }
 
-  return { respuestas, valores: derivar(respuestas), desvios: desvios(respuestas), dicho };
+  // LAS QUE SE HICIERON, con las respuestas finales: una que se salteo por una
+  // respuesta que despues se corrigio no cuenta.
+  const preguntadas = PREGUNTAS.filter((q) => !q.salta || !q.salta(respuestas)).map((q) => q.id);
+  return { respuestas, valores: derivar(respuestas), desvios: desvios(respuestas), dicho, tropiezos, preguntadas };
+}
+
+/** Cuanto del archivo de valores salio de una pregunta y cuanto lo derivo `derivar()`.
+ *
+ *  SE CALCULA, NO SE COPIA. Rigel escribia en prosa «deriva 20 de 23 valores» y envejecio
+ *  a la primera reclasificacion. Aca sale de las preguntas que de verdad se hicieron y de
+ *  lo que `derivar()` devuelve: un valor requerido que aparece con el mismo nombre que una
+ *  pregunta hecha es contestado; el resto lo derivo el asistente sin preguntar. Es lo que
+ *  el registro de friccion dice del camino, y lo que evita una tabla de fuentes al lado de
+ *  `derivar()` --que seria otra declaracion de lo mismo, esperando divergir--. */
+export function reparto(respuestas, requeridos) {
+  const preguntadas = PREGUNTAS.filter((q) => !q.salta || !q.salta(respuestas)).map((q) => q.id);
+  const valores = derivar(respuestas);
+  const presentes = requeridos.filter((k) => valores[k] !== undefined);
+  const contestados = presentes.filter((k) => preguntadas.includes(k)).length;
+  return { preguntas: preguntadas.length, contestados, derivados: presentes.length - contestados, total: requeridos.length };
 }
 
 /** El resumen que se imprime antes de escribir nada, para que la persona vea lo

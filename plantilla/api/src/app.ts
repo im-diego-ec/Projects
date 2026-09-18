@@ -24,8 +24,18 @@ export function createApp() {
 
   // Publico: no toca base ni auth. Es lo que mira el health check del
   // balanceador, asi que tiene que seguir respondiendo cuando la base no esta.
+  //
+  // EL OBJETO VA ABIERTO EN VARIAS LINEAS, y no es estilo. En una sola linea
+  // entraba en el ancho del formateador con el marcador sin resolver y NO con
+  // un nombre de proyecto largo: el andamio pasaba `format:check` y el repo
+  // recien nacido no. Un objeto abierto es la unica forma que el formateador
+  // conserva igual con cualquier largo del nombre.
   app.get("/api/health", (_req, res) => {
-    res.json({ estado: "ok", servicio: "{{PROYECTO}}-api", ts: new Date().toISOString() });
+    res.json({
+      estado: "ok",
+      servicio: "{{PROYECTO}}-api",
+      ts: new Date().toISOString(),
+    });
   });
 
   // Protegido: la identidad sale de los claims firmados del token, nunca del

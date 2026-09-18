@@ -74,13 +74,17 @@ test("lo que se MUDA no se excluye por donde vivia", () => {
 });
 
 test("POR QUE NO ALCANZA CON VACIAR LOS DIRECTORIOS: el pipeline decide por existencia", () => {
-  // El paso de Terraform del pipeline que el andamio reparte decide con
+  // El paso de Terraform del pipeline que corre sobre el proyecto decide con
   // `[ -d "${D}" ]`, no con "hay .tf adentro". Un infra/ con un solo documento
   // adentro sigue contando como raiz de Terraform, asi que dejar el directorio
   // con el catalogo adentro haria que el proyecto arranque verificando una
   // infraestructura que no tiene. Este caso fija esa lectura del pipeline: si
   // manana cambia a mirar el contenido, la decision de aca se puede revisar.
-  const ci = fs.readFileSync(path.join(ANDAMIO, ".github/workflows/ci.yml"), "utf-8");
+  //
+  // El paso vive en el job `terraform` del workflow reusable del marco, que el
+  // ci.yml del andamio llama. Hasta el change la-ventana-se-cierra habia ademas
+  // una copia inline en el ci.yml del andamio, que es la que este caso leia.
+  const ci = fs.readFileSync(path.join(RAIZ, ".github/workflows/marco-ci.yml"), "utf-8");
   assert.match(
     ci,
     /if \[ -d "\$\{D\}" \]; then RAICES\+=/,

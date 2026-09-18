@@ -42,18 +42,30 @@ if ! node --test ${BANCOS}; then
   exit 1
 fi
 
-# 2. actionlint, si esta. Es el check que puso el CI en rojo dos veces seguidas
-#    mientras el banco local salia verde: el banco no valida el esquema de
-#    GitHub Actions ni pasa shellcheck por los bloques `run:`.
-if command -v actionlint > /dev/null 2>&1; then
-  if ! actionlint; then
-    echo "pre-push: ERROR — actionlint rechaza las definiciones de pipeline." >&2
+# 2. actionlint, con la MISMA version que el CI. Es el check que puso el CI en
+#    rojo dos veces seguidas mientras el banco local salia verde: el banco no
+#    valida el esquema de GitHub Actions ni pasa shellcheck por los bloques `run:`.
+#
+#    No se usa el `actionlint` del PATH, a proposito: puede ser de cualquier
+#    version, y sin shellcheck sale 0 sin revisar los scripts (medido el
+#    2026-09-18). La herramienta lee la version del mismo input que el CI,
+#    verifica el checksum, usa el shellcheck del PATH si esta y dice cuando su
+#    verde es mas debil. Sus codigos: 0 verde, 1 hallazgos, 2 no pudo correr.
+set +e
+node herramientas/actionlint-local.mjs
+RC_ACTIONLINT=$?
+set -e
+case "${RC_ACTIONLINT}" in
+  0) ;;
+  1)
+    echo "pre-push: ERROR — actionlint rechaza las definiciones de pipeline (archivo y linea, arriba)." >&2
     exit 1
-  fi
-else
-  echo "pre-push: AVISO — actionlint no esta instalado, asi que la validacion del"
-  echo "  pipeline NO se corrio aca y solo la vas a ver en el CI. Instalalo con:"
-  echo "    brew install actionlint shellcheck"
-fi
+    ;;
+  *)
+    echo "pre-push: AVISO — actionlint NO se corrio aca (salida ${RC_ACTIONLINT}; el motivo esta arriba)."
+    echo "  La validacion del pipeline solo la vas a ver en el CI. No bloquea el push: un"
+    echo "  defecto de la herramienta local no puede frenar el trabajo de nadie."
+    ;;
+esac
 
 echo "pre-push: OK"

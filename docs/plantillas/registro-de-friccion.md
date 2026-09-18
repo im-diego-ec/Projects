@@ -5,6 +5,36 @@ Se llena **mientras** alguien arranca un proyecto siguiendo
 `docs/adopciones/AAAA-MM-DD-<proyecto>.md` de este repo. No va al repo del
 proyecto: la guía es un documento del marco, y sus correcciones salen de acá.
 
+## Lo que ya no se llena a mano
+
+La parte que la herramienta ve, la escribe ella. Al terminar, `projects init` deja
+`registro-de-friccion.md` en la raíz del proyecto —al lado de la bitácora, e ignorado
+en git— **antes** de imprimir `LISTO`, también cuando no tuvo que rodear nada: un
+registro vacío dice que el camino aguantó una corrida entera, y eso es distinto de
+que nadie haya mirado. Trae cada `::warning::` de la corrida y cada pregunta del
+asistente que no se contestó bien a la primera, con su punto exacto y en una de seis
+clases cerradas:
+
+| Clase | Qué es |
+|---|---|
+| `COMANDO` | un comando escrito no funcionó y hubo que reemplazarlo |
+| `PASO_NO_APLICA` | un paso del camino no se corrió (por ejemplo, `--sin-arranque`) |
+| `ORDEN` | hubo que cambiar el orden o volver atrás |
+| `VALOR_INFERIDO` | hubo que inferir un valor que nadie dio |
+| `SIN_COMPROBAR` | una comprobación no se pudo hacer |
+| `PREGUNTA` | una pregunta del asistente no se contestó bien a la primera |
+
+No lleva el nombre del proyecto, la cuenta ni rutas de la máquina, y la herramienta
+**ofrece** mandarlo como issue a este repositorio: se confirma escribiendo `si`, y si
+no, el comando para hacerlo después queda impreso. **Eso no se copia a mano acá.**
+
+Esta plantilla sigue siendo para lo que la herramienta **no ve**: el reloj de cada
+fase, los ajustes de GitHub y el primer change, y el camino técnico cuando se corre
+entero a mano. Las dos clasificaciones no compiten: las seis de arriba dicen **qué**
+se rodeó; las de los tropiezos de abajo (`guía`, `andamio`, `marco`…) dicen **adónde
+va el arreglo**, y se eligen cuando un apartamiento del registro se convierte en un PR
+o en un change.
+
 ## Las dos reglas de uso
 
 **1. No arregles mientras corrés.** Si un paso te traba, anotalo y seguí. Arreglar

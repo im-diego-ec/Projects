@@ -4,6 +4,8 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
+import { evaluar } from "./expresiones.mjs";
+
 const RAIZ = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 const ANDAMIO = path.join(RAIZ, "plantilla");
 const WORKFLOW = path.join(ANDAMIO, ".github/workflows/desplegar.yml");
@@ -256,12 +258,29 @@ test("se publica el commit que paso el CI, no la punta de main", () => {
   // la corrida que disparo el workflow. Entre que el CI termina y el despliegue
   // arranca puede entrar otro merge, y entonces se publica codigo que ningun CI
   // aprobo — en silencio, porque las dos corridas reportan exito.
+  //
+  // DESDE EL 2026-09-17 el checkout no nombra `head_sha` directo: lo lee del
+  // paso que FIJA el commit de la corrida, el mismo del que sale la etiqueta de
+  // la version. Antes el checkout usaba `head_sha` y la etiqueta `GITHUB_SHA`, y
+  // bajo `workflow_run` esos dos pueden ser commits distintos (OPS-04). Este caso
+  // sigue vigilando lo mismo, ahora en los dos eslabones: el checkout pide el
+  // commit fijado, y el commit fijado ES el que el CI midio.
   const t = workflow();
   assert.match(t, /uses: actions\/checkout@/, "sin checkout no hay nada que publicar");
   assert.match(
     t,
-    /ref:\s*\$\{\{\s*github\.event\.workflow_run\.head_sha\s*\}\}/,
-    "el checkout tiene que pedir el commit que el CI midio (`head_sha`), no la rama",
+    /ref:\s*\$\{\{\s*steps\.version\.outputs\.sha\s*\}\}/,
+    "el checkout de DEV tiene que pedir el commit fijado por el paso `version`, no la rama",
+  );
+  const derivacion = /id: version[\s\S]*?\n\s+SHA: (\$\{\{[^\n]+\}\})/.exec(t);
+  assert.ok(derivacion, "el paso `version` no deriva el commit de una expresion legible");
+  const medido = "1111111111111111111111111111111111111111";
+  const punta = "2222222222222222222222222222222222222222";
+  const github = { event_name: "workflow_run", sha: punta, event: { workflow_run: { head_sha: medido } } };
+  assert.equal(
+    evaluar(derivacion[1], { github }),
+    medido,
+    "bajo `workflow_run` el commit fijado tiene que ser el que el CI midio (`head_sha`), no la punta de main",
   );
 });
 
@@ -422,11 +441,17 @@ test("produccion promueve LA ETIQUETA QUE PUSO DEV, y no una cualquiera", () => 
   // sino una version ELEGIDA, que por defecto es el commit del disparo. Si ese
   // defecto se separa de la etiqueta de DEV, promover sin elegir publica algo que
   // nunca se subio.
+  //
+  // Y DESDE EL 2026-09-17 LA ETIQUETA SALE DEL COMMIT FIJADO, no de GITHUB_SHA:
+  // bajo `workflow_run` GITHUB_SHA es la punta de main y no lo que el CI midio.
+  // El eslabon 2 dejo de ser una comparacion de NOMBRES de variable y paso a ser
+  // de VALORES: se evalua que commit rotula DEV en el unico evento que puede
+  // promover -un disparo a mano- y se compara con el defecto de produccion.
   const t = workflow();
 
   const subida = /versions upload[\s\S]{0,400}?--tag "\$\{([A-Z_]+)\}"/.exec(t);
   assert.ok(subida, "el job de DEV ya no sube la version con una etiqueta: sin etiqueta, la promocion tiene que adivinar");
-  assert.equal(subida[1], "GITHUB_SHA", "la etiqueta tiene que ser el commit: es lo unico que identifica QUE se miro");
+  assert.equal(etiquetaDeDev(t, disparoAMano), disparoAMano.sha, "la etiqueta tiene que ser el commit: es lo unico que identifica QUE se miro");
 
   const promocion = /versions deploy[\s\S]{0,400}?--version-tag "\$\{([A-Z_]+)\}@/.exec(t);
   assert.ok(promocion, "el job de produccion ya no promueve por etiqueta: estaria raspando un id de alguna salida");
@@ -440,12 +465,10 @@ test("produccion promueve LA ETIQUETA QUE PUSO DEV, y no una cualquiera", () => 
   );
 
   // Eslabon 2: lo que ese paso elige, cuando no se elige nada, ES la etiqueta de DEV.
-  const defecto = /SHA="\$\{VERSION:-\$\{([A-Z_]+)\}\}"/.exec(t);
-  assert.ok(defecto, "el paso que elige la version ya no tiene un defecto legible: no se puede saber que promueve si no se elige");
   assert.equal(
-    defecto[1],
-    subida[1],
-    `DEV etiqueta con \${${subida[1]}} y promover sin elegir usa \${${defecto[1]}}: si no son la misma, promover por defecto publica algo que nunca se subio`,
+    defectoDeProduccion(t, disparoAMano),
+    etiquetaDeDev(t, disparoAMano),
+    "promover sin elegir usa otro commit que el que DEV rotula con el mismo disparo: promover por defecto publicaria algo que nunca se subio",
   );
 
   // Eslabon 3: el arbol que se saca es el de ESA version, no el de la rama.
@@ -460,13 +483,48 @@ test("MUERDE: si las dos etiquetas se separan, se caza", () => {
   // Anti-vacuidad del caso de arriba: se separa el defecto a proposito y se
   // comprueba que el predicado lo ve. Sin esto, el caso quedaria verde con los dos
   // extractores rotos --que es como los dos podrian devolver `undefined` y ser
-  // "iguales"--.
-  const mutado = workflow().replace('SHA="${VERSION:-${GITHUB_SHA}}"', 'SHA="${VERSION:-${GITHUB_RUN_ID}}"');
-  const subida = /versions upload[\s\S]{0,400}?--tag "\$\{([A-Z_]+)\}"/.exec(mutado);
-  const defecto = /SHA="\$\{VERSION:-\$\{([A-Z_]+)\}\}"/.exec(mutado);
-  assert.ok(subida && defecto, "los dos extractores tienen que seguir encontrando algo, o la comparacion no mide");
-  assert.notEqual(defecto[1], subida[1], "el predicado no distingue dos etiquetas distintas");
+  // "iguales"--. Se muta de los DOS lados, uno por vez.
+  const t = workflow();
+  assert.ok(etiquetaDeDev(t, disparoAMano) && defectoDeProduccion(t, disparoAMano), "los dos extractores tienen que devolver un commit");
+  const prodMutado = t.replace('SHA="${VERSION:-${GITHUB_SHA}}"', 'SHA="${VERSION:-${GITHUB_RUN_ID}}"');
+  assert.notEqual(prodMutado, t, "la mutacion de produccion no cambio nada");
+  assert.notEqual(defectoDeProduccion(prodMutado, disparoAMano), etiquetaDeDev(prodMutado, disparoAMano), "el predicado no ve un defecto de produccion distinto");
+  const devMutado = t.replace("SHA: ${{ github.event.workflow_run.head_sha || github.sha }}", "SHA: ${{ github.event.workflow_run.head_sha || github.run_id }}");
+  assert.notEqual(devMutado, t, "la mutacion de DEV no cambio nada");
+  assert.notEqual(defectoDeProduccion(devMutado, disparoAMano), etiquetaDeDev(devMutado, disparoAMano), "el predicado no ve una etiqueta de DEV distinta");
 });
+
+// El unico evento que promueve: un disparo a mano desde main.
+const disparoAMano = {
+  event_name: "workflow_dispatch",
+  ref: "refs/heads/main",
+  sha: "3333333333333333333333333333333333333333",
+  run_id: "987654321",
+  event: { inputs: { promover_a_produccion: "true", version: "" } },
+};
+
+/** Las variables del runner que un script puede nombrar, con su contexto. */
+const DEL_RUNNER = { GITHUB_SHA: "github.sha", GITHUB_RUN_ID: "github.run_id", GITHUB_REF: "github.ref" };
+
+/** El commit con el que DEV rotula la version, evaluado bajo un evento: la
+ *  variable de `--tag`, su cableado en el `env:` del paso, y el paso `version`
+ *  que la fija. Cualquier eslabon que no se encuentre devuelve null. */
+function etiquetaDeDev(t, github) {
+  const tag = /versions upload[\s\S]{0,400}?--tag "\$\{([A-Z_]+)\}"/.exec(t)?.[1];
+  if (!tag) return null;
+  if (DEL_RUNNER[tag]) return evaluar(DEL_RUNNER[tag], { github });
+  const cable = new RegExp(`${tag}: \\$\\{\\{ steps\\.version\\.outputs\\.sha \\}\\}`).test(t);
+  const derivacion = /id: version[\s\S]*?\n\s+SHA: (\$\{\{[^\n]+\}\})/.exec(t)?.[1];
+  if (!cable || !derivacion) return null;
+  return evaluar(derivacion, { github });
+}
+
+/** El commit que produccion promueve cuando no se elige ninguno. */
+function defectoDeProduccion(t, github) {
+  const variable = /SHA="\$\{VERSION:-\$\{([A-Z_]+)\}\}"/.exec(t)?.[1];
+  if (!variable || !DEL_RUNNER[variable]) return null;
+  return evaluar(DEL_RUNNER[variable], { github });
+}
 
 test("MUERDE: si se corta el cable entre el paso que elige y el que promueve, se caza", () => {
   // El otro extremo de la cadena: el paso puede elegir bien y el comando promover

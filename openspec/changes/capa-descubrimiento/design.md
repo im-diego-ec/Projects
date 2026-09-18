@@ -1,11 +1,11 @@
 ---
 artefacto: design
 dri: Builder 1
-aprueba: Builder 2 (builder par)  # el delta lo gatea además PO (PO) por CODEOWNERS
+aprueba: revision adversarial (desvio del marco: un solo mantenedor, ver AGENTS.md)  # el delta lo gatea además PO (PO) por CODEOWNERS
 informado: PO
 estado: pendiente-de-revision
 experimental: true
-veredicto_antes_de: 2026-09-21
+veredicto_antes_de: 2026-10-15  # era 2026-09-21; la corrio el PO el 2026-09-17 (D3), motivo en proposal.md
 ---
 
 # capa-descubrimiento — Design
@@ -336,6 +336,15 @@ un fallo; en un gate, la ausencia de número inventa un éxito.
 
 ### D7 — (obligatoria) El estado experimental caduca por fecha, y el marco lo hace cumplir
 
+> **Actualización del 2026-09-17.** Esta decisión ya no vive acá: el requirement, el paso
+> y su banco salieron al change `el-experimental-caduca`, que es donde está su diseño
+> vigente (con tres ajustes que el texto de abajo no trae: el lector de frontmatter
+> descarta los comentarios de YAML, un `experimental:` que no es booleano es rojo, y una
+> fecha que no existe en el calendario también). Lo de abajo queda como historia del
+> motivo. La «salida escrita» del último párrafo se tomó antes del veredicto y no
+> después, porque esperar el desenlace era apostar a que la compuerta sobreviviera a un
+> descarte.
+
 Un change activo y sin archivar **es** el estado experimental nativo del marco:
 la propuesta existe, está revisada, es citable y no es contrato. Es el mecanismo
 correcto y tiene un modo de falla obvio: el zombi. Un change que nadie archiva ni
@@ -532,8 +541,11 @@ es el peor lugar posible para descubrir un error de este repo.
 Destino, escrito acá y no como intención: **check propuesto** para el CI de Projects,
 que si el cuerpo del canónico cambia y el `manifiesto.json` no gana una entrada de
 versión nueva, sea rojo. Es dogfoodeable, a diferencia del transporte del artefacto,
-porque no necesita un consumidor: compara dos archivos de este repo. Va como tarea
-4.5, y no depende del veredicto del piloto. El corte de la versión en sí es la
+porque no necesita un consumidor: compara dos archivos de este repo. Iba como tarea
+4.5, y no depende del veredicto del piloto (desde el 2026-09-17 está hecha en el
+change `el-experimental-caduca`, adaptada: la huella que Projects agregó después de
+esta medición ya caza el cuerpo que cambia con el manifiesto intacto, y lo que faltaba
+era que no se pudiera pegar la huella nueva sobre una versión ya publicada). El corte de la versión en sí es la
 tarea 4.6, y es humana.
 
 **Alternativa descartada: poner solo la mitad operativa en el canónico y nada en el
@@ -571,6 +583,9 @@ versión del canónico se corta cuando una persona la corte.
 > veredicto vence, y el pipeline SHALL rechazar el repositorio cuando esa fecha
 > pase sin veredicto, o cuando el change se declare experimental sin fecha.
 
+Este segundo enunciado **salió del delta de este change el 2026-09-17**: su versión
+vigente, con escenarios, está en `openspec/changes/el-experimental-caduca/`.
+
 > **Requirement: El descubrimiento se produce fuera del repositorio y entra como
 > insumo de la sesión** (D11)
 >
@@ -601,7 +616,7 @@ el nombre del directorio declarado; las propiedades siguen siendo las mismas.
 | El corpus se produce fuera del repositorio y no queda residente (D11) | **— sin check** | mismo límite que la fila anterior, y por la misma razón: el detector no ve un nombre. La mitigación es la misma y es real: la trazabilidad funciona **sin** el corpus, así que subirlo no compra nada. Lo que sí se puede verificar es lo que ya verifica el requirement 1: que el artefacto derivado no tenga forma de contrato |
 | Un insumo con forma de contrato que no sea un `.md` (por ejemplo un prototipo) | **— sin check, y el diseñado es ciego** | el check de forma busca encabezados de delta y escenarios; un prototipo HTML no trae ninguno de los dos y pasaría. Es el caso más peligroso y hoy queda cubierto solo por G6, o sea lectura humana. Declarado en `piloto/pre-registro.md`, sección 4 |
 | Un insumo con la SUSTANCIA de un escenario pero sin la palabra | **— sin check, y las dos herramientas no se ponen de acuerdo** | medido el 2026-08-21: `validate --all --strict` cuenta el **encabezado `####`**, no la palabra. Un requirement cuyos tres escenarios se renombran a `#### <cualquier cosa>` sale **0**; borrarles el encabezado y dejar los `WHEN`/`THEN` sale **1**. El check de D2, en cambio, va a buscar el literal `#### Scenario:`. O sea que un artefacto con `#### <algo>` más `WHEN`/`THEN` es un contrato para el validador y un documento cualquiera para el check de forma. Al diseñar 5.1 hay que buscar la **estructura**, no la palabra |
-| El canónico gana una regla sin subir de versión | **— sin check, y el rojo cae río abajo** | medido el 2026-08-21 (D11): la suite de Projects sale **0** con 203 pruebas y el consumidor al día sale **1** con `::error::`. Destino: tarea 4.5 |
+| El canónico gana una regla sin subir de versión | **— sin check, y el rojo cae río abajo** | medido el 2026-08-21 (D11): la suite de Projects sale **0** con 203 pruebas y el consumidor al día sale **1** con `::error::`. Destino: tarea 4.5. **Cerrado el 2026-09-17**: la huella de `actions/constitucion/pruebas/huella-del-canonico.test.mjs` cobra el cuerpo que cambia, y el job `canonico-versionado` de `.github/workflows/ci.yml` cobra la huella pegada sobre una versión publicada (change `el-experimental-caduca`) |
 | La procedencia es buena, no solo existente | **— sin check, y no puede haberlo** | ver la última sección |
 
 ## El pre-registro, y qué se commitea antes de arrancar

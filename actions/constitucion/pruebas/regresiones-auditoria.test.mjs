@@ -718,8 +718,8 @@ test("la propiedad se busca dentro de UNA entrada, no en la concatenacion del ar
 //
 // El programa de ese paso va inline en el YAML (un heredoc no puede cerrar dentro de
 // un bloque indentado), así que la prueba lo EXTRAE del workflow y lo corre. Es la
-// única forma de que el código que llega a todos los consumidores por `@v1` pase por
-// un caso controlado.
+// única forma de que el código que llega a todos los consumidores con cada versión
+// pase por un caso controlado.
 // ---------------------------------------------------------------------------
 
 /** Saca el programa inline del paso de permisos del `marco-ci.yml` y lo deja en un
@@ -803,7 +803,7 @@ test("el recorte toca SOLO el separador final: los dos puntos de una ruta no se 
 // A06 · «El guardrail de deltas tiene un hueco conocido: si el título de un
 //        requirement del bloque MODIFIED no existe en el spec vivo, NO avisa»
 //
-// REFUTADA: avisa y sale 1, y el arreglo ya viaja por `@v1` a todos los
+// REFUTADA: avisa y sale 1, y el arreglo ya viaja con la action a todos los
 // consumidores. Medido de nuevo el 2026-08-20 sobre un fixture propio: el MODIFIED
 // huérfano da exit 1 nombrando las dos salidas legítimas (moverlo a ADDED o
 // declarar el retitulado en RENAMED), y el MODIFIED que pierde escenarios también
@@ -822,7 +822,7 @@ test("el canonico ya no manda a revisar a mano el hueco que el guardrail de delt
   assert.equal(
     /hueco conocido/.test(openspec),
     false,
-    "el canonico sigue anunciando un hueco que actions/guardrail-deltas cierra y que viaja por @v1 a todos los consumidores",
+    "el canonico sigue anunciando un hueco que actions/guardrail-deltas cierra, y ese guardrail le llega a cada consumidor con la version que pina",
   );
   assert.match(openspec, /guardrail de deltas/, "al borrar el hueco se perdio la mencion del guardrail que si existe");
   assert.match(

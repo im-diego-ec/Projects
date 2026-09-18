@@ -681,9 +681,9 @@ function tapaElRojoEn(mapa) {
  *
  * POR QUÉ CUALQUIER FILTRO DE `paths` DESCALIFICA, y es más estricto que preguntar si
  * los archivos protegidos matchean. Esta compuerta no se dispara solo cuando alguien
- * EDITA el artefacto: el artefacto vence por FECHA (`exigible_desde`), así que un PR
- * que no toca ningún archivo de la constitución es exactamente uno donde el rojo tiene
- * que aparecer igual. Y hay una segunda razón, que es una regla del propio marco: el
+ * EDITA el artefacto: el artefacto se atrasa cuando se mueve el PIN —el PR de bump
+ * toca un workflow, no la constitución—, así que un PR que no toca ningún archivo de
+ * la constitución es exactamente uno donde el rojo tiene que aparecer igual. Y hay una segunda razón, que es una regla del propio marco: el
  * check requerido es el veredicto agregado, y un workflow filtrado por `paths` no
  * reporta en los PRs que saltea — que es el error que ya costó una semana de ruleset
  * esperando una señal que no llegaba. Ningún filtro de rutas puede demostrarse seguro
@@ -1479,7 +1479,8 @@ const JOB_SUGERIDO = [
   "      - uses: actions/checkout@v7",
   "      - uses: actions/setup-node@v7",
   '        with: { node-version: "22" }',
-  // Version exacta y no @v1: el tag mayor EXISTE pero es interno del marco, y un
+  // Version exacta y no @v1: el tag mayor EXISTE pero no es un canal —solo lo
+  // resuelven por dentro las versiones del marco publicadas hasta la 1.9.6—, y un
   // consumidor pinado a @v1 no recibe PR de bump de Dependabot ni aparece en el
   // censo — el modo de falla mas callado del bootstrap (README.md, «Nunca @v1 en el
   // repo de un proyecto»).

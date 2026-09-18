@@ -1,14 +1,24 @@
 ---
 artefacto: design
 dri: Builder 1
-aprueba: Builder 2 (builder par)
+aprueba: revision adversarial (desvio del marco: un solo mantenedor, ver AGENTS.md)
 informado: PO
-estado: pendiente-de-revision
+estado: en-ejecucion
 ---
 
 # reglas-al-dia — Design
 
 ## Context
+
+> **Nota del 2026-09-17: de quién son los hechos de esta sección.** El design se
+> escribió el 2026-08-19, antes de que Projects se bifurcara de Rigel (2026-08-24).
+> «El consumidor viejo» y «el repositorio en adopción» son dos repositorios de ese
+> linaje, **no consumidores de Projects**; el segundo figuraba con un nombre de esta
+> cuenta que era un renombrado mecánico, y ese nombre se retiró. Los hechos quedan
+> como el porqué del mecanismo. Lo que cambió desde entonces en el árbol —el canal
+> por versión exacta, la ventana retirada, el bloque 6 no aplicable— está dicho donde
+> corresponde: en D6, en «Cómo se hace cumplir solo» y en la sección final
+> «Auditoría de cierre».
 
 El área implementa con agentes. En ese modo **las reglas que el agente lee SON el
 producto**: una regla que no entra al contexto de la sesión no existe, por bien
@@ -25,9 +35,8 @@ este.
 
 Tres hechos verificados hoy, que juntos vuelven insostenible el carril actual:
 
-**1. El scaffold ni siquiera entrega bien la primera vez.** La adopción de
-intranet (`im-diego-ec/intranet`, rama `projects/adopcion-marco`, PR #1,
-abierta hoy) copió `plantilla/AGENTS.md` y el resultado tiene 241 líneas contra
+**1. El scaffold ni siquiera entrega bien la primera vez.** La adopción del
+segundo de esos repositorios (su PR de adopción, abierto ese día) copió `plantilla/AGENTS.md` y el resultado tiene 241 líneas contra
 355. No es reflujo de formato: se perdieron reglas enteras. De las 7 viñetas ✅
 quedaron 5, de las 9 🛑 quedaron 8. Concretamente desapareció la regla de
 ejecutores que descargan (`plantilla/AGENTS.md:225-232`) — la única del bloque ✅
@@ -41,12 +50,12 @@ ejecutor.
 **2. Y donde el texto llegó, llegó cambiado en la sustancia.** La 🛑 de
 `plantilla/AGENTS.md:253-256` dice que la instancia dev del proveedor de
 identidad es **separada** y que el modo real exige `APP_ENV=prod` como guard
-estructural. La copia de intranet (`AGENTS.md:173`) dice que «dev usa la
+estructural. La copia del repositorio en adopción (`AGENTS.md:173`) dice que «dev usa la
 instancia real de Clerk pero con datos de prueba», y la cadena `APP_ENV` no
 aparece ni una vez en el archivo. Esa regla nació del incidente del 2026-07-28,
 cuando el scheduler de dev notificó a usuarios reales y cuatro empleados
 «reservaron» en el ambiente de pruebas (`projects/README.md:39`). Un agente que
-mañana trabaje en intranet lee una constitución que autoriza justo lo que ese
+mañana trabaje en ese repositorio lee una constitución que autoriza justo lo que ese
 incidente prohibió, y nada en el repo lo señala.
 
 **3. En el consumidor viejo la divergencia ya corre en las dos direcciones.**
@@ -230,8 +239,8 @@ puede fallar cerrado en las dos direcciones, así que se separan:
   (`marco-ci.yml:942`, que mira archivos rastreados no-`.md`). Meterlo también
   acá sería doble contabilidad, y en una doble contabilidad la declaración
   siempre pierde contra el check.
-- **Repo sin allowlist versionado** (el caso de intranet, que no tiene `.claude/`
-  en absoluto): `::warning::` ruidoso, nunca verde mudo. Es el límite que el
+- **Repo sin allowlist versionado** (el caso del repositorio en adopción, que no
+  tenía `.claude/` en absoluto): `::warning::` ruidoso, nunca verde mudo. Es el límite que el
   check vecino ya declara (`marco-ci.yml:940-942`): lo rastreado es lo único que
   se puede mirar.
 
@@ -270,9 +279,8 @@ acuerde:
    ignoró cuatro PRs.
 
 La asimetría hay que decirla: **el check llega por el carril referenciado, a
-todos, gratis** (el `ci.yml:55` del consumidor viejo e
-`intranet/.github/workflows/ci.yml:17` ya hacen
-`uses: .../marco-ci.yml@v1`); **el escritor es scaffold**, o sea la forma que
+todos, gratis** (el `ci.yml:55` del consumidor viejo y el `ci.yml:17` del
+repositorio en adopción ya hacían `uses: .../marco-ci.yml@v1`); **el escritor es scaffold**, o sea la forma que
 este change existe para arreglar. No es circular porque el check es lo que
 fuerza la situación: un consumidor sin ese workflow igual se pone amarillo y
 después rojo, y el modo verificar sube el artefacto corregido como
@@ -284,6 +292,35 @@ Un cambio urgente —una corrección de seguridad, o una regla que ya causó un
 incidente— puede acortar la ventana con `urgente: true`, y esa marca es una
 decisión que se justifica en la sección «Para consumidores» del CHANGELOG. Se
 nombra la puerta de atrás en vez de fingir que no existe.
+
+> **Corregido el 2026-09-17, contra el árbol: las dos mitades de D6 ya no son como
+> están escritas arriba.**
+>
+> 1. **El piso de 28 días se retiró** en la 1.6.0 (2026-08-22, change
+>    `ventana-vencida`), y con él la marca `urgente`. Su premisa era el tag móvil:
+>    desde el 2026-08-21 el marco se consume por versión exacta, y el rojo de una
+>    versión nueva aparece **dentro del PR de bump**, donde se lee antes de mergear.
+>    El mecanismo de fechas quedó como opt-in de quien publica
+>    (`actions/constitucion/constitucion.mjs:111-127`), y todas las versiones de
+>    `actions/constitucion/canonico/manifiesto.json` declaran `exigible_desde` igual
+>    a `publicada`. Lo que el CI de Projects rechaza hoy es una exigibilidad
+>    **anterior** a la publicación (`constitucion.test.mjs:703`), no una demasiado
+>    cercana. Y desde el change `ventana-vencida` (2026-09-17) tampoco es opt-in:
+>    `actions/constitucion/pruebas/la-ventana-no-vuelve.test.mjs` pone rojo una
+>    `exigible_desde` distinta de `publicada`.
+> 2. **El PR que se abre solo es el del bump, no el del artefacto.** El
+>    `actualizar-marco.yml` del andamio existe y abre PR, pero corre la action con el
+>    pin que el repo **ya** tiene, así que ante una versión nueva regenera el artefacto
+>    viejo: es un no-op para su propio caso de uso, y el propio archivo lo declara
+>    (`plantilla/.github/workflows/actualizar-marco.yml:14-32`). El bump lo propone
+>    Dependabot y nace rojo; el arreglo mientras tanto es bajar el artifact
+>    `constitucion-al-dia` y commitearlo sobre la rama del bump —y ese artifact hoy
+>    sale vacío por los archivos ocultos: `tasks.md`, tarea 5.3—. Que pin y artefacto
+>    viajen juntos es el ADR 005 y queda fuera de este change.
+>
+> El delta se corrigió en consecuencia: la propiedad es «la versión llega en un PR
+> que nadie tuvo que abrir, y el rojo está adentro de ese PR», no «avisa durante una
+> ventana».
 
 ### D7 — La ausencia es roja, no `exit 0` mudo
 
@@ -322,6 +359,13 @@ validación contra un consumidor real antes de mover `v1`
 > alguna de las superficies de instrucciones que el repositorio declara para sus
 > agentes.
 >
+> Una versión nueva SHALL llegar dentro del pull request que propone subir el pin,
+> abierto sin intervención humana; el atraso SHALL ser un fallo desde el día en que
+> la versión se publica —o sea, dentro de ese pull request—, salvo que la versión
+> declare de antemano una exigibilidad posterior. *(Párrafo reescrito el 2026-09-17:
+> decía que el atraso avisaba durante una ventana y que el pull request traía el
+> artefacto regenerado, y ninguna de las dos cosas es lo que hace el árbol.)*
+>
 > Un proyecto SHALL poder apartarse de una regla declarando el desvío con la
 > regla que anula y su motivo escrito; el desvío SHALL quedar impreso junto a esa
 > regla dentro del mismo artefacto que los agentes cargan, y SHALL caducar
@@ -341,10 +385,13 @@ el emisor; la propiedad sigue siendo la misma.
 
 - **WHEN** el marco publica una versión con una regla nueva y un repositorio
   consumidor no modifica una sola línea
-- **THEN** en el repositorio se abre solo un pull request con el artefacto
-  regenerado, y su pipeline avisa en cada corrida que el artefacto está atrasado,
-  indicando desde qué fecha eso pasa a ser un fallo
-- **AND** desde esa fecha el pipeline falla hasta que el artefacto quede al día
+- **THEN** en el repositorio se abre solo un pull request que sube el pin a esa
+  versión, y dentro de ese pull request el pipeline falla nombrando la versión que
+  declara el artefacto y la que publica el marco, con el arreglo escrito en el
+  mensaje
+- **AND** mientras ese pull request no se integre, el pipeline de la rama de
+  integración sigue verificando contra la versión pinada y no cambia de veredicto
+  por la publicación
 
 #### Scenario: El artefacto existe y ningún agente lo carga
 
@@ -384,22 +431,38 @@ el emisor; la propiedad sigue siendo la misma.
 
 ## Cómo se hace cumplir solo
 
+> **Tabla reescrita el 2026-09-17 contra el árbol.** La original nombraba un paso
+> inline «Constitucion del marco al dia» del job `higiene` que se **borró** el
+> 2026-08-20 (dos verificadores que ya discrepaban; queda uno solo, la action), y una
+> fila de «ventana de gracia de 28 días» que se retiró el 2026-08-22. Cada fila de
+> abajo apunta a lo que corre hoy.
+
 | Requirement | Check | Falla cuando |
 |---|---|---|
-| Artefacto presente y al día | paso `Constitucion del marco al dia` (job `higiene` de `marco-ci.yml`) | falta el artefacto, o su versión declarada es menor que la exigible; antes de `exigible_desde` es `::warning::`, después `::error::` |
-| El contenido es el que el marco publica | ídem | el cuerpo difiere del re-render de la versión que declara, comparado con fin de línea normalizado |
-| Cadena de carga intacta, por superficie declarada | ídem | una superficie declarada no referencia el artefacto fuera de comillas y bloques de código |
-| Desvío con motivo escrito | ídem | el motivo falta o está vacío |
-| Desvío que sobrevivió a su regla | ídem | el id que nombra no existe en el canónico de la versión vigente |
-| Permisos del agente sin autorización de escritura | paso `Permisos del agente sin escritura` (nuevo) | una entrada del allowlist autoriza una operación mutante y no está declarada como desvío |
-| Ejecutores del allowlist pinados | `Ejecutores de paquetes pinados`, **ya existente** (`marco-ci.yml:942`) | una invocación por un ejecutor que descarga no lleva versión exacta |
-| Piso de permisos recomendado | ídem paso nuevo, `::warning::` | falta una entrada del piso — **rojo a propósito no, porque un permiso de menos es fricción y no riesgo** |
-| Allowlist no versionado | ídem paso nuevo, `::warning::` | el repo no rastrea `.claude/settings.json`: lo no rastreado no se puede mirar, y callarse sería declararlo sano |
-| La ventana de gracia existe de verdad | check en el CI de **Projects** | una versión del canónico declara `exigible_desde < publicada + 28 días` |
+| Artefacto presente y al día | job `constitucion` de `plantilla/.github/workflows/ci.yml:89`, que corre `actions/constitucion` en modo `verificar` (`:115-117`) y cuelga de `ci-ok` (`:594-615`) | falta el artefacto (`artefacto-faltante`, `constitucion.mjs:1154`) o declara una versión menor que la del canónico pinado (`artefacto-atrasado`, `:1177`): `::error::` desde el día de publicación; `::warning::` solo si esa versión declaró de antemano una exigibilidad posterior |
+| El contenido es el que el marco publica | ídem | el cuerpo difiere del re-render de la versión que declara, con fin de línea normalizado (`artefacto-divergente`, `:1277`); una cabecera subida a mano tampoco pasa (`artefacto-sello-incoherente` y `artefacto-adelantado`, `:1245-1266`) |
+| Cadena de carga intacta, por superficie declarada | ídem | una superficie declarada no importa el artefacto fuera de bloques de código (`cadena-rota`, `:1288` y `:1296`) |
+| Desvío con motivo, aprobador y fecha | ídem | falta cualquiera de los tres (`desvio-sin-motivo`, `desvio-sin-aprobador`, `desvio-sin-fecha`, `:889-930`) |
+| Desvío que sobrevivió a su regla | ídem | el id que nombra no existe en el canónico de la versión pinada (`desvio-muerto`, `:906`), con el motivo en el mensaje |
+| Que el consumidor cablee la verificación | job `constitucion-cableada` de `marco-ci.yml:3871`, modo `cableado` (`:3900`) | el repo versiona `.projects-valores.json` y ningún workflow que GitHub ejecute invoca la verificación colgada del veredicto (aviso si todavía no adoptó) |
+| Permisos del agente sin autorización de escritura | paso `Permisos del agente sin escritura` (`marco-ci.yml:3149`) | una entrada del allowlist autoriza una operación mutante y no está declarada como desvío |
+| Ejecutores del allowlist pinados | `Ejecutores de paquetes pinados`, **ya existente** (`marco-ci.yml:1956`) | una invocación por un ejecutor que descarga no lleva versión exacta |
+| Piso de permisos recomendado | `actions/constitucion` (lo declara el manifiesto y lo mide quien lo transporta), `::warning::` | falta una entrada del piso — **rojo a propósito no, porque un permiso de menos es fricción y no riesgo** |
+| Allowlist no versionado | paso `Permisos del agente sin escritura`, `::warning::` (`marco-ci.yml:3237`) | el repo no rastrea `.claude/settings.json`: lo no rastreado no se puede mirar, y callarse sería declararlo sano |
+| El manifiesto del canónico es válido | job `pruebas_actions` del `ci.yml` de **Projects** (`.github/workflows/ci.yml:142-156`), sobre `actions/constitucion/pruebas/` | una versión declara una exigibilidad **anterior** a su publicación, las versiones están desordenadas o les faltan fechas, o el canónico se pasa de su presupuesto de líneas (`constitucion.test.mjs:703`, `:745`, `:768`, `:779`) |
 | El `AGENTS.md` del proyecto no contradice al artefacto | **— sin check** | no hay forma mecánica de distinguir «lo dice distinto» de «lo contradice». La mitigación real es de migración: el texto derivado del marco se borra del archivo del proyecto, así el duplicado no existe |
 | El agente obedece lo que lee | **— sin check, y no puede haberlo** | ver la última sección |
 
 ## Migración de los dos consumidores
+
+> **Nota del 2026-09-17: los bloques 1 y 2 NO APLICAN a Projects.** Los dos
+> repositorios que migran acá son del linaje anterior a la bifurcación (ver la nota al
+> principio de *Context*), no consumidores de Projects. Se conservan como el registro
+> de por qué el bloque 0 era bloqueante —que sí se cumplió: el canónico trae lo
+> rescatado— y el `tasks.md` declara el bloque 6 no aplicable, con su motivo. Los
+> consumidores reales de Projects nacieron después de que el mecanismo existiera: el
+> arranque les genera el artefacto (`herramientas/projects-init.mjs:3949-3952`), así
+> que no hay nada que migrar, solo que medir en el cierre (tarea 7.3).
 
 El orden importa y el primer bloque es bloqueante: **si la primera regeneración
 corre antes de subir lo que hoy solo vive en los consumidores, el escritor lo
@@ -436,8 +499,8 @@ invariantes, la tabla de Ambientes con el CORS, y la regla de ejecutores
 pinados — cuya ausencia hoy convive con un `settings.json:4-8` que autoriza
 `npx --yes openspec`.
 
-**Bloque 2 — `intranet`.** Es el caso más urgente aunque parezca el más nuevo: su
-adopción está **abierta y sin mergear** (PR #1, rama `projects/adopcion-marco`), así
+**Bloque 2 — el repositorio en adopción.** Es el caso más urgente aunque parezca el
+más nuevo: su adopción está **abierta y sin mergear** (su PR de adopción), así
 que la corrección entra antes de que la copia lossy quede en `main`. Su `ci.yml`
 ya llama a `@v1` (`:17`). Se hace en el mismo PR de adopción: `.projects-valores.json`,
 render, y su `AGENTS.md` baja a lo propio —tabla de stack, «no existe
@@ -455,6 +518,14 @@ aplica y el paso se publica en MINOR con la ventana de gracia activa, o sea
 amarillo para todos desde el día uno. `v1` se mueve **después** de que los dos
 PRs de migración estén mergeados y verificados, que es lo que exige
 `projects/AGENTS.md:150-156`.
+
+> **Corregido el 2026-09-17.** El estreno ocurrió en la 1.3.0 (MINOR, 2026-08-21), y
+> ese mismo día `v1` dejó de ser el canal: desde entonces cada versión llega como PR
+> de bump con el pin exacto, el rojo aparece dentro de ese PR y la ventana de gracia
+> se retiró en la 1.6.0. Mover `v1` ya no estrena nada (`AGENTS.md`, «Versionado»: la
+> única línea que lo usa es la de `actions/guardrail-deltas`). Lo que sigue en pie de
+> este párrafo es la regla 🛑 de no publicar sin probar contra un consumidor real, y
+> es la del release, no la de este change.
 
 ## Lo que este diseño NO resuelve
 
@@ -509,3 +580,79 @@ PRs de migración estén mergeados y verificados, que es lo que exige
 - **Projects no se dogfoodea acá** (D7), y además hoy su propio `.claude/` no está
   rastreado, así que el check de artefactos regenerados sale mudo en el repo que
   lo publica. Rastrearlo es un ítem del tasks, independiente de este mecanismo.
+  *(Rastreado desde entonces: tarea 1.2, `git ls-files .claude` → 6 archivos.)*
+
+## Auditoría de cierre (2026-09-17)
+
+El change llegó a esta fecha con **2/41** tareas tildadas y casi todo construido: las
+piezas entraron por los changes que vinieron después y ninguno volvió a marcarlas. La
+pasada de cierre audita cada tarea contra el árbol, corrige lo que el árbol desmiente
+y deja el change listo para archivar cuando el PO apruebe el delta. Es el porte de la
+misma auditoría que Rigel hizo sobre su copia (1.11.0: `ccb4c8a`, de 2/41 a 31/41;
+`9f8fec7`, bloque 7 reescrito; archivado después en `15724a7`).
+
+### Clasificación de lo que toca esta pasada
+
+| Pieza | Forma | Por qué esa y no otra |
+| --- | --- | --- |
+| `tasks.md`, `proposal.md`, `design.md` de este change | ninguna: artefacto de trabajo del marco | No viajan a ningún repositorio. Son el registro del porqué, y al archivar pasan a historia |
+| El delta de `gobierno-contribucion` | **canónico** | Al archivar se funde en `openspec/specs/`, que vive solo en Projects: los proyectos lo cumplen, no lo copian. Por eso lo aprueba el PO, y el desvío de la revisión cruzada no lo alcanza |
+| `migracion-intranet.md` (borrado) | ninguna | Era el diff de un repositorio ajeno a Projects. Borrarlo no le cambia nada a nadie que consuma el marco |
+| `docs/11-reglas-no-escritas.md` (tarea 7.5) | documentación del marco | Se lee en este repositorio; no la hereda ningún proyecto |
+
+**Nada de esta pasada es referenciado, scaffold ni regenerado**: no cambia ninguna
+línea que un consumidor ejecute, reciba por bump o regenere. Para los tres
+consumidores reales el impacto es **cero**, y archivar tampoco lo cambia: el
+mecanismo lo corren desde la 1.3.0.
+
+### Qué se corrigió del delta, y por qué es de fondo
+
+El requirement decía que el atraso **avisaba sin bloquear** entre la publicación y
+una fecha declarada, y que la puesta al día llegaba como un **pull request con el
+artefacto regenerado**. El árbol no hace ninguna de las dos: desde la 1.6.0 el atraso
+es rojo el día que la versión se publica (la fecha posterior quedó como opt-in que
+ninguna versión usa, y desde el change `ventana-vencida` un banco la rechaza), y el pull request que llega solo es el del bump de Dependabot, sin el
+artefacto adentro. Archivar el texto viejo habría escrito en el contrato vivo una
+promesa que el marco no cumple. El texto nuevo enuncia lo que sí se sostiene: la
+versión llega en un pull request que nadie tuvo que abrir, el rojo aparece adentro de
+ese pull request, y mientras no se integre la rama de integración no cambia de
+veredicto.
+
+Verificado a mano, porque el guardrail de deltas no ve estos casos: el título del
+`ADDED` **no existe** en `openspec/specs/gobierno-contribucion/spec.md` (los tres
+requirements vivos son plantilla de PR, CODEOWNERS y protección de la rama) ni en
+ningún otro delta activo de esa capability. No hay `MODIFIED`: la nota del plan que
+pedía reproducir escenarios vigentes no aplica a este delta.
+
+### Alternativas descartadas
+
+- **Archivar ahora, con el delta como estaba.** Descartado: escribía en el spec vivo
+  la ventana que la 1.6.0 retiró y un PR que el andamio no abre. Un change cuyo
+  contrato miente no se archiva aunque sus casillas digan que sí.
+- **Dejar el bloque 6 como «diferido», como hizo Rigel con su tercer consumidor.**
+  Descartado: allá el repositorio existía y era suyo, así que diferir tenía una fecha
+  posible de vuelta. Acá los dos repositorios no son de Projects; «diferido» prometería
+  una migración que nadie va a hacer. «No aplica», con el motivo escrito y lo que cada
+  tarea protegía nombrado al lado, es la conclusión honesta.
+- **Borrar las tareas del bloque 6 y del bloque 7 en vez de reescribirlas.**
+  Descartado: el conteo pasaría de 41 a otro número sin que nadie pueda ver por qué, y
+  el razonamiento de por qué ya no aplican es justo lo que el próximo lector necesita.
+- **Arreglar en este change el artifact que sale vacío (tarea 5.3).** Descartado: son
+  dos líneas del andamio, pero son contrato para los consumidores y las porta el
+  change `el-marco-deja-de-afirmar-lo-que-no-hace`, que se trabaja en paralelo.
+  Editar las mismas líneas desde dos changes es un conflicto seguro a cambio de nada;
+  la tarea queda abierta con el motivo.
+
+### Qué hace cumplir esto solo
+
+Lo que este change entrega ya tiene sus checks, uno por fila en «Cómo se hace cumplir
+solo». Lo que esta pasada agrega no es mecanismo sino verdad sobre el mecanismo, y lo
+sostienen checks que ya existen: `openspec validate --all --strict` sobre el delta
+corregido, `pruebas/ci-del-marco/desvio-de-review-del-marco.test.mjs` (el `aprueba:`
+del proposal sigue nombrando al PO, porque el delta toca `gobierno-contribucion`),
+`pruebas/ci-del-marco/changes-citan-lo-que-existe.test.mjs` (toda cita del canónico
+en este change apunta a un archivo que existe) y el banco de `pruebas/docs/` sobre la
+sección nueva de `docs/11-reglas-no-escritas.md`. **Lo que ningún check hace**: que
+las casillas de un `tasks.md` describan el árbol. Esta auditoría es una lectura, y la
+próxima vez que un change quede atrás de su árbol nada se va a poner rojo; la
+contención es la revisión adversarial antes del archive, que exige el desvío del marco.

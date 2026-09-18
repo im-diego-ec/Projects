@@ -1,6 +1,7 @@
 {
   "nota": "Ledger de versiones de la PORCION DEL MARCO de la constitucion. La version es la del release de Projects que la publica: si el release sale con otro numero, se corrige esta entrada en el MISMO PR del release. Las secciones se derivan del arbol (NN-*.md), no de una lista aca.",
-  "presupuesto_lineas": 700,
+  "presupuesto_lineas": 738,
+  "presupuesto_nota": "COMO SE MIDE, que es lo que el manifiesto no decia hasta el 2026-09-17: el check NO cuenta `wc -l` sobre los NN-*.md. `leerCanonico()` arma un solo cuerpo pegando las secciones con una linea en blanco entre cada par, asi que cobra la suma de los archivos MAS (secciones - 1): con diez secciones, nueve lineas mas. El unico numero que vale es el campo `lineas` que devuelve `leerCanonico()`, el mismo que cobra el check; con `wc -l` no se puede saber, y `actions/constitucion/pruebas/presupuesto-del-canonico.test.mjs` verifica que esa aritmetica siga siendo la que describe esta nota. Medido el 2026-09-17 antes de subirlo: `wc -l` daba 687 y `leerCanonico()` 696 de 700, o sea cuatro de margen y no trece. Rigel midio el mismo error sobre su propia nota (2c9e5e5): creia tener diez de margen y tenia cero. DECISION DEL 2026-09-17 (change el-canonico-dice-como-se-trabaja): el presupuesto sube de 700 a 738 y quedan 733 usadas. Las 37 lineas nuevas son reglas, no espacio libre: las cuatro de revision con meta en `40-fronteras` (23), el estado terminado en local y no cerrado pegado a la definicion de terminado en `30-git-despliegue` (10) y la remision a congelar el insumo en `10-openspec` (4); el enlace al issue macro y los residuos del renombrado en `90-marca` entraron con cero lineas. Van juntas en UNA version porque cada version del canonico deja rojo el PR de bump de cada consumidor hasta que regenera. Las cinco que sobran son colchon de mantenimiento -reajustar un parrafo, corregir una linea que se desborda- y NO alcanzan para una regla nueva, que necesita su comentario de id, su cuerpo y sus blancos: agregar una regla vuelve a ser una decision con su numero, y quien la tome reescribe esta nota (el banco lo exige: la nota nombra el presupuesto vigente). NO SALE NINGUNA REGLA: los ids son estables, y un desvio que nombra un id borrado es `desvio-muerto`, rojo en un consumidor que no hizo nada. Si el margen se vuelve a consumir, el arreglo no es subirlo sin mirar: es preguntarse que sale. Medido el 2026-09-17 donde podria salir: `40-fronteras` son 176 lineas con 29 reglas y no tiene grasa; `10-openspec` son 96 con 7, y sus cuatro reglas mas largas (`openspec-flujo`, `openspec-validar-tras-editar`, `openspec-ciclo-de-vida`, `openspec-change-o-pr-directo`) suman 52 lineas con texto, buena parte explicacion que podria vivir en la documentacion.",
   "piso_permisos": [
     {
       "nombre": "el linter",
@@ -55,6 +56,12 @@
       "publicada": "2026-08-31",
       "exigible_desde": "2026-08-31",
       "huella_canonico": "3180d942a463f4a8db5db9ae118b9cfc3b0ffa25527d570acde49e9d14a53c28"
+    },
+    {
+      "version": "1.10.0",
+      "publicada": "2026-09-17",
+      "exigible_desde": "2026-09-17",
+      "huella_canonico": "c58a8cd98a2d81bb37baabc4cffa1e44cbbb4f30f64bd7ff2194b17455bc98f2"
     }
   ]
 }

@@ -34,8 +34,8 @@
 
 <!-- projects:regla id=github-closes-apunta-al-sub-issue -->
 
-- `Closes` apunta solo al sub-issue 1:1; el issue macro del change lo cierra
-  únicamente el PR final del change.
+- `Closes` apunta solo al sub-issue 1:1; al issue macro lo enlaza únicamente el PR
+  final, y con la misma exigencia: en el cuerpo desde la creación.
 
 <!-- projects:regla id=github-labels -->
 

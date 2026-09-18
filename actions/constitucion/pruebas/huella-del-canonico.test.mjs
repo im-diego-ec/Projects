@@ -35,6 +35,15 @@ const MANIFIESTO = path.join(CANONICO, "manifiesto.json");
 // lleva la huella del texto que publica. Si el texto cambia y la huella no, esto
 // se pone rojo — que es exactamente el momento en que hay que decidir si eso es
 // una version nueva.
+//
+// LA MITAD QUE ESTE BANCO NO PUEDE VER: que alguien pegue la huella nueva sobre
+// la entrada de una version que YA SALIO. Este archivo solo mira el arbol de hoy
+// y ahi la huella coincide; para verlo hace falta la base del PR. Medido el
+// 2026-09-17 sobre el arbol de f6a01ac: con una regla nueva en 40-fronteras.md y
+// la huella pegada sobre la 1.7.0, los 418 casos de actions/ salen en verde. Lo
+// cobra el job `canonico-versionado` de .github/workflows/ci.yml (change
+// el-experimental-caduca), con su banco en
+// pruebas/ci-del-marco/canonico-versionado.test.mjs.
 // ---------------------------------------------------------------------------
 
 /** La huella del texto canonico: los .md en orden, con su nombre adentro.
@@ -80,9 +89,12 @@ test("la version que el manifiesto declara ultima lleva la huella del texto que 
     huella,
     `el texto canonico cambio y la version ${actual.version} sigue declarando la huella vieja. Los ${archivos.length} ` +
       `archivos de canonico/ ya no son los que esa version publico.\n\n` +
-      `NO se arregla pegando la huella nueva sobre la vieja: eso haria que dos textos distintos se llamen igual, que ` +
-      `es el defecto original. Se arregla AGREGANDO una version nueva a \`versiones\` con la huella de hoy —` +
-      `${huella}— y moviendo, en el release, el pin de plantilla/.github/workflows/ci.yml.\n\n` +
+      `Si ${actual.version} YA SE PUBLICO (su numero no es mayor que el ultimo \`## [X.Y.Z]\` del CHANGELOG), NO se ` +
+      `arregla pegando la huella nueva sobre la vieja: eso haria que dos textos distintos se llamen igual, que es el ` +
+      `defecto original, y el job \`canonico-versionado\` del ci.yml del marco lo pone en rojo. Se arregla AGREGANDO ` +
+      `una version nueva a \`versiones\` con la huella de hoy —${huella}— y moviendo, en el release, el pin de ` +
+      `plantilla/.github/workflows/ci.yml. Si ${actual.version} TODAVIA NO SE PUBLICO (es la entrada pendiente del ` +
+      `proximo release), su huella se actualiza en el lugar: no la recibio ningun consumidor.\n\n` +
       `Por que importa: un proyecto renderiza su constitucion con la accion del ARBOL y su CI la verifica con la del ` +
       `TAG que el andamio pina. Si los dos textos difieren bajo el mismo numero, el proyecto nace con el job ` +
       `\`constitucion\` en rojo — y como \`ci-ok\` lo exige por \`needs\` y el despliegue solo corre con el CI en ` +

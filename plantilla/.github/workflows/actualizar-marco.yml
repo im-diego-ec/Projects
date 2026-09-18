@@ -36,8 +36,8 @@ name: Actualizar el marco
 # este al dia y siga cargado lo verifica el job de marco del ci.yml (llega por
 # uses: ...@<version>, con el bump por PR). Este workflow no verifica: solo
 # propone el arreglo. Borrarlo no deja el repo sin control — deja el repo
-# esperando que alguien regenere a mano hasta que el check pase de aviso a
-# rojo.
+# esperando que alguien regenere a mano, con el check en rojo desde el PR de
+# bump que lo deja atrasado.
 #
 # NO ES PARTE DEL PIPELINE: no reporta ningun check y no gatea ningun merge.
 # El unico check requerido sigue siendo el veredicto agregado (ci-ok).

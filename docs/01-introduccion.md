@@ -25,9 +25,10 @@ fea a propósito— pero es la diferencia entre haber configurado algo y haber
 construido algo.
 
 **Lo que todavía NO vas a lograr,** y conviene saberlo antes de empezar y no a
-mitad de camino: el marco **no lo publica en internet**. Verlo en tu computadora
-sí; darle una dirección a otra persona para que entre, todavía no. Esa parte
-falta y está declarada en la sección 6.
+mitad de camino: si lo que armás es **una aplicación**, el marco **todavía no la
+publica en internet**. Verla en tu computadora sí; darle una dirección a otra
+persona para que entre, todavía no. Un **sitio para leer** sí se publica. Las dos
+cosas están explicadas en la sección 6.
 
 ### Cuánto lleva
 

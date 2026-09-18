@@ -34,7 +34,7 @@ import fs from "node:fs";
 import path from "node:path";
 import process from "node:process";
 import { derivar, desvios } from "./projects-asistente.mjs";
-import { FORMATOS, invocadoDirecto } from "./projects-init.mjs";
+import { FORMATOS, invocadoDirecto, jsonParaElArchivo } from "./projects-init.mjs";
 
 /** La cuenta que publica el marco. Se usa SOLO para ORG_MARCO --que es un valor
  *  del proyecto, no una identidad de este repositorio-- y nunca para decidir
@@ -199,8 +199,11 @@ export function escribir(destino, entrada, repo) {
   fs.mkdirSync(destino, { recursive: true });
   const rutaValores = path.join(destino, "valores.json");
   const rutaDesvios = path.join(destino, "desvios.json");
-  fs.writeFileSync(rutaValores, `${JSON.stringify(valores, null, 2)}\n`);
-  fs.writeFileSync(rutaDesvios, `${JSON.stringify({ desvios: apartamientos }, null, 2)}\n`);
+  // CON LA FORMA DEL FORMATEADOR: `personalizar.yml` copia `desvios.json` tal
+  // cual al proyecto como `.projects-desvios.json`, y ahi nadie formatea despues
+  // (corre con --sin-arranque). Ver jsonParaElArchivo en projects-init.mjs.
+  fs.writeFileSync(rutaValores, jsonParaElArchivo(rutaValores, valores));
+  fs.writeFileSync(rutaDesvios, jsonParaElArchivo(rutaDesvios, { desvios: apartamientos }));
   return { respuestas: r, valores, desvios: apartamientos, rutaValores, rutaDesvios };
 }
 

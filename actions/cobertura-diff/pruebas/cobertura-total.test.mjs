@@ -19,6 +19,7 @@ import { after } from "node:test";
 import { readFileSync } from "node:fs";
 
 import { commit, correr, escribir, limpiar, repoNuevo } from "./ayuda.mjs";
+import { fechasEnCodigo } from "../../../pruebas/ci-del-marco/fechas-en-codigo.mjs";
 import {
   agregarPorPaquete,
   diasEntre,
@@ -28,14 +29,13 @@ import {
 
 after(limpiar);
 
-// El dia con el que se comparan los plazos. La compuerta del total se estrena
-// con una VENTANA DE GRACIA (ver VENTANA_DE_GRACIA_HASTA en el comparador):
-// mientras dura, un paquete sin deuda declarada avisa en vez de detener. Los
-// casos de regimen —los que exigen ROJO por falta de declaracion— se corren con
-// la ventana YA CERRADA, porque es el estado permanente lo que hay que fijar;
-// los de la ventana en si tienen sus dos pruebas propias, una a cada lado.
+// El dia con el que se comparan los plazos, y el UNICO uso que tiene una fecha en
+// esta compuerta. Hasta el change la-ventana-se-cierra habia una segunda —el cierre de la ventana de
+// estreno— y los casos que exigian ROJO por falta de declaracion tenian que
+// correrse con esa ventana ya cerrada para fijar el regimen permanente. Ya no: sin
+// declaracion es rojo cualquier dia, asi que esos casos corren con este mismo dia y
+// el banco no tiene ningun calendario que administrar.
 const HOY = "2026-08-20";
-const CERRADA = "2026-10-01";
 
 // ---------------------------------------------------------------------------
 // Armado de los casos
@@ -115,10 +115,10 @@ function repoConTotal({
 /** El caso de la auditoria: 6 lineas, 2 cubiertas, la del cambio entre ellas. */
 const LINEAS_33 = [0, 0, 0, 0, 1, 1];
 
-// Por defecto los casos corren con la ventana de estreno YA CERRADA: lo que hay
-// que fijar es el regimen permanente. La ventana tiene sus propias pruebas.
+// Todos los casos corren con el mismo dia: el veredicto de esta compuerta ya no
+// depende de ninguna fecha salvo la que el propio paquete declara en su deuda.
 const correrTotal = (dir, base, env = {}) =>
-  correr(dir, { COBERTURA_BASE: base, COBERTURA_MINIMO: "80", COBERTURA_HOY: CERRADA, ...env });
+  correr(dir, { COBERTURA_BASE: base, COBERTURA_MINIMO: "80", COBERTURA_HOY: HOY, ...env });
 
 // ---------------------------------------------------------------------------
 // La regla, como funcion pura. Los bordes que un repo temporal esconde.
@@ -127,33 +127,40 @@ const correrTotal = (dir, base, env = {}) =>
 const metricas = (encontradas, cubiertas) => ({ lineas: { encontradas, cubiertas } });
 
 test("por debajo del minimo y sin deuda declarada: ROJO, y no es un retroceso", () => {
-  const v = veredictoDePaquete({ metricas: metricas(6, 2), minimo: 80, hoy: CERRADA });
+  const v = veredictoDePaquete({ metricas: metricas(6, 2), minimo: 80, hoy: HOY });
   assert.equal(v.estado, "rojo");
   assert.equal(v.filas[0].veredicto, "sin-plazo");
   assert.ok(Math.abs(v.filas[0].falta - (80 - 100 / 3)) < 1e-9);
 });
 
-test("la ventana de estreno afloja la falta de declaracion, y solo eso", () => {
-  const dentro = { metricas: metricas(6, 2), minimo: 80, hoy: "2026-08-20", ventanaHasta: "2026-09-30" };
-  const v = veredictoDePaquete(dentro);
-  assert.equal(v.estado, "amarillo");
-  assert.equal(v.filas[0].veredicto, "sin-plazo-en-gracia");
-  assert.equal(v.diasDeVentana, 41);
-
-  // El ultimo dia de la ventana todavia cuenta; el siguiente ya no.
-  assert.equal(
-    veredictoDePaquete({ ...dentro, hoy: "2026-09-30" }).filas[0].veredicto,
-    "sin-plazo-en-gracia"
-  );
-  assert.equal(veredictoDePaquete({ ...dentro, hoy: "2026-10-01" }).filas[0].veredicto, "sin-plazo");
-  assert.equal(veredictoDePaquete({ ...dentro, hoy: "2026-10-01" }).estado, "rojo");
+// EL CASO QUE NO PODIA EXISTIR HASTA EL CHANGE la-ventana-se-cierra, y por eso se escribe primero.
+//
+// Mientras hubo ventana de estreno, la falta de declaracion era AMARILLA hasta el
+// 2026-09-30 y ROJA desde el 2026-10-01: el veredicto dependia del dia. Este caso
+// fija la propiedad contraria —NINGUNA fecha la vuelve verde— y contra el codigo
+// anterior se pone rojo tres veces: los dos primeros dias caian en "amarillo" con
+// veredicto "sin-plazo-en-gracia", y `diasDeVentana` existia.
+test("por debajo del minimo y sin deuda declarada: ROJO cualquier dia, sin fecha de por medio", () => {
+  const sinDeuda = { metricas: metricas(6, 2), minimo: 80 };
+  // Los tres dias que la ventana distinguia: dentro, su ultimo dia, y el siguiente.
+  for (const hoy of ["2026-08-20", "2026-09-30", "2026-10-01"]) {
+    const v = veredictoDePaquete({ ...sinDeuda, hoy });
+    assert.equal(v.estado, "rojo", `el ${hoy} tendria que ser rojo y dio ${v.estado}`);
+    assert.equal(v.filas[0].veredicto, "sin-plazo", `veredicto inesperado el ${hoy}`);
+  }
+  // Y no queda ningun campo de ventana por el que reintroducirla sin que se note.
+  const v = veredictoDePaquete({ ...sinDeuda, hoy: HOY });
+  for (const campo of ["enVentana", "ventanaHasta", "diasDeVentana"]) {
+    assert.equal(campo in v, false, `el veredicto todavia publica \`${campo}\``);
+  }
+  assert.equal("enGracia" in v.filas[0], false, "la fila todavia publica `enGracia`");
 });
 
-test("la ventana de estreno NO perdona lo que el paquete escribio y rompio", () => {
-  const dentro = { minimo: 80, hoy: "2026-08-20", ventanaHasta: "2026-09-30" };
+test("lo que el paquete escribio y rompio es ROJO", () => {
+  const base = { minimo: 80, hoy: HOY };
   // Un plazo declarado y vencido es una promesa propia incumplida.
   const vencido = veredictoDePaquete({
-    ...dentro,
+    ...base,
     metricas: metricas(6, 2),
     deuda: { motivo: "heredada", fecha: "1999-01-01" },
   });
@@ -161,7 +168,7 @@ test("la ventana de estreno NO perdona lo que el paquete escribio y rompio", () 
   assert.equal(vencido.filas[0].veredicto, "plazo-vencido");
 
   // Un retroceso por debajo de un piso declarado, tambien.
-  const retroceso = veredictoDePaquete({ ...dentro, metricas: metricas(100, 90), piso: { lineas: 93.7 } });
+  const retroceso = veredictoDePaquete({ ...base, metricas: metricas(100, 90), piso: { lineas: 93.7 } });
   assert.equal(retroceso.estado, "rojo");
   assert.equal(retroceso.filas[0].veredicto, "retroceso");
 });
@@ -443,7 +450,7 @@ test("un paquete por encima del minimo pasa, y la seccion del total sale igual e
 
 test("sin commit base el plano del diff NO APLICA y el del total mide igual: un push a main no es una amnistia", () => {
   const { dir } = repoConTotal({ lineas: LINEAS_33 });
-  const r = correr(dir, { COBERTURA_MINIMO: "80", COBERTURA_HOY: CERRADA });
+  const r = correr(dir, { COBERTURA_MINIMO: "80", COBERTURA_HOY: HOY });
   assert.match(r.resumen, /\*\*No aplicable\*\*/);
   assert.equal(r.codigo, 1);
   assert.match(r.todo, /el total de líneas del paquete "web" es 33\.33%/);
@@ -519,18 +526,18 @@ test("los archivos de prueba no cuentan en el total: medirlos lo infla con codig
   assert.match(r.todo, /el total de líneas del paquete "web" es 33\.33%/);
 });
 
-test("dentro de la ventana de estreno la corrida pasa, y grita el dia en que sera roja", () => {
+// EL MISMO REPOSITORIO QUE LA VENTANA DEJABA PASAR. Hasta la-ventana-se-cierra este caso
+// exacto salia EXIT 0 el 2026-08-20 y EXIT 1 el 2026-10-01: la corrida imprimia
+// "PASA por la ventana de estreno" y una fila AMARILLA. Ahora el dia no cambia
+// nada, y la corrida no menciona ninguna ventana por ningun lado.
+test("un paquete bajo el minimo sin deuda es rojo el mismo dia que la version se publica", () => {
   const { dir, base } = repoConTotal({ lineas: LINEAS_33 });
-  const r = correrTotal(dir, base, { COBERTURA_HOY: "2026-08-20" });
-  assert.equal(r.codigo, 0, "el estreno no puede enrojecer a un consumidor que no toco una linea");
-  assert.match(r.stderr, /PASA por la ventana de estreno/);
-  assert.match(r.stderr, /se cierra el 2026-09-30/);
-  assert.match(r.stderr, /desde ese dia el mismo estado es ROJO/);
-  assert.match(r.resumen, /\*\*Pasa por la ventana de estreno\*\*/);
-  assert.match(r.resumen, /AMARILLO · ventana de estreno/);
-  // Y el mismo repositorio, con la ventana cerrada, es rojo. Si esta asercion
-  // se cayera, la ventana no seria una ventana: seria la compuerta apagada.
-  assert.equal(correrTotal(dir, base).codigo, 1);
+  for (const hoy of ["2026-08-20", "2026-10-01"]) {
+    const r = correrTotal(dir, base, { COBERTURA_HOY: hoy });
+    assert.equal(r.codigo, 1, `el ${hoy} tendria que ser rojo`);
+    assert.equal(/ventana/i.test(r.todo), false, `la corrida del ${hoy} todavia nombra una ventana`);
+    assert.match(r.resumen, /ROJO · sin plazo/);
+  }
 });
 
 test("COBERTURA_HOY no puede correr un plazo en silencio", () => {
@@ -704,46 +711,77 @@ test("sin NINGUN reporte, un piso declarado NO enrojece el total: ahi no desapar
   // el codigo de salida habla unicamente del total. Con un rango el diff
   // enrojeceria por su cuenta ("hay lineas agregadas y ningun reporte") y el
   // 1 no diria nada sobre la regla que esta prueba mide.
-  const r = correr(dir, { COBERTURA_MINIMO: "80", COBERTURA_HOY: CERRADA });
+  const r = correr(dir, { COBERTURA_MINIMO: "80", COBERTURA_HOY: HOY });
   assert.equal(r.codigo, 0, r.todo);
   assert.match(r.resumen, /\*\*No medido\*\*/);
   assert.doesNotMatch(r.stderr, /declara un piso de cobertura/);
 });
 
 // ---------------------------------------------------------------------------
-// LA VENTANA DE ESTRENO TIENE QUE ESTAR EN EL CONTRATO, NO SOLO EN EL CODIGO
+// LA AMNISTIA NO PUEDE VOLVER POR LA PUERTA DEL CODIGO
 //
-// Es la leccion de la afirmacion A07 aplicada a esta misma rama. A07 decia
-// "la integracion FALLA cuando un paquete queda por debajo del minimo" y la
-// compuerta no existia. Esta rama la construyo, y la estreno con una ventana de
+// Es la leccion de la afirmacion A07, y sobrevive a la ventana que la produjo.
+// A07 decia "la integracion FALLA cuando un paquete queda por debajo del minimo"
+// y la compuerta no existia. Cuando se construyo, se estreno con una ventana de
 // gracia que NADIE habia escrito en el spec: medido contra el espejo del
 // consumidor real, el caso central del requirement —un paquete a 70,70% de
-// funciones sin deuda declarada— salia EXIT 0. El scenario del spec vivo decia
-// "la integracion falla". El comentario del codigo explicaba la ventana; el
-// contrato, no.
+// funciones sin deuda declarada— salia EXIT 0 mientras el scenario del spec vivo
+// decia "la integracion falla". El comentario del codigo explicaba la ventana; el
+// contrato, no. Un comentario no es el contrato.
 //
-// Un comentario no es el contrato. Esta prueba ata la constante al texto del
-// spec, asi que mover la fecha sin actualizar el spec es rojo — que es la unica
-// forma de que la coherencia no dependa de que alguien se acuerde.
+// La ventana se borro con la-ventana-se-cierra, y esta prueba cambio de signo: ya no ata la
+// fecha al spec, ata la AUSENCIA. Si alguien vuelve a escribir una amnistia con
+// fecha en el comparador, esto es rojo antes de que llegue a un consumidor. La
+// leccion nunca fue la fecha: era que una amnistia que el contrato no nombra es
+// indistinguible de la verificacion que no existe.
+//
+// LA MITAD DEL SPEC LLEGA CON EL ARCHIVE. El spec vivo todavia promete la ventana
+// —los specs se mueven cuando el change se archiva, no cuando se implementa— asi
+// que afirmarlo aca seria rojo por el orden del flujo y no por un defecto. Va con
+// el bloque de archive; la tarea esta escrita ahi.
 // ---------------------------------------------------------------------------
 
-test("la fecha de la ventana de estreno esta escrita en el spec vivo", () => {
-  const raiz = new URL("../../../", import.meta.url);
-  const comparador = readFileSync(new URL("../medir-cobertura-diff.mjs", import.meta.url), "utf8");
-  const m = comparador.match(/const VENTANA_DE_GRACIA_HASTA = "(\d{4}-\d{2}-\d{2})"/);
-  assert.ok(m, "no se encontro la constante VENTANA_DE_GRACIA_HASTA en el comparador");
+/** Toda fecha AAAA-MM-DD escrita en una linea de CODIGO del comparador, con su
+ *  linea. No mira el nombre de nada: el comparador no tiene ninguna fecha legitima
+ *  en su codigo —la unica que consulta es la que el paquete declara en su deuda, y
+ *  esa llega por el package.json—, asi que cualquiera es una amnistia hasta que se
+ *  demuestre lo contrario. Las de sus comentarios cuentan historia y no cuentan. */
+function amnistiasConFecha(texto) {
+  return fechasEnCodigo(texto, "js").map((f) => `:${f.linea} ${f.texto}`);
+}
 
-  for (const ruta of [
-    "openspec/specs/calidad-codigo/spec.md",
-    "openspec/changes/archive/2026-08-19-calidad-fail-closed/specs/calidad-codigo/spec.md",
-  ]) {
-    const spec = readFileSync(new URL(ruta, raiz), "utf8");
-    assert.match(
-      spec,
-      new RegExp(m[1]),
-      `${ruta} no menciona la fecha ${m[1]} en la que la ventana de estreno se cierra`
-    );
+test("el comparador no tiene ninguna amnistia con fecha", () => {
+  const comparador = readFileSync(new URL("../medir-cobertura-diff.mjs", import.meta.url), "utf8");
+
+  assert.deepEqual(
+    amnistiasConFecha(comparador),
+    [],
+    "volvio una fecha al codigo del comparador: la-ventana-se-cierra borro la ultima amnistia, y la unica fecha " +
+      "que la verificacion puede consultar es la que el paquete declara en su deuda"
+  );
+
+  // Y no queda ninguna via por la que el nivel de un hallazgo se decida con una
+  // fecha que no sea la que el propio paquete declaro en su deuda.
+  for (const nombre of ["VENTANA_DE_GRACIA", "ventanaHasta", "enVentana", "enGracia", "sin-plazo-en-gracia"]) {
+    assert.equal(comparador.includes(nombre), false, `el comparador todavia nombra ${nombre}`);
   }
+});
+
+test("MUERDE: la amnistia se ve por su fecha, no por como se llama", () => {
+  // Hallazgo FO-H1 de la revision adversarial del porte. Este caso buscaba una
+  // constante en MAYUSCULAS con VENTANA, GRACIA, AMNISTIA o ESTRENO en el nombre, mas
+  // una lista fija de identificadores viejos: la forma camelCase que el propio
+  // comparador uso por dentro, o un nombre cualquiera, volvian sin que nada lo viera.
+  for (const forma of [
+    'const ventanaDeGracia = "2026-12-31";',
+    'const PLAZO_DE_ESTRENO = "2026-12-31";',
+    'if (hoy <= "2026-12-31") return "amarillo";',
+  ]) {
+    assert.notDeepEqual(amnistiasConFecha(forma), [], `no vio la fecha en: ${forma}`);
+  }
+  // Y una fecha en un comentario es historia, no una amnistia: el comparador cuenta
+  // en sus comentarios cuando vivio la ventana, y eso no puede ser rojo.
+  assert.deepEqual(amnistiasConFecha("// Vivio hasta el 2026-09-30 y aflojaba TRES veredictos"), []);
 });
 
 // ---------------------------------------------------------------------------
@@ -891,17 +929,18 @@ test("dos suites que miden el mismo archivo NO son un denominador corto", () => 
   assert.match(r.resumen, /funciones \| \*\*100\.00%\*\*/);
 });
 
-test("dentro de la ventana de estreno el denominador apagado avisa, y dice el dia", () => {
-  // Un rojo nuevo del marco no puede aterrizar sin ventana: `v1` es un tag
-  // movil y el 2026-08-19 ya se cobro esa leccion una vez. Lo que SI cambia hoy
-  // es que deja de ser MUDO.
+test("el denominador apagado es ROJO, no un aviso con fecha", () => {
+  // Hasta la-ventana-se-cierra este caso salia EXIT 0 con un ::warning:: y la fecha de cierre
+  // de la ventana pegada al mensaje. Apagar la metrica que enrojece costaba una
+  // linea de configuracion del reporter y compraba seis semanas; ahora no compra
+  // nada, y el rojo cae dentro del PR de bump donde se puede leer.
   const { dir, base } = repoConLcovCrudo(
     `TN:\nSF:web/src/mod.js\n${LINEAS_OK}\n${RAMAS_OK}\nend_of_record\n`
   );
   const r = correrTotal(dir, base, { COBERTURA_HOY: HOY });
-  assert.equal(r.codigo, 0, r.todo);
-  assert.match(r.todo, /::warning[^\n]*funciones/);
-  assert.match(r.todo, /2026-09-30/);
+  assert.equal(r.codigo, 1, r.todo);
+  assert.match(r.todo, /::error[^\n]*funciones/);
+  assert.equal(/ventana/i.test(r.todo), false, "la corrida todavia nombra una ventana");
 });
 
 test("el parser guarda el denominador que el reporte declara, no solo los items", () => {
@@ -924,7 +963,7 @@ test("un SF: que no resuelve se nombra tambien en un push a main", () => {
   const { dir } = repoConLcovCrudo(
     `TN:\nSF:web/src/no-existe.js\nFNF:0\nFNH:0\n${LINEAS_OK}\nBRF:0\nBRH:0\nend_of_record\n`
   );
-  const r = correr(dir, { COBERTURA_MINIMO: "80", COBERTURA_HOY: CERRADA });
+  const r = correr(dir, { COBERTURA_MINIMO: "80", COBERTURA_HOY: HOY });
   assert.match(r.todo, /no-existe\.js/);
 });
 
@@ -1061,20 +1100,18 @@ test("el denominador de un archivo medido por dos reportes es el MAYOR declarado
   assert.doesNotMatch(r.todo, /sus propios reportes declaran 7\b/);
 });
 
-test("dentro de la ventana de estreno el denominador CORTO tambien avisa en vez de detener", () => {
-  // HALLAZGO DE UN CONTROL NEGATIVO. La prueba de la ventana que ya habia
-  // ejercitaba el caso "sin contador"; mutar la rama de la ventana del
-  // denominador CORTO a rojo-desde-hoy sobrevivia al banco entero. Son dos
-  // veredictos distintos con la misma ventana, y una ventana que solo esta
-  // probada en uno de los dos no esta probada: el otro puede aterrizar en rojo
-  // sobre un consumidor que no leyo nada, que es justo lo que la ventana existe
-  // para impedir.
+test("el denominador CORTO es ROJO, y su fila lo dice", () => {
+  // ESTE CASO NACIO DE UN CONTROL NEGATIVO, y la leccion sobrevive a la ventana
+  // que lo produjo. La prueba de la ventana que habia ejercitaba solo el caso
+  // "sin contador"; mutar la rama del denominador CORTO sobrevivia al banco
+  // entero. Son dos veredictos distintos y cada uno necesita su propio caso: uno
+  // probado y el otro no es un veredicto sin probar, no medio banco.
   const { dir, base } = repoConLcovCrudo(
     `TN:\nSF:web/src/mod.js\nFN:1,a\nFNDA:1,a\nFN:2,b\nFNDA:1,b\nFN:3,c\nFNDA:1,c\nFNF:10\nFNH:3\n${LINEAS_OK}\n${RAMAS_OK}\nend_of_record\n`
   );
   const r = correrTotal(dir, base, { COBERTURA_HOY: HOY });
-  assert.equal(r.codigo, 0, r.todo);
-  assert.match(r.todo, /::warning[^\n]*denominador llego CORTO/);
-  assert.match(r.todo, /2026-09-30/);
-  assert.match(r.resumen, /AMARILLO · denominador corto \(ventana de estreno\)/);
+  assert.equal(r.codigo, 1, r.todo);
+  assert.match(r.todo, /::error[^\n]*denominador llego CORTO/);
+  assert.equal(/ventana/i.test(r.todo), false, "la corrida todavia nombra una ventana");
+  assert.match(r.resumen, /ROJO · denominador corto/);
 });

@@ -96,7 +96,8 @@ git checkout main && git pull --ff-only && git checkout -b docs/archive-<nombre-
 Averigua el pin del CLI que usa el marco (no lo adivines, no lo tipees de
 memoria). **El pin no esta escrito en este repo**: vive en el `default` del input
 `version_openspec` del workflow reusable del marco, y este repo lo hereda sin
-repetirlo — por eso una subida del pin llega sola y no hay nada que sincronizar.
+repetirlo — por eso una subida del pin le llega con el PR de bump del marco, y no
+hay nada que sincronizar a mano.
 Se lee del marco sin clonarlo:
 
 ```bash
@@ -160,12 +161,14 @@ grep -rn "^### Requirement: " openspec/changes/<nombre-del-change>/specs/
 Anota cuantas operaciones esperas por capability. Ese numero es con lo que vas a
 contrastar la salida del paso 2: si el script aplica menos, algo no se detecto.
 
-**Antes de aplicar nada, revisa a mano cada bloque `## MODIFIED Requirements`.**
-Un MODIFIED **reemplaza el requirement COMPLETO**: todo escenario vigente que el
-delta no repita **se pierde en el archive**, en silencio. El guardrail de deltas
-caza la mayoria de esos casos, pero tiene un hueco conocido: **si el titulo del
-requirement del delta no existe en el spec vivo, no avisa**. Compara titulo por
-titulo contra el spec vivo:
+**Antes de aplicar nada, revisa cada bloque `## MODIFIED Requirements` y cada
+`## ADDED Requirements`.** Un MODIFIED **reemplaza el requirement COMPLETO**: todo
+escenario vigente que el delta no repita **se pierde en el archive**, en silencio.
+El guardrail de deltas del CI caza eso, y tambien un MODIFIED cuyo titulo no existe
+en el spec vivo (lo reporta como huerfano y sale 1). Su hueco real es el simetrico:
+**un ADDED cuyo titulo ya existe en el spec vivo** pasa el guardrail y
+`validate --strict` en verde, y recien lo frena el paso 2 de esta skill. Compara
+titulo por titulo contra el spec vivo, los MODIFIED y tambien los ADDED:
 
 ```bash
 grep -rn "^### Requirement: " openspec/specs/<capability>/spec.md
@@ -377,6 +380,7 @@ npx --yes @fission-ai/openspec@X.Y.Z list
 >
 > No es un archive mal hecho: es un paso que todavia no hiciste. **Anda al Paso 5,
 > completa los `Purpose`, y volve acá.** Los tres verdes se piden despues de eso.
+
 - `list` **sin changes activos** (o sin el que acabas de archivar).
 - **El guardrail de deltas en verde.** Ese no corre en local: vive en el marco y
   llega a este repo por el `uses: ...@<version>` del `ci.yml`, asi que su veredicto se
@@ -423,11 +427,25 @@ verdad despues del archive.
 git add -A
 git commit -m "docs(openspec): <nombre-del-change> cerrado y archivado — <N>/<N> tareas"
 git push -u origin docs/archive-<nombre-del-change>
-gh pr create --title "docs(openspec): archive de <nombre-del-change>" --body "Closes #<sub-issue>"
+gh pr create --title "docs(openspec): archive de <nombre-del-change>" --body "Closes #<sub-issue>
+Closes #<issue-macro>"
 ```
 
 `Closes #<numero>` va en el cuerpo **desde la creacion**: es lo unico que crea el
-enlace real. Un `ref #N` en texto plano **no enlaza nada**.
+enlace real. Un `ref #N` en texto plano **no enlaza nada**. El PR final del change
+lleva DOS: el del sub-issue de este bloque y el del issue macro.
+
+**Verificalo ANTES de mergear, y marca la tarea en ESTE mismo PR:**
+
+```bash
+gh pr view <n> --json closingIssuesReferences
+```
+
+Los dos numeros tienen que aparecer ahi. Que el PR **lleve** el enlace es una propiedad
+de su CUERPO, verdadera desde que el PR nace, asi que la tarea que lo atestigua se
+marca aca y no despues del merge. Enunciada como «el PR final CIERRA el issue macro»
+—que solo es verdad despues del merge— la tarea no se podia marcar en el PR que la
+cumple, y costaba un PR de una linea mas por change.
 
 En el cuerpo del PR van las tres salidas del paso 4 y una linea que explique que
 los specs que aparecen en el diff **son el contrato vigente promovido**, no
@@ -442,7 +460,8 @@ contenido nuevo — es la pregunta que sale en review todas las veces.
 | `openspec archive` en Windows        | Imprime `Specs updated successfully` y hace rollback: `git status --short` no muestra ni un cambio en `openspec/specs/` | No usar el CLI para archivar en Windows. Usar esta skill                                           |
 | Script de archive que no aplica nada | "deltas aplicados" con cero operaciones y exit 0                                                                        | El script de esta skill sale 1 en ese caso. Si ves un verde con 0 operaciones, el script esta roto |
 | MODIFIED que omite escenarios        | `validate --strict` en **verde** y aun asi el spec vivo pierde escenarios al archivar                                   | Comparar titulo por titulo antes de aplicar + conteo de escenarios antes/despues                   |
-| Retitulado sin declarar              | El guardrail **no avisa** cuando el titulo del delta no existe en el spec vivo                                          | Declarar el par FROM/TO en `## RENAMED Requirements`                                               |
+| Retitulado sin declarar              | El guardrail sale 1: `el MODIFIED de "..." no existe en el spec vigente`                                                | Declarar el par FROM/TO en `## RENAMED Requirements`                                               |
+| ADDED con un titulo que ya existe    | Guardrail y `validate --strict` en **verde**; el paso 2 sale 1 con `ADDED "..." YA existe en el spec vivo`              | Antes de escribirlo, buscar el titulo en `openspec/specs/`: si ya existe, es un MODIFIED           |
 | Capability nueva                     | Nace con `Purpose: TBD` y nadie lo nota                                                                                 | `git grep -n "Purpose: TBD" -- openspec/specs/` y completarlo en el mismo PR                       |
 
 ## Estado de verificacion del script
@@ -489,4 +508,5 @@ reales.
 - [ ] Change movido con `git mv`, carpeta original vacia
 - [ ] `validate --all --strict` + `list` sin changes activos + guardrail de deltas: los tres verdes
 - [ ] Sin `Purpose: TBD` pendientes
-- [ ] PR con `Closes #<sub-issue>` desde la creacion
+- [ ] PR con `Closes` al sub-issue Y al issue macro, en el cuerpo desde la creacion
+- [ ] `closingIssuesReferences` verificado ANTES del merge, y la tarea marcada en este PR
