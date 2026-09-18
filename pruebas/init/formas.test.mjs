@@ -660,6 +660,27 @@ test("una eleccion mal escrita es un error, y el mensaje sugiere la correcta", (
   assert.equal(problemasDeEleccion({ forma: 7 }).length, 1, "y un tipo que no es texto tambien");
 });
 
+// TIPO_CUENTA ERA LA TERCERA ELECCION SIN COMPROBAR (revision adversarial del
+// porte, FO-S13/H3, 2026-09-18). `tipoDeCuentaDe` cae en "usuario" ante cualquier
+// cosa que no sea exactamente "organizacion", y la propia herramienta escribe
+// «organización» con tilde en su prosa: con ese valor, una organizacion nacia con
+// el CODEOWNERS de una cuenta personal, salida 0 y sin una linea de aviso. Es el
+// mismo modo de falla que `forma` —ausente no es lo mismo que mal escrito— y se
+// cierra igual.
+test("un TIPO_CUENTA mal escrito es un error que sugiere el correcto; ausente sigue valiendo usuario", () => {
+  assert.deepEqual(problemasDeEleccion({ TIPO_CUENTA: "organizacion" }), []);
+  assert.deepEqual(problemasDeEleccion({ TIPO_CUENTA: " Usuario " }), [], "la mayuscula y el espacio no son un error");
+  assert.deepEqual(problemasDeEleccion({ ORG: "una-org" }), [], "ausente vale usuario, el lado que no rompe en silencio");
+  const p = problemasDeEleccion({ TIPO_CUENTA: "organización" });
+  assert.equal(p.length, 1, "la tilde que la propia herramienta escribe en su prosa tiene que ser UN problema, nombrado");
+  assert.match(p[0], /TIPO_CUENTA = "organización" no es una opcion/);
+  assert.match(p[0], /usuario, organizacion/);
+  assert.match(p[0], /Quisiste decir "organizacion"/);
+  assert.match(p[0], /CODEOWNERS/, "el mensaje tiene que decir que decide esta clave, no hablar de archivos");
+  assert.equal(problemasDeEleccion({ TIPO_CUENTA: "org" }).length, 1);
+  assert.equal(problemasDeEleccion({ TIPO_CUENTA: true }).length, 1, "un tipo que no es texto tambien");
+});
+
 test("las opciones declaradas son exactamente las que el asistente ofrece", () => {
   // Dos listas que describen lo mismo se separan. Esta las cruza: si el asistente
   // gana una forma y la validacion no se entera, esa forma se vuelve un error.

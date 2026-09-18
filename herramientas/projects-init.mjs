@@ -806,6 +806,12 @@ export function problemasDeEleccion(valores) {
   for (const [clave, validas] of [
     ["forma", FORMAS],
     ["plataforma", PLATAFORMAS],
+    // TIPO_CUENTA ERA LA TERCERA, y con el mismo modo de falla (revision
+    // adversarial del porte, FO-S13/H3): `tipoDeCuentaDe` cae en "usuario" ante
+    // cualquier cosa que no sea "organizacion", y esta misma herramienta escribe
+    // «organización» con tilde en su prosa. Con ese valor una organizacion nacia
+    // con el CODEOWNERS de una cuenta personal, salida 0 y sin aviso.
+    ["TIPO_CUENTA", TIPOS_DE_CUENTA],
   ]) {
     const crudo = valores?.[clave];
     if (crudo === undefined || crudo === null || crudo === "") continue; // ausente: vale el default
@@ -833,11 +839,17 @@ export function problemasDeEleccion(valores) {
     }
     if (!validas.includes(v)) {
       const cerca = validas.find((x) => x.startsWith(v.slice(0, 4)) || v.startsWith(x.slice(0, 4)));
+      const queDecide =
+        clave === "TIPO_CUENTA"
+          ? `. Esta clave decide la forma de CODEOWNERS —personas en una cuenta de usuario, equipos en una ` +
+            `organizacion—, asi que un valor que no se reconoce no se puede asumir: una organizacion recibiria el ` +
+            `CODEOWNERS de una cuenta personal sin que nada lo diga`
+          : `. Esta clave decide QUE ARCHIVOS recibe tu proyecto, asi que un valor que no se reconoce no se puede ` +
+            `asumir: te daria un proyecto distinto del que pediste sin avisarte`;
       problemas.push(
         `${clave} = ${JSON.stringify(crudo)} no es una opcion. Las que hay: ${validas.join(", ")}` +
           (cerca ? `. ¿Quisiste decir "${cerca}"?` : "") +
-          `. Esta clave decide QUE ARCHIVOS recibe tu proyecto, asi que un valor que no se reconoce no se puede ` +
-          `asumir: te daria un proyecto distinto del que pediste sin avisarte`,
+          queDecide,
       );
     }
   }

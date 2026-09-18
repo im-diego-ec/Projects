@@ -1671,13 +1671,19 @@ sin `pnpm-lock.yaml`, corré `corepack pnpm install` y guardá ese archivo.
   no lo dice. Al terminar, la herramienta lista los dos equipos en solo lectura y avisa con el
   arreglo y el comando para mirarlo; «no pude mirar» se dice con su motivo, y en una cuenta
   personal no consulta nada. Es aviso y no rojo porque el arreglo es de quien administra la
-  organización. El mismo control, a pedido: `node herramientas/projects-doctor.mjs --valores
+  organización. `TIPO_CUENTA` se valida como `forma` y `plataforma`: ausente vale `usuario`,
+  y un valor que no es `usuario` ni `organizacion` —«organización» con tilde, por ejemplo— es
+  error con la sugerencia, en vez de caer en `usuario` y armar una organización con el
+  CODEOWNERS de una cuenta personal. El mismo control, a pedido: `node herramientas/projects-doctor.mjs --valores
   <archivo>` (ahí un problema medido sale 1). Viene de Rigel 1.14.0 (commit b8836af), que
   deriva el PO de sus equipos; acá se porta la propiedad, no la derivación. Para
   consumidores: nada; es de la herramienta de arranque.
 - **`herramientas/actionlint-local.mjs`: actionlint con el pin del CI, en tu máquina.** Lee
   la versión del `default` de `version_actionlint` en `marco-ci.yml`, verifica el checksum
-  contra el mismo release y usa el shellcheck del `PATH` pasado explícito. Sin shellcheck,
+  contra el mismo release y usa el shellcheck del `PATH` pasado explícito. El binario queda
+  en una caché **del usuario** (no en el `/tmp` compartido), y su sha se vuelve a comparar
+  en **cada** corrida: si falta o no coincide, la caché se descarta y se baja y verifica de
+  nuevo; si otro usuario puede escribirla, no se usa y lo dice. Sin shellcheck,
   actionlint deja de revisar los bloques `run:` **sin avisar** (medido: un SC2016 sale 0), así
   que la herramienta lo anuncia y no llama «válido» a ese verde; en Windows apaga la
   integración que se cuelga, y tiene techo de tiempo. El hook `pre-push` la usa en vez del

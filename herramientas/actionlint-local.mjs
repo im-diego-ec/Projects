@@ -215,21 +215,108 @@ async function bajar(url, destino) {
   fs.writeFileSync(destino, Buffer.from(await r.arrayBuffer()));
 }
 
-/** Deja el binario de actionlint de esa version en la cache y devuelve su ruta.
- *  Tira con un mensaje que dice que paso; quien llama lo convierte en exit 2. */
-async function binarioDeActionlint(version) {
-  const asset = assetDe(version);
-  // La cache va por VERSION: subir el pin baja el binario nuevo solo.
-  const cache = path.join(os.tmpdir(), `projects-actionlint-${version}`);
-  const binario = path.join(cache, asset.binario);
-  if (fs.existsSync(binario)) return binario;
+// ---------------------------------------------------------------------------
+// LA CACHE SE VERIFICA EN CADA CORRIDA, NO SOLO AL BAJAR.
+//
+// QUE DEFECTO CIERRA (revision adversarial del porte, FO-S7/H1 y RV-H2, medido el
+// 2026-09-18). La cache vivia en os.tmpdir() —en Linux, /tmp, que comparten todos
+// los usuarios— y un acierto era `existsSync(binario)`: el sha256 contra el
+// checksums.txt del release se comparaba solo en la primera descarga. Un archivo
+// cualquiera en `<tmp>/projects-actionlint-<version>/actionlint` —plantado por otro
+// usuario, o truncado— se ejecutaba, y la salida decia «definiciones de pipeline
+// validas (actionlint X —el pin del CI— con shellcheck)» con rc 0: el hook
+// pre-push quedaba en OK sin haber linteado nada.
+//
+// AHORA: la cache es del USUARIO (no el temporal compartido); en POSIX, el
+// directorio y su padre tienen que ser de quien corre esto, no enlaces y sin
+// escritura para otros —si no, no se usa y se dice por que—; y al terminar una
+// descarga verificada se guarda el sha256 del binario extraido, que se vuelve a
+// calcular en cada acierto. Si falta o no coincide, la cache entera se descarta y
+// se baja y verifica de nuevo. Sin red en el camino feliz: re-hashear un binario
+// de pocos MB es lo unico que cuesta.
+// ---------------------------------------------------------------------------
 
-  fs.mkdirSync(cache, { recursive: true });
-  const base = `https://github.com/rhysd/actionlint/releases/download/v${version}`;
+/** El archivo, junto al binario, con el sha256 que tenia al salir de un tarball
+ *  verificado contra el release. */
+export const ARCHIVO_DEL_SHA = "actionlint.sha256";
+
+/** La base de la cache de ESTE usuario. En Windows, %LOCALAPPDATA% (el temporal de
+ *  Windows ya es por usuario, y es el respaldo); en macOS, ~/Library/Caches; en el
+ *  resto, $XDG_CACHE_HOME o ~/.cache. Nunca el /tmp compartido. */
+export function baseDeCache({ plataforma = process.platform, entorno = process.env, home = os.homedir() } = {}) {
+  if (plataforma === "win32") return entorno.LOCALAPPDATA || os.tmpdir();
+  if (plataforma === "darwin") return path.join(home, "Library", "Caches");
+  return entorno.XDG_CACHE_HOME || path.join(home, ".cache");
+}
+
+/** El directorio de la cache para una version. Va por VERSION: subir el pin baja
+ *  el binario nuevo solo. */
+export function directorioDeCache(base, version) {
+  return path.join(base, "projects", `actionlint-${version}`);
+}
+
+/** Por que no se puede confiar en una ruta de la cache, o null si se puede.
+ *
+ *  En POSIX tiene que ser de quien corre esto, no un enlace simbolico, y nadie mas
+ *  puede escribirla. En Windows no se mira: la cache vive en %LOCALAPPDATA%, que ya
+ *  es del usuario, y los bits de modo de Node no dicen nada ahi. */
+export function desconfianza(ruta, { plataforma = process.platform, uid = typeof process.getuid === "function" ? process.getuid() : null } = {}) {
+  if (plataforma === "win32" || uid === null) return null;
+  const st = fs.lstatSync(ruta);
+  if (st.isSymbolicLink()) return `${ruta} es un enlace simbolico`;
+  if (st.uid !== uid) return `${ruta} es de otro usuario (uid ${st.uid}, no ${uid})`;
+  if (st.mode & 0o022) return `${ruta} lo pueden escribir otros usuarios (modo ${(st.mode & 0o777).toString(8)})`;
+  return null;
+}
+
+/** El binario de la cache si sigue siendo el que se verifico; null si hay que
+ *  bajarlo de nuevo. TIRA si la cache no es de confianza: no se borra ni se
+ *  ejecuta lo que puede no ser de uno. */
+export function binarioEnCache(cache, asset, confianza = {}) {
+  for (const ruta of [path.dirname(cache), cache]) {
+    if (!fs.existsSync(ruta)) continue;
+    const motivo = desconfianza(ruta, confianza);
+    if (motivo) {
+      throw new Error(
+        `no confio en la cache de actionlint: ${motivo}. Alguien mas pudo dejar ahi un binario, y esta herramienta no ` +
+          `lo corre. Arreglo: borra ${cache} (o corregi su dueno y sus permisos) y volve a correr esto`,
+      );
+    }
+  }
+  const binario = path.join(cache, asset.binario);
+  if (!fs.existsSync(binario) || desconfianza(binario, confianza)) return null;
+  let guardado;
+  try {
+    guardado = fs.readFileSync(path.join(cache, ARCHIVO_DEL_SHA), "utf8").trim().split(/\s+/)[0];
+  } catch {
+    return null; // un binario sin su sha no se verifico nunca: se baja de nuevo
+  }
+  return /^[0-9a-f]{64}$/.test(guardado) && sha256(binario) === guardado ? binario : null;
+}
+
+/** Deja el binario de actionlint de esa version en la cache, VERIFICADO, y devuelve
+ *  su ruta. Tira con un mensaje que dice que paso; quien llama lo convierte en exit 2.
+ *  Las opciones existen para el banco: una base propia y una descarga sin red. */
+export async function binarioDeActionlint(
+  version,
+  { base = baseDeCache(), bajar: bajarArchivo = bajar, plataforma = process.platform, arquitectura = process.arch, uid } = {},
+) {
+  const asset = assetDe(version, plataforma, arquitectura);
+  const cache = directorioDeCache(base, version);
+  const confianza = uid === undefined ? { plataforma } : { plataforma, uid };
+  const verificado = binarioEnCache(cache, asset, confianza);
+  if (verificado) return verificado;
+
+  // Lo que haya quedado —un binario sin su sha, un sha que no coincide, una
+  // descarga a medias— se descarta entero y se vuelve a bajar y a verificar.
+  fs.rmSync(cache, { recursive: true, force: true });
+  fs.mkdirSync(cache, { recursive: true, mode: 0o700 });
+  const binario = path.join(cache, asset.binario);
+  const url = `https://github.com/rhysd/actionlint/releases/download/v${version}`;
   console.log(`bajando actionlint ${version} (${asset.nombre})`);
   try {
-    await bajar(`${base}/${asset.nombre}`, path.join(cache, asset.nombre));
-    await bajar(`${base}/actionlint_${version}_checksums.txt`, path.join(cache, "checksums.txt"));
+    await bajarArchivo(`${url}/${asset.nombre}`, path.join(cache, asset.nombre));
+    await bajarArchivo(`${url}/actionlint_${version}_checksums.txt`, path.join(cache, "checksums.txt"));
     const esperado = shaEsperado(fs.readFileSync(path.join(cache, "checksums.txt"), "utf8"), asset.nombre);
     const real = sha256(path.join(cache, asset.nombre));
     if (real !== esperado) {
@@ -243,12 +330,15 @@ async function binarioDeActionlint(version) {
     // zip. Por eso Windows descomprime con PowerShell y el resto con tar, y los dos
     // con `cwd` y nombres relativos.
     const x =
-      process.platform === "win32"
+      plataforma === "win32"
         ? spawnSync("powershell", ["-NoProfile", "-Command", `Expand-Archive -Path ${asset.nombre} -DestinationPath . -Force`], { cwd: cache, encoding: "utf8" })
         : spawnSync("tar", ["-xzf", asset.nombre, asset.binario], { cwd: cache, encoding: "utf8" });
     if (x.status !== 0 || !fs.existsSync(binario)) {
       throw new Error(`no pude extraer ${asset.nombre}: ${`${x.stderr ?? ""}${x.error?.message ?? ""}`.trim() || "el binario no aparecio"}`);
     }
+    // El sha del binario RECIEN salido de un tarball verificado: es lo que cada
+    // acierto de cache vuelve a comparar.
+    fs.writeFileSync(path.join(cache, ARCHIVO_DEL_SHA), `${sha256(binario)}  ${asset.binario}\n`);
     return binario;
   } catch (e) {
     fs.rmSync(cache, { recursive: true, force: true });
@@ -256,12 +346,12 @@ async function binarioDeActionlint(version) {
   }
 }
 
-export async function main(argv = process.argv.slice(2)) {
+export async function main(argv = process.argv.slice(2), opciones = {}) {
   let version;
   let binario;
   try {
     version = versionPinada(fs.readFileSync(WORKFLOW, "utf8"));
-    binario = await binarioDeActionlint(version);
+    binario = await binarioDeActionlint(version, opciones);
   } catch (e) {
     console.error(`::error::no pude preparar actionlint: ${e.message}. No hay veredicto local; el CI lo corre igual.`);
     return SALIDA.noSeCorrio;

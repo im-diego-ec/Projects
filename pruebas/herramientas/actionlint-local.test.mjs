@@ -15,7 +15,8 @@
 //
 // QUE PRUEBA, Y QUE NO. Lo que se puede probar sin red: que la version se lea del
 // MISMO input que usa el CI y reviente si no esta; que el asset corresponda a la
-// maquina; que un asset sin checksum no se de por bueno; que sin shellcheck el
+// maquina; que un asset sin checksum no se de por bueno; que la cache se vuelva a
+// verificar en cada corrida y no ejecute lo que no verifico; que sin shellcheck el
 // veredicto no se llame «valido»; que en Windows no se intente la integracion que
 // se cuelga; y que el hook bloquee con hallazgos y avise —sin bloquear— cuando la
 // herramienta no pudo correr. Bajar el binario y correrlo de verdad es medir a
@@ -29,11 +30,17 @@ import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 
 import {
+  ARCHIVO_DEL_SHA,
   SALIDA,
   WORKFLOW,
   argumentosDeShellcheck,
   assetDe,
+  baseDeCache,
+  binarioDeActionlint,
   buscarEnPath,
+  desconfianza,
+  directorioDeCache,
+  main,
   sha256,
   shaEsperado,
   veredicto,
@@ -172,6 +179,143 @@ test("el rojo del CI manda a la herramienta que existe, no a instalar a mano", (
   assert.match(linea, /herramientas\/actionlint-local\.mjs/, "el rojo sigue mandando a instalar actionlint sin decir con que");
   assert.ok(fs.existsSync(path.join(RAIZ, "herramientas", "actionlint-local.mjs")), "el rojo manda a una herramienta que no existe");
 });
+
+// LA CACHE, verificada en cada corrida y no solo al bajar.
+//
+// ROJO MEDIDO antes del cambio (revision adversarial del porte, FO-S7/H1 y RV-H2,
+// 2026-09-18): la cache vivia en os.tmpdir() y un acierto era `existsSync`. Con
+// `TMPDIR=$T` y un `$T/projects-actionlint-1.7.12/actionlint` que imprime «BINARIO
+// PLANTADO» y sale 0, la herramienta lo EJECUTO y dijo «definiciones de pipeline
+// validas (actionlint 1.7.12 —el pin del CI— con shellcheck)», rc 0. Y anular la
+// comparacion del sha (`if (real !== esperado)` -> `if (false)`) dejaba este banco
+// en 15/15: ningun caso ejercitaba la verificacion.
+//
+// Se prueba sin red y con tar de verdad: un release de juguete (un tarball con un
+// `actionlint` que es un script, y su checksums.txt) y una descarga inyectada que lo
+// copia. Lo que se mide es la herramienta, no GitHub.
+const SIN_TAR = process.platform === "win32" ? "en Windows la herramienta extrae con PowerShell: esto lo cubre la matriz POSIX" : false;
+const VERSION = versionPinada(fs.readFileSync(WORKFLOW, "utf8"));
+const BINARIO_VERIFICADO = '#!/bin/sh\necho "actionlint de juguete, verificado"\nexit 0\n';
+
+/** Un release de juguete en `dir`: el tarball del asset de esta maquina con un
+ *  `actionlint` adentro y el checksums.txt. `shaDelChecksums` permite mentir. */
+function armarRelease(dir, { shaDelChecksums } = {}) {
+  const asset = assetDe(VERSION);
+  const armado = path.join(dir, "armado");
+  fs.mkdirSync(armado, { recursive: true });
+  fs.writeFileSync(path.join(armado, asset.binario), BINARIO_VERIFICADO, { mode: 0o755 });
+  const r = spawnSync("tar", ["-czf", path.join(dir, asset.nombre), asset.binario], { cwd: armado, encoding: "utf8" });
+  assert.equal(r.status, 0, r.stderr);
+  const sha = shaDelChecksums ?? sha256(path.join(dir, asset.nombre));
+  fs.writeFileSync(path.join(dir, "checksums.txt"), `${sha}  ${asset.nombre}\n${"f".repeat(64)}  otro-asset.zip\n`);
+  return asset;
+}
+
+/** La descarga inyectada: copia del release de juguete, y cuenta. */
+function descargaDe(dir) {
+  const d = {
+    veces: 0,
+    bajar: async (url, destino) => {
+      d.veces += 1;
+      const nombre = url.endsWith("_checksums.txt") ? "checksums.txt" : url.split("/").pop();
+      fs.copyFileSync(path.join(dir, nombre), destino);
+    },
+  };
+  return d;
+}
+
+function enTemporal(fn) {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "actionlint-cache-"));
+  return Promise.resolve()
+    .then(() => fn(dir))
+    .finally(() => fs.rmSync(dir, { recursive: true, force: true }));
+}
+
+test("la cache es del usuario, no el temporal compartido", () => {
+  assert.equal(baseDeCache({ plataforma: "linux", entorno: {}, home: "/home/ana" }), path.join("/home/ana", ".cache"));
+  assert.equal(baseDeCache({ plataforma: "linux", entorno: { XDG_CACHE_HOME: "/x" }, home: "/home/ana" }), "/x");
+  assert.equal(baseDeCache({ plataforma: "darwin", entorno: {}, home: "/Users/ana" }), path.join("/Users/ana", "Library", "Caches"));
+  assert.equal(baseDeCache({ plataforma: "win32", entorno: { LOCALAPPDATA: "C:\\Users\\ana\\AppData\\Local" } }), "C:\\Users\\ana\\AppData\\Local");
+  for (const plataforma of ["linux", "darwin"]) {
+    assert.notEqual(baseDeCache({ plataforma, entorno: {}, home: "/home/ana" }), os.tmpdir(), `en ${plataforma} la cache volvio al temporal compartido`);
+  }
+});
+
+test("cache: la primera vez baja y verifica; la segunda NO baja y vuelve a verificar", { skip: SIN_TAR }, () =>
+  enTemporal(async (dir) => {
+    const release = path.join(dir, "release");
+    fs.mkdirSync(release);
+    armarRelease(release);
+    const d = descargaDe(release);
+    const base = path.join(dir, "cache");
+    const primero = await binarioDeActionlint(VERSION, { base, bajar: d.bajar });
+    assert.equal(d.veces, 2, "la primera vez baja el asset y el checksums.txt");
+    assert.equal(fs.readFileSync(primero, "utf8"), BINARIO_VERIFICADO);
+    assert.ok(fs.existsSync(path.join(directorioDeCache(base, VERSION), ARCHIVO_DEL_SHA)), "no guardo el sha del binario verificado");
+    const segundo = await binarioDeActionlint(VERSION, { base, bajar: d.bajar });
+    assert.equal(segundo, primero);
+    assert.equal(d.veces, 2, "un acierto de cache volvio a bajar: la cache tiene que ahorrar la red");
+  }),
+);
+
+test("cache: un binario PLANTADO —sin su sha, o con un sha que no es el suyo— no se corre: se baja y verifica de nuevo", { skip: SIN_TAR }, () =>
+  enTemporal(async (dir) => {
+    const release = path.join(dir, "release");
+    fs.mkdirSync(release);
+    const asset = armarRelease(release);
+    const base = path.join(dir, "cache");
+    const cache = directorioDeCache(base, VERSION);
+    const plantado = '#!/bin/sh\necho "BINARIO PLANTADO SIN VERIFICAR"\nexit 0\n';
+
+    // El caso de la revision: la cache tiene SOLO el binario, sin sha.
+    fs.mkdirSync(cache, { recursive: true, mode: 0o700 });
+    fs.writeFileSync(path.join(cache, asset.binario), plantado, { mode: 0o755 });
+    const d = descargaDe(release);
+    const b1 = await binarioDeActionlint(VERSION, { base, bajar: d.bajar });
+    assert.equal(d.veces, 2, "un binario sin sha se tomo como verificado");
+    assert.equal(fs.readFileSync(b1, "utf8"), BINARIO_VERIFICADO);
+
+    // Y con un sha guardado que ya no es el del archivo (reemplazado o truncado).
+    fs.writeFileSync(b1, plantado, { mode: 0o755 });
+    const b2 = await binarioDeActionlint(VERSION, { base, bajar: d.bajar });
+    assert.equal(d.veces, 4, "un binario que no coincide con su sha se tomo como verificado");
+    assert.equal(fs.readFileSync(b2, "utf8"), BINARIO_VERIFICADO);
+  }),
+);
+
+test("cache: un asset cuyo sha no es el del checksums.txt es ROJO, no deja cache, y main sale 2", { skip: SIN_TAR }, () =>
+  enTemporal(async (dir) => {
+    const release = path.join(dir, "release");
+    fs.mkdirSync(release);
+    armarRelease(release, { shaDelChecksums: "0".repeat(64) });
+    const base = path.join(dir, "cache");
+    await assert.rejects(binarioDeActionlint(VERSION, { base, bajar: descargaDe(release).bajar }), /checksum .* no coincide/);
+    assert.ok(!fs.existsSync(directorioDeCache(base, VERSION)), "la descarga que no verifico quedo en la cache");
+    assert.equal(await main([], { base, bajar: descargaDe(release).bajar }), SALIDA.noSeCorrio);
+  }),
+);
+
+test("cache: la que otros pueden escribir, o es de otro usuario, NO se usa y lo dice", { skip: SIN_TAR }, () =>
+  enTemporal(async (dir) => {
+    const release = path.join(dir, "release");
+    fs.mkdirSync(release);
+    armarRelease(release);
+    const base = path.join(dir, "cache");
+    const d = descargaDe(release);
+    const binario = await binarioDeActionlint(VERSION, { base, bajar: d.bajar });
+    const cache = path.dirname(binario);
+
+    fs.chmodSync(cache, 0o777);
+    await assert.rejects(binarioDeActionlint(VERSION, { base, bajar: d.bajar }), /no confio en la cache de actionlint: .*escribir otros usuarios/);
+    fs.chmodSync(cache, 0o700);
+
+    const otro = process.getuid() + 1;
+    await assert.rejects(binarioDeActionlint(VERSION, { base, bajar: d.bajar, uid: otro }), /no confio en la cache de actionlint: .*otro usuario/);
+    assert.match(desconfianza(cache, { plataforma: "linux", uid: otro }), /otro usuario/);
+    assert.equal(desconfianza(cache, { plataforma: "linux", uid: process.getuid() }), null);
+    assert.equal(d.veces, 2, "una cache de la que no se confia no se reemplaza sola");
+  }),
+);
 
 // EL HOOK, corrido de verdad con un `node` de mentira delante del PATH.
 //

@@ -202,6 +202,43 @@ test("doctor --valores: un problema MEDIDO sale 1; no pude mirar sale 0; bien sa
   }
 });
 
+// EL DOCTOR AFIRMABA LO QUE NO MIDIO (revision adversarial del porte, FO-S13/H3,
+// 2026-09-18). Con TIPO_CUENTA ausente o escrito «organización», `--valores` decia
+// «la cuenta es personal ... no hay equipos que comprobar» y salia 0 sin llamar a
+// `gh` una sola vez: una lectura de texto presentada como un hecho, en la fase 1 de
+// la guia tecnica, que es donde un PO lo corre.
+test("doctor --valores: un TIPO_CUENTA mal escrito sale 1 con el arreglo, sin consultar ni afirmar nada", () => {
+  const { ruta, limpiar } = conValores(JSON.stringify({ ...BASE, TIPO_CUENTA: "organización" }));
+  try {
+    let consultas = 0;
+    const r = revisarEquipos(ruta, { comprobar: () => ((consultas += 1), { estado: "no-aplica" }) });
+    assert.equal(r.codigo, 1, r.lineas.join("\n"));
+    const texto = r.lineas.join("\n");
+    assert.match(texto, /TIPO_CUENTA = "organización" no es una opcion/);
+    assert.match(texto, /Quisiste decir "organizacion"/);
+    assert.doesNotMatch(texto, /la cuenta es personal/, "afirmo una cuenta personal que no midio");
+    assert.equal(consultas, 0, "con un valor que no se reconoce no hay nada que comprobar todavia");
+  } finally {
+    limpiar();
+  }
+});
+
+test("doctor --valores: sin TIPO_CUENTA dice lo que LEYO, no que la cuenta es personal, y sale 0", () => {
+  const { TIPO_CUENTA: _omitido, ...sinTipo } = BASE;
+  const { ruta, limpiar } = conValores(JSON.stringify(sinTipo));
+  try {
+    const r = revisarEquipos(ruta);
+    assert.equal(r.codigo, 0, "una cuenta personal sin TIPO_CUENTA es el default legitimo: no puede enrojecer");
+    const texto = r.lineas.join("\n");
+    assert.doesNotMatch(texto, /la cuenta es personal/, "presento como hecho una lectura del archivo");
+    assert.match(texto, /TIPO_CUENTA/);
+    assert.match(texto, /no se le pregunt[oó] a GitHub/i);
+    assert.match(texto, /"organizacion"/, "y dice que poner si en realidad es una organizacion");
+  } finally {
+    limpiar();
+  }
+});
+
 test("doctor --valores: lee el archivo aunque tenga BOM, y uno ilegible sale 1 diciendo cual", () => {
   const conBom = conValores(Buffer.concat([Buffer.from([0xef, 0xbb, 0xbf]), Buffer.from(JSON.stringify(BASE))]));
   try {

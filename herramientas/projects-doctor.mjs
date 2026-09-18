@@ -37,6 +37,7 @@ import {
   invocadoDirecto,
   leerValores,
   lineasDeEquiposDelPO,
+  problemasDeEleccion,
 } from "./projects-init.mjs";
 
 /** Si la salida va a una persona o a un log de CI. Con TTY se escribe para leer;
@@ -277,9 +278,26 @@ export function revisarEquipos(ruta, { leer = leerValores, comprobar = comprobar
   } catch (e) {
     return { codigo: 1, lineas: [`${PROBLEMA} no pude leer ${ruta}: ${e.message}`] };
   }
+  // UN TIPO_CUENTA MAL ESCRITO NO ES UNA CUENTA PERSONAL (revision adversarial del
+  // porte, FO-S13/H3). Con «organización» con tilde, esto decia «la cuenta es
+  // personal» y salia 0 sin consultar nada. Se rechaza con la MISMA regla que
+  // `projects init` le aplica al archivo, antes de comprobar nada.
+  const eleccion = problemasDeEleccion({ TIPO_CUENTA: valores?.TIPO_CUENTA });
+  if (eleccion.length) return { codigo: 1, lineas: eleccion.map((p) => `${PROBLEMA} ${p}`) };
   const r = comprobar(valores);
   if (r.estado === "no-aplica") {
-    return { codigo: 0, lineas: ["  [    ] Equipos del PO: la cuenta es personal (TIPO_CUENTA no es «organizacion»), así que no hay equipos que comprobar"] };
+    // Se dice lo que se LEYO, no un hecho que nadie midio: GitHub no se consulto.
+    const leido =
+      valores?.TIPO_CUENTA === undefined || valores?.TIPO_CUENTA === null || valores?.TIPO_CUENTA === ""
+        ? "TIPO_CUENTA no está en el archivo, y ausente vale «usuario»"
+        : "TIPO_CUENTA dice «usuario»";
+    return {
+      codigo: 0,
+      lineas: [
+        `  [    ] Equipos del PO: ${leido}, así que CODEOWNERS nombra personas y no hay equipos que comprobar.`,
+        "         No se le preguntó a GitHub qué es la cuenta: si ORG es una organización, poné TIPO_CUENTA en \"organizacion\" y volvé a correr esto.",
+      ],
+    };
   }
   const { lineas } = lineasDeEquiposDelPO(r, valores);
   const bloquea = EQUIPOS_CON_PROBLEMA.has(r.estado);

@@ -164,3 +164,48 @@ arreglo y se vio en rojo.
       anteriores del carril.
 - [ ] 7.6 Las filas de los cinco requirements ADDED en `openspec/cobertura-de-requirements.md`.
       **Motivo**: van con el archive, y ese archivo lo toca en paralelo el lote 18.
+
+## 8. Revisión adversarial del carril: lo que cazó y cómo se cerró
+
+- [x] 8.1 La caché de actionlint no se volvía a verificar (FO-S7/H1, RV-H2): vivía en
+      `os.tmpdir()` —en Linux, `/tmp`, compartido— y un acierto era `existsSync`, así que
+      cualquier archivo en `<tmp>/projects-actionlint-<versión>/actionlint` se ejecutaba y
+      la salida decía «definiciones de pipeline validas (actionlint 1.7.12 —el pin del CI—
+      con shellcheck)». Contradecía el requirement («verificando la integridad del binario
+      contra el release del que se baja»). **Rojo medido** antes del arreglo: con
+      `TMPDIR=$T` y un binario plantado que imprime «BINARIO PLANTADO SIN VERIFICAR», la
+      herramienta lo corrió → `BINARIO PLANTADO SIN VERIFICAR: -color -shellcheck=/opt/homebrew/bin/shellcheck`
+      y `definiciones de pipeline validas ...`, rc 0. **Arreglo** en
+      `herramientas/actionlint-local.mjs`: caché del usuario (`baseDeCache`: `~/Library/Caches`,
+      `$XDG_CACHE_HOME` o `~/.cache`, `%LOCALAPPDATA%`), directorio y padre de quien corre
+      la herramienta y sin escritura para otros (`desconfianza`; si no, no se usa y lo
+      dice), y el sha256 del binario recién extraído de un tarball verificado guardado en
+      `actionlint.sha256` y comparado en cada acierto (`binarioEnCache`); si falta o no
+      coincide, la caché se descarta y se baja y verifica de nuevo. **Evidencia**:
+      `pruebas/herramientas/actionlint-local.test.mjs` → `# pass 20 # fail 0` (cinco casos
+      nuevos con un release de juguete, tar real y descarga inyectada: la segunda corrida
+      no baja; un binario sin sha o con otro sha se reemplaza; un asset con otro sha es
+      rojo, no deja caché y `main` sale 2; una caché escribible por otros o de otro uid no
+      se usa). Cada mutación deja el banco en `# fail 1`: la comparación del sha anulada
+      (`if (false)`), el acierto por `existsSync`, el acierto sin re-hashear, sin mirar
+      dueño ni permisos y la caché de vuelta en `os.tmpdir()`. De punta a punta: el binario
+      plantado en la caché nueva se descartó, se bajó el real (`bajando actionlint 1.7.12`) y
+      sobre este repo → `definiciones de pipeline validas`, rc 0; la segunda corrida, sin
+      bajar.
+- [x] 8.2 `TIPO_CUENTA` no se validaba (FO-S13/H3): con «organización» con tilde —como lo
+      escribe la propia herramienta en su prosa— o ausente, `projects-doctor --valores`
+      decía «la cuenta es personal ... no hay equipos que comprobar» y salía 0 sin llamar a
+      `gh`, y `projects init` armaba una organización con el CODEOWNERS de una cuenta
+      personal. **Arreglo**: `problemasDeEleccion` (`herramientas/projects-init.mjs`) valida
+      `TIPO_CUENTA` contra `TIPOS_DE_CUENTA` como ya hacía con `forma` y `plataforma`
+      (ausente sigue valiendo `usuario`; mal escrito es error con la sugerencia); el doctor
+      aplica la misma regla antes de comprobar y, en el caso `no-aplica`, dice lo que leyó
+      («TIPO_CUENTA no está en el archivo, y ausente vale «usuario»» o «TIPO_CUENTA dice
+      «usuario»») y que no se le preguntó a GitHub. **Evidencia**, rojo primero: los tres
+      casos nuevos (`pruebas/init/formas.test.mjs` y dos en
+      `pruebas/init/equipos-del-po.test.mjs`) → `# fail 3` antes del arreglo; después,
+      `# pass 26` y `# pass 16`. Por CLI: `--valores` con `"organización"` →
+      `::error::el archivo de valores tiene 1 problema(s). No se escribio nada` con
+      `¿Quisiste decir "organizacion"?`; el doctor sobre el mismo archivo → código 1 y cero
+      llamadas a `gh`.
+
