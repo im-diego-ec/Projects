@@ -58,6 +58,8 @@ usan, y la relectura de las filas (4.3) antes que la regla que la exige quede en
 ## Bloque 3 — La excepción de `@v1` también vence
 
 - [x] 3.1 `vigenteEn` en la única excepción de `pinado.test.mjs`, y un caso que la vence.
+      *(Superado en la integración: la excepción la retiró `guardrail-deltas-por-version-exacta`,
+      y con ella este caso. Ver 7.4.)*
       **Evidencia**: `pinado.test.mjs:99` y el caso de `:355`, con sus controles positivos
       contra el predicado real. Con `vigenteEn: "1.9.5"` → **exit 1** (el caso cae); sin
       la clave → **exit 1** («no declaran `vigenteEn` como X.Y.Z»). Restaurado → exit 0,
@@ -191,7 +193,7 @@ usan, y la relectura de las filas (4.3) antes que la regla que la exige quede en
       `pasosDe()` como el par de lectores de `permiso`. **Destino:** el lote 15 del porte
       (`las-actions-publicadas-resuelven-y-se-documentan`), cuyo item
       `la-compuerta-llega-o-se-declara` es esta pregunta.
-- [ ] 7.4 **Tres choques seguros con el carril L2 al integrar** (RV-L3-04). No se arreglan
+- [x] 7.4 **Tres choques seguros con el carril L2 al integrar** (RV-L3-04). No se arreglan
       desde acá porque el arreglo depende de lo que traiga L2. **Destino:** la integración de
       los carriles; quien junte L2 con este carril tiene que hacer las tres cosas:
       (a) el lote 6 de L2 (`guardrail-deltas-por-version-exacta`) borra la excepción de `@v1`
@@ -208,6 +210,13 @@ usan, y la relectura de las filas (4.3) antes que la regla que la exige quede en
       docs»): la entrada `(sin name, id: detectar)` de `SIN_BANCO_TODAVIA` en
       `pruebas/marco-ci/cobertura-de-los-pasos.test.mjs` pasa a ser una declaración fantasma
       y hay que renombrarla al nombre nuevo (o borrarla, si L2 le escribió banco).
+      **Evidencia (integración del porte, 2026-09-18):** (a) el caso de vencimiento de
+      `pinado.test.mjs` se borró al resolver el conflicto del commit de este lote, junto con
+      el `porque()` del lote 14; corregidos la entrada de `CHANGELOG.md` («Cambiado»), el
+      encabezado de `pruebas/vigencia.mjs`, este proposal y el design. (b) La fila del
+      Environment pasó a `**sin destino**, vigente en 1.9.6`, conservando el aviso de L2 y su
+      ancla. (c) L2 le escribió banco al paso (`deteccion-del-carril.test.mjs`), así que la
+      entrada se borró. Banco completo en verde después de juntar L1, L2 y L3.
 - [ ] 7.5 **El próximo release sale rojo en 13 puntos, a propósito, y la skill del release no
       lo dice** (RV-L3-09). Medido el 2026-09-18 sobre una copia con `## [1.10.0]` agregado al
       CHANGELOG: `pruebas/docs/cobertura-de-requirements.test.mjs`,

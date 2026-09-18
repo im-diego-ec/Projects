@@ -299,12 +299,13 @@ mueve sobre un cambio incompatible.
   recibe. Si querés la sección nueva, copiala de `plantilla/.github/PULL_REQUEST_TEMPLATE.md`
   a tu `.github/PULL_REQUEST_TEMPLATE.md`.
 
-- **Las excepciones que existen por una ventana vencen con la versión.** La excepción de
-  `@v1` de `pruebas/andamio/pinado.test.mjs` y la de `carril-docs` declaran la versión
-  en que se decidieron, y se ponen rojas en el pull request del release que corte otra.
-  Hay dos salidas: cerrar lo que la excepción tapaba, o mover la versión, que es una
-  decisión firmada. Viene de Rigel (2.5.0). **Para consumidores: nada** (bancos del
-  marco).
+- **Las excepciones que existen por una ventana vencen con la versión.** La de
+  `carril-docs` en `pruebas/andamio/actions-alcanzables.test.mjs` declara la versión en
+  que se decidió, y se pone roja en el pull request del release que corte otra. Hay dos
+  salidas: cerrar lo que la excepción tapaba, o mover la versión, que es una decisión
+  firmada. La de `@v1` de `pruebas/andamio/pinado.test.mjs` ya no existe: la retiró el
+  pin exacto del guardrail de deltas (entrada de arriba). Viene de Rigel (2.5.0).
+  **Para consumidores: nada** (bancos del marco).
 
 ### Eliminado
 

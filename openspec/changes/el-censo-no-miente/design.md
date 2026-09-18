@@ -8,7 +8,7 @@
 | `pruebas/andamio/actions-alcanzables.test.mjs` (nuevo) | **no viaja** | Mira las actions que el marco publica y los `uses:` del marco y del andamio. La pregunta es del marco: ¿publico algo que nadie corre? |
 | `pruebas/alcance-de-las-actions.mjs` (nuevo, el lector único del alcance) | **no viaja** | Lo importan dos bancos. Ver D2 sobre por qué vive en `pruebas/` y no en `herramientas/`. |
 | `pruebas/vigencia.mjs` (nuevo, el lector único de la versión publicada y el predicado de vencimiento) | **no viaja** | Lo importan tres bancos. Mismo criterio que el anterior. |
-| `pruebas/andamio/pinado.test.mjs` (la excepción de `@v1` declara `vigenteEn`) | **no viaja** | Banco del marco. |
+| `pruebas/andamio/pinado.test.mjs` (importa el lector único; la excepción de `@v1` que declaraba `vigenteEn` la retiró `guardrail-deltas-por-version-exacta`, y la integración del porte borró su caso de vencimiento) | **no viaja** | Banco del marco. |
 | `openspec/cobertura-de-requirements.md` | **no viaja**; no es canónica | Es una medición fechada del marco sobre su propio contrato (`docs/README.md` la clasifica así). No la copia nadie ni manda sobre nada. |
 | Los cuatro requirements de `calidad-codigo` | **canónico** | Son contrato del marco, y hablan de la superficie que publica la cobertura **del marco**: un consumidor no tiene nada que cumplir con ellos. |
 | `openspec/config.yaml` (la línea del contexto que describe la página) y `docs/README.md` (su fila en el mapa) | **no viaja** | Describen la página; se corrigen en el mismo cambio para no afirmar la forma vieja. |
@@ -175,7 +175,7 @@ pero no las relee.
 | Una compuerta que no corre | «ninguna compuerta publicada vive en una action que ningun `uses:` invoca» | refutación con `carril-docs` y con el alcance mutado |
 | Una fila con compuerta que no cita nada | «toda fila que cuenta como compuerta nombra algo que se pueda ir a mirar» | refutación |
 | Una action publicada sin invocar | `actions-alcanzables.test.mjs` · «toda action publicada esta alcanzada por algun `uses:`, o declarada» | sin la excepción de `carril-docs` |
-| Una excepción vencida o sin versión | `actions-alcanzables.test.mjs` y `pinado.test.mjs`, casos de vencimiento | con `vigenteEn` en 1.9.5 y sin él |
+| Una excepción vencida o sin versión | `actions-alcanzables.test.mjs`, caso de vencimiento (el de `pinado.test.mjs` se fue con su excepción, en la integración del porte) | con `vigenteEn` en 1.9.5 y sin él |
 
 **Lo que depende de alguien:** que la clasificación de cada fila sea correcta (D5), y que
 quien corta el release relea las filas vencidas en vez de mover la versión de todas a la

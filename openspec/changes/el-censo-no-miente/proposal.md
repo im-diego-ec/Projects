@@ -38,7 +38,10 @@ nadie audita: la de afirmar menos, o más, de lo que hay.
 Y un defecto al lado, que es el mismo mecanismo: **la excepción de `@v1` de
 `pruebas/andamio/pinado.test.mjs` no vence.** Existe por una decisión de distribución
 pendiente —retirar o no el último `@v1` vivo—, y una excepción que espera una decisión sin
-fecha es permanente por defecto.
+fecha es permanente por defecto. *(Nota de la integración del porte, 2026-09-18: el change
+`guardrail-deltas-por-version-exacta`, de otro carril, retiró esa excepción entera al pinar
+la línea a la versión exacta. Al juntar los carriles, el vencimiento quedó para las
+excepciones de alcanzables, y `pinado.test.mjs` solo comparte el lector de la versión.)*
 
 **De dónde viene.** Rigel —el repo hermano del que este marco trae mejoras— cerró los
 cuatro con su censo de compuertas, en cinco pasos:
@@ -77,8 +80,8 @@ lote del porte.
   (`pruebas/alcance-de-las-actions.mjs`). **`carril-docs` se declara, no se cablea**, con su
   motivo y su versión (design D4).
 - **Las excepciones que existen por una ventana vencen con la versión**: las de alcanzables
-  y la de `@v1` de `pinado.test.mjs`, con un solo lector de la versión publicada
-  (`pruebas/vigencia.mjs`).
+  (y la de `@v1` de `pinado.test.mjs`, hasta que `guardrail-deltas-por-version-exacta` la
+  retiró), con un solo lector de la versión publicada (`pruebas/vigencia.mjs`).
 - **Cuatro requirements nuevos en `calidad-codigo`** que fijan lo anterior como contrato del
   marco.
 
@@ -92,8 +95,8 @@ ninguna action y ningún archivo del andamio cambian: los tres consumidores real
 tienen nada que hacer. No hace falta versión propia; va en la próxima que se corte.
 
 **El costo cae en el release del marco, y es a propósito.** Al cortar la versión siguiente,
-once filas «sin destino» de la página, la excepción de `carril-docs` y la de `@v1` se ponen
-rojas en el pull request del release. Cada una tiene su arreglo escrito en el mensaje del
+once filas «sin destino» de la página y la excepción de `carril-docs` se ponen
+rojas en el pull request del release (la de `@v1` ya no existe: ver la nota de arriba). Cada una tiene su arreglo escrito en el mensaje del
 rojo. Es la fricción que convierte «nadie lo decidió» en una decisión firmada.
 
 ## Distribución

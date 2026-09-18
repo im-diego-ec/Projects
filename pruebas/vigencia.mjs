@@ -3,14 +3,16 @@
 //
 // QUE ES ESTO. El lector UNICO de «que version declara este arbol como publicada» y el
 // predicado UNICO de «esta declaracion ya vencio». Lo usan tres bancos que hasta hoy no se
-// hablaban, y los tres tienen listas que existen por una VENTANA y no para siempre:
+// hablaban, y dos tienen listas que existen por una VENTANA y no para siempre:
 //
-//   · `pruebas/andamio/pinado.test.mjs`, cuya excepcion de `@v1` sobrevive hasta que el marco
-//     decida retirar el tag (lo leia con su propia copia del regex del CHANGELOG);
 //   · `pruebas/andamio/actions-alcanzables.test.mjs`, cuyas excepciones son actions publicadas
 //     que ningun `uses:` invoca;
 //   · `pruebas/docs/cobertura-de-requirements.test.mjs`, cuyas filas «sin destino» son
-//     requirements verificables que nadie tiene anotados como trabajo.
+//     requirements verificables que nadie tiene anotados como trabajo;
+//   · y `pruebas/andamio/pinado.test.mjs`, que solo LEE la version publicada (la leia con su
+//     propia copia del regex del CHANGELOG). Su excepcion de `@v1` tambien vencia por aca
+//     hasta que el change `guardrail-deltas-por-version-exacta` la retiro entera: desde
+//     entonces ese banco no tiene excepciones que vencer.
 //
 // DE DONDE VIENE. Del porte de Rigel (2.5.0, change `el-ambiente-se-exige`, commits fa84c09 y
 // 69f512a): las excepciones de su banco de actions alcanzables declaran `vigenteEn`, y el dia
