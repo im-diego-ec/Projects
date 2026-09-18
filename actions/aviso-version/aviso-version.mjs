@@ -409,6 +409,16 @@ export function extraerParaConsumidores(cuerpo) {
   return { encontrada: true, texto: limpiarBordes(lineas.slice(inicio + 1, fin).join("\n")) };
 }
 
+/** ¿El resumen para consumidores quedó VACÍO? Sin texto, o hecho solo de espacios y
+ *  comentarios HTML, que el destino no muestra. Es un predicado aparte de «ausente» a
+ *  propósito: la sección EXISTE, así que `construirMensaje` toma la rama del resumen y
+ *  manda el encabezado «Qué tiene que hacer un consumidor:» sin nada debajo. Hasta la
+ *  revisión adversarial del porte (2026-09-17) ninguna rama lo miraba y el aviso salía
+ *  así con exit 0 y sin una advertencia. */
+function sinContenido(texto) {
+  return String(texto).replace(/<!--[\s\S]*?-->/g, "").trim() === "";
+}
+
 /**
  * Las líneas BREAKING, derivadas de la convención que el propio CHANGELOG
  * declara ("se marca en mayúsculas al inicio de la línea"). Es una PROPIEDAD del
@@ -536,6 +546,10 @@ export function construirMensaje({
     mensaje: texto,
     breaking: breaking.length > 0,
     sinParaConsumidores: !consumidores.encontrada,
+    // La sección está y no dice nada. NO cambia lo que se manda —eso espera el OK
+    // humano, porque cambia el mensaje y la salida de una pieza referenciada—: lo
+    // advierte `main` y lo cobra, en rojo, la compuerta del CHANGELOG del marco.
+    paraConsumidoresVacia: consumidores.encontrada && sinContenido(consumidores.texto),
     recortado,
     // El dialecto que se USO, no el que se pidio: `validarFormato` normaliza, y quien
     // llama lo tiene que poder decir sin volver a resolverlo.
@@ -697,6 +711,17 @@ export async function main(env = process.env) {
         ". Arreglo: agregar esa seccion a la entrada, aunque diga solo \"Nada que hacer\""
     );
   }
+  // LA SECCION QUE ESTA Y NO DICE NADA. Fail-open ruidoso: el mensaje sale igual que
+  // antes —con el encabezado de la accion y nada debajo— y la corrida lo dice. Sin esto
+  // era la unica forma de «nadie dice que hacer» que salia sin una sola advertencia.
+  if (armado.paraConsumidoresVacia) {
+    console.log(
+      `::warning::la entrada [${version}] del CHANGELOG trae "### Para consumidores" pero VACIA (sin texto, o solo ` +
+        "espacios o comentarios): el aviso sale con «Que tiene que hacer un consumidor:» y nada debajo. " +
+        "Arreglo: escribir en esa seccion que tiene que hacer un consumidor con esta version, aunque sea \"Nada que hacer\", " +
+        "y volver a disparar el aviso con el boton"
+    );
+  }
   // EL CONSEJO SE BIFURCA POR LA RAMA QUE `construirMensaje` TOMO DE VERDAD, y no por
   // el largo. Era el mismo texto en las dos ramas —«acortar la seccion Para
   // consumidores»—, asi que sin la seccion mandaba a acortar algo que no existe, y lo
@@ -732,7 +757,13 @@ export async function main(env = process.env) {
     "",
     `- Enlace del release: ${urlRelease}`,
     `- Dialecto: \`${armado.dialecto}\`${formatoDeclarado ? "" : " (el default: nadie lo declaro)"}`,
-    `- Seccion «Para consumidores»: ${armado.sinParaConsumidores ? "**ausente** (el mensaje se armo con el cuerpo completo de la entrada)" : "presente"}`,
+    `- Seccion «Para consumidores»: ${
+      armado.sinParaConsumidores
+        ? "**ausente** (el mensaje se armo con el cuerpo completo de la entrada)"
+        : armado.paraConsumidoresVacia
+          ? "presente pero **vacia** (el mensaje lleva el encabezado de la accion sin nada debajo)"
+          : "presente"
+    }`,
     `- BREAKING declarado: ${armado.breaking ? "**si**" : "no"}`,
     `- Recortado: ${armado.recortado ? `**si** (limite ${limite})` : "no"}`,
     `- Largo del mensaje: ${armado.mensaje.length} caracteres`,

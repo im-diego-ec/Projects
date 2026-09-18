@@ -54,7 +54,20 @@ Lo único que puede aparecer es **un aviso nuevo** si tu `.projects-desvios.json
 tiene un desvío incompleto o una fecha imposible; completalo ahora, porque en la
 línea mayor siguiente el desvío incompleto deja de absorber.
 
-**El resto es andamio y no te llega solo**: un proyecto nuevo nace con la promoción a
+**Si usás `actions/aviso-version` para anunciar tus propias versiones**, el mensaje
+cambia aunque no toques nada: el primer párrafo cambia de redacción, las dos líneas de
+encuadre pasan de `*…*` a `**…**` y cada cambio incompatible llega entero en vez de
+cortado. Si tu destino es Slack, declará el dato nuevo `formato: mrkdwn`; en una copia
+del archivo de aviso del marco va como la variable de repositorio
+`AVISO_VERSION_FORMATO`, en la pestaña Variables y no en Secrets. Teams y Discord no
+necesitan nada. Si no la usás, nada de esto te toca.
+
+**Desde la próxima versión, una compuerta nueva puede llegar en rojo dentro de tu PR
+de actualización**, con lo que tenés que cambiar escrito en esta sección. Solo lo que
+se arregla fuera de tu repositorio —un ajuste de GitHub, un permiso de quien lo
+administra— sigue llegando primero como aviso.
+
+**Lo demás es andamio y no te llega solo**: un proyecto nuevo nace con la promoción a
 producción manual, desvíos más precisos y documentos al día; uno ya creado conserva la
 copia que recibió. Si tenés un sitio generado con `desplegar.yml`, su producción se
 sigue publicando cada vez que se integra un cambio a `main`, hasta que copies el archivo
@@ -340,7 +353,10 @@ nuevo (ver «Cambiado»).
 - **El preámbulo del aviso deriva el tag móvil de la versión** en vez de escribir `v1`,
   y un banco ata el canal que nombra (Dependabot) a la configuración que reparte el
   andamio: si el andamio deja de recibir el marco por Dependabot, el banco se pone rojo
-  en vez de dejar la frase vieja. **Para consumidores: nada.**
+  en vez de dejar la frase vieja. **Para consumidores:** nada si no invocás la action.
+  Si la invocás, el primer párrafo del mensaje cambia de redacción: ya no dice que el
+  tag móvil «sigue existiendo y ya no es el canal», sino que no es el canal y para qué
+  existe.
 - **El paso 1 de la skill de release escribe `[No publicado]` con su `### Para
   consumidores` de fábrica**, que es lo que la compuerta nueva acepta; un banco extrae
   ese bloque de la skill y lo pasa por la misma compuerta. **Para consumidores: nada.**
@@ -672,7 +688,14 @@ nuevo (ver «Cambiado»).
   físicas, así que la única viñeta BREAKING de `[No publicado]`, envuelta en cuatro
   líneas, iba a salir como «…—hoy, nadie—: `produccion`» y nada más. Ahora pega las
   líneas de continuación hasta la viñeta siguiente, un encabezado o una línea vacía.
-  **Para consumidores: nada.**
+  **Para consumidores:** nada si no invocás la action; si la invocás, tus viñetas
+  BREAKING envueltas llegan enteras.
+- **El aviso de versión advierte una sección «Para consumidores» vacía.** Un
+  encabezado sin texto —o sólo con comentarios— pasaba como presente: el mensaje salía
+  con «Qué tiene que hacer un consumidor:» y nada debajo, sin ninguna advertencia.
+  Ahora la corrida emite `::warning::` con el arreglo y su resumen la declara vacía. Lo
+  que el mensaje manda en ese caso no cambia. **Para consumidores:** nada si no invocás
+  la action; si la invocás, puede aparecer esa advertencia nueva.
 - **El emisor del aviso daba el consejo al revés.** Sin «Para consumidores» y con el
   mensaje recortado, mandaba a «acortar la sección Para consumidores» —que no existía—
   y afirmaba que el aviso salía «con el cuerpo completo» mientras lo recortaba. Ahora
@@ -1339,11 +1362,14 @@ nuevo (ver «Cambiado»).
 
 - **El aviso de la próxima versión se mide en el PR que lo escribe, no después de
   mandarlo.** `herramientas/aviso-entra-en-el-mensaje.mjs` corre en el job
-  `changelog-en-el-pr` del `ci.yml` del marco y pone **rojo** el PR por tres causas,
-  cada una con su arreglo escrito: que la entrada no traiga `### Para consumidores`,
-  que el texto de fábrica del release quede encima de cambios reales, o que el mensaje
-  no entre en el límite. Mide `[No publicado]` y la versión más alta —la del PR de
-  release— con las mismas funciones de la action, y no una estimación. Medido el
+  `changelog-en-el-pr` del `ci.yml` del marco y pone **rojo** el PR, cada causa con su
+  arreglo escrito: que la entrada no traiga `### Para consumidores` o la traiga vacía,
+  que el texto de fábrica del release quede encima de cambios reales (aunque se le haya
+  tocado la puntuación, o los cambios estén sueltos bajo el encabezado), o que el
+  mensaje no entre en el límite. Mide `[No publicado]`, la versión más alta y —con el
+  `CHANGELOG.md` del commit base del PR— toda versión cuyo aviso cambia en ese PR, como
+  el corte de una línea vieja; lo hace con las mismas funciones de la action, y no con
+  una estimación. Un banco corre el paso del CI por su nombre. Medido el
   2026-09-17: el `[No publicado]` tenía 40488 caracteres y ninguna sección para
   consumidores, así que el próximo aviso iba a armar 41091 y entregar 3451 recortados,
   sin decirle a nadie qué hacer. Portado de Rigel en su forma corregida (1.17.3 y 2.4.0).
@@ -1778,7 +1804,7 @@ siendo rojo.
 
 ### Para consumidores
 
-**Nada que hacer en el pipeline.** Los dos arreglos son del andamio: un proyecto
+**Nada que hacer en tus verificaciones.** Los dos arreglos son del andamio: un proyecto
 nuevo los trae, y uno ya creado conserva su copia de `actualizar-marco.yml`.
 
 ## [1.9.3] — 2026-09-03

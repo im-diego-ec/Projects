@@ -144,11 +144,76 @@ El arreglo es sobre la señal (`::warning::` y `run-name`), no sobre el default.
 `false` haría que un dispatch descuidado le mande un mensaje al canal de todos los
 consumidores, que es peor que un verde que no envió. El banco fija el default.
 
+## Decisiones de la revisión adversarial (2026-09-17)
+
+La revisión encontró cuatro verdes mudos en la compuerta y uno en el emisor. Cada
+decisión nombra el hallazgo que la motivó (FO-H1…H4, RV-L4-01…03).
+
+### 10. Qué versiones se miden: las que el PR cambia, medido por lo que su aviso mandaría
+
+La compuerta medía `[No publicado]` y la versión más alta, y declaraba residuo al resto
+porque «su mensaje ya salió (o no salió nunca)». Es falso para un backport: cortar la
+1.9.7 cuando ya existe la 2.0.0 deja un texto final que el `release` manda apenas se
+publique el tag (FO-H2).
+
+- **Elegida: con el `CHANGELOG.md` del commit base del PR, medir además toda versión
+  cuyo aviso cambia** —nueva, o que armaría otro mensaje en algún dialecto, o que
+  cambiaría el veredicto del centinela—. El paso del CI saca la base con `git show` y la
+  pasa como segundo argumento; sin ella, la compuerta mide lo de siempre y lo dice con
+  un `::notice::`.
+- **Descartada: medir todas las versiones.** Pone rojo cualquier PR por historia que
+  no escribió (la 1.3.0 tiene un resumen de 8810 caracteres).
+- **Descartada: medir las versiones cuyo CUERPO cambia**, que era la sugerencia de la
+  revisión. Una errata en el detalle de una versión vieja la pondría en rojo por un
+  resumen escrito antes de esta compuerta, y esa errata no cambia una letra de lo que
+  el aviso mandaría. Medir el mensaje mide exactamente lo que el PR escribe del aviso.
+- **Descartada: sólo declarar el límite** en el `::notice::`. Deja el backport verde en
+  el único PR donde se podía ver.
+
+**Lo que ya encontró:** con los dos parches del porte aplicados, la integración cambia
+las 1.9.x, y la 1.9.4 decía «Nada que hacer en el pipeline»: jerga que la compuerta
+vieja no veía porque sólo medía la 1.9.6. El parche quedó corregido.
+
+### 11. El resumen vacío: rojo en la compuerta, advertencia en la action
+
+Un `### Para consumidores` sin texto EXISTE, así que no caía en «ausente», y el aviso
+mandaba «Qué tiene que hacer un consumidor:» con nada debajo, con la compuerta verde y
+la action sin una advertencia (FO-H1, RV-L4-01).
+
+- **Elegida:** la action devuelve `paraConsumidoresVacia` desde `construirMensaje` (un
+  predicado, un lugar), emite `::warning::` y lo dice en el resumen de la corrida; la
+  compuerta usa ese mismo campo y pone rojo con el arreglo «escribirla». Vacío es sin
+  texto, o sólo espacios y comentarios HTML.
+- **Diferida, con OK humano: que el mensaje caiga a la rama sin resumen.** Es lo
+  coherente con el fail-open de la ausencia, pero cambia el texto que llega al canal y
+  la salida `sin_para_consumidores` de una pieza referenciada. El `::warning::` es un
+  fail-open ruidoso, que AGENTS.md pide sin preguntar; el cambio de mensaje, no (tarea
+  9.9).
+
+### 12. El centinela compara palabras, y la compañía es cualquier cambio
+
+- **El texto de fábrica se reconoce por sus palabras**: sin acentos, puntuación, marcas
+  de énfasis ni caja. Sacarle el punto final apagaba el centinela (FO-H4). Se descartó
+  buscar «nada» o una distancia de edición: «Nada que hacer hoy.» escrito por una
+  persona es suyo y tiene que seguir verde.
+- **La compañía es cualquier cambio declarado**, no sólo un `###`: viñetas sueltas bajo
+  el encabezado de la versión, o bajo un pseudo-título en negrita, también cuentan
+  (RV-L4-03). Comentarios, separadores y líneas vacías no.
+
+### 13. El paso del CI y la guarda de «programa principal» tienen banco
+
+Borrar el paso, cambiar su `run` por `echo`, o romper la guarda con `if (false)` dejaba
+toda la suite verde (RV-L4-02). El banco extrae el paso por su nombre
+(`scriptDelPaso`, el mismo extractor del paso vecino) y lo corre sobre un repositorio de
+prueba con base y cabeza; y lanza la herramienta como proceso por una ruta con `..`
+sobre un changelog rojo. Para eso el paso pasó a un bloque `run: |`.
+
 ## Qué hace cumplir esto solo
 
 | Propiedad | Compuerta que falla sola |
 |---|---|
-| El aviso de la próxima versión trae su resumen, sin texto de fábrica sobre cambios, y entra | Paso «El aviso de la proxima version dice que hacer y entra sin recortarse» del `ci.yml` (job `changelog-en-el-pr`) |
+| El aviso de la próxima versión trae su resumen, con texto, sin texto de fábrica sobre cambios, y entra | Paso «El aviso de la proxima version dice que hacer, sin jerga, y entra sin recortarse» del `ci.yml` (job `changelog-en-el-pr`) |
+| Ese paso existe, invoca la compuerta y le pasa la base del PR; la compuerta corre como programa | `pruebas/ci-del-marco/aviso-entra-en-el-mensaje.test.mjs` (el paso extraído por nombre y corrido sobre un repositorio de prueba; la herramienta lanzada por una ruta con `..`) |
 | La compuerta mide el mensaje real, con el límite real | `pruebas/ci-del-marco/aviso-entra-en-el-mensaje.test.mjs` (exactitud contra el payload de la action y «el límite vive en UN lugar») |
 | El placeholder de la skill de release pasa la compuerta y es el que reconoce el centinela | `pruebas/ci-del-marco/placeholder-del-release.test.mjs` |
 | BREAKING entero, puntero derivado, canal atado al andamio, consejo según la rama | `actions/aviso-version/pruebas/aviso-version.test.mjs` |
@@ -159,14 +224,22 @@ Todos los bancos se escribieron primero y se vieron rojos contra el código ante
 
 ## Residuo declarado
 
-- **Sólo se miden `[No publicado]` y la versión más alta.** Las demás ya salieron (o no
-  salieron nunca) y reenviarlas es un acto deliberado con el botón.
+- **Una versión cuyo aviso el PR no cambia no se mide.** Si ya estaba mal, el botón que
+  la reenvía es un acto deliberado de alguien que la está leyendo; la compuerta no
+  re-litiga historia que el PR no escribió (decisión 10).
+- **Sin la base del PR, la compuerta mide sólo `[No publicado]` y la más alta**, y lo
+  dice con un `::notice::`. Es el caso de correrla a mano sin el segundo argumento; el
+  CI la pasa siempre y el banco del paso lo exige.
+- **Una sección «Para consumidores» vacía sigue saliendo vacía** si alguien la manda con
+  el botón: la action la advierte y no la reemplaza (decisión 11, tarea 9.9).
 - **El banco del simulacro verifica que las señales estén escritas**, no que GitHub las
   renderice: correr el workflow exige un dispatch real.
 - **Una viñeta BREAKING con un segundo párrafo** lleva al aviso sólo el primero; el
   resto sigue en el CHANGELOG, que el mensaje enlaza.
-- **La compuerta no juzga si el resumen es bueno**, sólo que exista, que no sea el texto
-  de fábrica encima de cambios y que entre.
-- **El borrador de «Para consumidores» de `[No publicado]`** del parche resume lo que
-  había hoy en esa sección; la integración del porte lo tiene que completar con lo que
-  declaren los demás lotes. La compuerta cobra que exista y entre, no que esté completo.
+- **La compuerta no juzga si el resumen es bueno**, sólo que exista, que tenga texto,
+  que no sea el texto de fábrica encima de cambios, que no use jerga y que entre.
+- **El borrador de «Para consumidores» de `[No publicado]`** del parche trae las notas de
+  los tres lotes de este carril (8, 36 y 10); la integración del porte lo tiene que
+  completar con las de los demás carriles, y el encabezado del parche lo dice. La
+  compuerta cobra que exista, tenga texto, entre y no use jerga; que esté completo no lo
+  puede medir ninguna máquina, así que queda como paso de la integración (tarea 6.3).

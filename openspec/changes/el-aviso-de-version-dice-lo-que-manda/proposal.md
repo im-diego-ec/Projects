@@ -62,10 +62,11 @@ sección exista en cada versión.
 ## Qué cambia
 
 1. **La compuerta** `herramientas/aviso-entra-en-el-mensaje.mjs`, en el job
-   `changelog-en-el-pr` del `ci.yml` del marco, en rojo: mide `[No publicado]` y la
-   versión más alta con las funciones de la propia action, y falla si falta el
-   resumen para consumidores, si el texto de fábrica del release quedó encima de
-   cambios reales, o si el mensaje no entra. Cada `::error::` trae su arreglo, y el de
+   `changelog-en-el-pr` del `ci.yml` del marco, en rojo: mide `[No publicado]`, la
+   versión más alta y —con el `CHANGELOG.md` del commit base del PR— toda versión cuyo
+   aviso cambia en ese PR, con las funciones de la propia action. Falla si falta el
+   resumen para consumidores o está vacío, si el texto de fábrica del release quedó
+   encima de cambios reales, o si el mensaje no entra. Cada `::error::` trae su arreglo, y el de
    la sección ausente dice **cuánto llega** de verdad. Se porta en su forma corregida
    (Rigel 1.17.3 + 2.4.0), no en la original.
 2. **El emisor** (`aviso-version.mjs`): la viñeta BREAKING llega entera; el puntero se
@@ -110,6 +111,11 @@ referenciable y su contrato se trata como tal:
   punto pasa por su OK antes del release.
 - **El texto de dos `::warning::` y del preámbulo cambia**: es diagnóstico, no
   contrato. Ningún `output` cambia.
+- **Una sección «Para consumidores» vacía ahora se advierte** con un `::warning::` y en
+  el resumen de la corrida (revisión adversarial del 2026-09-17). Lo que el mensaje
+  manda en ese caso NO cambia en este change: hacerlo caer a la rama sin resumen cambia
+  el texto que llega al canal y la salida `sin_para_consumidores`, y eso espera el OK
+  humano (tarea 9.9).
 - **La compuerta, el simulacro y la skill no viajan**: viven en el CI propio, el
   workflow propio y el procedimiento de release de este repo.
 
@@ -119,3 +125,15 @@ principio de una entrada de 40000 caracteres.
 
 **Contrato: patch. Distribución:** referenciado (la action) y canónico (compuerta,
 bancos, workflow propio, skill). Detalle en el design.
+
+## Dependencia de integración
+
+El `aprueba:` de este change cita el desvío de review del marco («un solo mantenedor,
+ver AGENTS.md»), y **ese desvío no está declarado en esta rama**: lo declara el change
+`el-marco-declara-su-desvio-de-review` del carril L1 del porte, que agrega el recuadro a
+`AGENTS.md` y la regla a `openspec/config.yaml`. Este change **se integra después de
+ese, o junto con él**; integrado solo, su frontmatter contradice la config vigente, que
+exige que `aprueba` nombre roles. No depende de la memoria de nadie:
+`pruebas/ci-del-marco/aprueba-cita-lo-que-existe.test.mjs` —llega con el arreglo del
+change `que-es-breaking`, que comparte la guarda del carril del porte— pone rojo el PR a
+`main` que traiga un `aprueba:` que cite el desvío sin que `AGENTS.md` lo declare.

@@ -33,12 +33,14 @@
 
 import test from "node:test";
 import assert from "node:assert/strict";
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { execFileSync, spawnSync } from "node:child_process";
+import { mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import * as laAction from "../../actions/aviso-version/aviso-version.mjs";
 import { SIN_TRADUCCION } from "../docs/lectura.mjs";
+import { scriptDelPaso } from "../marco-ci/extraer.mjs";
 import {
   ENTRADA_SIN_PUBLICAR,
   PLACEHOLDER_SIN_CAMBIOS,
@@ -686,3 +688,336 @@ test("el ::error:: de la jerga nombra la seccion, las palabras y el arreglo, y s
   assert.match(error, /Arreglo:/);
   assert.match(error, /backticks/, "y dice la salida legitima para un nombre que hay que copiar tal cual");
 });
+
+// ===========================================================================
+// REVISION ADVERSARIAL DEL PORTE (2026-09-17): los huecos que la compuerta dejaba
+// verdes. Cada bloque cita el hallazgo que lo motivo y trae su contrapeso: lo que
+// tiene que SEGUIR verde, porque un endurecimiento que no lo dice no se distingue de
+// una compuerta que se volvio loca.
+// ===========================================================================
+
+// ---------------------------------------------------------------------------
+// FO-H1 / RV-L4-01 — un «Para consumidores» que existe pero esta VACIO
+// ---------------------------------------------------------------------------
+//
+// `extraerParaConsumidores` lo daba por encontrado con texto "", y ninguna de las
+// cuatro causas lo miraba: el aviso salia con «Que tiene que hacer un consumidor:» y
+// nada debajo, y la compuerta imprimia que el aviso «manda su seccion». Es el caso
+// que esta compuerta existe para impedir —cambios reales y nadie dice que hacer—,
+// entrando por la puerta de al lado.
+
+const vaciaDe = (r, etiqueta = ENTRADA_SIN_PUBLICAR) =>
+  r.hallazgos.filter((h) => h.etiqueta === etiqueta && h.motivo === "para-consumidores-vacia");
+
+test("ROJO PRIMERO: un «Para consumidores» VACIO, seguido de otro encabezado, es ROJO", () => {
+  const r = medir(changelogCon(""), LIMITE_POR_DEFECTO, {});
+  assert.deepEqual(
+    r.hallazgos.filter((h) => h.etiqueta === ENTRADA_SIN_PUBLICAR).map((h) => h.motivo),
+    ["para-consumidores-vacia"],
+    "la seccion existe y no dice nada: el aviso manda un encabezado sin nada debajo",
+  );
+});
+
+test("ROJO PRIMERO: un «Para consumidores» hecho solo de espacios o de un comentario tambien esta vacio", () => {
+  assert.equal(vaciaDe(medir(changelogCon("   \n\t\n"), LIMITE_POR_DEFECTO, {})).length, 1, "solo espacios");
+  assert.equal(vaciaDe(medir(changelogCon("<!-- completar antes del release -->"), LIMITE_POR_DEFECTO, {})).length, 1, "solo un comentario");
+});
+
+test("ROJO PRIMERO: la reproduccion de la revision sale 1 con un ::error:: que manda a ESCRIBIRLA", () => {
+  const texto = [
+    "# Changelog",
+    "",
+    "## [No publicado]",
+    "",
+    "### Para consumidores",
+    "",
+    "### Añadido",
+    "",
+    "- Una compuerta nueva que pone rojo tu CI.",
+    "",
+    "## [1.9.6] — 2026-09-01",
+    "",
+    "### Para consumidores",
+    "",
+    "Nada que hacer.",
+    "",
+  ].join("\n");
+  const { codigo, dicho } = conTexto(texto);
+  assert.equal(codigo, 1, `la compuerta salio verde con la seccion vacia:\n${dicho}`);
+  const err = errores(dicho);
+  assert.equal(err.length, 1, `una causa, un ::error::\n${err.join("\n")}`);
+  assert.match(err[0], /\[No publicado\]/);
+  assert.match(err[0], /VACIA/);
+  assert.match(err[0], /Arreglo: ESCRIBIRLA/);
+  assert.doesNotMatch(dicho, /✓/, "y no imprime que el aviso manda su seccion");
+});
+
+test("CONTRAPESO: «Nada que hacer.» y el texto de fabrica solo siguen verdes", () => {
+  assert.deepEqual(vaciaDe(medir(changelogCon("Nada que hacer."), LIMITE_POR_DEFECTO, {})), [], "un texto corto no es un texto vacio");
+  assert.deepEqual(medir(sinPublicarCon(PLACEHOLDER_SIN_CAMBIOS, []), LIMITE_POR_DEFECTO, {}).hallazgos, []);
+});
+
+// ---------------------------------------------------------------------------
+// FO-H2 — la version que el PR corta POR DEBAJO de la mas alta
+// ---------------------------------------------------------------------------
+//
+// La compuerta media `[No publicado]` y la version mas alta, y declaraba residuo al
+// resto porque «su mensaje ya salio (o no salio nunca)». Es falso para un backport:
+// cortar la 1.9.7 cuando ya existe la 2.0.0 deja un texto final que el `release` va a
+// mandar apenas se publique el tag, y no se media. Es la misma forma que el defecto
+// de Rigel que el propio archivo cuenta: medir otra seccion en el PR de release.
+//
+// El arreglo mide ademas toda version cuyo aviso CAMBIA contra la base del PR. El
+// contrapeso: la historia que el PR no toca —o que toca sin cambiar lo que su aviso
+// mandaria— no se pone roja, porque ese PR no la escribio.
+
+const lineaDos = (...entradas) =>
+  [
+    "# Changelog",
+    "",
+    `## [${ENTRADA_SIN_PUBLICAR}]`,
+    "",
+    "### Para consumidores",
+    "",
+    PLACEHOLDER_SIN_CAMBIOS,
+    "",
+    "---",
+    "",
+    "## [2.0.0] — 2026-09-10",
+    "",
+    "### Para consumidores",
+    "",
+    "Nada que hacer.",
+    "",
+    "---",
+    "",
+    ...entradas.flatMap((e) => [e, "", "---", ""]),
+    "## [1.9.6] — 2026-09-01",
+    "",
+    "### Para consumidores",
+    "",
+    "Nada que hacer.",
+    "",
+  ].join("\n");
+
+const BASE_SIN_BACKPORT = lineaDos();
+const backport = (cuerpo) => lineaDos(`## [1.9.7] — 2026-09-17\n\n${cuerpo}`);
+
+test("ROJO PRIMERO: con la base del PR, la 1.9.7 recien cortada bajo la 2.0.0 se mide, y sin resumen es ROJA", () => {
+  const r = medir(backport("### Añadido\n\n- Cosa larga sin resumen."), LIMITE_POR_DEFECTO, {}, BASE_SIN_BACKPORT);
+  assert.ok(r.candidatos.some((c) => c.etiqueta === "1.9.7"), `no se midio la version que este PR corta: ${r.candidatos.map((c) => c.etiqueta)}`);
+  assert.deepEqual(
+    r.hallazgos.map((h) => [h.etiqueta, h.motivo]),
+    [["1.9.7", "sin-para-consumidores"]],
+  );
+});
+
+test("CONTROL POSITIVO: la 1.9.7 cortada con su resumen sale verde, y sigue midiendose", () => {
+  const r = medir(backport("### Para consumidores\n\nNada que hacer.\n\n### Corregido\n\n- algo"), LIMITE_POR_DEFECTO, {}, BASE_SIN_BACKPORT);
+  assert.deepEqual(r.hallazgos, []);
+  assert.deepEqual(r.candidatos.map((c) => c.etiqueta), [ENTRADA_SIN_PUBLICAR, "2.0.0", "1.9.7"]);
+});
+
+test("CONTRAPESO: la historia que el PR no toca no se mide, aunque no pasaria la compuerta", () => {
+  // La 1.5.0 no trae resumen ni en la base ni en la cabeza: el PR no la escribio.
+  const vieja = "## [1.5.0] — 2026-08-20\n\n### Añadido\n\n- algo viejo sin resumen";
+  const r = medir(lineaDos(vieja), LIMITE_POR_DEFECTO, {}, lineaDos(vieja));
+  assert.ok(!r.candidatos.some((c) => c.etiqueta === "1.5.0"), "se midio historia que este PR no toco");
+  assert.deepEqual(r.hallazgos, []);
+});
+
+test("CONTRAPESO: tocar el detalle de una version vieja sin cambiar lo que su aviso manda no la mide; cambiar el resumen, si", () => {
+  const vieja = (detalle, resumen) => `## [1.5.0] — 2026-08-20\n\n### Para consumidores\n\n${resumen}\n\n### Añadido\n\n- ${detalle}`;
+  const base = lineaDos(vieja("una errata", "Revisá el pipeline de tu repositorio."));
+
+  const errata = medir(lineaDos(vieja("una errata corregida", "Revisá el pipeline de tu repositorio.")), LIMITE_POR_DEFECTO, {}, base);
+  assert.ok(!errata.candidatos.some((c) => c.etiqueta === "1.5.0"), "una errata en el detalle no cambia el aviso: no es escribirlo");
+
+  const resumen = medir(lineaDos(vieja("una errata", "Revisá el pipeline y el workflow de tu repositorio.")), LIMITE_POR_DEFECTO, {}, base);
+  assert.deepEqual(
+    resumen.hallazgos.map((h) => [h.etiqueta, h.motivo]),
+    [["1.5.0", "jerga-en-para-consumidores"]],
+    "cambiar el resumen es escribir el aviso de esa version: se mide entero",
+  );
+});
+
+test("sin la base del PR, lo que no se midio se DICE, y el verde no afirma haber medido todo", () =>
+  conTemporal((dir) => {
+    const ruta = join(dir, "CHANGELOG.md");
+    writeFileSync(ruta, backport("### Añadido\n\n- Cosa larga sin resumen."));
+    const { codigo, dicho } = correr([ruta]);
+    assert.equal(codigo, 0, "sin base no hay como saber que version corta este PR: se mide lo de siempre");
+    assert.match(dicho, /^::notice::.*base/m, `falta el ::notice:: que nombra el limite:\n${dicho}`);
+    assert.doesNotMatch(dicho, /todavia se pueden mandar/, "afirma haber medido todas las secciones que el aviso puede mandar");
+  }));
+
+test("con la base del PR por argumento, main pone ROJA la version cortada por debajo de la mas alta", () =>
+  conTemporal((dir) => {
+    const ruta = join(dir, "CHANGELOG.md");
+    const base = join(dir, "changelog-de-la-base.md");
+    writeFileSync(ruta, backport("### Añadido\n\n- Cosa larga sin resumen."));
+    writeFileSync(base, BASE_SIN_BACKPORT);
+    const { codigo, dicho } = correr([ruta, base]);
+    assert.equal(codigo, 1, dicho);
+    assert.match(errores(dicho).join("\n"), /\[1\.9\.7\]/);
+  }));
+
+test("una base que no se puede leer es ROJO con el arreglo, no una medicion a medias en verde", () =>
+  conTemporal((dir) => {
+    const ruta = join(dir, "CHANGELOG.md");
+    writeFileSync(ruta, BASE_SIN_BACKPORT);
+    const { codigo, dicho } = correr([ruta, join(dir, "no-existe.md")]);
+    assert.equal(codigo, 1);
+    assert.match(errores(dicho).join("\n"), /Arreglo:/);
+  }));
+
+// ---------------------------------------------------------------------------
+// FO-H4 — el texto de fabrica, tocado apenas, apagaba el centinela
+// ---------------------------------------------------------------------------
+//
+// La igualdad toleraba espacios y caja y nada mas: sacarle el punto final al
+// placeholder alcanzaba para que el aviso dijera «no hay ningun cambio sin publicar»
+// sobre una version con cambios. Ahora tolera puntuacion, acentos y marcas de enfasis
+// SOLO contra el texto de fabrica, que es comparar palabras y no buscar «nada».
+
+const deFabricaCon = (anuncio) =>
+  medir(sinPublicarCon(anuncio, ["", "### Añadido", "", "- Una compuerta nueva que pone rojo tu CI."]), LIMITE_POR_DEFECTO, {})
+    .hallazgos.filter((h) => h.etiqueta === ENTRADA_SIN_PUBLICAR)
+    .map((h) => h.motivo);
+
+test("ROJO PRIMERO: el texto de fabrica sin el punto final, con cambios, sigue siendo ROJO", () => {
+  assert.deepEqual(deFabricaCon(PLACEHOLDER_SIN_CAMBIOS.replace(/\.$/, "")), ["placeholder-con-cambios"]);
+});
+
+test("ROJO PRIMERO: el texto de fabrica sin acentos o con negrita, con cambios, sigue siendo ROJO", () => {
+  const sinAcentos = PLACEHOLDER_SIN_CAMBIOS.normalize("NFD").replace(/[̀-ͯ]/g, "");
+  assert.notEqual(sinAcentos, PLACEHOLDER_SIN_CAMBIOS, "el fixture tiene que diferir de verdad");
+  assert.deepEqual(deFabricaCon(sinAcentos), ["placeholder-con-cambios"]);
+  assert.deepEqual(deFabricaCon(`**${PLACEHOLDER_SIN_CAMBIOS.replace(":", "**:")}`), ["placeholder-con-cambios"]);
+});
+
+test("CONTRAPESO: «Nada que hacer hoy.» escrito por una persona junto a cambios sigue verde", () => {
+  assert.deepEqual(deFabricaCon("Nada que hacer hoy."), [], "alguien lo penso: no es el texto de fabrica");
+});
+
+// ---------------------------------------------------------------------------
+// RV-L4-03 — cambios que no estan bajo un encabezado `###`
+// ---------------------------------------------------------------------------
+//
+// El centinela solo contaba como «compania» a los `###`. Viñetas escritas directo
+// bajo `## [No publicado]`, o bajo un pseudo-titulo en negrita, dejaban el texto de
+// fabrica anunciando «ningun cambio» sobre una version con cambios. El escenario del
+// spec dice «la seccion sin publicar declara cambios», no «tiene subsecciones».
+
+const sueltaCon = (suelto) =>
+  [
+    "# Changelog",
+    "",
+    `## [${ENTRADA_SIN_PUBLICAR}]`,
+    "",
+    ...suelto,
+    "",
+    "### Para consumidores",
+    "",
+    PLACEHOLDER_SIN_CAMBIOS,
+    "",
+    "---",
+    "",
+    "## [1.9.6] — 2026-09-10",
+    "",
+    "### Para consumidores",
+    "",
+    "Nada que hacer.",
+    "",
+  ].join("\n");
+
+const propiosDe = (texto) => medir(texto, LIMITE_POR_DEFECTO, {}).hallazgos.filter((h) => h.etiqueta === ENTRADA_SIN_PUBLICAR);
+
+test("ROJO PRIMERO: viñetas directo bajo [No publicado] con el texto de fabrica son ROJO", () => {
+  const propios = propiosDe(sueltaCon(["- **Compuerta nueva** que pone rojo tu PR si falta X."]));
+  assert.deepEqual(propios.map((h) => h.motivo), ["placeholder-con-cambios"]);
+  assert.match(propios[0].subsecciones.join(" "), /Compuerta nueva/, "y nombra lo que encontro, para que el error sea accionable");
+});
+
+test("ROJO PRIMERO: un pseudo-titulo en negrita con viñetas tambien es compania", () => {
+  assert.deepEqual(propiosDe(sueltaCon(["**Añadido**", "", "- algo"])).map((h) => h.motivo), ["placeholder-con-cambios"]);
+});
+
+test("CONTRAPESO: separadores y comentarios no son cambios, y el texto de fabrica solo sigue verde", () => {
+  assert.deepEqual(propiosDe(sueltaCon(["---", "", "<!-- el paso 1 del release deja esto asi -->"])), []);
+});
+
+// ---------------------------------------------------------------------------
+// RV-L4-02 — que el paso del CI corra la compuerta, y que la compuerta corra
+// ---------------------------------------------------------------------------
+//
+// Dos verdes mudos que ningun caso cazaba. (a) El paso del ci.yml se podia borrar o
+// cambiar por `echo omitido` y toda la suite quedaba verde; el paso vecino ya tenia
+// banco por nombre (changelog-en-el-pr.test.mjs). (b) La guarda de «programa
+// principal» se podia romper —`if (false)`— y la herramienta salia 0 sin medir nada:
+// el propio archivo dice que eso «en un paso de CI es un verde mudo», y no habia un
+// solo caso que la lanzara como proceso. Los dos se cierran corriendo el texto que
+// corre de verdad.
+
+const CI = join(RAIZ, ".github", "workflows", "ci.yml");
+const PASO_DEL_AVISO = "El aviso de la proxima version dice que hacer, sin jerga, y entra sin recortarse";
+
+/** Un repositorio de prueba con la base y la cabeza del PR, cada una con su CHANGELOG. */
+function repoDelPr(dir, changelogBase, changelogCabeza) {
+  const git = (...args) =>
+    execFileSync("git", ["-c", "user.name=banco", "-c", "user.email=banco@local", "-c", "commit.gpgsign=false", ...args], {
+      cwd: dir,
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "pipe"],
+    });
+  git("init", "--quiet", "--initial-branch=main");
+  writeFileSync(join(dir, "CHANGELOG.md"), changelogBase);
+  git("add", "-A");
+  git("commit", "--quiet", "-m", "base");
+  const base = git("rev-parse", "HEAD").trim();
+  writeFileSync(join(dir, "CHANGELOG.md"), changelogCabeza);
+  git("commit", "--quiet", "-am", "cabeza");
+  // La herramienta se enlaza DESPUES de los commits: no es parte del PR simulado. Sus
+  // imports se resuelven por su ruta real, asi que llegan a la action de este arbol.
+  symlinkSync(join(RAIZ, "herramientas"), join(dir, "herramientas"), "junction");
+  return base;
+}
+
+function correrElPaso(changelogBase, changelogCabeza) {
+  const script = scriptDelPaso(PASO_DEL_AVISO, CI);
+  const dir = mkdtempSync(join(tmpdir(), "paso-aviso-"));
+  try {
+    const base = repoDelPr(dir, changelogBase, changelogCabeza);
+    const r = spawnSync("bash", ["-c", script], {
+      cwd: dir,
+      encoding: "utf8",
+      env: { ...process.env, BASE: base, RUNNER_TEMP: dir },
+    });
+    return { script, codigo: r.status, salida: `${r.stdout ?? ""}${r.stderr ?? ""}` };
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+}
+
+test("ROJO PRIMERO: el paso del CI, corrido de verdad sobre un PR que corta una version vieja sin resumen, sale 1", () => {
+  const { script, codigo, salida } = correrElPaso(BASE_SIN_BACKPORT, backport("### Añadido\n\n- Cosa larga sin resumen."));
+  assert.match(script, /node herramientas\/aviso-entra-en-el-mensaje\.mjs CHANGELOG\.md/, "el paso tiene que invocar la compuerta");
+  assert.equal(codigo, 1, `el paso salio ${codigo} sobre un PR rojo:\n${salida}`);
+  assert.match(salida, /::error[^\n]*\[1\.9\.7\]/, "y el rojo nombra la version que este PR corta");
+});
+
+test("CONTROL POSITIVO: el mismo paso sobre un PR con el resumen escrito sale 0", () => {
+  const { codigo, salida } = correrElPaso(BASE_SIN_BACKPORT, backport("### Para consumidores\n\nNada que hacer.\n\n### Corregido\n\n- algo"));
+  assert.equal(codigo, 0, salida);
+});
+
+test("ROJO PRIMERO: lanzada como programa por una ruta con «..», la compuerta mide y sale 1 sobre un changelog rojo", () =>
+  conTemporal((dir) => {
+    const rojo = join(dir, "CHANGELOG.md");
+    writeFileSync(rojo, ["# Changelog", "", `## [${ENTRADA_SIN_PUBLICAR}]`, "", "### Corregido", "", "- algo", ""].join("\n"));
+    const r = spawnSync(process.execPath, [join(RAIZ, "pruebas", "..", "herramientas", "aviso-entra-en-el-mensaje.mjs"), rojo], {
+      encoding: "utf8",
+    });
+    assert.equal(r.status, 1, `salio ${r.status}: la guarda de «programa principal» contesto que no y no midio nada\n${r.stdout}${r.stderr}`);
+    assert.match(r.stdout, /::error/);
+  }));

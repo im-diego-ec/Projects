@@ -1034,9 +1034,15 @@ jobs:
       # (que-es-breaking): una compuerta nueva sale en rojo el dia que sale solo si su
       # arreglo llega escrito en palabras que entiende quien recibe el PR de bump.
       #
-      # Mide las dos secciones que el aviso todavia puede mandar —[No publicado] y la
-      # version mas alta— porque en el PR de release la primera acaba de vaciarse y la
-      # que importa es la segunda.
+      # Mide [No publicado], la version mas alta y, con el CHANGELOG del commit base
+      # del PR, toda version cuyo aviso cambia en este PR. La tercera es la del PR de
+      # release de una linea vieja (cortar la 1.9.7 cuando ya existe la 2.0.0): no es
+      # la mas alta y su texto sale igual apenas se publique el tag. La revision
+      # adversarial del porte (2026-09-17) la midio verde sin resumen.
+      #
+      # EL PASO TIENE BANCO POR SU NOMBRE: aviso-entra-en-el-mensaje.test.mjs lo extrae
+      # con scriptDelPaso y lo corre sobre un repositorio de prueba. Renombrarlo, o
+      # cambiar su run por otra cosa, es rojo en ese banco.
       #
       # ROJO Y NO AVISO, por la misma razon que el paso de arriba: vive en el ci.yml de
       # Projects y no viaja a ningun consumidor; los unicos afectados son quienes
@@ -1050,7 +1056,29 @@ jobs:
 
       - name: El aviso de la proxima version dice que hacer, sin jerga, y entra sin recortarse
         shell: bash
-        run: node herramientas/aviso-entra-en-el-mensaje.mjs CHANGELOG.md
+        env:
+          BASE: ${{ github.event.pull_request.base.sha }}
+        run: |
+          set -euo pipefail
+
+          # Sin el commit base no hay como saber que versiones cambia este PR, y medir
+          # solo las dos de siempre seria el verde a medias que este paso existe para
+          # evitar. Mismo arreglo que el paso de arriba.
+          if ! git cat-file -e "${BASE}^{commit}" 2>/dev/null; then
+            echo "::error::no pude resolver el commit base del PR (${BASE}), asi que no se puede saber que versiones del CHANGELOG cambia este PR. Este check NO se declara verde por no haber podido medir. Arreglo: el checkout de este job necesita fetch-depth: 0"
+            exit 1
+          fi
+
+          DE_LA_BASE="${RUNNER_TEMP:-/tmp}/changelog-de-la-base.md"
+          if git cat-file -e "${BASE}:CHANGELOG.md" 2>/dev/null; then
+            git show "${BASE}:CHANGELOG.md" > "${DE_LA_BASE}"
+          else
+            # Una base sin CHANGELOG hace nueva a toda version: se miden todas, y se dice.
+            echo "::notice::el commit base del PR no tiene CHANGELOG.md: toda version cuenta como nueva y se mide"
+            : > "${DE_LA_BASE}"
+          fi
+
+          node herramientas/aviso-entra-en-el-mensaje.mjs CHANGELOG.md "${DE_LA_BASE}"
 
   # UNA VERSION PUBLICADA DEL CANONICO NO SE REESCRIBE, Y ESTE ES EL UNICO LUGAR DONDE
   # ESO SE PUEDE CAZAR A TIEMPO.

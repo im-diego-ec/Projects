@@ -126,3 +126,52 @@ Lote 8 del porte de Rigel. Las mediciones son del 2026-09-17 sobre la rama
 - [ ] 7.6 Validación contra un consumidor real. Ningún consumidor usa `aviso-version`,
       así que no hay dónde ensayar el cambio del `default`; el aviso se ejercita recién
       con el release. Queda para la skill `projects-validar-consumidor` en el release.
+
+## 9. Hallazgos de la revisión adversarial (2026-09-17)
+
+Rojo primero en los dos bancos, contra el árbol de `0ab2b85`:
+`aviso-entra-en-el-mensaje.test.mjs` → `ℹ tests 55 · ℹ pass 40 · ℹ fail 15`;
+`aviso-version.test.mjs` → `ℹ tests 45 · ℹ pass 42 · ℹ fail 3`.
+
+- [x] 9.1 **FO-H1 / RV-L4-01 — sección vacía.** `construirMensaje` devuelve
+      `paraConsumidoresVacia`; `main` emite `::warning::` y el resumen la declara
+      «presente pero vacía»; la compuerta la pone roja (`para-consumidores-vacia`, arreglo
+      «ESCRIBIRLA»). Contrapeso verde: «Nada que hacer.» y el texto de fábrica solo.
+- [x] 9.2 **FO-H2 — la versión cortada por debajo de la más alta.** `medir(…, base)` y
+      `versionesQueCambian`: con la base del PR se mide toda versión cuyo aviso cambia.
+      El paso del `ci.yml` saca la base con `git show` y la pasa. Contrapesos verdes:
+      historia no tocada, y errata en el detalle que no cambia el aviso. Sin base,
+      `::notice::` y el verde deja de afirmar «las secciones que todavía se pueden
+      mandar».
+- [x] 9.3 **FO-H4 — texto de fábrica retocado.** Se reconoce por sus palabras (sin
+      acentos, puntuación, énfasis ni caja). Contrapeso verde: «Nada que hacer hoy.».
+- [x] 9.4 **RV-L4-03 — cambios sueltos.** La compañía del centinela es cualquier línea
+      que declare algo fuera de «Para consumidores», no sólo un `###`.
+- [x] 9.5 **RV-L4-02 — el paso y la guarda con banco.** El paso pasa a `run: |` y el
+      banco lo extrae por su nombre y lo corre sobre un repositorio de prueba (rojo y
+      control); la herramienta se lanza como proceso por una ruta con `..`.
+- [x] 9.6 Mutaciones, cada una roja en su banco y restaurada: paso cambiado por
+      `echo omitido` → `fail 1`; paso sin la base → `fail 1`; guarda `if (false && …)` →
+      `fail 2`; rama `vacia` apagada → `fail 3`; versiones que cambian apagadas →
+      `fail 5`; medir toda la historia → `fail 3`; puntuación sin normalizar → `fail 2`;
+      texto suelto ignorado → `fail 2`; `::notice::` sin base apagado → `fail 1`; el verde
+      con la afirmación vieja → `fail 1`.
+- [x] 9.7 **RV-L4-04 — el borrador del parche.** `.porte/08-normalizar-changelog.patch`
+      regenerado: `[No publicado] › Para consumidores` suma las notas de los lotes 36
+      (`formato`, el encuadre y el preámbulo para quien invoca la action) y 10 (la
+      política D1), y su encabezado dice que la integración suma las de los demás
+      carriles. La medición nueva encontró jerga en el resumen de la 1.9.4 («Nada que
+      hacer en el pipeline»), corregida. Evidencia: los dos parches aplican en los dos
+      órdenes (`git apply`), y la compuerta con la base sale 0 midiendo `[No publicado]`
+      (1960), la 1.9.6 y las 1.9.0–1.9.5 por cambiar.
+- [x] 9.8 La skill de release corre la compuerta con el `CHANGELOG.md` de `main` como
+      base, suma la fila de la sección vacía y describe el centinela nuevo.
+- [ ] 9.9 **OK humano: que una sección vacía caiga a la rama sin resumen** en
+      `actions/aviso-version` (manda el cuerpo entero, como la ausencia). Cambia el
+      mensaje que llega al canal y la salida `sin_para_consumidores` de una pieza
+      referenciada: «Pregunta primero» de AGENTS.md. Hoy la action lo advierte y la
+      compuerta lo pone rojo en el marco.
+- [ ] 9.10 **Integrar después de `el-marco-declara-su-desvio-de-review` (carril L1)**, o
+      junto con él (RV-L4-09). El `aprueba:` de este change cita un desvío que esta rama
+      no declara; la guarda que lo pone rojo en un PR a `main` llega con el arreglo del
+      change `que-es-breaking`.

@@ -662,3 +662,70 @@ test("CONTROL POSITIVO: con la seccion presente y sobre el limite, sigue mandand
     assert.match(recorte, /acortar la seccion "Para consumidores"/);
     assert.equal(avisos.filter((l) => /no trae la seccion/.test(l)).length, 0, "la seccion esta: no hay aviso de ausencia");
   }));
+
+// ---------------------------------------------------------------------------
+// La seccion que existe pero esta VACIA (revision adversarial del porte, FO-H1 y
+// RV-L4-01, 2026-09-17)
+//
+// `extraerParaConsumidores` devolvia `encontrada: true` con `texto: ""` para un
+// `### Para consumidores` seguido de inmediato por otro encabezado. Ninguna rama lo
+// miraba: no era «ausente» (no caia en el ::warning:: de ausencia) y el mensaje salia
+// con «Que tiene que hacer un consumidor:» y NADA debajo, con exit 0 y sin una sola
+// advertencia. Es el caso «hay cambios y nadie dice que hacer», en verde y mudo.
+//
+// LO QUE ESTOS CASOS FIJAN, y lo que no: la corrida lo ADVIERTE (fail-open ruidoso,
+// regla de AGENTS.md que no pide permiso). Lo que el mensaje manda en ese caso NO
+// cambia en este arreglo: hacerlo caer a la rama sin resumen cambia el texto que
+// reciben los consumidores y la salida `sin_para_consumidores` de una pieza
+// referenciada, y eso espera el OK humano (tareas del change).
+// ---------------------------------------------------------------------------
+
+const esElDeVacia = (l) => /VACIA/.test(l);
+
+test("ROJO PRIMERO: una «Para consumidores» VACIA se advierte, con el arreglo, y no pasa como presente", async () =>
+  conTemporal(async (dir) => {
+    const changelog = join(dir, "CHANGELOG.md");
+    const resumen = join(dir, "resumen.md");
+    writeFileSync(changelog, conEntrada("### Para consumidores\n\n### Añadido\n\n- una compuerta nueva que pone rojo tu CI"));
+    // `resumir` escribe donde dice el entorno DEL PROCESO, como en el runner: se pone y
+    // se restaura alrededor de la corrida.
+    const antes = process.env.GITHUB_STEP_SUMMARY;
+    process.env.GITHUB_STEP_SUMMARY = resumen;
+    let corrida;
+    try {
+      corrida = await correr({ AVISO_VERSION: "3.1.0", AVISO_CHANGELOG: changelog, AVISO_SALIDA: join(dir, "payload.json") });
+    } finally {
+      if (antes === undefined) delete process.env.GITHUB_STEP_SUMMARY;
+      else process.env.GITHUB_STEP_SUMMARY = antes;
+    }
+    const { codigo, dicho } = corrida;
+    assert.equal(codigo, 0, "el emisor no es rojo por esto: el release ya salio");
+    const avisos = avisosDe(dicho);
+    const vacia = avisos.find(esElDeVacia);
+    assert.ok(vacia, `una seccion vacia salio sin ninguna advertencia:\n${avisos.join("\n")}`);
+    assert.match(vacia, /\[3\.1\.0\]/, "nombra la entrada");
+    assert.match(vacia, /Arreglo:/, "y dice que hacer");
+    const lineaDelResumen = readFileSync(resumen, "utf8").split("\n").find((l) => /Seccion «Para consumidores»/.test(l));
+    assert.match(lineaDelResumen ?? "", /vacia/i, `el resumen de la corrida la da por presente sin mas: ${lineaDelResumen}`);
+  }));
+
+test("ROJO PRIMERO: una «Para consumidores» hecha solo de un comentario tambien esta vacia", async () =>
+  conTemporal(async (dir) => {
+    const { avisos } = await emitir(dir, "### Para consumidores\n\n<!-- completar antes del release -->\n\n### Añadido\n\n- algo");
+    assert.ok(avisos.find(esElDeVacia), "un comentario no es un resumen: el destino no lo muestra");
+  }));
+
+test("ROJO PRIMERO: construirMensaje dice si la seccion llego vacia, para que la compuerta use el mismo predicado", () => {
+  const armar = (cuerpo) =>
+    construirMensaje({ version: "3.1.0", seccion: { encontrada: true, encabezado: "[3.1.0]", cuerpo }, urlRelease: "r", urlChangelog: "c" });
+  assert.equal(armar("### Para consumidores\n\n### Añadido\n\n- x").paraConsumidoresVacia, true);
+  assert.equal(armar("### Para consumidores\n\n   \n<!-- nada -->\n").paraConsumidoresVacia, true);
+  assert.equal(armar("### Para consumidores\n\nNada que hacer.").paraConsumidoresVacia, false, "un texto corto no es un texto vacio");
+  assert.equal(armar("### Añadido\n\n- x").paraConsumidoresVacia, false, "la ausencia es otro caso, con su propio aviso");
+});
+
+test("CONTROL POSITIVO: «Nada que hacer.» no es una seccion vacia", async () =>
+  conTemporal(async (dir) => {
+    const { avisos } = await emitir(dir, "### Para consumidores\n\nNada que hacer.\n\n### Añadido\n\n- algo");
+    assert.equal(avisos.filter(esElDeVacia).length, 0, `advierte una seccion que tiene texto:\n${avisos.join("\n")}`);
+  }));

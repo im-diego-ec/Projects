@@ -271,9 +271,11 @@ Nada todavía: no hay ningún cambio sin publicar.
 
 > **Y el dia que escribas una entrada de verdad, ese texto se reemplaza.** El
 > centinela de la compuerta pone ROJO una seccion cuyo `Para consumidores` siga
-> siendo el texto de fabrica y que ya tenga otras subsecciones (`### Añadido`,
-> `### Corregido`, …): hay cambios y el anuncio diria que no hay ninguno. Sin el
-> centinela, el placeholder habria cambiado un rojo molesto por un verde mudo.
+> siendo el texto de fabrica y que ya declare cambios —otras subsecciones
+> (`### Añadido`, `### Corregido`, …) o viñetas sueltas bajo el encabezado—: hay
+> cambios y el anuncio diria que no hay ninguno. Reconoce el texto aunque le falte el
+> punto, los acentos o le sobre una negrita: retocarlo no lo vuelve un resumen pensado.
+> Sin el centinela, el placeholder habria cambiado un rojo molesto por un verde mudo.
 
 **Verificacion del paso 1** — los dos encabezados, en este orden:
 
@@ -290,15 +292,20 @@ un arbol que la compuerta del aviso rechaza. La verificacion que cubre las dos c
 es la compuerta misma, y conviene correrla aca en vez de esperar el CI:
 
 ```bash
-node herramientas/aviso-entra-en-el-mensaje.mjs CHANGELOG.md
+git show main:CHANGELOG.md > "${TMPDIR:-/tmp}/changelog-de-main.md"
+node herramientas/aviso-entra-en-el-mensaje.mjs CHANGELOG.md "${TMPDIR:-/tmp}/changelog-de-main.md"
 ```
 
-Tiene que salir **0**. Mide las dos secciones que el aviso todavia puede mandar
-—`[No publicado]` y la recien cortada— y cobra cuatro cosas:
+Tiene que salir **0**. Mide `[No publicado]`, la version mas alta y —con el segundo
+argumento, el `CHANGELOG.md` de `main`— toda version cuyo aviso cambia en esta rama:
+la recien cortada **aunque no sea la mas alta**, que es el caso de un parche sobre una
+linea vieja. Sin el segundo argumento mide solo las dos primeras y lo dice con un
+`::notice::`; el CI se lo pasa siempre. Cobra cinco cosas:
 
 | Lo que cobra | Por que |
 |---|---|
 | Que cada una tenga su `### Para consumidores` | Sin ella el aviso manda la entrada entera, recortada si no entra |
+| Que esa seccion tenga texto (no vacia, ni solo un comentario) | Vacia, el aviso manda «Que tiene que hacer un consumidor:» y nada debajo |
 | Que el texto de fabrica no quede encima de cambios reales | El centinela del paso 1: hay cambios y el anuncio diria que no hay ninguno |
 | Que su `### Para consumidores` no use jerga de oficio (la lista de `pruebas/docs/lectura.mjs`, fuera de backticks) | Una compuerta nueva sale en rojo el dia que sale solo si su arreglo se entiende sin ser tecnico (`AGENTS.md`, «Que es BREAKING») |
 | Que el mensaje entre en el limite | El `::warning::` de la action llega DESPUES de mandar el mensaje recortado |
@@ -698,7 +705,8 @@ El orden 1 → 6 de esta skill es el orden. No se reordena por comodidad.
 - [ ] Evidencia de validacion contra un consumidor real (id de corrida verde)
 - [ ] `X.Y.Z` elegido con el criterio de semver
 - [ ] CHANGELOG cortado: `## [X.Y.Z] — YYYY-MM-DD` + `## [No publicado]` nuevo con su
-      `### Para consumidores` de fabrica, y `node herramientas/aviso-entra-en-el-mensaje.mjs` en 0
+      `### Para consumidores` de fabrica, y `node herramientas/aviso-entra-en-el-mensaje.mjs`
+      en 0 con el `CHANGELOG.md` de `main` como segundo argumento
 - [ ] **Pines internos movidos a `X.Y.Z`** y `node --test pruebas/andamio/pinado.test.mjs` en verde
 - [ ] Si el canonico de la constitucion cambio: entrada nueva en `manifiesto.json`
 - [ ] El ledger del canonico no declara una version que no existe: corrido el `node -e`

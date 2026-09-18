@@ -804,6 +804,7 @@ se toca nunca: es lo que el consumidor va a copiar y pegar. Cada corrida dice co
 | Cualquier corrida | `::notice::` con el dialecto que usó y si lo declaró alguien o cayó al default |
 | `formato` con un valor que no es `markdown` ni `mrkdwn` | **Rojo**, sin payload, nombrando los dos valores válidos |
 | Entrada **sin** esa sección | `::warning::` y el mensaje se **arma con el cuerpo completo** de la versión: se manda de más, no de menos. Si ese cuerpo no entra en el límite, llega recortado y el aviso dice a cuánto |
+| Entrada con esa sección **vacía** (sin texto, o sólo comentarios) | `::warning::` con el arreglo y el resumen de la corrida la declara vacía. El mensaje sale igual, con «Qué tiene que hacer un consumidor:» y nada debajo: la salida `sin_para_consumidores` sigue en `"false"` |
 | Entrada con líneas `BREAKING` | `::warning::` y el mensaje las pone **primero**, cada viñeta entera aunque venga envuelta en varias líneas |
 | Mensaje más largo que el límite | `::warning::` con el largo al que recortó, deja el enlace al release y da el arreglo **de su rama**: sin la sección, escribirla; con la sección, acortarla |
 | **No hay entrada para esa versión** | **Rojo**, con el arreglo: agregar la entrada y re-disparar el botón |
@@ -832,11 +833,12 @@ caro posible, porque le diría a un consumidor que haga algo que no corresponde.
 - **«Para consumidores» es una convención del changelog, y en el marco se verifica
   al escribirla.** `herramientas/aviso-entra-en-el-mensaje.mjs` corre en el CI
   propio de Projects (job `changelog-en-el-pr`) y pone rojo el PR si falta la
-  sección, si el texto de fábrica del release quedó encima de cambios reales, si
+  sección o está vacía, si el texto de fábrica del release quedó encima de cambios reales, si
   la sección usa la jerga de oficio que las páginas para quien no es técnico tienen
   prohibida (fuera de backticks) o si el mensaje no entra en el límite en **alguno
   de los dos dialectos**; mide
-  `[No publicado]` y la versión más alta, con las mismas funciones de esta action. Un repo que use la action sin esa
+  `[No publicado]`, la versión más alta y toda versión cuyo aviso cambia en el PR
+  (con el `CHANGELOG.md` de su base), con las mismas funciones de esta action. Un repo que use la action sin esa
   compuerta la detecta recién al avisar, cuando la versión ya está publicada.
 - **Esta action no envía nada, así que no puede garantizar que el aviso llegue.**
   Lo que el workflow que la consuma no puede hacer es callarse: sin destino

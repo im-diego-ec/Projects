@@ -2,7 +2,7 @@
 // ¿El aviso que la próxima versión le va a mandar a los consumidores dice qué hacer, y
 // entra sin recortarse?
 //
-//   node herramientas/aviso-entra-en-el-mensaje.mjs [ruta-del-changelog]
+//   node herramientas/aviso-entra-en-el-mensaje.mjs [ruta-del-changelog] [changelog-de-la-base-del-PR]
 //
 // POR QUÉ ESTO EXISTE, Y POR QUÉ ACÁ. La action del aviso (`actions/aviso-version`) ya
 // avisa cuando el mensaje se pasa del límite o cuando la entrada no trae «Para
@@ -35,7 +35,7 @@
 // variables del workflow del aviso, y un verde que dependa de adivinar el destino es
 // un verde a medias.
 //
-// ── SE MIDEN DOS SECCIONES, Y LA SEGUNDA ES LA QUE A RIGEL LE FALTABA ─────────────
+// ── SE MIDEN TRES CLASES DE SECCION, Y LA SEGUNDA ES LA QUE A RIGEL LE FALTABA ─────
 //
 // Su primera versión leía SIEMPRE `## [No publicado]`, y así se le escapaba el único PR
 // donde el texto ya es final: el de release. El corte renombra `[No publicado]` a
@@ -43,28 +43,41 @@
 // que la compuerta medía la sección recién vaciada y salía VERDE (medido cortando su
 // 1.17.2: la compuerta dijo 478 y el mensaje enviado tenía 2177).
 //
-// Así que se miden las DOS secciones que el aviso puede mandar sin que nadie escriba
-// una línea más:
+// Así que se miden las secciones que el aviso puede mandar sin que nadie escriba una
+// línea más:
 //
 //   1. `[No publicado]` — la que se está escribiendo. Su versión todavía no existe, así
 //      que se estima (ver VERSION_ESTIMADA).
 //   2. La versión MÁS ALTA del changelog — la que se acaba de cortar en el PR de release
 //      y la que el `release` va a mandar apenas se publique el tag. El workflow del
 //      aviso tiene botón, y reenviar una versión ya publicada es una operación soportada.
+//   3. Con la BASE DEL PR (segundo argumento), toda versión cuyo aviso CAMBIA en este PR:
+//      la que no existía en la base, y la que existía pero ahora armaría otro mensaje. Es
+//      la que faltaba: el PR de release de una línea vieja —cortar la 1.9.7 cuando ya
+//      existe la 2.0.0— deja un texto final que el `release` va a mandar apenas se
+//      publique el tag, y NO es la más alta. La revisión adversarial del porte
+//      (2026-09-17) la midió verde con la sección sin resumen: la misma forma que el
+//      defecto de Rigel de arriba, un piso más abajo.
 //
-// SE MIDEN LAS DOS, NO UNA U OTRA: caer a la versión más alta sólo cuando
+// SE MIDEN TODAS, NO UNA U OTRA: caer a la versión más alta sólo cuando
 // `[No publicado]` «está vacía» obliga a decidir qué es estar vacía, y una heurística
 // errada salta la sección que sí tenía contenido sin decir nada.
 //
-// RESIDUO DECLARADO: las versiones que NO son la más alta no se miden. Su mensaje ya
-// salió (o no salió nunca), y el botón que las puede reenviar es un acto deliberado de
-// alguien que está leyendo esa entrada. Ponerlas en rojo sería re-litigar historia
-// dentro de PRs que no la escribieron.
+// «CAMBIA» ES LO QUE EL AVISO MANDARÍA, no el texto de la entrada: una errata en el
+// detalle de una versión vieja no cambia su aviso, y ponerla en rojo por un resumen
+// escrito antes de esta compuerta sería re-litigar historia dentro de un PR que no la
+// escribió. Cambiar su resumen, en cambio, SÍ es escribir su aviso, y se mide entero.
+//
+// SIN LA BASE, LO DICE. Corrida a mano sin el segundo argumento, la compuerta mide sólo
+// las dos primeras y emite un `::notice::` con lo que no pudo ver. En el CI la base
+// siempre va: el paso la saca con `git show` del commit base del PR, y
+// `pruebas/ci-del-marco/aviso-entra-en-el-mensaje.test.mjs` corre ese paso por su
+// nombre sobre un repositorio de prueba.
 //
 // Y NINGUNA de las dos es ROJO, no un aviso: no haber podido medir nada no es haber
 // medido bien.
 //
-// ── Y SE MIDEN CUATRO COSAS, Y SÓLO UNA ES UN LARGO ──────────────────────────────
+// ── Y SE MIDEN CINCO COSAS, Y SÓLO UNA ES UN LARGO ───────────────────────────────
 //
 // 1. QUE FALTE `### Para consumidores` ES ROJO, aunque el cuerpo entre en el límite.
 //    Rigel lo decidió el 2026-09-09 (su issue #369) y Projects lo adopta por la política
@@ -83,6 +96,11 @@
 //    detalle del marco.
 //
 // 3. EL CENTINELA DEL TEXTO DE FÁBRICA (ver `esPlaceholderConCambios`).
+//
+// 5. QUE LA SECCIÓN NO ESTÉ VACÍA. Un `### Para consumidores` sin texto —o hecho sólo de
+//    espacios o comentarios— EXISTE, así que no cae en la causa 1, y el aviso manda
+//    «Qué tiene que hacer un consumidor:» con nada debajo. El predicado es el de la
+//    action (`paraConsumidoresVacia`, que devuelve `construirMensaje`), no uno propio.
 //
 // 4. QUE LA SECCIÓN SE ENTIENDA SIN SER TÉCNICO (ver `jergaEnParaConsumidores`). Es la
 //    otra mitad de la política D1 del PO (2026-09-17): una compuerta nueva cuyo arreglo
@@ -144,14 +162,51 @@ export function versionMasAlta(changelog) {
   };
 
   let mejor = null;
+  for (const version of versionesDelChangelog(changelog)) {
+    if (mejor === null || mayor(version, mejor)) mejor = version;
+  }
+  return mejor;
+}
+
+/** Las versiones semver que declara el changelog, en el orden del archivo y sin
+ *  repetir. `[No publicado]` y cualquier encabezado que no sea una versión quedan
+ *  afuera, a propósito. */
+function versionesDelChangelog(changelog) {
+  const vistas = [];
   for (const linea of String(changelog).split(/\r?\n/)) {
     const titulo = (linea.match(/^##\s+\[([^\]]+)\]/) ?? [])[1];
     if (!titulo) continue;
     const version = normalizarVersion(titulo);
-    if (!esVersionSemver(version)) continue; // `[No publicado]` cae acá, a propósito
-    if (mejor === null || mayor(version, mejor)) mejor = version;
+    if (esVersionSemver(version) && !vistas.includes(version)) vistas.push(version);
   }
-  return mejor;
+  return vistas;
+}
+
+/** Lo que la compuerta juzga del aviso de una versión: los mensajes que armaría, SIN
+ *  techo y en cada dialecto, y el veredicto del centinela (que depende de la compañía de
+ *  la sección y no del mensaje). `null` si la versión no está en ese changelog. Dos
+ *  firmas iguales quieren decir que este PR no tocó nada que la compuerta mida. */
+function firmaDelAviso(changelog, version, env) {
+  const seccion = extraerSeccionVersion(changelog, version);
+  if (!seccion.encontrada) return null;
+  const params = { version, seccion, ...enlacesDelRelease(version, env) };
+  return JSON.stringify({
+    mensajes: FORMATOS.map((formato) => construirMensaje({ ...params, formato, limite: Number.MAX_SAFE_INTEGER }).mensaje),
+    centinela: esPlaceholderConCambios(seccion.cuerpo),
+  });
+}
+
+/**
+ * Las versiones cuyo aviso CAMBIA entre la base del PR y su cabeza: las que la base no
+ * tenía y las que ahora armarían otro mensaje (o cambiarían el veredicto del
+ * centinela). Es lo que este PR escribe del aviso de cada versión, y por lo tanto lo que
+ * se le puede cobrar.
+ */
+export function versionesQueCambian(changelog, base, env = process.env) {
+  return versionesDelChangelog(changelog).filter((version) => {
+    const antes = firmaDelAviso(base, version, env);
+    return antes === null || antes !== firmaDelAviso(changelog, version, env);
+  });
 }
 
 /** El cuerpo que el paso 1 del release escribe bajo `### Para consumidores` cuando
@@ -161,11 +216,32 @@ export function versionMasAlta(changelog) {
  *  sueltas, cambiar una apagaría el centinela de abajo sin que nadie lo notara. */
 export const PLACEHOLDER_SIN_CAMBIOS = "Nada todavía: no hay ningún cambio sin publicar.";
 
-/** Igualdad tolerante al espaciado y a la caja, y NADA más. No normaliza acentos ni
- *  puntuación a propósito: el texto es una constante de este archivo, no algo que
- *  alguien redacte, así que una diferencia real es una copia que se separó. */
-const mismoTexto = (a, b) =>
-  String(a).trim().replace(/\s+/g, " ").toLowerCase() === String(b).trim().replace(/\s+/g, " ").toLowerCase();
+/** Las PALABRAS de un texto, sin nada más: sin acentos, sin puntuación ni marcas de
+ *  énfasis, sin caja y con el espaciado colapsado. Se usa SÓLO para reconocer el texto
+ *  de fábrica.
+ *
+ *  Toleraba espacios y caja y nada más, con el argumento de que «el texto es una
+ *  constante, no algo que alguien redacte». La revisión adversarial del porte
+ *  (2026-09-17) lo refutó con un carácter: sin el punto final, el centinela se apagaba y
+ *  el aviso anunciaba «no hay ningún cambio sin publicar» sobre una versión con
+ *  cambios. Un editor que recorta puntuación, o una mano que agrega una negrita, no
+ *  convierten el texto de fábrica en uno que alguien pensó.
+ *
+ *  LO QUE NO HACE: buscar «nada» ni nada parecido. Compara la secuencia de palabras
+ *  entera, así que «Nada que hacer hoy.» escrito por una persona sigue siendo suyo. */
+const palabrasDe = (t) =>
+  String(t)
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^\p{L}\p{N}\s]/gu, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .toLowerCase();
+
+const esTextoDeFabrica = (texto) => palabrasDe(texto) === palabrasDe(PLACEHOLDER_SIN_CAMBIOS);
+
+/** Una línea que no declara nada: vacía, un separador del formato o un comentario. */
+const esLineaSinCambios = (l) => l.trim() === "" || /^\s*(?:-{3,}|\*{3,}|_{3,})\s*$/.test(l);
 
 /**
  * EL CENTINELA. Devuelve los títulos de las subsecciones que delatan el problema, o
@@ -187,12 +263,30 @@ export function esPlaceholderConCambios(cuerpo) {
   const { encontrada, texto } = extraerParaConsumidores(cuerpo);
   // Sin la sección hay un hallazgo distinto y con otro arreglo; no se acumulan.
   if (!encontrada) return null;
-  if (!mismoTexto(texto, PLACEHOLDER_SIN_CAMBIOS)) return null;
+  if (!esTextoDeFabrica(texto)) return null;
 
-  const otras = String(cuerpo)
-    .split(/\r?\n/)
-    .filter((l) => /^#{3,}\s+/.test(l) && !/^#{3,}\s+para\s+consumidores\b/i.test(l))
-    .map((l) => l.replace(/^#{3,}\s+/, "").trim());
+  // LA COMPAÑÍA ES CUALQUIER CAMBIO DECLARADO, no sólo un `###`. Contaba únicamente
+  // encabezados, así que viñetas escritas directo bajo `## [No publicado]` —o bajo un
+  // pseudo-título en negrita— dejaban el texto de fábrica anunciando «ningún cambio»
+  // (revisión adversarial del porte, 2026-09-17). Lo que va dentro de una subsección ya
+  // lo representa su título; lo que va suelto, antes de cualquier `###`, se nombra por
+  // su primera línea. Los comentarios, los separadores y las líneas vacías no declaran
+  // nada.
+  const otras = [];
+  let suelta = null;
+  let dentroDeSubseccion = false;
+  for (const l of String(cuerpo).replace(/<!--[\s\S]*?-->/g, "").split(/\r?\n/)) {
+    const titulo = l.match(/^#{3,}\s+(.*)$/);
+    if (titulo) {
+      dentroDeSubseccion = true;
+      if (!/^para\s+consumidores\b/i.test(titulo[1])) otras.push(titulo[1].trim());
+      continue;
+    }
+    if (dentroDeSubseccion || esLineaSinCambios(l) || suelta !== null) continue;
+    const linea = l.trim();
+    suelta = `texto suelto fuera de las subsecciones («${linea.length > 60 ? `${linea.slice(0, 60)}…` : linea}»)`;
+  }
+  if (suelta !== null) otras.unshift(suelta);
 
   return otras.length > 0 ? otras : null;
 }
@@ -220,15 +314,19 @@ export function jergaEnParaConsumidores(cuerpo) {
  *    idénticos no agregan un dato. Trae, por dialecto, `largos` (el armado SIN techo,
  *    lo que se mandaría si entrara) y `llegan` (lo que de verdad sale, ya pasado por
  *    `recortar`), y `recortadoEnAlgunDialecto`.
+ *  · `"para-consumidores-vacia"` — la sección está y no dice nada (sin texto, o sólo
+ *    espacios o comentarios). UNO por sección. El arreglo es escribirla, como en la
+ *    ausencia, pero el mensaje es otro: acá el aviso NO cae al cuerpo entero, manda el
+ *    encabezado de la acción vacío.
  *  · `"placeholder-con-cambios"` — la sección sigue con el texto de fábrica y la
- *    entrada YA tiene otras subsecciones. Trae sus títulos.
+ *    entrada YA declara cambios. Trae sus títulos (o el texto suelto que encontró).
  *  · `"jerga-en-para-consumidores"` — la sección está y su prosa usa jerga de oficio que
  *    las páginas para quien no es técnico tienen prohibida. UNO por sección (la jerga no
  *    depende del dialecto). Trae `palabras`.
  *  · `"recorte"` — la sección está y el mensaje no entra. UNO por (sección, dialecto),
  *    porque puede entrar en uno y no en el otro. Trae `formato` y `largo`.
  *
- * Los dos primeros son EXCLUYENTES por sección, a propósito: cuando falta el encabezado
+ * Los tres primeros son EXCLUYENTES por sección, a propósito: cuando falta el encabezado
  * no se emite también el recorte, porque el arreglo es el mismo y ya se dice; y el
  * centinela va antes del recorte porque, mientras el anuncio sea el de fábrica, el largo
  * medido no es el del mensaje que va a salir. La jerga y el recorte, en cambio, se cobran
@@ -237,24 +335,35 @@ export function jergaEnParaConsumidores(cuerpo) {
  * Lista de hallazgos vacía = está todo. `sinCandidatos` = no había nada que medir, y
  * eso `main` lo trata como ROJO. Devuelve también el `limite` que USÓ, no el default:
  * los mensajes reportan ese, para que la compuerta nunca diga un número distinto del
- * que midió.
+ * que midió. Y `conBase`: si se pudo medir lo que este PR cambia, o sólo las dos de
+ * siempre.
+ *
+ * `base` es el texto del changelog en el commit base del PR, o `null` si no se tiene.
+ * Un texto vacío es una base SIN changelog: toda versión cuenta como nueva.
  */
-export function medir(changelog, limite = LIMITE_POR_DEFECTO, env = process.env) {
+export function medir(changelog, limite = LIMITE_POR_DEFECTO, env = process.env, base = null) {
   const porMedir = [];
 
   const sinPublicar = extraerSeccionVersion(changelog, ENTRADA_SIN_PUBLICAR);
   if (sinPublicar.encontrada) {
-    porMedir.push({ etiqueta: ENTRADA_SIN_PUBLICAR, version: VERSION_ESTIMADA, estimada: true, seccion: sinPublicar });
+    porMedir.push({ etiqueta: ENTRADA_SIN_PUBLICAR, version: VERSION_ESTIMADA, estimada: true, seccion: sinPublicar, porque: "sin-publicar" });
   }
 
   const alta = versionMasAlta(changelog);
   if (alta) {
     const seccion = extraerSeccionVersion(changelog, alta);
-    if (seccion.encontrada) porMedir.push({ etiqueta: alta, version: alta, estimada: false, seccion });
+    if (seccion.encontrada) porMedir.push({ etiqueta: alta, version: alta, estimada: false, seccion, porque: "mas-alta" });
+  }
+
+  if (base !== null) {
+    for (const version of versionesQueCambian(changelog, base, env)) {
+      if (version === alta) continue;
+      porMedir.push({ etiqueta: version, version, estimada: false, seccion: extraerSeccionVersion(changelog, version), porque: "cambia" });
+    }
   }
 
   if (porMedir.length === 0) {
-    return { sinCandidatos: true, faltaSinPublicar: true, candidatos: [], hallazgos: [], limite };
+    return { sinCandidatos: true, faltaSinPublicar: true, candidatos: [], hallazgos: [], limite, conBase: base !== null };
   }
 
   const hallazgos = [];
@@ -265,6 +374,7 @@ export function medir(changelog, limite = LIMITE_POR_DEFECTO, env = process.env)
     const llegan = {};
     const recortes = [];
     let sinParaConsumidores = false;
+    let vacia = false;
 
     for (const formato of FORMATOS) {
       // DOS ARMADOS POR DIALECTO, y los dos hacen falta. Sin techo para saber el largo
@@ -279,6 +389,7 @@ export function medir(changelog, limite = LIMITE_POR_DEFECTO, env = process.env)
       // Sale de `extraerParaConsumidores` sobre el cuerpo del changelog, que es el mismo
       // en todos los dialectos: los armados coinciden y se lee el último.
       sinParaConsumidores = completo.sinParaConsumidores;
+      vacia = completo.paraConsumidoresVacia === true;
       if (conTecho.recortado) recortes.push({ formato, largo: completo.mensaje.length });
     }
     const anuncioVacioConCambios = esPlaceholderConCambios(c.seccion.cuerpo);
@@ -291,6 +402,8 @@ export function medir(changelog, limite = LIMITE_POR_DEFECTO, env = process.env)
         llegan,
         recortadoEnAlgunDialecto: recortes.length > 0,
       });
+    } else if (vacia) {
+      hallazgos.push({ etiqueta: c.etiqueta, motivo: "para-consumidores-vacia" });
     } else if (anuncioVacioConCambios) {
       hallazgos.push({ etiqueta: c.etiqueta, motivo: "placeholder-con-cambios", subsecciones: anuncioVacioConCambios });
     } else {
@@ -299,10 +412,10 @@ export function medir(changelog, limite = LIMITE_POR_DEFECTO, env = process.env)
       for (const r of recortes) hallazgos.push({ etiqueta: c.etiqueta, motivo: "recorte", ...r });
     }
 
-    candidatos.push({ etiqueta: c.etiqueta, version: c.version, estimada: c.estimada, largos, llegan, sinParaConsumidores });
+    candidatos.push({ etiqueta: c.etiqueta, version: c.version, estimada: c.estimada, porque: c.porque, largos, llegan, sinParaConsumidores });
   }
 
-  return { sinCandidatos: false, faltaSinPublicar: !sinPublicar.encontrada, candidatos, hallazgos, limite };
+  return { sinCandidatos: false, faltaSinPublicar: !sinPublicar.encontrada, candidatos, hallazgos, limite, conBase: base !== null };
 }
 
 export function main(argv = process.argv.slice(2), env = process.env) {
@@ -319,7 +432,25 @@ export function main(argv = process.argv.slice(2), env = process.env) {
     return 1;
   }
 
-  const { sinCandidatos, faltaSinPublicar, candidatos, hallazgos, limite } = medir(changelog, LIMITE_POR_DEFECTO, env);
+  // LA BASE ES OPCIONAL, PERO SI SE PASO TIENE QUE LEERSE: quien la pasa quiere medir lo
+  // que el PR cambia, y seguir sin ella seria el verde a medias que esta compuerta evita.
+  const rutaBase = argv[1];
+  let base = null;
+  if (rutaBase) {
+    try {
+      base = readFileSync(rutaBase, "utf8");
+    } catch (e) {
+      console.log(
+        `::error::no se pudo leer el changelog de la base del PR en ${rutaBase} (${e.code ?? e.message}), asi que no se ` +
+          "puede saber que versiones cambia este PR. Esto NO se declara verde con una medicion a medias. Arreglo: " +
+          "escribir el CHANGELOG.md del commit base en esa ruta (git show \"<base>:CHANGELOG.md\" > <ruta>), o no " +
+          "pasar el segundo argumento para medir solo [No publicado] y la version mas alta"
+      );
+      return 1;
+    }
+  }
+
+  const { sinCandidatos, faltaSinPublicar, candidatos, hallazgos, limite, conBase } = medir(changelog, LIMITE_POR_DEFECTO, env, base);
 
   if (sinCandidatos) {
     console.log(
@@ -339,9 +470,18 @@ export function main(argv = process.argv.slice(2), env = process.env) {
     );
   }
 
+  if (!conBase) {
+    console.log(
+      "::notice::sin el changelog de la base del PR (segundo argumento) se midieron solo [No publicado] y la version " +
+        "mas alta. Una version mas baja que este PR agregue o cambie —el corte de una linea vieja— NO se midio. En el " +
+        "CI el paso le pasa la base; a mano: git show main:CHANGELOG.md > base.md y pasar base.md"
+    );
+  }
+
   const porDialecto = (valores) => FORMATOS.map((f) => `${f}=${valores[f] ?? "?"}`).join(" ");
+  const motivoDe = { "mas-alta": "la mas alta", cambia: "cambia en este PR" };
   for (const c of candidatos) {
-    const nota = c.estimada ? ` (version estimada ${c.version})` : "";
+    const nota = c.estimada ? ` (version estimada ${c.version})` : motivoDe[c.porque] ? ` (${motivoDe[c.porque]})` : "";
     const seccion = c.sinParaConsumidores ? " — SIN «Para consumidores»" : "";
     console.log(
       `[${c.etiqueta}]${nota}: armados ${porDialecto(c.largos)}; llegan ${porDialecto(c.llegan)} — limite ${limite}${seccion}`
@@ -349,19 +489,32 @@ export function main(argv = process.argv.slice(2), env = process.env) {
   }
 
   if (hallazgos.length === 0) {
+    // DICE LO QUE MIDIO, y nada mas. Afirmaba «para las secciones que todavia se pueden
+    // mandar», que era falso para una version cortada por debajo de la mas alta.
     console.log(
-      `✓ el aviso manda su seccion «Para consumidores», sin jerga de oficio, y entra sin recortarse en ${FORMATOS.join(" y ")}, para las ` +
-        "secciones que todavia se pueden mandar: " +
-        candidatos.map((c) => `[${c.etiqueta}]`).join(" y ")
+      `✓ el aviso manda su seccion «Para consumidores» con texto, sin jerga de oficio, y entra sin recortarse en ${FORMATOS.join(" y ")}, para las ` +
+        "secciones medidas: " +
+        candidatos.map((c) => `[${c.etiqueta}]`).join(", ") +
+        (conBase ? " (con la base del PR: toda version cuyo aviso cambia en este PR)" : " (sin la base del PR: ver el ::notice::)")
     );
     return 0;
   }
 
   for (const h of hallazgos) {
+    if (h.motivo === "para-consumidores-vacia") {
+      console.log(
+        `::error file=${ruta}::la seccion [${h.etiqueta}] trae "### Para consumidores" pero VACIA (sin texto, o solo ` +
+          "espacios o comentarios). El aviso manda solo esa seccion, asi que el consumidor recibiria «Que tiene que " +
+          "hacer un consumidor:» y nada debajo: hay una version y nadie dice que hacer con ella. Arreglo: ESCRIBIRLA " +
+          "— lo que un consumidor tiene que hacer con esta version, aunque sea «Nada que hacer»"
+      );
+      continue;
+    }
+
     if (h.motivo === "placeholder-con-cambios") {
       console.log(
-        `::error file=${ruta}::la seccion [${h.etiqueta}] tiene ${h.subsecciones.length} ` +
-          `subseccion(es) con cambios —${h.subsecciones.join(", ")}— y su ` +
+        `::error file=${ruta}::la seccion [${h.etiqueta}] declara cambios fuera de su «Para consumidores» ` +
+          `—${h.subsecciones.join(", ")}— y su ` +
           `"### Para consumidores" sigue diciendo el texto de fabrica del paso 1 del release ` +
           `("${PLACEHOLDER_SIN_CAMBIOS}"). O sea que hay cambios y el aviso anuncia que no hay ` +
           "ninguno, que es peor que no mandar nada: el consumidor lee «nada que hacer» sobre una " +
@@ -409,7 +562,7 @@ export function main(argv = process.argv.slice(2), env = process.env) {
       `::error file=${ruta}::la seccion [${h.etiqueta}] en dialecto '${h.formato}' se recortaria ` +
         `(${h.largo} caracteres contra un limite de ${limite}). ` +
         (esVersionCortada
-          ? "Es la version mas alta del changelog: si este PR la esta cortando, ese es EXACTAMENTE " +
+          ? "Es una version ya cortada: si este PR la corta o la cambia, ese es EXACTAMENTE " +
             "el mensaje que sale al canal en cuanto se publique el tag, y el ::warning:: de la " +
             "action llega DESPUES de mandarlo. "
           : "El destino recibiria el principio y un enlace, y el aviso de la action llega " +
