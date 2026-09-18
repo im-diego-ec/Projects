@@ -120,10 +120,6 @@ const SIN_BANCO_TODAVIA = {
       "El runner es Linux x86-64",
       "lee uname: el caso exige correr en la plataforma que se quiere refutar, o sea una matriz de sistemas operativos y no un banco",
     ],
-    [
-      "Formato y validez de las raices de Terraform",
-      "es HOMONIMO del paso del andamio, y el banco del andamio (terraform-en-ci.test.mjs) corre el de plantilla/.github/workflows/ci.yml, no este: este trae guardas propias —la fecha de ventana_terraform y la lista de raices vacia— que no corre nadie. Hasta el change rojo-primero salia 'citado' por el nombre ajeno. La ventana se retira en el lote la-ventana-se-cierra del porte, y el banco conviene escribirlo sobre el paso que quede",
-    ],
   ]),
   ".github/workflows/ci.yml": new Map([
     [
@@ -164,7 +160,15 @@ const SIN_BANCO_TODAVIA = {
   "plantilla/.github/workflows/desplegar.yml": new Map([
     [
       "Comprobar que este commit paso las verificaciones",
-      "consulta los check-runs del commit con gh: el banco necesita un gh simulado. El workflow entero lo reescribe el lote el-despliegue-no-le-da-la-llave-al-fork del porte, que trae el banco que evalua sus condiciones",
+      "consulta los check-runs del commit con gh: el banco necesita un gh simulado. El lote el-despliegue-no-le-da-la-llave-al-fork del porte reescribio el workflow y trajo el banco que evalua las condiciones de sus jobs (la-llave-del-despliegue.test.mjs), no uno que corra este script",
+    ],
+    [
+      "Rechazar un disparo a mano desde otra rama",
+      "su condicion la evalua la-llave-del-despliegue.test.mjs contra los eventos simulados, pero ubica el paso por /otra rama/ y no por su nombre, y su run —un rojo incondicional con el arreglo— no lo corre ningun caso. Nombrarlo en ese banco y correr su script lo salda",
+    ],
+    [
+      "Fijar el commit que se publica",
+      "tiene una rama roja propia —un SHA que no es un commit completo no se publica— que ningun caso corre; el banco del despliegue mira que los pasos lean ese commit, no el script que lo fija",
     ],
     [
       "Compilar el sitio",
@@ -243,6 +247,13 @@ const SIN_ROJO = {
       },
     ],
     ["Comprobar que la credencial existe, y NO fallar si no (#2)", { tipo: "aviso", motivo: "el mismo aviso, en el job de produccion" }],
+    [
+      "Avisar si la credencial esta al alcance de cualquier job",
+      {
+        tipo: "aviso",
+        motivo: "avisa en amarillo si la credencial de publicar esta guardada como secreto del repositorio y sale 0 siempre: el arreglo es configuracion de GitHub. Lo corre la-llave-del-despliegue.test.mjs",
+      },
+    ],
     ["Instalar", { tipo: "rojo-ajeno", motivo: "corepack y pnpm install --frozen-lockfile: el rojo es el de pnpm" }],
     ["Instalar (#2)", { tipo: "rojo-ajeno", motivo: "el mismo paso, en el job de produccion" }],
     [
