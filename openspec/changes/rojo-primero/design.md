@@ -158,6 +158,17 @@ además los bloques `/* */` habría cerrado el primero y no el segundo. Cargar e
 la clase: un comentario no devuelve nada, y una clave de otro objeto tampoco. Solo aplica al
 repo que distribuye el andamio; ningún consumidor corre esta parte del paso.
 
+**Revisado en la integración del porte (2026-09-18): el módulo NO se carga.** El carril
+`el-marco-deja-de-afirmar-lo-que-no-hace` arregló el mismo paso por su lado con un lector
+que recorre el archivo como JavaScript sin ejecutarlo, y con un motivo que esta decisión no
+había pesado: bajo `pull_request_target` el paso corre sobre el head del PR, y el marco
+promete leer ese código, no ejecutarlo (encabezado del job `cambios` de `marco-ci.yml`).
+Cargar el módulo rompía esa promesa. La integración se quedó con el lector y le sumó lo que
+esta decisión cerraba: aísla el objeto `coverage: { ... }` y busca ahí las métricas —atadas
+a `minimo`, así que un número fijo es rojo— y el `include` de su primer nivel, así que
+`test.include` no cuenta; y el rojo de «una base que no carga» sale de `node --check`, que
+parsea sin ejecutar. Los casos de `compuertas-de-estructura.test.mjs` pasan sin cambios.
+
 **Contrato:** patch. En un consumidor el paso sale por su camino inerte antes de llegar a
 esta línea, así que ningún veredicto cambia.
 

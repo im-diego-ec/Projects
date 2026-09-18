@@ -2828,7 +2828,8 @@ jobs:
           # andamio la saco de su config; desde entonces la cadena aparecia SOLO en
           # el comentario que explica que la opcion ya no existe, asi que el paso
           # daba VERDE leyendo prosa. Borrar el include: -lo que de verdad sostiene
-          # el total- lo dejaba verde igual. Ver pruebas/marco-ci/umbral-del-andamio.test.mjs.
+          # el total- lo dejaba verde igual. Ver pruebas/marco-ci/umbral-del-andamio.test.mjs
+          # y pruebas/marco-ci/compuertas-de-estructura.test.mjs (change rojo-primero).
           #
           # Y EL ALCANCE TIENE QUE TENER ALGO ADENTRO, que fue la segunda (hallazgo
           # FO-H2 de la revision adversarial del porte). El filtro era por linea y
@@ -2840,14 +2841,30 @@ jobs:
           # las cuatro metricas atadas a `minimo` y un include cuyo primer elemento
           # sea una cadena no vacia.
           #
+          # Y TIENE QUE SER EL DE `coverage`, que fue la tercera (hallazgo FO-S8 de
+          # la revision adversarial del carril rojo-primero). `test.include` elige
+          # que pruebas corren, no que codigo entra al calculo, y el texto
+          # `include:` lo tenia igual. El lector aisla el objeto `coverage: { ... }`
+          # y busca las metricas adentro y el include en su primer nivel; un numero
+          # fijo en una metrica (`branches: 80`) no esta atado al minimo que se le
+          # pasa, cumple el de hoy y no sube cuando un paquete pide mas.
+          #
           # SE LEE, NO SE IMPORTA. Importar la config daria el valor efectivo, pero
           # EJECUTARIA codigo del arbol, y bajo pull_request_target este job trae el
           # head del PR: el marco lee el codigo del repo, no lo ejecuta (ver el
-          # encabezado del job cambios). Limite declarado del lector: no entiende
+          # encabezado del job cambios). El carril rojo-primero propuso cargar el
+          # modulo y mirar lo que coberturaDelMarco() devuelve; la integracion del
+          # porte se quedo con el lector por esa promesa, y de aquella propuesta
+          # conserva el rojo de "una base que no carga": node --check PARSEA el
+          # archivo sin ejecutarlo. Limite declarado del lector: no entiende
           # expresiones regulares literales; una que contenga una comilla o un //
           # desalinea la lectura. El andamio no escribe ninguna en este archivo.
           if ! command -v node > /dev/null 2>&1; then
             echo "::error::no hay 'node' en el PATH y sin el no se puede leer la configuracion de cobertura del andamio. Esto es un fallo DEL MARCO, no de tu repo: el job higiene de marco-ci.yml instala node con actions/setup-node y la version que declara el input version_node, asi que si falta es que ese paso no corrio"
+            exit 1
+          fi
+          if ! CARGA="$(node --check "${BASE_VITEST}" 2>&1)"; then
+            echo "::error file=${BASE_VITEST}::no se pudo cargar ${BASE_VITEST} para leer lo que declara: $(printf '%s\n' "${CARGA}" | head -n 3 | tr '\n' ' '). Un archivo que no carga no reparte ningun umbral. Arreglo: que el modulo sea JavaScript valido (se comprueba con node --check, que lo parsea sin ejecutarlo)"
             exit 1
           fi
           # shellcheck disable=SC2016
@@ -2862,7 +2879,10 @@ jobs:
               process.exit(1);
             }
             // La comilla simple va como \u0027: el programa viaja entre comillas
-            // simples de shell.
+            // simples de shell. El contenido de cada cadena se tapa con x (los
+            // espacios quedan): asi una llave o un "coverage:" escritos DENTRO de
+            // una cadena no se leen como codigo, y una cadena vacia o de puros
+            // espacios se sigue distinguiendo de una con algo adentro.
             const SIMPLE = "\u0027";
             let codigo = "";
             for (let i = 0; i < fuente.length; ) {
@@ -2882,7 +2902,7 @@ jobs:
               if (c === "\"" || c === SIMPLE) {
                 let j = i + 1;
                 while (j < fuente.length && fuente[j] !== c && fuente[j] !== "\n") j += fuente[j] === "\\" ? 2 : 1;
-                codigo += fuente.slice(i, j + 1);
+                codigo += c + fuente.slice(i + 1, j).replace(/\S/g, "x") + fuente.slice(j, j + 1);
                 i = j + 1;
                 continue;
               }
@@ -2896,19 +2916,33 @@ jobs:
               codigo += c;
               i += 1;
             }
+            // El objeto coverage: todo lo que cuelga de el, y aparte su primer
+            // nivel (con los objetos anidados tapados), que es donde vive include.
+            let cobertura = "";
+            let primerNivel = "";
+            const abre = /\bcoverage\s*:\s*\{/.exec(codigo);
+            if (abre) {
+              let prof = 0;
+              for (let i = abre.index + abre[0].length; i < codigo.length; i += 1) {
+                const c = codigo[i];
+                if (c === "}" && prof === 0) break;
+                if (c === "{") prof += 1;
+                if (c === "}") prof -= 1;
+                cobertura += c;
+                primerNivel += prof === 0 && c !== "}" ? c : " ";
+              }
+            }
             const faltan = [];
             for (const metrica of ["lines", "functions", "branches", "statements"]) {
-              if (!new RegExp("\\b" + metrica + "\\s*:\\s*minimo\\b").test(codigo)) faltan.push(metrica + ": minimo");
+              if (!new RegExp("\\b" + metrica + "\\s*:\\s*minimo\\b").test(cobertura)) faltan.push(metrica + ": minimo");
             }
-            if (!/\binclude\s*:\s*\[\s*(["\x27])(?!\1)/.test(codigo)) {
-              faltan.push("include: [...] con al menos un patron");
-            }
+            if (!/\binclude\s*:\s*\[\s*(["\x27])\s*[xT]/.test(primerNivel)) faltan.push("include:");
             if (faltan.length) {
-              console.log(faltan.join(", "));
+              console.log(faltan.join(" "));
               process.exit(1);
             }
           ' "${BASE_VITEST}")"; then
-            echo "::error file=${BASE_VITEST}::a la configuracion de cobertura del andamio le falta, en codigo y no en comentarios ni en texto: ${FALTAN}. Las cuatro metricas y el alcance declarado (coverage.include, con al menos un patron) son lo que hace que el umbral mida algo. La opcion all: true NO es el arreglo: vitest 3 la retiro y la 5 la ignora sin aviso"
+            echo "::error file=${BASE_VITEST}::a la configuracion de cobertura del andamio le falta: ${FALTAN}. Tiene que estar en el objeto coverage y en codigo, no en comentarios ni en texto: las cuatro metricas atadas al minimo que se le pasa y el alcance declarado (coverage.include, con al menos un patron) son lo que hace que el umbral mida algo; un include de otra clave, como test.include, elige pruebas y no codigo. La opcion all: true NO es el arreglo: vitest 3 la retiro y la 5 la ignora sin aviso"
             exit 1
           fi
 

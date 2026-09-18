@@ -587,9 +587,13 @@ mueve sobre un cambio incompatible.
   por un comentario.** Exigía el texto `all: true` en la configuración de cobertura del
   andamio. vitest retiró esa opción en su mayor 4 y el andamio la sacó, pero el comentario
   que explica el retiro la nombra dos veces, y con eso el paso seguía en verde. Ahora
-  exige el alcance que la reemplaza (`include:`) y las cuatro métricas leyendo lo que la
-  configuración DEVUELVE, con el módulo cargado: ni un comentario ni una clave de otro
-  objeto cuentan. Lo encontró el banco nuevo del paso en su primer caso rojo.
+  exige el alcance que la reemplaza (`include:`) y las cuatro métricas **dentro del objeto
+  `coverage`**, atadas al mínimo que se le pasa: ni un comentario, ni un texto, ni una
+  clave de otro objeto (`test.include`) cuentan, y un archivo que no parsea es rojo. Lee
+  el archivo como código **sin ejecutarlo** —`node --check` para ver que parsea, y el
+  lector de la entrada anterior para el resto—: el paso corre sobre el head de un PR y el
+  marco promete leer ese código, no ejecutarlo. Lo encontró el banco nuevo del paso en su
+  primer caso rojo.
 
   **Para consumidores: nada.** En un consumidor el paso sale antes por su camino inerte
   («no distribuye el comparador») con el mismo `::notice::`, y ningún veredicto cambia.

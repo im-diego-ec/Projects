@@ -203,7 +203,9 @@ implementa el lote 17 del porte de Rigel (ver `proposal.md`).
       carga el módulo con `node` y mira lo que devuelve `coberturaDelMarco()`, con otro mínimo
       para ver que las métricas lo sigan (design D6). El contrapeso tiene caso: otro glob, un
       `include` partido en líneas y un `exclude` salen verdes, y la base real también.
-      Resultado: `28/28`.
+      Resultado: `28/28`. *(Revisado en la integración del porte: el paso no carga el
+      módulo —ver design D6—; lee el objeto `coverage` sin ejecutarlo y `node --check`
+      da el rojo de la base que no carga. Los mismos casos, en verde.)*
 - [x] 7.2 **El censo de pasos contaba los de un repositorio anidado** (RV-L3-03). Con un
       worktree en `.claude/worktrees/<rama>/`, `superficies()` sumaba sus workflows. **Rojo,
       medido sobre una copia del árbol con un worktree de juguete adentro:** `node --test
