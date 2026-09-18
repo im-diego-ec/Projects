@@ -195,11 +195,12 @@ declaracion pierde contra el check.
 
 **Y el canonico de la constitucion**, si el texto de `actions/constitucion/canonico/`
 cambio en esta version: `manifiesto.json` necesita una entrada nueva en `versiones`
-con `publicada` y `exigible_desde`, y lo normal es que las dos sean la MISMA fecha: un
-cambio del canonico es exigible el dia que se publica (la ventana de gracia obligatoria
-de 28 dias se retiro el 2026-08-22 — ver el change ventana-vencida). Poner un
-`exigible_desde` futuro sigue siendo posible y es una decision deliberada de estrenar
-con aviso, que se justifica en la seccion «Para consumidores». Sin esa entrada, el
+con `publicada` y `exigible_desde`, y las dos son SIEMPRE la misma fecha, la del
+release: un cambio del canonico es exigible el dia que se publica (la ventana de gracia
+de 28 dias se retiro el 2026-08-22 y el estreno con aviso el 2026-09-17 — ver el change
+ventana-vencida). Otra fecha pone rojo `actions/constitucion/pruebas/la-ventana-no-vuelve.test.mjs`.
+Si la entrada ya existe porque el change que toco el canonico la agrego con el numero
+tentativo, aca se corrige el numero y se refrescan las dos fechas. Sin esa entrada, el
 artefacto de los consumidores queda distinto del canonico y el check no puede decir por
 que.
 

@@ -305,7 +305,9 @@ nombra la puerta de atrás en vez de fingir que no existe.
 >    `actions/constitucion/canonico/manifiesto.json` declaran `exigible_desde` igual
 >    a `publicada`. Lo que el CI de Projects rechaza hoy es una exigibilidad
 >    **anterior** a la publicación (`constitucion.test.mjs:701`), no una demasiado
->    cercana.
+>    cercana. Y desde el change `ventana-vencida` (2026-09-17) tampoco es opt-in:
+>    `actions/constitucion/pruebas/la-ventana-no-vuelve.test.mjs` pone rojo una
+>    `exigible_desde` distinta de `publicada`.
 > 2. **El PR que se abre solo es el del bump, no el del artefacto.** El
 >    `actualizar-marco.yml` del andamio existe y abre PR, pero corre la action con el
 >    pin que el repo **ya** tiene, así que ante una versión nueva regenera el artefacto
@@ -608,8 +610,8 @@ mecanismo lo corren desde la 1.3.0.
 El requirement decía que el atraso **avisaba sin bloquear** entre la publicación y
 una fecha declarada, y que la puesta al día llegaba como un **pull request con el
 artefacto regenerado**. El árbol no hace ninguna de las dos: desde la 1.6.0 el atraso
-es rojo el día que la versión se publica (la fecha posterior es opt-in, y ninguna
-versión la usa), y el pull request que llega solo es el del bump de Dependabot, sin el
+es rojo el día que la versión se publica (la fecha posterior quedó como opt-in que
+ninguna versión usa, y desde el change `ventana-vencida` un banco la rechaza), y el pull request que llega solo es el del bump de Dependabot, sin el
 artefacto adentro. Archivar el texto viejo habría escrito en el contrato vivo una
 promesa que el marco no cumple. El texto nuevo enuncia lo que sí se sostiene: la
 versión llega en un pull request que nadie tuvo que abrir, el rojo aparece adentro de

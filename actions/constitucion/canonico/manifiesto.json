@@ -55,6 +55,12 @@
       "publicada": "2026-08-31",
       "exigible_desde": "2026-08-31",
       "huella_canonico": "3180d942a463f4a8db5db9ae118b9cfc3b0ffa25527d570acde49e9d14a53c28"
+    },
+    {
+      "version": "1.10.0",
+      "publicada": "2026-09-17",
+      "exigible_desde": "2026-09-17",
+      "huella_canonico": "006fa20b30faed2d86f32e942973a76e449060f0025bec3e7adcc03765839939"
     }
   ]
 }

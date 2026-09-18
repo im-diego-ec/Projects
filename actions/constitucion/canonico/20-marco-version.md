@@ -47,7 +47,6 @@ enrojeció un repo que el día anterior pasaba, y nadie lo había pedido.
   el workflow que la regenera, su PR se revisa y se mergea; no se cierra "para
   después". Si no lo cableó, la regeneración es **manual** y el artefacto de la
   corrida dice cómo — cablearlo es la forma de que deje de depender de que alguien se
-  acuerde. Un artefacto atrasado avisa primero y falla desde la fecha que el propio
-  aviso imprime.
+  acuerde. Un artefacto atrasado es **rojo** desde el PR de bump que lo deja atrás.
 
 ---

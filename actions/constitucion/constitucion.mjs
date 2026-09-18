@@ -37,19 +37,19 @@
 // un sello es un `git commit` y cambiar el canónico no.
 //
 // DÓNDE ESTÁ EL ROJO Y DÓNDE EL AVISO
-//   · artefacto ausente o atrasado -> ::warning:: hasta el `exigible_desde` de la
-//     versión pendiente más vieja, ::error:: desde esa fecha. Nunca verde mudo (D7):
-//     el vecino de este check sale por `exit 0` con «nada que verificar» y eso lo
-//     dejaría pasando justo donde el problema es peor.
-//   · `.projects-valores.json` ausente -> en modo VERIFICAR entra por la misma ventana
-//     que el artefacto faltante: es un atraso de adopción, no una manipulación, y un
-//     rojo seco el primer día es un endurecimiento estrenado sin modo aviso. En modo
-//     ESCRIBIR sigue siendo rojo, porque sin valores no hay con qué renderizar. La
-//     asimetría es la propiedad, no una excepción.
+//   · artefacto ausente o atrasado -> ::error:: desde el día en que la versión se
+//     publica: `exigible_desde` es siempre `publicada`, y lo exige el banco
+//     `pruebas/la-ventana-no-vuelve.test.mjs`. Nunca verde mudo (D7): el vecino de
+//     este check sale por `exit 0` con «nada que verificar» y eso lo dejaría pasando
+//     justo donde el problema es peor.
+//   · `.projects-valores.json` ausente -> ::error:: en los dos modos, con arreglos
+//     distintos. En VERIFICAR es un atraso de adopción y sale por la misma función de
+//     fecha que el artefacto faltante, con el arreglo de CREAR el archivo; en ESCRIBIR
+//     es un rojo seco, porque sin valores no hay con qué renderizar.
 //   · marcador del scaffold sin resolver -> ::error::, y en modo escribir no se emite
 //     nada. Un valor cuyo TEXTO es el propio marcador no cuenta como valor.
-//   · cuerpo distinto del re-render -> ::error:: siempre, con el diff. La ventana de
-//     gracia es para reglas NUEVAS, no para ediciones a mano.
+//   · cuerpo distinto del re-render -> ::error:: siempre, con el diff. Una edición a
+//     mano nunca tuvo ventana, y desde el 2026-08-22 no la tiene nada.
 //   · cadena de carga rota -> ::error::. Un import que no resuelve no emite ninguna
 //     señal por sí mismo: es indistinguible de que la regla nunca haya existido.
 //   · desvío sin motivo, o cuya regla ya no existe -> ::error:: (desvío muerto, con
@@ -83,9 +83,9 @@
 //                           workflow reusable tenía su copia y las dos divergieron
 //   CONSTITUCION_SALIDA_CORREGIDA  dónde deja el artefacto al día en modo verificar
 //
-// No hay variable para «hoy». La ventana de gracia se decide con la fecha del
-// sistema y `verificar()` la recibe por parámetro: un override por entorno sería un
-// botón para posponer el rojo para siempre.
+// No hay variable para «hoy». La fecha exigible se compara con la del sistema y
+// `verificar()` la recibe por parámetro: un override por entorno sería un botón para
+// posponer el rojo para siempre.
 
 import { createHash } from "node:crypto";
 import {
@@ -118,10 +118,13 @@ import { invocacionesDe, leerWorkflows, main as mainCableado } from "./cableado.
  *
  * Lo que quedaba del piso era su otro efecto: un repo podía estar atrasado y VERDE
  * durante cuatro semanas. Así que se retiró la política y se dejó el mecanismo:
- * `hallazgoPorFecha` sigue teniendo sus dos ramas, y una versión que de verdad
- * quiera estrenarse con aviso declara un `exigible_desde` futuro y lo consigue. Es
- * opt-in y es de quien publica; ya no es el trato por defecto de cada cambio de
- * texto. Ver el change ventana-vencida. */
+ * `hallazgoPorFecha` sigue teniendo sus dos ramas. Desde el 2026-09-17 la de aviso es
+ * INALCANZABLE POR DATOS: la versión exigible es la publicada (decisión D1 del PO:
+ * una compuerta cuyo arreglo está en el árbol del consumidor se exige en rojo el día
+ * que sale), y `pruebas/la-ventana-no-vuelve.test.mjs` pone rojo un manifiesto que
+ * declare otra fecha. La rama, el campo y el output `exigible_desde` se retiran en
+ * v2, donde quitar un output deja de ser un breaking a escondidas. Ver el change
+ * ventana-vencida. */
 
 const MS_POR_DIA = 86400000;
 
@@ -304,10 +307,11 @@ export function leerCanonico(dir) {
 }
 
 /**
- * Valida el manifiesto, incluida **la ventana de gracia** (D6): un release que exige
- * una regla nueva el mismo día que la publica pone en rojo a un consumidor que no
- * hizo nada. Esa garantía viaja acá, dentro de la action, y no en un paso de CI
- * aparte: así se verifica sola en cada corrida de cada repo.
+ * Valida el manifiesto: versiones semver en orden creciente, las dos fechas bien
+ * formadas y ninguna exigibilidad anterior a su publicación. Viaja acá, dentro de la
+ * action, y no en un paso de CI aparte: así se verifica sola en cada corrida de cada
+ * repo. Hasta el 2026-08-22 validaba además un piso de 28 días de gracia, que es la
+ * política que el change ventana-vencida retiró.
  *
  * ESTE ES EL ÚNICO CALENDARIO. Hubo un segundo, embebido en el `marco-ci.yml` que
  * heredan todos los consumidores, y la auditoría del 2026-08-20 midió que no tenía
@@ -317,12 +321,12 @@ export function leerCanonico(dir) {
  * `grep -rn 'manifiesto.json' .github/workflows/` no daba una coincidencia: ningún
  * workflow leía este archivo. La copia se borró; queda el calendario que sí se mide.
  *
- * LÍMITE DECLARADO, y quedó medido: la ventana se calcula entre dos campos
- * DECLARADOS, no contra el día real en que `v1` se mueve. Un release que se corre una
- * semana sin refrescar `publicada` deja la ventana efectiva en 21 días y esta función
- * sigue en verde, porque los dos números que compara siguen a 28. Por eso quien mueve
- * el tag refresca las fechas EN EL MISMO PR: no hay check que pueda suplirlo desde
- * acá, y decirlo es mejor que afirmar una garantía que la función no da.
+ * LO QUE ESTA FUNCIÓN NO EXIGE, a propósito: que `exigible_desde` sea IGUAL a
+ * `publicada`. Esa regla la exige el banco del marco
+ * (`pruebas/la-ventana-no-vuelve.test.mjs`), porque el manifiesto lo escribe el marco
+ * y el rojo tiene que caer en SU PR, no en el pipeline de un consumidor. Y un límite
+ * que sigue: las fechas son DECLARADAS, así que quien corta el release las refresca
+ * en el mismo PR; nada desde acá puede compararlas con el día real del tag.
  */
 export function validarManifiesto(manifiesto) {
   const problemas = [];
@@ -966,11 +970,10 @@ function diffLineas(esperado, actual, tope = 12) {
  * `valoresPresentes: false` es el caso del repo QUE TODAVÍA NO ADOPTÓ, y tiene su
  * propia rama porque las dos formas de equivocarse son simétricas y las dos ya
  * pasaron. Sin el archivo de valores no hay render posible, así que la verificación
- * completa no se puede hacer; pero devolver un rojo seco el primer día es el mismo
- * error que el verde mudo, con el signo cambiado: estrena un endurecimiento sin la
- * ventana de aviso que el propio marco exige. Acá la ausencia entra por la MISMA
- * puerta que el artefacto faltante: aviso hasta el `exigible_desde` de la versión
- * pendiente más vieja, rojo desde esa fecha, y nunca silencio.
+ * completa no se puede hacer; y ni el verde mudo ni una lluvia de rojos por marcador
+ * sirven. Acá la ausencia sale por la MISMA función de fecha que el artefacto
+ * faltante —rojo desde la publicación de la versión pendiente más vieja, y nunca
+ * silencio— pero con su arreglo propio: crear el archivo, no correr el escritor.
  */
 export function verificar({
   canonico,
@@ -1038,8 +1041,8 @@ export function verificar({
 
   // EL REPO QUE TODAVÍA NO ADOPTÓ. Se sale acá y no más abajo porque sin valores todo
   // placeholder faltaría y el resultado sería una lluvia de rojos secos que dicen lo
-  // mismo una vez por marcador, tapando el único hallazgo que importa y sin la ventana
-  // que le corresponde.
+  // mismo una vez por marcador, tapando el único hallazgo que importa y con un arreglo
+  // que no sirve.
   if (!valoresPresentes) {
     hallazgos.push(
       hallazgoPorFecha({
@@ -1308,10 +1311,11 @@ export function verificar({
 }
 
 /**
- * El rojo lo dispara una FECHA, no el release (D6). Entre `publicada` y
- * `exigible_desde` un artefacto ausente o atrasado sale `::warning::` con el arreglo;
- * desde `exigible_desde`, `::error::`. Nunca verde: el ausente no tiene rama
- * silenciosa de «no aplica».
+ * El rojo lo dispara la fecha exigible de la versión pendiente más vieja, que es
+ * siempre su publicación: o sea, el día que sale. La rama `::warning::` —una fecha
+ * exigible todavía futura— sigue en el código y es inalcanzable con el manifiesto que
+ * se publica (`pruebas/la-ventana-no-vuelve.test.mjs`); se retira en v2 junto con el
+ * campo. Nunca verde: el ausente no tiene rama silenciosa de «no aplica».
  */
 function hallazgoPorFecha({ codigo, ruta, pendiente, hoy, mensaje, arreglo }) {
   const fecha = pendiente?.exigible_desde;
@@ -1413,12 +1417,10 @@ export function main(env = process.env) {
   // ASIMÉTRICO, y la asimetría es la propiedad. En modo ESCRIBIR la ausencia del
   // archivo de valores es un rojo seco y tiene que serlo: no hay con qué renderizar, y
   // un artefacto con dobles llaves sin resolver es peor que ninguno. En modo
-  // VERIFICAR la ausencia es un ATRASO DE ADOPCIÓN y entra por la ventana de gracia,
-  // igual que el artefacto faltante: hasta el 2026-08-20 esta rama abortaba con exit 1
-  // ANTES de ramificar por modo, así que el repo que todavía no adoptó recibía un rojo
-  // seco el primer día —un endurecimiento estrenado sin modo aviso, contra la regla
-  // del propio marco— y, en el otro extremo, el escritor que debería depositar el
-  // artefacto por primera vez también fallaba.
+  // VERIFICAR la ausencia es un ATRASO DE ADOPCIÓN y sale por `verificar()`, igual que
+  // el artefacto faltante y con su arreglo propio. Hasta el 2026-08-20 esta rama
+  // abortaba con exit 1 ANTES de ramificar por modo: el rojo no decía cómo adoptar y
+  // el escritor que debería depositar el artefacto por primera vez también fallaba.
   if (!valoresLeidos.presente && modo === "escribir") {
     console.log(
       `::error::falta ${relative(raiz, rutaValores) || rutaValores}: sin los valores del proyecto no hay render posible, y un artefacto con dobles llaves sin resolver es peor que ninguno. Es un archivo de ESTE repo y vive fuera de .projects/ a proposito: .projects/ es desechable y el modo escribir lo reemplaza entero`,

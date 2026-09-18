@@ -119,7 +119,9 @@ referenciado:
   *Corregido el 2026-09-17:* la ventana obligatoria se retiró el 2026-08-22
   (change `ventana-vencida`): con el pin exacto, el rojo aparece dentro del PR de
   bump, que es donde se lee. El campo sobrevive como opt-in de quien publica, y
-  todas las versiones del canónico lo fijan igual a su publicación.
+  todas las versiones del canónico lo fijan igual a su publicación. Y desde el
+  change `ventana-vencida` (2026-09-17) ni siquiera es opt-in: la versión exigible
+  es la publicada y un banco rechaza la segunda fecha; el campo se retira en v2.
 - **La puesta al día se propone sola.** El repositorio consumidor abre por sí
   mismo el pull request con el artefacto regenerado. El camino normal deja de
   ser «acordate de correr algo».

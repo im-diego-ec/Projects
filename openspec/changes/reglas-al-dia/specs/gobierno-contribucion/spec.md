@@ -20,9 +20,10 @@ no se integre, el repositorio SHALL seguir verificándose contra la versión que
 tiene pinada: nada de la porción del marco cambia bajo sus pies sin un pull request
 que alguien pueda leer. El atraso SHALL ser un fallo desde el día en que la versión
 se publica, y por eso aparece dentro de ese pull request y antes de llegar a la
-rama de integración. La única excepción SHALL declararla de antemano la versión
-misma, con una fecha de exigibilidad posterior a su publicación: hasta esa fecha el
-atraso SHALL avisar sin bloquear, nombrando el día desde el cual falla.
+rama de integración. La versión exigible SHALL ser la publicada, sin excepción:
+ninguna versión SHALL declarar una fecha de exigibilidad posterior a su
+publicación, porque el arreglo —regenerar el artefacto— está dentro del árbol del
+propio repositorio y el aviso previo ya lo da ese pull request.
 
 Un proyecto SHALL poder apartarse de una regla declarando el desvío con la regla
 que anula y su motivo escrito; el desvío SHALL quedar impreso junto a esa regla

@@ -552,6 +552,15 @@ contramedidas son obligatorias y esta es la primera.
       prometía un aviso durante una ventana y un PR con el artefacto regenerado,
       y el árbol no hace ninguna de las dos—, la revisión adversarial registrada
       en `revision-adversarial.md`, y la tarea 5.3.
+      **Nota del 2026-09-17, change `ventana-vencida`:** el delta perdió su última
+      excepción. Decía «la única excepción SHALL declararla de antemano la versión
+      misma, con una fecha de exigibilidad posterior a su publicación»; ahora dice
+      que la versión exigible es la publicada, sin excepción. Es la decisión D1 del
+      PO del 2026-09-17 escrita en el spec, y la sostiene
+      `actions/constitucion/pruebas/la-ventana-no-vuelve.test.mjs`, que pone rojo un
+      manifiesto con dos fechas: con la frase vieja, el spec habría prometido una
+      excepción que el banco rechaza. Entra en la misma aprobación del PO que esta
+      tarea ya espera.
 - [x] 7.5 Anotar en las reglas no escritas qué filas cierra esto y cuáles quedan
       abiertas —declaradas como deuda, no como olvido—: que el `AGENTS.md` del
       proyecto contradiga al artefacto no lo caza ningún check (la mitigación es

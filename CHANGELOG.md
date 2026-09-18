@@ -113,6 +113,35 @@ mueve sobre un cambio incompatible.
   cada versión llega por el PR de bump y el rojo aparece adentro. Para consumidores:
   nada.
 
+- **La porción del marco de la constitución sube a una versión nueva (1.10.0, número
+  tentativo que corrige el release), y el PR de bump que la trae LLEGA ROJO.** La regla
+  `marco-artefacto-al-dia`, que cada proyecto carga en cada sesión, decía que un
+  artefacto atrasado «avisa primero y falla desde la fecha que el propio aviso imprime».
+  Es falso desde la 1.6.0: el atraso es rojo el día que la versión se publica. Un agente
+  que lee lo contrario trata el rojo del PR de bump como algo que puede esperar. Ahora
+  dice que el artefacto atrasado es **rojo** desde el PR de bump que lo deja atrás. El
+  cambio de una frase es una versión nueva del canónico, y no una corrección sobre la
+  1.7.0, a propósito: pisar la huella de la 1.7.0 haría que dos textos distintos se
+  llamen igual, y un artefacto en 1.7.0 se reportaría como «editado a mano».
+  Para consumidores: **EL PR DE BUMP A ESTA VERSIÓN LLEGA CON EL JOB `constitucion` EN
+  ROJO** si tu artefacto declara la 1.7.0 (medido sobre un repo de juguete: `exit=1`, dos
+  `::error::` «le faltan reglas»). Se arregla dentro de ese mismo PR, sin escribir nada a
+  mano: en la rama del PR, parado en la raíz del repo, correr
+  `gh repo clone im-diego-ec/Projects /tmp/projects-marco -- --depth 1 --branch vX.Y.Z`
+  y `CONSTITUCION_MODO=escribir node /tmp/projects-marco/actions/constitucion/constitucion.mjs`
+  (con la `vX.Y.Z` del bump), y commitear los archivos que imprime, uno por superficie.
+  La otra salida que nombra el mensaje del rojo, bajar el artifact `constitucion-al-dia`,
+  sale vacía en los repos nacidos hasta la 1.9.6 hasta que su `ci.yml` suba archivos
+  ocultos. No cambia ningún nombre de job, `input`, `output` ni permiso: un repo que no
+  mergea el bump no cambia de color.
+- **La versión exigible es la publicada, sin excepción.** Lo que quedaba de la ventana
+  de gracia era la posibilidad de que una versión declarara un `exigible_desde`
+  posterior a su publicación y se estrenara en amarillo. Se retira como política: con
+  pin exacto, el aviso previo ya es el PR de bump, y el arreglo —regenerar el
+  artefacto— está en el árbol del propio repo. El output `exigible_desde` sigue
+  existiendo, siempre con la misma fecha que la publicación, y se retira en v2. Para
+  consumidores: nada; ninguna versión publicada usó nunca una fecha distinta.
+
 ### Corregido
 
 - **Cinco páginas seguían prometiendo una publicación automática que ya no ocurre**, y
@@ -158,6 +187,17 @@ mueve sobre un cambio incompatible.
   bifurcación; uno figuraba con un nombre de esta cuenta que era un renombrado
   mecánico. El documento se retiró y el bloque quedó declarado no aplicable, con lo
   que cada tarea protegía nombrado al lado. Para consumidores: nada.
+
+- **La documentación de `actions/constitucion` prometía una ventana de gracia que ya no
+  existe.** El encabezado de `action.yml` decía, en presente, «la ventana de gracia es
+  para reglas nuevas, no para ediciones a mano»; la descripción del output
+  `exigible_desde` ofrecía «un estreno con aviso»; nueve pasajes de `constitucion.mjs`
+  y uno de `cableado.mjs` describían avisos que la action ya no da; el README de las
+  actions y la skill del release ofrecían el estreno con aviso como opción de quien
+  publica; y el encabezado del `actualizar-marco.yml` del andamio hablaba de un check
+  que «pasa de aviso a rojo». Todo en prosa: la action verifica exactamente lo
+  mismo que antes. Para consumidores: nada. Un repo nacido del andamio conserva su copia
+  del comentario de `actualizar-marco.yml`, que es prosa y no cambia nada que corra.
 
 ### Añadido
 
@@ -576,6 +616,17 @@ mueve sobre un cambio incompatible.
   Projects lo vea; lo que un proyecto aprende y debería subir al marco sigue siendo
   manual; y nada limita cuántos desvíos declara un proyecto. Para consumidores:
   nada.
+
+- **Un banco que impide que la ventana de gracia vuelva:**
+  `actions/constitucion/pruebas/la-ventana-no-vuelve.test.mjs`. Pone rojo el PR del
+  marco que declare dos fechas distintas para una versión del canónico, que vuelva a
+  escribir una de las seis redacciones que ya prometieron la ventana, o que deje la
+  regla `marco-artefacto-al-dia` sin decir que el atraso es rojo. Nació rojo: sobre el
+  árbol anterior encontró nueve líneas. Límite declarado: caza esas redacciones, no una
+  nueva de la misma promesa. Es el porte del cierre que Rigel hizo a mano en su 1.10.0
+  (`794bbaf`), donde la frase sobrevivió una semana porque «contar menciones no
+  distingue la nota histórica del texto que sigue prometiendo». Para consumidores:
+  nada; corre en el CI de Projects.
 
 ### Corregido
 

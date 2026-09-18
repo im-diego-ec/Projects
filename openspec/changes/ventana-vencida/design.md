@@ -93,3 +93,101 @@ anteriores.
   próximo PR de bump llegue rojo; regenerarlo es trabajo de ese repo, en ese PR.
 - **La premisa vencida sigue escrita en el spec vivo de la cobertura.** Corregir esa
   justificación es parte de la decisión sobre esa otra ventana, no de esta.
+
+---
+
+## Adenda del 2026-09-17 — el cierre (porte de Rigel, lote 3)
+
+> **D1 queda superada en su mitad «opt-in».** Su argumento era que `AGENTS.md` pedía
+> estrenar un endurecimiento «en modo aviso», y que borrar el mecanismo dejaba esa regla
+> sin forma de cumplirse. La decisión D1 del PO del 2026-09-17 cambió la regla: una
+> compuerta se exige en rojo el día que sale, salvo que su arreglo quede **fuera** del
+> árbol del consumidor. Regenerar este artefacto queda adentro. La reescritura de
+> `AGENTS.md` es de otro change (`que-es-breaking`); esta adenda solo deja de apoyarse en
+> la frase vieja. D2, D3, D4 y D5 siguen valiendo tal como están.
+
+### D7. La excepción sale del spec; el mecanismo, todavía no
+
+**Decisión.** El delta deja de ofrecer la fecha de exigibilidad futura: la versión
+exigible es la publicada, sin excepción. En el código, `hallazgoPorFecha` conserva sus dos
+ramas y el manifiesto conserva el campo `exigible_desde`, pero la rama de aviso queda
+**inalcanzable por datos**: un banco del marco rechaza cualquier versión con dos fechas
+distintas. El campo, la rama y el output se retiran en v2.
+
+**Alternativas descartadas.**
+
+- **Retirar el mecanismo entero ya** (campo, rama y output, como hizo Rigel en su 2.0.0).
+  Quitar un output es breaking por la letra de `AGENTS.md`, y la línea v2 se abre una sola
+  vez con todos los breaking juntos (decisión D1 del PO). Queda preparado para ese change.
+- **Hacerlo cumplir en `validarManifiesto()`**, que corre en el pipeline de cada
+  consumidor. El manifiesto lo escribe el marco: si alguien declara una segunda fecha, el
+  defecto es del marco y el rojo tiene que caer en **su** PR, antes de publicar, y no en el
+  job `constitucion` de un repo que no hizo nada. Además rompería las pruebas del
+  mecanismo que sigue en el código hasta v2.
+- **Dejar la excepción en el spec**, como estaba aprobado. Contradice la decisión del PO,
+  y el spec prometería algo que el banco rechaza.
+
+### D8. El texto del canónico gana una versión, y no se pisa la de antes
+
+**Decisión.** La regla `marco-artefacto-al-dia` pasa de «avisa primero y falla desde la
+fecha que el propio aviso imprime» a «es **rojo** desde el PR de bump que lo deja atrás».
+El manifiesto gana la entrada **1.10.0** con la huella del texto nuevo y las dos fechas
+iguales. El número es tentativo: la nota del propio manifiesto manda corregirlo en el PR
+del release si sale con otro, y el release refresca las fechas.
+
+**Por qué versión nueva y no pisar la huella de la 1.7.0.** Es exactamente el defecto
+que `huella-del-canonico.test.mjs` existe para impedir: dos textos distintos con el mismo
+número. Pisarla haría que el artefacto de un consumidor en 1.7.0 dejara de coincidir con
+el re-render de «su» versión y la verificación lo reportara como **edición a mano**, que
+es el mensaje equivocado para lo que pasó.
+
+**Por qué ahora, con consumidores reales.** Cada versión del canónico pone rojo el PR de
+bump de cada consumidor hasta que regenere, y hoy hay tres en `@v1.9.6`. Por eso el
+change `el-canonico-dice-como-se-trabaja` (lote 11 del porte) mete sus reglas nuevas en
+**esta misma** versión, que todavía no se publicó: un solo rojo por consumidor en vez de
+dos. Actualizar la huella de una entrada **no publicada** no es pisar historia.
+
+**El costo de líneas.** Medido con `leerCanonico()`, que es como cuenta el presupuesto la
+action (pega las secciones con una línea en blanco entre cada par): 697 antes, **696**
+después, sobre 700. La frase nueva cabe en una línea.
+
+### D9. Clasificación de distribución de cada pieza que se toca
+
+| Pieza | Forma | Por qué esa |
+| --- | --- | --- |
+| `actions/constitucion/canonico/20-marco-version.md` y `manifiesto.json` | **Canónico** que viaja dentro de una action **referenciada**, y llega al consumidor como artefacto **regenerado** | Es la fuente única de la porción del marco. No es scaffold: el consumidor no la edita, la regenera. |
+| Comentarios de `action.yml`, `constitucion.mjs`, `cableado.mjs` y la descripción del output | **Referenciado** | Viajan con la action por `uses:@vX.Y.Z`. Cero cambio de comportamiento: ni un `input`, ni un `output`, ni un nombre de job. |
+| `plantilla/.github/workflows/actualizar-marco.yml` (un comentario) | **Scaffold** | Lo recibe solo un proyecto nuevo; los tres que existen conservan su copia. Es prosa: no cambia nada que corra. |
+| `actions/README.md` | Documentación del marco | No viaja. |
+| `.claude/skills/projects-release/SKILL.md` | Herramienta interna del repo | Skill propia de Projects, no la regenera el CLI de OpenSpec, así que se edita a mano sin perder nada. |
+| `actions/constitucion/pruebas/la-ventana-no-vuelve.test.mjs` | Banco interno | Corre en el CI de Projects (`actions/**/pruebas/*.test.mjs`). Viaja en el árbol de la action pero ningún consumidor lo ejecuta. |
+| Deltas de `calidad-codigo` (este change) y `gobierno-contribucion` (`reglas-al-dia`) | **Canónico** (specs del marco) | El segundo es de la capability de gobernanza: lo aprueba el PO. |
+
+### D10. Qué lo hace cumplir solo, y qué no
+
+- **Una sola fecha por versión:** `la-ventana-no-vuelve.test.mjs` sobre el manifiesto
+  real. Medido: poner `exigible_desde` en 2026-09-28 a la 1.7.0 lo pone rojo nombrando la
+  versión y las dos fechas.
+- **La regla del canónico dice rojo:** el mismo banco busca el bloque de
+  `marco-artefacto-al-dia` por su id estable y exige «rojo» y ningún «aviso/avisa».
+- **La prosa que describe el veredicto:** el mismo banco caza las seis redacciones que ya
+  estuvieron escritas, en el canónico, la action, su README, la skill del release y el
+  actualizador del andamio. **Límite declarado:** es una lista cerrada. No caza una
+  redacción nueva de la misma promesa, porque decidir si una frase promete un aviso no es
+  decidible con un patrón. Lo que cubre ese resto es la revisión adversarial del change,
+  que es donde esta clase apareció las dos veces.
+- **Que el texto y su número no se separen:** `huella-del-canonico.test.mjs`, que ya
+  existía.
+
+### D11. Lo que la auditoría de cierre encontró y este change NO arregla
+
+- **El arreglo que imprime el rojo miente a medias.** Dice «correr el modo escribir de
+  esta action (el PR semanal de actualizacion lo hace solo)», y con Dependabot como canal
+  (decisión D2 del PO) el actualizador corre el pin **viejo**: su propio encabezado dice
+  que es un no-op para una versión nueva. Y la otra salida, «bajar el artefacto corregido
+  que este job sube», sale vacía hasta que el andamio suba archivos ocultos (tarea 5.3 de
+  `reglas-al-dia`). Es otra promesa y otra pieza: va con el change
+  `el-marco-deja-de-afirmar-lo-que-no-hace`.
+- **El resumen de cada corrida imprime «exigible desde».** Es verdad —es la misma fecha
+  que la publicación— y se va con el output en v2.
+

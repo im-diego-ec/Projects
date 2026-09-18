@@ -848,12 +848,15 @@ distribución pasó a versión exacta. Con pin exacto, el aviso previo **es el P
 bump**, y lo único que la ventana seguía produciendo era un repo atrasado y verde
 durante cuatro semanas.
 
-El estreno con aviso **sigue siendo posible y es opt-in de quien publica**: una versión
-que declara un `exigible_desde` posterior a su `publicada` avisa hasta esa fecha, y la
-corrida nombra el día desde el cual el mismo estado es rojo. Si el consumidor acumuló
-varias versiones sin adoptar, manda la fecha de la **más vieja pendiente**. Lo que
-**no** existe es rama silenciosa de "este repo no aplica": el repo sin artefacto es
-exactamente el que hay que avisar.
+**La versión exigible es la publicada, sin excepción.** Hasta el 2026-09-17 una versión
+podía declarar un `exigible_desde` posterior a su `publicada` y estrenarse con aviso;
+desde la decisión D1 del PO —una compuerta cuyo arreglo está en el árbol del consumidor
+se exige en rojo el día que sale, y regenerar este artefacto lo está— el banco
+`constitucion/pruebas/la-ventana-no-vuelve.test.mjs` pone rojo el PR del marco que
+declare otra fecha. El campo y el output `exigible_desde` siguen existiendo, con la
+misma fecha que `publicada`, y se retiran en v2. Lo que **no** existe es rama
+silenciosa de "este repo no aplica": el repo sin artefacto es exactamente el que hay
+que avisar.
 
 Límites declarados, en el encabezado del `action.yml` y acá: esto garantiza que el
 **texto** llegue íntegro y al día a la superficie que el agente carga, **no** que

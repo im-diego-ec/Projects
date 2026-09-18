@@ -681,9 +681,9 @@ function tapaElRojoEn(mapa) {
  *
  * POR QUÉ CUALQUIER FILTRO DE `paths` DESCALIFICA, y es más estricto que preguntar si
  * los archivos protegidos matchean. Esta compuerta no se dispara solo cuando alguien
- * EDITA el artefacto: el artefacto vence por FECHA (`exigible_desde`), así que un PR
- * que no toca ningún archivo de la constitución es exactamente uno donde el rojo tiene
- * que aparecer igual. Y hay una segunda razón, que es una regla del propio marco: el
+ * EDITA el artefacto: el artefacto se atrasa cuando se mueve el PIN —el PR de bump
+ * toca un workflow, no la constitución—, así que un PR que no toca ningún archivo de
+ * la constitución es exactamente uno donde el rojo tiene que aparecer igual. Y hay una segunda razón, que es una regla del propio marco: el
  * check requerido es el veredicto agregado, y un workflow filtrado por `paths` no
  * reporta en los PRs que saltea — que es el error que ya costó una semana de ruleset
  * esperando una señal que no llegaba. Ningún filtro de rutas puede demostrarse seguro
