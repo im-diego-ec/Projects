@@ -4142,6 +4142,38 @@ async function main(argv) {
         else console.log(linea);
       }
       if (rojo) {
+        // CON --repositorio, EL ROJO TAMBIEN DEJA EL REPOSITORIO (revision adversarial
+        // del porte, RV-H1). Devolver 1 aca, antes del bloque del repositorio, dejaba
+        // una CARPETA sin aviso ni comandos, y en el camino del doble clic no habia
+        // vuelta: reabrir el lanzador choca con la guarda del destino ocupado. El
+        // requirement pide el repositorio en main igual, y sin primer guardado --un
+        // proyecto en rojo guardado y subido estrena el CI en rojo--, con el motivo y
+        // los comandos para despues. No se consulta ni se crea nada afuera.
+        if (o.repositorio) {
+          friccion.enFase("el repositorio");
+          const fallo = hechos.find((h) => !h.ok);
+          let repoMod = null;
+          try {
+            repoMod = await import("./projects-repositorio.mjs");
+          } catch (e) {
+            console.error(
+              `::warning::no pude cargar herramientas/projects-repositorio.mjs (${e.message}). Se pidio --repositorio y ` +
+                "NO se hizo: la carpeta no quedo como repositorio git.",
+            );
+          }
+          if (repoMod) {
+            await repoMod.dejarElRepositorio({
+              destino: o.destino,
+              org: valores.ORG,
+              proyecto: valores.PROYECTO,
+              visibilidad: repoMod.visibilidadDeLasRespuestas(o.valores),
+              remoto: o.remoto,
+              listoParaGuardar: false,
+              motivoSinGuardar: `el arranque salio rojo en «${fallo?.paso?.titulo ?? "un paso"}» (${fallo?.error ?? "sin detalle"}), y un proyecto que no quedo en verde no se guarda ni se sube`,
+              preguntar: null,
+            });
+          }
+        }
         console.error("");
         console.error("Lo que sigue —las tareas humanas— NO se imprime: primero hay que dejar el proyecto en verde.");
         return 1;

@@ -67,6 +67,16 @@ lockfile, y el CI corre con `--frozen-lockfile`; con `--sin-herramientas` no hay
 rojo por una razón que la corrida ya conoce. **Descartado:** guardar igual y
 avisar; el rojo quedaría publicado en el primer envío.
 
+**Y un arranque que sale rojo también deja el repositorio** (corregido por la
+revisión adversarial del porte, RV-H1). La primera versión devolvía 1 apenas un paso
+del arranque fallaba, antes del bloque del repositorio: ni `git init` ni aviso ni
+comandos, y en el camino del doble clic no había vuelta, porque reabrir el lanzador
+choca con la guarda del destino ocupado. Ahora, con `--repositorio`, el rojo corre el
+mismo `dejarElRepositorio` con `listoParaGuardar: false` y el paso que falló como
+motivo —`main`, sin guardado, sin consultar nada afuera— y después sale 1 como antes.
+**Descartado:** imprimir solo los comandos sin crear el repositorio; el requirement
+pide el repositorio en `main` aunque falte el verde, y crear uno vacío no publica nada.
+
 **Confirmación con «si» escrito; Enter es que no.** El asistente usa el criterio
 contrario —«Enter = sí»— porque su confirmación protege un archivo local que se
 reescribe. Acá la acción es la única visible desde afuera (un repositorio público

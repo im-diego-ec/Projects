@@ -125,3 +125,28 @@ estado: en-ejecucion
       release, con OK humano.
 - [ ] 6.4 Revisión adversarial registrada en este change. **Motivo**: va en la
       pasada final del porte, después de integrar los carriles.
+
+## 7. Revisión adversarial del carril: lo que cazó y cómo se cerró
+
+- [x] 7.1 Con `--repositorio` y el arranque en rojo, `projects init` devolvía 1 antes del
+      bloque del repositorio (RV-H1): sin `git init`, sin aviso y sin comandos, contra el
+      escenario «El proyecto no quedó en verde». **Rojo medido**, con `corepack` y `pnpm`
+      falsos que salen 0 a `--version` y 1 a `install`: `rc=1`, sin `.git`, y la salida sin
+      «── EL REPOSITORIO ──». **Arreglo** en `herramientas/projects-init.mjs` (bloque `if
+      (rojo)` del arranque): con `--repositorio` corre `dejarElRepositorio` con
+      `listoParaGuardar: false`, el paso que falló como motivo y `preguntar: null`, y sale 1
+      como antes (design, «Sin arranque en verde no hay primer guardado»). **Evidencia**:
+      caso nuevo en `pruebas/init/el-doble-clic-deja-un-repo.test.mjs` («con --repositorio y
+      el arranque en ROJO…»), con la herramienta real copiada sin `registro-npm.mjs` para no
+      depender de la red; antes del arreglo, `el arranque rojo dejo una CARPETA, no un
+      repositorio`; después, el banco → `# pass 26`. Por CLI: `── EL REPOSITORIO ──`,
+      `Repositorio git creado en … rama main.`,
+      `::warning::el primer guardado NO se hizo: el arranque salio rojo en «instalar las
+      dependencias» (salio 1)…` y los comandos `git add -A` / `git commit` / `gh repo create`.
+- [ ] 7.2 Los otros `return 1` posteriores a la copia —los del bloque de OpenSpec y la
+      constitución (`openspec init` que falla o miente, un render que falla o no declara lo
+      escrito)— tampoco dejan el repositorio. **Motivo**: no es el hallazgo de la revisión y
+      esos caminos ya tienen salida: cada mensaje manda a volver a correr con
+      `--forzar --sin-herramientas`, que con `--repositorio` deja el repositorio sin guardado.
+      Queda para un change que unifique el cierre de todo fallo posterior a la copia.
+

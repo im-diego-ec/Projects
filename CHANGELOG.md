@@ -1467,7 +1467,10 @@ avisos.
   visibilidad sale de la respuesta que el asistente ya guardó. Lo publicado se
   comprueba en el disco (`origin` y `origin/main` igual a `HEAD`), no por el código
   de salida de `gh`. Todo lo que no se pudo hacer sale como `::warning::` con los
-  comandos exactos. `--sin-remoto` (en `projects-init.mjs` y en los lanzadores) deja
+  comandos exactos, también cuando el arranque sale rojo: el destino queda repositorio
+  en `main` sin primer guardado, con el motivo y los comandos para después, en vez de
+  una carpeta que reabrir el lanzador ya no puede tocar (el destino está ocupado).
+  `--sin-remoto` (en `projects-init.mjs` y en los lanzadores) deja
   el repositorio solo en la máquina. La lógica vive en un módulo nuevo,
   `herramientas/projects-repositorio.mjs`, sin shell en ningún sistema.
   Para consumidores: nada. Es herramienta del marco que corre desde el clon y no

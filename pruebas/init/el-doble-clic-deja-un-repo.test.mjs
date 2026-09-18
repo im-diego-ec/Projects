@@ -438,6 +438,56 @@ test("si el arranque no quedo en verde no hay primer guardado: ese envio naceria
   assert.match(c.avisado.join("\n"), /::warning::el primer guardado NO se hizo: se pidio --sin-arranque/);
 });
 
+// EL ARRANQUE ROJO NO PUEDE DEJAR UNA CARPETA (revision adversarial del porte, RV-H1,
+// 2026-09-18). Con --repositorio y el arranque en rojo, la herramienta devolvia 1 ANTES del
+// bloque del repositorio: sin `git init`, sin aviso y sin comandos. Y en el camino del doble
+// clic no habia salida: volver a abrir el lanzador choca con la guarda del destino ocupado.
+// Medido con un pnpm falso que falla en install: rc 1, `.git` ausente, y la salida sin
+// «── EL REPOSITORIO ──». El requirement dice lo contrario: el destino queda repositorio en
+// main y, si falta el verde, el aviso dice por que no hay primer guardado y con que comandos.
+//
+// Corre la herramienta real COPIADA sin `registro-npm.mjs`, a proposito: sin ese modulo el
+// arranque no consulta la red antes de instalar (lo avisa y sigue), y el caso no depende de
+// que haya internet. El gestor de paquetes es un guion de shell en el PATH: solo POSIX.
+const SOLO_POSIX = process.platform === "win32" ? { skip: "el gestor de paquetes de este caso es un guion de shell; en Windows seria un .cmd por cmd.exe" } : {};
+
+test("con --repositorio y el arranque en ROJO: repositorio en main, sin primer guardado, y el aviso con los comandos", SOLO_POSIX, () => {
+  const raiz = tmp("arranque-rojo");
+  fs.mkdirSync(path.join(raiz, "herramientas"));
+  for (const f of ["projects-init.mjs", "projects-repositorio.mjs", "projects-doctor.mjs"]) {
+    fs.copyFileSync(path.join(RAIZ, "herramientas", f), path.join(raiz, "herramientas", f));
+  }
+  fs.cpSync(ANDAMIO, path.join(raiz, "plantilla"), { recursive: true });
+  const bin = path.join(raiz, "bin");
+  fs.mkdirSync(bin);
+  // corepack y pnpm que existen (`--version` sale 0) y fallan al instalar.
+  const falso = '#!/bin/sh\ncase "$1" in --version) echo 0.0.0-de-mentira; exit 0 ;; esac\necho "install de mentira: falla a proposito ($*)" >&2\nexit 1\n';
+  for (const nombre of ["corepack", "pnpm"]) fs.writeFileSync(path.join(bin, nombre), falso, { mode: 0o755 });
+  const entorno = entornoDePrueba({ antesDelPath: bin });
+  const destino = path.join(raiz, VALORES.PROYECTO);
+  fs.mkdirSync(destino);
+  const valores = path.join(raiz, "valores.json");
+  fs.writeFileSync(valores, JSON.stringify(VALORES));
+  const r = spawnSync(
+    process.execPath,
+    [path.join(raiz, "herramientas", "projects-init.mjs"), "--sin-herramientas", "--repositorio", "--valores", valores, "--destino", destino],
+    { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"], env: entorno },
+  );
+  const salida = `${r.stdout ?? ""}${r.stderr ?? ""}`;
+  assert.equal(r.status, 1, `el arranque rojo tiene que seguir saliendo 1:\n${salida.slice(-1500)}`);
+  assert.match(salida, /install de mentira: falla a proposito/, "el caso no llego a correr el install: no mide lo que dice");
+  const e = estadoSegunGit(destino, entorno);
+  assert.equal(e.repo, true, `el arranque rojo dejo una CARPETA, no un repositorio:\n${salida.slice(-1500)}`);
+  assert.equal(e.rama, "main", `la rama es ${e.rama}`);
+  assert.equal(e.commit, null, "guardo un proyecto que no quedo en verde: ese envio nace rojo");
+  assert.equal(e.origin, null, "con el arranque rojo no se consulta ni se crea nada afuera");
+  assert.match(salida, /── EL REPOSITORIO ──/);
+  assert.match(salida, /::warning::el primer guardado NO se hizo: el arranque salio rojo/, "no dice por que no hay primer guardado");
+  assert.match(salida, /git add -A/, "no deja los comandos para guardarlo despues");
+  assert.match(salida, /las tareas humanas— NO se imprime/, "la lista de lo que sigue no se puede imprimir sobre un proyecto en rojo");
+  fs.rmSync(raiz, { recursive: true, force: true });
+});
+
 test("un destino que YA era repositorio con historia no se toca", async () => {
   const entorno = entornoDePrueba();
   const destino = proyectoArmado("ya-era");
