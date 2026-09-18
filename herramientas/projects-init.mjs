@@ -255,10 +255,11 @@ export function seExcluyeDelCopiado(rel, plataforma = "aws", forma = "aplicacion
  *  ignora la eleccion.
  *
  *  POR QUE NO ALCANZA CON VACIAR LOS DIRECTORIOS. El paso de Terraform del
- *  pipeline decide con `[ -d "${D}" ]`, no con "hay .tf adentro" —medido en
- *  plantilla/.github/workflows/ci.yml—, asi que un `infra/` con un solo documento
- *  adentro sigue contando como raiz de Terraform. O no viaja el directorio, o el
- *  proyecto arranca verificando infraestructura que no tiene.
+ *  pipeline decide con `[ -d "${D}" ]`, no con "hay .tf adentro" —medido en el
+ *  job `terraform` de .github/workflows/marco-ci.yml, que el ci.yml del andamio
+ *  llama—, asi que un `infra/` con un solo documento adentro sigue contando como
+ *  raiz de Terraform. O no viaja el directorio, o el proyecto arranca
+ *  verificando infraestructura que no tiene.
  *
  *  `aws` es el valor por defecto A PROPOSITO: un archivo de valores viejo, escrito
  *  antes de que esta clave se leyera, describe un proyecto de AWS. Cambiar eso en

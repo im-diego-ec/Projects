@@ -220,124 +220,26 @@ jobs:
       - run: pnpm format:check
 
       # -------------------------------------------------------------------
-      # LA INFRAESTRUCTURA TAMBIEN SE VERIFICA
+      # LA INFRAESTRUCTURA SE VERIFICA, Y NO ACA
       #
-      # Este repositorio reparte dos raices de Terraform (infra/ e infra-prod/)
-      # y un .github/dependabot.yml con dos entradas del ecosistema terraform:
-      # van a llegar PRs que suben el provider. Sin este paso, ese PR se puede
-      # mergear en verde sin que nadie haya corrido `terraform validate` una
-      # sola vez, y la unica compuerta seria que alguien se acuerde — que no
-      # cuenta como compuerta. Ni el linter ni el formateador ni el censo de
-      # fuentes alcanzan un .tf: lo que no esta aca, no lo mira nadie.
+      # Formato y validez de infra/ e infra-prod/ (`terraform fmt -check` y
+      # `terraform init -backend=false && terraform validate`) los corre el job
+      # `terraform` del workflow del marco que este archivo llama arriba
+      # (marco-ci.yml), que mira esas dos raices por default y corre en CADA
+      # PR, tambien en los que solo tocan infra/ —este job build_test no corre
+      # en esos, porque ^infra/ es carril de docs—.
       #
-      # POR QUE ES EXIGIBLE DESDE EL DIA UNO, que es lo que lo separa de los
-      # PENDIENTE-INFRA: las dos comprobaciones son INERTES. `fmt -check` solo
-      # lee texto. `init -backend=false` no toca el bucket del state —que hoy es
-      # el PENDIENTE-INFRA 1 y a proposito no resuelve— ni pide credenciales de
-      # ninguna cuenta. No hace falta que este repositorio se despliegue, ni que
-      # exista la infraestructura que el codigo referencia.
+      # Hasta la 1.9.6 el andamio traia aca una copia inline del mismo paso,
+      # con su propia fecha de gracia (2026-09-30). Se retiro: dos copias ya
+      # habian divergido, y la de aca no tenia version del marco que la
+      # endureciera. Si tu raiz de Terraform se llama distinto, declarala en
+      # el input raices_terraform del uses: de arriba. Si este proyecto no usa
+      # Terraform, borra infra/ e infra-prod/ y el job lo dice y sale verde.
       #
-      # VENTANA DE GRACIA HASTA EL 2026-09-30, y despues rojo sin que nadie
-      # toque nada. Hasta esa fecha un fallo AVISA en vez de detener. El motivo
-      # es que hasta hoy nada miro estos archivos, asi que la primera corrida es
-      # tambien la primera medicion: la ventana es el plazo para arreglar lo que
-      # reporte. La fecha esta comparada mas abajo contra el reloj, no anotada en
-      # un checklist, justamente para que el vencimiento no dependa de nadie.
-      #
-      # SI ESTE PROYECTO NO USA TERRAFORM, borra este paso junto con infra/,
-      # infra-prod/ y las dos entradas de terraform del dependabot.yml. Mientras
-      # los directorios no existan el paso no verifica nada y lo dice, en vez de
-      # pasar en un silencio indistinguible de haber verificado.
-      #
-      # EL BINARIO AUSENTE ES UN CASO DE FALLO, NO UN CASO NEUTRO, y sigue la
-      # MISMA ventana que los otros dos. El binario sale hoy de la imagen del
-      # runner: falta el `uses:` pinado por SHA que lo garantice. Mientras la
-      # ventana corre, no encontrarlo AVISA; vencida la ventana, no encontrarlo
-      # es ROJO. El motivo es que la alternativa —avisar para siempre— convierte
-      # este paso en un aviso perpetuo que se lee como compuerta: bastaria con
-      # que la imagen del runner dejara de traer terraform para que el paso
-      # pasara en verde sin haber verificado nada, indefinidamente y sin que
-      # nadie se entere. "No pude verificar" no es "verifique y esta bien".
-      # Para cerrar el limite de raiz, agregar antes de este paso
-      # `uses: hashicorp/setup-terraform@<sha> # v<x.y.z>` con el SHA
-      # resuelto, nunca copiado de memoria:
-      #   curl -sS https://api.github.com/repos/hashicorp/setup-terraform/git/ref/tags/v3
-      #   curl -sS https://api.github.com/repos/hashicorp/setup-terraform/git/tags/<sha-del-objeto-tag>
-      # el object.sha del segundo llamado es el commit que va en el uses: y el
-      # campo message dice la version exacta que va en el comentario de al lado.
-      #
-      # ESTE PASO SE EJECUTA EN UN BANCO, no solo se lee: el marco extrae este
-      # mismo bloque `run:` del YAML y lo corre contra arboles fabricados con un
-      # `terraform` falso, en los cinco caminos que tiene (sin raices; sin
-      # binario dentro y fuera de la ventana; fmt y validate en rojo dentro y
-      # fuera). Vive en pruebas/andamio/terraform-en-ci.test.mjs del repo del
-      # marco, y si este paso se borra o se renombra, ese banco se pone rojo.
+      # GRAVEDAD, por version y no por fecha: en toda la linea 1 del marco un
+      # hallazgo AVISA; desde v2 detiene. Lo anuncia el CHANGELOG del marco,
+      # que es lo que el PR de bump de Dependabot pone adelante.
       # -------------------------------------------------------------------
-      - name: Formato y validez de las raices de Terraform
-        shell: bash
-        env:
-          # Hasta este dia inclusive un fallo avisa; a partir del siguiente es
-          # rojo. Moverla es una decision que se escribe, no un default.
-          VENTANA_TERRAFORM: "2026-09-30"
-        run: |
-          set -euo pipefail
-
-          # Array y no cadena: sin comillas una raiz con espacio se parte, y con
-          # comillas se pasarian todas como UN argumento. El array es lo unico que
-          # no obliga a elegir entre los dos fallos. Mismo arreglo que marco-ci.yml.
-          RAICES=()
-          for D in infra infra-prod; do
-            if [ -d "${D}" ]; then RAICES+=("${D}"); fi
-          done
-
-          if [ ${#RAICES[@]} -eq 0 ]; then
-            echo "::notice::no hay raices de Terraform en este repositorio (ni infra/ ni infra-prod/): no se verifico infraestructura porque no hay ninguna. Si el proyecto tampoco las va a tener, borra este paso y las entradas de terraform de .github/dependabot.yml"
-            exit 0
-          fi
-          echo "raices de Terraform encontradas: ${RAICES[*]}"
-
-          # La gravedad se DERIVA del reloj, y se deriva ANTES de mirar si hay
-          # binario: el binario ausente comparte la ventana con los otros dos
-          # fallos, no queda fuera de ella.  Las dos fechas son ISO, asi que la
-          # comparacion de texto ordena igual que la de calendario.
-          HOY="$(date -u +%F)"
-          if [ "${HOY}" \> "${VENTANA_TERRAFORM}" ]; then
-            GRAVEDAD="error"
-          else
-            GRAVEDAD="warning"
-            echo "::notice::verificacion de Terraform en modo aviso hasta el ${VENTANA_TERRAFORM} (hoy es ${HOY}). Despues de esa fecha un fallo de fmt, de validate o la ausencia del binario detienen el CI sin que nadie toque este archivo"
-          fi
-
-          if ! command -v terraform >/dev/null 2>&1; then
-            echo "::${GRAVEDAD}::hay raices de Terraform (${RAICES[*]}) y este runner no trae el binario, asi que NO se verifico formato ni validez. Arreglo: agregar antes de este paso hashicorp/setup-terraform pinado por SHA — el encabezado de este paso trae los dos comandos que resuelven el SHA sin inventarlo"
-            if [ "${GRAVEDAD}" = "error" ]; then exit 1; fi
-            exit 0
-          fi
-          terraform version
-
-          HUBO_FALLO=0
-
-          # 1. FORMATO. Solo lee texto: ni providers, ni red, ni credenciales.
-          if ! terraform fmt -check -recursive -no-color "${RAICES[@]}"; then
-            echo "::${GRAVEDAD}::hay archivos de Terraform sin formatear (la lista esta arriba, un archivo por linea). Arreglo: corre 'terraform fmt -recursive ${RAICES[*]}' y commitea el resultado"
-            HUBO_FALLO=1
-          fi
-
-          # 2. VALIDEZ, raiz por raiz. El -backend=false es lo que la vuelve
-          # inerte: init resuelve providers y modulos y NO inicializa el state
-          # remoto, asi que el marcador del bucket no estorba.
-          for D in "${RAICES[@]}"; do
-            echo "::group::${D}: terraform init -backend=false && terraform validate"
-            if ! ( cd "${D}" && terraform init -backend=false -input=false -no-color && terraform validate -no-color ); then
-              echo "::endgroup::"
-              echo "::${GRAVEDAD}::terraform validate fallo en '${D}'. Reproducilo local con: cd ${D} && terraform init -backend=false && terraform validate"
-              HUBO_FALLO=1
-              continue
-            fi
-            echo "::endgroup::"
-          done
-
-          if [ "${HUBO_FALLO}" -eq 1 ] && [ "${GRAVEDAD}" = "error" ]; then exit 1; fi
 
       # -------------------------------------------------------------------
       # POR QUE NO HAY `pnpm -r typecheck` / `-r test` / `-r build` ACA
@@ -576,11 +478,11 @@ jobs:
       #      paso NO abre esa compuerta: sobre el total, el 80 del marco es
       #      piso duro y el umbral local solo puede subirlo.
       #
-      #      Este plano se estrena con VENTANA DE GRACIA hasta el 2026-09-30:
-      #      hasta ese dia, un paquete por debajo del minimo SIN declaracion
-      #      avisa en vez de detener, y la corrida grita la fecha. Despues es
-      #      rojo sin que nadie toque nada. Si este repo ya tiene un paquete en
-      #      deuda, ese es el plazo real para subirlo o declararla.
+      #      Este plano NO tiene ventana de gracia: un paquete por debajo del
+      #      minimo SIN declaracion es rojo desde el primer PR, cualquier dia.
+      #      Si este repo ya tiene un paquete en deuda, el arreglo es subirlo o
+      #      declarar la deuda con su motivo y su fecha en el package.json del
+      #      paquete; la corrida lo dice con esas palabras.
       #
       # El piso es TRANSICION, no destino, y por eso lleva plazo: sin plazo
       # escrito el piso termina siendo el minimo de hecho. Paso de verdad,

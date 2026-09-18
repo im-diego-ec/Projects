@@ -1,74 +1,57 @@
-// BANCO DEL PASO QUE VERIFICA LAS RAICES DE TERRAFORM DEL ANDAMIO.
+// BANCO DEL PASO QUE VERIFICA LAS RAICES DE TERRAFORM.
 //
-// POR QUE EXISTE. El paso vive INLINE en el `run:` de
-// plantilla/.github/workflows/ci.yml, y hasta este cambio nada lo habia
-// ejecutado nunca: era una compuerta cuyo veredicto dependia de una comparacion
-// de fechas contra el reloj, escrita a mano y nunca corrida. Un paso asi puede
-// estar roto en la direccion mas cara —salir 0 cuando debia salir 1— durante
-// meses, porque en modo aviso el resultado observable de "funciona" y el de "no
-// hace nada" son el mismo.
+// DONDE VIVE EL PASO, Y POR QUE CAMBIO DE ARCHIVO. Hasta el change
+// la-ventana-se-cierra habia DOS copias del mismo paso: una inline en el job
+// build_test de plantilla/.github/workflows/ci.yml y otra en el job `terraform`
+// del workflow reusable (.github/workflows/marco-ci.yml). Este banco extraia la
+// del ANDAMIO, y la del reusable —la que corre en TODO consumidor— no tenia un
+// solo caso commiteado: el censo de pasos la daba por cubierta porque este
+// archivo menciona el mismo nombre (colision de nombre, declarada en el
+// encabezado del job). Las dos copias ya habian divergido: la del andamio no
+// tenia la guarda de raices vacias ni el recorte bajo pull_request_target, y se
+// salteaba justo en los PRs que solo tocan infra/ (build_test no corre en el
+// carril de docs, y ^infra/ es carril de docs).
+//
+// La copia del andamio se RETIRO: el ci.yml del andamio ya llama a marco-ci.yml,
+// cuyo job `terraform` mira las mismas raices por default. Este banco extrae
+// ahora el paso del REUSABLE, y el caso «el andamio no trae una segunda copia»
+// impide que vuelva.
 //
 // EL BANCO NO COPIA EL SCRIPT. Lo EXTRAE del YAML con el mismo extractor que usan
 // los otros bancos de pasos inline y lo corre contra arboles fabricados, con un
 // `terraform` falso cuyos codigos de salida controla el caso. Si el paso se
 // renombra o pierde su `run:`, el extractor tira y esto se pone rojo en vez de
-// dejar de probar en silencio — que es tambien lo que impide borrar el paso sin
-// que nada lo note.
+// dejar de probar en silencio.
 //
-// LO QUE VERIFICA, y son los cinco caminos que el paso tiene:
+// ── LA GRAVEDAD YA NO SALE DEL RELOJ, SALE DE LA LINEA MAYOR ───────────────
+// Hasta la 1.9.6 la gravedad de un hallazgo se derivaba comparando el dia de la
+// corrida con el input `ventana_terraform` (default 2026-09-30): avisaba hasta esa
+// fecha y detenia desde el dia siguiente, sin PR de bump de por medio. La decision
+// D9 del PO la cambio: en toda la linea 1 un hallazgo AVISA, el endurecimiento
+// queda anunciado para v2, y el input queda sin efecto hasta que v2 lo quite. El
+// motivo es que uno de los tres hallazgos —el binario ausente— NO se arregla en el
+// arbol del consumidor: lo que lo garantiza es un hashicorp/setup-terraform pinado
+// que este job todavia no lleva (decision D1: un arreglo fuera del arbol del
+// consumidor va en aviso o se trata como breaking).
+//
+// La gravedad la fija el env `GRAVEDAD_TERRAFORM` del paso —no es un input: la
+// decide la version que el consumidor pina—, y el bloque «LA LINEA MAYOR» de este
+// banco la ata al CHANGELOG: el PR que publique la 2.0.0 se pone rojo si el paso
+// sigue en aviso o si el input `ventana_terraform` sigue existiendo. Es lo que
+// hace que el anuncio de v2 no dependa de que alguien se acuerde.
+//
+// LO QUE VERIFICA, sobre el script extraido y con las dos gravedades:
 //   1. sin raices de Terraform, ::notice:: y verde — no hay nada que verificar;
-//   2. con raices y sin binario DENTRO de la ventana, ::warning:: y verde;
-//   3. con raices y sin binario con la VENTANA VENCIDA, ::error:: y ROJO;
-//   4. fmt o validate en rojo dentro de la ventana, ::warning:: y verde;
-//   5. fmt o validate en rojo con la ventana vencida, ::error:: y ROJO.
-//
-// ── LO QUE ESTE BANCO ASUMIA Y DEJO DE SER CIERTO ──────────────────────────
-// Estaba escrito como si Terraform APLICARA SIEMPRE: el camino 1 era "todavia no
-// hay infraestructura", un estado transitorio de camino a los otros cuatro. Desde
-// que el marco dejo de fijar la nube, ya no lo es. El proyecto declara su
-// plataforma —`supabase`, `cloudflare`, `gcp`, `aws` o `ninguna`— y hay dos
-// familias enteras para las que el camino 1 es el estado NORMAL Y PERMANENTE:
-// `ninguna`, que es una respuesta de primera clase y no un hueco, y cualquier
-// plataforma cuyo despliegue no pasa por Terraform. Para esos proyectos, este paso
-// no puede ponerse rojo NUNCA — ni siquiera vencida la ventana.
-//
-// Y el camino 1 no lo media: corria con la ventana por defecto (2999-12-31), o sea
-// DENTRO de la ventana, donde el paso no se pone rojo por nada. "Sale verde" era
-// verdad por el motivo equivocado. El caso 6 vence la ventana y ademas le saca el
-// binario, que es la unica forma de distinguir "el paso es inerte" de "la ventana
-// todavia lo tapa".
-//
-// LOS TRES CAMINOS QUE SE AGREGARON, todos sobre el mismo script extraido:
-//   6. `ninguna`: sin raices, ventana VENCIDA y sin binario -> verde y sin error;
-//   7. una plataforma sin Terraform (archivos de otro proveedor en el arbol) no
-//      inventa raices: mismo camino 1, verde;
-//   8. LA TRAMPA, medida: un `infra/` que quedo con documentacion y sin un solo
-//      `.tf` SIGUE contando como raiz, porque el paso mira si el DIRECTORIO
-//      existe. Vencida la ventana y sin binario, eso es ROJO en un proyecto que
-//      no usa Terraform. Es la razon por la que infra/adaptadores.md dice que al
-//      elegir una plataforma sin Terraform se borra el directorio ENTERO y ese
-//      archivo se mueve a la raiz.
-//
-// ── EL PISO DE ARRIBA, QUE ES DONDE ESTABA EL AGUJERO DE VERDAD ────────────
-// Los caminos 6, 7 y 8 corren sobre arboles FABRICADOS. Eso los deja probar la
-// logica del paso y, exactamente por eso, NO prueban nada sobre el andamio: un
-// caso que arma `raices: []` demuestra que "un repo sin raices sale verde", no
-// que el repo que `projects init` produce sea uno de esos. Durante una ronda el
-// andamio declaro `plataforma: "ninguna"` MIENTRAS repartia las dos raices de
-// Terraform, y las 17 pruebas de este archivo siguieron verdes: ninguna comparaba
-// la clave declarada contra lo que hay en el disco de plantilla/.
-//
-// Por eso el bloque del final compara las dos mitades —lo que el andamio DICE y
-// lo que REPARTE— y ademas corre el paso extraido contra el reparto REAL, no
-// contra uno inventado. Si vuelven a separarse, esto se pone rojo antes de que
-// nadie instancie nada.
-//
-// EL CAMINO 3 ES EL QUE HABIA QUE ESCRIBIR Y MEDIR. Antes, el binario ausente
-// salia 0 con un aviso PARA SIEMPRE, sin importar la fecha: bastaba con que la
-// imagen del runner dejara de traer terraform para que el paso pasara en verde
-// sin haber verificado nada, indefinidamente. Los dos README de infra prometen
-// que despues de la ventana esto se pone rojo solo; este banco es lo que mide
-// que la promesa sea cierta tambien cuando falta el binario.
+//   2. con raices y sin binario en aviso (la linea 1), ::warning:: y verde;
+//   3. con raices y sin binario con gravedad error (la v2), ::error:: y ROJO;
+//   4. fmt o validate en rojo en aviso, ::warning:: y verde;
+//   5. fmt o validate en rojo con gravedad error, ::error:: y ROJO;
+//   6-8. la plataforma: `ninguna`, otra plataforma y la trampa del infra/ vacio;
+//   9. raices_terraform declarado vacio: ::error:: y ROJO en las dos gravedades;
+//  10. bajo pull_request_target, solo formato y el recorte anunciado;
+//  11. el input ventana_terraform declarado: ::notice:: de que no tiene efecto;
+//  12. una gravedad invalida en el env: ::error:: y ROJO;
+//  13. el dia de la corrida no cambia el veredicto.
 //
 // LO QUE ESTE BANCO NO PUEDE. No corre Terraform de verdad: el binario es falso
 // y lo que se mide es la LOGICA DE GRAVEDAD del paso, no que `terraform validate`
@@ -81,19 +64,42 @@ import os from "node:os";
 import path from "node:path";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
-import { scriptDelPaso } from "../marco-ci/extraer.mjs";
+import { RUTA_WORKFLOW, scriptDelPaso } from "../marco-ci/extraer.mjs";
 
 const RAIZ = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
-const CI = path.join(RAIZ, "plantilla", ".github", "workflows", "ci.yml");
+const CI_ANDAMIO = path.join(RAIZ, "plantilla", ".github", "workflows", "ci.yml");
 const PASO = "Formato y validez de las raices de Terraform";
 
-const script = scriptDelPaso(PASO, CI);
-const yaml = fs.readFileSync(CI, "utf8");
+const script = scriptDelPaso(PASO, RUTA_WORKFLOW);
+const marco = fs.readFileSync(RUTA_WORKFLOW, "utf8");
+const andamio = fs.readFileSync(CI_ANDAMIO, "utf8");
 
 // PATH sin el bin falso: es el escenario "el runner no trae terraform". Se
 // declara aca y se comprueba abajo, porque si la maquina que corre el banco
 // tuviera terraform en /usr/bin el caso 3 probaria otra cosa.
 const PATH_PELADO = "/usr/bin:/bin";
+
+/** Las lineas del bloque `env:` del paso, entre su `- name:` y su `run:`. */
+function envDelPaso(texto = marco) {
+  const lineas = texto.split("\n");
+  const inicio = lineas.findIndex((l) => l.trim() === `- name: ${PASO}`);
+  if (inicio === -1) return [];
+  const env = [];
+  for (let i = inicio + 1; i < lineas.length; i++) {
+    if (/^\s*run: \|/.test(lineas[i]) || /^\s*- name: /.test(lineas[i])) break;
+    env.push(lineas[i]);
+  }
+  return env;
+}
+
+/** La gravedad que el paso DECLARA en su env, o null si no la declara. */
+function gravedadDeclarada(texto = marco) {
+  for (const l of envDelPaso(texto)) {
+    const m = /^\s*GRAVEDAD_TERRAFORM:\s*["']?([^"'\s#]+)["']?\s*(?:#.*)?$/.exec(l);
+    if (m) return m[1];
+  }
+  return null;
+}
 
 /** Un directorio con un `terraform` falso cuyos rc los decide el caso. */
 function binFalso(dir, { fmt = 0, init = 0, validate = 0 } = {}) {
@@ -119,19 +125,42 @@ function binFalso(dir, { fmt = 0, init = 0, validate = 0 } = {}) {
   return bin;
 }
 
+/** Un `date` falso que contesta siempre el mismo dia: es como se mide que el
+ *  veredicto no depende del reloj sin esperar a que pase el calendario. */
+function relojFalso(dir, fecha) {
+  const reloj = path.join(dir, "reloj");
+  fs.mkdirSync(reloj, { recursive: true });
+  const ruta = path.join(reloj, "date");
+  fs.writeFileSync(ruta, `#!/bin/sh\necho "${fecha}"\n`);
+  fs.chmodSync(ruta, 0o755);
+  return reloj;
+}
+
 /**
- * Corre el script del paso sobre un arbol fabricado.
+ * Corre un script del paso sobre un arbol fabricado.
  *
- * `raices` son los directorios de Terraform que existen; `ventana` es el valor
- * de VENTANA_TERRAFORM, que en el workflow llega por `env:`. `conBinario` en
- * false deja el PATH sin el falso, que es el escenario del runner pelado.
+ * `raices` son los directorios de Terraform que existen; `gravedad` es el valor
+ * de GRAVEDAD_TERRAFORM, que en el workflow llega por `env:`; `declaradas` es el
+ * input raices_terraform y `ventana` el input ventana_terraform, que en la linea 1
+ * ya no tiene efecto. `conBinario` en false deja el PATH sin el falso, que es el
+ * escenario del runner pelado. `fecha`, si viene, pone un `date` falso adelante.
  *
  * `archivos` escribe rutas sueltas (clave = ruta relativa con "/", valor =
  * contenido) SIN crear ningun `.tf`. Es lo que hace medibles los arboles de una
- * plataforma que no usa Terraform: un `wrangler.toml`, un `supabase/config.toml`
- * o un `infra/` que quedo solo con documentacion.
+ * plataforma que no usa Terraform.
  */
-function correr({ raices = [], archivos = {}, ventana = "2999-12-31", conBinario = true, rc = {} } = {}) {
+function correr({
+  raices = [],
+  archivos = {},
+  gravedad = "warning",
+  declaradas = "infra infra-prod",
+  ventana = "",
+  evento = "pull_request",
+  conBinario = true,
+  rc = {},
+  fecha = null,
+  texto = script,
+} = {}) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "projects-tf-"));
   for (const r of raices) {
     fs.mkdirSync(path.join(dir, r), { recursive: true });
@@ -143,12 +172,16 @@ function correr({ raices = [], archivos = {}, ventana = "2999-12-31", conBinario
     fs.writeFileSync(abs, contenido);
   }
   const bin = binFalso(dir, rc);
-  const res = spawnSync("bash", ["-c", script], {
+  const delante = fecha ? `${relojFalso(dir, fecha)}:` : "";
+  const res = spawnSync("bash", ["-c", texto], {
     cwd: dir,
     encoding: "utf8",
     env: {
-      PATH: conBinario ? `${bin}:${PATH_PELADO}` : PATH_PELADO,
+      PATH: `${delante}${conBinario ? `${bin}:${PATH_PELADO}` : PATH_PELADO}`,
+      RAICES_DECLARADAS: declaradas,
       VENTANA_TERRAFORM: ventana,
+      GRAVEDAD_TERRAFORM: gravedad,
+      EVENTO: evento,
       HOME: dir,
     },
   });
@@ -156,29 +189,58 @@ function correr({ raices = [], archivos = {}, ventana = "2999-12-31", conBinario
   return { code: res.status, salida: `${res.stdout}${res.stderr}` };
 }
 
+/** Las anotaciones de una salida, para comparar dos corridas sin el ruido del log. */
+const anotaciones = (salida) => salida.split("\n").filter((l) => /^::(notice|warning|error)/.test(l));
+
 // ---------------------------------------------------------------------------
-// 0 · QUE EL BANCO ESTE MIDIENDO ALGO
+// 0 · QUE EL BANCO ESTE MIDIENDO ALGO, Y SOBRE LA UNICA COPIA
 // ---------------------------------------------------------------------------
 
-test("terraform · el extractor encontro el paso y el script no salio vacio", () => {
+test("terraform · el extractor encontro el paso del reusable y el script no salio vacio", () => {
   assert.ok(script.length > 400, `el script salio de ${script.length} caracteres: el extractor fallo`);
   assert.match(script, /terraform fmt -check/, "el script tiene que correr fmt -check");
-  assert.match(script, /-backend=false/, "el init tiene que ser inerte");
-  assert.match(script, /VENTANA_TERRAFORM/, "la gravedad tiene que derivarse de la ventana");
+  assert.match(script, /-backend=false/, "el init no puede inicializar el state remoto");
+  assert.match(script, /GRAVEDAD_TERRAFORM/, "la gravedad tiene que salir del env del paso");
 });
 
-test("terraform · el paso vive dentro del job build_test y no suelto", () => {
-  const deBuildTest = yaml.indexOf("\n  build_test:");
-  const delPaso = yaml.indexOf(`- name: ${PASO}`);
-  assert.ok(deBuildTest > 0, "no existe el job build_test en el ci.yml del andamio");
-  assert.ok(delPaso > deBuildTest, "el paso de Terraform quedo fuera del job build_test");
-  const siguienteJob = yaml.slice(deBuildTest + 1).search(/\n {2}[a-z_]+:\n/);
-  assert.ok(delPaso - deBuildTest < siguienteJob, "el paso de Terraform cayo en otro job");
+test("terraform · el paso vive dentro del job terraform del reusable y no suelto", () => {
+  const delJob = marco.indexOf("\n  terraform:\n");
+  const delPaso = marco.indexOf(`- name: ${PASO}`);
+  const delSiguiente = marco.indexOf("\n  marco_ok:\n");
+  assert.ok(delJob > 0, "no existe el job terraform en marco-ci.yml");
+  assert.ok(delPaso > delJob && delPaso < delSiguiente, "el paso de Terraform quedo fuera del job terraform");
 });
 
-test("terraform · la ventana es UNA fecha ISO y vive solo en el env del paso", () => {
-  const marca = yaml.match(/VENTANA_TERRAFORM: "(\d{4}-\d{2}-\d{2})"/g) || [];
-  assert.equal(marca.length, 1, `la ventana esta escrita ${marca.length} veces: una sola declaracion o divergen`);
+test("terraform · el andamio NO trae una segunda copia del paso, y si llama al reusable que lo corre", () => {
+  // UNA COPIA, UNA GRAVEDAD. La del andamio se retiro porque ya habia divergido
+  // de la del reusable y porque su gravedad no tenia linea mayor que la
+  // endureciera: el andamio se copia una vez y despues es del proyecto. Se mira
+  // el YAML sin sus comentarios: el comentario que explica DONDE vive ahora la
+  // verificacion nombra los comandos, y eso no es una copia.
+  const codigo = andamio
+    .split("\n")
+    .filter((l) => !/^\s*#/.test(l))
+    .join("\n");
+  const copias = [
+    [`- name: ${PASO}`, "el paso con su nombre"],
+    ["terraform fmt", "un terraform fmt inline"],
+    ["terraform validate", "un terraform validate inline"],
+    ["VENTANA_TERRAFORM", "la ventana de Terraform"],
+    ["GRAVEDAD_TERRAFORM", "la gravedad de Terraform"],
+  ].filter(([aguja]) => codigo.includes(aguja));
+  assert.deepEqual(
+    copias.map(([, que]) => que),
+    [],
+    "plantilla/.github/workflows/ci.yml volvio a traer su propia verificacion de Terraform. La verificacion vive en el " +
+      "job `terraform` de marco-ci.yml, que el ci.yml del andamio ya llama y que mira infra/ e infra-prod/ por default; " +
+      "una segunda copia diverge (ya divergio una vez) y su gravedad no sigue la linea mayor del marco. Arreglo: " +
+      "borrala del andamio y, si le falta algo al job del reusable, agregalo ahi",
+  );
+  assert.match(andamio, /\/Projects\/\.github\/workflows\/marco-ci\.yml@/, "el andamio dejo de llamar a marco-ci.yml: sin eso nadie verifica sus raices");
+  const porDefault = /^ {6}raices_terraform:\s*$[\s\S]*?^ {8}default:\s*"([^"]*)"/m.exec(marco)?.[1] ?? "";
+  for (const r of ["infra", "infra-prod"]) {
+    assert.ok(porDefault.split(/\s+/).includes(r), `el default de raices_terraform ya no incluye ${r}, que es una raiz que el andamio reparte`);
+  }
 });
 
 test("terraform · el escenario del runner pelado es medible en esta maquina", () => {
@@ -190,7 +252,7 @@ test("terraform · el escenario del runner pelado es medible en esta maquina", (
 });
 
 // ---------------------------------------------------------------------------
-// LOS CINCO CAMINOS
+// LOS CAMINOS, CON LAS DOS GRAVEDADES
 // ---------------------------------------------------------------------------
 
 test("terraform · 1 · sin raices no verifica nada, lo dice y sale verde", () => {
@@ -200,29 +262,20 @@ test("terraform · 1 · sin raices no verifica nada, lo dice y sale verde", () =
   assert.doesNotMatch(salida, /::error::/);
 });
 
-// ---------------------------------------------------------------------------
-// LA PLATAFORMA: los caminos que aparecieron cuando el marco dejo de fijar la nube
-// ---------------------------------------------------------------------------
-
-test("terraform · 6 · `ninguna`: sin raices, VENTANA VENCIDA y sin binario, sigue verde", () => {
-  // El caso 1 corria dentro de la ventana, que es donde el paso no se pone rojo
-  // por nada: "salio verde" no distinguia entre un paso inerte y uno tapado por
-  // la fecha. Aca la ventana esta vencida Y no hay binario —las dos condiciones
-  // que en el caso 3 dan ROJO— y tiene que seguir verde, porque no hay
-  // infraestructura que verificar. Es la garantia que vuelve a `ninguna` una
-  // respuesta de primera clase: un proyecto que no despliega no amanece rojo el
-  // dia que vence una ventana que no lo nombra.
-  const { code, salida } = correr({ raices: [], ventana: "2000-01-01", conBinario: false });
-  assert.equal(code, 0, "un repositorio sin raices de Terraform no puede ponerse rojo, ni vencida la ventana");
+test("terraform · 6 · `ninguna`: sin raices, gravedad error y sin binario, sigue verde", () => {
+  // Las dos condiciones que en el caso 3 dan ROJO —gravedad de la v2 y runner sin
+  // binario— y tiene que seguir verde, porque no hay infraestructura que
+  // verificar. Es la garantia que vuelve a `ninguna` una respuesta de primera
+  // clase: un proyecto que no despliega no amanece rojo el dia que el marco
+  // endurezca una verificacion que no lo nombra.
+  const { code, salida } = correr({ raices: [], gravedad: "error", conBinario: false });
+  assert.equal(code, 0, "un repositorio sin raices de Terraform no puede ponerse rojo, ni con la gravedad de la v2");
   assert.match(salida, /::notice::no hay raices de Terraform/);
   assert.doesNotMatch(salida, /::error::/);
   assert.doesNotMatch(salida, /::warning::/, "no hay nada de que avisar: no falta un binario que no hace falta");
 });
 
 test("terraform · 7 · una plataforma sin Terraform no inventa raices", () => {
-  // El arbol de un proyecto que eligio otra plataforma: su configuracion de
-  // despliegue existe, y NO es Terraform. El paso mira `infra` e `infra-prod` y
-  // nada mas, asi que esto tiene que leerse igual que un repositorio vacio.
   const { code, salida } = correr({
     raices: [],
     archivos: {
@@ -230,7 +283,7 @@ test("terraform · 7 · una plataforma sin Terraform no inventa raices", () => {
       "supabase/config.toml": "[db]\nport = 54322\n",
       "adaptadores.md": "# Adaptadores de plataforma\n",
     },
-    ventana: "2000-01-01",
+    gravedad: "error",
     conBinario: false,
   });
   assert.equal(code, 0);
@@ -240,97 +293,217 @@ test("terraform · 7 · una plataforma sin Terraform no inventa raices", () => {
 
 test("terraform · 8 · TRAMPA: un `infra/` sin un solo .tf sigue contando como raiz", () => {
   // LO QUE SE MIDE ACA ES EL COMPORTAMIENTO DE HOY, no el deseado. El paso decide
-  // con `[ -d infra ]`: le alcanza con que el DIRECTORIO exista. Asi que un
-  // proyecto que eligio `supabase`, borro los `.tf` y se dejo `infra/` con la
-  // documentacion adentro queda exigiendo un binario de Terraform que no usa —y,
-  // vencida la ventana, con el CI rojo por infraestructura que no tiene.
-  //
-  // Por eso infra/adaptadores.md dice que al elegir una plataforma sin Terraform
-  // se borra el directorio ENTERO y ese archivo se mueve a la raiz: mientras el
-  // paso mire directorios y no archivos `.tf`, dejar la carpeta es la trampa.
-  //
-  // El arreglo de fondo esta en el paso y no aca: que la deteccion sea por
-  // presencia de `*.tf`. Cuando eso cambie, esta prueba se pone roja y hay que
-  // reescribirla — que es exactamente lo que se quiere de una trampa documentada.
-  const { code, salida } = correr({
-    raices: [],
-    archivos: { "infra/adaptadores.md": "# Adaptadores de plataforma\n" },
-    ventana: "2000-01-01",
-    conBinario: false,
-  });
-  assert.match(salida, /::error::hay raices de Terraform \(infra\)/);
-  assert.equal(code, 1, "hoy el directorio vacio de .tf basta para exigir Terraform: si esto salio 0, la deteccion cambio");
+  // con `[ -d infra ]`: le alcanza con que el DIRECTORIO exista. Por eso
+  // infra/adaptadores.md dice que al elegir una plataforma sin Terraform se borra
+  // el directorio ENTERO y ese archivo se mueve a la raiz. El arreglo de fondo esta
+  // en el paso: que la deteccion sea por presencia de `*.tf`. Cuando eso cambie,
+  // esta prueba se pone roja y hay que reescribirla.
+  const arbol = { raices: [], archivos: { "infra/adaptadores.md": "# Adaptadores de plataforma\n" }, conBinario: false };
+  const v2 = correr({ ...arbol, gravedad: "error" });
+  assert.match(v2.salida, /::error::hay raices de Terraform \(infra\)/);
+  assert.equal(v2.code, 1, "hoy el directorio vacio de .tf basta para exigir Terraform: si esto salio 0, la deteccion cambio");
+  const v1 = correr({ ...arbol, gravedad: "warning" });
+  assert.match(v1.salida, /::warning::hay raices de Terraform \(infra\)/, "en la linea 1 la trampa avisa, no calla");
+  assert.equal(v1.code, 0);
 });
 
-test("terraform · 2 · sin binario DENTRO de la ventana avisa y sale verde", () => {
-  const { code, salida } = correr({ raices: ["infra", "infra-prod"], ventana: "2999-12-31", conBinario: false });
+test("terraform · 2 · sin binario en AVISO (la linea 1) avisa y sale verde", () => {
+  const { code, salida } = correr({ raices: ["infra", "infra-prod"], gravedad: "warning", conBinario: false });
   assert.equal(code, 0);
   assert.match(salida, /::warning::hay raices de Terraform \(infra infra-prod\) y este runner no trae el binario/);
+  assert.match(salida, /::notice::verificacion de Terraform en modo aviso/, "el aviso tiene que decir que es aviso, y hasta cuando");
 });
 
-test("terraform · 3 · sin binario con la VENTANA VENCIDA es ROJO — el fail-open que se cerro", () => {
-  const { code, salida } = correr({ raices: ["infra", "infra-prod"], ventana: "2000-01-01", conBinario: false });
+test("terraform · 3 · sin binario con gravedad ERROR (la v2) es ROJO — el fail-open que no puede volver", () => {
+  const { code, salida } = correr({ raices: ["infra", "infra-prod"], gravedad: "error", conBinario: false });
   assert.match(salida, /::error::hay raices de Terraform \(infra infra-prod\) y este runner no trae el binario/);
-  assert.equal(code, 1, "vencida la ventana, no poder verificar tiene que detener el CI y no avisar");
+  assert.equal(code, 1, "con la gravedad de la v2, no poder verificar tiene que detener el CI y no avisar");
 });
 
-test("terraform · 4 · fmt y validate en rojo DENTRO de la ventana avisan y salen verde", () => {
-  const fmt = correr({ raices: ["infra"], ventana: "2999-12-31", rc: { fmt: 3 } });
+test("terraform · 4 · fmt y validate en rojo en AVISO avisan y salen verde", () => {
+  const fmt = correr({ raices: ["infra"], gravedad: "warning", rc: { fmt: 3 } });
   assert.equal(fmt.code, 0);
   assert.match(fmt.salida, /::warning::hay archivos de Terraform sin formatear/);
 
-  const val = correr({ raices: ["infra"], ventana: "2999-12-31", rc: { validate: 1 } });
+  const val = correr({ raices: ["infra"], gravedad: "warning", rc: { validate: 1 } });
   assert.equal(val.code, 0);
   assert.match(val.salida, /::warning::terraform validate fallo en 'infra'/);
 });
 
-test("terraform · 5 · fmt y validate en rojo con la ventana vencida son ROJO", () => {
-  const fmt = correr({ raices: ["infra"], ventana: "2000-01-01", rc: { fmt: 3 } });
+test("terraform · 5 · fmt y validate en rojo con gravedad ERROR son ROJO", () => {
+  const fmt = correr({ raices: ["infra"], gravedad: "error", rc: { fmt: 3 } });
   assert.match(fmt.salida, /::error::hay archivos de Terraform sin formatear/);
   assert.equal(fmt.code, 1);
 
-  const val = correr({ raices: ["infra", "infra-prod"], ventana: "2000-01-01", rc: { validate: 1 } });
+  const val = correr({ raices: ["infra", "infra-prod"], gravedad: "error", rc: { validate: 1 } });
   assert.match(val.salida, /::error::terraform validate fallo en 'infra'/);
   assert.match(val.salida, /::error::terraform validate fallo en 'infra-prod'/, "la segunda raiz se sigue mirando");
   assert.equal(val.code, 1);
 });
 
-test("terraform · con binario y todo en orden, verde y sin un solo aviso", () => {
-  const { code, salida } = correr({ raices: ["infra", "infra-prod"], ventana: "2000-01-01" });
-  assert.equal(code, 0);
-  assert.doesNotMatch(salida, /::error::/);
-  assert.doesNotMatch(salida, /::warning::/);
+test("terraform · con binario y todo en orden, verde y sin un solo aviso, en las dos gravedades", () => {
+  for (const gravedad of ["warning", "error"]) {
+    const { code, salida } = correr({ raices: ["infra", "infra-prod"], gravedad });
+    assert.equal(code, 0, `gravedad ${gravedad}`);
+    assert.doesNotMatch(salida, /::error::/);
+    assert.doesNotMatch(salida, /::warning::/);
+  }
 });
 
 // ---------------------------------------------------------------------------
-// QUE LA DERIVACION POR RELOJ MUERDA
+// LAS RAMAS DEL REUSABLE QUE NINGUN CASO EJERCITABA
 // ---------------------------------------------------------------------------
 
-test("terraform · la derivacion por reloj MUERDE: clavada en warning, el rojo desaparece", () => {
-  // Se muta el script EXTRAIDO, nunca el archivo del repo: se le saca la rama que
-  // deriva "error" del reloj, que es como se ve un arreglo que "simplifica" la
-  // compuerta hasta dejarla en aviso perpetuo. Los tres caminos rojos tienen que
-  // ponerse verdes; si alguno siguiera rojo, es que no dependia de la ventana.
-  const clavado = script.replace(/GRAVEDAD="error"/g, 'GRAVEDAD="warning"');
-  assert.notEqual(clavado, script, "la mutacion no encontro la rama de error");
+test("terraform · 9 · raices_terraform declarado VACIO es ROJO en las dos gravedades: no es un repo sin infra", () => {
+  for (const gravedad of ["warning", "error"]) {
+    const { code, salida } = correr({ raices: ["infra"], declaradas: "   ", gravedad });
+    assert.equal(code, 1, `gravedad ${gravedad}: un with: mal escrito no puede salir verde diciendo que no hay infraestructura`);
+    assert.match(salida, /::error::el input raices_terraform llego vacio/);
+    assert.doesNotMatch(salida, /::notice::no hay raices de Terraform/, "no puede afirmar que no hay raices");
+  }
+});
 
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "projects-tf-mut-"));
-  fs.mkdirSync(path.join(dir, "infra"), { recursive: true });
-  const bin = binFalso(dir, { fmt: 3 });
-  const conMutacion = spawnSync("bash", ["-c", clavado], {
-    cwd: dir,
-    encoding: "utf8",
-    env: { PATH: `${bin}:${PATH_PELADO}`, VENTANA_TERRAFORM: "2000-01-01", HOME: dir },
-  });
-  assert.equal(conMutacion.status, 0, "con la gravedad clavada en warning el paso tiene que dejar de detener");
+test("terraform · 10 · bajo pull_request_target verifica formato y NO validez, y lo anuncia", () => {
+  // validate rojo con gravedad error: si corriera, saldria 1. Bajo
+  // pull_request_target no puede correr (init descarga y validate ejecuta codigo
+  // elegido por el PR, con el token y los secretos del llamador).
+  const r = correr({ raices: ["infra"], gravedad: "error", evento: "pull_request_target", rc: { validate: 1 } });
+  assert.equal(r.code, 0, r.salida);
+  assert.match(r.salida, /::notice::bajo pull_request_target este paso verifica FORMATO y no validez/);
+  assert.doesNotMatch(r.salida, /terraform-falso init/, "init no puede correr bajo pull_request_target");
+  assert.doesNotMatch(r.salida, /terraform-falso validate/, "validate no puede correr bajo pull_request_target");
+  // Y el formato SI se mira.
+  const fmt = correr({ raices: ["infra"], gravedad: "error", evento: "pull_request_target", rc: { fmt: 3 } });
+  assert.equal(fmt.code, 1);
+  assert.match(fmt.salida, /::error::hay archivos de Terraform sin formatear/);
+});
 
-  const sinMutacion = spawnSync("bash", ["-c", script], {
-    cwd: dir,
-    encoding: "utf8",
-    env: { PATH: `${bin}:${PATH_PELADO}`, VENTANA_TERRAFORM: "2000-01-01", HOME: dir },
-  });
-  assert.equal(sinMutacion.status, 1, "sin la mutacion, el mismo arbol tiene que salir rojo");
-  fs.rmSync(dir, { recursive: true, force: true });
+test("terraform · 11 · el input ventana_terraform ya no tiene efecto, y quien lo pasa se entera", () => {
+  // Con la fecha que era el default, con una vencida, y con un valor que ni es
+  // fecha: el veredicto es el mismo que sin el input, y un ::notice:: le dice al
+  // consumidor que lo saque antes de que v2 lo quite (pasar un input que el
+  // reusable no declara rompe la llamada).
+  const sin = correr({ raices: ["infra"], gravedad: "warning", rc: { fmt: 3 } });
+  assert.doesNotMatch(sin.salida, /ventana_terraform/, "sin el input no hay nada que avisar sobre el");
+  for (const ventana of ["2026-09-30", "2000-01-01", "manana"]) {
+    const con = correr({ raices: ["infra"], gravedad: "warning", rc: { fmt: 3 }, ventana });
+    assert.equal(con.code, sin.code, `con ventana_terraform=${ventana} el veredicto cambio`);
+    assert.match(con.salida, /::notice::el input ventana_terraform llego como '[^']*' y ya no tiene efecto/);
+    assert.match(con.salida, /se quita en v2/);
+    assert.doesNotMatch(con.salida, /::error::/, `ventana_terraform=${ventana} no puede producir un error: el input no tiene efecto`);
+  }
+});
+
+test("terraform · 12 · una gravedad invalida en el env es ROJO, y dice que el defecto es del marco", () => {
+  for (const gravedad of ["", "rojo", "notice"]) {
+    const { code, salida } = correr({ raices: ["infra"], gravedad });
+    assert.equal(code, 1, `GRAVEDAD_TERRAFORM='${gravedad}' tiene que detener: un valor desconocido dejaria la compuerta en un lado sin decir cual`);
+    assert.match(salida, /::error::GRAVEDAD_TERRAFORM vale/);
+    assert.match(salida, /defecto DEL MARCO/);
+  }
+});
+
+test("terraform · 13 · el DIA de la corrida no cambia el veredicto", () => {
+  // Es la propiedad que la ventana violaba: el mismo arbol, con la misma
+  // version del marco, salia verde el 2026-09-30 y rojo el 2026-10-01. Con un
+  // `date` falso adelante en el PATH, dos dias opuestos tienen que dar el mismo
+  // codigo y las mismas anotaciones, en las dos gravedades.
+  for (const gravedad of ["warning", "error"]) {
+    const antes = correr({ raices: ["infra"], gravedad, rc: { fmt: 3 }, fecha: "2000-01-01", ventana: "2026-09-30" });
+    const despues = correr({ raices: ["infra"], gravedad, rc: { fmt: 3 }, fecha: "2999-12-31", ventana: "2026-09-30" });
+    assert.equal(antes.code, despues.code, `gravedad ${gravedad}: el codigo de salida dependio del dia`);
+    assert.deepEqual(anotaciones(antes.salida), anotaciones(despues.salida), `gravedad ${gravedad}: las anotaciones dependieron del dia`);
+  }
+});
+
+test("terraform · la gravedad declarada MUERDE: clavada en warning, el rojo de la v2 desaparece", () => {
+  // Se muta el script EXTRAIDO, nunca el archivo del repo: se le saca la linea que
+  // toma la gravedad del env, que es como se ve un arreglo que "simplifica" la
+  // compuerta hasta dejarla en aviso perpetuo. Con la mutacion, el arbol que con
+  // gravedad error sale rojo tiene que salir verde; si siguiera rojo, el rojo no
+  // dependia de la gravedad declarada.
+  const clavado = script.replace(/GRAVEDAD="\$\{GRAVEDAD_TERRAFORM\}"/, 'GRAVEDAD="warning"');
+  assert.notEqual(clavado, script, "la mutacion no encontro la linea que toma la gravedad del env");
+  const arbol = { raices: ["infra"], gravedad: "error", rc: { fmt: 3 } };
+  assert.equal(correr({ ...arbol, texto: clavado }).code, 0, "con la gravedad clavada en warning el paso tiene que dejar de detener");
+  assert.equal(correr(arbol).code, 1, "sin la mutacion, el mismo arbol con gravedad error tiene que salir rojo");
+});
+
+// ---------------------------------------------------------------------------
+// LA LINEA MAYOR: el anuncio de v2 no depende de que alguien se acuerde
+// ---------------------------------------------------------------------------
+
+/** El mayor de la version publicada mas reciente: la primera `## [X.Y.Z]` del
+ *  CHANGELOG. `[No publicado]` no matchea a proposito. */
+function mayorPublicada() {
+  const ch = fs.readFileSync(path.join(RAIZ, "CHANGELOG.md"), "utf8");
+  const m = ch.match(/^## \[(\d+)\.\d+\.\d+\]/m);
+  assert.ok(m, "CHANGELOG.md no tiene ninguna entrada `## [X.Y.Z]`: sin eso no hay linea mayor con que comparar");
+  return Number(m[1]);
+}
+
+/** Que le falta al paso para decir lo que su linea mayor promete. Vacio = coherente. */
+function problemasDeLinea({ mayor, gravedad, inputVentana }) {
+  const p = [];
+  if (mayor >= 2) {
+    if (gravedad !== "error") {
+      p.push(
+        `la ${mayor}.x se publico y el paso de Terraform sigue con GRAVEDAD_TERRAFORM=${gravedad}: la v2 anuncio que un hallazgo DETIENE. ` +
+          `Arreglo: GRAVEDAD_TERRAFORM: error en el env del paso de marco-ci.yml (y el hashicorp/setup-terraform pinado por SHA que ` +
+          `el encabezado del job describe, para que el binario ausente deje de ser un defecto del marco)`,
+      );
+    }
+    if (inputVentana) {
+      p.push(
+        `la ${mayor}.x se publico y el input ventana_terraform sigue declarado: la v2 lo quita. Arreglo: borralo de los inputs ` +
+          `de marco-ci.yml, del env del paso y del ejemplo del encabezado`,
+      );
+    }
+  } else {
+    if (gravedad !== "warning") {
+      p.push(
+        `en la linea ${mayor} el paso de Terraform tiene que AVISAR (decision D9: el endurecimiento va en v2) y declara ` +
+          `GRAVEDAD_TERRAFORM=${gravedad}. Endurecerlo dentro de la linea 1 pone rojo a un consumidor que mergea el bump sin ` +
+          `leerlo, por un binario que no puede arreglar en su arbol. Arreglo: GRAVEDAD_TERRAFORM: warning`,
+      );
+    }
+    if (!inputVentana) {
+      p.push(
+        `en la linea ${mayor} el input ventana_terraform tiene que seguir declarado (sin efecto): quitar un input es BREAKING ` +
+          `y rompe la llamada de todo consumidor que lo pase. Arreglo: devolverlo como no-op, se quita en v2`,
+      );
+    }
+  }
+  return p;
+}
+
+const INPUT_VENTANA = /^ {6}ventana_terraform:\s*$/m;
+
+test("terraform · la gravedad del paso y el input ventana_terraform siguen a la LINEA MAYOR del CHANGELOG", () => {
+  const gravedad = gravedadDeclarada();
+  assert.ok(gravedad, "el paso de Terraform no declara GRAVEDAD_TERRAFORM en su env: la gravedad no puede quedar implicita");
+  const problemas = problemasDeLinea({ mayor: mayorPublicada(), gravedad, inputVentana: INPUT_VENTANA.test(marco) });
+  assert.deepEqual(problemas, [], `\n${problemas.join("\n")}\n`);
+});
+
+test("terraform · la LINEA MAYOR MUERDE en las cuatro direcciones", () => {
+  // Sin esto, el caso de arriba podria ser una funcion que devuelve [] pase lo que
+  // pase. Las cuatro formas en que el paso y su linea se separan:
+  const casos = [
+    [{ mayor: 2, gravedad: "warning", inputVentana: false }, /sigue con GRAVEDAD_TERRAFORM=warning/],
+    [{ mayor: 2, gravedad: "error", inputVentana: true }, /el input ventana_terraform sigue declarado/],
+    [{ mayor: 1, gravedad: "error", inputVentana: true }, /tiene que AVISAR/],
+    [{ mayor: 1, gravedad: "warning", inputVentana: false }, /quitar un input es BREAKING/],
+  ];
+  for (const [estado, espera] of casos) {
+    const p = problemasDeLinea(estado);
+    assert.ok(p.some((x) => espera.test(x)), `${JSON.stringify(estado)} no fue detectado: ${JSON.stringify(p)}`);
+  }
+  // Los dos estados coherentes no disparan nada.
+  assert.deepEqual(problemasDeLinea({ mayor: 1, gravedad: "warning", inputVentana: true }), []);
+  assert.deepEqual(problemasDeLinea({ mayor: 2, gravedad: "error", inputVentana: false }), []);
+  // Y el lector del env no inventa: sin la linea, no hay gravedad declarada.
+  assert.equal(gravedadDeclarada(marco.replace(/^\s*GRAVEDAD_TERRAFORM:.*$/m, "")), null);
 });
 
 // ---------------------------------------------------------------------------
@@ -444,8 +617,8 @@ function repartoDelAndamio(raiz = ANDAMIO) {
  * repartir ninguna. No es una preferencia de estilo: el paso del CI decide con
  * `[ -d infra ]`, o sea que el disco MANDA sobre la clave. Una clave que dice
  * `ninguna` sobre un arbol con raices no es una inexactitud de documentacion, es
- * un repositorio que amanece rojo el dia que vence la ventana por infraestructura
- * que su propio registro dice que no tiene.
+ * un repositorio que exige un binario de Terraform —en aviso en la linea 1, en
+ * rojo desde v2— por infraestructura que su propio registro dice que no tiene.
  */
 function problemasDeCoherencia(plataforma, reparto) {
   const problemas = [];
@@ -468,8 +641,8 @@ function problemasDeCoherencia(plataforma, reparto) {
     problemas.push(
       `el andamio declara plataforma \`${plataforma}\` y reparte igual ${presentes.map((d) => `\`${d}/\``).join(" y ")}. ` +
         `El paso de Terraform del CI decide por el DISCO y no por esta clave, asi que el repositorio recien ` +
-        `nacido va a exigir un binario de Terraform que su plataforma no usa —y en rojo, en cuanto venza la ` +
-        `ventana—. Arreglo: o el andamio deja de repartir esas raices, o la clave dice \`aws\``,
+        `nacido va a exigir un binario de Terraform que su plataforma no usa —en aviso en la linea 1 y en rojo ` +
+        `desde v2—. Arreglo: o el andamio deja de repartir esas raices, o la clave dice \`aws\``,
     );
   }
   return problemas;
@@ -534,26 +707,32 @@ test("plataforma · la comprobacion de coherencia MUERDE", () => {
 
 test("plataforma · el paso corrido contra el reparto REAL hace lo que AGENTS.md promete", () => {
   // LOS CASOS 6, 7 Y 8 CORREN SOBRE ARBOLES INVENTADOS. Este corre el mismo
-  // script extraido sobre las raices que plantilla/ tiene de verdad, con la
-  // ventana vencida y sin binario, que es el escenario mas duro. No mide una
-  // preferencia: mide que la documentacion del repo que nace y el comportamiento
-  // del CI de ese repo digan lo mismo.
+  // script extraido sobre las raices que plantilla/ tiene de verdad, sin binario,
+  // que es el escenario mas duro, y con las DOS gravedades: la que el paso declara
+  // hoy y la de la v2. No mide una preferencia: mide que la documentacion del repo
+  // que nace y el comportamiento del CI de ese repo digan lo mismo.
   const presentes = Object.entries(repartoDelAndamio())
     .filter(([, n]) => n !== null)
     .map(([d]) => d);
-  const { code, salida } = correr({ raices: presentes, ventana: "2000-01-01", conBinario: false });
+  const hoy = correr({ raices: presentes, gravedad: gravedadDeclarada(), conBinario: false });
+  const v2 = correr({ raices: presentes, gravedad: "error", conBinario: false });
 
   if (plataformaDelAndamio() === "aws") {
     // El repositorio nace CON infraestructura, asi que este paso es una compuerta
-    // real y despues de la ventana detiene: o alguien agrega
-    // hashicorp/setup-terraform pinado por SHA, o borra las raices al elegir otra
-    // plataforma. Las dos salidas estan escritas en AGENTS.md y en infra/README.md;
-    // lo que no puede pasar es que el marco prometa verde y el paso de rojo.
-    assert.equal(code, 1, "el andamio reparte raices de Terraform: vencida la ventana este paso TIENE que detener");
-    assert.match(salida, /::error::hay raices de Terraform/);
+    // real: en la linea 1 avisa que no pudo verificar, y con la gravedad de la v2
+    // detiene. Las dos salidas —agregar hashicorp/setup-terraform pinado por SHA,
+    // o borrar las raices al elegir otra plataforma— estan escritas en AGENTS.md y
+    // en infra/README.md; lo que no puede pasar es que el marco prometa verde y el
+    // paso de rojo, ni que calle.
+    assert.match(hoy.salida, /::(warning|error)::hay raices de Terraform/, "el andamio reparte raices: sin binario, el paso no puede callar");
+    assert.equal(hoy.code, gravedadDeclarada() === "error" ? 1 : 0, "el codigo de salida no coincide con la gravedad declarada");
+    assert.equal(v2.code, 1, "el andamio reparte raices de Terraform: con la gravedad de la v2 este paso TIENE que detener");
+    assert.match(v2.salida, /::error::hay raices de Terraform/);
   } else {
-    assert.equal(code, 0, "el andamio no reparte raices: este paso no puede ponerse rojo ni vencida la ventana");
-    assert.match(salida, /::notice::no hay raices de Terraform/);
+    for (const r of [hoy, v2]) {
+      assert.equal(r.code, 0, "el andamio no reparte raices: este paso no puede ponerse rojo en ninguna gravedad");
+      assert.match(r.salida, /::notice::no hay raices de Terraform/);
+    }
   }
 });
 

@@ -235,6 +235,73 @@ mueve sobre un cambio incompatible.
   que te protege es que el texto de la versión que pinás no puede cambiar bajo el
   mismo número.
 
+- **`cobertura-diff` ya no tiene ventana de gracia: el total de un paquete no mira la
+  fecha de la corrida.** Hasta la 1.9.6, tres veredictos pasaban en amarillo hasta el
+  2026-09-30 y en rojo desde el 2026-10-01: un paquete por debajo del mínimo **sin deuda
+  declarada**, una métrica que el reporte lcov **no midió** (cero ítems y ningún
+  `FNF:`/`BRF:` declarado) y un **denominador más corto** que el que el propio reporte
+  declara. Los tres son rojos desde esta versión, cualquier día; la única fecha que la
+  action mira es la que el paquete declara en su deuda. La ventana existía porque el
+  marco se consumía por el tag móvil `v1`; desde la versión exacta, el aviso previo es el
+  PR de bump. Viene de Rigel 2.0.0 (commit `771ba2c`), y la cerró la decisión D9 del PO.
+
+  **Para consumidores — y esto te toca aunque no actualices:** tu pin `@v1.9.6` ya trae
+  la fecha adentro, así que **el 2026-10-01 esos tres veredictos se ponen rojos solos en
+  tu CI**, sin PR de por medio. Si ningún paquete tuyo está bajo el 80% sin deuda
+  declarada, no pasa nada. Si alguno lo está, el arreglo es el mismo con tu pin actual o
+  con esta versión: agregar pruebas hasta el mínimo, o declarar la deuda con su motivo y
+  su fecha en el `package.json` del paquete (`projects.cobertura.deuda = { "motivo": "…",
+  "fecha": "AAAA-MM-DD" }`); y si el rojo es de «no medida», que el reporter emita la
+  métrica (o declare `FNF:0`/`BRF:0` si de verdad no hay nada). Si esta versión se publica
+  antes del 2026-10-01, ese rojo se adelanta a tu PR de bump, que es donde se puede leer.
+
+- **El job `terraform` de `marco-ci.yml` avisa en toda la línea 1 y detiene desde v2: su
+  gravedad dejó de depender de una fecha.** Hasta la 1.9.6 un archivo sin formato, una
+  raíz que no valida o un runner sin el binario de `terraform` avisaban hasta el día que
+  decía el input `ventana_terraform` (default `2026-09-30`) y detenían desde el siguiente.
+  Uno de esos tres —el binario ausente— se arregla en el marco (le falta un
+  `hashicorp/setup-terraform` pinado), no en tu repo, así que por la decisión D9 del PO el
+  endurecimiento queda **anunciado para v2**, que se abre una sola vez con todos los
+  breaking. Un banco del marco impide publicar la 2.0.0 sin endurecerlo. El input
+  `ventana_terraform` sigue aceptándose **sin efecto**, con default vacío.
+
+  **Para consumidores — también te toca antes de actualizar:** con tu pin `@v1.9.6`, **el
+  2026-10-01 el job `terraform` pasa a detener**. Si tu repo no tiene `infra/` ni
+  `infra-prod/` (ni las raíces que declares en `raices_terraform`), no pasa nada. Si las
+  tiene, tenés tres salidas: arreglar lo que el job reporta hoy en su log (formato:
+  `terraform fmt -recursive <raíces>`; validez: `terraform init -backend=false &&
+  terraform validate` en cada raíz); **o** subir a esta versión, donde el job avisa hasta
+  v2; **o**, si todavía no podés subir, pasar `ventana_terraform: "<una fecha posterior>"`
+  en el `with:` del `uses:` de `marco-ci.yml` (en la 1.9.6 ese input sí tiene efecto). Si
+  el rojo es «este runner no trae el binario», el defecto es del marco y cualquiera de las
+  dos últimas lo evita. **Después de subir**, sacá `ventana_terraform` de tu `with:`: un
+  `::notice::` te lo recuerda en cada corrida, y en v2 el input se quita y pasarlo hace
+  fallar la corrida entera.
+
+  Ojo con la dirección: para un repo que sube a esta versión **después** del 2026-10-01,
+  el job **afloja** (de rojo en la 1.9.6 a aviso) hasta v2. Es deliberado (D9); los
+  hallazgos siguen saliendo como `::warning::` en el resumen de la corrida.
+
+### Eliminado
+
+- **El andamio ya no trae su propia copia del paso «Formato y validez de las raices de
+  Terraform».** Vivía inline en el job `build_test` de `plantilla/.github/workflows/ci.yml`
+  con su propia fecha (`VENTANA_TERRAFORM: "2026-09-30"`), ya divergida de la del marco y
+  salteada justo en los PRs que sólo tocan `infra/` (que son carril de docs). El `ci.yml`
+  del andamio ya llama a `marco-ci.yml`, cuyo job `terraform` mira `infra` e `infra-prod`
+  por default. `plantilla/AGENTS.md`, `plantilla/infra/README.md`,
+  `plantilla/infra-prod/README.md` y `plantilla/infra/adaptadores.md` lo dicen así.
+
+  **Para consumidores — parche manual, porque el andamio no viaja con el bump:** si tu
+  repo nació del andamio entre la 1.8.0 y la 1.9.6, su `.github/workflows/ci.yml` trae ese
+  paso con `VENTANA_TERRAFORM: "2026-09-30"`, y **el 2026-10-01 se endurece solo**, con
+  cualquier versión del marco que pines. Borrá el paso entero (desde el comentario «LA
+  INFRAESTRUCTURA TAMBIEN SE VERIFICA» hasta su último `fi`): el job `terraform` del
+  reusable hace la misma verificación y además corre en los PRs que sólo tocan `infra/`.
+  Si tus raíces se llaman distinto, declaralas en el input `raices_terraform` del
+  `uses:`. Para verificar: `grep -n "VENTANA_TERRAFORM" .github/workflows/ci.yml` no
+  devuelve nada.
+
 ### Corregido
 
 - **Cinco páginas seguían prometiendo una publicación automática que ya no ocurre**, y
@@ -993,6 +1060,21 @@ mueve sobre un cambio incompatible.
   si el rojo aparece en tu PR de bump, el mensaje trae el change, la fecha y las tres
   salidas: escribir el veredicto, correr la fecha con el motivo escrito o descartar el
   change.
+
+- **Ninguna versión del marco se concede una ventana de gracia por datos.** Banco nuevo
+  `pruebas/ci-del-marco/sin-exigibilidad-futura.test.mjs` (de Rigel 2.0.0): ninguna
+  entrada del manifiesto del canónico declara `exigible_desde` posterior a `publicada`.
+  El mecanismo sigue disponible en la action `constitucion`; lo que el banco afirma es
+  que el marco no lo usa para sí.
+
+  **Para consumidores: nada.** Es un banco del repositorio del marco.
+
+- **La compuerta de fechas con dueño mira también el andamio y la asignación YAML de una
+  línea** (`VENTANA_X: "AAAA-MM-DD"`, también comentada), que era la forma exacta de la
+  fecha del andamio y la que no veía. Su anti-vacuidad corre sobre un árbol fabricado,
+  porque en el marco ya no queda ninguna fecha de gracia.
+
+  **Para consumidores: nada.** Es un banco del repositorio del marco.
 
 ### Corregido
 

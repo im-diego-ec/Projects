@@ -80,10 +80,8 @@ name: Marco CI (reusable)
 #       #   # default: el job lo mide igual y lo imprime en un ::notice::. Declarado,
 #       #   # un arbol distinto es rojo. Se copia de esa corrida, no se inventa.
 #       #   huella_openspec: ""
-#       #   # Raices de Terraform de ESTE repo, separadas por espacios, y el ultimo
-#       #   # dia en que un hallazgo avisa en vez de detener.
+#       #   # Raices de Terraform de ESTE repo, separadas por espacios.
 #       #   raices_terraform: "infra infra-prod"
-#       #   ventana_terraform: "2026-09-30"
 #
 #     build_test:
 #       name: build-test
@@ -262,18 +260,19 @@ on:
         default: "infra infra-prod"
       ventana_terraform:
         description: >-
-          Ultimo dia (ISO, YYYY-MM-DD) en que un hallazgo del job `terraform`
-          AVISA en vez de detener. A partir del dia siguiente el mismo hallazgo
-          es rojo, sin que nadie toque este archivo: la gravedad se deriva del
-          reloj y no de un checklist. La ventana existe porque para casi todo
-          consumidor la primera corrida de este job es tambien la primera vez
-          que alguien mira sus .tf, asi que el plazo es para arreglar lo que
-          reporte, no para decidir si se mira. Moverla hacia adelante es
-          declarar una postergacion: queda escrita en el ci.yml del consumidor,
-          con autor y fecha, en vez de vivir en la cabeza de alguien.
+          SIN EFECTO, y se quita en v2. Hasta la 1.9.6 era el ultimo dia (ISO)
+          en que un hallazgo del job `terraform` avisaba en vez de detener, con
+          default 2026-09-30. La gravedad de ese job dejo de depender del reloj
+          (change la-ventana-se-cierra, decision D9 del PO): en toda la linea 1
+          un hallazgo AVISA, y desde v2 detiene, sin fecha. Sigue declarado solo
+          para no romper la llamada de quien lo pasa en su with:, porque pasar
+          un input que el reusable no declara es un error de la corrida entera.
+          Si llega con valor, el job lo dice con un ::notice:: y no hace nada
+          mas con el. Arreglo para el consumidor: sacarlo del with: antes de
+          subir a v2.
         type: string
         required: false
-        default: "2026-09-30"
+        default: ""
       runner:
         description: >-
           Runner para todos los jobs de marco. TIENE que ser Linux x86-64, y el
@@ -4292,16 +4291,29 @@ jobs:
   # ::notice:: en vez de dejar el hueco callado. Ver la rama por evento del paso
   # de abajo y el bloque PULL_REQUEST_TARGET del encabezado del job cambios.
   #
-  # VENTANA DE GRACIA, derivada del reloj y no de un checklist: hasta el dia que
-  # diga el input `ventana_terraform` un hallazgo AVISA; a partir del siguiente
-  # detiene. Es lo que hace que este job entre en modo aviso para todo el mundo sin
-  # depender de que alguien lo apague despues.
+  # LA GRAVEDAD SALE DE LA LINEA MAYOR, NO DEL RELOJ. Hasta la 1.9.6 se derivaba
+  # comparando el dia de la corrida con el input `ventana_terraform` (default
+  # 2026-09-30): avisaba hasta esa fecha y detenia desde el dia siguiente, en el
+  # pipeline de cada consumidor y sin PR de bump de por medio. La decision D9 del
+  # PO (change la-ventana-se-cierra) la cambio: en TODA la linea 1 un hallazgo
+  # AVISA, el endurecimiento queda anunciado para v2 y el input queda sin efecto
+  # hasta que v2 lo quite. El motivo tiene nombre: uno de los tres hallazgos, el
+  # binario ausente, NO se arregla en el arbol del consumidor (lo arregla el
+  # setup-terraform pinado que este job todavia no lleva, ver abajo), y la
+  # decision D1 manda que un arreglo fuera del arbol del consumidor vaya en aviso
+  # o se trate como breaking.
+  #
+  # La gravedad la fija el env GRAVEDAD_TERRAFORM del paso. NO es un input: la
+  # decide la version que el consumidor pina, no el consumidor. Y lo que evita que
+  # el aviso sea perpetuo no es una fecha sino un banco:
+  # pruebas/andamio/terraform-en-ci.test.mjs la ata al CHANGELOG, asi que el PR
+  # que publique la 2.0.0 se pone rojo si este paso sigue en `warning` o si
+  # `ventana_terraform` sigue declarado. Y en la linea 1 se pone rojo al reves: si
+  # alguien lo endurece antes (breaking) o quita el input (breaking).
   #
   # EL BINARIO AUSENTE ES UN CASO DE FALLO, NO UN CASO NEUTRO, y comparte la misma
-  # ventana. "No pude verificar" no es "verifique y esta bien": avisar para siempre
-  # cuando falta el binario convierte este job en un verde perpetuo, y bastaria con
-  # que la imagen del runner dejara de traer terraform para que dejara de verificar
-  # sin que nadie se entere.
+  # gravedad. "No pude verificar" no es "verifique y esta bien": en la linea 1 se
+  # anuncia con un ::warning:: que dice de quien es el defecto, y desde v2 detiene.
   #
   # LO QUE FALTA PARA CERRAR EL LIMITE DE RAIZ, y ya NO es el SHA: el binario sale
   # HOY de la imagen del runner. Lo que lo garantiza es un
@@ -4326,33 +4338,25 @@ jobs:
   # el SHA de arriba ya resuelto. Mientras ese paso no exista, la rama "no hay
   # binario" de abajo es la que sostiene la promesa, y por eso no es neutra.
   #
-  # LA COPIA DEL ANDAMIO SIGUE EN PIE, A PROPOSITO Y NO POR OLVIDO. El mismo paso
-  # vive todavia inline en plantilla/.github/workflows/ci.yml, y su banco
-  # (pruebas/andamio/terraform-en-ci.test.mjs) lo EXTRAE de ahi por nombre: borrarlo
-  # sin tocar el banco lo pone rojo. Retirarlo es un cambio de dos archivos que no
-  # es este, y el comando que dice exactamente que hay que mover es:
-  #   grep -n 'Formato y validez de las raices de Terraform' plantilla/.github/workflows/ci.yml pruebas/andamio/terraform-en-ci.test.mjs
-  # Mientras las dos copias convivan, un repo del andamio verifica sus raices dos
-  # veces: cuesta segundos y no cambia ningun veredicto.
+  # LA COPIA DEL ANDAMIO SE RETIRO (change la-ventana-se-cierra). El mismo paso
+  # vivia inline en el job build_test de plantilla/.github/workflows/ci.yml, con
+  # su propia fecha (VENTANA_TERRAFORM: "2026-09-30" en su env) y ya divergido de
+  # este: sin la guarda de raices vacias, sin el recorte bajo pull_request_target,
+  # y salteado justo en los PRs que solo tocan infra/ (build_test no corre en el
+  # carril de docs). Su gravedad, ademas, no tenia linea mayor que la endureciera:
+  # el andamio se copia una vez y despues es del proyecto. El ci.yml del andamio
+  # llama a este reusable, y este job mira las mismas raices por default. El banco
+  # impide que la copia vuelva (caso «el andamio NO trae una segunda copia»).
   #
-  # ESTE PASO TODAVIA NO TIENE BANCO PROPIO, Y EL CHECK QUE VIGILA ESO LO DA POR
-  # CUBIERTO POR COLISION DE NOMBRE. Queda escrito aca porque es lo unico que se
-  # puede hacer desde este archivo, y porque un hueco que no esta escrito se
-  # redescubre a mano una auditoria por vez.
-  # `pruebas/marco-ci/cobertura-de-los-pasos.test.mjs` pregunta si ALGUN banco
-  # MENCIONA el nombre del paso; el banco de la copia del andamio menciona este
-  # mismo nombre porque la copia se llama igual, pero extrae su texto de
-  # plantilla/.github/workflows/ci.yml, que es otro archivo. O sea que el verde
-  # que hoy trae este paso lo compro esa coincidencia y no un caso que lo haya
-  # corrido: ninguna de sus ramas —ventana con forma invalida, raices declaradas
-  # vacias, sin raices en el arbol, sin binario, fmt rojo, validate rojo, el
-  # recorte por `pull_request_target`, y las dos gravedades de cada una— la
-  # ejercita un caso commiteado. La forma de verlo, sin creerle a este comentario:
-  #   node --test pruebas/marco-ci/cobertura-de-los-pasos.test.mjs
-  #   grep -n 'Formato y validez de las raices de Terraform' pruebas/andamio/terraform-en-ci.test.mjs
-  # y el arreglo es un banco propio en pruebas/marco-ci/ que extraiga ESTE paso de
-  # ESTE archivo —pruebas/marco-ci/extraer.mjs ya extrae por nombre sobre
-  # RUTA_WORKFLOW— y le corra las ramas con un `terraform` falso en el PATH.
+  # ESTE PASO TIENE BANCO, Y ES ESTE: pruebas/andamio/terraform-en-ci.test.mjs
+  # extrae ESTE paso de ESTE archivo (scriptDelPaso sobre RUTA_WORKFLOW) y le corre
+  # todas sus ramas con un `terraform` falso en el PATH y las dos gravedades: sin
+  # raices, raices declaradas vacias, sin binario, fmt rojo, validate rojo, el
+  # recorte por `pull_request_target`, el input ventana_terraform sin efecto, una
+  # gravedad invalida y el dia de la corrida. Hasta el change la-ventana-se-cierra
+  # ese banco extraia la copia del andamio, y el censo de
+  # pruebas/marco-ci/cobertura-de-los-pasos.test.mjs daba este paso por cubierto por
+  # COLISION de nombre: la mencion era de otro archivo. Ya no.
   # ---------------------------------------------------------------------------
   terraform:
     name: terraform
@@ -4382,22 +4386,41 @@ jobs:
         shell: bash
         env:
           RAICES_DECLARADAS: ${{ inputs.raices_terraform }}
+          # SIN EFECTO en la linea 1: se lee solo para avisarle a quien lo pasa que
+          # sobra. Se quita en v2.
           VENTANA_TERRAFORM: ${{ inputs.ventana_terraform }}
+          # La gravedad de un hallazgo, por LINEA MAYOR y no por reloj: `warning` en
+          # toda la 1.x (decision D9), `error` desde v2. No es un input. La ata al
+          # CHANGELOG pruebas/andamio/terraform-en-ci.test.mjs: el PR que publique la
+          # 2.0.0 se pone rojo si esto sigue en warning.
+          GRAVEDAD_TERRAFORM: warning
           EVENTO: ${{ github.event_name }}
         run: |
           set -euo pipefail
 
-          # La ventana se valida ANTES de usarse. Comparar fechas ISO como texto
-          # ordena igual que el calendario, pero solo si las dos SON fechas ISO: un
-          # valor con cualquier otra forma haria que la comparacion decidiera al azar
-          # y el job quedara clavado en aviso sin que nadie lo note.
-          if ! printf '%s' "${VENTANA_TERRAFORM}" | grep -qE '^[0-9]{4}-[0-9]{2}-[0-9]{2}$'; then
-            echo "::error::el input ventana_terraform llego como '${VENTANA_TERRAFORM}', que no es una fecha ISO YYYY-MM-DD. La gravedad de este job se decide comparando esa fecha con el reloj, asi que un valor con otra forma dejaria la compuerta clavada en un lado sin decir cual. Arreglo: escribi la fecha en el 'with:' del uses: de marco-ci.yml en tu ci.yml, o saca el input y deja el default"
-            exit 1
+          # EL INPUT ventana_terraform YA NO DECIDE NADA. Hasta la 1.9.6 fijaba el
+          # ultimo dia de aviso; la gravedad dejo de depender del reloj y el input
+          # quedo declarado solo para no romper la llamada de quien lo pasa. Se
+          # avisa ANTES de mirar raices, para que tambien se entere un repo sin
+          # infraestructura: el dia que v2 lo quite, su with: rompe la corrida.
+          if [ -n "${VENTANA_TERRAFORM}" ]; then
+            echo "::notice::el input ventana_terraform llego como '${VENTANA_TERRAFORM}' y ya no tiene efecto: la gravedad de este job dejo de depender de una fecha. En toda la linea 1 del marco un hallazgo AVISA y no detiene, y desde v2 detiene, sin fecha. El input se quita en v2, y pasar un input que el reusable no declara hace fallar la corrida entera. Arreglo: sacalo del 'with:' del uses: de marco-ci.yml en tu ci.yml"
           fi
 
-          # Y LA LISTA DE RAICES SE VALIDA IGUAL, por simetria y porque el fallo
-          # que evita es peor que el de la ventana. Sin esta guarda,
+          # LA GRAVEDAD SE VALIDA ANTES DE USARSE. La fija el env de este paso y no
+          # el consumidor, asi que un valor desconocido es un defecto del marco; y
+          # usarlo sin validar dejaria la compuerta clavada en un lado sin decir cual.
+          case "${GRAVEDAD_TERRAFORM}" in
+            warning | error) ;;
+            *)
+              echo "::error::GRAVEDAD_TERRAFORM vale '${GRAVEDAD_TERRAFORM}' y solo admite warning o error. Es un defecto DEL MARCO y no de tu repo: esa variable la fija el paso 'Formato y validez de las raices de Terraform' de marco-ci.yml y ningun consumidor la puede pasar. Arreglo: reportalo en el repositorio del marco; mientras tanto, pinar la version anterior del marco devuelve el job a un estado conocido"
+              exit 1
+              ;;
+          esac
+          GRAVEDAD="${GRAVEDAD_TERRAFORM}"
+
+          # Y LA LISTA DE RAICES SE VALIDA IGUAL, por simetria con la gravedad y
+          # porque el fallo que evita es el peor de los dos. Sin esta guarda,
           # `raices_terraform: ""` en el `with:` de un consumidor dejaba el bucle
           # de abajo sin nada que recorrer, el job salia VERDE en segundos y el
           # ::notice:: afirmaba "no hay raices de Terraform en este repositorio"
@@ -4425,15 +4448,11 @@ jobs:
           fi
           echo "raices de Terraform encontradas: ${RAICES[*]}"
 
-          # La gravedad se DERIVA del reloj, y se deriva ANTES de mirar si hay
-          # binario: el binario ausente comparte la ventana con los otros dos
-          # fallos, no queda fuera de ella.
-          HOY="$(date -u +%F)"
-          if [ "${HOY}" \> "${VENTANA_TERRAFORM}" ]; then
-            GRAVEDAD="error"
-          else
-            GRAVEDAD="warning"
-            echo "::notice::verificacion de Terraform en modo aviso hasta el ${VENTANA_TERRAFORM} (hoy es ${HOY}). Despues de esa fecha un fallo de fmt, de validate o la ausencia del binario detienen el CI sin que nadie toque ningun archivo"
+          # El modo aviso se ANUNCIA, y se anuncia ANTES de mirar si hay binario:
+          # el binario ausente comparte la gravedad con los otros dos fallos, no
+          # queda fuera de ella. Un aviso que no dice que es aviso se lee como verde.
+          if [ "${GRAVEDAD}" = "warning" ]; then
+            echo "::notice::verificacion de Terraform en modo aviso en toda la linea 1 del marco: un fallo de fmt, de validate o la ausencia del binario se anuncian como warning y no detienen el CI. Desde v2 detienen, sin fecha (anunciado en el CHANGELOG del marco, decision D9). El dia de la corrida no cambia nada"
           fi
 
           if ! command -v terraform >/dev/null 2>&1; then
@@ -4514,11 +4533,11 @@ jobs:
           # distribuidor no le compra ningun salteo. "skipped" aca significa que alguien
           # le puso un `if:`, y eso es apagarlo — la doc de GitHub dice que un job
           # salteado reporta Success, asi que esta linea es la que convierte el salteo
-          # en rojo. Mientras la ventana del input ventana_terraform siga abierta sus
-          # hallazgos avisan y el job termina en success igual, o sea que un rojo suyo
-          # antes de esa fecha significa que no pudo medir, no que encontro algo.
+          # en rojo. En toda la linea 1 sus hallazgos avisan y el job termina en
+          # success igual, o sea que un rojo suyo significa que no pudo medir (raices
+          # declaradas vacias, o una gravedad invalida), no que encontro algo.
           [ "${{ needs.terraform.result }}" = "success" ] || {
-            echo "::error::la verificacion de las raices de Terraform termino en '${{ needs.terraform.result }}'. Ese job corre siempre y no se puede saltear: si dice 'skipped' es que alguien le agrego un if:, y si dice 'failure' mira su log — dentro de la ventana de gracia sus hallazgos solo avisan, asi que un rojo ahi adentro es que NO PUDO medir"
+            echo "::error::la verificacion de las raices de Terraform termino en '${{ needs.terraform.result }}'. Ese job corre siempre y no se puede saltear: si dice 'skipped' es que alguien le agrego un if:, y si dice 'failure' mira su log — en la linea 1 del marco sus hallazgos solo avisan, asi que un rojo suyo es que NO PUDO medir"
             exit 1
           }
 

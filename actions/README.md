@@ -433,17 +433,16 @@ nada obliga a nadie mientras nadie lo toque.
 > y manda a arreglarlo **en el marco**, no en el manifiesto del proyecto: el
 > denominador declarado prueba que el reporter sí midió.
 
-> **Ventana de estreno, hasta el 2026-09-30.** Mientras dure, los dos veredictos
-> que **nadie escribió** —un paquete por debajo del mínimo que no declara deuda, y
-> una métrica que el reporte no midió— pasan en amarillo con un `::warning::` que
-> nombra el día en que serán rojos. La ventana nació cuando el canal era el tag
-> móvil `v1`: sin ella, la compuerta aparecía en el pipeline de cada consumidor sin
-> que nadie la hubiera leído. Con la versión exacta ese aviso previo es el PR de
-> bump, así que la ventana sobrevive a su causa y se cierra sola en su fecha. No
-> afloja lo que un paquete escribió y rompió —deuda vencida, retroceso, piso sin
-> datos, declaración inválida—, y se cierra sola: pasada la fecha, el mismo estado
-> es rojo sin que nadie toque una línea. La línea que separa las dos mitades es la
-> autoría del caso, no su gravedad.
+> **No hay ventana de estreno, y el día de la corrida no decide nada.** Hasta la
+> 1.9.6 los tres veredictos que **nadie escribió** —un paquete por debajo del mínimo
+> que no declara deuda, una métrica que el reporte no midió y un denominador más
+> corto que el declarado— pasaban en amarillo hasta el 2026-09-30. La ventana nació
+> cuando el canal era el tag móvil `v1`, que ponía la compuerta en el pipeline de
+> cada consumidor sin que nadie la hubiera leído; con la versión exacta ese aviso
+> previo es el PR de bump, así que se borró (change `la-ventana-se-cierra`). Los
+> tres son **rojos** desde la versión que la borró, igual que lo que un paquete
+> escribió y rompió. La única fecha que esta action mira es la que el propio
+> paquete declara en su deuda.
 
 El piso es el mecanismo de **transición** hacia el mínimo, no un sustituto de él,
 y por eso lleva plazo. Sin fecha, el piso termina siendo el mínimo de hecho, y eso

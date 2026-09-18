@@ -173,15 +173,13 @@ información del primer día, que es la peor que va a haber.
   aplica**: no hay nada desplegado que verificar.
 - **COSTO** — cero, y es cero de verdad y no cero hasta que caduque una promoción.
 - **PLAN GRATUITO** — no aplica.
-- **Qué hay que hacer en el repositorio** — cuatro pasos, y **hasta que estén hechos el CI
-  sigue exigiendo Terraform**, porque el job decide mirando si los directorios existen y no
-  la clave: (1) mover este archivo a la raíz y borrar `infra/` e `infra-prod/` enteros; (2)
-  borrar las dos entradas del ecosistema `terraform` de `.github/dependabot.yml`; (3)
-  opcionalmente borrar el paso «Formato y validez de las raíces de Terraform» del
-  `ci.yml` —sin raíces ya sale verde solo, y dejarlo puesto abarata volver a Terraform—; y
-  (4) poner `"plataforma": "ninguna"` en `.projects-valores.json`. Con el paso 1 hecho, ese
-  job dice `::notice::` y sale verde para siempre: no queda ninguna ventana que pueda
-  vencer.
+- **Qué hay que hacer en el repositorio** — tres pasos, y **hasta que estén hechos el CI
+  sigue exigiendo Terraform**, porque el job `terraform` del marco decide mirando si los
+  directorios existen y no la clave: (1) mover este archivo a la raíz y borrar `infra/` e
+  `infra-prod/` enteros; (2) borrar las dos entradas del ecosistema `terraform` de
+  `.github/dependabot.yml`; y (3) poner `"plataforma": "ninguna"` en
+  `.projects-valores.json`. Con el paso 1 hecho, ese job dice `::notice::` y sale verde
+  para siempre, en cualquier versión del marco: no depende de ninguna fecha.
 
 ### PENDIENTE-PLATAFORMA · ninguna · cuándo deja de alcanzar
 

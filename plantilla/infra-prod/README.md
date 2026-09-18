@@ -46,7 +46,9 @@ se revisa a mano: `grep -rn PENDIENTE-INFRA infra infra-prod`.
 ## Lo que el CI **sí** mira desde el primer PR
 
 El aviso de arriba es sobre los **pendientes**, no sobre el resto del archivo. El
-job `build-test` de `.github/workflows/ci.yml` corre en cada PR que toque código:
+job `terraform` del workflow del marco —el que `.github/workflows/ci.yml` llama en su
+primer job, `marco`— corre en cada PR, también en los que solo tocan `infra/`, y en
+cada push a `main`:
 
 ```bash
 terraform fmt -check -recursive infra infra-prod
@@ -59,20 +61,20 @@ tocar el bucket del state — que es justamente el pendiente 1. No hacen falta
 cuenta, credenciales ni que este repositorio se despliegue, y por eso son
 exigibles desde el día uno aunque los pendientes no tengan compuerta.
 
-Estrenan en **modo aviso hasta el 2026-09-30** y después se ponen rojas solas, sin
-que nadie toque el workflow: hasta hoy nada miraba estos archivos, así que la
-primera corrida es también la primera medición, y la ventana es el plazo para
-arreglar lo que reporte. Los mismos dos comandos corren en tu máquina sin
-credenciales.
+Corren en **modo aviso** —un fallo se anuncia en el resumen de la corrida y no
+bloquea el merge— en toda la versión 1 del marco, y **bloquean desde la versión
+2**. El cambio no depende de una fecha: llega con el PR de Dependabot que sube el
+marco a la versión 2, y las notas de esa versión lo dicen ahí mismo. Los mismos dos
+comandos corren en tu máquina sin credenciales.
 
-**Tres cosas se ponen rojas, no dos.** El binario de `terraform` sale hoy de la
-imagen del runner —al paso todavía le falta un `hashicorp/setup-terraform` pinado
+**Tres cosas se avisan, no dos.** El binario de `terraform` sale hoy de la imagen
+del runner —al job del marco todavía le falta un `hashicorp/setup-terraform` pinado
 por SHA—, así que _no encontrarlo_ es el tercer fallo y corre con **la misma
-ventana**: avisa hasta el 2026-09-30 y después detiene el CI. Es a propósito: si
-la ausencia del binario avisara para siempre, este paso pasaría en verde sin
-haber verificado nada el día que la imagen del runner dejara de traerlo, y «no
-pude verificar» se leería como «verifiqué y está bien». Mientras tanto, un
-`::warning::` en el resumen de la corrida dice cuál de los tres pasó.
+gravedad**: avisa en la versión 1 y detiene desde la 2. Es justamente el motivo de
+que la versión 1 entera avise: el arreglo del binario es del marco y no de este
+repositorio. Mientras tanto, un `::warning::` en el resumen de la corrida dice cuál
+de los tres pasó, así que «no pude verificar» nunca se lee como «verifiqué y está
+bien».
 
 ## El pendiente de alarmas no se puede copiar de nadie, y por eso está acá
 

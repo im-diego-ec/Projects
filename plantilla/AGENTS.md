@@ -135,20 +135,19 @@ cierra sola a los 6 meses**, o antes si se agotan los créditos, y después AWS 
 datos 90 días y los borra—, así que si el objetivo es coste cero, el adaptador se lee
 **antes** de quedarse con ésta.
 
-**Si se quiere sacar Terraform de acá**, son cuatro pasos, en este orden:
+**Si se quiere sacar Terraform de acá**, son tres pasos, en este orden:
 
 1. borrar `infra/` e `infra-prod/` enteros, después de mover `infra/adaptadores.md` a la
    raíz del repositorio — es lo único de ahí que sigue valiendo sin Terraform;
 2. borrar del `.github/dependabot.yml` las dos entradas del ecosistema `terraform`, que si
    no van a abrir PRs para actualizar un provider que ya nadie usa;
-3. borrar el paso «Formato y validez de las raíces de Terraform» de
-   `.github/workflows/ci.yml` (opcional: sin las raíces ese paso ya sale verde solo, y
-   dejarlo puesto es lo que hace barato volver a Terraform el día que haga falta);
-4. poner `"plataforma": "ninguna"` en `.projects-valores.json`.
+3. poner `"plataforma": "ninguna"` en `.projects-valores.json`.
 
-Hasta que el paso 1 esté hecho, **el job de Terraform del CI sigue exigiendo el binario**:
-decide mirando si los directorios existen, no la clave. Una vez borrados lo dice con un
-`::notice::` y sale verde, y ya no hay ninguna ventana de gracia que pueda vencer.
+Hasta que el paso 1 esté hecho, **el job `terraform` del CI sigue exigiendo el binario**
+—es del workflow del marco que `.github/workflows/ci.yml` llama, y en la versión 1 del
+marco avisa sin bloquear; desde la 2 bloquea—: decide mirando si los directorios existen,
+no la clave. Una vez borrados lo dice con un `::notice::` y sale verde en cualquier
+versión, y no depende de ninguna fecha.
 <!-- projects:fin-solo-si-hay-infra -->
 
 Los nombres de la fila **Package manager** son DIRECTORIOS y están escritos literales a

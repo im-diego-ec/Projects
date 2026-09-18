@@ -111,7 +111,7 @@ const CASTELLANO_CORRIENTE = {
   "plantilla/infra/README.md": {
     andamio: 'se usa como sustantivo comun y el contexto lo dice entero: "el andamio no reparte infraestructura sin verificar"',
     marcador: 'lo explica la frase que lo usa: "el marcador está dentro del nombre del bucket"',
-    "modo aviso": 'la propia linea dice que significa: "estrenan en modo aviso hasta el <fecha> y después se ponen rojas solas"',
+    "modo aviso": 'la propia linea dice que significa: "un fallo se anuncia en el resumen de la corrida y no bloquea el merge"',
   },
   "plantilla/infra-prod/README.md": {
     andamio: "igual que en infra/README.md: sustantivo comun",
