@@ -52,8 +52,9 @@ change —la propuesta escrita— que la decida. Hasta entonces se revisa a mano
 `grep -rn PENDIENTE-INFRA infra infra-prod`.
 
 Dos de los siete —el bucket del state y el identificador del cluster— se parecen
-más a un **dato del área** que a una decisión de este proyecto. Están como
-pendiente porque el andamio hoy no los sustituye. Si te toca resolverlos a mano,
+más a un **dato de la organización** que a una decisión de este proyecto, cuando
+la organización ya los tiene (si no, crearlos es infraestructura base y se
+pregunta antes). Están como pendiente porque el andamio hoy no los sustituye. Si te toca resolverlos a mano,
 anotalo: el arreglo de fondo es que pasen a ser valores y estos dos pendientes
 desaparezcan.
 

@@ -58,8 +58,8 @@ provider "aws" {
   }
 }
 
-# LA BASE ES COMPARTIDA Y NO SE CREA ACÁ. El área tiene un cluster por cuenta y
-# cada aplicación vive como una base dentro de él. Esto es una referencia de
+# LA BASE NO SE CREA ACÁ. Cada aplicación vive como una base dentro de un cluster
+# que existe fuera de este root (ver `pendientes.tf`, sección 2). Esto es una referencia de
 # lectura: si el cluster no existe, `plan` falla diciéndolo, que es lo correcto.
 #
 # PENDIENTE-INFRA: El identificador del cluster es un PENDIENTE — ver `pendientes.tf`, sección 2.

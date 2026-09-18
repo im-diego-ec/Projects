@@ -31,11 +31,12 @@
 # QUÉ FALTA   El nombre del bucket en el `backend "s3"` de `main.tf`.
 #
 # CÓMO SE DECIDE
-#   No se crea: el área tiene un bucket por cuenta compartido por los roots de
-#   sus aplicaciones, con `key` por proyecto —ya derivada—. Pedí el de la cuenta
-#   {{CUENTA_PROD}}. Tiene que ser DISTINTO del de dev.
-#   Igual que en dev: esto se parece más a un dato del área que a una decisión de
-#   este proyecto; si lo resolvés a mano, anotalo.
+#   Igual que en dev, según lo que la organización ya tenga en la cuenta
+#   {{CUENTA_PROD}}: un bucket de state que comparten otros roots —la `key` por
+#   proyecto ya está derivada— o ninguno, y entonces crearlo es infraestructura
+#   base que se pregunta antes. Tiene que ser DISTINTO del de dev.
+#   Si ya existe, es un dato de la organización y no una decisión de este
+#   proyecto; si lo resolvés a mano, anotalo.
 #
 # CUÁNDO SE RESUELVE   Al levantar PRODUCCIÓN por primera vez, antes que los demás
 #   que se resuelven ese día y por el mismo motivo que en dev: sin él no corre
@@ -51,9 +52,10 @@
 # QUÉ FALTA   El `cluster_identifier` del `data` de `main.tf`.
 #
 # CÓMO SE DECIDE
-#   Un cluster por cuenta, una base por aplicación. Este proyecto no crea
-#   cluster: hacerlo sale de la infraestructura base fijada, que es frontera ⚠️.
-#   El nombre de la base derivalo de {{PROYECTO}}.
+#   Igual que en dev: este root lee un cluster y no lo crea. Si la organización
+#   ya tiene uno en la cuenta de producción, pedí su identificador; si no, crearlo
+#   es infraestructura base (frontera ⚠️) y se pregunta antes. Una base por
+#   aplicación: el nombre de la base derivalo de {{PROYECTO}}.
 #   La conexión va con IAM, no con contraseña: el marco no guarda credenciales
 #   rotativas de base, y una capturada como variable de entorno del deploy ya
 #   tiró una aplicación del área.
@@ -61,7 +63,7 @@
 # CUÁNDO SE RESUELVE   Con el 1, y con las mismas dos tareas humanas del pendiente
 #   2 de dev —la base y su usuario dentro del cluster, y el grupo de seguridad en
 #   el puerto del motor—. En producción, además, cualquier escritura exige el OK
-#   explícito de @{{BUILDER_1}}.
+#   explícito de Builder 1.
 #
 # SI NO SE HACE   `plan` falla. Y "resolverlo" creando un cluster propio es
 #   apartarse de la base fijada sin preguntar.
@@ -149,7 +151,7 @@
 #   tiene que tolerar que se lo invoque dos veces con el mismo efecto, porque va a
 #   pasar.
 #
-# CUÁNDO SE RESUELVE   Con el 6 de dev: es la misma pregunta a @{{PO}} y se
+# CUÁNDO SE RESUELVE   Con el 6 de dev: es la misma pregunta al PO y se
 #   contesta una sola vez, antes de tocar infraestructura.
 #
 # SI NO SE HACE   Nada si el proyecto no los necesita — de ahí que borrar la

@@ -204,7 +204,7 @@ worktree de la rama del porte, corrida el 2026-09-17.
       antes del lote, `grep -c CUÁNDO plantilla/infra/pendientes.tf` → 0.
 
 - [x] **4.4** El pendiente nuevo **«La retención y la clase del grupo de logs del servicio»**:
-      `plantilla/infra/pendientes.tf:245` (7) y `plantilla/infra-prod/pendientes.tf:209` (8),
+      `plantilla/infra/pendientes.tf:252` (7) y `plantilla/infra-prod/pendientes.tf:211` (8),
       con el criterio condicional en dev y la clase casi fija en producción (design, D13).
       Medido contra la tabla «Supported features» de «Log classes» de la documentación de
       CloudWatch Logs el 2026-09-17: `Metric filters` → No, `GetLogEvents`/`FilterLogEvents` →
@@ -216,7 +216,7 @@ worktree de la rama del porte, corrida el 2026-09-17.
       citando el requirement— de lo que el negocio elige por encima, y ata la tercera al
       pendiente 8. Los encabezados de los dos `pendientes.tf` pasan a «estos pendientes no
       tienen compuerta» sin prometer que llega con el change del despliegue.
-      **Evidencia**: `plantilla/infra-prod/pendientes.tf:160` (alarmas) y los encabezados.
+      **Evidencia**: `plantilla/infra-prod/pendientes.tf:162` (alarmas) y los encabezados.
 
 - [x] **4.6** Los dos `README.md` cuentan siete y ocho, dicen las cuatro partes, nombran el
       pendiente de logs y el piso de alarmas.
@@ -296,6 +296,31 @@ worktree de la rama del porte, corrida el 2026-09-17.
 
 - [ ] **4.17** **La entrada del CHANGELOG.** Escrita como fragmento en
       `.porte/changelog/12-infra-exigible.md`; entra a `CHANGELOG.md` al integrar el porte.
+
+### 4.f — La revisión adversarial del carril (2026-09-18)
+
+- [x] **4.18** **Los «CUÁNDO SE RESUELVE» nombran el rol, no el handle** (RV-L12-01). Las
+      tres líneas que este lote había escrito con `@{{PO}}` (dev, pendiente 6; producción,
+      pendiente 6) y `@{{BUILDER_1}}` (producción, pendiente 2) dicen ahora «el PO», «al PO» y
+      «Builder 1»: `projects-init` sustituye el marcador una sola vez al nacer el proyecto, y
+      cada handle escrito es un lugar más que editar cuando se reasigna el rol (decisión D8
+      del PO). `grep -rn '@{{' plantilla/infra plantilla/infra-prod` → solo los tres
+      encabezados 🛑 de producción, anteriores a este change (ver 4.20).
+- [x] **4.19** **Los pendientes del bucket y del cluster dejan de afirmar la topología de un
+      área** (RV-L12-02). El fragmento y D12 decían que el bucket compartido por cuenta «era un
+      dato del área de origen, no del marco», y los pendientes 1 y 2 —en dev y en producción—
+      seguían diciendo «el área tiene un bucket por cuenta» y «un cluster por cuenta». Ahora
+      el «CÓMO SE DECIDE» es condicional: si la organización ya los tiene, se pide el dato; si
+      no, crearlos es infraestructura base, fuera de este root, y se pregunta antes. Lo mismo
+      en el comentario del `data "aws_rds_cluster"` de `plantilla/infra/main.tf` y en
+      `plantilla/infra/README.md`. El código no cambia: el root sigue LEYENDO el cluster.
+      `pruebas/andamio/` → `tests 187 / pass 187`.
+- [ ] **4.20** **Los tres encabezados 🛑 de producción siguen con `@{{BUILDER_1}}`**
+      (`plantilla/infra-prod/main.tf`, `pendientes.tf` y `README.md`, anteriores a este
+      change). **Motivo:** `AGENTS.md` manda usar los handles por rol en el andamio, y D8 pide
+      que reasignar un rol cueste editar un solo lugar; en un encabezado que dice a quién
+      pedirle el OK las dos reglas chocan, y cuál gana lo decide el PO para todo el andamio
+      (el `CODEOWNERS` de cada proyecto tiene el mismo problema), no este change.
 
 ## Lo que NO es tarea de este change, y está declarado
 

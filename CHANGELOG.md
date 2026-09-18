@@ -768,7 +768,10 @@ mueve sobre un cambio incompatible.
   pendiente con criterio y sin momento se lee como trabajo futuro sin dueño: en Rigel, el
   segundo consumidor llegó al bloque 7 de 14 con sus seis pendientes intactos (1.9.0,
   `dev-alcanzable`). El bucket del state sigue siendo pendiente y no pasa a marcador: era un
-  dato del área de origen, no del marco. Para consumidores: nada obligatorio. Es contenido del
+  dato del área de origen, no del marco. Por eso los pendientes del bucket y del cluster dejan
+  de afirmar que «el área» tiene uno por cuenta: si la organización ya lo tiene, se pide el
+  dato; si no, crearlo es infraestructura base y se pregunta antes. Y el «cuándo» nombra el
+  rol que contesta («el PO», «Builder 1»), no su handle. Para consumidores: nada obligatorio. Es contenido del
   andamio y no viaja solo; un repositorio nacido con la plataforma `aws` puede copiar a mano
   los párrafos «CUÁNDO SE RESUELVE» de la versión nueva de esos dos archivos.
 - **El pendiente de la retención y la clase del grupo de logs del servicio, en dev (7) y en

@@ -54,22 +54,27 @@
 #   `backend "s3"` de `main.tf`.
 #
 # CÓMO SE DECIDE
-#   NO se crea uno nuevo: el área tiene un bucket de state POR CUENTA que
-#   comparten los roots de todas sus aplicaciones, con una `key` por proyecto —la
-#   `key` ya está puesta y derivada del nombre del proyecto—. Pedí el nombre del
-#   bucket de la cuenta {{CUENTA_DEV}}, o leelo del `main.tf` de otro proyecto
-#   del área que ya esté desplegado.
+#   Depende de lo que tu organización ya tenga en la cuenta {{CUENTA_DEV}}, y eso
+#   se pregunta antes de escribir nada:
+#   · Si ya hay un bucket de state que comparten los roots de otras aplicaciones,
+#     este root va ahí: la `key` ya está puesta y derivada del nombre del
+#     proyecto, así que no pisa a nadie. Pedí el nombre a quien administra la
+#     cuenta, o leelo del `main.tf` de otro proyecto que ya esté desplegado.
+#   · Si no hay, el bucket es infraestructura base de la cuenta y no de este
+#     proyecto: se crea una vez, fuera de este root, y crearla se pregunta antes
+#     (frontera ⚠️).
 #
-#   Ojo: esto se parece más a un DATO del área que a una decisión de este
-#   proyecto. Si te toca resolverlo a mano, decilo en el registro de la adopción:
-#   el arreglo de fondo es que el andamio lo sustituya como valor y este pendiente
-#   deje de existir.
+#   Ojo: en el primer caso esto se parece más a un DATO de la organización que a
+#   una decisión de este proyecto. Si te toca resolverlo a mano, decilo en el
+#   registro de la adopción: el arreglo de fondo es que el andamio lo sustituya
+#   como valor y este pendiente deje de existir.
 #
 # CUÁNDO SE RESUELVE
 #   Al levantar el ambiente de dev por primera vez, y antes que los demás que se
 #   resuelven ese día: sin el bucket no corre `terraform init`, y sin `init` no se
-#   puede probar ninguno de los otros. Pedí el dato apenas se decida levantar dev:
-#   lo contesta quien administra la cuenta, no quien escribe el Terraform.
+#   puede probar ninguno de los otros. Preguntá apenas se decida levantar dev: si
+#   el bucket existe, el dato lo tiene quien administra la cuenta y no quien
+#   escribe el Terraform; si no existe, crearlo es la primera tarea de ese día.
 #
 # SI NO SE HACE
 #   `terraform init` falla. No hay riesgo de crear un state en el lugar
@@ -84,26 +89,28 @@
 #   `main.tf`.
 #
 # CÓMO SE DECIDE
-#   Igual que el bucket: el área tiene UN cluster por cuenta y cada aplicación
-#   vive como una base dentro de él. Este proyecto NO crea un cluster —crear uno
-#   por aplicación multiplica el costo fijo y sale de la infraestructura base
-#   fijada, que es frontera ⚠️ y se pregunta antes—. Pedí el identificador, y el
-#   nombre de la base de este proyecto derivalo de {{PROYECTO}}.
+#   Este root LEE un cluster (`data`), no lo crea: cada aplicación vive como una
+#   base dentro de un cluster, y un cluster por aplicación multiplica el costo
+#   fijo. Cuál, depende de lo que tu organización ya tenga:
+#   · Si ya hay un cluster en la cuenta, pedí su identificador; el nombre de la
+#     base de este proyecto derivalo de {{PROYECTO}}.
+#   · Si no hay, el cluster es infraestructura base: se decide y se pregunta antes
+#     (frontera ⚠️), se crea fuera de este root, y este root lo lee igual.
 #
-#   Vale la misma nota que el pendiente 1: parece un dato del área y no una
-#   decisión de este proyecto.
+#   Vale la misma nota que el pendiente 1: si el cluster ya existe, es un dato de
+#   la organización y no una decisión de este proyecto.
 #
 # CUÁNDO SE RESUELVE
 #   Junto con el 1. Y el mismo día conviene pedir las dos tareas HUMANAS que
-#   arrastra y que ningún Terraform hace: crear la base de este proyecto y su
-#   usuario dentro del cluster, y autorizar el grupo de seguridad de las tareas en
-#   el puerto del motor. Sin esas dos, el servicio levanta y no conecta, y el fallo
-#   aparece recién en runtime.
+#   arrastra y que ningún Terraform de este root hace: crear la base de este
+#   proyecto y su usuario dentro del cluster, y autorizar el grupo de seguridad de
+#   las tareas en el puerto del motor. Sin esas dos, el servicio levanta y no
+#   conecta, y el fallo aparece recién en runtime.
 #
 # SI NO SE HACE
 #   `plan` falla al no encontrar el cluster. Y si alguien lo "resuelve" creando
-#   un cluster propio, se aparta de la infraestructura base sin haberlo
-#   preguntado.
+#   un cluster dentro de este root, mete infraestructura base en un proyecto sin
+#   haberlo preguntado.
 # ---------------------------------------------------------------------------
 
 # ---------------------------------------------------------------------------
@@ -233,7 +240,7 @@
 #
 # CUÁNDO SE RESUELVE
 #   ANTES de tocar infraestructura, porque no lo contesta quien escribe Terraform
-#   sino @{{PO}}: se lee el spec del producto y se busca si algo tiene que pasar
+#   sino el PO: se lee el spec del producto y se busca si algo tiene que pasar
 #   sin que nadie lo dispare. Si la respuesta es no, esta sección se borra y listo.
 #
 # SI NO SE HACE
