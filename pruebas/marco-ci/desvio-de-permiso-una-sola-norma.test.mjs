@@ -183,3 +183,22 @@ test("MUERDE: si el paso vuelve a exigir que la fecha exista, el 30 de febrero l
   const r = veredictoDelPaso(entrada, mutado);
   assert.equal(r.acepta, false, porque("el mutado tenia que objetar el 30 de febrero", r.salida));
 });
+
+test("un desvio que nombra regla y permiso a la vez NO absorbe: el permiso queda como hallazgo, en rojo", () => {
+  // La revision adversarial del porte (2026-09-18) encontro que este arreglo habia nacido en
+  // modo aviso —«hoy el desvio absorbe igual; en la linea mayor siguiente deja de absorber»—
+  // contra la decision D1 del PO: una compuerta cuyo arreglo cabe en el repositorio del
+  // consumidor (aca, partir la entrada en dos) se exige en rojo el dia que sale. Y no le cambia
+  // el color a ningun repo que hoy pase: la action de la constitucion ya da esa entrada por
+  // ERROR (desvio-ambiguo).
+  const entrada = { ...COMPLETO, regla: "alguna-regla-del-canonico" };
+  assert.equal(veredictoDeLaAction(entrada).acepta, false, "la premisa: la action rechaza la entrada ambigua");
+  const r = veredictoDelPaso(entrada);
+  assert.ok(!/Permiso de escritura con desvio declarado/.test(r.salida), porque("el desvio ambiguo absorbio el hallazgo", r.salida));
+  assert.ok(r.detalle.startsWith("exit 1"), porque("el permiso sin desvio valido no puso rojo", r.salida));
+  assert.ok(
+    /::warning file=\.projects-desvios\.json,title=Desvio de permiso ambiguo::.*NO absorbe/.test(r.salida),
+    porque("el aviso no dice que el desvio dejo de absorber", r.salida),
+  );
+  assert.ok(!/linea mayor siguiente/.test(r.salida), porque("el aviso sigue prometiendo un endurecimiento futuro", r.salida));
+});

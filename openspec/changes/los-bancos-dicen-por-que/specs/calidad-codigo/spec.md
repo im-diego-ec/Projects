@@ -140,12 +140,18 @@ sea la clave con que empiece el paso siguiente, ni el de un paso de otro job.
 Cuando una línea de un bloque de comandos del pipeline continúa en la siguiente, la
 siguiente SHALL ser una línea de comando. Un comentario o una línea vacía entre las dos
 SHALL poner rojo el pipeline del marco, aunque el intérprete acepte el bloque como
-válido.
+válido. Una línea que parece continuar y no continúa —la barra final seguida de
+espacios— SHALL ponerlo rojo también.
 
 #### Scenario: Un comentario entre un comando y sus argumentos
 
 - **WHEN** un bloque de comandos tiene una línea que continúa en la siguiente, y después viene un comentario o una línea vacía
 - **THEN** el pipeline del marco falla nombrando el archivo y la línea, aunque la validación de sintaxis pase
+
+#### Scenario: Una barra final seguida de espacios
+
+- **WHEN** un bloque de comandos tiene una línea que termina en una barra invertida seguida de uno o más espacios
+- **THEN** el pipeline del marco falla nombrando el archivo y la línea, porque la línea de abajo corre como un comando aparte
 
 #### Scenario: Lo que parece continuación y no lo es
 

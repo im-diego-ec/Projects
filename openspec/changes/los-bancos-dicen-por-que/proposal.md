@@ -75,7 +75,7 @@ Lo que pasó en Rigel, con su fecha y su commit:
   lectores de `permiso` por comportamiento, corriendo el paso real.
 - `.github/workflows/marco-ci.yml`, paso «Permisos del agente sin escritura». La fecha se
   valida con el **mismo** predicado que `esFecha`. Un desvío que nombra también una regla
-  **avisa**.
+  **avisa y no absorbe**: el permiso queda como hallazgo, igual que para la action.
 
 ## Distribución
 
@@ -89,18 +89,35 @@ Lo que pasó en Rigel, con su fecha y su commit:
 
 Hay tres consumidores reales, todos en `@v1.9.6`: `custodia-bingo`, `plantilla-sitio` y
 `plantilla-aplicacion`. **Solo les llega el cambio del paso de permisos**, con el PR de
-Dependabot de la versión que lo incluya. Solo cambian dos anotaciones, y **ningún
-veredicto**:
+Dependabot de la versión que lo incluya:
 
 - Un desvío con una fecha como `2026-02-30`, que la action ya aceptaba, **deja de avisar**.
   El aviso anterior afirmaba un error que no existía.
-- Un desvío que nombra `regla` y `permiso` a la vez **empieza a avisar** (`Desvio de permiso
-  ambiguo`). Sigue absorbiendo, como los demás desvíos incompletos: el modo aviso del change
-  `un-solo-predicado-del-desvio` no se toca.
+- Un desvío que nombra `regla` y `permiso` a la vez **avisa y deja de absorber** (`Desvio de
+  permiso ambiguo`): el permiso sale como hallazgo sin desvío, rojo si está en el archivo de
+  ajustes. Es una compuerta endurecida cuyo arreglo cabe en el repositorio del consumidor
+  —partir la entrada en dos—, así que por **D1 del PO** sale exigible el día que sale y no
+  estrena en aviso. **No le cambia el color a ningún repo que hoy pase**: la action de la
+  constitución ya da esa entrada por error (`desvio-ambiguo`), así que un repo que la tenga
+  ya está rojo por ese camino.
 
-Nada se pone rojo y nada se pone verde. **Contrato: patch**, una corrección de
-comportamiento dentro del contrato. **No rompe a nadie.**
+**Contrato: minor**, por la regla de D1 (una compuerta que se arregla dentro del repo sale en
+un minor, con el arreglo en «Para consumidores»). No quita ni renombra ningún `input`,
+`output`, job ni permiso.
 
-Lo que **no** se hace acá, porque sería breaking: exigir que la fecha de un desvío
-**exista** (hoy los dos lectores aceptan el 30 de febrero). Es un endurecimiento de los dos
-lectores a la vez y va con la línea v2 (D1 del PO; lote 38 del porte).
+Lo que **no** se hace acá: exigir que la fecha de un desvío **exista** (hoy los dos lectores
+aceptan el 30 de febrero). Por D1 no sería breaking —el arreglo es corregir una fecha en el
+propio repo—: saldría rojo el día que sale, en un minor. No entra en este change por su
+alcance y no por su color: endurece `esFecha` de `actions/constitucion`, que este change no
+toca, y endurecer solo el paso volvería a separar los dos lectores que este change ata. Queda
+como pendiente con destino en `tasks.md` (bloque 8).
+
+## Costo al integrar, dentro del propio marco
+
+El job nuevo exige limpio **entero** cada banco que toca el pull request. Eso vale para el
+pull request que integre el porte: contra `main` toca bancos con deuda que ningún carril de
+este change escribió (136 aserciones ciegas en 14 bancos, medidas el 2026-09-18; el detalle
+está en `tasks.md`, 9.9). Así que el porte no puede entrar a `main` junto con este job sin
+una decisión: pagar esas aserciones antes, o integrar el job después que el resto, en un pull
+request que solo toque los bancos de este change. No afecta a ningún consumidor: el job vive
+en el `ci.yml` de Projects.

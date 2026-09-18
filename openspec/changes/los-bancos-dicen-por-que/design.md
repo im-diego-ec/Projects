@@ -64,8 +64,28 @@ cerrar una expresión. Ahora las dos cuentas coinciden línea por línea en los 
 - **Dejarlo como en Rigel.** Un falso negativo del 14% es la dirección peligrosa: el check
   deja pasar justo lo que existe para frenar.
 
-**Límite declarado:** no se sigue un template anidado dentro de `${}`. Sobre el árbol de hoy
-no cambia el conteo, y la medición contra el AST lo acredita.
+**Límite declarado:** no se sigue un template anidado dentro de `${}`. Que sobre el árbol de
+hoy eso no cambie el conteo lo acreditó una medición **de un solo uso**, fechada el
+2026-09-17; ningún caso del banco la repite, porque repetirla exige el parser como
+dependencia. El banco fija las formas concretas que esa medición encontró distintas (su grupo
+6). La primera versión del comentario de la herramienta decía que «el banco lo compara contra
+el AST», y no era cierto: se corrigió.
+
+**Qué es un mensaje ciego, corregido después de la revisión adversarial (2026-09-18).** La
+regla portada de Rigel contaba solo el literal suelto. Cuatro formas igual de ciegas pasaban
+—una constante del archivo, una concatenación de literales, un `new Error("...")` y un
+`porque("motivo")` sin su segundo argumento, que es la forma que sugería el propio mensaje de
+error a medio escribir—, y un literal con comillas escapadas tampoco se veía. Ahora es ciego
+todo mensaje que **no lee ningún valor del programa**: se juntan los nombres que la expresión
+lee (sin propiedades, claves, palabras clave ni un puñado de globales), las constantes del
+archivo se resuelven a su inicializador, una llamada a cualquier función que no sea `porque`,
+`Error` o un conversor cuenta como lectura, y lo que Node trata como ausencia de mensaje
+(`""`, `undefined`) no tapa nada. El lexer suma dos bordes: `x++ / 2` es una división y
+`if (a) /re/` es una regex. **Descartado:** marcar ciego todo lo que no sea `porque()` con dos
+argumentos o un template interpolado. Contaría como ciego `assert.match(r.salida, /re/,
+r.salida)`, que imprime el input entero y es la forma más común del árbol. **Límite
+declarado:** un `let` o un parámetro se tratan como evidencia, porque pueden valer cualquier
+cosa.
 
 ### D3. El instrumento reproduce la invocación de `ci.yml`, que acá son tres
 
@@ -105,10 +125,16 @@ revés:
 
 - **Fecha.** El paso pasa a usar exactamente el predicado de `esFecha`. Su propio comentario
   decía que ese era el objetivo, y la action es la que valida la forma («la forma se valida
-  en UN solo lado»). Endurecer la action para que exija fechas existentes haría rojo lo que
-  hoy pasa, y eso es breaking. Queda para v2, en los dos lectores a la vez.
-- **Regla y permiso a la vez.** El paso **avisa**. El modo aviso del change
-  `un-solo-predicado-del-desvio` se respeta: sigue absorbiendo.
+  en UN solo lado»). Endurecer los dos para que exijan fechas existentes NO se descarta por
+  breaking —con D1, una compuerta cuyo arreglo cabe en el repo sale en rojo en un minor—, sino
+  por alcance: cambia `esFecha` de `actions/constitucion`, que este change no toca, y hacerlo
+  solo en el paso volvería a separar los dos lectores. Pendiente con destino en `tasks.md`.
+- **Regla y permiso a la vez.** El paso **avisa y no absorbe**, desde el día que sale. La
+  primera versión de este change lo estrenaba en aviso («en la línea mayor siguiente deja de
+  absorber») y se lo atribuía al modo aviso de `un-solo-predicado-del-desvio`; la revisión
+  adversarial lo marcó contra D1, y tenía razón: el arreglo es partir la entrada en dos, en el
+  repo del consumidor. Y ningún repo que hoy pase cambia de color, porque la action ya la da
+  por error.
 
 **Descartado:**
 
@@ -134,6 +160,11 @@ calculada por otro camino: del `run:` hacia atrás hasta su ítem.
 El control de Rigel marcaba toda línea terminada en `\`. Acá se excluyen dos formas que
 bash no toma por continuación: una línea que es un comentario, y un número par de barras.
 Un control que caza lo correcto enseña a ignorarlo.
+
+Y una tercera forma que **parece** continuación y no lo es se marca: la barra seguida de
+espacios. La barra escapa el primer espacio y la línea de abajo corre como un comando aparte;
+`bash -n` no dice nada. La primera versión recortaba el final de la línea antes de buscar la
+barra y la daba por sana. Lo encontró la revisión adversarial del porte.
 
 ## Cómo se hace cumplir solo
 

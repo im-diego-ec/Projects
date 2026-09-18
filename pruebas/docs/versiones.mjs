@@ -19,8 +19,8 @@
 // TODO LO QUE MIRA ES PURO SOBRE TEXTO a proposito: asi el banco puede correr
 // cada comprobacion contra una copia MUTADA y verla fallar. Una guarda que nadie
 // vio fallar no es una guarda.
-import { existsSync, readdirSync, readFileSync } from "node:fs";
-import { dirname, join } from "node:path";
+import { existsSync, readdirSync, readFileSync, realpathSync } from "node:fs";
+import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 export const RAIZ = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
@@ -391,4 +391,20 @@ function imprimir() {
   }
 }
 
-if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) imprimir();
+// «¿Me invocaron a mi?», por realpath en los DOS lados. La comparacion literal no calzaba si se
+// invocaba por una ruta que pasa por un enlace (`/tmp` en macOS, un directorio enlazado), y
+// entonces `node pruebas/docs/versiones.mjs` salia 0 sin imprimir nada. Lo vigila
+// pruebas/banco/aserciones-con-evidencia.test.mjs, junto con la hermana que tenia el mismo defecto.
+function mismaRuta(a, b) {
+  const real = (p) => {
+    try {
+      return realpathSync(p);
+    } catch {
+      return resolve(p);
+    }
+  };
+  const [x, y] = [real(a), real(b)];
+  return process.platform === "win32" ? x.toLowerCase() === y.toLowerCase() : x === y;
+}
+
+if (process.argv[1] && mismaRuta(process.argv[1], fileURLToPath(import.meta.url))) imprimir();

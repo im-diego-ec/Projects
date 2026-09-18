@@ -153,14 +153,20 @@ salvo donde se dice otra cosa.
 ## 8. Pendientes declarados, que NO entran acá
 
 - **Exigir que la fecha de un desvío exista**, en los dos lectores a la vez. Hoy los dos
-  aceptan el 30 de febrero. Es un endurecimiento, así que es breaking. **Destino:** línea
-  v2 (lote 38).
+  aceptan el 30 de febrero. Por D1 del PO **no es breaking**: el arreglo es corregir una
+  fecha en el propio repo, así que saldría rojo el día que sale, en un minor, con el arreglo
+  en «Para consumidores». No entra acá por alcance: cambia `esFecha` de
+  `actions/constitucion`, y hacerlo solo en el paso volvería a separar los dos lectores.
+  **Destino:** el mismo change que el pendiente de abajo, que es el que mueve la lectura de
+  desvíos (`un-solo-predicado-del-desvio`).
 - **Valores que no son cadena en un desvío.** La action los pasa por `String()` y el paso
   los descarta: `"aprobado_por": 123` vale para una y no para el otro. La tabla es de lo que
   una persona escribe. **Destino:** el change que mueva la lectura de desvíos dentro de la
   action (ver `un-solo-predicado-del-desvio`).
-- **La deuda del árbol (281 aserciones en 59 archivos)** se paga por área, cuando alguien
-  toque cada banco. **Destino:** ninguno; lo hace cumplir el job nuevo.
+- **La deuda del árbol (285 aserciones en 60 archivos con la definición corregida del
+  bloque 9)** se paga por área, cuando alguien toque cada banco. **Destino:** ninguno; lo hace
+  cumplir el job nuevo. Pero ver 9.9: el porte entero toca bancos con deuda, y eso tiene un
+  costo al integrar.
 - **El job `changelog-en-el-pr` usa un diff de DOS puntos** (`ci.yml:977`). Tiene el mismo
   falso rojo que el D1 del design evita acá: si main cambia una superficie que viaja
   después de abrir el PR, el PR queda obligado a tocar el CHANGELOG sin haberla tocado.
@@ -170,5 +176,77 @@ salvo donde se dice otra cosa.
   se puede»**, porque la validación no estaría exportada. `clasificarDesvios` sí está
   exportada, y el banco de 6.1 lo hace. **Destino:** quien archive ese change (lote 2) lo
   anota al cerrarlo. No se edita desde acá porque es de otro carril.
-- **Revisión adversarial** con lentes independientes. **Destino:** la pasada final del
-  porte, antes del archive.
+- **Revisión adversarial** con lentes independientes. Hecha el 2026-09-18; lo que encontró y
+  lo que se hizo con cada hallazgo está en el bloque 9.
+
+## 9. Lo que encontró la revisión adversarial (2026-09-18)
+
+Mediciones con Node v24.19.0 y el bash 3.2 de macOS; la de Node 22 se dice donde se usó.
+
+- [x] 9.1 **La herramienta no veía los mensajes ciegos que no eran una cadena suelta**
+      (FO-S2). Una constante, una concatenación de literales, `new Error("...")`,
+      `porque("motivo")` sin evidencia y `{ message: "x" }.message` pasaban, y el chequeo del
+      diff decía «no tapan su evidencia». **Rojo primero:** el banco nuevo contra la
+      herramienta anterior da `tests 42, pass 33, fail 9`, y el caso «los mensajes ciegos que
+      no son una cadena suelta se cuentan» lista las diez formas que se escapaban. **Arreglo:**
+      `esCiego` en `pruebas/aserciones-con-evidencia.mjs`: ciego es el mensaje que no lee ningún
+      valor del programa, con las constantes del archivo resueltas y una llamada a una función
+      que no sea `porque`, `Error` o un conversor contada como lectura. El contrapeso tiene
+      caso propio: `porque("m", x)`, un template con `${x}`, `r.salida` como mensaje, `""` y
+      `undefined` (que Node trata como ausencia de mensaje) no se cuentan. **Medido contra el
+      AST de acorn**, de nuevo de un solo uso y fuera del repo, con la misma semántica: `ast 285
+      en 60 archivos | herramienta 285 | archivos que difieren: 0`. Contra la herramienta
+      anterior, 4 aserciones más en el árbol, las cuatro concatenaciones de literales. El
+      banco que este change toca y tenía una (`pruebas/andamio/pinado.test.mjs:281`) se pagó.
+- [x] 9.2 **Comillas escapadas y dos bordes del lexer** (RV-L3-06). `"el \"paso\""` y
+      `'it\'s'` no eran ciegas para `CIEGO`; `x++ / 2` abría una regex y `if (a) /re"/`
+      cerraba una expresión. Los tres dan ahora un hallazgo, con caso en el grupo 8 del banco.
+      **Refutado en parte:** «una regex tras un salto de línea con ASI» no es JavaScript
+      válido. `let a = 1\n/"/.test("x")` no compila (`SyntaxError: Unexpected identifier 'x'`):
+      JavaScript lee esa `/` como división, igual que la herramienta.
+- [x] 9.3 **Invocada por una ruta con un enlace, la herramienta salía 0 muda** (FO-S5). La
+      guarda comparaba `process.argv[1]` sin realpath. **Rojo primero:** el caso «invocada por
+      una ruta que pasa por un enlace» contra la herramienta anterior: «invocada por un enlace
+      no puso rojo». **Arreglo:** `mismaRuta` con realpath en los dos lados, la misma de
+      `actions/censo-fuentes`. **Y la hermana que la revisión no vio:**
+      `pruebas/docs/versiones.mjs` comparaba `argv[1]` literal; por un enlace imprimía 0 líneas
+      y ahora imprime la tabla. Un caso nuevo exige realpath en todo guion de `pruebas/` que lea
+      `process.argv[1]`, y salió rojo sobre `versiones.mjs` antes del arreglo.
+- [x] 9.4 **`porque()` perdía o rompía la evidencia** (RV-L3-07). Un `Error` salía `{}`, y un
+      circular o un BigInt hacían lanzar. **Arreglo:** JSON para objetos planos y arreglos, con
+      red, y `util.inspect` para todo lo demás. Caso nuevo en el grupo 4; contra la versión
+      anterior, rojo.
+- [x] 9.5 **El comentario prometía un mecanismo que no existe** (RV-L3-08): decía que el banco
+      comparaba contra el AST. Corregido en la herramienta y en el design (D2): es una
+      medición fechada, repetida en 9.1, y el banco fija las formas concretas.
+- [x] 9.6 **Un número de vueltas que desborda bash dejaba verde al instrumento** (FO-S10). Con
+      `9223372036854775808` el bucle no iteraba y el resumen decía «No apareció en
+      9223372036854775808 vueltas». **Rojo primero:** `tests 16, pass 14, fail 2`. **Arreglo:**
+      tope de 1 a 99999 en la validación y un contador de vueltas corridas que se compara con
+      las pedidas antes del veredicto (MUERDE: un bucle que se queda corto sale rojo con
+      «corrió 1 de 2 vueltas»). 1, 40 y 1000 se aceptan. Resultado: `16/16`.
+- [x] 9.7 **Una barra final seguida de un espacio no es continuación** (FO-S19). El control
+      recortaba la línea antes de buscar la barra y la daba por sana. **Rojo primero:** «la
+      barra seguida de un espacio tiene que cazarse», `0 !== 1`. Premisa medida en el caso:
+      `bash -n` sale 0 y el guion falla al correr la línea de abajo sola. Resultado: `7/7`.
+      Escenario nuevo en el delta de `calidad-codigo`.
+- [x] 9.8 **El desvío ambiguo se estrenaba en aviso, contra D1** (RV-L3-02). **Rojo primero:**
+      el caso «un desvío que nombra regla y permiso a la vez NO absorbe» sobre el paso
+      anterior. **Arreglo:** en «Permisos del agente sin escritura», la entrada ambigua avisa y
+      no absorbe, y el permiso sale como hallazgo. Corregidos el proposal (impacto, contrato
+      minor y la atribución a D1) y el design (D4). Resultado: `5/5`.
+- [ ] 9.9 **El porte entero no pasa este job contra `main`** (RV-L3-01). La compuerta exige
+      limpio cada banco que toca el pull request, y el pull request que integre el porte toca
+      bancos con deuda que no son de este change. Medido el 2026-09-18 con la herramienta
+      corregida: esta rama contra `main` toca 39 bancos, con 136 aserciones ciegas en 14 de
+      ellos (32 en `pruebas/andamio/desplegar.test.mjs`); `feat/porte-rigel-2-8` sola, 138 en
+      14. Lo que tocan los otros carriles sobre esa base: L1 7, L2 100, L4 49, L5 43. **No se
+      paga desde acá** porque esos bancos son de otros carriles y pagarlos es un conflicto
+      seguro. **Destino:** la integración del porte, y exige una decisión: o se pagan esas
+      aserciones en cada carril antes de juntar, o el job entra a `main` después que el resto
+      del porte, en un pull request propio que solo toque los bancos de este change.
+- [ ] 9.10 **El aviso de desvío INCOMPLETO sigue diciendo «en la línea mayor siguiente deja de
+      absorber»** (la otra mitad de RV-L3-02, línea del mismo paso). Es del change
+      `un-solo-predicado-del-desvio`, no de este. Por D1 tendría que dejar de absorber ya, y
+      tampoco le cambiaría el color a ningún repo que hoy pase: la action ya da esa entrada
+      por error. **Destino:** `un-solo-predicado-del-desvio` (lote 2 del porte, que lo archiva).

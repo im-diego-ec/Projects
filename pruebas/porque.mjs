@@ -29,6 +29,8 @@
 // fuera de todos: una copia por banco es la divergencia que el marco prohibe en todo lo demas.
 // ---------------------------------------------------------------------------
 
+import { inspect } from "node:util";
+
 /** Cuanto de la evidencia entra en el mensaje antes de recortarse. */
 export const TOPE = 4000;
 
@@ -43,13 +45,35 @@ export const TOPE = 4000;
  * completo, y quien investiga concluye que algo «no aparece» cuando lo que pasa es que no se
  * imprimio.
  *
- * Lo que no es cadena se serializa como JSON indentado —un objeto impreso con `String()` dice
- * `[object Object]`, que no es evidencia de nada—; lo que JSON no puede serializar (`undefined`,
- * una funcion) cae a `String()`.
+ * Lo que no es cadena se serializa, y como depende de QUE es:
+ *
+ *   · un objeto plano o un arreglo, como JSON indentado —un objeto impreso con `String()` dice
+ *     `[object Object]`, que no es evidencia de nada—;
+ *   · todo lo demas, con `util.inspect`. Un `Error` por JSON sale `{}` —el mensaje y el stack
+ *     no son propiedades enumerables— y un `Map` o un `Set` tambien. Y lo que JSON no puede
+ *     serializar SE ROMPE: un objeto circular o un BigInt hacen que `JSON.stringify` lance, y
+ *     la asercion terminaba en un TypeError en vez de en su motivo. Por eso el JSON va con red:
+ *     si lanza, tambien cae a `inspect`.
  */
+function serializar(evidencia) {
+  if (typeof evidencia === "string") return evidencia;
+  const plano =
+    evidencia !== null &&
+    typeof evidencia === "object" &&
+    (Array.isArray(evidencia) || [Object.prototype, null].includes(Object.getPrototypeOf(evidencia)));
+  if (plano || typeof evidencia === "number" || typeof evidencia === "boolean" || evidencia === null) {
+    try {
+      const json = JSON.stringify(evidencia, null, 2);
+      if (json !== undefined) return json;
+    } catch {
+      // Circular, o un BigInt adentro: lo dice inspect, que no lanza.
+    }
+  }
+  return inspect(evidencia, { depth: 6, breakLength: 100 });
+}
+
 export function porque(motivo, evidencia) {
-  const texto =
-    typeof evidencia === "string" ? evidencia : (JSON.stringify(evidencia, null, 2) ?? String(evidencia));
+  const texto = serializar(evidencia);
   const recortada = texto.length > TOPE ? `[...recortado, ${texto.length} caracteres]\n${texto.slice(-TOPE)}` : texto;
   return `${motivo}\n\n--- la evidencia ---\n${recortada}`;
 }

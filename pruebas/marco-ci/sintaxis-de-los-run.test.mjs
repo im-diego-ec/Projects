@@ -203,17 +203,25 @@ test("MUERDE: el error que motivo este banco se caza, y `bash -n` NO alcanza", (
 // ---------------------------------------------------------------------------
 
 /** Las continuaciones cortadas de un bloque: una linea que termina en `\` seguida de un
- *  comentario o de una linea vacia.
+ *  comentario o de una linea vacia, y una que termina en `\` seguida de espacios.
  *
  *  Dos cosas NO son continuacion, y contarlas enseniaria a ignorar el control: una linea que es
  *  ella misma un COMENTARIO (en bash la barra final de un comentario es texto), y una que
- *  termina en un numero PAR de barras (`\\` es una barra escapada, no una continuacion). */
+ *  termina en un numero PAR de barras (`\\` es una barra escapada, no una continuacion).
+ *
+ *  Y UNA BARRA SEGUIDA DE ESPACIOS TAMPOCO ES CONTINUACION, y por eso se caza: la barra escapa
+ *  el primer espacio y la linea de abajo corre como un comando aparte. Se mira ANTES de recortar
+ *  el final de la linea; la primera version recortaba primero y la daba por sana. */
 export function continuacionesCortadas(cuerpo) {
   const l = cuerpo.split("\n");
   const cortadas = [];
   for (let i = 0; i < l.length - 1; i += 1) {
+    if (/^\s*#/.test(l[i])) continue;
+    if (/(^|[^\\])(\\\\)*\\[ \t]+$/.test(l[i])) {
+      cortadas.push({ indice: i, texto: l[i].trim() });
+      continue;
+    }
     const actual = l[i].trimEnd();
-    if (/^\s*#/.test(actual)) continue;
     const barras = actual.match(/\\+$/);
     if (!barras || barras[0].length % 2 === 0) continue;
     const siguiente = l[i + 1].trim();
@@ -239,9 +247,10 @@ test("ninguna continuacion de linea de un `run:` queda cortada por un comentario
   assert.deepEqual(
     malos,
     [],
-    "una linea que termina en barra invertida seguida de un comentario o de una linea vacia deja el comando SIN " +
-      "los argumentos que venian abajo, y bash no se queja: es sintacticamente valido. Arreglo: sacar el comentario " +
-      `de entre las dos lineas (arriba del comando, no en el medio) o borrar la linea vacia:\n  ${malos.join("\n  ")}`,
+    "una linea que termina en barra invertida seguida de un comentario o de una linea vacia —o en una barra seguida " +
+      "de espacios, que no continua— deja el comando SIN los argumentos que venian abajo, y bash no se queja: es " +
+      "sintacticamente valido. Arreglo: sacar el comentario de entre las dos lineas (arriba del comando, no en el " +
+      `medio), borrar la linea vacia, o borrar los espacios que siguen a la barra:\n  ${malos.join("\n  ")}`,
   );
 });
 
@@ -273,4 +282,29 @@ test("MUERDE: la continuacion cortada se caza, `bash -n` NO la ve, y lo correcto
     [],
     "dos barras son una barra escapada, no una continuacion",
   );
+});
+
+test("MUERDE: una barra final seguida de un ESPACIO no continua, y se caza", () => {
+  // Lo encontro la revision adversarial del porte (2026-09-18). `\ ` al final de la linea no es
+  // una continuacion: la barra escapa el espacio, y la linea de abajo corre como un comando
+  // aparte. `bash -n` no dice nada, y el control lo daba por sano porque recortaba el espacio
+  // ANTES de buscar la barra. Es la misma clase: shell valido que hace otra cosa.
+  const cuerpo = ["echo inicio", 'printf "[%s]" uno \\ ', "  dos"].join("\n");
+
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "run-barra-espacio-"));
+  const guion = path.join(tmp, "malo.sh");
+  fs.writeFileSync(guion, `${cuerpo}\n`);
+  const sintaxis = spawnSync("bash", ["-n", guion], { encoding: "utf-8" });
+  const corrida = spawnSync("bash", [guion], { encoding: "utf-8" });
+  fs.rmSync(tmp, { recursive: true, force: true });
+  assert.equal(sintaxis.status, 0, "la premisa: `bash -n` no lo ve");
+  assert.notEqual(corrida.status, 0, `la premisa: la linea de abajo corre sola y falla. Salida: ${corrida.stdout}${corrida.stderr}`);
+
+  assert.equal(continuacionesCortadas(cuerpo).length, 1, "la barra seguida de un espacio tiene que cazarse");
+  assert.equal(continuacionesCortadas(["cmd \\\t", "  arg"].join("\n")).length, 1, "y seguida de un tab");
+
+  // Lo que no se puede marcar.
+  assert.deepEqual(continuacionesCortadas(["cmd \\", "  arg"].join("\n")), [], "una continuacion sana");
+  assert.deepEqual(continuacionesCortadas(["cmd a\\\\ ", "echo ok"].join("\n")), [], "dos barras y un espacio: ni continuacion ni escape");
+  assert.deepEqual(continuacionesCortadas(["# comentario con barra \\ ", "echo ok"].join("\n")), [], "una barra en un comentario es texto");
 });

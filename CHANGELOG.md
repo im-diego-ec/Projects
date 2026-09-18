@@ -542,14 +542,16 @@ mueve sobre un cambio incompatible.
   **Para consumidores: nada.** Ningún veredicto cambia. Si un desvío tuyo tenía una fecha
   así, deja de salir el aviso.
 
-- **Un desvío que nombra a la vez una `regla` y un `permiso` ya no pasa en silencio.** La
-  action lo rechaza (`desvio-ambiguo`), y el paso de permisos lo absorbía sin decir nada:
-  era rojo por un camino y verde por el otro. Ahora el paso **avisa** (`Desvio de permiso
-  ambiguo`) y **sigue absorbiendo**, igual que con los demás desvíos incompletos, hasta la
-  línea mayor siguiente.
+- **Un desvío que nombra a la vez una `regla` y un `permiso` ya no pasa en silencio, ni
+  anula nada.** La action lo rechaza (`desvio-ambiguo`), y el paso de permisos lo absorbía
+  sin decir nada: era rojo por un camino y verde por el otro. Ahora el paso **avisa**
+  (`Desvio de permiso ambiguo`) y **no lo toma**: el permiso que nombraba queda como un
+  hallazgo sin desvío, en rojo si está en el archivo de ajustes del agente.
 
-  **Para consumidores: nada que hacer para seguir en verde.** Si aparece el aviso, parte
-  la entrada en dos: una con la regla y otra con el permiso.
+  **Para consumidores:** si tu `.projects-desvios.json` tiene una entrada con `regla` y
+  `permiso` a la vez, partila en dos: una con la regla y otra con el permiso, cada una con
+  su motivo. Un repo que hoy pasa en verde no la tiene: el job de la constitución ya la da
+  por error.
 
 - **El extractor de pasos de los bancos devolvía el script del paso de al lado.** Cortaba
   solo en `- name:`. Al pedir un paso sin `run:` seguido de uno que arranca con `- id:` o
@@ -1122,25 +1124,29 @@ mueve sobre un cambio incompatible.
   que el día que caen en CI dicen el motivo y se callan lo que pasó. Se agrega
   `pruebas/porque.mjs`, con `porque(motivo, evidencia)`, y un job nuevo de `ci.yml`,
   `aserciones-con-evidencia`. Ese job pone rojo el PR que deja una aserción así en un
-  banco que toca, y la anota con archivo y línea. La deuda del resto del árbol (281) se
-  publica en cada corrida y no bloquea. Viene de Rigel (d71c40c). **Y la herramienta de
-  Rigel tenía acá un falso negativo del 14%**, medido contra el AST de un parser: una regex
-  con comillas le escondía las aserciones que venían después. Se arregló antes de
-  cablearla. **Para consumidores: nada** (CI del marco).
+  banco que toca, y la anota con archivo y línea. Cuenta como ciego todo mensaje que no lee
+  ningún valor del programa, no solo la cadena suelta: una constante que vale una cadena,
+  una concatenación de literales o un `porque("motivo")` sin su segundo argumento también
+  tapan el input. La deuda del resto del árbol (285) se publica en cada corrida y no
+  bloquea. Viene de Rigel (d71c40c). **Y la herramienta de Rigel tenía acá un falso negativo
+  del 14%**, medido contra el AST de un parser: una regex con comillas le escondía las
+  aserciones que venían después. Se arregló antes de cablearla. **Para consumidores: nada**
+  (CI del marco).
 
 - **Un instrumento para reproducir un banco intermitente**:
   `.github/workflows/reproducir-intermitente.yml`, que se dispara a mano. Repite un banco
   N veces en la misma invocación con que lo corre `ci.yml`. Antes de contar, corre una
   vuelta de línea de base: si ya está roja, dice que mide su propio entorno. Deja una línea
   por vuelta con el acumulado, así que una corrida cortada sigue siendo una medición, y un
-  verde dice que es una cota y no una ausencia. Viene de Rigel (b047c16, c38e542 y el PR
-  #540 todavía abierto, 0448928). Reusa el `upload-artifact` que el andamio ya pina.
+  verde dice que es una cota y no una ausencia. Acepta de 1 a 99999 vueltas y compara las
+  que corrió con las pedidas antes de dar el veredicto. Viene de Rigel (b047c16, c38e542 y el
+  PR #540 todavía abierto, 0448928). Reusa el `upload-artifact` que el andamio ya pina.
   **Para consumidores: nada** (CI del marco).
 
 - **Las continuaciones de línea cortadas por un comentario o una línea vacía ponen rojo el
-  banco de sintaxis.** Es shell válido que corre el comando sin sus argumentos, y
-  `bash -n` no lo ve. Viene de Rigel (cffa81f). **Para consumidores: nada** (banco del
-  marco).
+  banco de sintaxis**, y también una barra final seguida de espacios, que parece continuar
+  y no continúa. Es shell válido que corre el comando sin sus argumentos, y `bash -n` no lo
+  ve. Viene de Rigel (cffa81f). **Para consumidores: nada** (banco del marco).
 
 ### Corregido
 

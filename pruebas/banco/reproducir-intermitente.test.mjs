@@ -142,6 +142,43 @@ test("vueltas que no son un entero positivo: ROJO, y no corre nada", () => {
   }
 });
 
+test("vueltas que desbordan la aritmetica de bash: ROJO, y no corre nada", () => {
+  // Lo encontro la revision adversarial del porte (2026-09-18). 9223372036854775808 pasa el
+  // "entero positivo", pero en la aritmetica de 64 bits de bash se da vuelta: el bucle no itera,
+  // el job sale VERDE con «No aparecio en 9223372036854775808 vueltas» y la estimacion dice «~0
+  // minutos». Corria la vuelta cero y nada mas.
+  for (const vueltas of ["9223372036854775808", "100000"]) {
+    const r = correr({ banco: "pruebas/x/verde.test.mjs", vueltas });
+    assert.equal(r.exit, 1, porque(`vueltas=${vueltas} no puso rojo`, r.salida));
+    assert.deepEqual(r.corridos, [], porque(`vueltas=${vueltas} corrio algo igual`, r.corridos));
+  }
+});
+
+test("el contrapeso del tope: 1, 40 (el default) y 1000 vueltas se aceptan", () => {
+  // Se corta el paso justo despues de validar, para no correr mil vueltas en el banco.
+  const ancla = 'SALIDAS="${RUNNER_TEMP}/salidas"\n';
+  assert.ok(script.includes(ancla), porque("el ancla del corte ya no esta", script));
+  const guion = script.replace(ancla, `exit 0\n${ancla}`);
+  for (const vueltas of ["1", "40", "1000"]) {
+    const r = correr({ banco: "pruebas/x/verde.test.mjs", vueltas, guion });
+    assert.equal(r.exit, 0, porque(`vueltas=${vueltas} se rechazo`, r.salida));
+    assert.ok(r.salida.includes(`${vueltas} vuelta(s)`), porque(`vueltas=${vueltas} no llego a la validacion`, r.salida));
+  }
+});
+
+test("MUERDE: si el bucle corre menos vueltas que las pedidas, el veredicto no se declara", () => {
+  // La segunda mitad del arreglo: aunque la validacion dejara pasar un numero que el bucle no
+  // recorre, el paso cuenta las vueltas que CORRIO y las compara con las pedidas antes del
+  // veredicto. Se provoca con un bucle que se queda corto.
+  const bucle = "for ((i = 1; i <= VUELTAS; i++)); do";
+  assert.ok(script.includes(bucle), porque("el ancla del bucle ya no esta", script));
+  const guion = script.replace(bucle, "for ((i = 1; i <= VUELTAS - 1; i++)); do");
+  const r = correr({ banco: "pruebas/x/verde.test.mjs", vueltas: "2", guion });
+  assert.equal(r.exit, 1, porque("un bucle corto salio verde", r.salida));
+  assert.ok(r.salida.includes("corrio 1 de 2 vueltas"), porque("el rojo no dice cuantas corrio", r.salida));
+  assert.ok(!r.resumen.includes("No aparecio en"), porque("el resumen declaro la cota sobre vueltas que no corrio", r.resumen));
+});
+
 test("un banco que no existe, que no es banco o que el CI no corre: ROJO con el motivo", () => {
   for (const banco of ["pruebas/x/no-existe.test.mjs", "pruebas/x/ayuda.mjs", "pruebas/x/../x/verde.test.mjs"]) {
     const r = correr({ banco, forma: "banco" });

@@ -3828,8 +3828,14 @@ jobs:
                 // action la rechaza (desvio-ambiguo) y este paso la absorbia en
                 // silencio: el mismo "rojo por un camino y verde por el otro" que este
                 // bloque vino a cerrar, sin aviso. Lo encontro el banco que ata los dos
-                // lectores, el 2026-09-17. Mismo criterio que el aviso de abajo: avisa y
-                // sigue absorbiendo hasta la linea mayor siguiente.
+                // lectores, el 2026-09-17.
+                //
+                // Y NO ABSORBE, desde el dia que sale. El arreglo cabe en el repo del
+                // consumidor (partir la entrada en dos), asi que por la politica de
+                // compuertas del marco no se estrena avisando. Y no le cambia el color a
+                // ningun repo que hoy pase: la action de la constitucion ya da esta
+                // entrada por ERROR. El permiso queda sin desvio y sale como cualquier
+                // hallazgo, con la severidad de su fuente.
                 const regla = cruda && typeof cruda.regla === "string" ? cruda.regla.trim() : "";
                 if (regla) {
                   console.log(
@@ -3837,10 +3843,11 @@ jobs:
                       escapar(
                         "el desvio de \"" + permiso + "\" nombra ademas la regla \"" + regla + "\", y una entrada anula UNA cosa: " +
                           "si no, el motivo escrito deja de decir de que es. La action de la constitucion ya lo da por ERROR " +
-                          "(desvio-ambiguo). Hoy el desvio absorbe igual; en la linea mayor siguiente deja de absorber. " +
-                          "Arreglo: partilo en dos entradas, una con la regla y otra con el permiso."
+                          "(desvio-ambiguo), y este paso tampoco lo toma: NO absorbe, asi que el permiso sale abajo como " +
+                          "hallazgo sin desvio. Arreglo: partilo en dos entradas, una con la regla y otra con el permiso."
                       )
                   );
+                  continue;
                 }
                 // DOS LECTORES DEL MISMO ARCHIVO, Y HASTA ACA PEDIAN COSAS DISTINTAS.
                 // `actions/constitucion/constitucion.mjs` exige motivo + aprobado_por +

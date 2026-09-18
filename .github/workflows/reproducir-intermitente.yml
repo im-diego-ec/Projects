@@ -50,7 +50,7 @@ on:
         required: true
         default: pruebas/marco-ci/distribuidor.test.mjs
       vueltas:
-        description: "Cuantas veces correrlo (un entero positivo)"
+        description: "Cuantas veces correrlo (un entero de 1 a 99999)"
         required: true
         default: "40"
       forma:
@@ -117,8 +117,14 @@ jobs:
           esac
           # Un numero de vueltas que no es un entero positivo haria que el bucle no corriera NINGUNA
           # y el job saliera verde diciendo «0 fallas»: un «no reprodujo» sobre cero vueltas.
-          if ! printf '%s' "${VUELTAS}" | grep -qE '^[1-9][0-9]*$'; then
-            echo "::error::vueltas='${VUELTAS}' no es un entero positivo. Con eso el bucle no correria ninguna vuelta y este job diria «0 fallas» sin haber medido nada"
+          #
+          # Y CON TOPE, que no es cosmetico: un entero que desborda la aritmetica de 64 bits de
+          # bash (9223372036854775808) pasaba el "entero positivo", el bucle no iteraba y el job
+          # salia verde con «No aparecio en 9223372036854775808 vueltas» sobre la vuelta cero
+          # sola. 99999 vueltas no entran en ningun tope de job; el numero existe para que la
+          # aritmetica de abajo nunca desborde.
+          if ! printf '%s' "${VUELTAS}" | grep -qE '^[1-9][0-9]{0,4}$'; then
+            echo "::error::vueltas='${VUELTAS}' no es un entero positivo de hasta 99999. Con eso el bucle no correria las vueltas pedidas y este job diria «0 fallas» sin haber medido nada"
             exit 1
           fi
 
@@ -228,7 +234,11 @@ jobs:
           fi
 
           FALLAS=0
+          # LAS VUELTAS QUE CORRIERON, contadas aparte de las pedidas: el veredicto se declara
+          # sobre las que corrieron, y si no son las pedidas no se declara ninguno.
+          CORRIDAS=0
           for ((i = 1; i <= VUELTAS; i++)); do
+            CORRIDAS=$((CORRIDAS + 1))
             # UNA LINEA POR VUELTA CON EL ACUMULADO, y no un punto. Un punto no sobrevive a una
             # cancelacion: el job muere y lo unico que queda es una fila de caracteres que hay que
             # contar a mano, que es lo que paso en Rigel. Con el acumulado, el log dice en todo
@@ -246,6 +256,11 @@ jobs:
               grep -E "not ok|AssertionError|Input:|la evidencia" "${SALIDAS}/vuelta-${i}.txt" | head -40 || true
             fi
           done
+
+          if [ "${CORRIDAS}" -ne "${VUELTAS}" ]; then
+            echo "::error::el bucle corrio ${CORRIDAS} de ${VUELTAS} vueltas pedidas. Un «no aparecio en ${VUELTAS}» sobre eso seria falso, asi que este job no declara ninguna cota"
+            exit 1
+          fi
 
           {
             echo "## ${VUELTAS} vuelta(s) de \`${BANCO}\` en forma \`${FORMA}\`"

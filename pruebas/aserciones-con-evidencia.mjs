@@ -2,8 +2,9 @@
 // ---------------------------------------------------------------------------
 // LAS ASERCIONES QUE TAPAN SU EVIDENCIA.
 //
-// QUE BUSCA. `assert.match` y `assert.doesNotMatch` con un tercer argumento que es una cadena
-// SIN interpolar. Node, con mensaje, imprime SOLO el mensaje: el input —que sin mensaje habria
+// QUE BUSCA. `assert.match` y `assert.doesNotMatch` con un tercer argumento que no lee ningun
+// valor del programa: una cadena sin interpolar, o cualquier expresion armada solo con literales
+// (ver `esCiego`). Node, con mensaje, imprime SOLO el mensaje: el input —que sin mensaje habria
 // impreso completo— se pierde. El detalle de por que esto es al reves de lo intuitivo vive en
 // `pruebas/porque.mjs`, que es el arreglo.
 //
@@ -24,7 +25,11 @@
 // herramienta, no una suite. Su banco es `pruebas/banco/aserciones-con-evidencia.test.mjs`.
 //
 // LO QUE NO VERIFICA, declarado: que el motivo sea BUENO, ni que la evidencia elegida sea la
-// util. Eso es comprension de lectura. Lo que sostiene es que la evidencia ESTE.
+// util. Eso es comprension de lectura. Lo que sostiene es que la evidencia ESTE: que el mensaje
+// lea ALGUN valor del programa. Un mensaje armado solo con literales —una cadena, una
+// concatenacion de cadenas, una constante del archivo que vale una cadena, un `new Error("...")`
+// o un `porque("motivo")` sin su segundo argumento— es ciego aunque no sea una cadena suelta, y
+// se cuenta. Ver `esCiego`.
 // ---------------------------------------------------------------------------
 
 import fs from "node:fs";
@@ -59,15 +64,27 @@ export const RAIZ = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "
  *
  * Una `/` abre una regex, y no una division, cuando lo anterior significativo NO puede terminar
  * una expresion: nada, un operador, una apertura, una coma, o una palabra clave como `return`.
- * Es la regla con la que cualquier lexer de JavaScript resuelve la ambiguedad. El limite
- * declarado: un template con otro template anidado dentro de `${}` no se sigue; sobre el arbol
- * de hoy no hay ninguno que cambie el conteo (el banco lo compara contra el AST, ver
- * `pruebas/banco/aserciones-con-evidencia.test.mjs`).
+ * Es la regla con la que cualquier lexer de JavaScript resuelve la ambiguedad, con sus dos
+ * excepciones: un `++` o un `--` pegados SI terminan una expresion (`x++ / 2` es una division),
+ * y el `)` que cierra la cabeza de un `if`, `while`, `for` o `with` NO la termina (`if (a) /re/`
+ * es una regex).
+ *
+ * EL LIMITE DECLARADO: un template con otro template anidado dentro de `${}` no se sigue. Que
+ * sobre el arbol eso no cambie el conteo NO lo mide ningun banco: fue una MEDICION de un solo
+ * uso, el 2026-09-17, contra el AST de acorn (fuera del repo, porque el marco corre sin
+ * dependencias), y dio las mismas 285 lineas. Lo que el banco SI fija son las formas concretas
+ * que esa medicion encontro distintas (su grupo 6). Un template anidado nuevo que esconda una
+ * asercion no lo va a ver nadie hasta la proxima medicion.
  */
 export function sinCadenas(texto) {
   const salida = texto.split("");
-  // Lo ultimo significativo que hubo en el CODIGO: decide si una `/` es regex o division.
+  // Lo ultimo significativo que hubo en el CODIGO, y donde: decide si una `/` es regex o division.
   let previo = "";
+  let previoEn = -1;
+  // Por cada `(` abierto, si abre la cabeza de un `if`/`while`/`for`/`with`; y si el ultimo `)`
+  // cerro una de esas. Despues de ese `)` viene una sentencia, no el resto de una expresion.
+  const aperturas = [];
+  let cierreDeControl = false;
   const blanquear = (j) => {
     if (texto[j] !== "\n") salida[j] = " ";
   };
@@ -90,6 +107,7 @@ export function sinCadenas(texto) {
       }
       i = j + 1;
       previo = c;
+      previoEn = j;
       continue;
     }
     // Un comentario de linea tampoco se mira: un ejemplo en prosa no es una asercion.
@@ -115,7 +133,7 @@ export function sinCadenas(texto) {
       i = j + 2;
       continue;
     }
-    if (c === "/" && abreRegex(texto, i, previo)) {
+    if (c === "/" && abreRegex(texto, i, previo, previoEn, cierreDeControl)) {
       let j = i + 1;
       let enClase = false;
       while (j < texto.length && texto[j] !== "\n") {
@@ -133,9 +151,15 @@ export function sinCadenas(texto) {
       }
       i = j + 1;
       previo = "/";
+      previoEn = j;
       continue;
     }
-    if (!/\s/.test(c)) previo = c;
+    if (c === "(") aperturas.push(/(?:^|[^\w$.])(?:if|while|for|with)\s*$/.test(texto.slice(Math.max(0, i - 12), i)));
+    else if (c === ")") cierreDeControl = aperturas.pop() ?? false;
+    if (!/\s/.test(c)) {
+      previo = c;
+      previoEn = i;
+    }
     i++;
   }
   return salida.join("");
@@ -145,7 +169,12 @@ export function sinCadenas(texto) {
 const ANTES_DE_REGEX = "(,=:[!&|?{};+-*%<>~^";
 const PALABRAS_ANTES_DE_REGEX = /(?:^|[^\w$])(?:return|typeof|instanceof|in|of|new|delete|void|throw|case|do|else|yield|await)$/;
 
-function abreRegex(texto, i, previo) {
+function abreRegex(texto, i, previo, previoEn, cierreDeControl) {
+  // `x++ / 2` y `x-- / 2`: el incremento POSFIJO cierra la expresion, y lo que sigue es una
+  // division. Sin esto la `/` abria una regex que se comia la asercion de la misma linea.
+  if ((previo === "+" || previo === "-") && texto[previoEn - 1] === previo) return false;
+  // `if (a) /re/.test(b)`: ese `)` cierra la cabeza de una sentencia, no una expresion.
+  if (previo === ")") return cierreDeControl;
   if (previo === "" || ANTES_DE_REGEX.includes(previo)) return true;
   if (!/[\w$]/.test(previo)) return false;
   // Una palabra: es regex solo si es una palabra clave que espera una expresion.
@@ -156,12 +185,164 @@ function abreRegex(texto, i, previo) {
 export const LLAMADA = /assert\.(?:match|doesNotMatch)\s*\(/g;
 
 /**
- * Un mensaje CIEGO: una cadena literal sin interpolacion ni concatenacion.
- *
- * Un template con `${...}` o una concatenacion SI traen evidencia, asi que no son el defecto —
- * y contarlos seria el sobreconteo que esta herramienta existe para no cometer.
+ * La forma mas comun de un mensaje CIEGO: una cadena literal sin interpolar. Admite comillas
+ * escapadas adentro (`"el \"paso\""`, `'it\'s'`): la version anterior no las admitia y ese
+ * mensaje pasaba por uno con evidencia.
  */
-export const CIEGO = /^(?:"[^"]*"|'[^']*'|`[^`$]*`)$/s;
+export const CIEGO = /^(?:"(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*'|`(?:[^`$\\]|\\.|\$(?!\{))*`)$/s;
+
+/** Lo que Node trata como «sin mensaje»: con esto imprime el input, asi que no tapa nada. */
+const SIN_MENSAJE = /^(?:undefined|null|""|''|``|0|false)$/;
+
+/** Palabras que no leen ningun valor del programa. */
+const NO_LEEN = new Set([
+  "new", "typeof", "void", "delete", "in", "of", "instanceof", "true", "false", "null", "undefined",
+  "NaN", "Infinity", "await",
+]);
+
+/** Globales cuyo nombre no es evidencia: `JSON.stringify(x)` la trae por `x`, no por `JSON`. */
+const GLOBALES = new Set([
+  "JSON", "Object", "Array", "String", "Number", "Math", "Boolean", "Symbol", "BigInt", "Date",
+  "RegExp", "Error", "TypeError", "RangeError", "Map", "Set", "Reflect", "Intl",
+]);
+
+/**
+ * Las unicas funciones cuyo resultado depende SOLO de sus argumentos, asi que llamarlas con
+ * literales da un mensaje ciego: `porque("motivo")`, `new Error("...")`. Cualquier otra llamada
+ * —`leer("x.md")`, `correr(...)`— devuelve un valor del programa, y eso es evidencia.
+ */
+const PURAS = new Set(["porque", "Error", "TypeError", "RangeError", "String", "Number", "Boolean"]);
+
+/** La marca de una llamada a algo que no esta en PURAS: ningun `resolver` la resuelve. */
+const LLAMADA_OPACA = "(llamada)";
+
+/** Las interpolaciones `${...}` de un template (sin sus comillas invertidas), como fuente. */
+function interpolaciones(contenido) {
+  const salida = [];
+  for (let k = 0; k < contenido.length; k++) {
+    if (contenido[k] === "\\") {
+      k++;
+      continue;
+    }
+    if (contenido[k] !== "$" || contenido[k + 1] !== "{") continue;
+    const resto = contenido.slice(k + 2);
+    const blanco = sinCadenas(resto);
+    let prof = 0;
+    let fin = blanco.length;
+    for (let j = 0; j < blanco.length; j++) {
+      if ("([{".includes(blanco[j])) prof++;
+      else if (")]}".includes(blanco[j])) {
+        if (prof === 0) {
+          fin = j;
+          break;
+        }
+        prof--;
+      }
+    }
+    salida.push(resto.slice(0, fin));
+    k += 2 + fin;
+  }
+  return salida;
+}
+
+/**
+ * Los nombres que una expresion LEE: sus identificadores, menos los que no traen un valor del
+ * programa —una propiedad (`.x`), una clave de objeto (`{ x: `), una palabra clave, un puñado de
+ * globales y las funciones de PURAS—. Una llamada a cualquier otra funcion, o a un metodo, cuenta
+ * como lectura (`LLAMADA_OPACA`): su resultado es un valor del programa. Entra en las
+ * interpolaciones de sus templates.
+ */
+export function referenciasDe(expresion) {
+  const blanco = sinCadenas(expresion);
+  const refs = [];
+  for (const m of blanco.matchAll(/(?<![\w$])[A-Za-z_$][\w$]*/g)) {
+    const nombre = m[0];
+    const antes = blanco.slice(0, m.index).trimEnd();
+    const despues = blanco.slice(m.index + nombre.length).trimStart();
+    const llamada = despues.startsWith("(") || despues.startsWith("`");
+    const propiedad = antes.endsWith(".") && !antes.endsWith("...");
+    if (llamada && !(PURAS.has(nombre) && !propiedad) && !(propiedad && antes.endsWith("JSON."))) {
+      refs.push(LLAMADA_OPACA);
+      continue;
+    }
+    if (llamada || propiedad || NO_LEEN.has(nombre) || GLOBALES.has(nombre)) continue;
+    if (despues.startsWith(":") && /[{,]$/.test(antes)) continue;
+    refs.push(nombre);
+  }
+  // Los templates: en el blanqueado quedan solo sus comillas invertidas, de a pares.
+  const marcas = [...blanco.matchAll(/`/g)].map((m) => m.index);
+  for (let k = 0; k + 1 < marcas.length; k += 2) {
+    for (const interp of interpolaciones(expresion.slice(marcas[k] + 1, marcas[k + 1]))) refs.push(...referenciasDe(interp));
+  }
+  return refs;
+}
+
+/**
+ * El valor con que el archivo inicializa la constante `nombre`: la ultima `const nombre =`
+ * ANTES de `antesDe` (la mas cercana, que es la que suele estar en alcance), o la primera
+ * despues si no hay ninguna antes. `null` si el archivo no la declara con `const`: un `let`, un
+ * parametro o un import pueden valer cualquier cosa, y se tratan como evidencia.
+ */
+function inicializadorDe(fuente, blanco, nombre, antesDe) {
+  const escapado = nombre.replace(/[$]/g, "\\$");
+  const declaraciones = [...blanco.matchAll(new RegExp(`(?<![\\w$.])const\\s+${escapado}\\s*=(?![=>])`, "g"))];
+  if (declaraciones.length === 0) return null;
+  const previas = declaraciones.filter((d) => d.index < antesDe);
+  const d = previas.length > 0 ? previas[previas.length - 1] : declaraciones[0];
+  const desde = d.index + d[0].length;
+  let prof = 0;
+  let j = desde;
+  for (; j < blanco.length; j++) {
+    const c = blanco[j];
+    if ("([{".includes(c)) prof++;
+    else if (")]}".includes(c)) {
+      if (prof === 0) break;
+      prof--;
+    } else if ((c === ";" || c === ",") && prof === 0) break;
+    else if (c === "\n" && prof === 0) {
+      // Sin punto y coma: la declaracion sigue solo si la linea termina o la siguiente empieza
+      // con un operador.
+      const hasta = blanco.slice(desde, j).trimEnd();
+      const siguiente = blanco.slice(j + 1).trimStart();
+      if (hasta !== "" && !/[+\-*/%=&|?:,(]$/.test(hasta) && !/^[+\-*/%&|?:.]/.test(siguiente)) break;
+    }
+  }
+  return fuente.slice(desde, j);
+}
+
+/**
+ * Si un mensaje es CIEGO: si no lee NINGUN valor del programa que no sea, a su vez, una
+ * constante del archivo armada solo con literales.
+ *
+ * POR QUE NO ALCANZA CON MIRAR SI ES UNA CADENA SUELTA, que es lo que hacia esta herramienta.
+ * Medido: `const M = "..."` y despues `M` como mensaje, `"a" + "b"`, `new Error("...")` y
+ * `porque("motivo")` sin su segundo argumento pasaban como si trajeran evidencia, y en los
+ * cuatro Node imprime el motivo y pierde el input — en el ultimo, con un «la evidencia:
+ * undefined» que se lee como evidencia. Este ultimo era ademas la forma que sugiere el propio
+ * mensaje de error de esta herramienta, a medio escribir.
+ *
+ * LO QUE SIGUE SIN SER CIEGO, a proposito: todo mensaje que lee un valor —`porque("m", x)`, un
+ * template con `${x}`, `JSON.stringify(h)`, el propio input como mensaje (`r.salida`)— y lo que
+ * Node trata como ausencia de mensaje (`undefined`, `""`), con lo que imprime el input igual.
+ *
+ * Y UN NOMBRE QUE TAMBIEN LEE EL INPUT es evidencia, aunque valga una constante: si el mensaje
+ * muestra lo mismo que se esta mirando (`assert.match(m, /x/, porque("...", m))`), el input
+ * esta en el mensaje.
+ *
+ * `resolver(nombre)` devuelve el inicializador de una constante del archivo, o `null`; `delInput`
+ * son los nombres que lee el primer argumento de la asercion.
+ */
+export function esCiego(expresion, resolver = () => null, delInput = new Set(), vistos = new Set()) {
+  const e = String(expresion ?? "").trim();
+  if (e === "" || SIN_MENSAJE.test(e)) return false;
+  if (CIEGO.test(e)) return true;
+  for (const nombre of referenciasDe(e)) {
+    if (nombre === LLAMADA_OPACA || delInput.has(nombre) || vistos.has(nombre)) return false;
+    const valor = resolver(nombre);
+    if (valor === null || !esCiego(valor, resolver, delInput, new Set([...vistos, nombre]))) return false;
+  }
+  return true;
+}
 
 /**
  * Los argumentos de una llamada, partidos por comas de nivel cero.
@@ -217,7 +398,9 @@ export function ciegasEn(fuente) {
     const abre = m.index + m[0].length - 1;
     const args = argumentos(texto, fuente, abre);
     if (args.length < 3) continue;
-    if (!CIEGO.test(args[2])) continue;
+    const resolver = (nombre) => inicializadorDe(fuente, texto, nombre, m.index);
+    const delInput = new Set(referenciasDe(args[0]));
+    if (!esCiego(args[2], resolver, delInput)) continue;
     halladas.push({ linea: texto.slice(0, m.index).split("\n").length, mensaje: args[2] });
   }
   return halladas;
@@ -303,7 +486,8 @@ export function ejecutar(args, raiz = RAIZ) {
         `::error file=${rel},line=${h.linea}::esta asercion tapa su evidencia: assert.match con un ` +
           "mensaje imprime SOLO el mensaje, y el input —que sin mensaje se habria impreso completo— se " +
           "pierde. El dia que caiga en CI vas a tener el motivo y no lo que paso. Arreglo: envolve el " +
-          "mensaje con porque(<motivo>, <lo que se miro>) de pruebas/porque.mjs",
+          "mensaje con porque(<motivo>, <lo que se miro>) de pruebas/porque.mjs, con los DOS " +
+          "argumentos: sin el segundo el mensaje sigue ciego",
       );
     }
   }
@@ -316,7 +500,28 @@ export function ejecutar(args, raiz = RAIZ) {
   return { codigo: 1, salida, errores };
 }
 
-const invocadoDirecto = process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url);
+/**
+ * «¿Me invocaron a mi?», resuelto por realpath en los DOS lados.
+ *
+ * `import.meta.url` llega resuelto y `process.argv[1]` no: invocada por una ruta que pasa por un
+ * enlace —`/tmp` en macOS, que es `/private/tmp`, o un directorio enlazado— la comparacion literal
+ * daba falso y la herramienta salia 0 SIN IMPRIMIR NADA, con una asercion ciega adelante. Es el
+ * defecto que `actions/censo-fuentes`, `actions/cobertura-diff`, `actions/aviso-version` y
+ * `herramientas/` ya habian cerrado; aca no habia cruzado.
+ */
+function mismaRuta(a, b) {
+  const real = (p) => {
+    try {
+      return fs.realpathSync(p);
+    } catch {
+      return path.resolve(p);
+    }
+  };
+  const [x, y] = [real(a), real(b)];
+  return process.platform === "win32" ? x.toLowerCase() === y.toLowerCase() : x === y;
+}
+
+const invocadoDirecto = Boolean(process.argv[1]) && mismaRuta(process.argv[1], fileURLToPath(import.meta.url));
 
 if (invocadoDirecto) {
   // Los archivos que el PR toca llegan por argumento; sin argumentos, se censa el arbol.
