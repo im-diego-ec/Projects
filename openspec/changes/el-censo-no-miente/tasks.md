@@ -153,6 +153,77 @@ usan, y la relectura de las filas (4.3) antes que la regla que la exige quede en
       **No hecho en este lote**: la entrada está en
       `.porte/changelog/18-el-censo-no-miente.md` y se funde al integrar.
 
+## Bloque 7 — Lo que encontró la revisión adversarial (2026-09-18)
+
+- [x] 7.1 **Una ausencia escrita en otra forma contaba como compuerta** (FO-S20). `estadoDe`
+      clasificaba como completa toda celda que no abriera exactamente con una de las formas en
+      negrita. **Rojo, sobre la página real mutada como lo hizo la revisión** (la fila «El
+      formato acordado se verifica en cada integración» con «**Ninguno**: hoy nada lo pone en
+      rojo ...» y su ancla): antes, `25/25`; con el arreglo, `fail 7`. **Rojo primero en el
+      banco:** dos casos nuevos contra la versión anterior → `tests 28, pass 26, fail 2`: siete
+      formas de escribir la ausencia (con mayúscula, sin negrita, «nada», «sin compuerta», «no
+      hay», una forma en negrita mal escrita) y una fila que solo cita documentación.
+      **Arreglo:** en `pruebas/docs/cobertura-de-requirements.test.mjs`, `estadoDe` manda a
+      «sin declarar» toda celda que abre en negrita sin ser una de las formas, o con una
+      palabra de ausencia en cualquier caja; `ausenciasMalDeclaradas` la pone en rojo con su
+      propio mensaje; `compuertasSinCita` no cuenta una ruta `.md`. El contrapeso tiene caso:
+      las filas completas que abren con texto normal y las parciales siguen con compuerta, y la
+      página real queda igual (30 de 41, 15 parciales). Resultado: `28/28`. En el delta de
+      `calidad-codigo`: la cláusula y el escenario «Una ausencia escrita en otra forma», y la
+      cita que no sea documentación en «Una compuerta que no se puede ir a mirar».
+- [x] 7.2 **El lector del alcance contaba `uses:` que no invocan nada** (FO-S13). **Rojo
+      primero:** el caso MUERDE nuevo de `pruebas/andamio/actions-alcanzables.test.mjs` contra el
+      lector anterior → `fail 1`, y alcanzaba `input-desc` (un `description: |`), `heredoc` (un
+      heredoc en un `run:`) y `docs-ejemplo` (un workflow que GitHub no corre). **Arreglo:**
+      `alcanzadas()` lee solo la clave `uses:` de un paso con `pasosDe()`, y `workflowsDelArbol()`
+      toma de `superficies()` solo los de `.github/workflows/` y `plantilla/.github/workflows/`
+      (design D2). El recorrido propio del lector, con su guarda de repositorios anidados
+      (`alcance-de-las-actions.mjs:52` de 2.2), se fue: la guarda vive ahora en `superficies()` de
+      `pruebas/marco-ci/extraer.mjs`, compartida con el censo de pasos (bloque 7 de
+      `rojo-primero`). Sobre el árbol siguen alcanzadas las cinco de siempre y `carril-docs`
+      sigue declarada. Resultado: `7/7`. En el delta: el escenario «Una invocación que no invoca
+      nada» suma la descripción de un parámetro y la definición que el proveedor no ejecuta.
+- [ ] 7.3 **La hermana de 7.2 en el reusable**: el paso «Censo de fuentes cableado» de
+      `marco-ci.yml` busca el cableado con un `grep` de línea, y un `- uses:
+      .../actions/censo-fuentes@...` dentro de un heredoc lo da por cableado (confirmado por la
+      revisión). No se arregla acá: corre en el árbol del consumidor, sin el código del marco,
+      así que cerrarlo exige un lector de pasos dentro del YAML, atado por comportamiento a
+      `pasosDe()` como el par de lectores de `permiso`. **Destino:** el lote 15 del porte
+      (`las-actions-publicadas-resuelven-y-se-documentan`), cuyo item
+      `la-compuerta-llega-o-se-declara` es esta pregunta.
+- [ ] 7.4 **Tres choques seguros con el carril L2 al integrar** (RV-L3-04). No se arreglan
+      desde acá porque el arreglo depende de lo que traiga L2. **Destino:** la integración de
+      los carriles; quien junte L2 con este carril tiene que hacer las tres cosas:
+      (a) el lote 6 de L2 (`guardrail-deltas-por-version-exacta`) borra la excepción de `@v1`
+      de `pruebas/andamio/pinado.test.mjs` —«cero excepciones»— y este lote le agregó
+      `vigenteEn` y un caso que la vence: al juntar, borrar ese caso (o reescribirlo para lo que
+      quede) y corregir lo que afirma que la excepción existe: el fragmento
+      `.porte/changelog/18-el-censo-no-miente.md` («Cambiado»), el encabezado de
+      `pruebas/vigencia.mjs` y el proposal de este change. El lote 14 le sumó un `porque()` a la
+      aserción de `@v1` de ese banco, que L2 también borra;
+      (b) L2 agrega a la página la fila «El Environment de producción...» con «`**ninguno**`
+      que se ponga rojo»: con la regla de este change es una ausencia sin declarar, y hay que
+      reclasificarla con uno de los tres estados;
+      (c) L2 le pone nombre al paso `id: detectar` de `marco-ci.yml` («Detectar el carril de
+      docs»): la entrada `(sin name, id: detectar)` de `SIN_BANCO_TODAVIA` en
+      `pruebas/marco-ci/cobertura-de-los-pasos.test.mjs` pasa a ser una declaración fantasma
+      y hay que renombrarla al nombre nuevo (o borrarla, si L2 le escribió banco).
+- [ ] 7.5 **El próximo release sale rojo en 13 puntos, a propósito, y la skill del release no
+      lo dice** (RV-L3-09). Medido el 2026-09-18 sobre una copia con `## [1.10.0]` agregado al
+      CHANGELOG: `pruebas/docs/cobertura-de-requirements.test.mjs`,
+      `pruebas/andamio/actions-alcanzables.test.mjs` y `pruebas/andamio/pinado.test.mjs` →
+      `fail 5`, con 11 filas «sin destino» vencidas, la excepción de `carril-docs` y la de
+      `@v1`. Cada rojo trae su arreglo, pero la skill `projects-release` no los nombra. No se
+      edita desde acá: la skill la tocan tres carriles de esta misma ola (L1, L2 y L4), y un
+      cuarto es un conflicto seguro. **Destino:** el lote 9 del porte
+      (`el-ensayo-ejercita-lo-que-publica`), que ya reescribe el runbook de
+      `.claude/skills/projects-release/SKILL.md`. Lo que tiene que agregar, en el paso que
+      prepara el PR del release: releer cada fila «sin destino» vencida y decidirla de nuevo
+      (compuerta, change que la tenga, propiedad que la hace no verificable, o mover
+      `vigente en` a la versión nueva como decisión firmada), y lo mismo con cada excepción
+      vencida de `actions-alcanzables.test.mjs` y `pinado.test.mjs`. Ningún lote publica
+      versiones antes del lote 38 (D1), así que nadie corta un release antes de que eso esté.
+
 ## Pendiente fuera de este change
 
 - **Las dos detecciones del carril de docs** —`actions/carril-docs` y la inline del job
@@ -162,5 +233,4 @@ usan, y la relectura de las filas (4.3) antes que la regla que la exige quede en
   `la-compuerta-llega-o-se-declara`, en otro lote del porte.
 - **El release que corte la versión siguiente** va a encontrar en rojo, a propósito, las
   11 filas sin destino, la excepción de `carril-docs` y la de `@v1`. Cada rojo trae su
-  arreglo. La skill `projects-release` no lo menciona todavía; la tocan otros lotes del
-  porte y conviene sumarlo ahí.
+  arreglo. Que la skill `projects-release` lo diga es la tarea 7.5, con destino en el lote 9.

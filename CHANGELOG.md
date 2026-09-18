@@ -1225,7 +1225,9 @@ mueve sobre un cambio incompatible.
   afirma: **pendiente** en un change vivo (el change existe y nombra al requirement),
   **no verificable** por una propiedad del requirement (un motivo de esfuerzo no cuenta),
   o **sin destino**, con la versión en que se decidió. Esta última **vence** al cortar la
-  versión siguiente. Un `**ninguno**` pelado es rojo. Viene de Rigel (2.0.0 `censo-honesto`
+  versión siguiente. Un `**ninguno**` pelado es rojo, y también cualquier otra forma de
+  escribir la ausencia («Ninguno», «nada», «sin compuerta»...): antes contaban como
+  compuerta. Viene de Rigel (2.0.0 `censo-honesto`
   y 2.4.0 `el-numero-del-censo`); el tercer estado es de este marco, porque acá el destino
   tiene que poder comprobarse sin red. **Para consumidores: nada** (página y banco del
   marco).
@@ -1237,8 +1239,10 @@ mueve sobre un cambio incompatible.
 
 - **Una compuerta que no corre no cuenta, y toda action publicada tiene que correr en
   algún lado.** Hay un banco nuevo, `pruebas/andamio/actions-alcanzables.test.mjs`: toda
-  action de `actions/` tiene que estar invocada por algún `uses:` del marco o del andamio,
-  o declarada con su motivo. La página de cobertura no puede citar como compuerta nada de
+  action de `actions/` tiene que estar invocada por la clave `uses:` de un paso de un
+  workflow que GitHub ejecuta (los del marco y los del andamio), o declarada con su motivo:
+  un `uses:` dentro de un heredoc, del texto de un input o de un workflow de ejemplo no
+  cuenta. La página de cobertura no puede citar como compuerta nada de
   una action que nadie invoca. Los dos bancos usan el mismo lector del alcance. El caso
   existía: **`actions/carril-docs` no la invoca ningún workflow del árbol**. Se declara,
   no se cablea, porque `marco-ci.yml` trae la misma detección inline. Viene de Rigel

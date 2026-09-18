@@ -33,49 +33,33 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
+import { pasosDe, superficies } from "./marco-ci/extraer.mjs";
+
 export const RAIZ = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
-/** Los directorios que no son del marco y no se recorren: dependencias, historia y bancos.
- *  `pruebas/` queda fuera porque sus fixtures escriben `uses:` a proposito. */
-const NO_SE_RECORREN = new Set([".git", "node_modules", "pruebas"]);
-
-/** Si una carpeta de adentro es OTRO repositorio: trae su propio `.git` (directorio en un
- *  clon, archivo en un worktree).
+/** Donde GitHub EJECUTA un workflow: el `.github/workflows/` de la raiz. Y el del andamio, que
+ *  es el que queda en la raiz de cada proyecto nacido de el.
  *
- *  No es teoria. Las sesiones de agente pueden dejar worktrees DENTRO del checkout (por
- *  ejemplo `.claude/worktrees/<rama>/`), cada uno con una copia entera de
- *  `.github/workflows/`, y Rigel lo midio: un `grep -rn .` sobre su arbol devolvia 36 lineas
- *  de ruido de los worktrees en vuelo (commit b372d9c de alla). Aca el ruido
- *  seria peor que ruido: el `uses:` de una rama en vuelo haria «alcanzada» a una action que
- *  el arbol que se esta midiendo no invoca, y el banco daria verde por un archivo que no es
- *  suyo. Es la direccion insegura, asi que se corta. */
-const esOtroRepositorio = (abs) => fs.existsSync(path.join(abs, ".git"));
-
-/** Los workflows del arbol: todo `.github/workflows/*.yml` en cualquier profundidad.
- *
- *  SE DERIVAN Y NO SE LISTAN, que es la doctrina del censo de pasos de `rojo-primero`: una
- *  superficie nueva entra sola. Hoy son dos directorios —los del marco y los que reparte el
- *  andamio—, y `plantilla/` no es un detalle: `censo-fuentes` y `cobertura-diff` NO las invoca
- *  `marco-ci.yml`, las invoca el andamio. Dejarlo afuera pondria rojo a dos actions que corren
- *  en cada proyecto nacido de el.
+ *  POR QUE DOS LUGARES FIJOS Y NO «cualquier `.github/workflows/`». Un workflow bajo
+ *  `docs/ejemplo/.github/workflows/` no lo corre nadie: GitHub solo mira el de la raiz. Contarlo
+ *  hacia «alcanzada» a una action que no corre en ningun repositorio (lo midio la revision
+ *  adversarial del porte, 2026-09-18). La direccion segura es la de ahora: un workflow que
+ *  aparezca en otro lugar no alcanza nada, y la action que solo invoque ese sale huerfana, que
+ *  es un rojo que pide decidir.
  *
  *  Los `action.yml` NO cuentan como origen de un `uses:`. Una action que solo invocara otra
  *  composite action saldria huerfana: es la direccion segura (un rojo que pide declararla),
  *  y hoy no hay ninguna. */
+const ORIGENES = /^(?:plantilla\/)?\.github\/workflows\/[^/]+\.ya?ml$/;
+
+/** Los workflows que corren: los de ORIGENES, sacados del MISMO recorrido del arbol que usa el
+ *  censo de pasos (`superficies()` del extractor). Ese recorrido ya saltea `pruebas/`, donde los
+ *  fixtures escriben `uses:` a proposito, y todo repositorio anidado —un worktree dentro del
+ *  checkout, como los que deja una sesion de agente—, cuyo `uses:` haria «alcanzada» a una
+ *  action que el arbol medido no invoca. Rigel midio ese ruido (commit b372d9c de alla). Un
+ *  solo recorrido, para que los dos lectores no puedan discrepar sobre que arbol miran. */
 export function workflowsDelArbol(raiz = RAIZ) {
-  const encontrados = [];
-  const recorrer = (relativa) => {
-    for (const e of fs.readdirSync(path.join(raiz, relativa), { withFileTypes: true })) {
-      if (NO_SE_RECORREN.has(e.name)) continue;
-      const hija = relativa === "" ? e.name : `${relativa}/${e.name}`;
-      if (e.isDirectory()) {
-        if (!esOtroRepositorio(path.join(raiz, hija))) recorrer(hija);
-      }
-      else if (/(^|\/)\.github\/workflows\/[^/]+\.ya?ml$/.test(hija)) encontrados.push(hija);
-    }
-  };
-  recorrer("");
-  return encontrados.sort();
+  return superficies(raiz).filter((rel) => ORIGENES.test(rel));
 }
 
 /** LAS TRES FORMAS de invocar una action del marco, y las tres son legitimas:
@@ -88,15 +72,17 @@ export function workflowsDelArbol(raiz = RAIZ) {
  *      si mismo (`aviso-version.yml`, y los jobs de `ci.yml` que no pueden resolver la ref
  *      publicada en el repo que la contiene).
  *
- *  SOLO CUENTA LA CLAVE `uses:` DE VERDAD, anclada al principio de la linea. Un `echo "uses:
- *  ..."` dentro de un `run:` —`marco-ci.yml` imprime asi el snippet que el consumidor tiene que
- *  pegar— no invoca nada. La i vale para el dueno y el repo (GitHub no distingue mayusculas
- *  ahi); el nombre de la action se compara despues contra la carpeta, byte por byte, porque la
- *  ruta dentro del repo SI las distingue. */
+ *  SE COMPARAN CONTRA EL VALOR DE LA CLAVE `uses:` DE UN PASO, el que lee `pasosDe`, y no contra
+ *  una linea del archivo. La version anterior anclaba `uses:` al principio de la linea y contaba
+ *  tres cosas que no invocan nada: una linea de un heredoc dentro de un `run:`, el texto de un
+ *  `description: |` y (con el recorrido de antes) un workflow que GitHub no ejecuta. La i vale
+ *  para el dueno y el repo (GitHub no distingue mayusculas ahi); el nombre de la action se
+ *  compara despues contra la carpeta, byte por byte, porque la ruta dentro del repo SI las
+ *  distingue. */
 export const FORMAS = [
-  { nombre: "publicada", patron: /^\s*(?:-\s+)?uses:\s*["']?im-diego-ec\/Projects\/actions\/([A-Za-z0-9_-]+)@/i },
-  { nombre: "andamio", patron: /^\s*(?:-\s+)?uses:\s*["']?\{\{ORG_MARCO\}\}\/Projects\/actions\/([A-Za-z0-9_-]+)@/i },
-  { nombre: "local", patron: /^\s*(?:-\s+)?uses:\s*["']?\.\/actions\/([A-Za-z0-9_-]+)\/?["']?\s*(?:#.*)?$/ },
+  { nombre: "publicada", patron: /^im-diego-ec\/Projects\/actions\/([A-Za-z0-9_-]+)@/i },
+  { nombre: "andamio", patron: /^\{\{ORG_MARCO\}\}\/Projects\/actions\/([A-Za-z0-9_-]+)@/i },
+  { nombre: "local", patron: /^\.\/actions\/([A-Za-z0-9_-]+)\/?$/ },
 ];
 
 /** Los directorios de `actions/` que publican una action: los que traen `action.yml`. */
@@ -110,23 +96,24 @@ export function actionsPublicadas(raiz = RAIZ) {
     .sort();
 }
 
-/** Toda action nombrada por un `uses:` de algun workflow del arbol: nombre -> [{archivo, linea, forma}].
+/** Toda action nombrada por la clave `uses:` de un PASO de algun workflow que corre:
+ *  nombre -> [{archivo, linea, forma}].
  *
- *  Las lineas COMENTADAS no cuentan: un `uses:` comentado es la forma mas facil de «cablear»
- *  algo sin cablearlo, y es exactamente el defecto que esto persigue. */
+ *  Un `uses:` comentado no cuenta (es la forma mas facil de «cablear» algo sin cablearlo), ni uno
+ *  impreso por un `echo` o un heredoc, ni el texto de un escalar de bloque: `pasosDe` solo
+ *  devuelve la clave de un paso dentro de `steps:`. */
 export function alcanzadas(raiz = RAIZ) {
   const encontradas = new Map();
   for (const archivo of workflowsDelArbol(raiz)) {
-    const lineas = fs.readFileSync(path.join(raiz, archivo), "utf8").split(/\r?\n/);
-    lineas.forEach((l, i) => {
-      if (/^\s*#/.test(l)) return;
+    for (const paso of pasosDe(path.join(raiz, archivo))) {
+      if (paso.uses === null) continue;
       for (const forma of FORMAS) {
-        const m = l.match(forma.patron);
+        const m = paso.uses.match(forma.patron);
         if (!m) continue;
         if (!encontradas.has(m[1])) encontradas.set(m[1], []);
-        encontradas.get(m[1]).push({ archivo, linea: i + 1, forma: forma.nombre });
+        encontradas.get(m[1]).push({ archivo, linea: paso.lineaUses ?? paso.linea, forma: forma.nombre });
       }
-    });
+    }
   }
   return encontradas;
 }

@@ -23,6 +23,16 @@ consumidor recibe nada.
 `**no verificable** — <propiedad>` y `**sin destino**, vigente en X.Y.Z — <texto>`—, y
 `**ninguno**` pelado es rojo.
 
+**Y el default no es «tiene compuerta».** La primera versión clasificaba como completa toda
+celda que no abriera exactamente con una de esas formas, y la revisión adversarial del porte
+(2026-09-18) midió el costo: «**Ninguno**: hoy nada lo pone en rojo», con mayúscula, contaba
+como compuerta en todos los números y ningún control de ausencia la veía. Ahora una celda que
+abre en negrita sin ser una de las formas, o con una palabra de ausencia en cualquier caja
+(«ninguno», «nada», «sin compuerta», «no hay»...), es una ausencia sin declarar, y es rojo. Y
+una fila con compuerta tiene que citar una ruta que no sea documentación, o un paso: una
+página de `docs/` no pone nada en rojo. **Descartado:** exigir que toda fila completa cite un
+paso existente. La mayoría cita un banco por su ruta, y eso ya se busca.
+
 Rigel tiene dos (`rigel:compuerta-pendiente <destino>` y `rigel:sin-compuerta
 <propiedad>`), y su destino admitía «issue, change o documento»: sus 36 pendientes
 apuntaban a un issue paraguas. Acá el destino tiene que ser algo que el banco compruebe
@@ -86,6 +96,16 @@ reemplazó por el único.
 `.git` —un worktree de una sesión de agente dentro del checkout— trae una copia entera de
 `.github/workflows/`, y su `uses:` haría «alcanzada» a una action que el árbol medido no
 invoca. Es la dirección insegura. El banco lo muerde con un worktree de juguete.
+
+**Y cuenta solo lo que GitHub ejecuta, corregido después de la revisión adversarial
+(2026-09-18).** La primera versión anclaba `uses:` al principio de la línea y recorría todo
+`.github/workflows/` a cualquier profundidad. Tres cosas que no invocan nada la hacían
+«alcanzada»: una línea de un heredoc dentro de un `run:`, el texto de un `description: |` y
+un workflow bajo `docs/ejemplo/.github/workflows/`, que GitHub no corre. Ahora cuenta solo el
+valor de la clave `uses:` de un paso, leído con `pasosDe()` —el lector del censo de pasos—, y
+solo en `.github/workflows/` y `plantilla/.github/workflows/` de la raíz. Y el recorrido del
+árbol es uno solo: el de `superficies()`, que también dejó de entrar a repositorios anidados
+(el censo de pasos no lo hacía, y un worktree adentro le sumaba 63 pasos sin estado).
 
 ## D3. Rojo, y no aviso como en Rigel
 

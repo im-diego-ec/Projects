@@ -145,27 +145,42 @@ export function seccionesDeLaPagina(texto = pagina()) {
   return secciones;
 }
 
+/** Las palabras con que se escribe una AUSENCIA al principio de una celda, ya sin acentos y en
+ *  minusculas. */
+const AUSENCIA = /^(?:ningun[oa]?|nada|no hay|no tiene|no existe|sin compuerta|sin destino|sin banco|pendiente|no verificable|todavia no|aun no|ausente)\b/;
+
 /** El estado de una fila, por la forma en que EMPIEZA su celda del medio.
  *
  *  Seis estados y excluyentes. Los dos primeros tienen compuerta; los otros cuatro no:
  *
- *    completa       · cualquier otra cosa: la celda nombra lo que la pone en rojo
+ *    completa       · la celda nombra lo que la pone en rojo, en texto normal
  *    parcial        · `**parcial**...`: existe un camino al rojo, y cubre una parte
  *    pendiente      · `**pendiente** → change `x``: verificable, con el trabajo en un change
  *    no-verificable · `**no verificable** — ...`: con la propiedad que lo impide
  *    sin-destino    · `**sin destino**, vigente en X.Y.Z — ...`: verificable y sin dueño
- *    sin-declarar   · `**ninguno**`: la ausencia gratis, que es lo que esto persigue
+ *    sin-declarar   · la ausencia gratis, que es lo que esto persigue: `**ninguno**`, y toda
+ *                     otra celda que abre en NEGRITA sin ser una de las cuatro formas, o con una
+ *                     palabra de ausencia («ninguno», «nada», «sin compuerta», «no hay»...) en
+ *                     cualquier caja
+ *
+ *  EL DEFAULT YA NO ES «COMPLETA» PARA CUALQUIER COSA. Lo era, y la revision adversarial del
+ *  porte (2026-09-18) midio lo que costaba: una fila «**Ninguno**: hoy nada lo pone en rojo»,
+ *  con mayuscula, contaba como compuerta en el encabezado, el resumen y el desglose, y ningun
+ *  control de ausencia la veia. Una ausencia mal escrita tiene que caer del lado de las
+ *  ausencias, donde `ausenciasMalDeclaradas` la pone en rojo pidiendo la forma, y no del lado
+ *  de las compuertas, donde publica como sostenido algo que su propia fila dice que no lo esta.
  *
  *  «parcial» cuenta como compuerta a proposito y la pagina lo declara: dice que existe al
  *  menos un camino por el que ese requirement pone algo en rojo solo, no que este cubierto
  *  entero. Por eso se publica aparte, como subconjunto de los que tienen compuerta. */
 export function estadoDe(fila) {
   const c = fila.cobertura;
-  if (/^\*\*ninguno\*\*/.test(c)) return "sin-declarar";
   if (/^\*\*pendiente\*\*/.test(c)) return "pendiente";
   if (/^\*\*no verificable\*\*/.test(c)) return "no-verificable";
   if (/^\*\*sin destino\*\*/.test(c)) return "sin-destino";
   if (/^\*\*parcial/.test(c)) return "parcial";
+  if (c.startsWith("**")) return "sin-declarar";
+  if (AUSENCIA.test(sinAcentos(c.replace(/^[*_`\s]+/, "")))) return "sin-declarar";
   return "completa";
 }
 export const tieneCompuerta = (fila) => ["completa", "parcial"].includes(estadoDe(fila));
@@ -490,8 +505,13 @@ export function ausenciasMalDeclaradas(texto, { version = versionPublicada(), vi
     for (const f of s.filas) {
       const quien = `«${f.requirement}» (${s.capability})`;
       const d = declaracionDe(f);
-      if (d.estado === "sin-declarar") {
+      if (d.estado === "sin-declarar" && /^\*\*ninguno\*\*\s*$/.test(f.cobertura)) {
         mal.push(`${quien} dice \`**ninguno**\` y nada mas: un requirement nuevo sin compuerta y uno cuya compuerta nadie supo construir se leen igual. ${salidas}`);
+      } else if (d.estado === "sin-declarar") {
+        mal.push(
+          `${quien} declara la ausencia con una forma que la pagina no reconoce («${f.cobertura.slice(0, 50)}»), y con eso se ` +
+            `contaba como compuerta en todos los numeros. ${salidas}`,
+        );
       } else if (d.estado === "pendiente") {
         if (!d.change) mal.push(`${quien} se declara pendiente sin decir en que change: la forma es \`**pendiente** → change \`<nombre>\`\``);
         else if (!vivos.has(d.change))
@@ -590,10 +610,14 @@ export function compuertasSinCita(texto) {
   for (const s of seccionesDeLaPagina(texto)) {
     for (const f of s.filas.filter(tieneCompuerta)) {
       const celda = citasDeLaFila(f);
-      if (anclasDe(celda).length === 0 && pasosCitados(celda).length === 0)
+      // Una ruta de documentacion (`.md`) no cuenta: una pagina de docs/ o un spec no ponen nada
+      // en rojo. Lo midio la revision adversarial del porte: con cualquier ruta que existiera
+      // alcanzaba.
+      const citasQueCorren = anclasDe(celda).filter((a) => !a.ruta.endsWith(".md"));
+      if (citasQueCorren.length === 0 && pasosCitados(celda).length === 0)
         mal.push(
-          `«${f.requirement}» (${s.capability}) cuenta como compuerta y no cita ninguna ruta ni ningun paso «...»: nadie puede ir a ` +
-            "mirar lo que la pone en rojo. Nombrala, o declara la fila sin compuerta con su estado",
+          `«${f.requirement}» (${s.capability}) cuenta como compuerta y no cita ninguna ruta que no sea documentacion ni ningun paso «...»: ` +
+            "nadie puede ir a mirar lo que la pone en rojo. Nombrala, o declara la fila sin compuerta con su estado",
         );
     }
   }
@@ -1098,6 +1122,61 @@ test("MUERDE: una fila que cuenta como compuerta sin citar nada se caza", () => 
   assert.ok(fila, "no hay ninguna fila con compuerta: esta refutacion se quedo sin material");
   const mal = compuertasSinCita(conCelda(texto, fila.requirement, "el review lo mira con cuidado"));
   assert.ok(mal.some((m) => m.startsWith(`«${fila.requirement}»`)), `una frase suelta no puede contar como compuerta. Dijo: ${mal.join(" / ")}`);
+});
+
+test("MUERDE: una ausencia escrita en otra forma NO cuenta como compuerta, y se caza", () => {
+  // Lo encontro la revision adversarial del porte (2026-09-18). `estadoDe` daba por «completa»
+  // —con compuerta— toda celda que no abriera EXACTAMENTE con una de las cinco formas en
+  // negrita. Una fila que declaraba en palabras que no tiene compuerta («**Ninguno**: hoy nada
+  // lo pone en rojo», con mayuscula) contaba como sostenida en el encabezado, el resumen y el
+  // desglose, salia de todos los controles de ausencia y el banco quedaba 25/25 verde: el
+  // default era permisivo. Ahora una celda que abre en negrita sin ser una de las cuatro formas,
+  // o con una palabra de ausencia en cualquier caja, es una ausencia sin declarar.
+  const texto = pagina();
+  const { fila, seccion } = unaFila(texto, (f) => estadoDe(f) === "completa") ?? {};
+  assert.ok(fila, "no hay ninguna fila completa: esta refutacion se quedo sin material");
+  const formas = [
+    "**Ninguno**: hoy nada lo pone en rojo; el paso existe pero no corre en ningún lado",
+    "ninguno: el paso no corre",
+    "Nada lo pone en rojo todavía",
+    "Sin compuerta: lo mira el review",
+    "No hay compuerta que lo haga fallar",
+    "**Sin Destino**, vigente en 1.9.6 — una grafia que no es la forma",
+    "**nada** por ahora",
+  ];
+  const escapadas = [];
+  for (const forma of formas) {
+    const mutado = conCelda(texto, fila.requirement, forma, "`plantilla/.github/workflows/ci.yml:206`");
+    const f = unaFila(mutado, (x) => x.requirement === fila.requirement).fila;
+    const mal = ausenciasMalDeclaradas(mutado);
+    if (tieneCompuerta(f) || !mal.some((m) => m.startsWith(`«${fila.requirement}»`))) escapadas.push(forma);
+    // Y los numeros la cuentan del lado de las ausencias: el encabezado viejo queda desajustado.
+    else if (!desajustes(mutado).some((m) => m.includes(`${seccion.capability}: el encabezado dice ${seccion.diceConCompuerta} con compuerta`)))
+      escapadas.push(`${forma} (los conteos no la movieron)`);
+  }
+  assert.deepEqual(escapadas, [], porque("estas formas de decir «no tiene compuerta» se contaron como compuerta", escapadas));
+});
+
+test("el contrapeso: las filas completas que abren con texto normal, y las parciales, siguen con compuerta", () => {
+  const completa = (cobertura) => estadoDe({ cobertura });
+  assert.equal(completa("`pnpm format:check` desde la raíz"), "completa");
+  assert.equal(completa("Paso «Sin marcadores del scaffold sin resolver», con banco que lo hace morder"), "completa");
+  assert.equal(completa("El banco de enlaces entero: cada enlace relativo tiene que resolver"), "completa");
+  assert.equal(completa("**parcial**, en el despliegue del sitio: DEV sube la versión"), "parcial");
+  assert.equal(completa("**parcial, en una sola dirección**: el detector de secretos"), "parcial");
+  assert.equal(completa("**pendiente** → change `stack-estandar`"), "pendiente");
+});
+
+test("MUERDE: una compuerta que solo cita documentacion no cita nada que la ponga en rojo", () => {
+  // La otra mitad del mismo hallazgo: `compuertasSinCita` se conformaba con cualquier ruta que
+  // existiera, y una pagina de `docs/` o un spec no ponen nada en rojo.
+  const texto = pagina();
+  const { fila } = unaFila(texto, (f) => estadoDe(f) === "completa") ?? {};
+  const soloDocs = conCelda(texto, fila.requirement, "lo explica `docs/README.md`", "`docs/README.md`");
+  const mal = compuertasSinCita(soloDocs);
+  assert.ok(mal.some((m) => m.startsWith(`«${fila.requirement}»`)), porque("una cita a documentacion paso por compuerta", mal));
+  const conBanco = conCelda(texto, fila.requirement, "lo explica `docs/README.md` y lo exige `pruebas/docs/enlaces.test.mjs`", "—");
+  assert.deepEqual(compuertasSinCita(conBanco), [], porque("una cita a un banco, junto a la de la documentacion, alcanza", compuertasSinCita(conBanco)));
 });
 
 test("MUERDE: el resumen y el universo tampoco se pueden quedar viejos", () => {

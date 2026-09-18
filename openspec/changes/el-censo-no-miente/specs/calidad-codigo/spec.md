@@ -18,7 +18,9 @@ estados está esa ausencia, y los tres NO SHALL confundirse:
   publique otra: una ausencia sin dueño que no vence es un olvido con nombre.
 
 Una ausencia sin estado declarado SHALL poner el pipeline en rojo, y el pipeline SHALL
-medir lo que cada estado afirma: que el change del pendiente exista vivo y nombre al
+medir lo que cada estado afirma. Una declaración que dice que no hay compuerta con otras
+palabras o en otra forma que la de los tres estados SHALL contarse como una ausencia sin
+declarar, y NO SHALL contarse como compuerta. Lo que cada estado afirma: que el change del pendiente exista vivo y nombre al
 requirement, que la propiedad del no verificable no sea un motivo de esfuerzo, y que la
 versión del sin destino sea la publicada. El resumen de la cobertura SHALL publicar
 cuántos requirements hay en cada estado.
@@ -27,6 +29,11 @@ cuántos requirements hay en cada estado.
 
 - **WHEN** un requirement sin compuerta figura en la declaración sin ninguno de los tres estados
 - **THEN** el pipeline falla nombrando el requirement y las tres salidas
+
+#### Scenario: Una ausencia escrita en otra forma
+
+- **WHEN** la fila de un requirement dice en palabras que no tiene compuerta, con otra caja, sin la forma de ninguno de los tres estados o con esa forma mal escrita
+- **THEN** el pipeline falla sobre ese requirement, y el resumen no lo cuenta como cubierto
 
 #### Scenario: Un pendiente cuyo destino no existe
 
@@ -85,7 +92,9 @@ hacerlo un solo lector para las dos comprobaciones: con dos lectores, una podrí
 una pieza y la otra contarla como compuerta.
 
 Toda fila que la declaración cuente como compuerta SHALL nombrar algo que se pueda ir a
-mirar: una ruta del repositorio o un paso por su nombre.
+mirar: una ruta del repositorio que no sea documentación, o un paso por su nombre. Una
+invocación SHALL contarse solo si es la de un paso de una definición de pipeline que el
+proveedor ejecuta.
 
 #### Scenario: Una acción publicada que nadie invoca
 
@@ -94,7 +103,7 @@ mirar: una ruta del repositorio o un paso por su nombre.
 
 #### Scenario: Una invocación que no invoca nada
 
-- **WHEN** la única mención de una acción en las definiciones de pipeline está comentada, o dentro de un texto que el pipeline imprime, o en un repositorio anidado que no es el que se mide
+- **WHEN** la única mención de una acción en las definiciones de pipeline está comentada, o dentro de un texto que el pipeline imprime o de la descripción de un parámetro, o en una definición que el proveedor del pipeline no ejecuta, o en un repositorio anidado que no es el que se mide
 - **THEN** la acción cuenta como no invocada
 
 #### Scenario: La declaración cita una pieza que no corre
@@ -104,7 +113,7 @@ mirar: una ruta del repositorio o un paso por su nombre.
 
 #### Scenario: Una compuerta que no se puede ir a mirar
 
-- **WHEN** la declaración cuenta un requirement como cubierto y su fila no nombra ninguna ruta ni ningún paso
+- **WHEN** la declaración cuenta un requirement como cubierto y su fila no nombra ninguna ruta que no sea documentación ni ningún paso
 - **THEN** el pipeline falla, porque esa cobertura suma a los números sin que nadie pueda comprobarla
 
 ### Requirement: Una excepción de una compuerta vence al publicarse otra versión

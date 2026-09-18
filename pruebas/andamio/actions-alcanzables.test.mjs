@@ -125,6 +125,54 @@ test("MUERDE: sobre un arbol de juguete, lo comentado, lo impreso, lo ajeno y lo
   }
 });
 
+test("MUERDE: un `uses:` que no es la clave de un paso, o que vive donde GitHub no ejecuta, NO alcanza", () => {
+  // Lo encontro la revision adversarial del porte (2026-09-18): el lector anclaba `uses:` al
+  // principio de la linea y aceptaba tres cosas que no invocan nada. Un heredoc dentro de un
+  // `run:` (lo que imprime un paso para que el consumidor lo pegue), el texto de un
+  // `description: |` y un workflow bajo `docs/ejemplo/.github/workflows/`, que GitHub no corre.
+  const raiz = fs.mkdtempSync(path.join(os.tmpdir(), "alcanzables-clave-"));
+  try {
+    for (const a of ["invocada", "heredoc", "input-desc", "docs-ejemplo"]) {
+      fs.mkdirSync(path.join(raiz, "actions", a), { recursive: true });
+      fs.writeFileSync(path.join(raiz, "actions", a, "action.yml"), `name: ${a}\n`);
+    }
+    fs.mkdirSync(path.join(raiz, ".github", "workflows"), { recursive: true });
+    fs.writeFileSync(
+      path.join(raiz, ".github", "workflows", "ci.yml"),
+      [
+        "on:",
+        "  workflow_dispatch:",
+        "    inputs:",
+        "      x:",
+        "        description: |",
+        "          uses: ./actions/input-desc",
+        "jobs:",
+        "  a:",
+        "    steps:",
+        "      - uses: ./actions/invocada",
+        "      - run: |",
+        "          cat <<'FIN'",
+        "          - uses: im-diego-ec/Projects/actions/heredoc@v1.9.6",
+        "          FIN",
+        "",
+      ].join("\n"),
+    );
+    fs.mkdirSync(path.join(raiz, "docs", "ejemplo", ".github", "workflows"), { recursive: true });
+    fs.writeFileSync(
+      path.join(raiz, "docs", "ejemplo", ".github", "workflows", "ejemplo.yml"),
+      "jobs:\n  a:\n    steps:\n      - uses: ./actions/docs-ejemplo\n",
+    );
+    const alcance = alcanzadas(raiz);
+    assert.deepEqual(
+      [...alcance.keys()].sort(),
+      ["invocada"],
+      `solo la invocacion de verdad alcanza. Alcanzo: ${JSON.stringify(Object.fromEntries(alcance))}`,
+    );
+  } finally {
+    fs.rmSync(raiz, { recursive: true, force: true });
+  }
+});
+
 test("las tres formas de invocar se reconocen, cada una sobre una invocacion REAL del arbol", () => {
   // Si alguna deja de reconocerse, las actions que la usan salen huerfanas y el rojo manda a
   // cablear algo que ya esta cableado. Se exige que CADA forma encuentre al menos una invocacion
