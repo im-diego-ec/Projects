@@ -185,7 +185,12 @@ corepack. `$S` es el directorio temporal de la sesión.
       apunta al job `formato` y al paso nuevo, y las anclas de
       `plantilla/eslint.config.mjs` y `plantilla/.github/workflows/ci.yml` que el cambio
       corrió se reapuntan. **Evidencia**: `pruebas/docs/cobertura-de-requirements.test.mjs`
-      `# pass 13`.
+      `# pass 13`. **Corrección (revisión adversarial, RV-H5)**: no se reapuntaron
+      todas. La fila «CI verifica todos los paquetes de forma bloqueante» quedó en `:504`
+      cuando el paso «Verificar cada paquete» ya estaba en la 550 (`git show
+      156cd99:plantilla/.github/workflows/ci.yml | grep -n 'Verificar cada paquete'`), y el
+      banco no lo vio porque solo exige que la línea no esté vacía ni sea un comentario.
+      Corregida a `:603` en la tarea 8.4.
 - [x] 7.3 Las anclas de `openspec/changes/el-doble-clic-deja-un-repo/tasks.md` a
       `projects-init.mjs` reapuntadas (el archivo creció arriba de ellas).
 - [ ] 7.4 Al archivar: agregar la fila del requirement ADDED a
@@ -196,3 +201,34 @@ corepack. `$S` es el directorio temporal de la sesión.
 - [ ] 7.5 Revisión adversarial con lentes independientes, registrada en este change
       (desvío D8 del PO: un solo mantenedor). **Motivo**: va en la pasada final del porte.
 - [x] 7.6 Fragmento de CHANGELOG en `.porte/changelog/22-el-andamio-nace-formateado.md`.
+
+## 8. Revisión adversarial del carril: lo que cazó y cómo se cerró
+
+- [x] 8.1 El banco de los dos carriles no mordía tres formas de una línea de apagar el
+      formateador (FO-S11/H2, RV-H6): `if:` en el PASO, `continue-on-error` en el JOB
+      —con el que `needs.formato.result` vale `success` aunque prettier falle, así que
+      `ci-ok` también queda verde— y `continue-on-error` en el PASO.
+      `problemasDelFormato` lee ahora los pasos enteros (`pasosDelJob`), rechaza `if:` en
+      el paso que corre `pnpm format:check`, `continue-on-error` distinto de `false` en el
+      job y en sus pasos, y un `run:` con algo detrás (`|| true`). **Evidencia**, rojo
+      primero: con las cinco mutaciones nuevas y el detector viejo, `not ok 2 - el banco
+      MUERDE` («la mutacion "el PASO de format:check gana un if" no fue detectada»; sondeo
+      aparte: las tres mutaciones del hallazgo daban `problemas: []`). Con el arreglo,
+      `node --test pruebas/andamio/formato-en-los-dos-carriles.test.mjs` → `# pass 3`: el
+      tercer caso, «el banco NO muerde de más», deja pasar un `name:` antes y después del
+      `run:`, un `timeout-minutes:` en el paso, un paso previo de diagnóstico con su
+      propio `if:` y `continue-on-error: false`.
+- [x] 8.2 El MODIFIED afirmaba de todo repositorio algo que los tres consumidores en
+      `@v1.9.6` no cumplen (RV-H4). Acotado al andamio y a lo que nace de él, con un
+      escenario para el repositorio nacido antes; el fragmento del CHANGELOG deja de
+      presentarlo como opcional (design D9).
+- [ ] 8.3 Decidir para la v2 (lote 38) una compuerta en `marco-ci.yml` que verifique en
+      el consumidor que `format:check` corre fuera del carril de docs. **Motivo**: es
+      breaking para los tres consumidores y cambia lo que un reusable le exige a quien lo
+      llama; por D1 del PO va con los demás breaking y requiere OK humano (AGENTS.md,
+      «Pregunta primero»). No se puede cerrar desde este lote.
+- [x] 8.4 El ancla de «CI verifica todos los paquetes de forma bloqueante» en
+      `openspec/cobertura-de-requirements.md` apunta al paso «Verificar cada paquete»
+      (`plantilla/.github/workflows/ci.yml:603`). **Evidencia**: `grep -n 'name: Verificar
+      cada paquete' plantilla/.github/workflows/ci.yml` → `603`. Se commitea con el lote 23,
+      que fue el último que corrió la línea.

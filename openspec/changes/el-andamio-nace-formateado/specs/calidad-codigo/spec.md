@@ -61,6 +61,13 @@ la desalinea y entra sin verificarse detiene después la integración de otra
 persona, con una causa que no nombra al cambio que la introdujo. Que la
 verificación se omita en alguna integración SHALL ser un fallo, no un verde.
 
+Esa segunda garantía la entrega la integración que el andamio reparte, y un
+repositorio recibe el andamio una sola vez, al nacer. SHALL cumplirla el andamio y
+todo repositorio que nace de un andamio que ya la trae. Un repositorio nacido
+antes conserva la integración con la que nació hasta que copie la del andamio: el
+marco no verifica esta garantía en él y NO SHALL afirmar que la cumple, y la nota
+de la versión que la introduce SHALL decirle qué copiar para adoptarla.
+
 La verificación SHALL excluir los archivos que otra herramienta genera y
 regenera: un archivo generado obedece a la herramienta que lo produce y no al
 formateador, de modo que exigirle el formato del repositorio produce un fallo
@@ -81,3 +88,7 @@ permanente sobre un archivo que ninguna persona escribió ni puede corregir.
 #### Scenario: La verificación de formato queda omitida
 - **WHEN** la verificación de formato no corre en una integración, por una condición o una dependencia que la omite
 - **THEN** el veredicto de la integración es un fallo que lo dice, no un verde
+
+#### Scenario: Un repositorio nacido antes de que el andamio trajera los dos carriles
+- **WHEN** un repositorio nació de un andamio cuya integración no corría la verificación de formato en los cambios de solo documentación
+- **THEN** la nota de la versión que la introduce le dice qué copiar para adoptarla, y el marco no afirma que ese repositorio la cumple

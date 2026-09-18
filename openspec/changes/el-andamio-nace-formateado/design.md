@@ -165,6 +165,31 @@ La sección 4 de `plantilla/README.md` se reescribe como «lo que trae y lo que 
 con una fila por entrada de la raíz y una columna «Llega» que un banco deriva de
 `archivosDelAndamio` por forma y plataforma.
 
+### D9 — La garantía de los dos carriles se enuncia para lo que nace del andamio
+
+La revisión adversarial del porte (RV-H4) midió que el MODIFIED, tal como estaba
+escrito, afirmaba de «el repositorio» algo que los tres consumidores reales en
+`@v1.9.6` no cumplen el día del merge: nacieron con `format:check` dentro de
+`build_test`, el cambio es scaffold y no les llega, y `marco-ci.yml` no tiene nada que
+lo detecte. El fragmento lo presentaba como opcional («que lo quiera»).
+
+**Elegida:** acotar la garantía nueva al andamio y a lo que nace de él desde esta
+versión, decir en el requirement que el marco no la afirma de un repositorio nacido
+antes, y que la nota de la versión le dice qué copiar. El fragmento lo dice en esos
+términos: el proyecto existente conserva el agujero hasta copiar el job.
+
+**Descartadas:**
+
+- *Una compuerta en `marco-ci.yml` que exija en el consumidor que `format:check`
+  corra fuera del carril de docs, en rojo* (lo que pide D1 del PO para una compuerta
+  nueva). Pondría rojos a los tres consumidores con el PR de bump: es breaking, cambia
+  lo que un workflow reusable le exige a quien lo llama (⚠️ «Pregunta primero») y, por
+  D1, va a la v2 junto con los demás breaking. Queda como tarea abierta para el lote 38,
+  con su motivo (tasks 8.3).
+- *La misma compuerta en aviso.* D1 terminó el modo aviso como regla general, y la
+  excepción que lo permite es para arreglos que quedan fuera del árbol del consumidor;
+  este queda adentro.
+
 ## Clasificación de distribución
 
 | Pieza | Clase | Por qué esa y no otra |
@@ -173,7 +198,7 @@ con una fila por entrada de la raíz y una columna «Llega» que un banco deriva
 | `plantilla/README.md` | **scaffold** (no viaja) | Es la guía del bootstrap: vive en el andamio y se lee desde el marco |
 | `herramientas/projects-init.mjs`, `herramientas/projects-puerta.mjs` | **herramienta del marco** | Corren desde el clon del marco y no viajan al proyecto; lo que cambia es lo que escriben |
 | Paso «El andamio y lo que el init escribe pasan el formateador» de `.github/workflows/ci.yml` | **CI propio del marco** | Mide el andamio del marco; en un consumidor no habría andamio que medir, así que no puede ser referenciado |
-| Delta a `calidad-codigo` | **canónico** | Vive solo en este repo; los proyectos lo cumplen |
+| Delta a `calidad-codigo` | **canónico** | Vive solo en este repo. Lo cumplen el andamio y lo que nace de él desde esta versión; los tres consumidores existentes no, y el requirement lo dice en vez de callarlo (D9) |
 
 No hay nada **regenerado**: no se toca el pin de OpenSpec ni nada que genere su CLI.
 

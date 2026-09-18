@@ -48,6 +48,27 @@ const codigo = (bloque) =>
     .filter((l) => !/^\s*#/.test(l))
     .join("\n");
 
+/** Los pasos de un job, cada uno desde su `- ` (seis espacios) hasta el
+ *  siguiente, sin comentarios. Un paso se lee ENTERO porque su `if:` o su
+ *  `continue-on-error` pueden ir antes o despues del `run:`. */
+export function pasosDelJob(bloque) {
+  const pasos = [];
+  let actual = null;
+  for (const l of codigo(bloque).split("\n")) {
+    if (/^ {6}- /.test(l)) {
+      actual = [l];
+      pasos.push(actual);
+    } else if (actual && /^ {8}/.test(l)) actual.push(l);
+    else if (/^ {0,6}\S/.test(l)) actual = null;
+  }
+  return pasos.map((p) => p.join("\n"));
+}
+
+/** `continue-on-error` con cualquier valor distinto del literal `false` (que es
+ *  el default y no cambia nada). */
+const tragaElFallo = (texto, sangria) =>
+  new RegExp(`^${sangria}continue-on-error:(?!\\s*false\\s*$)`, "m").test(texto);
+
 /** Lo que el banco exige, como funcion pura para poder mutarla abajo. */
 export function problemasDelFormato(ci) {
   const problemas = [];
@@ -58,7 +79,28 @@ export function problemasDelFormato(ci) {
         "sin mirar el formato, y el rojo lo va a pagar quien no lo produjo",
     ];
   }
-  if (!/^\s*- run: pnpm format:check\s*$/m.test(codigo(formato))) problemas.push("el job `formato` no corre `pnpm format:check`");
+  // El paso se reconoce por su `run:`, con el valor EXACTO: un `|| true` detras
+  // es un formateador que no puede fallar. Un `name:` o un `timeout-minutes:`
+  // agregados al paso no cambian nada y no enrojecen.
+  const pasoDelFormato = pasosDelJob(formato).filter((p) => /^ {6}- run: pnpm format:check\s*$|^ {8}run: pnpm format:check\s*$/m.test(p));
+  if (!pasoDelFormato.length) problemas.push("el job `formato` no corre `pnpm format:check` (exacto, sin nada detras que se trague su fallo)");
+  for (const paso of pasoDelFormato) {
+    // Un `if:` en el PASO lo omite sin que el job se entere: el job termina en
+    // `success` y ci-ok lo acepta. Un paso de diagnostico con su propio `if:`
+    // (otro paso) no toca al formateador y no se mira.
+    if (/^ {6}- if:|^ {8}if:/m.test(paso)) {
+      problemas.push("el paso que corre `pnpm format:check` tiene un `if:`: omitido, el job termina en `success` sin haber mirado el formato");
+    }
+  }
+  // `continue-on-error` en el job o en cualquiera de sus pasos: con el del job,
+  // `needs.formato.result` vale `success` aunque prettier falle, asi que ci-ok
+  // —que exige exactamente `success`— tambien queda verde.
+  if (tragaElFallo(formato, " {4}")) {
+    problemas.push("el job `formato` tiene `continue-on-error`: su resultado es `success` aunque el formateador falle, y ci-ok lo deja pasar");
+  }
+  if (pasosDelJob(formato).some((p) => tragaElFallo(p, "(?: {6}- | {8})"))) {
+    problemas.push("un paso del job `formato` tiene `continue-on-error`: un fallo del formateador deja de detener la integracion");
+  }
   const condicion = formato.split("\n").filter((l) => /^ {4}if:/.test(l));
   if (condicion.length) {
     problemas.push(
@@ -113,10 +155,57 @@ test("el banco MUERDE: cada forma de devolver el agujero se caza", () => {
       nombre: "ci-ok deja de esperar al formato",
       mutar: (t) => t.replace(/needs: \[marco, constitucion, formato, build_test\]/, "needs: [marco, constitucion, build_test]"),
     },
+    // Las tres que siguen las cazo la revision adversarial del porte (FO-S11/H2,
+    // RV-H6): el banco miraba solo el `if:` del JOB, y estas apagan el
+    // formateador sin tocarlo. La del medio es la peor: con `continue-on-error`
+    // en el job, `needs.formato.result` vale `success` aunque prettier falle, asi
+    // que ci-ok tambien queda verde.
+    {
+      nombre: "el PASO de format:check gana un if",
+      mutar: (t) => t.replace(/^( {6}- run: pnpm format:check\n)/m, "$1        if: false\n"),
+    },
+    {
+      nombre: "el JOB formato gana continue-on-error",
+      mutar: (t) => t.replace(/^( {2}formato:\n)/m, "$1    continue-on-error: true\n"),
+    },
+    {
+      nombre: "el PASO de format:check gana continue-on-error",
+      mutar: (t) => t.replace(/^( {6}- run: pnpm format:check\n)/m, "$1        continue-on-error: true\n"),
+    },
+    {
+      nombre: "el paso con nombre propio gana un if",
+      mutar: (t) => t.replace(/^ {6}- run: pnpm format:check\n/m, "      - name: Formato\n        if: false\n        run: pnpm format:check\n"),
+    },
+    {
+      nombre: "el formateador se traga su propio fallo",
+      mutar: (t) => t.replace(/^( {6}- run: pnpm format:check)\n/m, "$1 || true\n"),
+    },
   ];
   for (const m of mutaciones) {
     const mutado = m.mutar(ci);
     assert.notEqual(mutado, ci, `la mutacion "${m.nombre}" no cambio nada: su ancla se movio y el banco pasaria en vacio`);
     assert.notDeepEqual(problemasDelFormato(mutado), [], `la mutacion "${m.nombre}" no fue detectada`);
+  }
+});
+
+test("el banco NO muerde de mas: lo que no apaga al formateador no enrojece", () => {
+  const ci = fs.readFileSync(CI, "utf8");
+  const inocuas = [
+    { nombre: "un name: debajo del run", mutar: (t) => t.replace(/^( {6}- run: pnpm format:check\n)/m, "$1        name: Formato\n") },
+    {
+      nombre: "un name: antes del run",
+      mutar: (t) => t.replace(/^ {6}- run: pnpm format:check\n/m, "      - name: Formato\n        run: pnpm format:check\n"),
+    },
+    { nombre: "un timeout-minutes en el paso", mutar: (t) => t.replace(/^( {6}- run: pnpm format:check\n)/m, "$1        timeout-minutes: 5\n") },
+    {
+      nombre: "un paso previo de diagnostico con su propio if",
+      mutar: (t) => t.replace(/^( {6}- run: pnpm format:check\n)/m, "      - run: echo diagnostico\n        if: failure()\n$1"),
+    },
+    { nombre: "continue-on-error: false (el default)", mutar: (t) => t.replace(/^( {6}- run: pnpm format:check\n)/m, "$1        continue-on-error: false\n") },
+  ];
+  for (const m of inocuas) {
+    const mutado = m.mutar(ci);
+    assert.notEqual(mutado, ci, `la variante "${m.nombre}" no cambio nada: su ancla se movio`);
+    assert.deepEqual(problemasDelFormato(mutado), [], `la variante "${m.nombre}" enrojecio y no apaga nada`);
   }
 });

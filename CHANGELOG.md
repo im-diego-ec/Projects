@@ -1540,7 +1540,11 @@ avisos.
   desalineada en `main` para que detone en el PR de otra persona (Rigel 1.13.0,
   commit d1c6380). Para consumidores: llega a los proyectos que nacen desde esta
   versión, con un check nuevo, `formato`; `ci-ok` sigue siendo el único requerido.
-  Un proyecto existente que lo quiera copia el job `formato` y su línea en el
+  **Un proyecto existente NO lo recibe y conserva el agujero**: su carril de docs
+  sigue sin mirar el formato, el requirement de `calidad-codigo` que lo exige se
+  enuncia para lo que nace desde esta versión, y nada del marco lo verifica en un
+  repositorio que ya existía (una compuerta en `marco-ci.yml` que lo exija queda como
+  decisión para la v2). Para cerrarlo: copia el job `formato` y su línea en el
   `Veredicto` de `ci-ok` desde `plantilla/.github/workflows/ci.yml`, y saca
   `- run: pnpm format:check` de `build_test`.
 

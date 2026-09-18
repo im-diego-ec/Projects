@@ -122,8 +122,10 @@ Hay tres consumidores reales, los tres en `@v1.9.6`
   input, output, permiso ni nombre de check. El paso nuevo vive en el `ci.yml` del
   marco, que no viaja.
 - **Todo lo demás es scaffold**: llega solo a los proyectos que nacen después de
-  esta versión. Los tres existentes no reciben nada. Si quieren lo mismo, lo
-  copian a mano, y el fragmento del CHANGELOG lo describe: el job `formato` con su
+  esta versión. Los tres existentes no reciben nada, y **conservan el agujero del
+  carril de docs** hasta copiar el job: el requirement modificado se enuncia para lo
+  que nace del andamio y lo dice (design D9), y nada del marco lo verifica en ellos.
+  El fragmento del CHANGELOG describe qué copiar: el job `formato` con su
   línea en `ci-ok`, el pin exacto de prettier (con `pnpm install` y `pnpm format`),
   las dos líneas abiertas del esqueleto y el `// [/FRONT]` de `eslint.config.mjs`.
 - **Un proyecto nuevo tiene un check más**: `formato`. No es un renombrado ni
