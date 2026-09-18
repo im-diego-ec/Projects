@@ -161,3 +161,19 @@ Cada mutación se aplicó sobre el código nuevo, se corrieron
       envía. Queda para la skill `projects-validar-consumidor` en el release y para el
       día que se configure el destino.
 - [ ] 8.7 Archive. No en este lote: va en la pasada final, después de 8.5.
+- [ ] 8.8 **Integrar después de `el-marco-declara-su-desvio-de-review` (carril L1)**, o
+      junto con él (revisión adversarial, RV-L4-09). El `aprueba:` de este change cita
+      un desvío que esta rama no declara; la guarda que lo pone rojo en un PR a `main`
+      llega con el arreglo del change `que-es-breaking`.
+
+## 9. Hallazgos de la revisión adversarial (2026-09-17)
+
+- [x] 9.1 **RV-L4-07 — el fragmento del CHANGELOG nombraba un solo cambio.** Decía que
+      «Qué tiene que hacer un consumidor:» era «el único cambio del mensaje por
+      default». Medido de nuevo armando las 19 secciones con el script de `fde8f4e`
+      (el de la 1.9.6), el de `489a463` (lote 8) y el de este lote: contra el lote 8
+      cambian las DOS líneas de encuadre (una por rama); contra la 1.9.6 cambia además
+      el primer párrafo. El fragmento nombra las dos líneas y remite a la entrada del
+      lote 8 para el resto; el proposal y el design dicen contra qué se midió.
+- [x] 9.2 **RV-L4-08 — referencia a la tarea equivocada.** El design decía «tarea 8.2
+      abierta» para el OK humano; es la 8.4 (la 8.2 es el `validate`, cerrada).

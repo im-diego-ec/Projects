@@ -653,10 +653,14 @@ sigue publicando en cada merge hasta que copies el archivo nuevo (ver «Cambiado
 - **El mensaje del aviso mezclaba dos dialectos**: su encuadre usaba el de Slack (`*`)
   y el cuerpo del CHANGELOG el de Markdown (`**`), así que ningún destino lo mostraba
   entero bien. Ahora el mensaje entero habla el dialecto declarado. **Para
-  consumidores:** si invocás la action y **no** declarás `formato`, la línea «Qué tiene
-  que hacer un consumidor:» pasa de `*…*` a `**…**` —es el único cambio del mensaje por
-  default, medido sobre todo el CHANGELOG—; si tu destino es Slack, declarar
-  `formato: mrkdwn` arregla esa línea y el cuerpo.
+  consumidores:** si invocás la action y **no** declarás `formato`, las dos líneas de
+  encuadre —«Qué tiene que hacer un consumidor:» y, cuando falta esa sección, «La
+  entrada de esta versión no trae la sección…»— pasan de `*…*` a `**…**`. Es el único
+  cambio que este arreglo le hace al mensaje por default (medido sobre todo el
+  CHANGELOG contra el script anterior a él). No es el único de la versión: el primer
+  párrafo cambia de redacción y las viñetas BREAKING llegan enteras, y eso lo cuenta la
+  entrada de «El aviso de la próxima versión se mide en el PR que lo escribe». Si tu
+  destino es Slack, declarar `formato: mrkdwn` arregla el encuadre y el cuerpo.
 
 ### Añadido
 

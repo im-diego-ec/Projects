@@ -93,8 +93,10 @@ change del lote 8). Aun así la action es referenciable y su contrato se trata c
 - **El encuadre del mensaje por default pasa de `*` a `**`.** Es el arreglo de la
   mezcla de dialectos, no un cambio de default: el default ya era markdown para el
   cuerpo, y ahora el encuadre lo acompaña. Medido: en `markdown`, sobre las 19
-  secciones del CHANGELOG, el mensaje nuevo difiere del viejo **sólo** en esa línea
-  (+2 caracteres). Un consumidor que ya mande a **Slack** lo nota —esa línea pasa a
+  secciones del CHANGELOG, el mensaje nuevo difiere del que arma el script del lote 8
+  **sólo** en su línea de encuadre (+2 caracteres; son dos líneas posibles, una por
+  rama). Contra la 1.9.6 publicada la versión trae además los cambios del lote 8 —el
+  primer párrafo y las viñetas BREAKING enteras—, y los nombra su entrada. Un consumidor que ya mande a **Slack** lo nota —esa línea pasa a
   mostrar los asteriscos, como ya los mostraba el cuerpo— y el arreglo es una línea:
   `formato: mrkdwn` (en el workflow del marco, la **variable** de repositorio
   `AVISO_VERSION_FORMATO`, pestaña Variables y no Secrets). Va dicho en «Para
@@ -104,3 +106,12 @@ change del lote 8). Aun así la action es referenciable y su contrato se trata c
 
 **Contrato: minor. Distribución:** referenciado (la action) y canónico (compuerta,
 workflow propio, bancos, documentación). Detalle en el design.
+
+## Dependencia de integración
+
+El `aprueba:` de este change cita el desvío de review del marco («un solo mantenedor,
+ver AGENTS.md»), y **ese desvío no está declarado en esta rama**: lo declara el change
+`el-marco-declara-su-desvio-de-review` del carril L1 del porte. Este change **se integra
+después de ese, o junto con él** (tarea 8.8). La guarda que lo pone rojo en un PR a
+`main` —`pruebas/ci-del-marco/aprueba-cita-lo-que-existe.test.mjs`— llega con el
+arreglo del change `que-es-breaking`.

@@ -49,7 +49,7 @@ andamio no invoca esta action) y ningún artefacto del CLI de OpenSpec se toca.
 
 **Contrato:** input opcional nuevo → **MINOR**. AGENTS.md lo pone en «Pregunta primero»
 (cambiar el contrato de un workflow reusable publicado), así que el release espera el
-OK humano: tarea 8.2 abierta.
+OK humano: tarea 8.4 abierta.
 
 ### 3. El encuadre acompaña al dialecto, también en el default
 
@@ -62,7 +62,9 @@ OK humano: tarea 8.2 abierta.
 
 **Por qué no es BREAKING.** No cambia un input, un output, un job, un permiso ni un
 check: cambia un texto. Medido sobre las 19 secciones del `CHANGELOG.md`, el mensaje
-por default difiere del anterior **sólo** en la línea del encuadre (+2 caracteres), y
+por default difiere del que arma el script del lote 8 **sólo** en su línea de encuadre
+(+2 caracteres; hay dos, una por rama, y cada sección lleva una). Contra la 1.9.6
+publicada difiere además en lo que cambió el lote 8, que su entrada nombra. Y
 ningún consumidor real invoca la action. El único destino que lo nota es uno de Slack
 que ya recibía el cuerpo con los asteriscos a la vista; su arreglo —declarar
 `mrkdwn`— va escrito en «Para consumidores».
