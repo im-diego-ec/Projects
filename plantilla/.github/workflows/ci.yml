@@ -12,10 +12,10 @@ name: CI
 # de OpenSpec en Projects. Ver AGENTS.md.
 #
 # HUECO A LLENAR AL CREAR EL PROYECTO: los pasos de build_test son del
-# producto. Estan escritos con los scripts que el marco da por hechos —lint y
-# format:check UNA vez desde la raiz; typecheck, test y build en CADA
-# paquete—; ajustalos al stack fijado en AGENTS.md y borra este parrafo
-# cuando quede hecho.
+# producto. Estan escritos con los scripts que el marco da por hechos —lint UNA
+# vez desde la raiz; typecheck, test y build en CADA paquete; format:check en su
+# job propio, `formato`—; ajustalos al stack fijado en AGENTS.md y borra este
+# parrafo cuando quede hecho.
 # ---------------------------------------------------------------------------
 
 on:
@@ -140,6 +140,49 @@ jobs:
           include-hidden-files: true
           if-no-files-found: error
 
+  # EL FORMATO CORRE EN LOS DOS CARRILES, Y ES UN JOB PROPIO POR ESO.
+  #
+  # Vivia dentro de `build_test`, que el carril de docs OMITE, y el
+  # .prettierignore de este repo SI formatea markdown. Consecuencia medida en el
+  # marco hermano del que viene este arreglo: una tabla mal formateada entro a
+  # `main` con el PR en verde —era de solo docs— y detono en el PR de OTRA
+  # persona, con una causa que no nombra al PR que la introdujo. Es el peor
+  # reparto posible de un rojo: lo paga quien no lo produjo.
+  #
+  # De todo lo que corre `build_test`, el formateador es lo unico que aplica
+  # igual a un cambio de solo documentacion: `prettier --check .` mira el arbol
+  # entero, `openspec/` y `docs/` incluidos. El lint NO se muda aca: necesita el
+  # cliente de datos generado, y sin el sale rojo por tipos que no resuelven.
+  # Medido: con `--ignore-scripts`, `pnpm format:check` sale 0 y `pnpm lint` 1.
+  #
+  # SIN `if:` Y SIN `needs:`, a proposito: cualquiera de los dos devuelve el
+  # agujero en una linea. Un banco del marco lo vigila
+  # (pruebas/andamio/formato-en-los-dos-carriles.test.mjs, en el repo del marco).
+  formato:
+    name: formato
+    # Instala sin scripts y corre un solo comando que solo lee archivos: el
+    # doble de lo que tarda cuando anda bien, como el resto de este archivo.
+    timeout-minutes: 10
+    runs-on: ubuntu-latest
+    # MINIMO REAL Y DECLARADO: clona el arbol y lee archivos. No llama a
+    # ninguna API de GitHub.
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      # corepack y no una action de terceros, igual que en build_test: menos
+      # superficie que auditar y una dependencia menos que pinear.
+      - run: corepack enable
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        with:
+          node-version: "24"
+      # `--ignore-scripts` no es un atajo: el formateador no necesita nada de lo
+      # que ejecutan los scripts de instalacion (motores del ORM, binarios
+      # nativos), y asi este job no ejecuta codigo de dependencias que nadie
+      # leyo. Mismo motivo que el setup-node de arriba va sin cache.
+      - run: pnpm install --frozen-lockfile --ignore-scripts
+      - run: pnpm format:check
+
   # Lo del producto. Se omite cuando el cambio no altera lo que se sirve.
   build_test:
     name: build-test
@@ -211,13 +254,16 @@ jobs:
         run: pnpm --filter {{PAQUETE_API}} --fail-if-no-match exec {{GENERAR_CLIENTE_DATOS}}
       # projects:fin-solo-si-hay-datos
 
-      # Lint y formato corren UNA vez desde la raiz sobre todo el arbol
-      # (eslint . / prettier --check .), no por paquete: asi los archivos que
-      # viven FUERA de los paquetes —configuracion, scripts sueltos, los
-      # workflows mismos— tambien quedan dentro del alcance. Aca no hay salteo
-      # posible: si la raiz no declara el script, `pnpm <script>` sale 1.
+      # Lint corre UNA vez desde la raiz sobre todo el arbol (eslint .), no por
+      # paquete: asi los archivos que viven FUERA de los paquetes
+      # —configuracion, scripts sueltos, los workflows mismos— tambien quedan
+      # dentro del alcance. Aca no hay salteo posible: si la raiz no declara el
+      # script, `pnpm <script>` sale 1.
+      #
+      # EL FORMATO NO ESTA ACA, y es a proposito: vive en el job `formato`, que
+      # corre en los DOS carriles. El lint se queda porque necesita el cliente
+      # de datos generado; el formateador solo lee archivos.
       - run: pnpm lint
-      - run: pnpm format:check
 
       # -------------------------------------------------------------------
       # LA INFRAESTRUCTURA SE VERIFICA, Y NO ACA
@@ -507,7 +553,7 @@ jobs:
   # gracias a if: always().
   ci_ok:
     name: ci-ok
-    needs: [marco, constitucion, build_test]
+    needs: [marco, constitucion, formato, build_test]
     if: always()
     # 5 minutos: no hace checkout ni toca la red, solo lee los resultados de sus
     # needs, que vienen del contexto.
@@ -529,6 +575,10 @@ jobs:
           # cualquier resultado que no sea success es un fallo. Un "skipped" aca
           # significaria que alguien le puso un if, y eso es apagarla.
           [ "${{ needs.constitucion.result }}" = "success" ] || { echo "::error::la verificacion de la constitucion del marco termino en '${{ needs.constitucion.result }}'"; exit 1; }
+          # El formato tampoco tiene carril rapido, y esa es toda la razon de que
+          # sea un job aparte: un "skipped" aca significaria que volvio a quedar
+          # detras de un `if`.
+          [ "${{ needs.formato.result }}" = "success" ] || { echo "::error::el formateador termino en '${{ needs.formato.result }}'. Corre en LOS DOS carriles a proposito: si dice 'skipped', alguien le puso una condicion al job y el carril de docs volvio a quedar sin mirar el formato. Si dice 'failure', el arreglo es correr 'pnpm format' en la raiz y commitear el resultado"; exit 1; }
           if [ "${{ needs.build_test.result }}" = "success" ]; then exit 0; fi
           if [ "${{ needs.build_test.result }}" = "skipped" ] && [ "${{ needs.marco.outputs.solo_docs }}" = "true" ]; then
             echo "solo docs: build-test omitido a proposito"; exit 0

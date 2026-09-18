@@ -103,17 +103,17 @@ CLI no lo hace.
 > framework, ORM, base de datos o servicio que no esté acá es una decisión y no una
 > implementación — las fronteras del marco dicen cómo se pide.
 
-| Capa                        | Herramienta                                                           |
-| --------------------------- | --------------------------------------------------------------------- |
-| Frontend                    | **React + TypeScript + Vite + Tailwind + shadcn/ui**                  |
-| Backend                     | **Node + TypeScript + Express**                                       |
-| Datos                       | **PostgreSQL** vía **Prisma**                                         |
-| Auth                        | **Supabase Auth** (el SDK vive detrás de un contrato propio en `{{PAQUETE_WEB}}/src/auth.ts`; el API verifica el JWT offline con `jose`) |
-| Validación de input externo | **Zod**                                                               |
-| Plataforma                  | **La elige el proyecto**; la que eligió este está en `.projects-valores.json` |
+| Capa                        | Herramienta                                                                                                                                             |
+| --------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Frontend                    | **React + TypeScript + Vite + Tailwind + shadcn/ui**                                                                                                    |
+| Backend                     | **Node + TypeScript + Express**                                                                                                                         |
+| Datos                       | **PostgreSQL** vía **Prisma**                                                                                                                           |
+| Auth                        | **Supabase Auth** (el SDK vive detrás de un contrato propio en `web/src/auth.ts`; el API verifica el JWT offline con `jose`)                            |
+| Validación de input externo | **Zod**                                                                                                                                                 |
+| Plataforma                  | **La elige el proyecto**; la que eligió este está en `.projects-valores.json`                                                                           |
 | CI/CD                       | **GitHub Actions**, con los workflows del marco. La promoción por ambientes que la constitución declara todavía no se reparte: está anotada como desvío |
-| Package manager             | **pnpm** con workspaces (monorepo: web, api, e2e)                     |
-| Tests                       | **Vitest** (unit/integración) + **Playwright** (E2E contra dev)       |
+| Package manager             | **pnpm** con workspaces (monorepo: web, api, e2e)                                                                                                       |
+| Tests                       | **Vitest** (unit/integración) + **Playwright** (E2E contra dev)                                                                                         |
 
 Salvo la fila **Plataforma**, ninguna de estas filas es elección del proyecto: las fija el
 área y el andamio las entrega implementadas. Lo que el proyecto decide es lo que viene
@@ -126,6 +126,7 @@ y no fija el producto que las da. Los valores admitidos son `supabase`, `cloudfl
 `gcp`, `aws` y `ninguna`.
 
 <!-- projects:solo-si-hay-infra -->
+
 Qué cubre cada uno, qué cuesta y qué límite tiene su plan gratuito está en
 `infra/adaptadores.md`.
 
@@ -148,6 +149,7 @@ Hasta que el paso 1 esté hecho, **el job `terraform` del CI sigue exigiendo el 
 marco avisa sin bloquear; desde la 2 bloquea—: decide mirando si los directorios existen,
 no la clave. Una vez borrados lo dice con un `::notice::` y sale verde en cualquier
 versión, y no depende de ninguna fecha.
+
 <!-- projects:fin-solo-si-hay-infra -->
 
 Los nombres de la fila **Package manager** son DIRECTORIOS y están escritos literales a

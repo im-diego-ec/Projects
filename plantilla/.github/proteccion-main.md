@@ -10,7 +10,7 @@ configuración.
 > 🔴 a 🟢 con la fecha, escribí el motivo de las diferidas, y borrá este recuadro.
 >
 > **Y no antes de que el CI haya corrido una vez:** la comprobación `ci-ok` no aparece
-> en la lista que ofrece el *ruleset* —el conjunto de reglas de GitHub que protege una
+> en la lista que ofrece el _ruleset_ —el conjunto de reglas de GitHub que protege una
 > rama— hasta que exista una corrida que la
 > haya reportado. El bootstrap entra a `main` por push directo; la protección se
 > aplica después.
@@ -31,12 +31,12 @@ y alcanzan para que nada entre a `main` sin pasar por un PR verde:
 **Se dejan apagadas a propósito, y el motivo va escrito acá el día que se aplica la
 protección** — no en un TODO aparte:
 
-| Regla                          | Estado      | Por qué no todavía                                                                                                                                                       |
-| ------------------------------ | ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Regla                          | Estado      | Por qué no todavía                                                                                                                                                                          |
+| ------------------------------ | ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | 1 aprobación requerida         | 🔴 diferida | Con una sola persona programando, exigir la aprobación de otra y no dejar a nadie en la lista de excepciones **bloquea todo merge sin salida**. Se enciende cuando haya una segunda persona |
-| Review de code owner requerido | 🔴 diferida | Es lo que convierte `CODEOWNERS` —el archivo que dice quién aprueba qué— en una condición real de merge; sin la fila de arriba no agrega nada, y con el equipo vacío no asignaría a nadie |
-| Rama al día antes del merge    | 🔴 diferida | Útil con varios PRs en vuelo; con uno solo agrega una vuelta de CI por merge                                                                                             |
-| Commits firmados               | 🔴 diferida | Exige que cada quien tenga su clave configurada; se enciende cuando todos la tengan, no antes                                                                            |
+| Review de code owner requerido | 🔴 diferida | Es lo que convierte `CODEOWNERS` —el archivo que dice quién aprueba qué— en una condición real de merge; sin la fila de arriba no agrega nada, y con el equipo vacío no asignaría a nadie   |
+| Rama al día antes del merge    | 🔴 diferida | Útil con varios PRs en vuelo; con uno solo agrega una vuelta de CI por merge                                                                                                                |
+| Commits firmados               | 🔴 diferida | Exige que cada quien tenga su clave configurada; se enciende cuando todos la tengan, no antes                                                                                               |
 
 ⚠️ **Encender las diferidas antes de tiempo es la forma más fácil de auto-encerrarse.**
 Se probó: aprobación requerida + code owner + bypass vacía, con un equipo de una

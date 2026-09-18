@@ -273,8 +273,8 @@ export default function App({ auth }: { auth: Autenticacion | null }) {
           </div>
           {base === BASE_CAIDA && (
             <p className="text-xs text-neutral-500">
-              El API responde pero la base no. Levantala con <code className="font-mono">docker compose up -d</code> y
-              recarga esta pagina.
+              El API responde pero la base no. Levantala con{" "}
+              <code className="font-mono">docker compose up -d</code> y recarga esta pagina.
             </p>
           )}
         </div>

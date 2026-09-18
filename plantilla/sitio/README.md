@@ -15,11 +15,11 @@ declara `typescript: ^5 || ^6` y el marco corre la 7. Medido el 2026-08-26 contr
 
 Qué cubre cada cosa hoy, para que nadie suponga de más:
 
-| Comando | Qué cubre |
-| --- | --- |
-| `pnpm typecheck` (`tsc --noEmit`) | los `.ts` de `src/lib/` |
-| `pnpm build` | que las páginas compilen — **pero no sus tipos**: medido, un error de tipos adentro de un `.astro` compila igual y sale con éxito |
-| `pnpm test` | el código de `src/lib/` |
+| Comando                           | Qué cubre                                                                                                                         |
+| --------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
+| `pnpm typecheck` (`tsc --noEmit`) | los `.ts` de `src/lib/`                                                                                                           |
+| `pnpm build`                      | que las páginas compilen — **pero no sus tipos**: medido, un error de tipos adentro de un `.astro` compila igual y sale con éxito |
+| `pnpm test`                       | el código de `src/lib/`                                                                                                           |
 
 O sea: **un error de tipos adentro de una página no lo caza nadie**. Se destraba
 solo cuando `astro check` soporte TypeScript 7. Mientras tanto, la lógica que
@@ -56,7 +56,7 @@ automatizados. Se hacen **una sola vez**:
 > todavía no configuraste enseña a ignorar los rojos, que es peor que no tener
 > la compuerta.
 
-### 1 · La cuenta · *3 minutos*
+### 1 · La cuenta · _3 minutos_
 
 Entrá a [`dash.cloudflare.com/sign-up`](https://dash.cloudflare.com/sign-up) y
 creá la cuenta. El plan gratuito alcanza de sobra para un sitio: los archivos de
@@ -65,7 +65,7 @@ tu sitio **no tienen límite de visitas** en ese plan.
 Después copiá tu **Account ID**: está en el panel, en la barra lateral derecha
 de la sección Workers, y es una tira de letras y números.
 
-### 2 · El subdominio · *1 minuto*
+### 2 · El subdominio · _1 minuto_
 
 En **Workers & Pages → Subdomain**: es el nombre que va en el medio de tu
 dirección (`{{PROYECTO}}.<tu-subdominio>.workers.dev`). Se elige una vez y **no
@@ -77,7 +77,7 @@ se puede cambiar después**.
 > con lo humano. Es el único de los cuatro que llega tarde, y por eso tiene paso
 > propio en vez de ser una nota al pie del anterior.
 
-### 3 · La credencial · *2 minutos*
+### 3 · La credencial · _2 minutos_
 
 En [`dash.cloudflare.com/profile/api-tokens`](https://dash.cloudflare.com/profile/api-tokens):
 
@@ -88,8 +88,8 @@ En [`dash.cloudflare.com/profile/api-tokens`](https://dash.cloudflare.com/profil
 
 > ⚠️ **Ojo con el token equivocado, que es el error más común.** Cloudflare
 > ofrece varios tipos y el de **R2** —su almacenamiento de archivos— se parece
-> bastante. Si la pantalla donde lo creaste te muestra además una *Access Key ID*
-> y una *Secret Access Key*, ése es de R2 y **no sirve para publicar**: el
+> bastante. Si la pantalla donde lo creaste te muestra además una _Access Key ID_
+> y una _Secret Access Key_, ése es de R2 y **no sirve para publicar**: el
 > despliegue va a fallar por permisos, con un error que no dice cuál era el
 > correcto.
 
@@ -103,9 +103,9 @@ dos veces —una con el nombre `dev` y otra con `produccion`—, y en cada uno:
    **Add deployment branch or tag rule** → `main`.
 2. En **Environment secrets → Add environment secret**, los dos:
 
-| Nombre | Valor |
-| --- | --- |
-| `CLOUDFLARE_API_TOKEN` | el que acabás de copiar |
+| Nombre                  | Valor                         |
+| ----------------------- | ----------------------------- |
+| `CLOUDFLARE_API_TOKEN`  | el que acabás de copiar       |
 | `CLOUDFLARE_ACCOUNT_ID` | el identificador de tu cuenta |
 
 > **Por qué en un environment y no como secreto del repositorio.** Un secreto del
@@ -137,7 +137,7 @@ dos veces —una con el nombre `dev` y otra con `produccion`—, y en cada uno:
 un secreto público: cualquiera que clone el proyecto se lo lleva, y cambiarlo
 después no borra el que ya se vio.
 
-### 5 · Publicar por primera vez · *1 minuto*
+### 5 · Publicar por primera vez · _1 minuto_
 
 En la pestaña **Actions** de tu repositorio, elegí el workflow **desplegar** y
 apretá **Run workflow**, con `main` elegida en **Use workflow from** —es la que
@@ -152,7 +152,7 @@ cada vez que las verificaciones quedan en verde sobre la rama principal.
 primera vez tiene la forma `https://{{PROYECTO}}.<tu-subdominio>.workers.dev`.
 Abrila: tiene que verse tu sitio.
 
-### Si publicaste algo roto: volver a la versión anterior · *1 minuto*
+### Si publicaste algo roto: volver a la versión anterior · _1 minuto_
 
 **Esto es lo primero que hay que hacer, antes de arreglar nada.** Mientras el
 sitio está roto, cada minuto lo paga quien entra. Volver atrás es un comando y

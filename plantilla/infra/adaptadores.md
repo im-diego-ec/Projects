@@ -71,8 +71,8 @@ elegida. Y el valor **se valida**: uno que no existe detiene el arranque con `EX
 uno que la constitución admite pero la herramienta todavía no implementa —`cloudflare`,
 `gcp`— recibe un mensaje que lo dice y nombra dónde vive ese trabajo.
 
-Este bloque decía *«la clave todavía no la lee nadie»* y *«escribir `azure` o borrarla no
-produce ningún aviso»*. Las dos afirmaciones eran ciertas cuando se escribieron y dejaron
+Este bloque decía _«la clave todavía no la lee nadie»_ y _«escribir `azure` o borrarla no
+produce ningún aviso»_. Las dos afirmaciones eran ciertas cuando se escribieron y dejaron
 de serlo sin que nada lo notara — mandaba a sostener a mano una coherencia que la
 herramienta ya sostenía, y a borrar carpetas que ya no llegan.
 
@@ -113,12 +113,12 @@ El contrato de arriba es lo que la hace tratable: no te mudás «de Supabase a G
 mudás de **(a) cómputo**, de **(b) datos**, de **(c) secretos** y de **(d) despliegue**.
 Son cuatro decisiones con costos muy distintos, y se pueden mover **por separado**.
 
-| Capacidad | Qué cuesta moverla | Se puede a medias |
-| --- | --- | --- |
-| **(a) cómputo** | poco: es un contenedor o un proceso, y el código no cambia | sí — se puede correr en dos lados y mover tráfico de a poco |
-| **(b) datos** | **es la cara**: hay que copiar, verificar y cortar | **no** — o los datos están, o no |
-| **(c) secretos** | medio: cambia cómo llegan, no cuáles son | sí |
-| **(d) despliegue** | medio: es reescribir el workflow, con su verificación | sí |
+| Capacidad          | Qué cuesta moverla                                         | Se puede a medias                                           |
+| ------------------ | ---------------------------------------------------------- | ----------------------------------------------------------- |
+| **(a) cómputo**    | poco: es un contenedor o un proceso, y el código no cambia | sí — se puede correr en dos lados y mover tráfico de a poco |
+| **(b) datos**      | **es la cara**: hay que copiar, verificar y cortar         | **no** — o los datos están, o no                            |
+| **(c) secretos**   | medio: cambia cómo llegan, no cuáles son                   | sí                                                          |
+| **(d) despliegue** | medio: es reescribir el workflow, con su verificación      | sí                                                          |
 
 **El orden que menos duele, y el motivo de cada paso:**
 
@@ -226,14 +226,14 @@ este proyecto lo dice el proyecto, no este archivo.
 Consultados el **2026-09-10** en la página de precios de Supabase. Importan **antes**
 de empezar, no después:
 
-| | Plan gratuito |
-|---|---|
-| Proyectos activos | **2** |
-| Tamaño de base | 500 MB (CPU compartida, 500 MB de RAM) |
-| Tráfico de salida | 5 GB |
-| Conexiones | 60 directas, 200 clientes por el pooler |
-| Inactividad | **los proyectos se pausan a la semana** |
-| Escalón siguiente | desde 25 USD/mes |
+|                   | Plan gratuito                           |
+| ----------------- | --------------------------------------- |
+| Proyectos activos | **2**                                   |
+| Tamaño de base    | 500 MB (CPU compartida, 500 MB de RAM)  |
+| Tráfico de salida | 5 GB                                    |
+| Conexiones        | 60 directas, 200 clientes por el pooler |
+| Inactividad       | **los proyectos se pausan a la semana** |
+| Escalón siguiente | desde 25 USD/mes                        |
 
 **Dos consecuencias que cambian cómo se arma el proyecto:**
 
@@ -253,7 +253,7 @@ El cliente y las migraciones **no pueden** usar la misma cadena:
 
 - **El cliente va por el pooler.** Es lo que aguanta muchas conexiones cortas.
 - **Las migraciones van por la conexión directa.** El pooler en modo transacción
-  **no soporta *prepared statements***, y las migraciones los usan.
+  **no soporta _prepared statements_**, y las migraciones los usan.
 
 Y en el plan gratuito hay un detalle más: la conexión directa es **IPv6**. El add-on
 de IPv4 es de organizaciones Pro. Así que las migraciones salen por **session mode**
@@ -277,31 +277,31 @@ no está en el mensaje, y se busca en el código de la aplicación.
 
 ### Quién cubre (a) y (d) cuando la base es Supabase — contestado, midiendo
 
-Esto era un pendiente abierto: *«dónde corre la API»*. Se midió el **2026-09-10** contra
+Esto era un pendiente abierto: _«dónde corre la API»_. Se midió el **2026-09-10** contra
 la documentación de Cloudflare, y la respuesta es **Worker + Hyperdrive**, con Supabase
 nombrado por la propia documentación de Cloudflare.
 
-| Capacidad | Quién la cubre | Por qué |
-|---|---|---|
-| **(a)** cómputo de la API | **Cloudflare Workers** | `connect()` de `cloudflare:sockets` abre TCP saliente, y la documentación usa el 5432 como ejemplo literal |
-| **(b)** base | **Supabase** | lo de siempre: PostgreSQL administrado con respaldos |
-| **(c)** secretos | **Supabase + las variables del proyecto** | sin cambios |
-| **(d)** despliegue y verificación | **Cloudflare Workers**, por versiones | se sube una versión, se mira, y se promueve **esa misma** sin recompilar |
+| Capacidad                         | Quién la cubre                            | Por qué                                                                                                    |
+| --------------------------------- | ----------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
+| **(a)** cómputo de la API         | **Cloudflare Workers**                    | `connect()` de `cloudflare:sockets` abre TCP saliente, y la documentación usa el 5432 como ejemplo literal |
+| **(b)** base                      | **Supabase**                              | lo de siempre: PostgreSQL administrado con respaldos                                                       |
+| **(c)** secretos                  | **Supabase + las variables del proyecto** | sin cambios                                                                                                |
+| **(d)** despliegue y verificación | **Cloudflare Workers**, por versiones     | se sube una versión, se mira, y se promueve **esa misma** sin recompilar                                   |
 
 **Y no hay que reescribir la aplicación**, que era el costo escondido que hacía temer
 esta ruta: Cloudflare implementó las APIs de `node:http` —cliente y servidor— y publicó
-`httpServerHandler`, anunciándolo como *«allowing developers to migrate existing Node.js
-applications with minimal code changes»*.
+`httpServerHandler`, anunciándolo como _«allowing developers to migrate existing Node.js
+applications with minimal code changes»_.
 
-**Cuesta 0 USD/mes**, y no «casi»: Hyperdrive *«is included in both the Free and Paid
-Workers plans»*, con 100 000 consultas por día.
+**Cuesta 0 USD/mes**, y no «casi»: Hyperdrive _«is included in both the Free and Paid
+Workers plans»_, con 100 000 consultas por día.
 
 > **Lo que sigue abierto es UNA cosa, y es mucho más barata que la pregunta original.**
-> No está confirmado que Hyperdrive alcance la cadena *Direct connection* de un proyecto
+> No está confirmado que Hyperdrive alcance la cadena _Direct connection_ de un proyecto
 > Supabase del plan gratuito, porque esa cadena es **IPv6** y el add-on de IPv4 es de
 > organizaciones Pro. **Si falla, no se cambia de proveedor: se cambia de cadena** — el
-> pooler compartido es IPv4 en todos los planes. O sea que la incógnita decide *cuál de
-> las dos cadenas* se escribe en el andamio, no quién cubre qué.
+> pooler compartido es IPv4 en todos los planes. O sea que la incógnita decide _cuál de
+> las dos cadenas_ se escribe en el andamio, no quién cubre qué.
 
 > **Y el techo de CPU de Workers pasa a aplicarte**, ahora que la API corre ahí. No se
 > repite acá: vive una sola vez, en el pendiente **«cloudflare · los 10 ms de CPU»** de la
@@ -332,6 +332,7 @@ front.
 > **La regla que queda:** ninguna cifra de costo de este marco se escribe sin decir **qué
 > incluye** y **con qué uso**. Un número sin las dos cosas no es una promesa de costo, es
 > un piso disfrazado de precio.
+
 - **PLAN GRATUITO** _(medido en developers.cloudflare.com el 2026-08-24)_:
   - Workers: **100 000 peticiones por día**, **10 ms de CPU por petición**, 50
     subpeticiones por invocación, 3 MB de tamaño comprimido del worker
@@ -343,13 +344,13 @@ front.
 Medido el **2026-09-10** corriendo el andamio dentro de **workerd** —el mismo runtime
 de Cloudflare— con `wrangler dev`, sin cuenta y sin desplegar:
 
-| Lo que se probó | Resultado |
-|---|---|
-| La app de Express entera | **200**, sin tocar una línea. Lo único nuevo son **cuatro líneas** de `worker.ts` con `httpServerHandler` |
-| El middleware de auth | **401** y falla cerrado, que es su razón de ser |
-| **El driver de Postgres** | `@prisma/adapter-pg` + `pg` cargaron y **abrieron un socket TCP**: la base contestó con su propio código de error |
-| El arranque completo (`server.ts`) | **200** también, con `dotenv/config` y los manejadores de señales adentro |
-| Tamaño del bundle | **1583 KiB comprimidos** contra un techo de **3 MB** |
+| Lo que se probó                    | Resultado                                                                                                         |
+| ---------------------------------- | ----------------------------------------------------------------------------------------------------------------- |
+| La app de Express entera           | **200**, sin tocar una línea. Lo único nuevo son **cuatro líneas** de `worker.ts` con `httpServerHandler`         |
+| El middleware de auth              | **401** y falla cerrado, que es su razón de ser                                                                   |
+| **El driver de Postgres**          | `@prisma/adapter-pg` + `pg` cargaron y **abrieron un socket TCP**: la base contestó con su propio código de error |
+| El arranque completo (`server.ts`) | **200** también, con `dotenv/config` y los manejadores de señales adentro                                         |
+| Tamaño del bundle                  | **1583 KiB comprimidos** contra un techo de **3 MB**                                                              |
 
 **Dos cosas que conviene saber antes de que sorprendan:**
 

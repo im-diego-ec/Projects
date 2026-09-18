@@ -12,16 +12,16 @@ lecturas distintas del mismo texto, hechas en momentos distintos.
 
 ## Los cuatro archivos, y quién aprueba cada uno
 
-| Archivo | Qué contesta | Quién lo aprueba |
-| --- | --- | --- |
-| `proposal.md` — el **proposal**, o sea el planteo: por qué vale la pena | **por qué**, y qué cambia | el PO |
-| `specs/<capacidad>/spec.md` — una **spec**: cómo se comporta el sistema, en escenarios | **cómo se comporta** | el PO |
-| `design.md` | **cómo se hace**, y qué se descartó | el otro builder |
-| `tasks.md` | **los pasos**, en orden | el otro builder |
+| Archivo                                                                                | Qué contesta                        | Quién lo aprueba |
+| -------------------------------------------------------------------------------------- | ----------------------------------- | ---------------- |
+| `proposal.md` — el **proposal**, o sea el planteo: por qué vale la pena                | **por qué**, y qué cambia           | el PO            |
+| `specs/<capacidad>/spec.md` — una **spec**: cómo se comporta el sistema, en escenarios | **cómo se comporta**                | el PO            |
+| `design.md`                                                                            | **cómo se hace**, y qué se descartó | el otro builder  |
+| `tasks.md`                                                                             | **los pasos**, en orden             | el otro builder  |
 
 **Por qué importa el orden.** Si el `design.md` ya está escrito cuando el PO
-aprueba el proposal, su aprobación es un trámite: está decidiendo *qué* cuando el
-*cómo* ya está decidido. Ésa es la razón de que esto se escriba de a partes.
+aprueba el proposal, su aprobación es un trámite: está decidiendo _qué_ cuando el
+_cómo_ ya está decidido. Ésa es la razón de que esto se escriba de a partes.
 
 ## Crear el directorio
 
@@ -84,10 +84,12 @@ escrita de forma que se pueda comprobar.
 The system SHALL <lo que tiene que pasar, en una frase verificable>.
 
 #### Scenario: <El caso, nombrado por lo que ocurre>
+
 - **WHEN** <la condición, concreta>
 - **THEN** <lo observable, que alguien pueda comprobar>
 
 #### Scenario: <Y el caso borde, que es el que importa>
+
 - **WHEN** <la condición rara>
 - **THEN** <qué pasa — y si es un error, cuál>
 ```

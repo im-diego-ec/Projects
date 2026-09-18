@@ -136,33 +136,39 @@ test("tabla · todo ejemplo de la tabla PASA la validacion de su valor", () => {
 
 test("tabla · la comprobacion de los ejemplos MUERDE", () => {
   const texto = fs.readFileSync(GUIA, "utf8");
+  // LAS ANCLAS TOLERAN EL RELLENO DE LA CELDA, y no por comodidad: la guia pasa
+  // el formateador del andamio (change `el-andamio-nace-formateado`), que alinea
+  // cada tabla rellenando las celdas con espacios hasta el ancho de su columna.
+  // Con las anclas literales de antes —"| `ejemplo-dev` |"— la primera pasada del
+  // formateador dejo a estas mutaciones sin nada que reemplazar.
+  const celda = (valor) => new RegExp(`\\|\\s*${valor.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\s*\\|`);
   const mutaciones = [
     {
       nombre: "un nombre de perfil vuelve a llevar un espacio adentro",
       // La forma exacta del desfase que esta guarda cierra: el valor viaja dentro
       // de un patron de la allowlist, donde un espacio no rompe el JSON, rompe el
       // patron — y una entrada de allowlist que no matchea nada no avisa.
-      mutar: (t) => t.replace("| `ejemplo-dev` |", "| `perfil de ejemplo dev` |"),
+      mutar: (t) => t.replace(celda("`ejemplo-dev`"), "| `perfil de ejemplo dev` |"),
       espera: /PERFIL_DEV/,
     },
     {
       nombre: "un id de cuenta pierde un digito",
-      mutar: (t) => t.replace("| `111111111111` |", "| `11111111111` |"),
+      mutar: (t) => t.replace(celda("`111111111111`"), "| `11111111111` |"),
       espera: /CUENTA_DEV/,
     },
     {
       nombre: "un handle de GitHub aparece con la arroba adelante",
-      mutar: (t) => t.replace("| `handle-del-po` |", "| `@handle-del-po` |"),
+      mutar: (t) => t.replace(celda("`handle-del-po`"), "| `@handle-del-po` |"),
       espera: /^PO:/,
     },
     {
       nombre: "una fila se queda sin su ejemplo",
-      mutar: (t) => t.replace("| `#alertas-prod` |", "| — |"),
+      mutar: (t) => t.replace(celda("`#alertas-prod`"), "| — |"),
       espera: /CANAL_ALERTAS: la fila no da un ejemplo/,
     },
     {
       nombre: "el dominio se escribe con esquema",
-      mutar: (t) => t.replace("| `agenda.ejemplo.com` |", "| `https://agenda.ejemplo.com/` |"),
+      mutar: (t) => t.replace(celda("`agenda.ejemplo.com`"), "| `https://agenda.ejemplo.com/` |"),
       espera: /DOMINIO_PROD/,
     },
   ];

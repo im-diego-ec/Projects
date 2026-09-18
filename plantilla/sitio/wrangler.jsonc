@@ -33,7 +33,7 @@
     // Ojo con la alternativa: `single-page-application` devuelve siempre el
     // `index.html`, y eso hace que un enlace mal escrito muestre la portada en
     // vez de un error — que es lo que una aplicación necesita y un sitio no.
-    "not_found_handling": "404-page"
+    "not_found_handling": "404-page",
   },
 
   // LAS DIRECCIONES DE PRUEBA, DECLARADAS A PROPOSITO Y NO HEREDADAS DEL DEFAULT.
@@ -56,6 +56,6 @@
   "preview_urls": true,
 
   "observability": {
-    "enabled": true
-  }
+    "enabled": true,
+  },
 }

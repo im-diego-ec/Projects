@@ -712,6 +712,195 @@ jobs:
           done
           echo "el pipeline del andamio pasa actionlint en todas las formas"
 
+      # EL ANDAMIO Y LO QUE EL INIT ESCRIBE ENCIMA PASAN EL FORMATEADOR QUE EL
+      # PROYECTO SE EXIGE, con la version que el proyecto instala.
+      #
+      # QUE CIERRA. Hasta este paso ningun CI del marco corria el formateador sobre
+      # plantilla/, y el andamio pinaba un RANGO de prettier. Medido el 2026-09-17
+      # con prettier 3.9.6: 15 archivos de plantilla/ no pasaban `prettier --check`,
+      # y un repo instanciado con `--sin-arranque` —la via de personalizar.yml, la
+      # puerta de quien no programa— nacia con `format:check` en ROJO en las 24
+      # combinaciones de forma, plataforma, tipo de cuenta y largo de nombres. El
+      # paso `formateado` del arranque lo tapaba en la otra via, y ese era el
+      # problema: tapaba, y el primer commit de cada proyecto traia reformateados
+      # archivos que publica el marco.
+      #
+      # DOS SUJETOS, y los dos hacen falta. `plantilla/` tal cual (con plantilla/
+      # como CWD, para que apliquen su .prettierrc y su .prettierignore, que son
+      # los que el proyecto hereda) y el DESTINO instanciado de cada combinacion,
+      # porque `projects init` poda bloques, sustituye marcadores y reescribe el
+      # archivo de valores: un andamio limpio no garantiza un repo limpio. Se
+      # instancia con los valores del ejemplo (nombres mas cortos que sus
+      # marcadores: una linea que se achica puede juntarse) y con valores largos
+      # (el nombre del proyecto con LARGO_DE_NOMBRE_MEDIDO caracteres: una linea que
+      # crece puede partirse). Las listas de formas, plataformas y tipos de cuenta
+      # se DERIVAN de la herramienta: una forma nueva entra sola.
+      #
+      # LA VERSION SE DERIVA DEL MANIFIESTO DEL ANDAMIO Y TIENE QUE SER EXACTA, que
+      # es la leccion que Rigel pago primero (su 1.13.0): media con una version
+      # escrita a mano mientras el proyecto resolvia otra desde un rango, y dos
+      # versiones de prettier no formatean igual. Un rango aca es ROJO: el
+      # andamio no trae lockfile y el primer install de cada proyecto resolveria
+      # la que hubiera salido ese dia, que este paso nunca midio.
+      #
+      # SE INSTALA CON EL REGISTRO EXPLICITO Y FUERA DEL ARBOL: npm lee el .npmrc
+      # del directorio donde corre, y un .npmrc en el arbol de un PR decidiria de
+      # donde baja lo que este paso ejecuta.
+      #
+      # EL BANCO QUE LO EJERCITA con un npm y un prettier falsos, rojos incluidos:
+      # pruebas/ci-del-marco/formato-del-andamio.test.mjs.
+      - name: El andamio y lo que el init escribe pasan el formateador
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          VERSION_PRETTIER="$(node -p 'require("./plantilla/package.json").devDependencies?.prettier ?? ""')"
+          if [ -z "${VERSION_PRETTIER}" ]; then
+            echo "::error::plantilla/package.json no declara prettier en devDependencies. Sin esa version este paso mediria con una arbitraria, asi que falla en vez de adivinar. Arreglo: declarar \"prettier\": \"<x.y.z>\", exacto, en las devDependencies de plantilla/package.json"
+            exit 1
+          fi
+          if ! [[ "${VERSION_PRETTIER}" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::el andamio declara prettier como \"${VERSION_PRETTIER}\", que no es una version exacta. Un rango deja que cada proyecto nuevo instale la version que haya salido el dia que nace, que este paso nunca midio, y dos versiones de prettier no formatean igual. Arreglo: pinala exacta en plantilla/package.json, sin ^ ni ~"
+            exit 1
+          fi
+          echo "== formateador: prettier@${VERSION_PRETTIER} (leido de plantilla/package.json) =="
+
+          FORMATEADOR="${RUNNER_TEMP}/formateador"
+          mkdir -p "${FORMATEADOR}"
+          ( cd "${FORMATEADOR}" && npm install --no-save --no-audit --no-fund --ignore-scripts \
+              --registry=https://registry.npmjs.org/ --prefix "${FORMATEADOR}" "prettier@${VERSION_PRETTIER}" )
+          PRETTIER="${FORMATEADOR}/node_modules/.bin/prettier"
+          if [ ! -x "${PRETTIER}" ]; then
+            echo "::error::npm termino y no dejo el binario de prettier en ${PRETTIER}. Este paso no se declara verde sin haber medido"
+            exit 1
+          fi
+          INSTALADA="$("${PRETTIER}" --version)"
+          if [ "${INSTALADA}" != "${VERSION_PRETTIER}" ]; then
+            echo "::error::se pidio prettier@${VERSION_PRETTIER} y quedo instalado ${INSTALADA}. Medir con otra version que la que el proyecto instala es el defecto que este paso existe para impedir"
+            exit 1
+          fi
+
+          HUBO_FALLO=0
+
+          # 1. EL ANDAMIO TAL CUAL.
+          echo "::group::plantilla/ tal cual"
+          if ( cd plantilla && "${PRETTIER}" --check . ); then
+            echo "::endgroup::"
+          else
+            echo "::endgroup::"
+            echo "::error::el ANDAMIO no pasa el formateador que su propio ci.yml le exige al proyecto (pnpm format:check), con la version que el proyecto instala. Un proyecto nuevo nace con el job formato en rojo por archivos que no escribio. Arreglo: cd plantilla && npx --yes prettier@${VERSION_PRETTIER} --write . , y revisar que ningun marcador de doble llave en posicion de valor YAML haya quedado reescrito con espacios adentro: la forma que sobrevive al formateador es la citada"
+            HUBO_FALLO=1
+          fi
+
+          # 2. LO QUE NACE: cada combinacion, instanciada sin arranque (el arranque
+          # formatea, y entonces este paso mediria al formateador y no al andamio).
+          cat > "${RUNNER_TEMP}/formato-de-los-destinos.mjs" <<'FIN'
+          import { spawnSync } from "node:child_process";
+          import fs from "node:fs";
+          import path from "node:path";
+          import { pathToFileURL } from "node:url";
+
+          const raiz = process.cwd();
+          const herramienta = path.join(raiz, "herramientas", "projects-init.mjs");
+          const init = await import(pathToFileURL(herramienta).href);
+          const prettier = process.env.PRETTIER;
+          const tmp = process.env.RUNNER_TEMP;
+
+          const listas = { FORMAS: init.FORMAS, PLATAFORMAS: init.PLATAFORMAS, TIPOS_DE_CUENTA: init.TIPOS_DE_CUENTA };
+          for (const [nombre, lista] of Object.entries(listas)) {
+            if (!Array.isArray(lista) || lista.length === 0) {
+              console.log("::error::herramientas/projects-init.mjs no exporta " + nombre + " como una lista con algo adentro: sin ella este paso no sabe que combinaciones medir, y no se declara verde");
+              process.exit(1);
+            }
+          }
+          const largo = init.LARGO_DE_NOMBRE_MEDIDO;
+          if (!Number.isInteger(largo) || largo < 1) {
+            console.log("::error::herramientas/projects-init.mjs no exporta LARGO_DE_NOMBRE_MEDIDO: sin el, este paso no sabe con que largo de nombre medir");
+            process.exit(1);
+          }
+
+          const pedido = spawnSync(process.execPath, [herramienta, "--ejemplo"], { encoding: "utf8" });
+          if (pedido.status !== 0) {
+            console.log("::error::projects init --ejemplo fallo (salida " + pedido.status + "): " + (pedido.stderr || "").trim());
+            process.exit(1);
+          }
+          const ejemplo = JSON.parse(pedido.stdout);
+
+          // LOS VALORES LARGOS: cada uno cerca del maximo que admite su forma
+          // (GitHub corta los handles y las organizaciones en 39), y el nombre del
+          // proyecto con el largo exacto que la herramienta declara medido.
+          const hasta = (base, n) => (base + "x".repeat(200)).slice(0, n);
+          const largos = {
+            PROYECTO: hasta("proyecto-con-un-nombre-largo-", largo),
+            ORG: hasta("Organizacion-Con-Un-Nombre-", 39),
+            BUILDER_1: hasta("builder-uno-con-un-handle-", 39),
+            BUILDER_2: hasta("builder-dos-con-un-handle-", 39),
+            PO: hasta("product-owner-con-un-handle-", 39),
+            EQUIPO_BUILDERS: hasta("equipo-de-builders-", 39),
+            EQUIPO_PO: hasta("equipo-del-po-", 39),
+            PREFIJO_RECURSOS: hasta("prefijo-de-recursos-", 40),
+            PERFIL_DEV: hasta("perfil-de-desarrollo-", 40),
+            PERFIL_PROD: hasta("perfil-de-produccion-", 40),
+            CANAL_ALERTAS: hasta("#alertas-de-produccion-", 40),
+            DOMINIO_DEV: "reservas-del-area-norte-dev.una-organizacion-con-nombre-largo.example.com",
+            DOMINIO_PROD: "reservas-del-area-norte.una-organizacion-con-nombre-largo.example.com",
+          };
+
+          const rojos = [];
+          let medidos = 0;
+          for (const forma of init.FORMAS) {
+            for (const plataforma of init.PLATAFORMAS) {
+              for (const cuenta of init.TIPOS_DE_CUENTA) {
+                for (const nombres of ["cortos", "largos"]) {
+                  const combinacion = forma + "/" + plataforma + "/" + cuenta + "/nombres " + nombres;
+                  const dir = fs.mkdtempSync(path.join(tmp, "destino-"));
+                  const destino = path.join(dir, "repo");
+                  fs.mkdirSync(destino);
+                  const rutaValores = path.join(dir, "valores.json");
+                  const valores = { ...ejemplo, ...(nombres === "largos" ? largos : {}), forma, plataforma, TIPO_CUENTA: cuenta };
+                  fs.writeFileSync(rutaValores, JSON.stringify(valores, null, 2));
+                  const armado = spawnSync(
+                    process.execPath,
+                    [herramienta, "--valores", rutaValores, "--destino", destino, "--sin-herramientas", "--sin-arranque"],
+                    { encoding: "utf8" },
+                  );
+                  if (armado.status !== 0) {
+                    console.log("::error::projects init fallo con " + combinacion + " (salida " + armado.status + "), asi que ese destino no se pudo medir y este paso no se declara verde. Lo ultimo que dijo: " + (armado.stderr || armado.stdout || "").trim().split("\n").slice(-3).join(" | "));
+                    rojos.push(combinacion + ": projects init fallo");
+                    continue;
+                  }
+                  const p = spawnSync(prettier, ["--check", "."], { cwd: destino, encoding: "utf8" });
+                  const salida = ((p.stdout || "") + (p.stderr || "")).trim();
+                  console.log("::group::" + combinacion);
+                  console.log(salida);
+                  console.log("::endgroup::");
+                  medidos += 1;
+                  if (p.status !== 0 || !/All matched files use Prettier code style!/.test(salida)) {
+                    const archivos = salida.split("\n").filter((l) => l.startsWith("[warn] ") && !/Code style issues/.test(l)).map((l) => l.slice(7));
+                    console.log("::error::el repo que nace con " + combinacion + " no pasa el formateador sin correrlo: " + (archivos.join(", ") || "(la salida de arriba)") + ". Arreglo: si el archivo llega tal cual del andamio, formatealo en plantilla/; si lo escribe projects init (el archivo de valores, una costura de las podas, la pagina de la proteccion de main), el arreglo va en herramientas/projects-init.mjs (jsonParaElArchivo, coserCosturas); si solo falla con nombres largos, una linea de codigo con el nombre del proyecto no entra en el ancho: abrila en varias lineas (un objeto abierto o una constante propia) o baja LARGO_DE_NOMBRE_MEDIDO con el motivo escrito. Reproducilo con --sin-arranque y prettier@" + (process.env.VERSION_PRETTIER || "<version>") + " --check . en el destino");
+                    rojos.push(combinacion);
+                  }
+                }
+              }
+            }
+          }
+          if (rojos.length > 0) {
+            console.log("== destinos en rojo: " + rojos.length + " ==");
+            for (const r of rojos) console.log("  " + r);
+            process.exit(1);
+          }
+          if (medidos === 0) {
+            console.log("::error::no se midio ningun destino: este paso no se declara verde sin haber medido");
+            process.exit(1);
+          }
+          console.log(medidos + " destino(s) nacen formateados sin correr el formateador, con los nombres del ejemplo y con nombres de " + largo + " caracteres");
+          FIN
+          if ! PRETTIER="${PRETTIER}" VERSION_PRETTIER="${VERSION_PRETTIER}" node "${RUNNER_TEMP}/formato-de-los-destinos.mjs"; then
+            HUBO_FALLO=1
+          fi
+
+          exit "${HUBO_FALLO}"
+
       # EL MARCO NO SE AUTO-IDENTIFICA POR UN LITERAL DE SU CUENTA.
       #
       # QUE CIERRA. marco-ci.yml decidia dos cosas comparando `github.repository`

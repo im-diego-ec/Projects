@@ -398,6 +398,32 @@ avisos.
   llegar en rojo dentro de tu PR de actualización, con lo que tenés que cambiar escrito
   en «Para consumidores».
 
+- **El andamio pina prettier exacto: `"prettier": "3.9.6"`, no `"^3.9.6"`.** Con el
+  rango, cada proyecto instalaba la versión que hubiera salido el día que nacía
+  (medido: un destino del 2026-09-17 resolvió 3.9.7) y ninguna medición del marco
+  podía afirmar nada sobre ella. Para consumidores: llega a los proyectos nuevos. Un
+  proyecto existente que quiera el mismo pin cambia la línea en su `package.json`,
+  corre `pnpm install` y `pnpm format`, y commitea el resultado; subirlo después es
+  un PR de Dependabot como cualquier dependencia.
+- **`projects init` escribe sus archivos con la forma del formateador.** El archivo
+  de valores, las respuestas y los desvíos (también los que escribe la puerta web)
+  salen con `jsonParaElArchivo`, que deja en una línea los arreglos cortos como hace
+  prettier (`package.json`, que prettier trata como `JSON.stringify`, queda igual);
+  y las podas por forma, plataforma y tipo de cuenta cosen la costura que dejan
+  (`coserCosturas`), sin dos líneas en blanco seguidas ni una al final. El paso
+  `formateado` del arranque se conserva solo para un nombre de proyecto de más de 60
+  caracteres (`LARGO_DE_NOMBRE_MEDIDO`), y con `--sin-arranque` ese caso se avisa con
+  el comando. Viene de Rigel 1.13.0 (commit c8b4fff). Para consumidores: nada; es
+  herramienta del marco y los archivos que escribe tienen las mismas claves.
+- **La guía del andamio (`plantilla/README.md`) describe lo que el andamio trae.**
+  La sección 4 decía que no traía `package.json`, `pnpm-workspace.yaml`, despliegue
+  ni `infra/`, y los trae; ahora es una tabla por entrada de la raíz, con cuándo
+  llega cada una, que un banco compara contra lo que `projects init` reparte. Los
+  caminos «sin frontend» y «sin E2E» traen sus seis lugares cada uno, recorridos
+  hasta `pnpm verificar` en verde, y la salida de `projects init` nombra los mismos.
+  `{{PAQUETES}}` figura como derivado, no como un valor a llenar. Para
+  consumidores: nada.
+
 ### Eliminado
 
 - **El andamio ya no trae su propia copia del paso «Formato y validez de las raices de
@@ -750,6 +776,26 @@ avisos.
   verdad y `gh` simulado) exige `.git`, rama `main` y `origin`, y conserva el caso
   rojo de la invocación de antes.
   Para consumidores: nada.
+
+- **El andamio pasa su propio formateador, y lo que nace de él también.** Se
+  formatearon los 15 archivos de `plantilla/` que no pasaban `prettier --check`; las
+  tablas de la portada del proyecto y de `AGENTS.md` dejan de llevar marcadores (el
+  ancho de la celda cambiaba al sustituirlos) y los centinelas de poda de la portada
+  dejan de estar adentro de tablas y citas (el formateador partía la tabla). Para
+  consumidores: nada; un proyecto existente no recibe el scaffold.
+- **La línea de `/api/health` y su doble dejan de romper el formato con un nombre de
+  proyecto largo.** `plantilla/api/src/app.ts` y `plantilla/web/src/App.test.tsx`
+  abren sus objetos en varias líneas, y el log de arranque de
+  `plantilla/api/src/server.ts` toma el nombre de una constante: antes se partían
+  con nombres de 22 y 17 caracteres; ahora la primera línea que se parte lo hace a
+  los 70 (Rigel 2.6.0, commit 4d0bd19). Para consumidores: si su proyecto tiene un
+  nombre largo y `format:check` en rojo por esas líneas, `pnpm format` lo resuelve;
+  si no, nada.
+- **Cada bloque `[FRONT]` de `eslint.config.mjs` marca su cierre con `// [/FRONT]`.**
+  Los bloques no tienen todos la misma forma, y borrarlos deduciendo dónde terminaba
+  cada uno rompía el archivo (Rigel 1.13.0, commit 1bd6dc0). Para consumidores:
+  nada; un proyecto existente sin frontend que todavía tenga los bloques puede
+  agregar las marcas a mano antes de borrarlos.
 
 ### Añadido
 
@@ -1475,6 +1521,28 @@ avisos.
   `herramientas/projects-repositorio.mjs`, sin shell en ningún sistema.
   Para consumidores: nada. Es herramienta del marco que corre desde el clon y no
   viaja al proyecto; la invocación sin la bandera escribe lo mismo que antes.
+
+- **El CI del marco corre el formateador sobre el andamio y sobre cada repo que
+  nace de él.** Paso nuevo «El andamio y lo que el init escribe pasan el
+  formateador» en el job `higiene` de `.github/workflows/ci.yml`: instala la versión
+  de prettier que declara `plantilla/package.json` —derivada, no escrita en el paso,
+  y en rojo si es un rango—, corre `prettier --check .` en `plantilla/` y en el
+  destino de cada combinación de forma, plataforma y tipo de cuenta, con los nombres
+  del ejemplo y con nombres largos, instanciado con `--sin-arranque` para que nadie
+  formatee después. Medido el 2026-09-17 antes del arreglo: 15 archivos del andamio
+  en rojo y 24 de 24 destinos en rojo. Viene de Rigel 1.13.0 (commits 7ceb40e y
+  40a7bce), extendido al destino porque acá las podas cambian el texto. Para
+  consumidores: nada; el paso vive en el CI del marco y no viaja.
+- **El `ci.yml` del andamio corre el formato en los dos carriles.** `format:check`
+  sale de `build_test` —que el carril de docs omite— a un job propio, `formato`, sin
+  condición ni dependencias, que instala con `--ignore-scripts`; `ci-ok` lo exige en
+  `success` y un `skipped` es rojo. Un PR de solo documentación ya no mete una tabla
+  desalineada en `main` para que detone en el PR de otra persona (Rigel 1.13.0,
+  commit d1c6380). Para consumidores: llega a los proyectos que nacen desde esta
+  versión, con un check nuevo, `formato`; `ci-ok` sigue siendo el único requerido.
+  Un proyecto existente que lo quiera copia el job `formato` y su línea en el
+  `Veredicto` de `ci-ok` desde `plantilla/.github/workflows/ci.yml`, y saca
+  `- run: pnpm format:check` de `build_test`.
 
 ### Corregido
 

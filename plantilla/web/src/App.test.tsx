@@ -41,7 +41,15 @@ function authFalsa(sesionInicial: Sesion | null = null, token: string | null = n
 // inventados— no podia leer al backend real sin que nada mordiera. El acople
 // entre estos dobles, los esquemas de App.tsx y los `res.json` de app.ts lo
 // vigila pruebas/andamio/acoples-del-andamio.test.mjs.
-const SALUD_OK = { estado: "ok", servicio: "{{PROYECTO}}-api", ts: "2026-01-01T00:00:00.000Z" };
+//
+// Abierto en varias lineas por la misma razon que el `res.json` de app.ts: en
+// una sola, entraba en el ancho del formateador con el marcador y no con un
+// nombre de proyecto largo.
+const SALUD_OK = {
+  estado: "ok",
+  servicio: "{{PROYECTO}}-api",
+  ts: "2026-01-01T00:00:00.000Z",
+};
 const HOLA_OK = { mensaje: "Hola desde el API", userId: "dev-user" };
 // El chequeo de LA BASE, que es otro endpoint y otra respuesta. /api/health no
 // toca la base a proposito, asi que doblarlo solo a el dejaba al banco verde
@@ -219,7 +227,9 @@ describe("App", () => {
     // Son DOS al montar y no una: la portada consulta el estado del API y el de
     // la base, y las dos respuestas tienen la forma ajena. `findByText` en
     // singular tira "found multiple" aca, que es lo correcto.
-    await waitFor(() => expect(screen.getAllByText("el API respondio algo que no entiendo")).toHaveLength(2));
+    await waitFor(() =>
+      expect(screen.getAllByText("el API respondio algo que no entiendo")).toHaveLength(2)
+    );
     expect(screen.queryByText("sin conexion con el API")).toBeNull();
 
     // El endpoint protegido corre por el mismo carril: los dos lugares donde el
@@ -229,7 +239,9 @@ describe("App", () => {
     // waitFor y no findAllByText: findAll* se conforma con UNA coincidencia, y
     // el healthcheck ya puso la primera — la prueba pasaria sin que el click
     // hubiera hecho nada. Lo que se espera es que aparezca la SEGUNDA.
-    await waitFor(() => expect(screen.getAllByText("el API respondio algo que no entiendo")).toHaveLength(3));
+    await waitFor(() =>
+      expect(screen.getAllByText("el API respondio algo que no entiendo")).toHaveLength(3)
+    );
   });
 
   // -------------------------------------------------------------------------
@@ -266,7 +278,9 @@ describe("App", () => {
 
     render(<App auth={null} />);
 
-    expect((await screen.findByLabelText("Estado de la base de datos")).textContent).toBe("no responde");
+    expect((await screen.findByLabelText("Estado de la base de datos")).textContent).toBe(
+      "no responde"
+    );
     // El API sigue en "ok": son dos indicadores distintos y no se contagian.
     expect((await screen.findByLabelText("Estado del API")).textContent).toBe("ok");
     expect(await screen.findByText(/docker compose up -d/)).toBeTruthy();

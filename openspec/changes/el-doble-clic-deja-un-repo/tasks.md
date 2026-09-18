@@ -58,14 +58,14 @@ estado: en-ejecucion
 ## 3. La herramienta y los lanzadores
 
 - [x] 3.1 `projects-init.mjs`: `--repositorio` y `--sin-remoto` en `BANDERAS`
-      (`:358-359`), en el parser (`:3098-3104`) y en `--help`. **Evidencia**:
+      (`:358-359`), en el parser (`:3278-3284`) y en `--help`. **Evidencia**:
       `pruebas/init/quisiste-decir.test.mjs` (una sola lista) en verde.
 - [x] 3.2 `projects-init.mjs`: el paso del repositorio después del arranque, con el
-      motivo cuando no hay primer guardado (`:4075-4086`), y la pregunta por la
-      terminal que trata el fin de la entrada como un no (`:3219`).
+      motivo cuando no hay primer guardado (`:4272-4283`), y la pregunta por la
+      terminal que trata el fin de la entrada como un no (`:3399`).
       **Evidencia**: `…deja-un-repo.test.mjs:209` y `:224` por la CLI.
 - [x] 3.3 La lista final sale de medir: `lineasDelPrimerEnvio` (`projects-repositorio.mjs:379`),
-      usada en `projects-init.mjs:4101`. **Evidencia**: `…deja-un-repo.test.mjs:515`
+      usada en `projects-init.mjs:4298`. **Evidencia**: `…deja-un-repo.test.mjs:515`
       (cuatro estados, incluido el checkout con el andamio sin guardar) y `:194`
       (la CLI sin la bandera dice «NO es un repositorio git»).
 - [x] 3.4 La vista previa no promete «no se toca GitHub» con `--repositorio`

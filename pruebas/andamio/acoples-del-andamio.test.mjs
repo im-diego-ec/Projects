@@ -591,7 +591,10 @@ test("andamio · la comprobacion del contrato MUERDE", () => {
   const mutaciones = [
     {
       nombre: "el API renombra un campo y el front se queda con el viejo",
-      mutar: (raiz) => reemplazar(path.join(raiz, "api/src/app.ts"), 'res.json({ estado: "ok"', 'res.json({ status: "ok"'),
+      // El ancla es la del objeto ABIERTO: la respuesta de /api/health va en
+      // varias lineas desde el change `el-andamio-nace-formateado`, para que el
+      // formateador la conserve con cualquier largo del nombre del proyecto.
+      mutar: (raiz) => reemplazar(path.join(raiz, "api/src/app.ts"), 'estado: "ok",\n      servicio', 'status: "ok",\n      servicio'),
     },
     {
       nombre: "el front vuelve a exigir el nombre en ingles",

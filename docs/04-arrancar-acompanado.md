@@ -1120,7 +1120,7 @@ Cinco casos reales. Ninguno es un defecto de tu repositorio.
 
 | Cuándo | Qué vas a ver | Por qué pasa | Qué hacer |
 |---|---|---|---|
-| Paso 8, si algo quedó sin formatear | `[warn] README.md` y `Code style issues found in the above file` | Al reemplazar los marcadores cambian los anchos del texto y las tablas quedan desalineadas | `corepack pnpm run format` y de nuevo. Pasa una sola vez |
+| Paso 8, si algo quedó sin formatear | `[warn] <archivo>` y `Code style issues found in the above file` | El proyecto nace formateado, y el marco lo mide en cada cambio. La excepción conocida es un nombre de proyecto de más de 60 caracteres: alguna línea de código del esqueleto deja de entrar en el ancho | `corepack pnpm run format` y de nuevo. Pasa una sola vez |
 | Paso 9, primera corrida | Un solo trabajo en rojo: «Sin marcadores del scaffold sin resolver» | Los dos recuadros 🕳️ que un humano tiene que resolver. Y **no se pueden resolver antes** del primer envío: uno de ellos manda pedirle al marco que genere su archivo, y para eso la receta que lo genera tiene que estar ya en la rama principal | Paso 13 |
 | Si intentás enviar el esqueleto como propuesta en vez de directo | La [compuerta](02-glosario.md) de cobertura en rojo | Mide las líneas que una propuesta agrega sin pruebas, y el esqueleto entero son muchas | Enviar directo a la rama principal la primera vez, como dice el paso 9 |
 | En el paso 5, un recuadro con `Update available` | No es rojo, pero parece un problema | Es la herramienta de la base de datos avisando que hay versión nueva | Nada. Las versiones nuevas llegan como propuesta revisable |

@@ -897,7 +897,7 @@ export function podarPorForma(texto, rel, forma) {
     try {
       const j = JSON.parse(texto);
       j.forma = forma;
-      return `${JSON.stringify(j, null, 2)}\n`;
+      return jsonParaElArchivo(rel, j);
     } catch {
       return texto;
     }
@@ -963,7 +963,7 @@ export function podarPorForma(texto, rel, forma) {
           .join(" && ");
       }
     }
-    return `${JSON.stringify(j, null, 2)}\n`;
+    return jsonParaElArchivo(rel, j);
   } catch {
     return texto;
   }
@@ -988,6 +988,133 @@ export function sacarCentinelas(texto) {
     .replace(/^[ \t]*<!-- projects:(?:fin-)?solo-si-[a-z0-9-]+ -->[ \t]*\r?\n/gm, "");
 }
 
+/** COSE LAS COSTURAS QUE DEJAN LAS PODAS, y solo esas.
+ *
+ *  EL DEFECTO QUE CIERRA, medido el 2026-09-17 con prettier 3.9.6 sobre las
+ *  combinaciones de forma, plataforma y tipo de cuenta: el andamio pasa el
+ *  formateador —lo exige el paso «El andamio y lo que el init escribe pasan el
+ *  formateador» del CI del marco— y el repo recien nacido NO, porque sacar un
+ *  bloque `projects:solo-si-…` o solo sus lineas de centinela deja la linea en
+ *  blanco de antes pegada a la de despues. Dos lineas en blanco seguidas, o una
+ *  al final del archivo, son exactamente lo que el formateador corrige: el
+ *  primer `format:check` salia rojo en `AGENTS.md`, `README.md` y
+ *  `.github/dependabot.yml` por algo que escribio esta herramienta.
+ *
+ *  POR QUE NO SE ARREGLA EN CADA REGEX DE PODA. Son una docena, en cuatro
+ *  funciones, y cada una tendria que saber si el bloque que saca estaba rodeado
+ *  de blancos. Una sola pasada al final, solo sobre los archivos que alguna poda
+ *  toco, deja a las podas decir QUE se saca y a esta decir como queda cosido.
+ *
+ *  LO QUE HACE, y por que es seguro: colapsa las corridas de lineas en blanco a
+ *  una y deja el archivo terminado en un solo salto. Es lo que el formateador
+ *  haria, y solo se aplica a un texto que la poda cambio —un archivo del andamio
+ *  que ya pasa el formateador no tiene dos blancos seguidos que no vengan de una
+ *  costura—. En markdown respeta los bloques de codigo: adentro de un cerco, dos
+ *  lineas en blanco son contenido y el formateador no las toca. */
+export function coserCosturas(texto, rel = "") {
+  const esMd = /\.md$/i.test(rel);
+  const salida = [];
+  let enCodigo = false;
+  for (const linea of texto.split("\n")) {
+    if (esMd && /^\s*(```|~~~)/.test(linea)) enCodigo = !enCodigo;
+    const blanca = linea.trim() === "";
+    if (!enCodigo && blanca && salida.length > 0 && salida[salida.length - 1].trim() === "") continue;
+    salida.push(blanca && !enCodigo ? "" : linea);
+  }
+  while (salida.length > 0 && salida[0].trim() === "") salida.shift();
+  while (salida.length > 0 && salida[salida.length - 1] === "") salida.pop();
+  return `${salida.join("\n")}\n`;
+}
+
+/** El ancho de una cadena como lo cuenta el formateador, para lo que este
+ *  archivo escribe: los caracteres de control y las marcas combinantes no
+ *  ocupan columna; el resto, una. Los caracteres anchos de Asia oriental y los
+ *  emoji cuentan dos para el formateador y aca uno: no aparecen en ningun
+ *  arreglo de los JSON que escribe esta herramienta, y si algun dia aparecen,
+ *  el paso del CI del marco que corre el formateador de verdad lo marca. */
+function anchoDeColumnas(s) {
+  let ancho = 0;
+  for (const c of s) {
+    const cp = c.codePointAt(0);
+    if (cp <= 0x1f || (cp >= 0x7f && cp <= 0x9f) || (cp >= 0x300 && cp <= 0x36f)) continue;
+    ancho += 1;
+  }
+  return ancho;
+}
+
+/** EL JSON CON LA FORMA QUE LE DA EL FORMATEADOR DEL ANDAMIO, y no la de
+ *  `JSON.stringify(x, null, 2)`.
+ *
+ *  EL DEFECTO QUE CIERRA. `JSON.stringify` parte TODO arreglo en varias lineas;
+ *  prettier deja en una los que entran en el ancho (`printWidth` 100 en
+ *  `plantilla/.prettierrc`). `.projects-valores.json` trae uno —`"superficies":
+ *  ["claude-code", "cursor"]`— y tres podas distintas lo reserializaban: el
+ *  archivo del andamio pasaba `prettier --check` y el del repo nuevo no.
+ *
+ *  POR QUE IMITARLO Y NO INSERTAR CLAVES A MANO. Rigel lo cerro insertando la
+ *  clave sin reserializar, y alcanzaba porque escribia UNA clave. Aca escriben
+ *  cuatro lugares —tres podas y el asistente, que arma el archivo entero desde
+ *  cero—, asi que la unica forma que sirve a todos es serializar con las reglas
+ *  del formateador para JSON, que para estos datos son pocas y estan medidas:
+ *    - un objeto no vacio va abierto, una clave por linea (prettier conserva
+ *      abierto un objeto que ya viene abierto);
+ *    - un arreglo va en una linea si entra en el ancho CONTANDO la coma que lo
+ *      sigue; si no, un elemento por linea;
+ *    - un arreglo que contiene un objeto no vacio se abre siempre, y tambien uno
+ *      de dos o mas elementos que son todos arreglos u objetos de mas de uno.
+ *  Contrastado contra prettier 3.9.6 caso por caso, bordes de 100 y 101
+ *  columnas incluidos: pruebas/init/el-andamio-nace-formateado.test.mjs.
+ *
+ *  LIMITE DECLARADO: un arreglo SOLO de numeros que no entra en una linea,
+ *  prettier lo rellena de a varios por linea y esto no lo imita. Ningun JSON que
+ *  escribe esta herramienta tiene uno. */
+export function jsonComoElFormateador(valor, { ancho = 100, sangria = 2 } = {}) {
+  const esObjeto = (v) => v !== null && typeof v === "object" && !Array.isArray(v);
+  const cuantos = (v) => (Array.isArray(v) ? v.length : esObjeto(v) ? Object.keys(v).length : 0);
+  const enUnaLinea = (v) => {
+    if (Array.isArray(v)) {
+      const partes = v.map(enUnaLinea);
+      return partes.includes(null) ? null : `[${partes.join(", ")}]`;
+    }
+    if (esObjeto(v)) return cuantos(v) === 0 ? "{}" : null;
+    return JSON.stringify(v);
+  };
+  const imprimir = (v, nivel, prefijo, sufijo) => {
+    const pad = " ".repeat(nivel * sangria);
+    if (Array.isArray(v)) {
+      if (v.length === 0) return `${pad}${prefijo}[]${sufijo}`;
+      const abierto =
+        v.some((e) => esObjeto(e) && cuantos(e) > 0) ||
+        (v.length > 1 && v.every((e) => (Array.isArray(e) || esObjeto(e)) && cuantos(e) > 1));
+      const plano = abierto ? null : enUnaLinea(v);
+      if (plano !== null && anchoDeColumnas(`${pad}${prefijo}${plano}${sufijo}`) <= ancho) return `${pad}${prefijo}${plano}${sufijo}`;
+      const hijos = v.map((e, i) => imprimir(e, nivel + 1, "", i < v.length - 1 ? "," : ""));
+      return `${pad}${prefijo}[\n${hijos.join("\n")}\n${pad}]${sufijo}`;
+    }
+    if (esObjeto(v)) {
+      const claves = Object.keys(v);
+      if (claves.length === 0) return `${pad}${prefijo}{}${sufijo}`;
+      const hijos = claves.map((k, i) => imprimir(v[k], nivel + 1, `${JSON.stringify(k)}: `, i < claves.length - 1 ? "," : ""));
+      return `${pad}${prefijo}{\n${hijos.join("\n")}\n${pad}}${sufijo}`;
+    }
+    return `${pad}${prefijo}${JSON.stringify(v)}${sufijo}`;
+  };
+  return `${imprimir(valor, 0, "", "")}\n`;
+}
+
+/** El texto de un JSON que esta herramienta deja en el proyecto, con la forma
+ *  que el formateador del proyecto le va a exigir.
+ *
+ *  `package.json` es la excepcion, y no por gusto: prettier lo formatea con el
+ *  parser `json-stringify`, que abre TODO arreglo no vacio —o sea, exactamente
+ *  `JSON.stringify(x, null, 2)`—. Aplicarle las reglas del resto de los JSON lo
+ *  desformatearia justo en el manifiesto. */
+export function jsonParaElArchivo(rel, valor) {
+  const nombre = String(rel).split(/[\\/]/).pop();
+  if (["package.json", "package-lock.json", "composer.json"].includes(nombre)) return `${JSON.stringify(valor, null, 2)}\n`;
+  return jsonComoElFormateador(valor);
+}
+
 export function podarPorPlataforma(texto, rel, plataforma, forma = "aplicacion") {
   // Esta va ANTES del corte de abajo: la plataforma se declara en el archivo de
   // valores del proyecto SIEMPRE, tambien cuando es `aws`. Si solo se escribiera
@@ -997,7 +1124,7 @@ export function podarPorPlataforma(texto, rel, plataforma, forma = "aplicacion")
     try {
       const j = JSON.parse(texto);
       j.plataforma = plataforma;
-      return `${JSON.stringify(j, null, 2)}\n`;
+      return jsonParaElArchivo(rel, j);
     } catch {
       return texto;
     }
@@ -1057,7 +1184,7 @@ export function podarPorPlataforma(texto, rel, plataforma, forma = "aplicacion")
       if (j?.permissions?.allow) j.permissions.allow = filtrar(j.permissions.allow);
       if (j?.permissions?.ask) j.permissions.ask = filtrar(j.permissions.ask);
       if (j?.permissions?.deny) j.permissions.deny = filtrar(j.permissions.deny);
-      return `${JSON.stringify(j, null, 2)}\n`;
+      return jsonParaElArchivo(rel, j);
     } catch {
       // Un settings.json que no parsea es un problema del andamio y lo caza otro
       // banco. Aca se devuelve tal cual en vez de romper la corrida entera.
@@ -1197,6 +1324,11 @@ export function preguntarTipoDeCuenta(cuenta) {
   }
 }
 
+/** Los dos tipos de cuenta que decide la poda de CODEOWNERS. Existe como lista
+ *  para que quien recorra todas las combinaciones (el paso del CI del marco que
+ *  mide el formato de cada destino) la derive en vez de escribirla. */
+export const TIPOS_DE_CUENTA = ["usuario", "organizacion"];
+
 export function tipoDeCuentaDe(valores) {
   const v = valores?.TIPO_CUENTA;
   const t = typeof v === "string" ? v.trim().toLowerCase() : "";
@@ -1218,7 +1350,7 @@ export function podarPorTipoDeCuenta(texto, rel, tipo = "usuario") {
     try {
       const j = JSON.parse(texto);
       j.TIPO_CUENTA = tipo;
-      return `${JSON.stringify(j, null, 2)}\n`;
+      return jsonParaElArchivo(rel, j);
     } catch {
       return texto;
     }
@@ -1285,11 +1417,28 @@ export function derivar(v) {
   };
 }
 
-/** Los tres marcadores cuyo camino "si no existe" exige borrar bloques a mano. */
+/** Los marcadores cuyo camino "si no existe" pide trabajo a mano, y cual.
+ *
+ *  LOS DE FRONTEND Y E2E NOMBRAN TODOS SUS LUGARES, no uno. Decian solo "los
+ *  bloques [FRONT]" y "la entrada del glob y las EXCEPCIONES", y cada camino toca
+ *  seis: seguidos al pie de la letra, el repo quedaba en rojo por lo que no
+ *  nombraban. Las dos listas se recorrieron hasta verde el 2026-09-17 y viven
+ *  COMPLETAS en plantilla/README.md del marco, seccion 2; un banco exige que cada
+ *  lugar de esa lista aparezca aca (pruebas/andamio/caminos-sin-paquete.test.mjs). */
 export const CON_LIMPIEZA_MANUAL = {
-  PAQUETE_WEB: "si el proyecto no tiene frontend: borrar los bloques [FRONT] de eslint.config.mjs y sus imports",
-  PAQUETE_SITIO: "si el proyecto no es un sitio de contenido: borrar la carpeta sitio/ del andamio",
-  PAQUETE_E2E: "si el proyecto no tiene suite E2E: borrar esa entrada del glob de Node Y las dos entradas EXCEPCIONES de ci.yml (una excepcion que no corresponde a ningun paquete es roja, a proposito)",
+  PAQUETE_WEB:
+    "si el proyecto no tiene frontend, son seis lugares en el mismo PR: borrar web/; en eslint.config.mjs, cada " +
+    "bloque entre // [FRONT] y // [/FRONT] (las dos marcas incluidas) y los tres import marcados; en package.json, " +
+    "las tres devDependencies del front (y pnpm install); en .claude/settings.json, las cuatro entradas de " +
+    "--filter web; en comandos-levantar-servicios.txt, las dos lineas del .env de web; y en README.md, la fila " +
+    "web/. La lista, recorrida hasta verde: plantilla/README.md del marco, «Si el proyecto NO tiene frontend»",
+  PAQUETE_SITIO: "solo viaja con la forma sitio: en las demas formas la carpeta no llega al proyecto y no hay nada que borrar",
+  PAQUETE_E2E:
+    "si el proyecto no tiene suite E2E, son seis lugares en el mismo PR: borrar e2e/; en .github/workflows/ci.yml, " +
+    "las dos entradas de EXCEPCIONES (una excepcion que no corresponde a ningun paquete es roja, a proposito); en " +
+    "package.json, el script e2e y el --filter del script test; en eslint.config.mjs, la entrada e2e/**/*.mjs del " +
+    "entorno Node; en README.md, la fila e2e/; y pnpm format, porque el arreglo de globs queda corto y el " +
+    "formateador lo junta. La lista, recorrida hasta verde: plantilla/README.md del marco, «Si el proyecto NO tiene suite E2E»",
   GENERAR_CLIENTE_DATOS: "si el proyecto no genera cliente de datos: borrar el paso \"Generar el cliente de la capa de datos\" de .github/workflows/ci.yml",
 };
 
@@ -1616,13 +1765,14 @@ export function instanciar({ raizAndamio, destino, valores }) {
       // Se poda ANTES de sustituir: lo que se saca puede tener marcadores
       // adentro —`{{PERFIL_DEV}}` vivia en el bloque de permisos de AWS— y
       // sustituirlos primero solo escribiria un relleno que despues se borra.
-      const texto = sacarCentinelas(
-        podarPorTipoDeCuenta(
-          podarPorForma(podarPorPlataforma(fs.readFileSync(origen, "utf8"), rel, plataforma, forma), rel, forma),
-          rel,
-          tipoDeCuenta,
-        ),
+      const crudo = fs.readFileSync(origen, "utf8");
+      const podado = sacarCentinelas(
+        podarPorTipoDeCuenta(podarPorForma(podarPorPlataforma(crudo, rel, plataforma, forma), rel, forma), rel, tipoDeCuenta),
       );
+      // Solo se cose lo que alguna poda toco: un archivo que llega intacto ya
+      // tiene la forma que el formateador le exige, y reescribirlo arriesga
+      // cambiarsela. Ver coserCosturas.
+      const texto = podado === crudo ? crudo : coserCosturas(podado, rel);
       const r = sustituir(texto, valores);
       total += r.cuenta;
       for (const f of r.faltantes) faltantes.add(f);
@@ -1905,6 +2055,21 @@ export function pinDelMarcoEnDestino(destino) {
 }
 
 
+/** EL LARGO DE NOMBRE DE PROYECTO PARA EL QUE EL ANDAMIO NACE FORMATEADO, medido.
+ *
+ *  El formateador parte una linea de codigo que no entra en 100 columnas, y el
+ *  nombre del proyecto llega por un marcador a lineas de codigo del esqueleto
+ *  (la respuesta de /api/health, el nombre en la portada, el log de arranque).
+ *  Hay un largo a partir del cual alguna de esas lineas deja de entrar: medido
+ *  el 2026-09-17 con prettier 3.9.6, la primera en partirse es la de
+ *  `web/src/App.tsx` que declara el nombre, a los 70 caracteres. Hasta este
+ *  largo el repo nace con `format:check` en verde SIN correr el formateador; es
+ *  el largo con el que el paso del CI del marco instancia el andamio para
+ *  medirlo, asi que una linea nueva que se parta antes lo pone rojo. Por encima
+ *  (GitHub admite nombres de hasta 100), el paso `formateado` del arranque lo
+ *  resuelve, y con `--sin-arranque` la herramienta lo AVISA en vez de callarlo. */
+export const LARGO_DE_NOMBRE_MEDIDO = 60;
+
 export const PASOS_DEL_ARRANQUE = [
   {
     clave: "instalado",
@@ -1939,9 +2104,15 @@ export const PASOS_DEL_ARRANQUE = [
     titulo: "formatear el arbol",
     args: ["run", "format"],
     necesitaRed: false,
+    // YA NO ES LO QUE PONE AL REPO EN FORMATO, y el motivo de abajo lo dice. El
+    // andamio llega formateado y la herramienta escribe con la forma del
+    // formateador (change `el-andamio-nace-formateado`); lo unico que puede
+    // quedar afuera es una linea de codigo que un nombre de proyecto muy largo
+    // no deja entrar en el ancho. Esta pasada se conserva para ese caso.
     porQue:
-      "al sustituir los marcadores cambian los anchos del texto y el formateador alinea las tablas de markdown por " +
-      "ancho: sin esta pasada el repo nace desalineado y `format:check` sale rojo por una razon que no es de nadie",
+      `el andamio ya nace formateado, pero con un nombre de proyecto de mas de ${LARGO_DE_NOMBRE_MEDIDO} caracteres ` +
+      "alguna linea de codigo del esqueleto deja de entrar en el ancho y el formateador la parte: esta pasada lo " +
+      "resuelve antes de que `format:check` lo marque en el primer CI",
     // Este era el mas circular de los cuatro: decia SOLO "corre `pnpm format`",
     // que es exactamente lo que acababa de fallar, y nada mas.
     arreglo:
@@ -2974,7 +3145,16 @@ export function insertarProteccionMedida(texto, { lineas: bloque, frase, compuer
   //    esto no escribe nada — describirle una promocion a un proyecto que no la
   //    tiene es el defecto que el change `promocion-por-ambientes` existe para
   //    cerrar.
-  if (compuertaDeProd.length) lineas.push(...compuertaDeProd, "");
+  //
+  //    El bloque llega con su propia linea en blanco adelante, y el agregado de
+  //    arriba ya termina en una: pegarlos tal cual dejaba DOS seguidas, que el
+  //    formateador corrige, y el sitio recien nacido salia con `format:check` en
+  //    rojo por esta pagina. Se sacan las del principio del bloque.
+  if (compuertaDeProd.length) {
+    const bloque = [...compuertaDeProd];
+    while (bloque.length > 0 && bloque[0].trim() === "") bloque.shift();
+    lineas.push(...bloque, "");
+  }
 
   return { texto: lineas.join("\n"), avisos };
 }
@@ -3564,8 +3744,12 @@ async function main(argv) {
     }
 
     const salida = rutaDeValores;
-    fs.writeFileSync(salida, `${JSON.stringify(resultado.valores, null, 2)}\n`);
-    fs.writeFileSync(rutaDeRespuestas, `${JSON.stringify(resultado.respuestas, null, 2)}\n`);
+    // CON LA FORMA DEL FORMATEADOR, no la de JSON.stringify: estos tres archivos
+    // quedan en el repo del proyecto (el copiado no los pisa, ver
+    // LO_QUE_ESCRIBE_EL_ASISTENTE), y con `superficies` partido en cuatro lineas
+    // el primer `format:check` salia rojo por algo que escribio esta herramienta.
+    fs.writeFileSync(salida, jsonParaElArchivo(salida, resultado.valores));
+    fs.writeFileSync(rutaDeRespuestas, jsonParaElArchivo(rutaDeRespuestas, resultado.respuestas));
     process.stdout.write(`\nEscrito: ${salida}\n`);
     process.stdout.write(`Escrito: ${rutaDeRespuestas}  (para que volver a correrlo no te haga contestar todo de nuevo)\n`);
     if (resultado.desvios.length) {
@@ -3575,7 +3759,7 @@ async function main(argv) {
       // con una lista pelada veia CERO desvios y no decia nada. La persona
       // declaraba cuatro apartamientos de las reglas del marco y la constitucion
       // de su proyecto salia como si no hubiera ninguno.
-      fs.writeFileSync(rutaDesvios, `${JSON.stringify({ desvios: resultado.desvios }, null, 2)}\n`);
+      fs.writeFileSync(rutaDesvios, jsonParaElArchivo(rutaDesvios, { desvios: resultado.desvios }));
       process.stdout.write(`Escrito: ${rutaDesvios}  (${resultado.desvios.length} desvio(s) declarado(s))\n`);
     }
 
@@ -4079,7 +4263,20 @@ async function main(argv) {
   }
   if (!o.arranque) {
     console.error("");
-    console.error("::warning::se pidio --sin-arranque: el repo quedo ESCRITO pero sin instalar, sin formatear y sin verificar.");
+    console.error("::warning::se pidio --sin-arranque: el repo quedo ESCRITO pero sin instalar y sin verificar.");
+    // EL FORMATO YA NO ESTA EN ESA LISTA, y decirlo importa: el repo nace con
+    // `format:check` en verde sin correr el formateador (medido en el CI del
+    // marco). La unica excepcion conocida es un nombre de proyecto mas largo que
+    // el medido, y esa se avisa con el comando, porque callarla dejaria un rojo
+    // en el primer CI que nadie anuncio.
+    const nombre = String(valores.PROYECTO ?? "");
+    if (nombre.length > LARGO_DE_NOMBRE_MEDIDO) {
+      console.error(
+        `::warning::el nombre del proyecto tiene ${nombre.length} caracteres y el andamio nace formateado hasta ` +
+          `${LARGO_DE_NOMBRE_MEDIDO}: alguna linea de codigo no va a entrar en el ancho y \`format:check\` saldria rojo. ` +
+          "Arreglo: `pnpm format` en la raiz del destino, antes del primer push.",
+      );
+    }
     console.error("Antes del primer push hay que correr, en la raiz del destino:");
     for (const paso of pasosDeEsteDestino) console.error(`  pnpm ${paso.args.join(" ")}`);
     console.error("Sin el install no hay lockfile, y el CI corre con --frozen-lockfile: el primer push moriria ahi.");
