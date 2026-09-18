@@ -153,3 +153,57 @@ test("las cantidades que afirma la guia son las que trae el andamio", () => {
   const excepciones = leer(".github/workflows/ci.yml").match(/EXCEPCIONES: "([^"]*)"/)?.[1] ?? "";
   assert.equal(excepciones.split(/\s+/).filter((e) => e.startsWith("{{PAQUETE_E2E}}:")).length, 2, "«las dos entradas de EXCEPCIONES»");
 });
+
+// ── El camino «sin cliente de datos» nombra cada lugar donde viaja el comando ──
+//
+// EL DEFECTO QUE CIERRA, y lo agrava el `postinstall` que suma el change
+// `el-andamio-nace-instalable`: CON_LIMPIEZA_MANUAL.GENERAR_CLIENTE_DATOS
+// nombraba UN lugar —el paso del ci.yml— cuando el comando viajaba a tres (el
+// script `datos` de la raiz, el `build` del paquete de datos y ese paso), y la
+// propia tabla del README del marco decia que borrar el paso «no alcanza». Con
+// el postinstall son cuatro, y el mas caro de olvidar es ese: sin comando, el
+// `pnpm install` del proyecto sale rojo. La lista de lugares se DERIVA del
+// andamio: cada archivo que viaja y lleva el marcador en una linea que no es
+// comentario tiene que estar nombrado en la salida de la herramienta.
+const FUERA_DEL_CAMINO_DE_DATOS = {
+  // El registro de los valores del proyecto: guarda el comando, no lo ejecuta.
+  ".projects-valores.json": "registro de valores",
+};
+
+/** Los archivos del andamio que viajan con la forma que tiene capa de datos y
+ *  ejecutan el comando del marcador (fuera de comentarios). */
+function lugaresDelComandoDeDatos() {
+  const lugares = [];
+  (function caminar(rel) {
+    for (const e of fs.readdirSync(path.join(ANDAMIO, rel), { withFileTypes: true })) {
+      if (e.name === "node_modules") continue;
+      const r = rel ? `${rel}/${e.name}` : e.name;
+      if (e.isDirectory()) {
+        caminar(r);
+        continue;
+      }
+      if (r === "README.md" || FUERA_DEL_CAMINO_DE_DATOS[r]) continue;
+      const vivas = fs
+        .readFileSync(path.join(ANDAMIO, r), "utf8")
+        .split("\n")
+        .filter((l) => l.includes("{{GENERAR_CLIENTE_DATOS}}") && !/^\s*(#|\/\/|\*)/.test(l));
+      if (vivas.length) lugares.push(r);
+    }
+  })("");
+  return lugares.sort();
+}
+
+test("«sin cliente de datos»: la salida de projects init nombra cada archivo donde viaja el comando", () => {
+  const lugares = lugaresDelComandoDeDatos();
+  assert.ok(lugares.length >= 3, `solo ${lugares.length} lugares con el comando de datos: el lector se rompio (${lugares.join(", ")})`);
+  const texto = CON_LIMPIEZA_MANUAL.GENERAR_CLIENTE_DATOS;
+  const faltan = lugares.filter((rel) => !new RegExp(`(^|[^\\w/.-])${rel.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\b`).test(texto));
+  assert.deepEqual(
+    faltan,
+    [],
+    "el comando de GENERAR_CLIENTE_DATOS viaja a estos archivos y la salida de projects init " +
+      "(CON_LIMPIEZA_MANUAL.GENERAR_CLIENTE_DATOS) no los nombra: quien no genera cliente de datos sigue la salida, " +
+      "deja el comando ahi y el repo queda en rojo (el postinstall, en el primer `pnpm install`)",
+  );
+  assert.match(texto, /postinstall/, "la salida no nombra el postinstall, que es el que rompe el install si queda sin comando");
+});

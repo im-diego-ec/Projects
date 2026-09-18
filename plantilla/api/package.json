@@ -6,6 +6,7 @@
     "dev": "tsx watch src/server.ts",
     "start": "tsx src/server.ts",
     "build": "{{GENERAR_CLIENTE_DATOS}} && tsc --noEmit",
+    "postinstall": "{{GENERAR_CLIENTE_DATOS}}",
     "typecheck": "tsc --noEmit",
     "test": "vitest run --coverage",
     "lint": "eslint . --max-warnings=0",
@@ -26,12 +27,12 @@
     "@types/express": "^5.0.6",
     "@types/node": "^26.3.0",
     "@types/supertest": "^7.2.1",
-    "@vitest/coverage-v8": "^4.1.11",
+    "@vitest/coverage-v8": "^5.0.1",
     "prisma": "^7.9.1",
     "supertest": "^7.2.2",
     "tsx": "^4.23.12",
     "typescript": "^7.0.2",
-    "vitest": "^4.1.11"
+    "vitest": "^5.0.1"
   },
   "projects": {
     "cobertura": {

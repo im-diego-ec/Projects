@@ -182,9 +182,9 @@ dejan como nota, pero no rompen nada.
 
 ### Generación de código previa a la verificación
 
-| Placeholder                 | Qué poner                                                                                               | Ejemplo           | Si no existe                                                                          |
-| --------------------------- | ------------------------------------------------------------------------------------------------------- | ----------------- | ------------------------------------------------------------------------------------- |
-| `{{GENERAR_CLIENTE_DATOS}}` | Comando que genera el cliente de la capa de datos, tal como se invoca **dentro** del paquete de backend | `prisma generate` | Borrar el paso "Generar el cliente de la capa de datos" de `.github/workflows/ci.yml` |
+| Placeholder                 | Qué poner                                                                                               | Ejemplo           | Si no existe                                                                                                                                                                                                                          |
+| --------------------------- | ------------------------------------------------------------------------------------------------------- | ----------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `{{GENERAR_CLIENTE_DATOS}}` | Comando que genera el cliente de la capa de datos, tal como se invoca **dentro** del paquete de backend | `prisma generate` | Tres archivos: el paso "Generar el cliente de la capa de datos" de `.github/workflows/ci.yml`, el script `datos` (y su eslabón en `verificar`) de `package.json`, y el `postinstall` y el principio del `build` de `api/package.json` |
 
 El paso existe y va **antes** del lint por una razón concreta: el código de acceso a datos
 está tipado contra el cliente generado, así que si el cliente no está, las reglas
@@ -192,6 +192,14 @@ type-aware no tienen tipos que mirar y cada acceso a datos vuelve a ser `any` si
 el lint pasa en verde sin haber verificado nada. Vale para cualquier artefacto generado del
 que dependa el tipado, no solo para el cliente de datos: si el proyecto tiene otro, se
 agrega junto a este.
+
+Y el mismo comando corre en el **`postinstall`** del paquete de backend: `pnpm install`
+deja el cliente generado, así que quien clona y corre `pnpm lint` o `pnpm typecheck` a
+secas ya no ve los 8 errores de tipos y el `TS2305` que salían sin él (medido el
+2026-09-17). El paso del CI y el script `datos` se conservan: el orden se lee en el
+pipeline y no depende de un script de instalación. Si el proyecto no genera cliente de
+datos, el `postinstall` es el lugar **más caro de olvidar**: sin comando, el primer
+`pnpm install` sale rojo.
 
 ### Personas, por ROL (nunca nombres propios en la prosa)
 
@@ -478,7 +486,7 @@ Y lo que **no** está en el andamio, con de dónde sale:
 
 | Falta                                                                                    | De dónde sale                                                                                                                                                                                                                                                                                                                                                                                                  |
 | ---------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `pnpm-lock.yaml`                                                                         | El primer `pnpm install` del proyecto. Un lockfile no convive con marcadores sin resolver, así que nace en el destino.                                                                                                                                                                                                                                                                                         |
+| `pnpm-lock.yaml`                                                                         | Lo escribe el nacimiento del proyecto, por los dos caminos: el `pnpm install` del arranque de `projects init`, o `pnpm install --lockfile-only` en `personalizar.yml` (la vía sin programas). No se versiona acá porque el andamio se poda por forma y plataforma: un único lockfile no coincidiría con el workspace de todas las formas.                                                                      |
 | Las skills y comandos **de OpenSpec** (`.claude/skills/openspec-*`, `.claude/commands/`) | **Regenerado**: los genera el CLI de OpenSpec en la versión que pina el marco. No se vendoran ni se editan a mano. Lo que sí llega en el scaffold son las dos piezas escritas a mano del marco (sección 3), que ningún CLI regenera.                                                                                                                                                                           |
 | `.projects/AGENTS-marco.md`                                                              | **Generado por el marco** en el repo nuevo (sección 2.5). Las entradas del render sí llegan en el scaffold.                                                                                                                                                                                                                                                                                                    |
 | `openspec/`                                                                              | Lo inicializa el CLI de OpenSpec en el repo nuevo, con la versión que pina el marco: `npx --yes @fission-ai/openspec@1.9.0 init --tools claude`. **No es opcional**: el job de OpenSpec del marco hace `[ -d openspec ] \|\| exit 1`, así que sin este paso el primer PR sale rojo. La misma corrida genera las skills y comandos de la fila de arriba. Los specs del MARCO son canónicos y viven en Projects. |

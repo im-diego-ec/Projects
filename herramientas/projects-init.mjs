@@ -1439,7 +1439,17 @@ export const CON_LIMPIEZA_MANUAL = {
     "package.json, el script e2e y el --filter del script test; en eslint.config.mjs, la entrada e2e/**/*.mjs del " +
     "entorno Node; en README.md, la fila e2e/; y pnpm format, porque el arreglo de globs queda corto y el " +
     "formateador lo junta. La lista, recorrida hasta verde: plantilla/README.md del marco, «Si el proyecto NO tiene suite E2E»",
-  GENERAR_CLIENTE_DATOS: "si el proyecto no genera cliente de datos: borrar el paso \"Generar el cliente de la capa de datos\" de .github/workflows/ci.yml",
+  // TRES ARCHIVOS Y NO UNO. Decia solo el paso del ci.yml, cuando el comando
+  // viajaba tambien al script `datos` de la raiz y al `build` del paquete de
+  // datos; y desde el change `el-andamio-nace-instalable` viaja ademas al
+  // `postinstall`, que es el mas caro de olvidar: sin comando, el primer
+  // `pnpm install` sale rojo. Un banco deriva la lista del andamio y exige que
+  // cada archivo aparezca aca (pruebas/andamio/caminos-sin-paquete.test.mjs).
+  GENERAR_CLIENTE_DATOS:
+    "si el proyecto no genera cliente de datos, son tres archivos en el mismo PR: en .github/workflows/ci.yml, el paso " +
+    "\"Generar el cliente de la capa de datos\"; en package.json, el script datos y el `pnpm datos &&` de verificar; y en " +
+    "api/package.json, el postinstall (sin comando, el primer pnpm install sale rojo) y el comando del principio del build, " +
+    "hasta su &&",
 };
 
 /** LA FORMA QUE CADA VALOR PUEDE TENER, uno por uno.

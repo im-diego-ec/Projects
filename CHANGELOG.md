@@ -86,7 +86,9 @@ producción manual, desvíos más precisos y documentos al día; uno ya creado c
 copia que recibió. Si tu repositorio nació con la 1.9.6 o antes, en el paso que sube
 `constitucion-al-dia` cambiá `if-no-files-found: warn` por las dos líneas de
 «Corregido». Y si fijás `@v1`, pasá a la versión exacta para volver a recibir estos
-avisos.
+avisos. Si tu sitio nació antes de esta versión, agregá a `sitio/package.json` las dos
+exclusiones de `plantilla/sitio/package.json` (ver «Corregido»); y si tu proyecto nació
+sin `pnpm-lock.yaml`, corré `corepack pnpm install` y guardá ese archivo.
 
 ### Cambiado
 
@@ -423,6 +425,26 @@ avisos.
   hasta `pnpm verificar` en verde, y la salida de `projects init` nombra los mismos.
   `{{PAQUETES}}` figura como derivado, no como un valor a llenar. Para
   consumidores: nada.
+
+- **El cliente de datos se genera al instalar.** `plantilla/api/package.json` gana
+  `"postinstall": "{{GENERAR_CLIENTE_DATOS}}"`: quien clona y corre `pnpm install && pnpm lint`
+  ya no ve 8 errores de tipos y un `TS2305` que no son suyos (medido el 2026-09-17; Rigel
+  2.6.0, commit 4d0bd19). El paso explícito del CI y el script `datos` se conservan. La
+  salida de `projects init` para un proyecto sin cliente de datos nombra ahora los **tres**
+  archivos donde viaja el comando (antes, uno), y un banco la deriva del andamio. Para
+  consumidores: llega a las aplicaciones nuevas. Una existente que lo quiera agrega la
+  línea `postinstall` con el mismo comando que su script `datos`; si el proyecto no
+  genera cliente de datos, no la agrega.
+- **vitest y `@vitest/coverage-v8` pasan a `^5.0.1`, como par, en `api`, `web` y `sitio`.**
+  El sitio venía con `^4.0.18`, un piso por debajo del de los otros dos (`^4.1.11`), y
+  ningún banco exigía que el proveedor de cobertura fuera del mismo rango que el
+  corredor, que lo exige en su misma versión exacta. Medido en las dos formas:
+  `pnpm verificar` en verde, el `include` sigue metiendo al total los archivos que
+  ninguna prueba importa y el umbral sigue mordiendo. La tabla `text` de la 5 oculta los
+  archivos al 100%: lo que decide es el lcov. Viene de Rigel 1.13.0 (commit 1bd6dc0) y
+  2.6.0 (commit fabe1e6). Para consumidores: llega a los proyectos nuevos. Uno existente
+  que quiera subir lo hace en un solo PR con los dos paquetes al mismo rango, y corre
+  `pnpm install` y `pnpm verificar`.
 
 ### Eliminado
 
@@ -796,6 +818,19 @@ avisos.
   cada uno rompía el archivo (Rigel 1.13.0, commit 1bd6dc0). Para consumidores:
   nada; un proyecto existente sin frontend que todavía tenga los bloques puede
   agregar las marcas a mano antes de borrarlos.
+
+- **Un sitio recién nacido tenía el censo de fuentes en rojo.** `sitio/astro.config.mjs`
+  y `sitio/vitest.config.ts` quedaban fuera del alcance —el linter los ignora por
+  `**/*.config.*` y `sitio/tsconfig.json` los deja afuera a propósito— sin exclusión
+  declarada: `censo-fuentes` salía 1 en cada corrida, y `cobertura-diff` los marcaría
+  sin datos en el primer PR que los toque (medido el 2026-09-17). `sitio/package.json`
+  los declara en `projects.cobertura.excluidos` con su motivo, como ya lo hacían `api/`
+  y `web/`. Para consumidores: un sitio nacido antes de esta versión (como
+  `plantilla-sitio`) agrega a su `sitio/package.json` el bloque
+  `"projects": { "cobertura": { "excluidos": [...] } }` con esas dos entradas, copiado
+  de `plantilla/sitio/package.json`.
+- **Fe de erratas de la 1.7.0**: su entrada decía que `middleware/requestId.ts` entró
+  «con su prueba», y no la tenía; la tiene desde esta versión. Para consumidores: nada.
 
 ### Añadido
 
@@ -1547,6 +1582,49 @@ avisos.
   decisión para la v2). Para cerrarlo: copia el job `formato` y su línea en el
   `Veredicto` de `ci-ok` desde `plantilla/.github/workflows/ci.yml`, y saca
   `- run: pnpm format:check` de `build_test`.
+
+- **La vía sin programas deja el lockfile que el primer CI exige.** `personalizar.yml`
+  —la puerta de los repositorios plantilla— armaba el proyecto con `--sin-arranque` y lo
+  guardaba **sin `pnpm-lock.yaml`**; el `ci.yml` del proyecto instala con
+  `--frozen-lockfile` y el primer push moría con `ERR_PNPM_NO_LOCKFILE` (medido el
+  2026-09-17). Paso nuevo «Dejar el lockfile que el primer CI exige»:
+  `corepack pnpm install --lockfile-only --ignore-scripts` sobre el proyecto recién
+  armado —resuelve versiones sin bajar el árbol ni ejecutar scripts de dependencias, en
+  un job cuyo token puede escribir— y rojo con el arreglo escrito si no queda el archivo,
+  antes de guardar nada. Viene de Rigel 2.6.0 (commit 4d0bd19), que versiona un lockfile
+  en el andamio; acá el andamio se poda por forma y plataforma, así que se porta la
+  propiedad y no el archivo. Para consumidores: los repositorios plantilla
+  (`plantilla-sitio`, `plantilla-aplicacion`) lo reciben cuando se regeneran desde el
+  marco; hasta entonces su vía sin programas sigue naciendo sin lockfile. Un proyecto ya
+  nacido por esa vía y sin lockfile lo arregla con `corepack pnpm install` en la raíz y
+  un commit de `pnpm-lock.yaml`.
+- **La integración del andamio levanta Postgres de verdad.** El job `build_test` del
+  `ci.yml` del andamio declara `services.postgres` con la misma imagen que el
+  `docker-compose.yml` (`postgres:16`), healthcheck `pg_isready` y `DATABASE_URL` a nivel
+  de job; la base se llama como el repositorio (`${{ github.event.repository.name }}`,
+  porque un workflow no puede llevar `{{PROYECTO}}`). Solo viaja con capa de datos: un
+  sitio no lo recibe. Medido contra un Postgres 16 real: la suite del API 53/53 y
+  `prisma migrate deploy` en 0; y el motivo de nombrar una sola base, también medido —
+  `prisma migrate deploy` contra una base que no existe **la crea en silencio** y sale 0.
+  Viene de Rigel 1.9.0 (commits 4bf260e y 755207b) y 2.4.0 (commit b7d3201: los lugares
+  que nombran la base se descubren en vez de listarse). Para consumidores: llega a las
+  aplicaciones que nacen desde esta versión; no es un check nuevo y `ci-ok` sigue siendo
+  el único requerido. Una aplicación existente que lo quiera copia el bloque entre
+  `# projects:solo-si-hay-datos` y `# projects:fin-solo-si-hay-datos` de nivel de job
+  (`services:` y `env:`) desde `plantilla/.github/workflows/ci.yml`.
+- **`requestId.ts` del andamio trae su prueba.** Cinco casos en
+  `plantilla/api/src/middleware/requestId.test.ts`: el trace del balanceador, el header
+  `X-Request-Id`, el contexto de log leído desde el handler, el id `local-` y que dos
+  requests locales no lo compartan. Hasta ahora se ejercía de rebote desde otras pruebas
+  (Rigel 1.13.0, commit f6fc798). Para consumidores: llega a los proyectos nuevos; uno
+  existente puede copiar el archivo tal cual.
+- **Tres bancos nuevos que fallan solos**: `pruebas/andamio/todo-camino-deja-el-lockfile.test.mjs`
+  (corre el paso de `personalizar.yml` con un `corepack` falso en sus cuatro caminos y
+  la copia real contra el `.gitignore` del andamio), `pruebas/andamio/fuentes-cubribles.test.mjs`
+  (cada fuente del andamio excluida con motivo, importada por una prueba de su paquete, o
+  juzgada por `medir-cobertura-diff.mjs` corriendo de verdad; exclusiones muertas en rojo)
+  y las secciones 2b y 2c de `pruebas/andamio/acoples-del-andamio.test.mjs`. Para
+  consumidores: nada; viven en el CI del marco.
 
 ### Corregido
 

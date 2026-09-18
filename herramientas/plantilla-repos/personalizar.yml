@@ -136,6 +136,41 @@ jobs:
             --destino "${RUNNER_TEMP}/proyecto" \
             --sin-arranque
 
+      - name: Dejar el lockfile que el primer CI exige
+        # EL DEFECTO QUE ESTO CIERRA, medido el 2026-09-17: el proyecto se armaba
+        # con --sin-arranque, asi que nadie corria `pnpm install` y se guardaba SIN
+        # pnpm-lock.yaml. El ci.yml del proyecto instala con --frozen-lockfile en
+        # sus dos jobs, y el primer push moria ahi con ERR_PNPM_NO_LOCKFILE: un rojo
+        # que la persona no escribio y que sin una terminal no puede arreglar.
+        #
+        # POR QUE NO VIENE HECHO EN EL ANDAMIO: el andamio se poda por forma y por
+        # plataforma, asi que no hay UN lockfile que sirva para todos los proyectos
+        # que nacen de el. Se resuelve aca, para el proyecto que acaba de armarse.
+        #
+        # POR QUE --lockfile-only --ignore-scripts Y NO EL ARRANQUE ENTERO: este job
+        # tiene un token que puede escribir en el repositorio y disparar workflows.
+        # Con esas dos banderas pnpm solo RESUELVE versiones: no baja el arbol ni
+        # ejecuta un solo script de instalacion de dependencias que nadie leyo. Lo
+        # que se instala de verdad lo instala el CI del proyecto, en un job que no
+        # puede escribir nada.
+        shell: bash
+        env:
+          # La primera vez corepack PREGUNTA antes de bajar la version de pnpm que
+          # el proyecto declara; aca nadie contesta.
+          COREPACK_ENABLE_DOWNLOAD_PROMPT: "0"
+        run: |
+          set -euo pipefail
+          cd "${RUNNER_TEMP}/proyecto"
+          if ! corepack pnpm install --lockfile-only --ignore-scripts; then
+            echo "::error::no pude resolver las versiones del proyecto (la salida de pnpm esta arriba), asi que no hay pnpm-lock.yaml y el primer CI moriria en --frozen-lockfile. No se guardo nada. Arreglo: volve a correr este workflow; si falla igual, la salida de arriba nombra el paquete o la red que fallo"
+            exit 1
+          fi
+          if [ ! -s pnpm-lock.yaml ]; then
+            echo "::error::pnpm termino sin error y NO dejo pnpm-lock.yaml (o lo dejo vacio): guardar el proyecto asi estrenaria el CI en rojo. No se guardo nada. Arreglo: volve a correr este workflow; si se repite, abri un issue en el marco con esta corrida"
+            exit 1
+          fi
+          echo "pnpm-lock.yaml resuelto: $(wc -l < pnpm-lock.yaml | tr -d ' ') lineas"
+
       - name: Poner tus valores, sin tocar los workflows
         # LOS WORKFLOWS NO SE TOCAN, y no es prolijidad: el GITHUB_TOKEN no puede
         # modificarlos. Llegaron correctos con la copia --derivan el nombre y el

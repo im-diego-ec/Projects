@@ -566,7 +566,7 @@ marco está al día en 2 superficies».
 
 | Directorio | Qué hay |
 |---|---|
-| `api/` | Express + TS + Prisma + **Supabase Auth** (el token se verifica en el propio API, sin llamada de red por request), con `lib/log.ts`, `middleware/auth.ts`, `middleware/errorHandler.ts`, `requestId.ts`, `asyncHandler.ts` — y **48 pruebas** |
+| `api/` | Express + TS + Prisma + **Supabase Auth** (el token se verifica en el propio API, sin llamada de red por request), con `lib/log.ts`, `middleware/auth.ts`, `middleware/errorHandler.ts` y `middleware/requestId.ts`, cada uno con su prueba — y **53 pruebas** |
 | `web/` | React + Vite + Tailwind + **Supabase Auth** (`src/auth.ts` es el único archivo que importa el SDK del proveedor), con **28 pruebas** |
 | `e2e/` | Playwright, con una prueba de humo |
 | `.github/`, `eslint.config.mjs`, `AGENTS.md`, … | La mecánica del marco |
@@ -692,11 +692,13 @@ pnpm verificar
 **con cobertura**, y el build. Es la misma cosa que el CI, y la regla del área es correrla
 **antes** de cada push — el CI es la corrida final, no el banco de pruebas.
 
-> **Ojo con el orden, que costó una corrida descubrirlo:** el primer paso de `verificar`
-> es `datos` (generar el cliente de Prisma) y está ahí por una razón. Si corrés
-> `pnpm lint` a secas justo después de instalar, sin generar, te salen **8 errores de
-> tipos sin resolver** apuntando a `$disconnect` — y el mensaje no dice «te falta generar
-> el cliente». `verificar` lo hace en el orden correcto.
+> **El orden ya no depende de vos:** el primer paso de `verificar` es `datos` (generar
+> el cliente de Prisma), y además `pnpm install` lo genera solo, en el `postinstall` del
+> paquete del API. Antes de ese `postinstall`, `pnpm lint` a secas justo después de
+> instalar daba **8 errores de tipos sin resolver** apuntando a `$disconnect` —y un
+> `TS2305` en el typecheck—, y el mensaje no decía «te falta generar el cliente». Si
+> instalás con `--ignore-scripts`, el `postinstall` no corre y vuelve a pasar:
+> `pnpm datos` lo arregla.
 
 ### 4.2 Lo que YA viene hecho, y que antes había que hacer a mano
 
@@ -876,7 +878,7 @@ o apuntan al lugar equivocado.
 | Qué | Síntoma | Dónde |
 |---|---|---|
 | `ID_MCP_SLACK` mal | Cinco entradas de allowlist que no matchean nada; permisos a mano para siempre | Fase 2 |
-| `pnpm lint` sin generar el cliente de datos | 8 errores de tipos apuntando a `$disconnect`, no a «falta generar». `pnpm verificar` lo hace en orden | Fase 4.1 |
+| `pnpm lint` sin el cliente de datos generado (un `pnpm install --ignore-scripts`, que saltea el `postinstall`) | 8 errores de tipos apuntando a `$disconnect`, no a «falta generar». `pnpm datos` lo genera; `pnpm verificar` lo hace en orden | Fase 4.1 |
 | Equipo `po` vacío | GitHub no asigna a nadie. El gate del PO no existe y nada lo dice | Fase 1 |
 | **Equipos sin escritura sobre el repo** | GitHub **ignora** al code owner sin avisar: el review cruzado queda asignado a nadie y el PR se ve normal. `gh repo create` no da acceso a ningún equipo | Fase 3.2 |
 | **El repo destino ya existía** | `gh repo create` devuelve 422 `name already exists` y corta el primer comando ejecutable de la guía | Fase 3.3 |

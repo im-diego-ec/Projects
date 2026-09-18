@@ -201,6 +201,55 @@ jobs:
     # necesita el job de arriba; aca no se usa para nada y no se concede.
     permissions:
       contents: read
+    # projects:solo-si-hay-datos
+    # LAS PRUEBAS TIENEN EL MOTOR DE DATOS REAL A MANO, NO SOLO UN DOBLE.
+    #
+    # Un doble devuelve exactamente lo que la prueba espera: no puede
+    # contradecirla. Lo que eso deja pasar esta medido en el marco hermano del
+    # que viene este bloque (2026-08-28): 51 pruebas verdes con dobles, y contra
+    # Postgres aparecieron tres defectos que ninguna veia --un error de
+    # restriccion que salia como 500 en vez de 422, ese camino registrado en
+    # nivel error siendo un rechazo rutinario, y un mensaje de "cuenta inactiva"
+    # con la cuenta activa--. Y hay una familia que ningun doble alcanza: las
+    # migraciones.
+    #
+    # LA MISMA IMAGEN QUE EL docker-compose.yml DEL LOCAL: una prueba que pasa
+    # contra otro motor traslada el defecto en vez de cazarlo.
+    #
+    # EL NOMBRE DE LA BASE ES EL DEL REPOSITORIO, no un literal ni el marcador
+    # del proyecto: este workflow llega por la copia del template y nadie lo
+    # puede retocar despues, asi que lo que cambia por repositorio sale del
+    # contexto. En los dos caminos de nacimiento el repositorio se llama como el
+    # proyecto, que es el nombre de la base del docker-compose.yml y del
+    # api/.env.example. El servicio y DATABASE_URL tienen que decir lo mismo: si
+    # divergen, el cliente de datos crea la base que falta EN SILENCIO y las
+    # pruebas corren contra algo distinto de lo que el servicio levanto. Lo
+    # vigila pruebas/andamio/acoples-del-andamio.test.mjs en el repo del marco.
+    #
+    # Viaja SOLO con capa de datos, entre estos centinelas: un sitio no tiene
+    # base que levantar.
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: "${{ github.event.repository.name }}"
+        ports:
+          - 5432:5432
+        # Sin healthcheck el job arranca antes de que Postgres acepte conexiones
+        # y el rojo sale como una conexion intermitente, que es el defecto mas
+        # caro de diagnosticar y el mas facil de atribuirle a la prueba.
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    # A nivel de JOB y no de paso: una conexion declarada paso a paso se olvida
+    # en el paso siguiente que alguien agregue.
+    env:
+      DATABASE_URL: "postgresql://postgres:postgres@localhost:5432/${{ github.event.repository.name }}"
+    # projects:fin-solo-si-hay-datos
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       # corepack en vez de una action de terceros: menos superficie que auditar
@@ -250,6 +299,10 @@ jobs:
       # despliegue solo corre con el CI en verde, ese rojo se lleva tambien la
       # publicacion, en silencio. Medido antes de gatearlo.
       # projects:solo-si-hay-datos
+      # El `postinstall` del paquete de datos ya lo genero en el install de
+      # arriba, y este paso se CONSERVA igual: deja escrito en el pipeline que
+      # el cliente existe antes del lint, en vez de depender de un script de
+      # instalacion que un `--ignore-scripts` saltea sin avisar.
       - name: Generar el cliente de la capa de datos
         run: pnpm --filter {{PAQUETE_API}} --fail-if-no-match exec {{GENERAR_CLIENTE_DATOS}}
       # projects:fin-solo-si-hay-datos
