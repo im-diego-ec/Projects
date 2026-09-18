@@ -135,3 +135,26 @@ se escribieron **antes** que su arreglo y se vieron en rojo.
       del módulo rompía los 10 casos de `pruebas/init/projects-init.test.mjs` que copian la
       herramienta sola a un clon parcial (`ERR_MODULE_NOT_FOUND` antes de la primera línea).
       Arreglado con `import()` y aviso (D7 del design), y fijado con el caso «copiada SOLA».
+
+## 8. Revisión adversarial del carril: lo que cazó y cómo se cerró
+
+- [x] 8.1 El caso vacío afirmaba «La corrida completo todos sus pasos sin apartarse de lo
+      escrito en ningun punto» aunque la corrida hubiera emitido `::warning::` por un camino
+      que no pasa por `console` (FO-S17/H4): un subproceso con `stdio: "inherit"` —el render
+      de `actions/constitucion/constitucion.mjs`, que avisa por ejemplo de un sobrante en
+      `.projects/` al reintentar con `--forzar`—, `openspec init` o los pasos del arranque.
+      **Arreglo**: `correrProgramaDelMarco` (`herramientas/projects-init.mjs`) corre el render
+      con la salida estándar por tubería —por donde `constitucion.mjs` escribe todo, con
+      `console.log`— y la reimprime por la consola que miran el registro y la bitácora; la de
+      errores sigue heredada para que una traza se vea entera. pnpm y openspec siguen en
+      vivo (sin terminal pnpm apaga su progreso), y `cuerpo` lo declara: el caso vacío dice
+      que la herramienta no emitió ningún aviso y que los de esos programas quedan en la
+      terminal, y «Lo que este registro no ve» lo dice en todos los casos. `execFileSync` y no
+      `spawnSync`, que el banco de lo que llega a un proceso hijo prohíbe en esa herramienta; el
+      residuo nuevo del vector (`script`) quedó declarado ahí con su motivo, en lugar del de
+      `path.join(raizMarco)`. **Evidencia**, rojo primero: con los tres casos nuevos de
+      `pruebas/init/registro-de-friccion.test.mjs` y el render todavía heredado →
+      `# fail 2` («el caso vacio no nombra los programas cuya salida no ve» y «el aviso que
+      el render imprimio por stdout no entro al registro»); con el arreglo → `# pass 25`.
+      Mutación: `correrProgramaDelMarco` con `stdio: "inherit"` → `# fail 2`.
+

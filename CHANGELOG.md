@@ -1721,7 +1721,11 @@ sin `pnpm-lock.yaml`, corré `corepack pnpm install` y guardá ese archivo.
   asistente y el arranque corran en dos procesos, como los corren los lanzadores). Seis clases
   cerradas —las cinco de Rigel más `PREGUNTA`—, cada apartamiento con su punto exacto; sin
   apartamientos, lo dice en vez de no existir, y con ellos la pantalla dice que no es un éxito
-  limpio. No lleva el nombre del proyecto, la cuenta ni rutas de la máquina. Hasta ahora el
+  limpio. Los avisos del render de la constitución —un programa corto del marco que la
+  herramienta invoca— entran también: su salida pasa por la consola que se vigila. Los de
+  pnpm, openspec y los pasos del arranque no, porque corren con su salida en vivo, y el
+  registro lo declara (en el caso vacío y en «Lo que este registro no ve») en vez de afirmar
+  una corrida sin apartamientos que no observó. No lleva el nombre del proyecto, la cuenta ni rutas de la máquina. Hasta ahora el
   registro era una plantilla que había que acordarse de llenar, y su única instancia era de
   otra organización; en su primera corrida encontró dos defectos que nadie había visto (la
   protección de `main` se mide antes de que el repositorio exista en el camino del doble clic,

@@ -200,12 +200,22 @@ export function cuerpo({ procedimiento, apartamientos, contexto = {} }) {
   if (apartamientos.length === 0) {
     // EL CASO VACIO TAMBIEN QUEDA, y no es burocracia: un registro que solo existe cuando
     // algo salio mal no distingue «el camino aguanto una corrida entera» de «nadie miro».
+    //
+    // Y DICE HASTA DONDE MIRO (revision adversarial del porte, FO-S17/H4): afirmaba «sin
+    // apartarse de lo escrito en ningun punto» aunque pnpm, openspec o un paso del
+    // arranque hubieran avisado en la terminal, donde este registro no mira.
     l.push("## Sin apartamientos");
     l.push("");
     l.push(
-      "La corrida completo todos sus pasos **sin apartarse de lo escrito en ningun punto**. Queda " +
-        "registrado explicitamente: un registro vacio dice que el camino aguanto una corrida entera, y " +
-        "eso es distinto de que nadie haya mirado.",
+      "La herramienta completo todos sus pasos **sin emitir un solo aviso**. Queda registrado " +
+        "explicitamente: un registro vacio dice que el camino aguanto una corrida entera, y eso es distinto " +
+        "de que nadie haya mirado.",
+    );
+    l.push("");
+    l.push(
+      "Lo que este registro NO vio: los avisos de los programas que la herramienta corre con su salida en " +
+        "vivo --pnpm, openspec y los pasos del arranque--. Si alguno dijo `::warning::`, esta en la terminal " +
+        "de la corrida, no aca.",
     );
   } else {
     l.push(`## ${apartamientos.length} apartamiento(s)`);
@@ -233,6 +243,11 @@ export function cuerpo({ procedimiento, apartamientos, contexto = {} }) {
     "Lo que pasa despues de la herramienta --los ajustes de GitHub, el primer envio, el primer change-- " +
       "no lo ve nadie automaticamente. Eso se anota a mano con `docs/plantillas/registro-de-friccion.md` " +
       "del repositorio del marco. El texto completo de cada aviso esta en la bitacora de la corrida.",
+  );
+  l.push("");
+  l.push(
+    "Tampoco ve la salida de los programas que corren con su salida en vivo --pnpm, openspec y los pasos " +
+      "del arranque--: pasarla por aca les apagaria el progreso. Sus avisos quedan en la terminal de la corrida.",
   );
   l.push("");
   l.push(

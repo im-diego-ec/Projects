@@ -44,7 +44,7 @@ import {
   vigilarAvisos,
 } from "../../herramientas/registro-de-friccion.mjs";
 import { PREGUNTAS, correrAsistente, reparto } from "../../herramientas/projects-asistente.mjs";
-import { FORMATOS, REQUERIDOS } from "../../herramientas/projects-init.mjs";
+import { FORMATOS, REQUERIDOS, correrProgramaDelMarco } from "../../herramientas/projects-init.mjs";
 
 const RAIZ = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 const HERRAMIENTA = path.join(RAIZ, "herramientas/projects-init.mjs");
@@ -114,6 +114,60 @@ test("una corrida SIN apartamientos tambien deja registro, y lo dice", () => {
   assert.match(texto, /Sin apartamientos/);
   assert.match(texto, /nadie (haya )?mir/i);
   assert.match(tituloDelRegistro("arranque", 0), /sin apartamientos/);
+});
+
+test("el caso vacio declara lo que NO vio: los avisos de los programas con salida en vivo", () => {
+  // REVISION ADVERSARIAL DEL PORTE (FO-S17/H4, 2026-09-18). El caso vacio afirmaba «la
+  // corrida completo todos sus pasos sin apartarse de lo escrito en ningun punto» aunque
+  // pnpm, openspec o un paso del arranque hubieran dicho `::warning::` en la terminal:
+  // corren con su salida en vivo y no pasan por la consola que se vigila. Un registro que
+  // existe para distinguir «el camino aguanto» de «nadie miro» no puede afirmar lo primero
+  // sobre lo que no observo.
+  const texto = cuerpo({ procedimiento: "arranque", apartamientos: [] });
+  const vacio = texto.slice(texto.indexOf("## Sin apartamientos"), texto.indexOf("## Lo que este registro no ve"));
+  assert.match(vacio, /pnpm/, "el caso vacio no nombra los programas cuya salida no ve");
+  assert.match(vacio, /terminal/, "y no dice donde mirar lo que no vio");
+  assert.doesNotMatch(vacio, /sin apartarse de lo escrito en ningun punto/, "sigue afirmando lo que no observo");
+  const noVe = texto.slice(texto.indexOf("## Lo que este registro no ve"));
+  assert.match(noVe, /salida en vivo/, "la seccion de lo que no ve tiene que declarar el limite en todos los casos");
+});
+
+test("un programa corto del marco corre con su salida por tuberia: sus avisos entran al registro y siguen en pantalla", () => {
+  // `constitucion.mjs` emite `::warning::` (un sobrante en .projects/ al reintentar con
+  // --forzar, un allowlist ilegible) y corria con stdio heredado: sus avisos salian en la
+  // terminal y el registro no los veia. Es corto y del marco, asi que su salida estandar
+  // —por donde escribe TODO, con console.log— se captura y se reimprime por la consola que
+  // se vigila; pnpm no, porque sin terminal apaga su progreso.
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "friccion-programa-"));
+  try {
+    const script = path.join(dir, "programa.mjs");
+    fs.writeFileSync(
+      script,
+      [
+        "console.log('una linea comun');",
+        "console.log('::warning::un sobrante en .projects/');",
+        "console.log('::error::un rojo que tambien tiene que verse');",
+        "process.exit(Number(process.env.SALIDA ?? 0));",
+      ].join("\n"),
+    );
+    const registro = crearRegistro({ fase: "OpenSpec y la constitucion" });
+    const escritas = [];
+    const consola = { log: (...a) => escritas.push(a.join(" ")), error: (...a) => escritas.push(a.join(" ")), warn: () => {} };
+    const vigia = vigilarAvisos(registro, consola);
+    const r = correrProgramaDelMarco(script, { cwd: dir, consola });
+    vigia.soltar();
+    assert.equal(r.codigo, 0);
+    assert.deepEqual(
+      registro.apartamientos.map((a) => [a.punto, a.real]),
+      [["OpenSpec y la constitucion", "un sobrante en .projects/"]],
+    );
+    assert.ok(escritas.includes("una linea comun"), "lo que el programa imprime tiene que seguir llegando a la pantalla");
+    const antes = escritas.length;
+    assert.equal(correrProgramaDelMarco(script, { cwd: dir, env: { ...process.env, SALIDA: "3" }, consola }).codigo, 3, "el codigo de salida del programa se conserva");
+    assert.ok(escritas.slice(antes).includes("::error::un rojo que tambien tiene que verse"), "un programa que falla tiene que seguir mostrando lo que dijo");
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
 });
 
 test("una corrida que termino bien rodeando cosas NO se reporta como exito limpio", () => {
@@ -410,6 +464,61 @@ test("LA CONDICION DE TERMINO: no hay LISTO sin el registro, y se dice antes", (
     assert.ok(!r.texto.includes(dato), `el registro lleva "${dato}", y su destino es un repositorio publico`);
   }
   fs.rmSync(r.base, { recursive: true, force: true });
+});
+
+// El ejecutor en una constante, como en pruebas/init/projects-init.test.mjs: el guardrail
+// de ejecutores del marco lee los bancos y un literal suelto seguido de algo que parece un
+// paquete lo toma por una invocacion sin version exacta.
+const EJECUTOR = "npx";
+
+test("de punta a punta: un ::warning:: del render de la constitucion queda en el registro de la corrida", () => {
+  const raiz = fs.mkdtempSync(path.join(os.tmpdir(), "registro-friccion-render-"));
+  try {
+    fs.mkdirSync(path.join(raiz, "herramientas"));
+    for (const f of ["projects-init.mjs", "registro-de-friccion.mjs"]) {
+      fs.copyFileSync(path.join(RAIZ, "herramientas", f), path.join(raiz, "herramientas", f));
+    }
+    fs.cpSync(path.join(RAIZ, "plantilla"), path.join(raiz, "plantilla"), { recursive: true });
+    fs.mkdirSync(path.join(raiz, ".github", "workflows"), { recursive: true });
+    fs.copyFileSync(path.join(RAIZ, ".github/workflows/marco-ci.yml"), path.join(raiz, ".github/workflows/marco-ci.yml"));
+    fs.mkdirSync(path.join(raiz, "actions", "constitucion"), { recursive: true });
+    // La constitucion de mentira hace lo que el modo escribir real --escribe y DECLARA lo
+    // escrito-- y ademas avisa, por console.log como la real.
+    fs.writeFileSync(
+      path.join(raiz, "actions", "constitucion", "constitucion.mjs"),
+      [
+        "import fs from 'node:fs';",
+        "fs.mkdirSync('.projects', { recursive: true });",
+        "fs.writeFileSync('.projects/AGENTS-marco.md', 'porcion del marco\\n');",
+        "fs.appendFileSync(process.env.GITHUB_OUTPUT, 'artefactos=.projects/AGENTS-marco.md\\n');",
+        "console.log('::warning::.projects/sobrante.md esta dentro de .projects/ y no lo emite el marco');",
+      ].join("\n"),
+    );
+    const bin = path.join(raiz, "bin");
+    fs.mkdirSync(bin);
+    fs.writeFileSync(path.join(bin, EJECUTOR), "#!/bin/sh\nmkdir -p openspec && printf 'x\\n' > openspec/project.md\nexit 0\n", { mode: 0o755 });
+    fs.writeFileSync(path.join(bin, `${EJECUTOR}.cmd`), "@echo off\r\nmkdir openspec\r\necho x> openspec\\project.md\r\nexit /b 0\r\n");
+    const destino = path.join(raiz, "proyecto");
+    fs.mkdirSync(destino);
+    const valores = path.join(raiz, "valores.json");
+    fs.writeFileSync(valores, JSON.stringify(VALORES));
+    const r = spawnSync(process.execPath, [path.join(raiz, "herramientas", "projects-init.mjs"), "--sin-arranque", "--valores", valores, "--destino", destino], {
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "pipe"],
+      env: { ...process.env, PATH: `${bin}${path.delimiter}${process.env.PATH}` },
+    });
+    const salida = `${r.stdout ?? ""}${r.stderr ?? ""}`;
+    assert.equal(r.status, 0, `esta corrida tendria que pasar:\n${salida.slice(-1500)}`);
+    const texto = fs.readFileSync(path.join(destino, NOMBRE_REGISTRO), "utf8");
+    assert.match(
+      texto,
+      /- \*\*Punto\*\*: OpenSpec y la constitucion\n- \*\*Lo que paso\*\*: \.projects\/sobrante\.md esta dentro de \.projects\//,
+      "el aviso que el render imprimio por stdout no entro al registro",
+    );
+    assert.match(salida, /::warning::\.projects\/sobrante\.md/, "y tiene que seguir saliendo en la pantalla");
+  } finally {
+    fs.rmSync(raiz, { recursive: true, force: true });
+  }
 });
 
 test("una corrida que FALLA no deja registro en el proyecto ni consume lo del asistente", () => {

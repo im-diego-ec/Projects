@@ -663,6 +663,49 @@ export function abrirBitacora(consola = console) {
   };
 }
 
+/** Corre un programa CORTO del marco con su salida estandar por una tuberia y la
+ *  reimprime por la consola de esta herramienta, linea por linea. Devuelve
+ *  `{ codigo, error }`.
+ *
+ *  QUE DEFECTO CIERRA (revision adversarial del porte, FO-S17/H4, 2026-09-18). El
+ *  render de la constitucion corria con `stdio: "inherit"`: sus `::warning::` (un
+ *  sobrante en .projects/ al reintentar con --forzar, un allowlist ilegible) salian en
+ *  la terminal y no pasaban por la consola que miran la bitacora y el registro de
+ *  friccion, que despues decia «sin apartamientos». Reimprimiendo por `consola`, lo que
+ *  el programa dice entra a los dos sin que nadie lo anote.
+ *
+ *  SOLO LA SALIDA ESTANDAR, y alcanza: `constitucion.mjs` escribe TODO —sus avisos y sus
+ *  errores— con `console.log`. La de errores sigue heredada, para que una traza de Node
+ *  se vea en vivo y entera: `execFileSync` y no `spawnSync` —que este archivo no usa,
+ *  ver el banco de lo que llega a un proceso hijo—, y con la de errores por tuberia una
+ *  corrida que sale 0 la descartaria sin mostrarla.
+ *
+ *  SOLO PARA LO CORTO Y DEL MARCO. pnpm y openspec siguen con su salida en vivo, por el
+ *  motivo de la bitacora: sin una terminal del otro lado pnpm apaga su progreso. */
+export function correrProgramaDelMarco(script, { cwd, env = process.env, consola = console } = {}) {
+  const reimprimir = (texto) => {
+    const lineas = String(texto ?? "").split(/\r?\n/);
+    if (lineas.at(-1) === "") lineas.pop();
+    for (const l of lineas) consola.log(l);
+  };
+  try {
+    reimprimir(
+      execFileSync(process.execPath, [script], {
+        cwd,
+        env,
+        encoding: "utf8",
+        stdio: ["ignore", "pipe", "inherit"],
+        maxBuffer: 64 * 1024 * 1024,
+      }),
+    );
+    return { codigo: 0, error: null };
+  } catch (e) {
+    reimprimir(e?.stdout);
+    if (typeof e?.status === "number") return { codigo: e.status, error: null };
+    return { codigo: null, error: e?.signal ? `murio por la senal ${e.signal}` : String(e?.message ?? e) };
+  }
+}
+
 /** Los datos de la maquina que hacen falta para entender un rojo ajeno.
  *
  *  Cada uno esta porque un rojo real se explico con el: la version de Node
@@ -4526,14 +4569,14 @@ async function correrLaHerramienta(argv, friccion, registroDeFriccion) {
           : "render de la porcion del marco de la constitucion",
       );
       if (accion.aviso) console.error(accion.aviso);
-      try {
-        execFileSync(process.execPath, [accion.script], {
-          cwd: o.destino,
-          stdio: "inherit",
-          env: { ...process.env, CONSTITUCION_MODO: "escribir", GITHUB_OUTPUT: salidaDelRender },
-        });
-      } catch (e) {
-        console.error(`::error::el render de la constitucion fallo: ${e.message}`);
+      // Por tuberia y reimpreso, no heredado: sus `::warning::` tienen que llegar al
+      // registro de friccion y a la bitacora. Ver correrProgramaDelMarco.
+      const render = correrProgramaDelMarco(accion.script, {
+        cwd: o.destino,
+        env: { ...process.env, CONSTITUCION_MODO: "escribir", GITHUB_OUTPUT: salidaDelRender },
+      });
+      if (render.error || render.codigo !== 0) {
+        console.error(`::error::el render de la constitucion fallo: ${render.error ?? `salio ${render.codigo}`}`);
         return 1;
       }
       artefactos = rutasDelRender(fs.readFileSync(salidaDelRender, "utf8"));
