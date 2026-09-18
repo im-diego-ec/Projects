@@ -30,11 +30,11 @@ const DECLARAN = [
 // que cada job DECLARE su bloque, pero nunca lee estos comentarios: la prosa y
 // el mecanismo podian divergir sin que nada lo notara.
 //
-// LO QUE ESTA COMPUERTA NO HACE. No verifica la CONSECUENCIA que esos bloques
-// describen --si el token queda corto, si la corrida no arranca, o si la
-// deteccion cae al fail-open--. Eso depende del comportamiento de GitHub ante un
-// reusable que pide de mas, y no se puede medir desde este banco. Ver el proposal
-// del change para el destino de esa parte.
+// LO QUE ESTA COMPUERTA NO HACE. No PROVOCA la consecuencia que esos bloques
+// describen: eso depende del comportamiento de GitHub ante un reusable que pide
+// de mas, y no se puede medir desde este banco. Se midio afuera (upstream de este
+// marco, corrida 33971175258: startup_failure), y lo que el ultimo caso de este
+// archivo fija es que la PROSA diga eso y no el fail-open que decia antes.
 // ---------------------------------------------------------------------------
 
 /** Los alcances que los jobs del reusable declaran de verdad. */
@@ -180,4 +180,68 @@ test("MUERDE: un permiso COMENTADO no cuenta como concedido", () => {
     if (m) leidos2.add(`${m[1]}: ${m[2]}`);
   }
   assert.deepEqual([...leidos2], ["contents: read"], "un permissions: de JOB se leyo como piso del encabezado");
+});
+
+// ---------------------------------------------------------------------------
+// LA CONSECUENCIA QUE ESOS BLOQUES DESCRIBEN, AHORA MEDIDA.
+//
+// Los tres bloques decian que sin `pull-requests: read` la deteccion del carril
+// «cae al fail-open». El change el-piso-del-reusable-se-mide dejo esa frase marcada
+// como no verificada y le dio destino propio; el destino es el change
+// el-marco-deja-de-afirmar-lo-que-no-hace, y la medicion es del upstream de este
+// marco: con el reusable declarando un alcance que el job llamador no concedia, la
+// corrida 33971175258 (2026-09-05) salio `startup_failure`, con CERO jobs, CERO
+// check-runs y un mensaje que no nombra el permiso. El job `cambios` de este
+// reusable DECLARA `pull-requests: read`, asi que un llamador que no lo concede no
+// cae en ningun fail-open: se queda sin corrida. Seguir la prosa vieja —«si falta,
+// solo pierdo el carril rapido»— deja un repo sin checks.
+//
+// LIMITE DECLARADO: la lista es de las formas EXACTAS que ya aparecieron, no un
+// detector de la idea. Lo que si es general es la otra mitad: cada archivo que
+// declara el piso tiene que nombrar `startup_failure`, o sea decir lo que pasa.
+// ---------------------------------------------------------------------------
+
+// Varios `#` seguidos tambien: el ejemplo de marco-ci.yml es un YAML comentado dentro
+// de un comentario, y sus lineas empiezan con "#   #".
+const aplanar = (t) => t.replace(/\r?\n[ \t]*(?:#[ \t]*)*/g, " ").replace(/[ \t]+/g, " ");
+
+const CONSECUENCIA_FALSA = [
+  "Sin pull-requests:read el job de deteccion del carril de docs no puede listar los archivos del PR, cae al fail-open",
+  'si aca falta pull-requests:read, el job "cambios" no puede listar los archivos del PR, cae al fail-open',
+  'Sin pull-requests:read, el job "cambios" no puede listar los archivos del PR, cae al fail-open',
+  "sin el, el job que detecta el carril de docs no puede listar los archivos del PR y cae al fail-open",
+  'sin el, el job "cambios" de marco-ci.yml no puede listar los archivos del PR, cae al fail-open',
+];
+
+test("la normalizacion une un comentario partido en dos lineas", () => {
+  // Sin este control, el caso de abajo seria un `includes` literal que no ve una
+  // frase partida, que es justo como viven en un YAML.
+  const partido = "# Sin pull-requests:read el job de deteccion del carril de docs no puede\n# listar los archivos del PR, cae al fail-open";
+  assert.ok(aplanar(partido).includes(CONSECUENCIA_FALSA[0]));
+  const anidado = "#   # OBLIGATORIO. si aca falta pull-requests:read, el job\n#   # \"cambios\" no puede listar los archivos del PR, cae al fail-open y el";
+  assert.ok(aplanar(anidado).includes(CONSECUENCIA_FALSA[1]));
+});
+
+test("ningun bloque del piso dice que sin el permiso se cae al fail-open: la corrida no arranca", () => {
+  const encontradas = [];
+  const mudos = [];
+  for (const rel of DECLARAN) {
+    const texto = fs.readFileSync(path.join(RAIZ, rel), "utf8");
+    const plano = aplanar(texto);
+    for (const f of CONSECUENCIA_FALSA) if (plano.includes(f)) encontradas.push(`${rel}: "${f}"`);
+    if (!texto.includes("startup_failure")) mudos.push(rel);
+  }
+  assert.deepEqual(
+    encontradas,
+    [],
+    "estos archivos siguen diciendo que sin pull-requests: read la deteccion cae al fail-open. Medido: el job " +
+      "cambios del reusable DECLARA ese permiso, y cuando el llamador no lo concede la corrida sale " +
+      "startup_failure, sin jobs ni checks. Reescribi la frase con esa consecuencia",
+  );
+  assert.deepEqual(
+    mudos,
+    [],
+    "estos archivos declaran el piso de permisos y no dicen que pasa si falta: nombra startup_failure y que la " +
+      "corrida entera no arranca, para que nadie recorte el permiso creyendo que solo pierde el carril rapido",
+  );
 });

@@ -27,6 +27,10 @@ estado: archivado
   declara su propio bloque, la corrida podría fallar al arrancar. **Destino:**
   change propio, con una corrida real de CI como evidencia — un PR en un repo de
   juguete con el permiso recortado. No se reescribe el texto sin esa medición.
+  **Resuelto en `el-marco-deja-de-afirmar-lo-que-no-hace`** con la medición del
+  upstream (corrida 33971175258 de Rigel, 2026-09-05: `startup_failure` con el
+  alcance declarado en el encabezado del reusable, que es el caso de `marco-ci.yml`).
+  La reproducción en un PR propio de Projects quedó como tarea abierta de ese change.
 
 ## Cierre — 2026-09-17, bajo el desvío de revisión de `AGENTS.md`
 

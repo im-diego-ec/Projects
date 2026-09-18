@@ -30,9 +30,11 @@ on:
   pull_request:
 
 # OBLIGATORIO y no decorativo: un workflow reusable nunca puede pedir mas
-# permisos que los que le concede quien lo llama. Sin pull-requests:read, el
-# job "cambios" no puede listar los archivos del PR, cae al fail-open y el
-# carril rapido no actua nunca (incidente del 2026-08-05).
+# permisos que los que le concede quien lo llama, y marco-ci.yml DECLARA
+# pull-requests: read. Si aca no se concede, la corrida entera sale
+# startup_failure: cero jobs, cero checks y un mensaje que no nombra el
+# permiso. No es un fail-open (medido en el upstream de este marco, corrida
+# 33971175258 del 2026-09-05, tambien con el reusable llamado por ruta local).
 permissions:
   contents: read
   pull-requests: read
@@ -54,9 +56,8 @@ jobs:
     # exacto del bloque que lleva este mismo job en el scaffold
     # (plantilla/.github/workflows/ci.yml).
     #
-    # pull-requests: read NO se puede recortar: sin el, el job "cambios" de
-    # marco-ci.yml no puede listar los archivos del PR, cae al fail-open y el
-    # carril rapido no actua nunca (incidente del 2026-08-05).
+    # pull-requests: read NO se puede recortar: marco-ci.yml lo declara, y sin
+    # el esta corrida no arranca (startup_failure, sin un solo check).
     permissions:
       contents: read
       pull-requests: read

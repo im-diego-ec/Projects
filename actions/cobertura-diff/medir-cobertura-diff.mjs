@@ -763,8 +763,8 @@ export function veredictoDePaquete({
       // "n/a" no es una metrica que no aplica: es un ratchet que se quedo sin
       // nada contra lo que comparar. Salia EXIT 0, con la fila impresa como
       // n/a y sin un solo ::warning::, asi que apagar la ganancia acumulada de
-      // un paquete costaba lo mismo que cambiar el reporter o apagar
-      // `all: true`. El arreglo es una linea de diff bajo review —borrar el
+      // un paquete costaba lo mismo que cambiar el reporter o recortar el
+      // `coverage.include`. El arreglo es una linea de diff bajo review —borrar el
       // piso con su motivo, o arreglar el reporter— y por eso esto es ROJO y no
       // un aviso: un aviso lo habria tapado igual que antes.
       const pisoHuerfano = typeof piso[clave] === "number" ? piso[clave] : null;
@@ -1085,11 +1085,11 @@ function compuertaDelTotal({ paquetes, exclusionDe, cobertura, minimoLocal, ambi
     // del diff ya enrojece cuando hay lineas agregadas sin datos, y en un push
     // a main sin cobertura emitida no hay nada que verificar. Pero se dice.
     console.error(
-      `::warning::ningun reporte de cobertura reclama archivos de un paquete versionado: el total por paquete NO se pudo medir en esta corrida. Arreglo: corre las pruebas con cobertura (y con 'all: true') antes de este paso`
+      `::warning::ningun reporte de cobertura reclama archivos de un paquete versionado: el total por paquete NO se pudo medir en esta corrida. Arreglo: corre las pruebas con cobertura y con su alcance declarado (coverage.include; en vitest 2.x era 'all: true') antes de este paso`
     );
     RT("**No medido** — ningun reporte de cobertura reclama archivos de algun paquete.");
     RT("");
-    RT("Arreglo: corre las pruebas **con cobertura** y con `all: true` antes de este paso.");
+    RT("Arreglo: corre las pruebas **con cobertura** y con su alcance declarado (`coverage.include`; en vitest 2.x era `all: true`) antes de este paso.");
     return 0;
   }
 
@@ -1231,7 +1231,7 @@ function compuertaDelTotal({ paquetes, exclusionDe, cobertura, minimoLocal, ambi
       const causa =
         f.declaradas > 0
           ? `sus reportes DECLARAN ${f.declaradas} item(s) de ${f.etiqueta} (${dato}:) y no llego ninguno: el reporter la midio y esta action no supo leer el formato en que la emitio. La causa conocida es lcov 2.x, que emite FNL:/FNA: donde antes iba FN:/FNDA:. Arreglo: esto se corrige en el marco (issue o change en Projects), NO en ${paq.manifiesto}`
-          : `no aporto un solo item de ${f.etiqueta} y ninguno de sus ${f.sinContador} registro(s) declaro el contador ${dato}: el reporte no la midio. Arreglo: que el reporter emita ${f.etiqueta} (y corra con 'all: true'); si de verdad no aplica a este paquete, declara la exclusion con su motivo en ${paq.manifiesto}`;
+          : `no aporto un solo item de ${f.etiqueta} y ninguno de sus ${f.sinContador} registro(s) declaro el contador ${dato}: el reporte no la midio. Arreglo: que el reporter emita ${f.etiqueta} (y que la cobertura declare su alcance con coverage.include); si de verdad no aplica a este paquete, declara la exclusion con su motivo en ${paq.manifiesto}`;
       console.error(
         `::${f.enGracia ? "warning" : "error"} file=${paq.manifiesto}::el total de ${f.etiqueta} del paquete "${nombre}" no se pudo medir: ${causa}. No medir una metrica no es lo mismo que no tenerla, y la diferencia esta en el propio formato: ${dato}:0 es el reporter diciendo que midio y no habia nada, y eso si pasa como n/a. Sin esa distincion, apagar la metrica que enrojece cuesta una linea de configuracion del reporter.${cola}`
       );
@@ -1266,7 +1266,7 @@ function compuertaDelTotal({ paquetes, exclusionDe, cobertura, minimoLocal, ambi
     // DESAPARECIO, que es la unica informacion util.
     for (const f of pisosHuerfanos) {
       console.error(
-        `::error file=${paq.manifiesto}::el paquete "${nombre}" declara un piso de ${f.etiqueta} de ${f.pisoDeclarado}% y su cobertura llego sin un solo dato de esa metrica: el piso no se pudo comparar contra nada y dejo de proteger la ganancia acumulada. Un piso que no compara es una compuerta apagada en verde. Arreglo: revisa el reporter de cobertura del paquete (que emita esa metrica, y con 'all: true'); si esa metrica de verdad no aplica a este paquete, saca projects.cobertura.piso.${f.clave} de ${paq.manifiesto} en una linea de diff con su motivo escrito`
+        `::error file=${paq.manifiesto}::el paquete "${nombre}" declara un piso de ${f.etiqueta} de ${f.pisoDeclarado}% y su cobertura llego sin un solo dato de esa metrica: el piso no se pudo comparar contra nada y dejo de proteger la ganancia acumulada. Un piso que no compara es una compuerta apagada en verde. Arreglo: revisa el reporter de cobertura del paquete (que emita esa metrica, y que la cobertura declare su alcance con coverage.include); si esa metrica de verdad no aplica a este paquete, saca projects.cobertura.piso.${f.clave} de ${paq.manifiesto} en una linea de diff con su motivo escrito`
       );
     }
 
@@ -1351,7 +1351,7 @@ function compuertaDelTotal({ paquetes, exclusionDe, cobertura, minimoLocal, ambi
     if (clavesDePiso.length) {
       codigo = 1;
       console.error(
-        `::error file=${p.manifiesto}::el paquete "${p.dir || "."}" declara un piso de cobertura (${clavesDePiso.join(", ")}) y no aporto ninguna metrica medible en esta corrida: ${razon}. El piso no se pudo comparar contra nada, asi que dejo de proteger la ganancia acumulada. Arreglo: revisa que las pruebas de este paquete emitan cobertura (con 'all: true') y que el projectRoot del reporter lcov apunte a la raiz del repositorio; si el paquete ya no se mide, saca projects.cobertura.piso de ${p.manifiesto} en una linea de diff con su motivo escrito`
+        `::error file=${p.manifiesto}::el paquete "${p.dir || "."}" declara un piso de cobertura (${clavesDePiso.join(", ")}) y no aporto ninguna metrica medible en esta corrida: ${razon}. El piso no se pudo comparar contra nada, asi que dejo de proteger la ganancia acumulada. Arreglo: revisa que las pruebas de este paquete emitan cobertura (con su alcance declarado en coverage.include) y que el projectRoot del reporter lcov apunte a la raiz del repositorio; si el paquete ya no se mide, saca projects.cobertura.piso de ${p.manifiesto} en una linea de diff con su motivo escrito`
       );
       RT(
         `- \`${p.manifiesto}\`: piso declarado (${clavesDePiso.join(", ")}) sobre un paquete sin ninguna metrica medible en esta corrida.`
@@ -1359,7 +1359,7 @@ function compuertaDelTotal({ paquetes, exclusionDe, cobertura, minimoLocal, ambi
       continue;
     }
     console.error(
-      `::warning file=${p.manifiesto}::el paquete "${p.dir || "."}" declara una deuda de cobertura (${p.deuda.fecha}: ${p.deuda.motivo}) y no aporto ninguna metrica medible en esta corrida: ${razon}, asi que la deuda no esta excusando nada. Arreglo: si el paquete ya no necesita el plazo, borra projects.cobertura.deuda de ${p.manifiesto}; si deberia estar midiendose, revisa que sus pruebas emitan cobertura con 'all: true'`
+      `::warning file=${p.manifiesto}::el paquete "${p.dir || "."}" declara una deuda de cobertura (${p.deuda.fecha}: ${p.deuda.motivo}) y no aporto ninguna metrica medible en esta corrida: ${razon}, asi que la deuda no esta excusando nada. Arreglo: si el paquete ya no necesita el plazo, borra projects.cobertura.deuda de ${p.manifiesto}; si deberia estar midiendose, revisa que sus pruebas emitan cobertura con su alcance declarado en coverage.include`
     );
     RT(
       `- \`${p.manifiesto}\`: deuda declarada (${p.deuda.fecha}) sobre un paquete sin ninguna metrica medible en esta corrida.`
@@ -1721,6 +1721,7 @@ function principal() {
   const detallePorArchivo = [];
   const descubiertas = [];
   const noReclamados = [];
+  const deConfiguracionDeCI = []; // fuente bajo .github/: no se le exige cobertura, se nombra
   const sospechosos = [];
   const sinDato = []; // fuente del cambio que ningun reporte reclama: ROJO
   const rancios = []; // reclamado, pero el reporte es anterior al cambio: ROJO
@@ -1760,6 +1761,24 @@ function principal() {
       // era circular—, sino la lista de extensiones de fuente del censo.
       noReclamados.push(archivo);
       if (!esFuente(archivo) || esArchivoDePrueba(archivo)) continue;
+      // `.github/` NUNCA ES FUENTE DE APLICACION. Es configuracion del proveedor
+      // de CI por definicion de la plataforma: ningun paquete la compila, ninguna
+      // suite la importa y ningun reporter va a emitir DA: para ella, asi que
+      // exigirle cobertura es un rojo que nadie puede apagar. Caso real en el
+      // upstream (Rigel 1.11.0): un `.github/scripts/*.mjs` salia rojo por «sin
+      // datos» mientras el Censo de fuentes del mismo pipeline lo daba verde.
+      //
+      // POR QUE LA RUTA Y NO «FUERA DE TODO PAQUETE», que fue el primer intento
+      // alla y quedo INERTE: los consumidores tienen un package.json en la RAIZ,
+      // asi que todo archivo cae en algun paquete. Lo cazo la validacion contra el
+      // consumidor real, no el banco; el banco de aca declara ese paquete raiz.
+      //
+      // No desaparece en silencio: ya quedo en noReclamados (el resumen lo lista
+      // como fuera de la medicion) y se nombra en un ::notice:: mas abajo.
+      if (archivo === ".github" || archivo.startsWith(".github/")) {
+        deConfiguracionDeCI.push(archivo);
+        continue;
+      }
       const contenido = lineasConContenido(archivo, lineas);
       lineasFueraDelDenominador += contenido.length;
       const exclusion = exclusionDe(archivo);
@@ -1819,6 +1838,15 @@ function principal() {
     for (const l of sinCubrirAqui) descubiertas.push({ archivo, linea: l });
   }
 
+  // La exencion de `.github/` se DICE, antes de cualquier salida temprana: un
+  // archivo fuente que la compuerta deja de mirar sin nombrarlo es exactamente la
+  // clase de silencio que este script existe para no tener.
+  if (deConfiguracionDeCI.length) {
+    console.error(
+      `::notice::${deConfiguracionDeCI.length} archivo(s) fuente del cambio viven bajo .github/ y no se les exige cobertura: son configuracion del proveedor de CI, ningun paquete los compila y ninguna suite los importa (${deConfiguracionDeCI.slice(0, 5).join(", ")}${deConfiguracionDeCI.length > 5 ? ", ..." : ""})`
+    );
+  }
+
   // 8) Un archivo del cambio con el mismo nombre que una ruta SF: que no
   //    resolvio es la firma exacta del cableado torcido. Rojo.
   if (sospechosos.length) {
@@ -1860,7 +1888,7 @@ function principal() {
     if (sinDato.length) {
       const cuantas = sinDato.reduce((a, x) => a + x.lineas, 0);
       console.error(
-        `::error::${sinDato.length} archivo(s) fuente del cambio (${cuantas} linea(s) agregadas) no los reclama ningun reporte de cobertura: no hay con que medirlos, y "sin datos" no es "cubierto". Arreglo: corre las pruebas con cobertura sobre esos archivos —revisa 'all: true' en la configuracion de cobertura del paquete para que el reporte incluya los que ninguna prueba importa— o declara la exclusion con su motivo en projects.cobertura.excluidos del package.json de su paquete`
+        `::error::${sinDato.length} archivo(s) fuente del cambio (${cuantas} linea(s) agregadas) no los reclama ningun reporte de cobertura: no hay con que medirlos, y "sin datos" no es "cubierto". Arreglo: corre las pruebas con cobertura sobre esos archivos —revisa el coverage.include de la configuracion de cobertura del paquete para que el reporte incluya los que ninguna prueba importa; en vitest 2.x eso lo hacia 'all: true', que la mayor 3 retiro— o declara la exclusion con su motivo en projects.cobertura.excluidos del package.json de su paquete`
       );
       for (const x of sinDato.slice(0, MAX_ANOTACIONES)) {
         console.error(

@@ -396,3 +396,48 @@ test("ningun archivo del marco afirma que marco-ci.yml sigue invocando una pieza
       "(ver ese paso). Reescribi la frase con eso",
   );
 });
+
+test("ningun archivo del marco afirma que `@v1` es el canal, ni que un arreglo llega sin PR", () => {
+  // LA TERCERA CARA DE LA MISMA CLASE, y la peor ubicada. actions/README.md es la
+  // superficie donde un consumidor decide COMO pinar, y su seccion Versionado seguia
+  // diciendo que `@v1` apunta al ultimo commit compatible de la 1.x y que un arreglo
+  // llega a todos en el proximo run, sin PR. Es falso desde el 2026-08-21: el canal es
+  // la version exacta mas el PR de Dependabot, y `v1` no avanza con cada release. Al
+  // consumidor lo dejaba pinado a un arbol que no se mueve, creyendo que recibia los
+  // arreglos. El upstream de este marco lo encontro como la octava copia vencida del
+  // mismo hecho (Rigel 2.4.0, commit 3ce8fde); aca estaba igual, y tambien en el
+  // encabezado del ci.yml del andamio y en el de marco-ci.yml.
+  //
+  // LIMITE DECLARADO, el de los dos casos de arriba: formas EXACTAS, sobre texto
+  // aplanado. Una redaccion nueva de la misma idea no la ve; la ve el review.
+  const FALSAS_DEL_CANAL = [
+    "`@v1` es un tag móvil: apunta al último commit compatible",
+    "Antes de mover `v1`, la action nueva se prueba",
+    "La ventana existe porque `v1` es un tag móvil",
+    "Con `v1` móvil, un consumidor recibe comportamiento nuevo",
+    "Un arreglo acá llega a todos los repos en su próximo run, sin PR en cada uno",
+    "asi un arreglo alla llega a este repo sin abrir un PR aca",
+    "Un arreglo aca arregla el CI de todos los repos a la vez",
+    "por eso una subida del pin llega sola",
+  ];
+  const aplanar = (t) => t.replace(/\r?\n[ \t]*(?:>|#|\/\/|\*)?[ \t]*/g, " ").replace(/[ \t]+/g, " ");
+  assert.ok(
+    aplanar("# se consume por referencia desde Projects, asi un arreglo alla llega a este repo\n# sin abrir un PR aca.").includes(FALSAS_DEL_CANAL[5]),
+    "la normalizacion dejo de unir las lineas partidas: este caso volvio a ser un `includes` literal",
+  );
+
+  const encontradas = [];
+  for (const abs of candidatosDeProsa()) {
+    const texto = aplanar(fs.readFileSync(abs, "utf8"));
+    for (const f of FALSAS_DEL_CANAL) {
+      if (texto.includes(f)) encontradas.push(`${path.relative(RAIZ, abs).replace(/\\/g, "/")}: "${f}"`);
+    }
+  }
+  assert.deepEqual(
+    encontradas,
+    [],
+    "el canal de distribucion es la version exacta mas el PR de bump de Dependabot: un arreglo del marco llega a " +
+      "cada consumidor como un PR que alguien lee y mergea, y `v1` no avanza con cada release. Reescribi la " +
+      "frase con eso; si citas la forma vieja para explicar que se corrigio, parafraseala",
+  );
+});

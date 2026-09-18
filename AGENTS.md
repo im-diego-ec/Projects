@@ -112,9 +112,13 @@ relectura de coherencia entre proposal/specs/design/tasks antes de commitear.
 change que pasó `validate --strict` y el guardrail de deltas en verde
 y aun así tenía dos bloqueantes que solo cazó una revisión adversarial con
 lentes independientes. Un delta `MODIFIED` debe reproducir **todos** los
-escenarios vigentes del requirement o el archive los borra en silencio; y el
-guardrail tiene un hueco conocido: si el **título de un requirement** del delta
-no existe en el spec vigente, no avisa. Verificarlo a mano, siempre.
+escenarios vigentes del requirement o el archive los borra en silencio; el
+guardrail de deltas caza eso, y también un `MODIFIED` cuyo título no existe en el
+spec vigente (sale 1). Su hueco real es el simétrico: **un `ADDED` cuyo título ya
+existe** en el spec vigente pasa el guardrail y `validate --strict` en verde
+(medido con el CLI 1.9.0), y recién lo frena el archive. Antes de escribir un
+`ADDED`, `git grep -n "^### Requirement: <título>" -- openspec/specs/`: eso sí, a
+mano, siempre.
 
 ---
 

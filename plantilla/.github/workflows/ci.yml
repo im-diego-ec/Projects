@@ -5,7 +5,7 @@ name: CI
 # copia: es un llamador delgado. La MECANICA del marco (deteccion del carril
 # de docs, guardrail de deltas de OpenSpec, validacion estricta) NO vive aca —
 # se consume por referencia desde Projects, asi un arreglo alla llega a este repo
-# sin abrir un PR aca.
+# como PR de bump de Dependabot sobre la version exacta de abajo, sin copiar nada.
 #
 # Regla dura del marco: este repo NO copia el workflow reusable para editarlo.
 # Si le falta algo, o es un input que hay que agregar en Projects, o es un change
@@ -24,9 +24,11 @@ on:
   pull_request:
 
 # OBLIGATORIO y no decorativo: un workflow reusable NUNCA recibe mas permisos
-# que los que le concede quien lo llama. Sin pull-requests:read el job de
-# deteccion del carril de docs no puede listar los archivos del PR, cae al
-# fail-open y el carril rapido no actua nunca (incidente del 2026-08-05).
+# que los que le concede quien lo llama, y el del marco DECLARA
+# pull-requests: read (lo usa para listar los archivos del PR). Si aca no se
+# concede, GitHub rechaza la corrida ENTERA: startup_failure, cero jobs, cero
+# checks y un mensaje que no nombra el permiso. No es un fail-open: es un PR
+# sin checks, y con ci-ok como check requerido, un PR que no se puede mergear.
 permissions:
   contents: read
   pull-requests: read
@@ -55,8 +57,10 @@ jobs:
     # visible el techo en el mismo lugar donde se lee el uses:, en vez de tener
     # que subir al encabezado para saberlo.
     #
-    # pull-requests: read NO se puede recortar: sin el, el job que detecta el
-    # carril de docs no puede listar los archivos del PR y cae al fail-open.
+    # pull-requests: read NO se puede recortar: el reusable lo declara, y un
+    # bloque de job REEMPLAZA al del encabezado, asi que si falta aca la corrida
+    # no arranca (startup_failure, sin un solo check), aunque el encabezado lo
+    # conceda.
     permissions:
       contents: read
       pull-requests: read
@@ -119,12 +123,22 @@ jobs:
       # un repo sin el workflow semanal de actualizacion lo baja de aca y lo aplica
       # a mano, y esa es la salida que el mensaje de fallo promete. Sin
       # if: !cancelled() no se subiria justo en la corrida que lo necesita.
+      #
+      # include-hidden-files: true NO es opcional: upload-artifact excluye los
+      # archivos ocultos desde su v4.4, y TODO lo que la action deja en ese
+      # directorio cuelga de uno (.projects/, .cursor/). Sin esta linea el
+      # artifact salia vacio y la salida de emergencia no existia.
+      # if-no-files-found: error por lo mismo: un artifact prometido que no se
+      # sube es un fail-open, y con warn nadie lo leia. En una corrida verde el
+      # directorio tampoco queda vacio: la action lo escribe siempre, y un banco
+      # del marco lo mide corriendo la action sobre un repo al dia.
       - if: "!cancelled()"
         uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5
         with:
           name: constitucion-al-dia
           path: ${{ steps.marco_constitucion.outputs.corregidos }}
-          if-no-files-found: warn
+          include-hidden-files: true
+          if-no-files-found: error
 
   # Lo del producto. Se omite cuando el cambio no altera lo que se sirve.
   build_test:

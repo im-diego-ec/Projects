@@ -349,6 +349,96 @@ mueve sobre un cambio incompatible.
   nada cambia bajo tus pies sin un pull request. Si mantenés un fork del marco, el tag
   que tiene que existir en el fork es el de la versión exacta (`docs/15-forkear-el-marco.md`).
 
+- **La salida de emergencia del bump no existía: el artifact `constitucion-al-dia`
+  se subía vacío.** Es lo que el ADR 005 manda a bajar y commitear sobre el PR de
+  Dependabot cuando nace rojo por el artefacto viejo. `upload-artifact` excluye los
+  archivos ocultos desde su v4.4, todo lo que la action deja ahí vive en `.projects/`
+  o `.cursor/`, y con `if-no-files-found: warn` el único rastro era un aviso que
+  nadie lee. El `ci.yml` del andamio ahora sube los ocultos y es rojo si no sube nada;
+  un banco corre la action y comprueba que una corrida verde también deja el
+  directorio lleno. Viene de Rigel 1.9.0.
+
+  **Para consumidores:** esto es scaffold y no te llega con el bump. Si tu repo nació
+  con la 1.9.6 o antes, en el job `constitucion` de tu `.github/workflows/ci.yml`,
+  en el paso que sube `constitucion-al-dia`, cambiá `if-no-files-found: warn` por
+  estas dos líneas:
+
+  ```yaml
+          include-hidden-files: true
+          if-no-files-found: error
+  ```
+
+- **`cobertura-diff` te mandaba a agregar `all: true`, una opción que vitest ya no
+  lee.** vitest 3 retiró `coverage.all` y la 5 la ignora sin aviso, así que seguir el
+  consejo agregaba una línea inerte y el archivo que ninguna prueba importa seguía sin
+  medirse. Los siete mensajes de arreglo, la cabecera del `action.yml` y el README de
+  las actions nombran ahora `coverage.include`; la forma vieja aparece solo como
+  historia. Viene de Rigel 2.6.0.
+
+  **Para consumidores: nada.** Si seguiste el consejo viejo, el `all: true` que
+  agregaste no hace nada y lo podés borrar; lo que tiene que estar es el `include`.
+
+- **Un script de CI bajo `.github/` ya no pone rojo `cobertura-diff`.** Un
+  `.github/scripts/*.mjs` sin datos de cobertura era rojo sin prueba posible que lo
+  apagara —corre en el runner, no en la suite de ningún paquete—, mientras el censo de
+  fuentes lo daba verde. Ahora no se mide, figura en el resumen como fuera de la
+  medición y la corrida lo nombra en un `::notice::`. La exención es por la ruta y no
+  por «fuera de todo paquete», que con un `package.json` en la raíz quedaba inerte.
+  Viene de Rigel 1.11.0.
+
+  **Para consumidores: nada.** Un rojo que pasa a verde; el código de aplicación sin
+  datos sigue siendo rojo.
+
+- **El piso de permisos decía que sin `pull-requests: read` la detección caía al
+  fail-open. Es peor: la corrida no arranca.** El reusable declara ese permiso, y
+  cuando un reusable declara un alcance que su llamador no concede, GitHub rechaza la
+  corrida entera —`startup_failure`, cero jobs, cero checks, un mensaje que no nombra
+  el permiso— (medido en Rigel, corrida 33971175258). Corregido en el ejemplo de
+  `marco-ci.yml`, en el `ci.yml` del andamio y en el del marco, con un banco que lo
+  sostiene.
+
+  **Para consumidores: nada que cambiar en la configuración.** Si tu `ci.yml` tiene el
+  comentario viejo arriba de `permissions:`, lo podés corregir; lo que importa es no
+  recortar `pull-requests: read`, ni en el encabezado ni en el bloque del job que
+  llama a `marco-ci.yml`.
+
+- **`actions/README.md` decía que `@v1` es un puntero que avanza solo y que un
+  arreglo llega a todos sin PR.** Es falso desde el 2026-08-21: el canal es la versión
+  exacta más el PR de Dependabot, y `v1` existe pero no avanza con cada release. Era la
+  superficie donde un consumidor decide cómo pinar. Corregido ahí, en los encabezados
+  de `marco-ci.yml` y del `ci.yml` del andamio y en la skill de archivado del andamio,
+  con las frases vencidas en un banco. Viene de Rigel 2.4.0.
+
+  **Para consumidores: nada,** salvo que tu repo pine `@v1`: pasá a la versión exacta
+  para volver a recibir PRs de bump.
+
+- **La constitución del marco mandaba a revisar a mano lo que el guardrail de deltas
+  ya caza, y callaba su hueco real.** El guardrail sí reporta un `MODIFIED` cuyo
+  título no existe en el spec vigente (sale 1). Lo que no caza —ni `openspec validate
+  --strict`, medido con el CLI 1.9.0— es un `ADDED` cuyo título ya existe: lo frena
+  recién el archive. `AGENTS.md`, la skill `projects-archive-change` (la del marco y la
+  del andamio) y el README de las actions lo dicen ahora así, y un banco corre el
+  guardrail para derivar qué puede decir la prosa. Viene de Rigel 2.3.0 y 2.4.0.
+
+  **Para consumidores:** la skill de archivado es scaffold; si querés la versión
+  corregida, copiá de `plantilla/.claude/skills/projects-archive-change/SKILL.md` el
+  párrafo del paso 1 y las dos filas de la tabla de trampas.
+
+- **El logger del andamio prometía un filtro que nadie corre.** `log.ts` decía que
+  «el filtro» buscaba una subcadena de nivel: ninguna pieza del marco lee ese campo, y
+  el spec de observabilidad exige leer el campo, no una subcadena. El comentario dice
+  ahora eso. Viene de Rigel 2.5.0.
+
+  **Para consumidores: nada.** Es un comentario de scaffold.
+
+- **Un check del marco daba verde leyendo un comentario.** El paso que verifica que
+  el andamio reparta el umbral de cobertura exigía la cadena `all: true`, que solo
+  sobrevivía en el comentario que explica que la opción ya no existe. Ahora lee
+  `include:` y las cuatro métricas en líneas de código. Solo actúa en el repositorio
+  que distribuye el andamio.
+
+  **Para consumidores: nada.** En tu repo ese paso se omite, como antes.
+
 ### Añadido
 
 - **Está medido que la API de este andamio corre en un Worker sin tocarla.** La ruta
@@ -847,6 +937,20 @@ mueve sobre un cambio incompatible.
   (21 pruebas, 6 rojas). Y la mordida se mide ahora contra el árbol real: una mutación tiene
   que dar más hallazgos que el árbol, no solo alguno. Para consumidores: nada; corre en el CI
   de Projects.
+
+- **Un PR del carril rápido que toca la definición del pipeline ahora lo dice.** El
+  default de `rutas_carril_docs` exime `^\.github/` entero, así que un PR que toca solo
+  un workflow saltea tu `build-test` y sale verde sin haber ejecutado lo que cambió
+  (en Rigel: 9 PRs mergeados así, 3 tocando el workflow de despliegue). Ahora el job
+  `cambios` emite un `::warning::` que nombra esos archivos —los no-markdown de un
+  subdirectorio de `.github/`— con el arreglo. El default **no cambia** en esta
+  versión: cambiarlo es incompatible y va con la línea `v2`. El paso que decide el
+  carril tiene ahora nombre («Detectar el carril de docs»); su `id` y el nombre del
+  check no cambian.
+
+  **Para consumidores: nada obligatorio.** Si querés cerrar el hueco ya, pasale
+  `rutas_carril_docs` al job que llama a `marco-ci.yml`, con la lista del default y
+  `^\.github/[^/]*$` en lugar de `^\.github/`.
 
 ### Corregido
 

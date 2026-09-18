@@ -14,8 +14,8 @@ describe("log", () => {
   });
 
   it("el contexto NO puede pisar los campos reservados", () => {
-    // El filtro de las alarmas busca la subcadena "nivel":"error": si un
-    // contexto pudiera sobreescribirla, un error dejaria de alertar.
+    // Las alarmas que se construyan leeran el CAMPO nivel: si un contexto
+    // pudiera sobreescribirlo, un error dejaria de alertar.
     const registro = JSON.parse(linea("error", "real", { nivel: "info", msg: "falso" }));
     expect(registro.nivel).toBe("error");
     expect(registro.msg).toBe("real");

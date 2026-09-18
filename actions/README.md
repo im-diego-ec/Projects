@@ -1,7 +1,9 @@
 # Composite actions del marco
 
 Piezas **referenciadas**: los proyectos no las copian, las consumen con `uses:`.
-Un arreglo acá llega a todos los repos en su próximo run, sin PR en cada uno.
+Un arreglo acá llega a cada repo como **PR de bump de Dependabot** sobre la versión
+exacta que pina: nadie lo copia, y nada cambia en un consumidor sin un PR que alguien
+pueda leer y mergear.
 
 ```yaml
 uses: im-diego-ec/Projects/actions/<nombre>@v1.9.6
@@ -27,13 +29,28 @@ acá: va por `vars` y `secrets` del repo consumidor.
 
 ## Versionado
 
-`@v1` es un tag móvil: apunta al último commit compatible de la línea 1.x.
-Un proyecto con requisitos de auditoría puede pinear el SHA
-(`@a1b2c3d4...`), a costa de perder los arreglos automáticos.
+**Se consume la versión exacta (`@vX.Y.Z`), y ese es todo el canal.** Cada versión
+nueva llega como **PR de Dependabot** en el repo consumidor: si trae una compuerta
+nueva, el rojo aparece **dentro de ese PR**, que es donde alguien lo puede leer antes
+de mergear.
 
-Antes de mover `v1`, la action nueva se prueba en un repo consumidor apuntando
-a la rama (`@nombre-de-rama`). Si cambia el nombre o el significado de un input
-o de un output, es `v2`, no `v1`.
+> **Hasta el change `el-marco-deja-de-afirmar-lo-que-no-hace`, esta sección describía
+> a `@v1` como un puntero que avanzaba solo con cada versión compatible de la 1.x.**
+> Dejó de ser cierto el 2026-08-21, cuando el canal pasó a ser la versión exacta, y
+> este era el peor lugar para seguir diciéndolo: es donde un consumidor decide cómo
+> pinar. `v1` **sigue existiendo** —las versiones publicadas hasta la 1.9.6 lo
+> resuelven dentro de su `marco-ci.yml`— pero **no avanza con cada release**: el paso
+> 5 del release no lo mueve sin OK humano, y si se congela del todo es una decisión
+> que va con la línea `v2` (ver `AGENTS.md`). El 2026-09-17 apuntaba a la `v1.8.0`.
+> Un repo pinado a `@v1` no recibe PR de bump ni aparece en el censo de consumidores.
+
+Un proyecto con requisitos de auditoría puede pinear el SHA (`@a1b2c3d4...`), a costa
+de quedar fuera del PR de bump.
+
+Antes de publicar la versión, la action nueva se prueba en un repo consumidor
+apuntando al **SHA** del commit (skill `projects-validar-consumidor`), y ese pin se
+revierte en el mismo PR que lo introdujo. Si cambia el nombre o el significado de un
+input o de un output, es breaking: va en la línea `v2`, no en una `1.x`.
 
 ---
 
@@ -82,6 +99,12 @@ Si el job ya hizo su propio `setup-node`, pasá `instalar-node: "false"`.
 
 El chequeo se limita al bloque `MODIFIED`: los requirements de `ADDED`
 legítimamente todavía no viven en el spec vigente.
+
+**Hueco conocido, el simétrico:** un `ADDED` cuyo título ya existe en el spec vigente
+**no** se caza acá, y tampoco lo caza `openspec validate --strict` (medido con el CLI
+1.9.0: los dos en verde). Lo frena recién el archive —el paso 2 de la skill
+`projects-archive-change` sale 1—, o sea al final del change. Antes de escribir un
+`ADDED`: `git grep -n "^### Requirement: <título>" -- openspec/specs/`.
 
 ### Correrlo en local
 
@@ -413,12 +436,14 @@ nada obliga a nadie mientras nadie lo toque.
 > **Ventana de estreno, hasta el 2026-09-30.** Mientras dure, los dos veredictos
 > que **nadie escribió** —un paquete por debajo del mínimo que no declara deuda, y
 > una métrica que el reporte no midió— pasan en amarillo con un `::warning::` que
-> nombra el día en que serán rojos. La ventana existe porque `v1` es un tag móvil:
-> sin ella, la compuerta aparece en el pipeline de cada consumidor sin que nadie la
-> haya leído. No afloja lo que un paquete escribió y rompió —deuda vencida,
-> retroceso, piso sin datos, declaración inválida—, y se cierra sola: pasada la
-> fecha, el mismo estado es rojo sin que nadie toque una línea. La línea que separa
-> las dos mitades es la autoría del caso, no su gravedad.
+> nombra el día en que serán rojos. La ventana nació cuando el canal era el tag
+> móvil `v1`: sin ella, la compuerta aparecía en el pipeline de cada consumidor sin
+> que nadie la hubiera leído. Con la versión exacta ese aviso previo es el PR de
+> bump, así que la ventana sobrevive a su causa y se cierra sola en su fecha. No
+> afloja lo que un paquete escribió y rompió —deuda vencida, retroceso, piso sin
+> datos, declaración inválida—, y se cierra sola: pasada la fecha, el mismo estado
+> es rojo sin que nadie toque una línea. La línea que separa las dos mitades es la
+> autoría del caso, no su gravedad.
 
 El piso es el mecanismo de **transición** hacia el mínimo, no un sustituto de él,
 y por eso lleva plazo. Sin fecha, el piso termina siendo el mínimo de hecho, y eso
@@ -455,9 +480,11 @@ abren, porque este plano recalcula el total desde el `lcov` en vez de creerle a 
 configuración del paquete.
 
 **Requisito para que el plano 2 mida lo que dice medir**: la cobertura del paquete
-tiene que emitirse con `all: true`. Sin eso, el reporte solo trae los archivos que
-alguna prueba importó y el total sale alto por omisión. El scaffold reparte esa
-configuración ya armada en `vitest.config.base.mjs`.
+tiene que declarar su alcance con `coverage.include`. Sin eso, el reporte solo trae
+los archivos que alguna prueba importó y el total sale alto por omisión. El scaffold
+reparte esa configuración ya armada en `vitest.config.base.mjs`. En vitest 2.x eso lo
+hacía `all: true`: la mayor 3 retiró la opción y la 5 la ignora sin aviso, así que
+agregarla hoy es una línea inerte.
 
 ```yaml
 jobs:
@@ -517,19 +544,28 @@ e incomparables contra el diff. En vitest:
 ```ts
 coverage: {
   reporter: [["lcov", { projectRoot: fileURLToPath(new URL("..", import.meta.url)) }]],
-  all: true,
+  include: ["src/**/*.{ts,tsx,mts,cts,js,jsx,mjs,cjs}"],
 }
 ```
 
-`all: true` importa igual: un archivo sin ninguna prueba tiene que aparecer en el
-reporte con sus líneas en cero. Con `all: false` desaparece del reporte, la
-compuerta lo contaría como "no medido" y el archivo menos probado del repo
-terminaría siendo justo el que no molesta a nadie. Por eso un **archivo fuente**
+El `include` importa igual: un archivo sin ninguna prueba tiene que aparecer en el
+reporte con sus líneas en cero. Si el alcance no lo nombra, desaparece del reporte,
+la compuerta lo contaría como "no medido" y el archivo menos probado del repo
+terminaría siendo justo el que no molesta a nadie. (En vitest 2.x esto lo pedía
+`all: true`; desde la mayor 3 lo fija el `include` y nada más.) Por eso un **archivo fuente**
 del cambio que ningún reporte reclama es **rojo**, y qué cuenta como fuente sale
 de la lista de extensiones del censo —no de las extensiones que casualmente
 traen los reportes presentes, que era circular: un repo que mide `.ts` no decía
 una palabra sobre un `.tsx` nuevo sin pruebas—. La salida es declarar la
 exclusión con su motivo en `projects.cobertura.excluidos`.
+
+**Salvo bajo `.github/`.** Un script de CI (`.github/scripts/*.mjs` y parecidos) corre en
+el runner y no en la suite de ningún paquete: ningún reporter va a emitir datos para
+él, así que exigirle cobertura era un rojo que ninguna prueba podía apagar —mientras el
+censo de fuentes del mismo pipeline lo daba verde—. Esos archivos no se miden, figuran
+en el resumen como fuera de la medición y la corrida los nombra en un `::notice::`. La
+exención es por la **ruta** y no por «fuera de todo paquete»: con un `package.json` en
+la raíz, todo archivo cae en algún paquete y esa otra regla quedaría inerte.
 
 ### Qué pasa en cada caso
 
@@ -603,7 +639,7 @@ saltea el job entero.
 - **El total se calcula sobre lo que los reportes reclaman.** Un archivo fuente
   que ningún `lcov` menciona no entra al denominador del total; lo caza el plano
   del diff cuando el cambio lo toca, y el censo de fuentes cuando queda fuera del
-  alcance de las herramientas. Es el motivo por el que `all: true` no es
+  alcance de las herramientas. Es el motivo por el que el `coverage.include` no es
   opcional: sin eso, el archivo menos probado del repo es justo el que no molesta
   a nadie.
 - **Las métricas del total salen de los registros por ítem del `lcov`** (`DA`,
@@ -676,10 +712,11 @@ permanente; la ventana tiene sus dos pruebas propias, una a cada lado de la fech
 ## `aviso-version`
 
 El `CHANGELOG.md` y la página del release son superficie de **consulta**, y
-nadie consulta a tiempo. Con `v1` móvil, un consumidor recibe comportamiento
-nuevo —incluido un check que lo pone en rojo— sin haber leído nada; pasó el
-2026-08-19, al mover `v1` la primera vez. Esta action convierte la publicación
-de una versión en una **notificación**.
+nadie consulta a tiempo. Cuando el canal era el tag móvil `v1`, un consumidor
+recibía comportamiento nuevo —incluido un check que lo ponía en rojo— sin haber
+leído nada; pasó el 2026-08-19, al mover `v1` la primera vez. Con la versión exacta
+el cambio llega en un PR de bump, pero ese PR nombra la versión y no lo que cambia.
+Esta action convierte la publicación de una versión en una **notificación**.
 
 **Arma el mensaje y no lo envía.** No conoce el destino, no lee ningún secret y
 no toca la red: lee el `CHANGELOG.md` del checkout, devuelve texto y escribe un
@@ -786,7 +823,7 @@ Es **referenciada**, y hoy tiene un solo consumidor: el propio Projects. Vive ac
 no como un script suelto del repo por dos razones que se sostienen solas —el
 banco de pruebas del CI descubre `actions/*/pruebas/` sin que nadie cablee nada,
 y "changelog + versión → mensaje" es genérico para cualquier repo que publique
-releases—. La contrapartida es honesta: al publicarse bajo `@v1`, sus `inputs` y
+releases—. La contrapartida es honesta: al publicarse con versión, sus `inputs` y
 `outputs` son contrato, y cambiarlos sigue las mismas reglas que el resto.
 
 ---
@@ -865,7 +902,7 @@ distribución, no el de comportamiento. Solo cubre las superficies que el
 repositorio **declara**. Y Projects **no puede dogfoodear** este mecanismo: su
 `AGENTS.md` es la constitución del marco, no la de un proyecto, así que la
 evidencia son el banco de pruebas de `constitucion/pruebas/` —que sí corre en el
-CI de Projects— y la validación contra un consumidor real antes de mover `v1`.
+CI de Projects— y la validación contra un consumidor real antes de publicar la versión.
 
 ---
 
@@ -969,7 +1006,7 @@ corre en cada PR con `node --test` (Node 22, cero dependencias, como todo acá).
 no puede dogfoodear los checks que interrogan manifiestos de paquete: Projects no
 tiene ninguno, así que sobre este repo el censo de fuentes no verifica nada — el
 mismo límite declarado que el check de marcadores del scaffold. Sin ese banco,
-código no trivial llegaría a todos los consumidores de `@v1` sin haberse
+código no trivial llegaría a todos los consumidores sin haberse
 ejecutado nunca sobre un caso controlado.
 
 El job **deriva** qué corre del árbol: una action nueva con pruebas queda

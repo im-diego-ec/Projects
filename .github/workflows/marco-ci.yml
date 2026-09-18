@@ -39,8 +39,9 @@ name: Marco CI (reusable)
 #                   distribuye el marco, y terraform no se puede saltear porque no
 #                   tiene `if:`
 #
-# El proyecto consumidor NO copia estos jobs: los referencia. Un arreglo aca
-# arregla el CI de todos los repos a la vez.
+# El proyecto consumidor NO copia estos jobs: los referencia por version exacta.
+# Un arreglo aca le llega a cada repo como PR de bump de Dependabot, sin que
+# nadie copie nada: un solo arreglo, un PR por consumidor que alguien lee.
 #
 # ---------------------------------------------------------------------------
 # COMO LO CONSUME UN PROYECTO
@@ -54,9 +55,15 @@ name: Marco CI (reusable)
 #     pull_request:
 #
 #   # OBLIGATORIO. Un workflow reusable NUNCA puede pedir mas permisos que los
-#   # que le concede quien lo llama: si aca falta pull-requests:read, el job
-#   # "cambios" no puede listar los archivos del PR, cae al fail-open y el
-#   # carril rapido no actua nunca (incidente real del 2026-08-05).
+#   # que le concede quien lo llama, y este reusable DECLARA pull-requests: read
+#   # (en su encabezado y en el job "cambios"). Si el llamador no lo concede,
+#   # GitHub rechaza la corrida ENTERA: startup_failure, cero jobs, cero checks
+#   # y un mensaje que no nombra el permiso. No es un fail-open: es un PR sin
+#   # checks, y con ci-ok como check requerido, un PR que no se puede mergear.
+#   # (Medido en el upstream de este marco, corrida 33971175258 del 2026-09-05,
+#   # con un alcance declarado en el encabezado del reusable. El incidente del
+#   # 2026-08-05, anterior a este repo, si fue un fail-open; un reusable que
+#   # declara el permiso, como este desde su primer commit, ya no cae ahi.)
 #   permissions:
 #     contents: read
 #     pull-requests: read
@@ -422,9 +429,13 @@ jobs:
     runs-on: ${{ inputs.runner }}
     # EL UNICO JOB DE ESTE ARCHIVO QUE PIDE MAS QUE contents: read, y lo pide por
     # job y no heredado del encabezado. pull-requests: read es lo que le permite
-    # LISTAR los archivos del PR por API; sin el la deteccion cae al fail-open y
-    # el carril rapido no actua nunca (incidente del 2026-08-05). contents: read
-    # es para el checkout del carril de push.
+    # LISTAR los archivos del PR por API; si ESTE bloque no lo pidiera (y el
+    # encabezado tampoco), la deteccion caeria al fail-open y el carril rapido no
+    # actuaria nunca (incidente del 2026-08-05). OJO, que es otro caso: si lo que
+    # falta es la CONCESION del llamador, no hay fail-open, hay startup_failure
+    # -la corrida entera no arranca-, porque este bloque lo declara. Ver el
+    # bloque OBLIGATORIO del encabezado. contents: read es para el checkout del
+    # carril de push.
     #
     # En un workflow REUSABLE este bloque es un techo de segunda instancia: lo que
     # llega no puede superar lo que concede el job que hace el `uses:` en el
@@ -546,7 +557,12 @@ jobs:
           echo "   (repositorio: ${GITHUB_REPOSITORY:-<sin GITHUB_REPOSITORY>} — el nombre no interviene en esta decision)"
           echo "es_distribuidor=${ES}" >> "${GITHUB_OUTPUT}"
 
-      - id: detectar
+      # CON NOMBRE, y no por prolijidad: el extractor del banco ubica los pasos por
+      # su linea "- name:", asi que sin nombre ningun banco podia correr el texto
+      # que decide el carril de cada consumidor. El id no cambia: las salidas del
+      # job lo leen por id. Banco: pruebas/marco-ci/deteccion-del-carril.test.mjs.
+      - name: Detectar el carril de docs
+        id: detectar
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
@@ -624,6 +640,26 @@ jobs:
             else
               echo "== archivos fuera del carril de docs =="
               cat fuera-del-carril.txt
+            fi
+          fi
+
+          # EL CARRIL EXIME A LA DEFINICION DEL PIPELINE, Y POR AHORA SOLO SE DICE.
+          # El default de rutas_carril_docs trae ^\.github/ entero, asi que un
+          # cambio que toca SOLO un workflow (o una action propia, o un script de
+          # CI) va por el carril rapido: el build-test del consumidor queda skipped
+          # y el check agregado sale verde sin haber ejecutado lo que el cambio
+          # modifica. Medido en el upstream de este marco: 9 PRs mergeados asi, 3
+          # tocando el workflow de despliegue. Cambiar el default cambia un
+          # comportamiento que nadie pidio y va con la linea v2; lo compatible es
+          # que el hueco deje de ser mudo, con el arreglo que el consumidor ya
+          # puede aplicar en su arbol. Se nombran los archivos NO markdown de un
+          # SUBDIRECTORIO de .github/: los sueltos de la raiz (CODEOWNERS,
+          # dependabot.yml) y la documentacion no definen la verificacion.
+          if [ "${SOLO_DOCS}" = "true" ]; then
+            { grep -E '^\.github/[^/]+/' files.txt || true; } | { grep -vE '\.md$' || true; } > pipeline-eximido.txt
+            if [ -s pipeline-eximido.txt ]; then
+              EXIMIDOS="$(head -n 5 pipeline-eximido.txt | paste -sd ',' - | sed 's/,/, /g')"
+              echo "::warning::este cambio va por el carril rapido (solo_docs=true) y toca archivos que definen el propio pipeline: ${EXIMIDOS}. El build-test de este repo se omite y el check agregado sale verde sin haber ejecutado lo que el cambio modifica. El default de rutas_carril_docs exime ^\.github/ entero, y cambiarlo va en la proxima version mayor del marco. Arreglo hoy, en tu ci.yml: pasale rutas_carril_docs al job que llama a marco-ci.yml con la lista del default, cambiando ^\.github/ por ^\.github/[^/]*$ (asi solo quedan en el carril los archivos sueltos de .github/)"
             fi
           fi
 
@@ -2560,15 +2596,30 @@ jobs:
             exit 1
           fi
 
-          # Las cuatro metricas y all:true. Sin all:true el reporte solo trae
-          # los archivos que alguna prueba importo y el total sube por omision:
-          # el umbral quedaria puesto sin medir el codigo que a nadie molesta.
+          # Las cuatro metricas y el ALCANCE declarado (include:). Sin alcance el
+          # reporte solo trae los archivos que alguna prueba importo y el total
+          # sube por omision: el umbral quedaria puesto sin medir el codigo que a
+          # nadie molesta.
+          #
+          # SE LEEN EN LINEAS DE CODIGO, NO EN COMENTARIOS, y esa es la correccion.
+          # Este paso exigia la cadena "all: true" con un grep sobre el archivo
+          # entero. vitest 3 retiro coverage.all (la 5 la ignora sin aviso) y el
+          # andamio la saco de su config; desde entonces la cadena aparecia SOLO en
+          # el comentario que explica que la opcion ya no existe, asi que el paso
+          # daba VERDE leyendo prosa. Borrar el include: -lo que de verdad sostiene
+          # el total- lo dejaba verde igual. Ver pruebas/marco-ci/umbral-del-andamio.test.mjs.
+          #
+          # El filtro es por linea: descarta las que empiezan con //, * o /*. Un
+          # comentario de bloque cuyas lineas no empiecen con * se leeria como
+          # codigo; el andamio no escribe asi.
+          CODIGO="$(grep -vE '^[[:space:]]*(//|\*|/\*)' "${BASE_VITEST}" || true)"
           FALTAN=()
-          for CLAVE in "lines: minimo" "functions: minimo" "branches: minimo" "statements: minimo" "all: true"; do
-            if ! grep -qF "${CLAVE}" "${BASE_VITEST}"; then FALTAN+=("${CLAVE}"); fi
+          for CLAVE in "lines: minimo" "functions: minimo" "branches: minimo" "statements: minimo"; do
+            if ! grep -qF "${CLAVE}" <<< "${CODIGO}"; then FALTAN+=("${CLAVE}"); fi
           done
+          if ! grep -qE '^[[:space:]]*include:[[:space:]]*\[' <<< "${CODIGO}"; then FALTAN+=("include: [...]"); fi
           if [ ${#FALTAN[@]} -gt 0 ]; then
-            echo "::error file=${BASE_VITEST}::a la configuracion de cobertura del andamio le falta: ${FALTAN[*]}. Las cuatro metricas y all:true son lo que hace que el umbral mida algo"
+            echo "::error file=${BASE_VITEST}::a la configuracion de cobertura del andamio le falta, en lineas de codigo y no en comentarios: ${FALTAN[*]}. Las cuatro metricas y el alcance declarado (coverage.include) son lo que hace que el umbral mida algo. La opcion all: true NO es el arreglo: vitest 3 la retiro y la 5 la ignora sin aviso"
             exit 1
           fi
 

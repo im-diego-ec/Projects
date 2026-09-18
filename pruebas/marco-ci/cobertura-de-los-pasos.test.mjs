@@ -177,14 +177,6 @@ const SIN_BANCO_TODAVIA = new Map([
     "Censo de fuentes cableado",
     "detecta cableado sobre el arbol del consumidor. Es el hueco mas grande de los que SI se pueden escribir sin red, y es el proximo banco",
   ],
-  [
-    "El andamio reparte el umbral del total del marco",
-    "compara el umbral del andamio contra el del marco; su mitad de datos ya la cubre el banco del andamio",
-  ],
-  [
-    "(sin name, id: detectar)",
-    "decide el carril de docs del consumidor. NO TIENE BANCO PORQUE NO TIENE NOMBRE: el extractor ubica los pasos por su linea '- name:', asi que scriptDelPaso() no lo puede sacar del YAML y ningun banco puede correr el texto que corre de verdad. El arreglo empieza FUERA de este banco: agregarle un 'name:' al paso '- id: detectar' de marco-ci.yml, y recien despues escribirle el caso",
-  ],
 ]);
 
 const PASOS = pasosConRun(RUTA_WORKFLOW);
