@@ -43,6 +43,39 @@
 // TODO LO QUE MIRA ES PURO SOBRE TEXTO, a proposito: cada refutacion de abajo le
 // pasa a LA MISMA funcion que corre la regla una copia mutada en memoria. Una
 // guarda que nadie vio fallar no es una guarda.
+//
+// ---------------------------------------------------------------------------
+// Y DESDE EL CHANGE `el-censo-no-miente` (2026-09-17), LA AUSENCIA DEJA DE SER GRATIS.
+//
+// Medido ese dia: 25 filas de la pagina decian `**ninguno**` y nada mas —17 del contrato
+// vivo y 8 de las capabilities en vuelo—, sin la propiedad que impide verificarlas ni el
+// lugar donde vive el trabajo que falta. Un requirement nuevo sin compuerta y uno cuya
+// compuerta nadie supo construir se leian igual. Y al releerlas una por una, NUEVE ya tenian
+// una compuerta parcial que la pagina no contaba —seis del contrato, tres en vuelo—: el mapa
+// estaba viejo en la direccion que nadie audita. Lo porto el marco desde Rigel (2.0.0
+// `censo-honesto`, 2.4.0 `el-numero-del-censo`, 2.6.0 issue #457 de alla), adaptado a una
+// pagina escrita a mano en vez de un censo por marcas en los workflows:
+//
+//   1. TODA FILA SIN COMPUERTA DECLARA SU ESTADO, en una de tres formas, y la cuarta —la
+//      `**ninguno**` pelada— es rojo:
+//        · `**pendiente** → change `<nombre>``: verificable, y el trabajo vive en un change
+//          VIVO que nombra al requirement. Las dos cosas se miden.
+//        · `**no verificable** — <propiedad>`: la propiedad del requirement que impide
+//          verificarlo. Los motivos de ESFUERZO («es dificil», «no hay tiempo») no cuentan.
+//        · `**sin destino**, vigente en X.Y.Z — <texto>`: verificable y NADIE lo tiene. Es el
+//          estado que Rigel no necesito —alla los pendientes apuntaban a un issue paraguas— y
+//          aca si: este banco no puede comprobar un issue sin red, y ningun change vivo nombra
+//          esos requirements. Inventar un destino seria mentir en la otra direccion; por eso
+//          se publica con su version y VENCE al cortar la siguiente, con el mismo predicado
+//          que vence las excepciones de `pinado.test.mjs` (`pruebas/vigencia.mjs`).
+//   2. LA COBERTURA POR MITADES SE CUENTA APARTE. Una fila `**parcial**` sigue contando como
+//      compuerta, pero cada encabezado y el resumen publican cuantas lo son, como subconjunto.
+//   3. UNA COMPUERTA QUE NO CORRE NO CUENTA. Si una fila con compuerta cita una pieza que
+//      vive en una action que ningun `uses:` invoca, es rojo. El lector del alcance es el
+//      mismo del banco de actions alcanzables (`pruebas/alcance-de-las-actions.mjs`).
+//   4. UNA FILA CON COMPUERTA CITA ALGO QUE SE PUEDA BUSCAR: una ruta o un paso. Una celda
+//      que dice una frase suelta no puede contar como compuerta.
+// ---------------------------------------------------------------------------
 import test from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
@@ -51,6 +84,9 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { pasosDe, superficies } from "../marco-ci/extraer.mjs";
+import { accionDeLaRuta, alcanzadas } from "../alcance-de-las-actions.mjs";
+import { FORMA_DE_VERSION, vencida, versionPublicada } from "../vigencia.mjs";
+import { porque } from "../porque.mjs";
 
 const RAIZ = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 export const PAGINA = "openspec/cobertura-de-requirements.md";
@@ -79,13 +115,19 @@ export function seccionesDeLaPagina(texto = pagina()) {
   const secciones = [];
   let actual = null;
   for (const linea of texto.split("\n")) {
-    const enc = linea.match(/^## ([a-z0-9-]+) — (capability EN VUELO, )?(\d+) requirements?, (\d+) con compuerta\s*$/);
+    // El «(N parciales)» se lee OPCIONAL a proposito: un encabezado que no lo publica
+    // tiene que ponerse rojo DICIENDO eso, y no desaparecer de la lista de secciones con un
+    // mensaje sobre capabilities que manda a buscar el error en otro lado.
+    const enc = linea.match(
+      /^## ([a-z0-9-]+) — (capability EN VUELO, )?(\d+) requirements?, (\d+) con compuerta(?: \((\d+) parcial(?:es)?\))?\s*$/,
+    );
     if (enc) {
       actual = {
         capability: enc[1],
         enVuelo: Boolean(enc[2]),
         diceRequirements: Number(enc[3]),
         diceConCompuerta: Number(enc[4]),
+        diceParciales: enc[5] === undefined ? null : Number(enc[5]),
         filas: [],
       };
       secciones.push(actual);
@@ -98,17 +140,36 @@ export function seccionesDeLaPagina(texto = pagina()) {
     if (!actual || !linea.startsWith("|")) continue;
     const c = celdas(linea);
     if (c.length < 2 || c[0] === "Requirement" || /^-+$/.test(c[0])) continue;
-    actual.filas.push({ requirement: c[0], cobertura: c[1] });
+    actual.filas.push({ requirement: c[0], cobertura: c[1], ancla: c[2] ?? "" });
   }
   return secciones;
 }
 
-/** Una fila cuenta como CON compuerta salvo que diga `ninguno` y nada mas.
+/** El estado de una fila, por la forma en que EMPIEZA su celda del medio.
  *
- *  «parcial» cuenta como compuerta a proposito y la pagina lo declara: dice que
- *  existe al menos un camino por el que ese requirement pone algo en rojo solo,
- *  no que este cubierto entero. */
-export const tieneCompuerta = (fila) => !/^\*\*ninguno\*\*/.test(fila.cobertura);
+ *  Seis estados y excluyentes. Los dos primeros tienen compuerta; los otros cuatro no:
+ *
+ *    completa       · cualquier otra cosa: la celda nombra lo que la pone en rojo
+ *    parcial        · `**parcial**...`: existe un camino al rojo, y cubre una parte
+ *    pendiente      · `**pendiente** → change `x``: verificable, con el trabajo en un change
+ *    no-verificable · `**no verificable** — ...`: con la propiedad que lo impide
+ *    sin-destino    · `**sin destino**, vigente en X.Y.Z — ...`: verificable y sin dueño
+ *    sin-declarar   · `**ninguno**`: la ausencia gratis, que es lo que esto persigue
+ *
+ *  «parcial» cuenta como compuerta a proposito y la pagina lo declara: dice que existe al
+ *  menos un camino por el que ese requirement pone algo en rojo solo, no que este cubierto
+ *  entero. Por eso se publica aparte, como subconjunto de los que tienen compuerta. */
+export function estadoDe(fila) {
+  const c = fila.cobertura;
+  if (/^\*\*ninguno\*\*/.test(c)) return "sin-declarar";
+  if (/^\*\*pendiente\*\*/.test(c)) return "pendiente";
+  if (/^\*\*no verificable\*\*/.test(c)) return "no-verificable";
+  if (/^\*\*sin destino\*\*/.test(c)) return "sin-destino";
+  if (/^\*\*parcial/.test(c)) return "parcial";
+  return "completa";
+}
+export const tieneCompuerta = (fila) => ["completa", "parcial"].includes(estadoDe(fila));
+export const esParcial = (fila) => estadoDe(fila) === "parcial";
 
 /** Los requirements que un spec declara, en el orden en que estan escritos. */
 export function requirementsDe(rutaSpec) {
@@ -168,7 +229,11 @@ export function capabilidadesEnVuelo() {
 // ---------------------------------------------------------------------------
 
 /** Una ruta del repositorio con extension conocida, con su linea opcional. */
-const RUTA = /((?:[\w.@-]+\/)+[\w.@-]+\.(?:mjs|yml|yaml|md|json))(?::(\d+)(?:-(\d+))?)?/g;
+// `tsx` va ANTES que `ts`, y no por estetica: la alternancia se prueba en orden, y con `ts`
+// primero `App.test.tsx` se leeria como `App.test.ts` mas una `x` suelta. Los `.ts` entraron
+// con el change `el-censo-no-miente`, cuando una fila empezo a citar el banco del logger del
+// andamio: sin ellos, esa cita no la validaba nadie.
+const RUTA = /((?:[\w.@-]+\/)+[\w.@-]+\.(?:mjs|yml|yaml|md|json|tsx|ts))(?::(\d+)(?:-(\d+))?)?/g;
 
 /** Una linea suelta entre comillas invertidas: `:207`. La pagina las escribe
  *  asi para no repetir la ruta cinco veces en la misma celda, y son la MITAD de
@@ -340,6 +405,202 @@ export function pasosCitadosQueNoPuedenFallar(texto, porNombre = pasosPorNombre(
 }
 
 // ---------------------------------------------------------------------------
+// LA AUSENCIA DECLARADA: tres formas, y la cuarta es rojo.
+//
+// POR QUE TRES Y NO DOS, que es lo que trajo Rigel. Alla un requirement sin compuerta es
+// `sin-compuerta <propiedad>` o `compuerta-pendiente <destino>`, y el destino de los 36
+// pendientes era un issue paraguas. Aca el destino tiene que ser algo que ESTE banco pueda
+// comprobar sin red —un change vivo que nombra al requirement—, y para la mayoria de los
+// requirements del contrato no existe ninguno. Obligarlos a «pendiente» empujaria a inventar
+// un destino; obligarlos a «no verificable» empujaria a escribir una afirmacion falsa sobre
+// reglas que SI se pueden verificar (Rigel clasifico 45 y 44 lo eran). El tercer estado dice
+// la verdad —verificable y sin dueño— y para que no sea la ausencia gratis con otro nombre,
+// VENCE: lleva la version publicada en que se decidio y se pone rojo al cortar la siguiente,
+// con el mismo predicado que vence las excepciones de `pinado.test.mjs`.
+// ---------------------------------------------------------------------------
+
+/** Las formulas que describen a quien escribe y no al requirement.
+ *
+ *  ES UN PROXY Y SE DECLARA COMO PROXY, igual que en Rigel (commit 7ce8037 de alla): juzgar
+ *  si una propiedad es BUENA es comprension de lectura. Lo que si se puede es rechazar las
+ *  formas baratas que dejan de ser ciertas en cuanto cambia quien lee —«es dificil», «no hay
+ *  tiempo»—. Caza la formula y deja el caso sutil al criterio de quien revisa. */
+const EXCUSAS =
+  /\b(dificil|complicad\w*|llevaria|lleva mucho|demasiado (tiempo|trabajo)|no hay (gente|tiempo|manos|recursos)|falta (gente|tiempo|manos)|no es prioridad|prioridad ahora|mas adelante|por ahora no|cuando haya tiempo)\b/;
+const sinAcentos = (s) =>
+  String(s)
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .toLowerCase();
+
+/** Lo minimo que tiene que decir una propiedad o un «sin destino» para no ser un tramite. */
+const MOTIVO_MINIMO = 40;
+
+/** Los changes VIVOS, con el texto de todos sus documentos: nombre -> texto.
+ *
+ *  `archive/` queda fuera por la misma razon que en `capabilidadesEnVuelo`: un change
+ *  archivado ya no es donde vive trabajo pendiente. Un pendiente que apunta a un change que se
+ *  archivo tiene que decidirse de nuevo, y eso es exactamente lo que el rojo pide. */
+export function changesVivos() {
+  const dir = path.join(RAIZ, "openspec/changes");
+  const salida = new Map();
+  const juntar = (abs) =>
+    fs
+      .readdirSync(abs, { withFileTypes: true })
+      .flatMap((e) => (e.isDirectory() ? [juntar(path.join(abs, e.name))] : e.name.endsWith(".md") ? [fs.readFileSync(path.join(abs, e.name), "utf-8")] : []))
+      .join("\n");
+  for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
+    if (!e.isDirectory() || e.name === "archive") continue;
+    salida.set(e.name, juntar(path.join(dir, e.name)));
+  }
+  return salida;
+}
+
+/** Lo que declara una fila sin compuerta, leido de su celda del medio. */
+export function declaracionDe(fila) {
+  const c = fila.cobertura;
+  const estado = estadoDe(fila);
+  if (estado === "pendiente") {
+    const m = c.match(/^\*\*pendiente\*\*\s*→\s*change\s+`([a-z0-9-]+)`/);
+    return { estado, change: m ? m[1] : null };
+  }
+  if (estado === "no-verificable") {
+    const m = c.match(/^\*\*no verificable\*\*\s*—\s*(.*)$/);
+    return { estado, motivo: m ? m[1].trim() : "" };
+  }
+  if (estado === "sin-destino") {
+    const m = c.match(/^\*\*sin destino\*\*, vigente en (\S+?)\s*—\s*(.*)$/);
+    return { estado, vigenteEn: m ? m[1] : null, motivo: m ? m[2].trim() : "" };
+  }
+  return { estado };
+}
+
+/** Toda fila sin compuerta que no declara su estado, o lo declara de una forma que no se sostiene.
+ *
+ *  `version` y `vivos` entran por parametro para que las refutaciones corran ESTA funcion
+ *  sobre un arbol de juguete, y no una copia. */
+export function ausenciasMalDeclaradas(texto, { version = versionPublicada(), vivos = changesVivos() } = {}) {
+  const mal = [];
+  const salidas =
+    "Tres salidas, y hay que elegir UNA: `**pendiente** → change `<nombre>`` si un change vivo tiene ese trabajo y " +
+    "nombra al requirement; `**no verificable** — <la propiedad del requirement que lo impide>`; o `**sin destino**, " +
+    `vigente en ${version} — <por que es verificable y que falta>\`. Y si en realidad SI hay algo que lo pone en rojo, ` +
+    "la salida es nombrarlo";
+  for (const s of seccionesDeLaPagina(texto)) {
+    for (const f of s.filas) {
+      const quien = `«${f.requirement}» (${s.capability})`;
+      const d = declaracionDe(f);
+      if (d.estado === "sin-declarar") {
+        mal.push(`${quien} dice \`**ninguno**\` y nada mas: un requirement nuevo sin compuerta y uno cuya compuerta nadie supo construir se leen igual. ${salidas}`);
+      } else if (d.estado === "pendiente") {
+        if (!d.change) mal.push(`${quien} se declara pendiente sin decir en que change: la forma es \`**pendiente** → change \`<nombre>\`\``);
+        else if (!vivos.has(d.change))
+          mal.push(
+            `${quien} declara su compuerta pendiente en el change \`${d.change}\`, y no hay ningun change vivo con ese nombre en ` +
+              "openspec/changes/. Si se archivo, el trabajo o se hizo (y la fila ya tiene compuerta) o se perdio (y hay que decidir de nuevo). " +
+              salidas,
+          );
+        else if (!vivos.get(d.change).includes(f.requirement))
+          mal.push(
+            `${quien} declara su compuerta pendiente en el change \`${d.change}\`, y ningun documento de ese change nombra el ` +
+              "requirement con su titulo exacto: un destino que no sabe que lo es no es un destino. Nombralo en el change, o elegi otra salida",
+          );
+      } else if (d.estado === "no-verificable") {
+        if (d.motivo.length < MOTIVO_MINIMO)
+          mal.push(`${quien} se declara no verificable sin la propiedad que lo impide (al menos ${MOTIVO_MINIMO} caracteres despues de «— »): un «no se puede» sin por que es un olvido con nombre`);
+        else if (EXCUSAS.test(sinAcentos(d.motivo)))
+          mal.push(
+            `${quien} declara como motivo el ESFUERZO («${d.motivo}») y no una propiedad del requirement. «Es dificil» describe a quien lo ` +
+              "escribio y deja de ser cierto en cuanto cambie quien lo lee. Si la propiedad SI se puede verificar, la declaracion correcta es " +
+              "`**pendiente**` con su change o `**sin destino**` con su version",
+          );
+      } else if (d.estado === "sin-destino") {
+        if (!d.vigenteEn || !FORMA_DE_VERSION.test(d.vigenteEn) || d.motivo.length < MOTIVO_MINIMO)
+          mal.push(
+            `${quien} se declara sin destino con una forma que no se puede leer: tiene que ser \`**sin destino**, vigente en X.Y.Z — <texto>\`, ` +
+              `con la version publicada del CHANGELOG (hoy ${version}, sin la v) y al menos ${MOTIVO_MINIMO} caracteres que digan por que es verificable y que falta`,
+          );
+        else if (vencida(d.vigenteEn, version))
+          mal.push(
+            `${quien} se declaro sin destino en la ${d.vigenteEn} y el CHANGELOG ya publica la ${version}: la declaracion VENCIO. Releela ` +
+              "y decidi de nuevo —darle una compuerta, un change que la tenga, o la propiedad que la hace no verificable—; si sigue sin " +
+              `dueño, mover la version a ${version} es una decision que alguien firma, no un olvido`,
+          );
+      }
+    }
+  }
+  return mal;
+}
+
+// ---------------------------------------------------------------------------
+// UNA COMPUERTA QUE NO CORRE NO CUENTA.
+//
+// Viene de Rigel (2.6.0, issue #457 de alla, commit c6d2f5e): su censo publicaba 43 de 77
+// requirements sostenidos con las declaraciones de una action que ningun workflow invocaba, y
+// 41 de 77 sin ellas. Aca la pagina es escrita a mano, asi que la misma mentira se escribe
+// citando un archivo de `actions/<x>/` —o un paso que solo vive ahi— cuando `<x>` no la invoca
+// ningun `uses:`. El lector del alcance es el del banco de actions alcanzables: si cada uno
+// tuviera el suyo, uno podria eximir una pieza y el otro contarla como compuerta.
+//
+// Y ACA ES ROJO, no aviso como en Rigel. Alla el aviso era de una herramienta que corre en CI
+// y el rojo de esa ventana ya lo daba el banco de alcanzables. Aca el arreglo es editar una
+// fila de esta pagina, que esta en el arbol de quien lo lee: no hay ventana que esperar. Y la
+// excepcion de un action en `actions-alcanzables.test.mjs` NO la vuelve compuerta: exime del
+// rojo de «nadie la invoca», no convierte en verdad que corra.
+// ---------------------------------------------------------------------------
+
+/** El texto de una fila en el que se buscan citas: su celda del medio y la del ancla. */
+const citasDeLaFila = (f) => `${f.cobertura} ${f.ancla}`;
+
+export function compuertasQueNoCorren(texto, { alcance = alcanzadas(), porNombre = pasosPorNombre() } = {}) {
+  const mal = [];
+  for (const s of seccionesDeLaPagina(texto)) {
+    for (const f of s.filas.filter(tieneCompuerta)) {
+      const celda = citasDeLaFila(f);
+      for (const a of anclasDe(celda)) {
+        const accion = accionDeLaRuta(a.ruta);
+        if (accion && !alcance.has(accion))
+          mal.push(
+            `«${f.requirement}» (${s.capability}) cita \`${a.ruta}\` como compuerta, y ningun \`uses:\` del marco ni del andamio ` +
+              `invoca \`actions/${accion}\`: publica el requirement como sostenido por algo que no corre en ningun repositorio. ` +
+              "Arreglo: cablear la action con su `uses:`, o sacar la cita de esta fila y dejarle la cobertura que de verdad tenga",
+          );
+      }
+      for (const nombre of pasosCitados(celda)) {
+        const donde = porNombre.get(nombre) ?? [];
+        const acciones = donde.map((p) => accionDeLaRuta(p.ruta));
+        if (donde.length > 0 && acciones.every((a) => a !== null && !alcance.has(a)))
+          mal.push(
+            `«${f.requirement}» (${s.capability}) cita el paso «${nombre}», que solo vive en ${[...new Set(acciones)].map((a) => `actions/${a}`).join(", ")}, ` +
+              "y ningun `uses:` la invoca: el paso existe y no corre. Arreglo: cablear la action, o sacar la cita de esta fila",
+          );
+      }
+    }
+  }
+  return [...new Set(mal)];
+}
+
+/** Las filas que se publican CON compuerta y no citan nada que se pueda buscar.
+ *
+ *  «Lo que lo hace fallar solo» es una afirmacion sobre el arbol, y la unica forma de
+ *  sostenerla es nombrar donde esta: una ruta o un paso. Una celda que dice una frase suelta
+ *  cuenta como compuerta en todos los numeros de esta pagina sin que nadie pueda ir a mirarla. */
+export function compuertasSinCita(texto) {
+  const mal = [];
+  for (const s of seccionesDeLaPagina(texto)) {
+    for (const f of s.filas.filter(tieneCompuerta)) {
+      const celda = citasDeLaFila(f);
+      if (anclasDe(celda).length === 0 && pasosCitados(celda).length === 0)
+        mal.push(
+          `«${f.requirement}» (${s.capability}) cuenta como compuerta y no cita ninguna ruta ni ningun paso «...»: nadie puede ir a ` +
+            "mirar lo que la pone en rojo. Nombrala, o declara la fila sin compuerta con su estado",
+        );
+    }
+  }
+  return mal;
+}
+
+// ---------------------------------------------------------------------------
 // LOS NUMEROS QUE LA PAGINA AFIRMA SOBRE SI MISMA.
 // ---------------------------------------------------------------------------
 
@@ -356,8 +617,28 @@ export function cifrasDeclaradas(texto) {
   // eran dos. Se admite el corte de linea entre las dos palabras porque la
   // pagina envuelve a los ochenta caracteres.
   const enVuelo = texto.match(/\*\*(\d+) capabilities en\s+vuelo\*\*/);
+  // EL DESGLOSE DE LOS DOS LADOS DEL RESUMEN (change `el-censo-no-miente`). Las parciales son
+  // un SUBCONJUNTO de las que tienen compuerta y se publican asi, no como una bolsa aparte que
+  // sumaria mas que el total; los cuatro estados de la ausencia si suman las que no la tienen.
+  // Se lee sobre el texto con los espacios juntados porque la pagina envuelve a los ochenta
+  // caracteres, y el corte puede caer en cualquier palabra.
+  const plano = texto.replace(/\s+/g, " ");
+  const estados = plano.match(
+    /\*\*De las (\d+) con compuerta, (\d+) (?:es|son) solo parcial(?:es)?\. De las (\d+) sin compuerta: (\d+) pendientes? en un change vivo, (\d+) no verificables?, (\d+) sin destino y (\d+) sin declarar\.\*\*/,
+  );
   return {
     enVuelo: enVuelo ? Number(enVuelo[1]) : null,
+    estados: estados
+      ? {
+          conCompuerta: Number(estados[1]),
+          parciales: Number(estados[2]),
+          sinCompuerta: Number(estados[3]),
+          pendiente: Number(estados[4]),
+          "no-verificable": Number(estados[5]),
+          "sin-destino": Number(estados[6]),
+          "sin-declarar": Number(estados[7]),
+        }
+      : null,
     universo: universo ? { requirements: Number(universo[1]), capabilities: Number(universo[2]) } : null,
     desglose: desglose
       ? [...desglose[1].matchAll(/(\d+)\s+`([a-z0-9-]+)`/g)].map((m) => ({ capability: m[2], cuantos: Number(m[1]) }))
@@ -395,10 +676,18 @@ export function desajustes(texto) {
         mal.push(`${s.capability}: las filas son [${filas.join(" | ")}] y el spec declara [${real.join(" | ")}]`);
     }
     const conCompuerta = s.filas.filter(tieneCompuerta).length;
+    const parciales = s.filas.filter(esParcial).length;
     if (s.diceRequirements !== s.filas.length)
       mal.push(`${s.capability}: el encabezado dice ${s.diceRequirements} requirements y la tabla tiene ${s.filas.length} filas`);
     if (s.diceConCompuerta !== conCompuerta)
       mal.push(`${s.capability}: el encabezado dice ${s.diceConCompuerta} con compuerta y las filas dan ${conCompuerta}`);
+    if (s.diceParciales === null)
+      mal.push(
+        `${s.capability}: el encabezado no publica cuantas de sus compuertas son solo parciales. La forma es ` +
+          `«## ${s.capability} — ..., ${conCompuerta} con compuerta (${parciales} parciales)»: sin ese numero, una capability cubierta a medias se lee cubierta`,
+      );
+    else if (s.diceParciales !== parciales)
+      mal.push(`${s.capability}: el encabezado dice ${s.diceParciales} parciales y las filas dan ${parciales}`);
   }
 
   // El universo y el resumen hablan SOLO del contrato vivo: las capabilities en
@@ -406,7 +695,7 @@ export function desajustes(texto) {
   const delContrato = secciones.filter((s) => !s.enVuelo);
   const totalFilas = delContrato.reduce((n, s) => n + s.filas.length, 0);
   const totalCon = delContrato.reduce((n, s) => n + s.filas.filter(tieneCompuerta).length, 0);
-  const { universo, desglose, resumen, enVuelo: diceEnVuelo } = cifrasDeclaradas(texto);
+  const { universo, desglose, resumen, estados, enVuelo: diceEnVuelo } = cifrasDeclaradas(texto);
 
   if (diceEnVuelo === null) mal.push("no se encontro la frase que cuenta las capabilities en vuelo («**N capabilities en vuelo**»)");
   else if (diceEnVuelo !== Object.keys(enVuelo).length)
@@ -427,6 +716,27 @@ export function desajustes(texto) {
     if (resumen.total !== totalFilas) mal.push(`el resumen dice ${resumen.total} requirements y son ${totalFilas}`);
     if (resumen.conCompuerta !== totalCon) mal.push(`el resumen dice ${resumen.conCompuerta} con compuerta y son ${totalCon}`);
     if (resumen.sinCompuerta !== totalFilas - totalCon) mal.push(`el resumen dice ${resumen.sinCompuerta} sin compuerta y son ${totalFilas - totalCon}`);
+  }
+  if (!estados)
+    mal.push(
+      "no se encontro el desglose del resumen («**De las A con compuerta, P son solo parciales. De las B sin compuerta: N pendientes " +
+        "en un change vivo, V no verificables, S sin destino y D sin declarar.**»): sin el, el resumen vuelve a contar igual una " +
+        "compuerta entera y una mitad, y una ausencia con dueño y una sin el",
+    );
+  else {
+    const filasDelContrato = delContrato.flatMap((s) => s.filas);
+    const cuenta = (estado) => filasDelContrato.filter((f) => estadoDe(f) === estado).length;
+    const medido = {
+      conCompuerta: totalCon,
+      parciales: filasDelContrato.filter(esParcial).length,
+      sinCompuerta: totalFilas - totalCon,
+      pendiente: cuenta("pendiente"),
+      "no-verificable": cuenta("no-verificable"),
+      "sin-destino": cuenta("sin-destino"),
+      "sin-declarar": cuenta("sin-declarar"),
+    };
+    for (const [clave, valor] of Object.entries(medido))
+      if (estados[clave] !== valor) mal.push(`el desglose del resumen dice ${estados[clave]} en «${clave}» y las filas del contrato dan ${valor}`);
   }
   return mal;
 }
@@ -453,15 +763,20 @@ test("la pagina se leyo entera: un cero en cualquiera de estos conteos es este b
   const filas = secciones.reduce((n, s) => n + s.filas.length, 0);
   assert.ok(filas >= 41, `se leyeron ${filas} filas de requirement y tienen que ser al menos cuarenta y una`);
   assert.ok(anclasDe(pagina()).length >= 20, "se leyeron menos de veinte anclas: el lector de rutas dejo de reconocer la forma que la pagina usa");
+  // Los lectores del change `el-censo-no-miente`: sin changes vivos, un «pendiente» no tiene
+  // contra que medirse; sin actions alcanzadas, toda cita de `actions/` saldria rojo.
+  assert.ok(changesVivos().size >= 1, "no se leyo ningun change vivo en openspec/changes/: el lector de destinos esta roto");
+  assert.ok(alcanzadas().size >= 3, `el lector del alcance encontro ${alcanzadas().size} actions invocadas: esta roto, y la regla de las compuertas que no corren pasaria vacia`);
 });
 
-test("el lector de las cifras encuentra las tres frases que vigila", () => {
+test("el lector de las cifras encuentra las cuatro frases que vigila", () => {
   // Una frase que se reescribe y deja de matchear apagaria su control sin un
   // solo rojo, que es el modo de falla exacto que este banco persigue.
-  const { universo, desglose, resumen, enVuelo } = cifrasDeclaradas(pagina());
+  const { universo, desglose, resumen, estados, enVuelo } = cifrasDeclaradas(pagina());
   assert.ok(universo, "no se encontro la frase del universo");
   assert.ok(desglose && desglose.length >= 8, "no se encontro el desglose por capability");
   assert.ok(resumen, "no se encontro la frase del resumen");
+  assert.ok(estados, "no se encontro el desglose del resumen por estado («De las A con compuerta, ...»)");
   assert.ok(enVuelo !== null, "no se encontro la frase que cuenta las capabilities en vuelo");
 });
 
@@ -520,8 +835,32 @@ test("ningun paso que la pagina publica como compuerta lleva continue-on-error",
     "la pagina publica estos pasos en la columna «Lo que lo hace fallar solo», y ninguno puede fallar: su " +
       "continue-on-error hace que el rojo no detenga nada. Arreglo, uno de dos: sacale el modificador al paso " +
       "y dale un rojo de verdad, o saca el paso de esa fila y deja al requirement con la cobertura que " +
-      "realmente tenga (si no queda ninguna, `**ninguno**`). Escribir un motivo mejor no es un arreglo.",
+      "realmente tenga (si no queda ninguna, la fila declara su estado: pendiente, no verificable o sin destino). " +
+      "Escribir un motivo mejor no es un arreglo.",
   );
+});
+
+test("toda fila sin compuerta declara su estado, y la declaracion se sostiene", () => {
+  const texto = pagina();
+  const sinCompuerta = seccionesDeLaPagina(texto).flatMap((s) => s.filas.filter((f) => !tieneCompuerta(f)));
+  assert.ok(sinCompuerta.length >= 5, `se leyeron ${sinCompuerta.length} filas sin compuerta: si cayo a casi cero, el lector de estados dejo de verlas y esta regla pasa vacia`);
+  const mal = ausenciasMalDeclaradas(texto);
+  assert.deepEqual(
+    mal,
+    [],
+    "la ausencia de compuerta no es gratis: una fila sin compuerta dice por que, y lo que dice se mide contra el arbol. " +
+      `Sin eso, un requirement que nadie miro y uno que nadie supo verificar se leen igual.\n  ${mal.join("\n  ")}`,
+  );
+});
+
+test("ninguna compuerta publicada vive en una action que ningun `uses:` invoca", () => {
+  const mal = compuertasQueNoCorren(pagina());
+  assert.deepEqual(mal, [], `la pagina publica como compuerta algo que no corre en ningun repositorio:\n  ${mal.join("\n  ")}`);
+});
+
+test("toda fila que cuenta como compuerta nombra algo que se pueda ir a mirar", () => {
+  const mal = compuertasSinCita(pagina());
+  assert.deepEqual(mal, [], `estas filas suman al numero de compuertas sin decir donde estan:\n  ${mal.join("\n  ")}`);
 });
 
 // ---------------------------------------------------------------------------
@@ -580,22 +919,185 @@ test("MUERDE: una capability EN VUELO que la pagina no nombra se caza", () => {
   );
 });
 
+/** La pagina con la celda del medio de UNA fila reemplazada, para las refutaciones. Se
+ *  reescribe la linea entera en vez de buscar la celda por su texto: las celdas largas traen
+ *  comillas invertidas y flechas, y una busqueda literal fallaria por la forma y no por la regla. */
+function conCelda(texto, requirement, cobertura, ancla = "—") {
+  let tocadas = 0;
+  const salida = texto
+    .split("\n")
+    .map((l) => {
+      if (!l.startsWith(`| ${requirement} |`)) return l;
+      tocadas += 1;
+      return `| ${requirement} | ${cobertura} | ${ancla} |`;
+    })
+    .join("\n");
+  assert.equal(tocadas, 1, `la fila «${requirement}» tenia que aparecer UNA vez en la pagina y aparecio ${tocadas}`);
+  return salida;
+}
+
+/** `assert.match` con el motivo Y lo que se miro: con mensaje solo, Node imprime el mensaje y
+ *  se calla el texto que no matcheo (`pruebas/porque.mjs`). Las refutaciones de abajo miran
+ *  mensajes largos, y cuando una cae hay que ver cual fue el mensaje de verdad. */
+const muerde = (valor, patron, motivo) => assert.match(valor, patron, porque(motivo, valor));
+
+/** Una fila real de la pagina que cumple `pred`, con su seccion. */
+function unaFila(texto, pred) {
+  for (const s of seccionesDeLaPagina(texto)) for (const f of s.filas) if (pred(f, s)) return { seccion: s, fila: f };
+  return null;
+}
+
 test("MUERDE: un conteo del encabezado escrito a mano que se queda viejo se caza", () => {
-  // El defecto (a): una fila pasa de `ninguno` a tener compuerta y el encabezado
+  // El defecto (a): una fila pasa de no tener compuerta a tenerla y el encabezado
   // sigue donde estaba. Se muta la pagina al reves —el encabezado se queda y la
   // fila cambia— porque el desajuste es el mismo y no hay que inventar ninguna
   // compuerta que no exista.
   const texto = pagina();
-  const seccion = seccionesDeLaPagina(texto).find((s) => s.filas.some((f) => !tieneCompuerta(f)));
-  assert.ok(seccion, "no hay ninguna fila que diga `ninguno`: esta refutacion se quedo sin material");
-  const fila = seccion.filas.find((f) => !tieneCompuerta(f));
-  const mutado = texto.replace(`| ${fila.requirement} | **ninguno** |`, `| ${fila.requirement} | una compuerta inventada |`);
-  assert.ok(mutado !== texto, `no se encontro la fila «${fila.requirement}» con su \`ninguno\``);
-  const mal = desajustes(mutado);
+  const hallada = unaFila(texto, (f) => !tieneCompuerta(f));
+  assert.ok(hallada, "no hay ninguna fila sin compuerta: esta refutacion se quedo sin material");
+  const { seccion, fila } = hallada;
+  const mal = desajustes(conCelda(texto, fila.requirement, "una compuerta inventada en `pruebas/docs/enlaces.test.mjs`"));
   assert.ok(
     mal.some((m) => m.includes(`${seccion.capability}: el encabezado dice ${seccion.diceConCompuerta} con compuerta`)),
     `la fila paso a tener compuerta y el encabezado no: la regla tiene que verlo. Dijo: ${mal.join(" / ")}`,
   );
+});
+
+test("MUERDE: una compuerta que pasa a parcial sin tocar el encabezado se caza, y un encabezado sin parciales tambien", () => {
+  // La cobertura por mitades (Rigel 2.4.0, `el-numero-del-censo`, issue #376 de alla: 15 de
+  // 41 requirements se publicaban sostenidos cuando toda su cobertura eran mitades).
+  const texto = pagina();
+  assert.deepEqual(desajustes(texto), [], "la pagina real tiene que estar al dia: sin eso, mutarla no prueba nada");
+  const hallada = unaFila(texto, (f) => estadoDe(f) === "completa");
+  assert.ok(hallada, "no hay ninguna fila con compuerta completa: esta refutacion se quedo sin material");
+  const { seccion, fila } = hallada;
+  const aParcial = desajustes(conCelda(texto, fila.requirement, `**parcial**: ${fila.cobertura}`, fila.ancla));
+  assert.ok(
+    aParcial.some((m) => m.includes(`${seccion.capability}: el encabezado dice ${seccion.diceParciales} parciales`)),
+    `la fila paso a parcial y el encabezado no: la regla tiene que verlo. Dijo: ${aParcial.join(" / ")}`,
+  );
+  assert.ok(aParcial.some((m) => m.includes("«parciales»")), `y el desglose del resumen tampoco puede quedar igual. Dijo: ${aParcial.join(" / ")}`);
+
+  const sinElNumero = texto.replace(/^(## [a-z0-9-]+ — .*con compuerta) \(\d+ parcial(?:es)?\)$/m, "$1");
+  assert.ok(sinElNumero !== texto, "no se encontro ningun encabezado con su numero de parciales");
+  assert.ok(
+    desajustes(sinElNumero).some((m) => m.includes("el encabezado no publica cuantas de sus compuertas son solo parciales")),
+    "un encabezado que deja de publicar sus parciales tiene que ponerse rojo diciendo eso",
+  );
+});
+
+test("MUERDE: una fila que vuelve a decir `**ninguno**` y nada mas se caza", () => {
+  const texto = pagina();
+  const hallada = unaFila(texto, (f) => !tieneCompuerta(f));
+  assert.ok(hallada, "no hay ninguna fila sin compuerta: esta refutacion se quedo sin material");
+  assert.deepEqual(ausenciasMalDeclaradas(texto), [], "la pagina real tiene que estar limpia: sin eso, mutarla no prueba nada");
+  const mal = ausenciasMalDeclaradas(conCelda(texto, hallada.fila.requirement, "**ninguno**"));
+  assert.equal(mal.length, 1, `una fila pelada tiene que dar exactamente un hallazgo. Dio: ${mal.join(" / ")}`);
+  muerde(mal[0], /dice `\*\*ninguno\*\*` y nada mas/, "el rojo tiene que decir cual es el defecto");
+  muerde(mal[0], /Tres salidas/, "y las tres salidas, que son el arreglo");
+});
+
+test("MUERDE: un pendiente a un change que no existe, o que no nombra el requirement, se caza", () => {
+  const texto = pagina();
+  const { fila } = unaFila(texto, (f) => !tieneCompuerta(f)) ?? {};
+  assert.ok(fila, "no hay ninguna fila sin compuerta: esta refutacion se quedo sin material");
+  // Un arbol de juguete de changes vivos: la funcion es la misma, lo que se controla es contra que mide.
+  const vivos = new Map([
+    ["uno-que-lo-nombra", `### Requirement: ${fila.requirement}\n`],
+    ["uno-que-no", "texto de un change que habla de otra cosa"],
+  ]);
+  const opciones = { vivos, version: "1.9.6" };
+  const conDestino = (change) => ausenciasMalDeclaradas(conCelda(texto, fila.requirement, `**pendiente** → change \`${change}\``), opciones);
+  const deLaFila = (mal) => mal.filter((m) => m.startsWith(`«${fila.requirement}»`));
+
+  // EL CONTROL POSITIVO, primero: un pendiente bien apuntado pasa. Sin esto, los dos rojos de
+  // abajo no distinguen «mide el destino» de «rechaza todo pendiente».
+  assert.deepEqual(deLaFila(conDestino("uno-que-lo-nombra")), [], "un pendiente a un change vivo que nombra el requirement tiene que pasar");
+  muerde(deLaFila(conDestino("uno-que-se-archivo")).join(" "), /no hay ningun change vivo con ese nombre/, "un destino que no existe tiene que ponerse rojo");
+  muerde(deLaFila(conDestino("uno-que-no")).join(" "), /ningun documento de ese change nombra el requirement/, "un destino que no sabe que lo es tiene que ponerse rojo");
+  muerde(
+    deLaFila(ausenciasMalDeclaradas(conCelda(texto, fila.requirement, "**pendiente**, algun dia"), opciones)).join(" "),
+    /sin decir en que change/,
+    "un pendiente sin change nombrado tiene que ponerse rojo",
+  );
+});
+
+test("MUERDE: un «no verificable» sin propiedad, o con un motivo de esfuerzo, se caza", () => {
+  const texto = pagina();
+  const { fila } = unaFila(texto, (f) => !tieneCompuerta(f)) ?? {};
+  assert.ok(fila, "no hay ninguna fila sin compuerta: esta refutacion se quedo sin material");
+  const con = (celda) => ausenciasMalDeclaradas(conCelda(texto, fila.requirement, celda)).filter((m) => m.startsWith(`«${fila.requirement}»`));
+
+  assert.deepEqual(
+    con("**no verificable** — el sujeto de la regla es una conversación entre dos personas, y ningún artefacto del árbol la registra"),
+    [],
+    "EL CONTROL POSITIVO: una propiedad del requirement tiene que pasar, o el filtro rechaza todo y nadie lo nota",
+  );
+  muerde(con("**no verificable** — no se puede").join(" "), /sin la propiedad que lo impide/, "un «no se puede» sin por que tiene que ponerse rojo");
+  for (const excusa of [
+    "es difícil de automatizar y hoy no hay tiempo para escribir la comprobación",
+    "no es prioridad ahora; se retoma más adelante cuando el equipo tenga manos libres",
+    "llevaría demasiado trabajo armar el banco de prueba para esta regla del contrato",
+  ])
+    muerde(con(`**no verificable** — ${excusa}`).join(" "), /ESFUERZO/, `«${excusa}» describe a quien escribe y tiene que ponerse rojo`);
+});
+
+test("MUERDE: un «sin destino» vencido, o sin su version, se caza", () => {
+  const texto = pagina();
+  const { fila } = unaFila(texto, (f) => !tieneCompuerta(f)) ?? {};
+  assert.ok(fila, "no hay ninguna fila sin compuerta: esta refutacion se quedo sin material");
+  const motivo = "verificable con un banco sobre el árbol del andamio, y ningún change vivo lo tiene";
+  const con = (celda, version) =>
+    ausenciasMalDeclaradas(conCelda(texto, fila.requirement, celda), { version }).filter((m) => m.startsWith(`«${fila.requirement}»`));
+
+  assert.deepEqual(con(`**sin destino**, vigente en 1.9.6 — ${motivo}`, "1.9.6"), [], "EL CONTROL POSITIVO: vigente en la version publicada tiene que pasar");
+  muerde(con(`**sin destino**, vigente en 1.9.6 — ${motivo}`, "1.10.0").join(" "), /VENCIO/, "cortar otra version tiene que vencerla");
+  muerde(con(`**sin destino**, vigente en v1.9.6 — ${motivo}`, "1.9.6").join(" "), /forma que no se puede leer/, "la version con `v` no es la forma");
+  muerde(con("**sin destino**, vigente en 1.9.6 — nadie", "1.9.6").join(" "), /forma que no se puede leer/, "sin decir por que es verificable no es una declaracion");
+});
+
+test("MUERDE: una compuerta citada en una action que nadie invoca se caza, por ruta y por paso", () => {
+  const texto = pagina();
+  const alcance = alcanzadas();
+  const porNombre = pasosPorNombre();
+  assert.deepEqual(compuertasQueNoCorren(texto, { alcance, porNombre }), [], "la pagina real tiene que estar limpia: sin eso, mutar no prueba nada");
+
+  // POR RUTA: una fila real que cita un archivo de `actions/<x>/`, con `<x>` sacada del alcance.
+  const porRuta = unaFila(texto, (f) => tieneCompuerta(f) && anclasDe(citasDeLaFila(f)).some((a) => accionDeLaRuta(a.ruta)));
+  assert.ok(porRuta, "ninguna fila con compuerta cita un archivo de actions/: esta mitad de la refutacion se quedo sin material");
+  const accion = anclasDe(citasDeLaFila(porRuta.fila)).map((a) => accionDeLaRuta(a.ruta)).find(Boolean);
+  const sinEsa = new Map([...alcance].filter(([a]) => a !== accion));
+  assert.ok(
+    compuertasQueNoCorren(texto, { alcance: sinEsa, porNombre }).some((m) => m.startsWith(`«${porRuta.fila.requirement}»`) && m.includes(`actions/${accion}`)),
+    `sin nadie que invoque actions/${accion}, la fila «${porRuta.fila.requirement}» tiene que ponerse roja`,
+  );
+
+  // Y EL CASO QUE EXISTE HOY EN EL ARBOL, sin tocar el alcance: citar a `carril-docs`, que ningun
+  // `uses:` invoca, como compuerta de una fila.
+  if (!alcance.has("carril-docs")) {
+    const conCarril = conCelda(texto, porRuta.fila.requirement, porRuta.fila.cobertura, "`actions/carril-docs/action.yml`");
+    assert.ok(
+      compuertasQueNoCorren(conCarril, { alcance, porNombre }).some((m) => m.includes("actions/carril-docs")),
+      "citar a carril-docs como compuerta tiene que ponerse rojo mientras nadie la invoque",
+    );
+  }
+
+  // POR PASO: un paso citado que, en un arbol mutado, solo vive en una action que nadie invoca.
+  const unPaso = pasosCitados(texto).find((n) => porNombre.has(n));
+  assert.ok(unPaso, "la pagina no cita ningun paso que el extractor conozca");
+  const mudado = new Map(porNombre);
+  mudado.set(unPaso, [{ ...porNombre.get(unPaso)[0], ruta: "actions/una-que-nadie-invoca/action.yml" }]);
+  const dePaso = compuertasQueNoCorren(texto, { alcance, porNombre: mudado });
+  assert.ok(dePaso.some((m) => m.includes(`«${unPaso}»`) && m.includes("actions/una-que-nadie-invoca")), `el paso «${unPaso}» mudado a una action huerfana tiene que ponerse rojo. Dijo: ${dePaso.join(" / ")}`);
+});
+
+test("MUERDE: una fila que cuenta como compuerta sin citar nada se caza", () => {
+  const texto = pagina();
+  assert.deepEqual(compuertasSinCita(texto), [], "la pagina real tiene que estar limpia: sin eso, mutarla no prueba nada");
+  const { fila } = unaFila(texto, (f) => tieneCompuerta(f)) ?? {};
+  assert.ok(fila, "no hay ninguna fila con compuerta: esta refutacion se quedo sin material");
+  const mal = compuertasSinCita(conCelda(texto, fila.requirement, "el review lo mira con cuidado"));
+  assert.ok(mal.some((m) => m.startsWith(`«${fila.requirement}»`)), `una frase suelta no puede contar como compuerta. Dijo: ${mal.join(" / ")}`);
 });
 
 test("MUERDE: el resumen y el universo tampoco se pueden quedar viejos", () => {

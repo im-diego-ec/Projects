@@ -299,6 +299,13 @@ mueve sobre un cambio incompatible.
   recibe. Si querés la sección nueva, copiala de `plantilla/.github/PULL_REQUEST_TEMPLATE.md`
   a tu `.github/PULL_REQUEST_TEMPLATE.md`.
 
+- **Las excepciones que existen por una ventana vencen con la versión.** La excepción de
+  `@v1` de `pruebas/andamio/pinado.test.mjs` y la de `carril-docs` declaran la versión
+  en que se decidieron, y se ponen rojas en el pull request del release que corte otra.
+  Hay dos salidas: cerrar lo que la excepción tapaba, o mover la versión, que es una
+  decisión firmada. Viene de Rigel (2.5.0). **Para consumidores: nada** (bancos del
+  marco).
+
 ### Eliminado
 
 - **El andamio ya no trae su propia copia del paso «Formato y validez de las raices de
@@ -586,6 +593,15 @@ mueve sobre un cambio incompatible.
 
   **Para consumidores: nada.** En un consumidor el paso sale antes por su camino inerte
   («no distribuye el comparador») con el mismo `::notice::`, y ningún veredicto cambia.
+
+- **Nueve filas de la página de cobertura decían `ninguno` sobre compuertas que ya
+  existían.** Seis eran del contrato: la plantilla de PR, la protección de la rama, el log
+  en JSON, el deploy reproducible y reversible, el deploy a dev que se verifica y
+  producción, que solo recibe lo que dev aprobó. Tres eran de capabilities en vuelo. Cinco
+  llegaron con el despliegue de dos ambientes y la promoción, y las otras cuatro eran bancos
+  que ya existían; nadie los había cruzado con la página. Ahora
+  figuran como parciales, con lo que cubren y lo que no: 30 de 41 requirements del
+  contrato con compuerta (antes se contaban 24). **Para consumidores: nada.**
 
 ### Añadido
 
@@ -1201,6 +1217,33 @@ mueve sobre un cambio incompatible.
   declararlo sin rojo, y la página de cobertura de requirements no lo puede citar como la
   compuerta de un requirement. Hoy ningún paso del marco lo usa. Viene de Rigel (2.4.0,
   change `el-numero-del-censo`). **Para consumidores: nada** (banco del marco).
+
+- **La ausencia de compuerta dejó de ser gratis en la página de cobertura.** En
+  `openspec/cobertura-de-requirements.md`, 25 filas decían `**ninguno**` y nada más, sin
+  la propiedad que impide verificarlas ni dónde vive el trabajo que falta. Ahora toda fila
+  sin compuerta declara uno de tres estados, y el banco de la página mide lo que cada uno
+  afirma: **pendiente** en un change vivo (el change existe y nombra al requirement),
+  **no verificable** por una propiedad del requirement (un motivo de esfuerzo no cuenta),
+  o **sin destino**, con la versión en que se decidió. Esta última **vence** al cortar la
+  versión siguiente. Un `**ninguno**` pelado es rojo. Viene de Rigel (2.0.0 `censo-honesto`
+  y 2.4.0 `el-numero-del-censo`); el tercer estado es de este marco, porque acá el destino
+  tiene que poder comprobarse sin red. **Para consumidores: nada** (página y banco del
+  marco).
+
+- **La página publica cuántas compuertas son solo parciales.** Cada encabezado y el resumen
+  dicen cuántas de las compuertas cubren solo una parte, como subconjunto y no como una
+  bolsa aparte: hoy 15 de las 30. Viene de Rigel (2.4.0, issue #376 de allá). **Para
+  consumidores: nada.**
+
+- **Una compuerta que no corre no cuenta, y toda action publicada tiene que correr en
+  algún lado.** Hay un banco nuevo, `pruebas/andamio/actions-alcanzables.test.mjs`: toda
+  action de `actions/` tiene que estar invocada por algún `uses:` del marco o del andamio,
+  o declarada con su motivo. La página de cobertura no puede citar como compuerta nada de
+  una action que nadie invoca. Los dos bancos usan el mismo lector del alcance. El caso
+  existía: **`actions/carril-docs` no la invoca ningún workflow del árbol**. Se declara,
+  no se cablea, porque `marco-ci.yml` trae la misma detección inline. Viene de Rigel
+  (2.2.0 y 2.6.0, issues #375 y #457 de allá). **Para consumidores: nada**; si usás
+  `carril-docs` por `uses:`, sigue igual.
 
 ### Corregido
 

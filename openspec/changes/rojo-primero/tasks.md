@@ -152,7 +152,8 @@ implementa el lote 17 del porte de Rigel (ver `proposal.md`).
 - [x] 4.2 Decidir si la propiedad admite compuerta automática.
       **Evidencia**: decidido que NO, y escrito con sus alternativas descartadas en el
       design (D5). Queda declarada como regla sin compuerta: al archivar, su fila en la
-      página dice `**ninguno**` con ese motivo.
+      página dice `**no verificable** —` con ese motivo (la forma que fija el change
+      `el-censo-no-miente`; un `**ninguno**` pelado ya no pasa el banco de la página).
 
 ## Bloque 5 — Un paso que no puede fallar no es compuerta (`el-numero-del-censo`)
 

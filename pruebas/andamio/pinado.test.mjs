@@ -3,6 +3,8 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
 
+import { versionPublicada as versionDelChangelog } from "../vigencia.mjs";
+
 // ─────────────────────────────────────────────────────────────────────────────
 // EL ANDAMIO NO SE QUEDA ATRAS DE LA VERSION PUBLICADA.
 //
@@ -98,13 +100,13 @@ const MAYOR_MOVIL = /^v\d+$/;
 // version» cuando cita un `uses:` sin comprometerse con un numero.
 const MARCADOR = /^(<|\{\{|vX\.Y\.Z$)/;
 
+// La primera entrada con numero del CHANGELOG (`## [1.4.1] — 2026-08-21`), con la `v`
+// delante. El lector es el UNICO del marco (`pruebas/vigencia.mjs`): el mismo que vence las
+// excepciones de `actions-alcanzables.test.mjs` (este archivo no tiene ninguna desde el change
+// `guardrail-deltas-por-version-exacta`). Una copia aca podria vencer una excepcion con un
+// CHANGELOG y comparar los pines con otro.
 function versionPublicada() {
-  const ch = fs.readFileSync(path.join(RAIZ, "CHANGELOG.md"), "utf8");
-  // La primera entrada con numero: `## [1.4.1] — 2026-08-21`. `[No publicado]`
-  // no matchea a proposito.
-  const m = ch.match(/^## \[(\d+\.\d+\.\d+)\]/m);
-  assert.ok(m, "CHANGELOG.md no tiene ninguna entrada `## [X.Y.Z]`: sin eso no hay con que comparar");
-  return `v${m[1]}`;
+  return `v${versionDelChangelog(RAIZ)}`;
 }
 
 function archivosDe(dir) {

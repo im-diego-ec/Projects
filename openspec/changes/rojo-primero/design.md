@@ -136,7 +136,8 @@ fallo medido: las 13 afirmaciones falsas de la auditoría tenían la sección ll
 
 Lo que sí se hace: las dos plantillas de PR piden el comando, el exit y un campo «No
 medido». Al archivar, la fila de este requirement en la página de cobertura dice
-`**ninguno**` con este motivo.
+`**no verificable** —` con este motivo (la forma que fija el change `el-censo-no-miente`:
+desde ese change, una fila que dice `**ninguno**` y nada más pone rojo el banco de la página).
 
 ## D6. El umbral del andamio: el alcance, y solo en código
 

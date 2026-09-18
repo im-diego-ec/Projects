@@ -1,8 +1,10 @@
 # Cobertura de los requirements canónicos
 
-Una fila **por requirement**, con el paso o el test que lo hace **fallar solo**, o
-`ninguno`. Vive acá, al lado de `specs/`, porque el dato que responde es el de esta
-carpeta: *de todo lo que el marco declara como contrato, ¿qué parte tiene compuerta?*
+Una fila **por requirement**, con el paso o el test que lo hace **fallar solo** o, si no
+lo tiene, **en qué estado está esa ausencia**: pendiente en un change vivo, no verificable
+por una propiedad del requirement, o sin destino hasta la próxima versión. Vive acá, al
+lado de `specs/`, porque el dato que responde es el de esta carpeta: *de todo lo que el
+marco declara como contrato, ¿qué parte tiene compuerta?*
 
 ## Por qué se construye desde el requirement y no desde el nombre de la capability
 
@@ -18,6 +20,38 @@ contiene en ningún lado la cadena `pipeline-entrega`, así que el método lo co
 como cero. Un check no se llama como el spec que cumple, y no tiene por qué.
 
 La dirección correcta es la de esta tabla: **del requirement hacia el check.**
+
+## Cómo se declara una fila sin compuerta
+
+**Desde el 2026-09-17 la ausencia de compuerta no es gratis.** Una celda que dice
+`**ninguno**` y nada más pone rojo el banco de esta página: un requirement nuevo que nadie
+miró y uno cuya compuerta nadie supo construir se leían igual. Toda fila sin compuerta
+declara uno de tres estados, y el banco mide lo que cada uno afirma:
+
+| Estado | Cómo empieza la celda | Qué mide el banco |
+|---|---|---|
+| **Pendiente** | ``**pendiente** → change `<nombre>` `` | que el change exista vivo en `openspec/changes/` y que alguno de sus documentos nombre al requirement con su título exacto |
+| **No verificable** | ``**no verificable** — <la propiedad que lo impide>`` | que la propiedad esté escrita y no sea un motivo de esfuerzo («es difícil», «no hay tiempo»): eso describe a quien escribe, no a la regla |
+| **Sin destino** | ``**sin destino**, vigente en X.Y.Z — <por qué es verificable y qué falta>`` | que la versión sea la que publica el `CHANGELOG.md`: al cortar la siguiente, la declaración **vence** y el pull request del release tiene que decidirla de nuevo |
+
+**El tercer estado es de este marco y no de Rigel**, de donde viene el resto. Allá los
+pendientes apuntaban a un issue paraguas; acá el destino tiene que poder comprobarse sin
+red, y para la mayoría del contrato no hay ningún change vivo que tenga ese trabajo.
+Forzarlos a «pendiente» sería inventar un destino, y forzarlos a «no verificable» sería
+escribir una afirmación falsa sobre reglas que sí se pueden verificar —Rigel clasificó sus
+45 requirements sin compuerta uno por uno y 44 lo eran—. «Sin destino» dice la verdad
+—verificable y sin dueño— y, para no ser la ausencia gratis con otro nombre, vence.
+
+**Las parciales se cuentan aparte.** Una fila `**parcial**` sigue contando como compuerta
+—dice que hay al menos un camino al rojo—, pero cada encabezado y el resumen publican
+cuántas lo son, como subconjunto de las que tienen compuerta y no como una bolsa aparte.
+
+**Y una compuerta que no corre no cuenta.** Una fila con compuerta que cita un archivo de
+`actions/<x>/`, o un paso que solo vive ahí, pone rojo el banco si ningún `uses:` del marco
+ni del andamio invoca esa action. El caso existe hoy: `actions/carril-docs` no la invoca
+ningún workflow del árbol —está declarada, con su motivo y su versión, en
+`pruebas/andamio/actions-alcanzables.test.mjs`— y ninguna fila la cita. Las dos
+compuertas leen el alcance con el mismo lector, `pruebas/alcance-de-las-actions.mjs`.
 
 ## Cómo se relee esta tabla sin creerle
 
@@ -74,7 +108,12 @@ existían — más los tres párrafos que afirmaban en prosa que «el andamio tr
 `actualizar-marco.yml` y `claude.yml`, y ninguno despliega». Ninguna se puso roja: una
 tabla que dice que algo *no* está verificado envejece hacia el lado que nadie audita,
 porque un `ninguno` de más no rompe nada — solo hace tomar decisiones con un mapa
-equivocado. El re-conteo del 2026-08-31 es el que sigue.
+equivocado. El re-conteo del 2026-08-31 lo corrigió, y la relectura fila por fila del
+2026-09-17 encontró **el mismo defecto otra vez**: **nueve** filas —seis del contrato y
+tres de capabilities en vuelo— decían `ninguno` sobre compuertas que ya existían: cinco
+llegaron con el despliegue de dos ambientes y la promoción, y las otras cuatro eran bancos
+que ya existían y nadie había cruzado con esta página. La medición de esa relectura es la
+que sigue.
 
 **Medido el 2026-09-17: 49 requirements vivos en 10 capabilities**
 (16 `calidad-codigo` + 4 `despliegue-ci` + 2 `gestion-secretos` +
@@ -107,18 +146,25 @@ entera **que sí la tiene**. Desde hoy no se escribe a mano: la lista sale de mi
 `openspec/changes/*/specs/` contra `openspec/specs/`, y lo mide
 [`pruebas/docs/cobertura-de-requirements.test.mjs`](../pruebas/docs/cobertura-de-requirements.test.mjs).
 
-**Resumen de la medición: 32 de 49 requirements tienen al menos una compuerta que
-falla sola; 17 no la tienen.** Los 17 siguen concentrados donde el marco reparte poco
-o nada de la pieza que los ejecutaría: `verificacion-desplegada` (4 de 5),
-`observabilidad` (4 de 5) y `despliegue-ci` (2 de 4). El andamio ya reparte un
-despliegue —`plantilla/.github/workflows/desplegar.yml`, con su banco en
-`pruebas/andamio/desplegar.test.mjs`— pero publica **un solo destino**: mientras no
-haya ambiente de desarrollo ni promoción de dev a producción, todo lo que se
-especifica *sobre esa secuencia* sigue sin tener dónde fallar.
+**Resumen de la medición: 38 de 49 requirements tienen al menos una compuerta que
+falla sola; 11 no la tienen.** **De las 38 con compuerta, 20 son solo parciales. De las
+11 sin compuerta: 0 pendientes en un change vivo, 0 no verificables, 11 sin destino y 0
+sin declarar.** Las parciales son la mitad de lo cubierto, y por eso se publican: un 38
+de 49 que no dijera cuántas son mitades invitaría a no escribir las compuertas que
+faltan. Los 11 sin compuerta siguen donde el marco reparte poco o nada de la pieza que
+los ejecutaría —`observabilidad` (3 de 5); `despliegue-ci`, `operacion-infra` y
+`verificacion-desplegada` (2 cada una); `calidad-codigo` y `gestion-secretos` (1 cada
+una)—, y ninguno tiene hoy un change vivo que lo nombre: por eso los once están sin
+destino, y vencen con la próxima versión. El despliegue que reparte el andamio
+—`plantilla/.github/workflows/desplegar.yml`, con su banco en
+`pruebas/andamio/desplegar.test.mjs`— ya tiene DEV, sonda y promoción deliberada, y eso
+es lo que movió tres filas del contrato y dos de las capabilities en vuelo; lo que sigue
+sin dónde fallar es lo que va después de la sonda mínima: el smoke, el E2E y lo que ellos
+crearían.
 
 ---
 
-## calidad-codigo — 16 requirements, 15 con compuerta
+## calidad-codigo — 16 requirements, 15 con compuerta (3 parciales)
 
 | Requirement | Lo que lo hace fallar solo | Ruta y ancla (2026-08-31) |
 |---|---|---|
@@ -126,7 +172,7 @@ especifica *sobre esa secuencia* sigue sin tener dónde fallar.
 | Prohibir `any` sin justificación | La regla `@typescript-eslint/no-explicit-any` que trae `tseslint.configs.recommended`, ejecutada por `pnpm lint` | `plantilla/eslint.config.mjs:58` + `plantilla/.github/workflows/ci.yml:219` |
 | Prohibir promesas flotantes | `no-floating-promises` de `recommendedTypeChecked`, más el ajuste de `no-misused-promises` del front | `plantilla/eslint.config.mjs:65` y `:155` + `plantilla/.github/workflows/ci.yml:219` |
 | Scripts de verificación sin enmascaramiento de fallo | Paso «Scripts de verificacion sin enmascaramiento» de `marco-ci.yml`, con banco propio en el andamio | `.github/workflows/marco-ci.yml`, paso «Scripts de verificacion sin enmascaramiento»; `pruebas/andamio/manifiestos.test.mjs` (mutación «vuelve un `\|\| true` al script lint de un paquete», `:360`) |
-| Test de regresión obligatorio por defecto conocido | **ninguno** | — |
+| Test de regresión obligatorio por defecto conocido | **sin destino**, vigente en 1.9.6 — verificable por la mitad que se puede correr: que el test que trae un PR de corrección falle contra el commit base y pase con el fix. Qué PR corrige un defecto conocido, y si el test está al nivel más bajo suficiente, sigue siendo juicio del review, que es donde el propio requirement pone el rechazo. Ningún change vivo lo tiene | — |
 | Las definiciones de pipeline se validan como código | Paso «Definiciones de pipeline validas» (actionlint pinado, corre también en el carril de docs), con banco que lo ve fallar sin red: sin workflows, con la descarga caída, con un asset que no coincide con su sha256 y con un hallazgo | `.github/workflows/marco-ci.yml`, paso «Definiciones de pipeline validas»; `pruebas/marco-ci/definiciones-pipeline.test.mjs` |
 | Un repositorio nacido del scaffold no conserva marcadores sin resolver | Paso «Sin marcadores del scaffold sin resolver», con banco que lo hace morder | `.github/workflows/marco-ci.yml`, paso «Sin marcadores del scaffold sin resolver»; `pruebas/marco-ci/higiene-sin-arbol.test.mjs:139` |
 | Ningún archivo fuente fuera del alcance de la verificación | La composite action del censo, y el paso que verifica que el consumidor la tenga CABLEADA (un guardrail que se puede sacar en silencio no es un guardrail) | `actions/censo-fuentes/action.yml:62`; paso «Censo de fuentes cableado» de `.github/workflows/marco-ci.yml`, con banco en `pruebas/marco-ci/compuertas-de-estructura.test.mjs` |
@@ -139,20 +185,23 @@ especifica *sobre esa secuencia* sigue sin tener dónde fallar.
 | El piso de permisos que se documenta es el que el reusable exige | Lee los `permissions:` que declaran los jobs del reusable y exige que las tres copias del piso —incluida la del andamio— concedan al menos eso, con un permiso comentado contando como ausente | `pruebas/andamio/piso-del-reusable.test.mjs:125`, con las mutaciones en `:141` y `:150` |
 | La evidencia que cita un change vive donde el change dice | **parcial**: toda cita al canónico desde un change activo tiene que apuntar a un archivo que exista. Que el texto citado siga diciendo lo mismo —la tercera cláusula— no lo mira ningún caso | `pruebas/ci-del-marco/changes-citan-lo-que-existe.test.mjs:71`, con la mutación en `:81` |
 
-**El que no tiene compuerta, y por qué.** «Test de regresión obligatorio por defecto
-conocido» es indecidible con un escaneo: distinguir un test que REPRODUCE el defecto de
-uno que solo lo acompaña exige entender qué defecto se corrigió. Queda como disciplina
-del review y así hay que contarlo, no como cobertura.
+**El que no tiene compuerta, y por qué no es «no verificable».** «Test de regresión
+obligatorio por defecto conocido» se contaba acá como indecidible con un escaneo, y la
+mitad lo es: saber qué pull request corrige un defecto conocido, y si el test está al
+nivel más bajo suficiente, exige entender el defecto. La otra mitad no: que el test que
+trae una corrección falle contra el commit base y pase con el fix se puede correr.
+Declararlo no verificable cerraría la pregunta con una afirmación a medias verdadera, así
+que queda sin destino, con su versión.
 
 ---
 
-## despliegue-ci — 4 requirements, 2 con compuerta
+## despliegue-ci — 4 requirements, 2 con compuerta (1 parcial)
 
 | Requirement | Lo que lo hace fallar solo | Ruta y ancla (2026-08-31) |
 |---|---|---|
 | La rama determina el ambiente de destino | **parcial**: el banco `la-llave-del-despliegue` **evalúa** la condición de cada job de `desplegar.yml` contra doce eventos simulados —push propio, PR desde un fork con la rama llamada `main`, PR propio, disparo a mano desde otra rama, entre otros— y exige la lista exacta de jobs que corren; el disparo a mano desde otra rama termina en rojo sin traer código. El caso rojo está demostrado contra las condiciones de la 1.9.6 y del job `dev` anterior, y cada cláusula tiene su mutación. En `desplegar.test.mjs` siguen el caso del verde y la mutación por job. Lo que ningún caso mira es la vía del disparo a una rama de trabajo con una credencial de DEV acotada: el andamio no la reparte | `pruebas/andamio/la-llave-del-despliegue.test.mjs:278`, `:290` y `:429`; `pruebas/andamio/desplegar.test.mjs:37` y `:194`; el disparo verificado vive en `plantilla/.github/workflows/desplegar.yml` |
-| El Environment de producción solo acepta deployments desde la rama de integración | **ninguno** que se ponga rojo: la política de rama es configuración de GitHub, fuera del árbol. Lo que hay es un **aviso**: el job `guardas` de `desplegar.yml` dice en amarillo, en cada corrida, si la credencial está guardada como secreto del repositorio, y el banco corre ese paso | `pruebas/andamio/la-llave-del-despliegue.test.mjs:310` |
-| La trust policy OIDC valida el claim que el proveedor de CI realmente emite | **ninguno** | — |
+| El Environment de producción solo acepta deployments desde la rama de integración | **sin destino**, vigente en 1.9.6 — la política de ramas vive en la configuración del proveedor, fuera del árbol, pero se lee con una consulta de solo lectura a su API, como ya hace `projects init` con la protección de la rama. Lo que hay hoy es un **aviso**, no un rojo: el job `guardas` de `desplegar.yml` dice en amarillo, en cada corrida, si la credencial está guardada como secreto del repositorio, y el banco `la-llave-del-despliegue` corre ese paso. El job `produccion` declara el environment, y ningún caso exige que lo siga declarando | `pruebas/andamio/la-llave-del-despliegue.test.mjs:310` (el aviso) |
+| La trust policy OIDC valida el claim que el proveedor de CI realmente emite | **sin destino**, vigente en 1.9.6 — la trust policy es infraestructura como código que un banco puede leer, pero el andamio no reparte ningún rol de nube: el despliegue que trae publica con un token del proveedor, sin OIDC. Hasta que un adaptador reparta el rol no hay archivo que mirar | — |
 | Los despliegues a un ambiente compartido se serializan | El caso «dos publicaciones a la vez HACEN COLA: ninguna cancela a la otra», que mira las líneas EJECUTABLES del workflow —no el comentario de al lado— y exige `cancel-in-progress: false` | `pruebas/andamio/desplegar.test.mjs:131` |
 
 **Qué cambió desde la medición anterior, que decía «los cuatro vacíos».** El andamio ya
@@ -162,22 +211,24 @@ reparte un despliegue: `plantilla/.github/workflows/desplegar.yml`, con quince c
 escribió y hoy no lo es — y `ls plantilla/.github/workflows/`, que era el comando que la
 respaldaba, es el que la refuta.
 
-**Qué sigue sin compuerta, y no es lo mismo que estar olvidado.** El Environment de
-producción y la trust policy OIDC se cumplen en la configuración del proveedor, que vive
-fuera del árbol: no hay archivo que un banco pueda leer. Y la correspondencia
-rama→ambiente solo es medible cuando haya **más de un** ambiente: el despliegue de hoy
-publica un destino único, así que el tramo de dev y la promoción que el spec describe no
-tienen todavía dónde fallar. La pieza que los volvería verificables es el esqueleto de
-entrega, que ya tiene design decidido en el change `entrega-referenciada`.
+**Qué sigue sin compuerta, y por qué está sin destino y no es «no verificable».** El
+Environment de producción y la trust policy OIDC se cumplen en la configuración del
+proveedor, fuera del árbol, y esta página los daba por imposibles de leer. No lo son: la
+configuración del proveedor se lee con una consulta de solo lectura —`projects init` ya
+lo hace con la protección de la rama—, y la trust policy es infraestructura como código
+el día que un adaptador reparta el rol. Lo que falta es quién lo escriba. Y la
+correspondencia rama→ambiente ya tiene dónde fallar: el despliegue tiene dos ambientes,
+y lo que no mira ningún caso es que los separe la rama —hoy los dos salen de `main`, y
+los separa la promoción—.
 
 ---
 
-## gestion-secretos — 2 requirements, 1 con compuerta
+## gestion-secretos — 2 requirements, 1 con compuerta (1 parcial)
 
 | Requirement | Lo que lo hace fallar solo | Ruta y ancla (2026-08-31) |
 |---|---|---|
 | Los secretos de runtime se inyectan por referencia, nunca horneados | **parcial**: el paso «Sin secretos en el repo (arbol y historia del cambio)» detecta el secreto EN TEXTO PLANO en el árbol y en la historia del cambio | `.github/workflows/marco-ci.yml`, paso «Sin secretos en el repo (arbol y historia del cambio)»; `pruebas/marco-ci/secretos.test.mjs` |
-| Una rotación de credenciales no interrumpe el servicio | **ninguno** | — |
+| Una rotación de credenciales no interrumpe el servicio | **sin destino**, vigente en 1.9.6 — observable contra un ambiente vivo: rotar la credencial y medir que el servicio vuelva solo. El andamio no reparte ni la base administrada ni el ensayo que la rote | — |
 
 **El alcance de ese «parcial», dicho para que no se lea como cobertura completa.** El
 detector encuentra un valor sensible versionado; no puede decir que la definición de
@@ -187,13 +238,13 @@ contra un ambiente vivo: pertenece a la familia que cierra la verificación desp
 
 ---
 
-## gobierno-contribucion — 3 requirements, 1 con compuerta
+## gobierno-contribucion — 3 requirements, 3 con compuerta (3 parciales)
 
 | Requirement | Lo que lo hace fallar solo | Ruta y ancla (2026-08-31) |
 |---|---|---|
-| Plantilla de pull request | **ninguno** — la plantilla se copia con el scaffold y ningún check verifica que siga existiendo ni que pida lo que el requirement exige | — |
-| Definición de propietarios de código | **parcial**: el paso de marcadores pone rojo un `CODEOWNERS` con la sustitución del scaffold sin resolver (que es el modo de falla silencioso: no asigna a nadie y no da error). Que el archivo EXISTA y que asigne por rol no lo verifica nadie | `.github/workflows/marco-ci.yml`, paso «Sin marcadores del scaffold sin resolver»; `pruebas/marco-ci/higiene-sin-arbol.test.mjs:139-150` |
-| Branch protection documentada como paso manual | **ninguno** | — |
+| Plantilla de pull request | **parcial**: que la plantilla que reparte el andamio exista y conserve la sección que explica qué es un change —la que pide su ruta— lo exige el banco de lo que lee el consumidor: si el archivo desaparece, el banco no lo puede leer y cae. Que pida la evidencia de tests no lo mira ningún caso, y la plantilla del propio marco no la mira nadie | `pruebas/docs/lo-que-lee-el-consumidor.test.mjs:81` (la entrada de la plantilla) y `:160` (el caso que la lee) |
+| Definición de propietarios de código | **parcial**: el paso de marcadores pone rojo un `CODEOWNERS` con la sustitución del scaffold sin resolver (que es el modo de falla silencioso: no asigna a nadie y no da error). Y el banco de CODEOWNERS lee los dos archivos —el del marco y el que reparte el andamio—, así que su ausencia es roja, y exige que cada owner tenga la forma que su cuenta puede resolver y que una regla cubra todo el repositorio. Que el propietario quede asignado de verdad como revisor depende de la API y de sus permisos, y no lo mira nadie | `.github/workflows/marco-ci.yml`, paso «Sin marcadores del scaffold sin resolver»; `pruebas/marco-ci/higiene-sin-arbol.test.mjs:139-150`; `pruebas/docs/codeowners.test.mjs:173` y `:231` |
+| Branch protection documentada como paso manual | **parcial**: que el documento de protección que reparte el andamio conserve las anclas donde `projects init` escribe el estado MEDIDO, y que ningún estado medido afirme que las reglas están activas, lo exige el banco del diagnóstico de la protección. Que la documentación siga coincidiendo con la configuración real, y que cada regla diferida tenga disparador y fecha, no lo mira nadie | `pruebas/init/proteccion.test.mjs:200` (ningún estado afirma las reglas activas) y `:268` (las anclas del documento real del andamio) |
 
 **El hueco que hay que leer entero.** `CODEOWNERS` **no gatea nada hoy**: la protección
 de la rama de integración corre con `required_approving_review_count` en `0` y
@@ -207,32 +258,33 @@ el árbol; lo que sí depende del árbol es no afirmar lo contrario mientras tan
 
 ---
 
-## observabilidad — 5 requirements, 1 con compuerta
+## observabilidad — 5 requirements, 2 con compuerta (2 parciales)
 
 | Requirement | Lo que lo hace fallar solo | Ruta y ancla (2026-08-31) |
 |---|---|---|
-| El servicio registra en JSON estructurado | **ninguno** | — |
-| La verificación post-deploy entiende el formato del log | **ninguno** | — |
-| Los errores del navegador dejan evidencia en nuestros logs | **ninguno** | — |
+| El servicio registra en JSON estructurado | **parcial**: el paso «Verificar cada paquete» corre, en cada proyecto nacido del andamio con API, el banco del logger —una línea de JSON válido con `nivel` y `msg`, el contexto como campos propios— y el del manejador central, que exige que un error no anticipado deje su línea de `nivel` error y no le llegue al cliente. Que TODO log del servicio pase por el logger —un `console.log` suelto no pone nada en rojo— y que la línea lleve el método y la ruta no lo mira ningún caso | `plantilla/api/src/lib/log.test.ts:9` y `plantilla/api/src/middleware/errorHandler.test.ts:22`; paso «Verificar cada paquete» de `plantilla/.github/workflows/ci.yml` |
+| La verificación post-deploy entiende el formato del log | **sin destino**, vigente en 1.9.6 — el filtro sería código con banco propio y se prueba con líneas de juguete: un `info` que menciona la palabra error, dos formatos mezclados. El andamio no reparte ninguna verificación que lea logs: la sonda del despliegue mira la dirección, no el log | — |
+| Los errores del navegador dejan evidencia en nuestros logs | **sin destino**, vigente en 1.9.6 — verificable en el andamio: un test del front que dispare un error global y compruebe el reporte, y uno del API que compruebe la línea. El front que reparte el andamio no captura errores globales ni los reporta | — |
 | Los errores son correlacionables entre capas | **parcial**: el banco de acoples exige que el front, el API y el banco del front hablen del MISMO contrato, que es la mitad estática de la correlación | `pruebas/andamio/acoples-del-andamio.test.mjs:542` |
-| Un aumento de errores del cliente avisa, no espera lectura | **ninguno** | — |
+| Un aumento de errores del cliente avisa, no espera lectura | **sin destino**, vigente en 1.9.6 — la alarma es infraestructura como código que un banco puede leer, como ya lee el pendiente de las alarmas de producción; depende de que antes exista el reporte de errores del navegador, que tampoco existe | — |
 
 **Por qué esta capability es la que peor se deja verificar estáticamente.** Sus cinco
 requirements son propiedades del servicio CORRIENDO: qué forma tiene una línea de log,
 qué reconoce el filtro post-deploy, si un reporte del navegador llega. Lo único que un
 check estático puede afirmar es que las piezas que las producen existan y encajen entre
-sí, y eso es exactamente lo que hace la única fila con compuerta.
+sí, y eso es lo que hacen sus dos filas con compuerta: el banco del logger del andamio y
+el de los acoples entre el front y el API.
 
 ---
 
-## operacion-infra — 6 requirements, 4 con compuerta
+## operacion-infra — 6 requirements, 4 con compuerta (3 parciales)
 
 | Requirement | Lo que lo hace fallar solo | Ruta y ancla (2026-08-31) |
 |---|---|---|
 | El state de la infraestructura vive en un backend remoto compartido | **parcial**: el pendiente del bucket del state viaja con sus cuatro partes obligatorias y el banco lo exige; el job `terraform` del workflow reusable corre `fmt -check` y `validate` sobre las raíces que el andamio reparte —avisa en la línea 1 y detiene desde v2— | `pruebas/andamio/infra-pendientes.test.mjs:226` (`pendientesConSusCuatroPartes`); paso «Formato y validez de las raices de Terraform» de `.github/workflows/marco-ci.yml`, con banco en `pruebas/andamio/terraform-en-ci.test.mjs` |
 | Las caídas se detectan por alarma, no por reporte humano | **parcial**: el banco exige que el pendiente de las alarmas viva SOLO en la raíz de producción, no en la de desarrollo. Que producción tenga el mínimo que el requirement fija no lo verifica nada: el andamio no reparte alarmas | `pruebas/andamio/infra-pendientes.test.mjs:292` (`alarmasSoloEnProd`) |
-| El gasto tiene un presupuesto con alerta | **ninguno** | — |
-| Los datos de producción están protegidos contra pérdida | **ninguno** | — |
+| El gasto tiene un presupuesto con alerta | **sin destino**, vigente en 1.9.6 — verificable en la raíz de producción que reparte el andamio, con el mismo banco que ya exige sus pendientes; hoy ningún pendiente pide el presupuesto, así que no hay nada que exigir | — |
+| Los datos de producción están protegidos contra pérdida | **sin destino**, vigente en 1.9.6 — la protección contra eliminación, la retención y el cifrado son atributos del recurso de base en la infraestructura como código, legibles por un banco, y el runbook de restore es un documento que un banco puede exigir. El andamio no reparte ni el recurso ni el runbook | — |
 | Higiene operativa de logs y TLS | **parcial**: el banco exige que el pendiente de la retención y la clase del grupo de logs exista en las DOS raíces, y ese pendiente y el del certificado entran en la guarda de las cuatro partes y en la de numeración correlativa. Que la retención quede declarada en la IaC y que la conexión valide el certificado no lo verifica nada: el andamio no reparte esos recursos. Esta fila decía «el pendiente correspondiente» hasta el 2026-09-17, cuando el de logs no existía | `pruebas/andamio/infra-pendientes.test.mjs:245` (`retencionDeLogsEnLosDosAmbientes`), `:226` y `:349` |
 | El andamio entrega los huecos de decisión de infraestructura con su criterio | El banco de huecos de infraestructura: cuatro partes por pendiente —los de infraestructura y los de plataforma del catálogo de adaptadores—, el pendiente de logs en los dos ambientes, numeración correlativa, punteros que resuelven, alarmas solo en producción — cada una con su mutación que la hace morder | `pruebas/andamio/infra-pendientes.test.mjs:226`, `:245`, `:266`, `:292`, `:310`, `:349`, y las mutaciones desde `:393` |
 
@@ -248,50 +300,48 @@ rojo— la decide el change que mida por plataforma si un repositorio llegó a s
 
 ---
 
-## pipeline-entrega — 4 requirements, 3 con compuerta
+## pipeline-entrega — 4 requirements, 4 con compuerta (2 parciales)
 
 | Requirement | Lo que lo hace fallar solo | Ruta y ancla (2026-08-31) |
 |---|---|---|
 | CI verifica todos los paquetes de forma bloqueante | El paso que DERIVA del gestor la lista de paquetes y exige que cada uno declare los scripts, con excepciones que solo pueden equivocarse hacia el rojo, y el paso que los corre parado dentro de cada paquete | `plantilla/.github/workflows/ci.yml:270` y `:420`, con banco en `pruebas/andamio/compuertas-del-andamio.test.mjs` |
-| El deploy está gateado por el éxito de CI | **parcial**: cinco casos del banco del despliegue, y uno de ellos es una mutación que corre la misma detección que la regla — la condición `workflow_run.conclusion == 'success'`, el commit que se publica (el que el CI midió, `head_sha`, fijado una vez por corrida y no la punta de la rama), la corrida a mano, que consulta `ci-ok` sobre ese commit y deja rastro si alguien se aparta, y el cruce de la etiqueta que puso DEV contra lo que la promoción publica por defecto. **La secuencia dev→producción ya existe**: la mutación exige la condición del verde en DEV y el disparo humano en producción, derivándolo del archivo. Que la condición no deje pasar a un fork ni a un PR propio lo evalúa el banco `la-llave-del-despliegue` | `pruebas/andamio/desplegar.test.mjs:37`, `:194` (la mutación), `:255`, `:287` y `:432` |
-| Cada deploy es reproducible y reversible | **ninguno** | — |
+| El deploy está gateado por el éxito de CI | **parcial**: cinco casos del banco del despliegue, y uno de ellos es una mutación que corre la misma detección que la regla — la condición `workflow_run.conclusion == 'success'`, el commit que se publica (el que el CI midió, `head_sha`, fijado una vez por corrida y no la punta de la rama), la corrida a mano, que consulta `ci-ok` sobre ese commit y deja rastro si alguien se aparta, y el cruce de la etiqueta que puso DEV contra lo que la promoción publica por defecto. **La secuencia dev→producción ya existe**: la mutación exige la condición del verde en DEV y el disparo humano en producción, derivándolo del archivo. Que la condición no deje pasar a un fork ni a un PR propio lo evalúa el banco `la-llave-del-despliegue`. Lo que sigue sin cubrirse es que producción continúe sola con DEV en verde: el andamio la hace un acto deliberado, que es lo que decidió la capability en vuelo `promocion-por-ambientes` | `pruebas/andamio/desplegar.test.mjs:37`, `:194` (la mutación), `:255`, `:287` y `:432` |
+| Cada deploy es reproducible y reversible | **parcial**, en el despliegue del sitio: DEV sube la versión con el SHA del commit como etiqueta y producción promueve ESA etiqueta sin compilar de nuevo —el caso lo exige eslabón por eslabón—, y volver atrás son dos comandos del paquete del sitio que el banco exige, con el pin de wrangler vigilado. Lo que no cubre ningún caso: un registro de artefactos para la aplicación, que el andamio todavía no despliega | `pruebas/andamio/desplegar.test.mjs:432`; `pruebas/andamio/volver-atras.test.mjs:28` y `:36` |
 | Los artefactos regenerados no divergen de la versión pinada | Paso «Artefactos regenerados al dia», con banco propio que verifica además que fuera de un árbol git sea ROJO y no «nada que verificar» | `.github/workflows/marco-ci.yml`, paso «Artefactos regenerados al dia»; `pruebas/marco-ci/artefactos.test.mjs` |
 
-**Por qué la compuerta de CI→deploy ya existe y la de reversibilidad no.** La primera
-vive entera dentro del árbol: es una condición escrita en un workflow que el andamio
-reparte, y un banco puede leerla y mutarla. La segunda no: el requirement pide un tag
-inmutable derivado del SHA en un registro de artefactos y un procedimiento de vuelta
-atrás **sin reconstruir**, y el despliegue de hoy compila y publica en el momento — no
-hay artefacto guardado al que volver, así que no hay nada que un banco pueda mirar. La
-fila anterior decía `ninguno` en las dos por el mismo motivo («el marco no reparte
-todavía el workflow de despliegue»), y ese motivo ya solo vale para una.
+**La reversibilidad pasó de `ninguno` a parcial sin que nadie tocara su fila**, y es el
+defecto de siempre. Esta sección decía que el despliegue «compila y publica en el
+momento — no hay artefacto guardado al que volver». Desde que tiene dos ambientes, DEV
+sube una versión etiquetada con el SHA del commit, producción promueve esa misma versión
+sin compilar de nuevo, y el paquete del sitio trae el comando que vuelve a una anterior.
+Lo que sigue sin cubrirse es la mitad de la aplicación: el andamio todavía no la
+despliega, así que no hay registro de artefactos que mirar.
 
 ---
 
-## verificacion-desplegada — 5 requirements, 1 con compuerta
+## verificacion-desplegada — 5 requirements, 3 con compuerta (3 parciales)
 
 | Requirement | Lo que lo hace fallar solo | Ruta y ancla (2026-08-31) |
 |---|---|---|
-| El deploy a dev se verifica solo, sin pedirle smoke a nadie | **ninguno** | — |
-| Producción solo recibe lo que dev ya verificó | **ninguno** | — |
-| Las verificaciones limpian lo que crean | **ninguno** | — |
+| El deploy a dev se verifica solo, sin pedirle smoke a nadie | **parcial**: después de subir a DEV, el paso «Comprobar que DEV contesta de verdad» pide la dirección publicada y pone rojo un 404, un 200 vacío o una dirección que no se pudo leer; el banco corre el script real contra un servidor de mentira. Es la sonda mínima y no la del requirement: no hay smoke de API contra la base de dev ni E2E con navegador, así que DEV en verde todavía no quiere decir que los flujos core funcionen | `pruebas/andamio/post-despliegue.test.mjs:126` y `:156` |
+| Producción solo recibe lo que dev ya verificó | **parcial**: el paso «Comprobar que esta version paso por DEV, y en verde» no deja promover una versión que nunca se subió a DEV, ni una cuyo DEV terminó en rojo, ni una sobre la que no pudo preguntar; el banco corre el script real con un `gh` de mentira. Lo que no cumple: la promoción no es automática —el andamio la hace un acto deliberado, que es lo que pide la capability en vuelo `promocion-por-ambientes`— y lo que DEV verificó es la sonda mínima, no el smoke ni el E2E | `pruebas/andamio/la-compuerta-de-prod.test.mjs:163` y `:175` |
+| Las verificaciones limpian lo que crean | **sin destino**, vigente en 1.9.6 — verificable el día que existan el smoke y el E2E que crean datos: una corrida que falla a mitad y deja residuos se puede provocar. El andamio no reparte ninguna verificación que cree datos, así que hoy no hay nada que limpiar | — |
 | Credenciales de prueba fuera del repositorio y de los logs | **parcial, en una sola dirección**: el detector de secretos pone rojo la credencial versionada; que no aparezca en los LOGS de una corrida no lo mira nadie | `.github/workflows/marco-ci.yml`, paso «Sin secretos en el repo (arbol y historia del cambio)» |
-| La verificación de producción es read-only | **ninguno** | — |
+| La verificación de producción es read-only | **sin destino**, vigente en 1.9.6 — la sonda de producción del despliegue que reparte el andamio solo lee (pide la dirección y mira el código), pero nada impide que una verificación escriba, y ningún banco corre esa sonda: es deuda declarada del censo de pasos. Verificable leyendo el paso | — |
 
-**Es casi la capability entera esperando la misma pieza, y la pieza que falta ya no es
-el despliegue.** Sus cinco requirements describen la SECUENCIA que va después de un
-deploy —dev se verifica solo, producción recibe únicamente lo que dev aprobó, las
-verificaciones limpian lo que crean—, y el despliegue que el andamio reparte publica un
-destino único sin tramo de dev: no hay dev que verificar ni promoción que gatear. El
-único requirement que tiene algo —las credenciales de prueba— lo tiene solo en la
-dirección del repositorio, no en la de los logs, y por eso cuenta como parcial. Que
-`gestion-secretos` (1 de 2), `despliegue-ci` (2 de 4), `pipeline-entrega` (3 de 4) y
-esta capability compartan el mismo hueco no es cuatro problemas: es uno, y tiene nombre
-—el segundo ambiente y la promoción entre los dos—.
+**Dos de sus filas decían `ninguno` sobre compuertas que ya corrían.** El despliegue
+que reparte el andamio tiene tramo de DEV: sube la versión, comprueba que la dirección
+conteste, y producción no promueve una versión que DEV no aprobó. Son parciales y así se
+cuentan: la sonda de DEV es la mínima —una dirección que contesta con contenido—, no el
+smoke de API ni el E2E que el requirement pide, y la promoción es deliberada donde este
+requirement la pide automática (la capability en vuelo `promocion-por-ambientes` decidió
+lo contrario, y esa diferencia está escrita en la fila). Lo que sigue sin compuerta —que
+las verificaciones limpien lo que crean y que la de producción sea de solo lectura—
+espera a que existan el smoke y el E2E, que son los que crearían datos.
 
 ---
 
-## base-tecnologica — 1 requirement, 1 con compuerta
+## base-tecnologica — 1 requirement, 1 con compuerta (0 parciales)
 
 Existe en `openspec/specs/` desde el 2026-09-17, cuando se archivó
 `una-sola-lista-de-plataformas` (hoy en `openspec/changes/archive/`). Hasta ese día
@@ -306,7 +356,7 @@ de capacidades, no la base única que esos tres describen—.
 
 ---
 
-## documentacion-del-marco — 3 requirements, 3 con compuerta
+## documentacion-del-marco — 3 requirements, 3 con compuerta (2 parciales)
 
 Existe en `openspec/specs/` desde el 2026-09-17, cuando se archivaron
 `el-andamio-dice-la-verdad` y `orden-de-lectura` (hoy en `openspec/changes/archive/`).
@@ -322,29 +372,33 @@ peor tipo de hueco: no faltaba deuda, faltaba cobertura que ya estaba pagada.
 
 ---
 
-## promocion-por-ambientes — capability EN VUELO, 5 requirements, 2 con compuerta
+## promocion-por-ambientes — capability EN VUELO, 5 requirements, 4 con compuerta (4 parciales)
 
 Tampoco existe en `openspec/specs/`: nace en
-`openspec/changes/promocion-por-ambientes/specs/`. Es la capability **con más
-requirements sin compuerta de toda esta página**, y eso es correcto y esperable: el
-change está en su fase de proposal, o sea que todavía no se construyó nada.
+`openspec/changes/promocion-por-ambientes/specs/`. **Esta sección decía que el change
+estaba en proposal y que no se había construido nada, y ya no era cierto**: al
+2026-09-17 lleva 23 de 31 tareas hechas, y dos de sus requirements tienen compuerta desde
+que el despliegue del andamio se partió en dos ambientes. Queda uno pendiente, en el
+mismo change.
 
-**Las dos filas que sí tienen compuerta no son un adelanto del trabajo**: son bancos que
-ya existían por otro motivo y que resultan cubrir parte de estos requirements. Se
-declaran como `parcial` para que nadie lea esa cobertura como completa.
+**Las filas «El proyecto declara qué puede publicar y qué no» y «Lo que la persona elige
+decide dónde se despliega» no son un adelanto del trabajo**: son bancos que ya existían
+por otro motivo y que resultan cubrir parte de estos requirements. Todas se declaran
+`parcial` para que nadie lea esa cobertura como completa.
 
 **Lo que esta capability viene a resolver es, justamente, una regla sin compuerta que ya
-existe.** `promocion-por-ambientes` está declarada en el canónico de la constitución
-desde antes de este change, la reciben todos los proyectos, y el andamio no reparte un
-solo paso que la cumpla. Hasta que exista, cada proyecto la anota como desvío declarado.
+existía.** `promocion-por-ambientes` está declarada en el canónico de la constitución
+desde antes de este change, la reciben todos los proyectos, y hasta este change el
+andamio no repartía un solo paso que la cumpliera. Hoy la cumple, en parte, la forma que
+recibe despliegue; la que no lo recibe la anota como desvío declarado.
 
 | Requirement | Lo que lo hace fallar solo | Ruta y ancla (2026-09-01) |
 |---|---|---|
-| Un cambio llega a producción pasando por un ambiente de prueba | **ninguno** — el change está en proposal | — |
-| La promoción a producción es un acto deliberado con rastro | **ninguno** — el change está en proposal | — |
+| Un cambio llega a producción pasando por un ambiente de prueba | **parcial**: el banco del despliegue exige que ningún job publique sobre un CI rojo —y su mutación lo ve fallar—, y el de la compuerta de producción que una versión que nunca se subió a DEV no se promueva, nombrándola. Lo que no cubre: solo el sitio recibe despliegue; la aplicación todavía no (tarea 4.3 del change) | `pruebas/andamio/desplegar.test.mjs:37` y `:194`; `pruebas/andamio/la-compuerta-de-prod.test.mjs:175` |
+| La promoción a producción es un acto deliberado con rastro | **parcial**: el caso de la guarda exige que el job `produccion` no mire `workflow_run` y pida el disparo a mano con la casilla marcada —y muta el archivo para verlo fallar—, y el apartamiento de la compuerta tiene nombre y deja escrito quién lo pidió. Que la promoción normal registre quién la pidió lo sostienen la corrida de GitHub y el mensaje de la promoción, y ningún caso lo mira | `pruebas/andamio/desplegar.test.mjs:194`; `pruebas/andamio/la-compuerta-de-prod.test.mjs:227` |
 | El proyecto declara qué puede publicar y qué no | **parcial**: el desvío declarado y la portada por forma ya tienen banco | `pruebas/init/asistente.test.mjs`, `pruebas/init/formas.test.mjs` |
 | Lo que la persona elige decide dónde se despliega | **parcial**: que una opción ofrecida se pueda armar ya tiene banco | `pruebas/docs/la-carta-no-miente.test.mjs` |
-| El costo de publicar está dicho antes de elegir | **ninguno** — el change está en proposal | — |
+| El costo de publicar está dicho antes de elegir | **pendiente** → change `promocion-por-ambientes` — lo más cerca que hay es que el número de actos humanos del sitio sea el mismo en todas las páginas que lo prometen (`pruebas/docs/actos-humanos.test.mjs`), y eso no dice el costo de cada camino ni que se diga antes de elegir | — |
 
 ## Qué NO dice esta tabla
 
@@ -352,15 +406,17 @@ solo paso que la cumpla. Hasta que exista, cada proyecto la anota como desvío d
   existe al menos un camino por el que ese requirement pone algo en rojo solo. Las
   filas que solo cubren una parte del enunciado están marcadas **parcial** con el
   alcance escrito.
-- **No dice que un `ninguno` sea deuda.** Algunos son indecidibles con un escaneo
-  («test de regresión obligatorio») y su lugar correcto es el review declarado, no una
-  compuerta que se pondría roja cuando el trabajo está bien hecho.
-- **No dice que la columna del medio esté al día.** Que una fila diga `ninguno` cuando
-  ya existe una compuerta es indecidible para una máquina: saber si algo pone un
+- **No dice que toda fila sin compuerta sea deuda, y cada fila dice cuál es.** Una
+  pendiente es trabajo con dueño; una no verificable no espera trabajo de nadie, y su
+  lugar correcto es el review declarado; una sin destino es trabajo sin dueño, y vence
+  con la versión para que no se quede así por olvido.
+- **No dice que la columna del medio esté al día.** Que una fila se declare sin
+  compuerta cuando ya existe una es indecidible para una máquina: saber si algo pone un
   requirement en rojo exige entender el requirement. Eso sigue dependiendo de que
-  alguien releía, y ya se midió lo que cuesta —tres filas quedaron diciendo `ninguno`
-  durante una semana sobre compuertas que existían—. Los comandos de arriba están para
-  rehacer esa columna, que es más barato que confiar en ella.
+  alguien relea, y ya se midió lo que cuesta, dos veces: tres filas durante una semana
+  en agosto, y nueve en la relectura del 2026-09-17. El vencimiento de las filas sin
+  destino obliga a esa relectura en cada versión, pero no la hace. Los comandos de
+  arriba están para rehacer esa columna, que es más barato que confiar en ella.
 - **Lo que sí tiene compuerta, desde el 2026-08-31, es todo lo demás de esta página**, y
   lo mide
   [`pruebas/docs/cobertura-de-requirements.test.mjs`](../pruebas/docs/cobertura-de-requirements.test.mjs):
@@ -372,7 +428,12 @@ solo paso que la cumpla. Hasta que exista, cada proyecto la anota como desvío d
   resumen, exactamente lo que dan las filas; todo paso citado por su nombre tiene que
   seguir llamándose así; y toda ruta citada tiene que existir con su línea adentro del
   archivo. **Promover un requirement al contrato sin agregar su fila se pone rojo el
-  mismo día** — que era, hasta ayer, lo que esta misma sección declaraba imposible.
+  mismo día** — que era, hasta ayer, lo que esta misma sección declaraba imposible. Y
+  desde el 2026-09-17, también: que toda fila sin compuerta declare su estado y que ese
+  estado se sostenga (el change vivo existe y la nombra, la propiedad no es un motivo de
+  esfuerzo, la versión no venció); que cada encabezado y el resumen publiquen cuántas
+  compuertas son parciales; que toda fila con compuerta cite algo que se pueda ir a
+  mirar; y que ninguna cite como compuerta una pieza que no corre.
 - **Y esta página no se puede volver a perder.** Estuvo huérfana: cero enlaces desde
   todo el repositorio, así que la única forma de encontrarla era saber que existía.
   Desde el 2026-08-31 está enumerada en `docs/README.md`, que es el mapa de la
@@ -383,21 +444,23 @@ solo paso que la cumpla. Hasta que exista, cada proyecto la anota como desvío d
 
 ---
 
-## capa-descubrimiento — capability EN VUELO, 2 requirements, 0 con compuerta
+## capa-descubrimiento — capability EN VUELO, 2 requirements, 1 con compuerta (1 parcial)
 
 No existe en `openspec/specs/`: nace en
 `openspec/changes/menu-que-no-miente/specs/`. Es la capability **más chica de esta
 página**, y a propósito: los dos requirements dicen una sola cosa —que el menú del
 asistente no ofrezca lo que el andamio no puede entregar— desde dos ángulos.
 
-**Los dos están sin compuerta porque el change está en proposal, y ese proposal
-todavía no se decidió.** Lo que sí se aplicó sin esperar la decisión es la
-corrección de copia: el detalle de AWS prometía como ventaja un Terraform que
+**Uno de los dos ya tiene compuerta, y no porque el change avanzara**: el banco de la
+plataforma, que nació cuando el marco sacó GCP de las opciones, pone rojo que el
+asistente ofrezca una plataforma que el marco no sostiene. El otro sigue pendiente en el
+change, que está en proposal y no se decidió. Lo que sí se aplicó sin esperar la
+decisión es la corrección de copia: el detalle de AWS prometía como ventaja un Terraform que
 exige una terminal que quien lee no tiene, y omitía que la cuenta gratuita de AWS
 se cierra sola a los 6 meses. Eso no era una opción discutible sino una afirmación
 que induce a error, y se corrigió.
 
-**La compuerta que sí existe hoy es la de al lado.**
+**Y hay otra al lado.**
 `pruebas/docs/promesas-sin-fuente.test.mjs` no cubre estos requirements —cubre otra
 cosa: que ninguna copia prometa «sin tarjeta» sin constancia— pero nació del mismo
 hallazgo y en el mismo acto. Se nombra acá para que quien lea esta sección no
@@ -405,5 +468,5 @@ concluya que del asunto no quedó nada verificándose.
 
 | Requirement | Lo que lo hace fallar solo | Ruta y ancla (2026-09-02) |
 |---|---|---|
-| El asistente sólo ofrece opciones que el andamio sabe producir | **ninguno** — el change está en proposal | — |
-| Una opción no se ofrece si su ventaja exige una herramienta que quien elige no tiene | **ninguno** — el change está en proposal | — |
+| El asistente sólo ofrece opciones que el andamio sabe producir | **parcial**: el banco de la plataforma pone rojo que el asistente ofrezca una plataforma que el marco declara sin sostén, y que esconda una que sí lo tiene, con la mutación que devuelve GCP a las opciones. La lista de lo que el marco sostiene está escrita a mano con su motivo; que cada opción produzca un proyecto entero lo miden los casos de punta a punta solo para AWS y para «sin AWS» | `pruebas/init/plataforma.test.mjs:291` y `:307` |
+| Una opción no se ofrece si su ventaja exige una herramienta que quien elige no tiene | **pendiente** → change `menu-que-no-miente` — el change está en proposal y todavía no decidió cómo se mide «fuera de alcance» | — |

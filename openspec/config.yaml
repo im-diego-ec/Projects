@@ -13,8 +13,9 @@ context: |
     - Canónico: los specs de marco (`openspec/specs/`) viven SOLO en este repo;
       los proyectos adoptantes no los copian, los cumplen. Qué parte de ese
       contrato tiene compuerta que falla sola —una fila por requirement, con la
-      ruta y la línea del paso o del test, o «ninguno»— está medido en
-      `openspec/cobertura-de-requirements.md`.
+      ruta y la línea del paso o del test, o el estado declarado de su ausencia:
+      pendiente en un change vivo, no verificable, o sin destino hasta la
+      próxima versión— está medido en `openspec/cobertura-de-requirements.md`.
     - Regenerado: las skills y comandos de OpenSpec no se vendoran; el marco
       pina la versión del CLI y cada repo las regenera.
   Premisa dura: el cumplimiento del marco debe ser AUTOMÁTICO (CI, scaffolds,
