@@ -28,6 +28,11 @@ desaparece.
 - **WHEN** la configuración de cobertura que reparte el andamio deja de declarar su alcance en código, aunque un comentario siga nombrándolo o nombrando la opción retirada
 - **THEN** el pipeline del marco falla nombrando el archivo y lo que falta, sin pedir la opción retirada como arreglo
 
+#### Scenario: El alcance declarado no contiene nada
+
+- **WHEN** la configuración de cobertura que reparte el andamio declara su alcance como una lista vacía, o lo escribe solo dentro de un texto o de un comentario de bloque
+- **THEN** el pipeline del marco falla igual que si no lo declarara, porque un alcance sin ningún patrón no mide nada; y un alcance con uno o más patrones, escrito en una línea o en varias, pasa
+
 ### Requirement: La configuración del proveedor de CI no se mide como código de aplicación
 
 Los archivos que viven en el directorio de configuración del proveedor de CI SHALL

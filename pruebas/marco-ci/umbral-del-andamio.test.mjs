@@ -16,11 +16,18 @@
 // opcion retirada. El caso rojo que lo prueba es el arbol REAL con la linea de
 // `include:` comentada: con el paso viejo salia verde.
 //
+// Y LO QUE EL PASO SIGUIENTE CERRO (hallazgo FO-H2 de la revision adversarial del
+// porte): el filtro era por linea, asi que un `include: []` vacio, la cadena dentro de
+// un template string o una metrica en medio de un comentario de bloque sin asteriscos
+// salian verdes. Ahora el paso recorre el archivo como JavaScript —sin importarlo:
+// importarlo ejecutaria codigo del arbol— y exige un include con al menos un patron.
+// Los casos del final lo fijan, con el contracaso del include partido en lineas.
+//
 // LO QUE NO MIDE, declarado. La otra mitad del paso —que el MINIMO_DEL_MARCO del
 // comparador y el del andamio coincidan— no se ejercita aca: este banco copia los
-// dos archivos reales y solo muta la configuracion de cobertura. Y el filtro de
-// comentarios es por linea (`//`, `*`, `/*`): un comentario de bloque cuyas lineas
-// no empiecen con `*` se leeria como codigo. El andamio no escribe asi.
+// dos archivos reales y solo muta la configuracion de cobertura. Y el lector del paso
+// no entiende expresiones regulares literales: una que contenga una comilla o un `//`
+// desalinea la lectura. El andamio no escribe ninguna en ese archivo.
 import { test, after } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
@@ -96,4 +103,54 @@ test("umbral del andamio · no exige la opcion que vitest retiro", () => {
   const sinComentarios = codigo.join("\n");
   const r = correr(sinComentarios);
   assert.equal(r.exit, 0, `sin un solo comentario la config sigue siendo valida y el paso tiene que pasar:\n${r.salida}`);
+});
+
+// ---------------------------------------------------------------------------
+// LO QUE EL FILTRO POR LINEA DEJABA PASAR (hallazgo FO-H2 de la revision
+// adversarial del porte). El paso exigia que alguna linea de codigo matcheara
+// `include: [`, y eso lo cumplen tres cosas que no declaran ningun alcance: una
+// lista VACIA, la misma cadena dentro de un template string, y cualquier linea en
+// medio de un comentario de bloque cuyas lineas no empiecen con `*`. Con las tres el
+// paso salia verde imprimiendo que el andamio «reparte el umbral del total».
+
+/** La config real con la linea del `include` reemplazada por `reemplazo`. */
+function conInclude(reemplazo) {
+  const lineas = REAL.split("\n");
+  const i = lineas.findIndex((l) => /^\s*include:\s*\[/.test(l));
+  assert.ok(i >= 0, "la config real ya no tiene su linea de include: el caso quedo midiendo aire");
+  lineas[i] = reemplazo;
+  return lineas.join("\n");
+}
+
+test("umbral del andamio · un alcance VACIO (include: []) es ROJO", () => {
+  const r = correr(conInclude("      include: [],"));
+  assert.equal(r.exit, 1, r.salida);
+  assert.match(r.salida, /include/);
+});
+
+test("umbral del andamio · el alcance escrito solo dentro de un template string es ROJO", () => {
+  const texto = conInclude("      include: [],").replace(
+    "export function coberturaDelMarco",
+    'const ejemplo = `\n      include: ["src/**"]\n`;\n\nexport function coberturaDelMarco',
+  );
+  const r = correr(texto);
+  assert.equal(r.exit, 1, r.salida);
+});
+
+test("umbral del andamio · una metrica dentro de un comentario de bloque sin asteriscos es ROJO", () => {
+  const lineas = REAL.split("\n");
+  const i = lineas.findIndex((l) => /^\s*branches:\s*minimo/.test(l));
+  assert.ok(i >= 0, "la config real ya no tiene la linea de branches");
+  lineas.splice(i, 1, "        /*", "        branches: minimo,", "        */");
+  const r = correr(lineas.join("\n"));
+  assert.equal(r.exit, 1, r.salida);
+  assert.match(r.salida, /branches: minimo/);
+});
+
+test("umbral del andamio · un alcance partido en varias lineas o con varias entradas sigue VERDE", () => {
+  const partido = conInclude('      include: [\n        "src/**/*.ts",\n        "src/**/*.tsx",\n      ],');
+  const r = correr(partido);
+  assert.equal(r.exit, 0, r.salida);
+  const conComillaSimple = conInclude("      include: ['src/**/*.{ts,tsx}'],");
+  assert.equal(correr(conComillaSimple).exit, 0, "una comilla simple es tan string como una doble");
 });

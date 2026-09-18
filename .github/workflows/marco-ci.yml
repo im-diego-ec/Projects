@@ -2601,7 +2601,7 @@ jobs:
           # sube por omision: el umbral quedaria puesto sin medir el codigo que a
           # nadie molesta.
           #
-          # SE LEEN EN LINEAS DE CODIGO, NO EN COMENTARIOS, y esa es la correccion.
+          # SE LEEN EN CODIGO, NO EN COMENTARIOS, y esa fue la primera correccion.
           # Este paso exigia la cadena "all: true" con un grep sobre el archivo
           # entero. vitest 3 retiro coverage.all (la 5 la ignora sin aviso) y el
           # andamio la saco de su config; desde entonces la cadena aparecia SOLO en
@@ -2609,17 +2609,85 @@ jobs:
           # daba VERDE leyendo prosa. Borrar el include: -lo que de verdad sostiene
           # el total- lo dejaba verde igual. Ver pruebas/marco-ci/umbral-del-andamio.test.mjs.
           #
-          # El filtro es por linea: descarta las que empiezan con //, * o /*. Un
-          # comentario de bloque cuyas lineas no empiecen con * se leeria como
-          # codigo; el andamio no escribe asi.
-          CODIGO="$(grep -vE '^[[:space:]]*(//|\*|/\*)' "${BASE_VITEST}" || true)"
-          FALTAN=()
-          for CLAVE in "lines: minimo" "functions: minimo" "branches: minimo" "statements: minimo"; do
-            if ! grep -qF "${CLAVE}" <<< "${CODIGO}"; then FALTAN+=("${CLAVE}"); fi
-          done
-          if ! grep -qE '^[[:space:]]*include:[[:space:]]*\[' <<< "${CODIGO}"; then FALTAN+=("include: [...]"); fi
-          if [ ${#FALTAN[@]} -gt 0 ]; then
-            echo "::error file=${BASE_VITEST}::a la configuracion de cobertura del andamio le falta, en lineas de codigo y no en comentarios: ${FALTAN[*]}. Las cuatro metricas y el alcance declarado (coverage.include) son lo que hace que el umbral mida algo. La opcion all: true NO es el arreglo: vitest 3 la retiro y la 5 la ignora sin aviso"
+          # Y EL ALCANCE TIENE QUE TENER ALGO ADENTRO, que fue la segunda (hallazgo
+          # FO-H2 de la revision adversarial del porte). El filtro era por linea y
+          # buscaba "include: [": lo cumplian una lista VACIA, la misma cadena dentro
+          # de un template string y cualquier linea en medio de un comentario de
+          # bloque sin asteriscos. Ahora un lector de node recorre el archivo como
+          # JavaScript: saca los comentarios de linea y de bloque, reemplaza el
+          # contenido de cada template string por un marcador, y recien ahi exige
+          # las cuatro metricas atadas a `minimo` y un include cuyo primer elemento
+          # sea una cadena no vacia.
+          #
+          # SE LEE, NO SE IMPORTA. Importar la config daria el valor efectivo, pero
+          # EJECUTARIA codigo del arbol, y bajo pull_request_target este job trae el
+          # head del PR: el marco lee el codigo del repo, no lo ejecuta (ver el
+          # encabezado del job cambios). Limite declarado del lector: no entiende
+          # expresiones regulares literales; una que contenga una comilla o un //
+          # desalinea la lectura. El andamio no escribe ninguna en este archivo.
+          if ! command -v node > /dev/null 2>&1; then
+            echo "::error::no hay 'node' en el PATH y sin el no se puede leer la configuracion de cobertura del andamio. Esto es un fallo DEL MARCO, no de tu repo: el job higiene de marco-ci.yml instala node con actions/setup-node y la version que declara el input version_node, asi que si falta es que ese paso no corrio"
+            exit 1
+          fi
+          # shellcheck disable=SC2016
+          if ! FALTAN="$(node -e '
+            const { readFileSync } = require("node:fs");
+            const ruta = process.argv[1];
+            let fuente;
+            try {
+              fuente = readFileSync(ruta, "utf8");
+            } catch (e) {
+              console.log("no se pudo leer " + ruta + " (" + e.message + ")");
+              process.exit(1);
+            }
+            // La comilla simple va como \u0027: el programa viaja entre comillas
+            // simples de shell.
+            const SIMPLE = "\u0027";
+            let codigo = "";
+            for (let i = 0; i < fuente.length; ) {
+              const c = fuente[i];
+              const d = fuente[i + 1];
+              if (c === "/" && d === "/") {
+                while (i < fuente.length && fuente[i] !== "\n") i += 1;
+                continue;
+              }
+              if (c === "/" && d === "*") {
+                const cierre = fuente.indexOf("*/", i + 2);
+                const hasta = cierre < 0 ? fuente.length : cierre + 2;
+                codigo += fuente.slice(i, hasta).replace(/[^\n]/g, " ");
+                i = hasta;
+                continue;
+              }
+              if (c === "\"" || c === SIMPLE) {
+                let j = i + 1;
+                while (j < fuente.length && fuente[j] !== c && fuente[j] !== "\n") j += fuente[j] === "\\" ? 2 : 1;
+                codigo += fuente.slice(i, j + 1);
+                i = j + 1;
+                continue;
+              }
+              if (c === "`") {
+                let j = i + 1;
+                while (j < fuente.length && fuente[j] !== "`") j += fuente[j] === "\\" ? 2 : 1;
+                codigo += j > i + 1 ? "\"T\"" : "\"\"";
+                i = j + 1;
+                continue;
+              }
+              codigo += c;
+              i += 1;
+            }
+            const faltan = [];
+            for (const metrica of ["lines", "functions", "branches", "statements"]) {
+              if (!new RegExp("\\b" + metrica + "\\s*:\\s*minimo\\b").test(codigo)) faltan.push(metrica + ": minimo");
+            }
+            if (!/\binclude\s*:\s*\[\s*(["\x27])(?!\1)/.test(codigo)) {
+              faltan.push("include: [...] con al menos un patron");
+            }
+            if (faltan.length) {
+              console.log(faltan.join(", "));
+              process.exit(1);
+            }
+          ' "${BASE_VITEST}")"; then
+            echo "::error file=${BASE_VITEST}::a la configuracion de cobertura del andamio le falta, en codigo y no en comentarios ni en texto: ${FALTAN}. Las cuatro metricas y el alcance declarado (coverage.include, con al menos un patron) son lo que hace que el umbral mida algo. La opcion all: true NO es el arreglo: vitest 3 la retiro y la 5 la ignora sin aviso"
             exit 1
           fi
 

@@ -57,6 +57,18 @@ banco se escribió y se corrió **antes** del arreglo, y el rojo quedó anotado.
       el banco escrito y la entrada todavía declarada, el banco puso rojos «la deuda declarada esta al dia» y
       «la deuda que queda sale por ::warning::» (`# fail 2`); sacada la entrada,
       `4/4` y `12 de 17 pasos con run: citados`.
+- [x] 3.4 **El alcance tiene que tener algo adentro** (hallazgo FO-H2 de la revisión
+      adversarial). El filtro por línea buscaba `include: [` y lo cumplían `include: []`,
+      la cadena dentro de un template string y una métrica en medio de un comentario de
+      bloque sin asteriscos. Rojo primero: cuatro casos nuevos en
+      `pruebas/marco-ci/umbral-del-andamio.test.mjs` contra el paso de `f6a01ac` →
+      `# tests 8 · # pass 5 · # fail 3` (el contracaso del include partido en líneas ya
+      pasaba). Después, `.github/workflows/marco-ci.yml:2840`: un lector de node recorre
+      el archivo como JavaScript **sin importarlo** —importarlo ejecutaría código del
+      árbol, y bajo `pull_request_target` el job trae el head del PR—, saca comentarios y
+      el texto de los template strings, y exige las cuatro métricas y un `include` cuyo
+      primer elemento sea una cadena no vacía → `8/8`. `actionlint` → `rc=0`. Escenario
+      nuevo en el delta de `calidad-codigo` («El alcance declarado no contiene nada»).
 
 ## 4. La prosa del piso de permisos dice `startup_failure`
 

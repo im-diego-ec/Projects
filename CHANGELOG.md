@@ -434,8 +434,10 @@ mueve sobre un cambio incompatible.
 - **Un check del marco daba verde leyendo un comentario.** El paso que verifica que
   el andamio reparta el umbral de cobertura exigía la cadena `all: true`, que solo
   sobrevivía en el comentario que explica que la opción ya no existe. Ahora lee
-  `include:` y las cuatro métricas en líneas de código. Solo actúa en el repositorio
-  que distribuye el andamio.
+  `include:` y las cuatro métricas en el código —sin comentarios de línea ni de bloque
+  y sin el texto de un template string—, y exige que el `include` tenga al menos un
+  patrón: `include: []` también es rojo. Lee el archivo como texto, sin ejecutarlo.
+  Solo actúa en el repositorio que distribuye el andamio.
 
   **Para consumidores: nada.** En tu repo ese paso se omite, como antes.
 
