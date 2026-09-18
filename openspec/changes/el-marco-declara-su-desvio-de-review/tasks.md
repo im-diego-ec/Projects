@@ -30,7 +30,7 @@ estado: en-ejecucion
 
 ## 2. El desvío
 
-- [x] 2.1 Recuadro en `AGENTS.md:60-89`, pegado al flujo que anula: aprobador y
+- [x] 2.1 Recuadro en `AGENTS.md:60-91`, pegado al flujo que anula: aprobador y
       fecha, reemplazo y dónde se registra, por qué no va en
       `.projects-desvios.json`, condición de retiro con su comando, y lo que no
       cambia.
@@ -138,3 +138,54 @@ estado: en-ejecucion
 - [ ] 7.5 El guardrail de deltas sale verde y mudo ante un directorio inexistente
       (medido). **Motivo:** es una action publicada y ningún lote del porte lo toma;
       queda reportado sin dueño.
+
+## 8. La revisión adversarial del carril (2026-09-18)
+
+Cinco hallazgos sobre el banco, todos confirmados en el árbol antes de tocarlo.
+Las refutaciones nuevas se escribieron **antes** del arreglo y corrieron contra el
+banco viejo: `tests 17 / pass 12 / fail 5`, las cinco nuevas en rojo.
+
+- [x] 8.1 **La regla 3 pasa a lista cerrada** (FO-S3). Buscaba nombres prohibidos y
+      le pasaban por al lado un valor YAML en bloque, `builder-2`, «el otro
+      builder», `Aprueba:` y una línea en blanco antes del `---`. Ahora el valor
+      tiene que ser uno de `VALORES_DEL_DESVIO`, la clave va en minúscula y al
+      margen, y un frontmatter corrido es rojo. Refutación: «un aprobador fuera de
+      la lista cerrada se caza en cualquiera de sus formas», con su contrapeso (los
+      valores reales con comentario al costado, `PO (PO)` e `informado:` no se
+      cazan).
+- [x] 8.2 **La regla 3 es simétrica** (RV-L2-02). Retirado el recuadro, un
+      `aprueba:` que sigue nombrando el desvío es rojo. El comentario de
+      `.github/CODEOWNERS` dice ahora lo que el banco cobra y lo que no (que el
+      valor nuevo sea el builder par). Refutación: «retirado el desvio, un
+      `aprueba:` que sigue nombrandolo se caza; el builder par no».
+- [x] 8.3 **La regla 5 exige el rol al principio del valor** (FO-S4): «revision
+      adversarial (no el PO)» y «Builder 1 (PO: no aplica)» pasaban. Refutación:
+      «el PO nombrado de costado, o negado, no es el PO en el valor».
+- [x] 8.4 **La regla 4 mira contenido y no encabezados** (FO-S2): cada lente con
+      nombre y cuerpo, al menos dos con evidencia verificable (ruta, comando o
+      sha), y un veredicto escrito; la carpeta sin fecha es rojo en vez de
+      saltearse. El mensaje de error ya no dicta los encabezados que lo ponen
+      verde. Contrapeso medido: las seis revisiones reales del 2026-09-17 pasan
+      (entre dos y cuatro lentes con evidencia cada una).
+- [x] 8.5 **La regla 6, nueva** (RV-L2-01): un change con delta de
+      `gobierno-contribucion` archivado bajo el desvío lleva
+      `aprobado_por_po: AAAA-MM-DD` en su proposal, no posterior al archive. El
+      recuadro de `AGENTS.md` y el delta lo dicen. Hoy ningún archive del
+      2026-09-17 toca `gobierno-contribucion`, así que el árbol pasa sin
+      excepciones.
+- [x] 8.6 Banco → `tests 18 / pass 18 / fail 0`. El delta de este change ganó el
+      escenario «Se archiva un change de la gobernanza del trabajo» y precisó otros
+      tres: **es de `gobierno-contribucion` y vuelve a esperar el OK del PO** con
+      este texto, no con el que se revisó.
+- [ ] 8.7 **Los commits del carril no están firmados** (RV-GOB-01), y
+      `AGENTS.md` exige commits firmados. **Motivo:** el orquestador del porte
+      commitea con `commit.gpgsign=false` a propósito, y firmar es usar la llave de
+      la persona: lo hace ella al integrar, con
+      `git rebase --exec 'git commit --amend --no-edit -S' feat/porte-rigel-2-8`
+      antes de abrir el PR.
+- [ ] 8.8 **Cuatro artefactos de changes activos no tienen frontmatter**
+      (`menu-que-no-miente/proposal.md`, `promocion-por-ambientes/proposal.md`,
+      `rojo-primero/tasks.md` y `rojo-primero/design.md`), así que no declaran
+      aprobador y la regla 3 no tiene qué mirar. **Motivo:** son de otros changes
+      que se trabajan en otros carriles; volver rojo el `.md` sin frontmatter se
+      decide cuando esos cuatro lo ganen, y exime a los deltas de spec.

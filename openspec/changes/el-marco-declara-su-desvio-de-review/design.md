@@ -86,17 +86,40 @@ corrigió al valor, y la regla 5 del banco lo exige.
 ### Un check y no un párrafo
 
 Rigel dejó el desvío escrito y nada lo sostiene. **Descartado** copiarlo así: por
-la regla de oro del marco, eso es documentación. El banco tiene cinco reglas y
+la regla de oro del marco, eso es documentación. El banco tiene seis reglas y
 cada una muerde sobre texto mutado en memoria:
 
 1. Un solo dueño en `CODEOWNERS` → el recuadro existe y trae sus siete piezas.
 2. Dos dueños → el recuadro se retiró.
-3. Mientras rija, ningún `aprueba:`/`revisa:` de un change activo nombra al
-   builder par.
+3. Mientras rija, todo `aprueba:`/`revisa:` de un change activo toma un valor de
+   una **lista cerrada**; retirado, ninguno sigue nombrando el desvío.
 4. Todo change archivado desde la fecha del desvío trae `revision-adversarial.md`
-   con al menos dos lentes y un veredicto.
+   con al menos dos lentes con nombre y contenido, dos de ellas con evidencia
+   verificable, y un veredicto escrito; una carpeta del archive sin fecha es rojo.
 5. Todo change activo con delta de `gobierno-contribucion` nombra al PO en el
-   valor del `aprueba:` de su proposal.
+   valor del `aprueba:` de su proposal, y el valor **empieza** con el rol.
+6. Todo change con delta de `gobierno-contribucion` archivado bajo el desvío
+   trae `aprobado_por_po: AAAA-MM-DD` en su proposal, no posterior al archive.
+
+**Por qué una lista cerrada y no una lista de nombres prohibidos** (corregido el
+2026-09-18, revisión adversarial del carril). La primera versión de la regla 3
+buscaba al builder par con una regex. Le pasaban por al lado `builder-2`, «el
+otro builder» —la forma en que lo dice el propio `AGENTS.md`—, un valor YAML en
+bloque, la clave con mayúscula y una línea en blanco antes del `---`: cinco
+formas de escribir lo mismo, todas verdes. Enumerar lo prohibido sobre texto
+libre no cierra; enumerar lo que vale sí. **Descartado:** exigir frontmatter en
+todo `.md` de un change activo —los deltas de spec no lo llevan, y cuatro
+artefactos de otros changes (`menu-que-no-miente/proposal.md`,
+`promocion-por-ambientes/proposal.md`, `rojo-primero/tasks.md` y `design.md`) no
+lo traen—; queda como tarea abierta.
+
+**Por qué la regla 6 existe.** La 5 mira lo que un change **activo** declara que
+va a pasar. La revisión del carril archivó en un clon `el-consumidor-se-anota`
+—todavía en `pendiente-de-revision`— y el banco y el guardrail de deltas salieron
+verdes: nada miraba la aprobación en el momento en que importa. El campo va en el
+proposal porque el archive lo mueve entero y no lo reescribe. Es una
+declaración, igual que todo lo que se escribe en un repo de un solo mantenedor;
+lo que la regla cambia es que omitirla deja de ser posible por descuido.
 
 **Descartado:** medir el permiso de escritura contra la API de GitHub. El banco
 del marco corre sin red, y colgarlo de un tercero lo pone rojo por motivos ajenos.

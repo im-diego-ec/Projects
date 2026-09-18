@@ -72,10 +72,13 @@ documentación, no gobierno. Acá lo sostiene un banco.
    lee quien escribe un artefacto nuevo.
 4. **`.github/CODEOWNERS`** dice que la condición de retiro se lee de él.
 5. **Un banco**, `pruebas/ci-del-marco/desvio-de-review-del-marco.test.mjs`, con
-   cinco reglas que se ponen rojas solas: el desvío existe con un solo dueño y
-   está completo; se retira con dos; ningún change activo nombra al builder par;
-   todo change archivado desde el desvío trae su revisión registrada; y todo
-   change que toca `gobierno-contribucion` nombra al PO en su `aprueba:`.
+   seis reglas que se ponen rojas solas: el desvío existe con un solo dueño y
+   está completo; se retira con dos; el `aprueba:` de un change activo toma un
+   valor de una lista cerrada mientras rige, y deja de nombrarlo cuando se
+   retira; todo change archivado desde el desvío trae su revisión registrada,
+   con contenido y evidencia; todo change que toca `gobierno-contribucion`
+   nombra al PO en su `aprueba:`; y ninguno de esos se archiva sin la constancia
+   `aprobado_por_po:` en su proposal.
 6. **Lo que el desvío desbloquea**: la revisión adversarial de los doce changes
    terminados, registrada en cada uno, y el archive de los que no necesitan otra
    aprobación. Los seis que tocan `gobierno-contribucion` quedan revisados y

@@ -58,8 +58,11 @@
 # DE RETIRO SE LEE DE ESTE ARCHIVO: el dia que aca aparezca un segundo handle
 # —con permiso de escritura, que es lo que lo vuelve owner de verdad—,
 # pruebas/ci-del-marco/desvio-de-review-del-marco.test.mjs se pone rojo hasta
-# que el recuadro de AGENTS.md se retire y los `aprueba:` vuelvan al builder
-# par. Y al reves: borrar el recuadro con un solo owner tambien es rojo.
+# que el recuadro de AGENTS.md se retire; y retirado, sigue rojo mientras un
+# `aprueba:` de un change activo nombre todavia la revision del desvio. Que el
+# valor nuevo sea el builder par no lo cobra: el banco sabe que valor ya no vale,
+# no quien aprueba cada artefacto. Y al reves: borrar el recuadro con un solo
+# owner tambien es rojo.
 # ---------------------------------------------------------------------------
 
 *                                  @im-diego-ec

@@ -35,21 +35,29 @@ Cada una de estas propiedades SHALL tener una comprobación que falle sola.
 
 #### Scenario: Un artefacto nombra a un aprobador que no existe
 
-- **WHEN** un change activo declara como aprobador o revisor al constructor par mientras el desvío rige
-- **THEN** el pipeline falla nombrando el archivo, la línea y el valor que corresponde
+- **WHEN** un change activo declara como aprobador o revisor al constructor par mientras el desvío rige, en cualquier forma de escribirlo, o un valor que no es ninguno de los que el desvío admite
+- **THEN** el pipeline falla nombrando el archivo, la línea y los valores que corresponden
 
 #### Scenario: Se archiva un change bajo el desvío
 
 - **WHEN** un change se archiva desde la fecha en que rige el desvío
-- **THEN** lleva registrada adentro su revisión adversarial, con al menos dos lentes y un veredicto
-- **AND** el pipeline falla si no la lleva
+- **THEN** lleva registrada adentro su revisión adversarial, con al menos dos lentes que dicen qué miran y qué encontraron —al menos dos de ellas con evidencia que se puede ir a verificar— y un veredicto escrito
+- **AND** el pipeline falla si no la lleva, si le falta cualquiera de esas piezas, o si la carpeta del archive no dice en qué fecha se archivó
 
 #### Scenario: Llega la segunda persona
 
 - **WHEN** el archivo de propietarios de código pasa a nombrar a una segunda identidad
 - **THEN** el pipeline falla hasta que el desvío se retire, en vez de dejarlo vigente sobre una condición que ya no se da
+- **AND** retirado el desvío, el pipeline falla mientras un change activo siga declarando como aprobador la revisión que reemplazaba a la cruzada
 
 #### Scenario: Un change toca la gobernanza del trabajo
 
 - **WHEN** un change toca la capability que gobierna quién aprueba qué
 - **THEN** su proposal y su spec siguen esperando la aprobación del rol de producto, y la revisión adversarial no la reemplaza
+- **AND** el pipeline falla si su declaración de aprobador no empieza por el rol de producto
+
+#### Scenario: Se archiva un change de la gobernanza del trabajo
+
+- **WHEN** se archiva, bajo el desvío, un change que toca la capability que gobierna quién aprueba qué
+- **THEN** lleva la constancia de la aprobación del rol de producto, con la fecha en que la dio, no posterior al archive
+- **AND** el pipeline falla si no la lleva, aunque la revisión adversarial esté registrada

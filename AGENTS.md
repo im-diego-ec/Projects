@@ -80,11 +80,13 @@ una sorpresa?** Si la respuesta es sí, era un change.
 > (`gh api "repos/{owner}/{repo}/collaborators" --jq '.[] | "\(.login): \(.role_name)"'`
 > hoy devuelve uno solo) y `.github/CODEOWNERS` lo nombre. Ese día este recuadro se
 > borra y los `aprueba:` vuelven al builder par; mientras siga puesto con dos dueños,
+> o mientras un `aprueba:` siga nombrando el desvío sin el recuadro,
 > `pruebas/ci-del-marco/desvio-de-review-del-marco.test.mjs` está en rojo.
 >
 > Lo que **no** cambia: la aprobación del PO sobre los proposals y specs que tocan
 > `gobierno-contribucion`, que ningún builder —ni ninguna revisión adversarial— puede
-> dar por él; los roles siguen siendo roles (reasignarlos es editar
+> dar por él, y que queda escrita antes del archive (`aprobado_por_po: AAAA-MM-DD` en
+> el proposal: sin esa constancia, el mismo banco no deja archivarlo); los roles siguen siendo roles (reasignarlos es editar
 > `.github/CODEOWNERS`, un solo lugar); y todo cambio sigue entrando por PR con el
 > veredicto agregado de CI en verde.
 

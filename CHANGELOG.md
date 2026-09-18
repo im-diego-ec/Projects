@@ -512,13 +512,17 @@ mueve sobre un cambio incompatible.
   por ellas—, y lo ya contestado se conserva: se vuelve, se corrige, y de ahí en
   adelante se avanza con Enter sin reescribir nada.
 
-- **Un banco que sostiene el desvío en cinco direcciones.**
+- **Un banco que sostiene el desvío en seis direcciones.**
   `pruebas/ci-del-marco/desvio-de-review-del-marco.test.mjs` se pone rojo si hay un
   solo dueño en `CODEOWNERS` y el desvío falta o está incompleto; si hay dos y el
-  desvío sigue puesto; si un change activo vuelve a nombrar al builder par; si un
-  change se archiva sin su `revision-adversarial.md`; y si un change que toca
-  `gobierno-contribucion` no nombra al PO en su `aprueba:`. Para consumidores:
-  nada; corre solo en el CI del marco.
+  desvío sigue puesto; si el `aprueba:` de un change activo no es uno de los
+  valores que el desvío admite (una lista cerrada, no una lista de nombres
+  prohibidos), o si sigue nombrando el desvío después de retirado; si un change
+  se archiva sin su `revision-adversarial.md` o con una que tiene los
+  encabezados y no el contenido; si un change que toca `gobierno-contribucion` no
+  empieza su `aprueba:` por el PO; y si uno de esos se archiva sin la constancia
+  `aprobado_por_po:` en su proposal. Para consumidores: nada; corre solo en el CI
+  del marco.
 - **Seis changes terminados pasan al contrato vivo.** Revisados bajo el desvío y
   archivados: `el-andamio-dice-la-verdad`, `el-comando-que-se-pega-funciona`,
   `el-piso-del-reusable-se-mide`, `los-changes-citan-lo-que-existe`,

@@ -19,9 +19,9 @@
 // El origen es Rigel (1.10.0, commit e48860d): declaro el mismo desvio en su
 // AGENTS.md y corrigio el campo `aprueba` de 29 artefactos. Aca se porta con una
 // diferencia que es el motivo de este archivo: en Rigel el desvio quedo escrito
-// y nada lo sostiene; aca un banco lo hace cumplir en cinco direcciones.
+// y nada lo sostiene; aca un banco lo hace cumplir en seis direcciones.
 //
-// LAS CINCO REGLAS, y cada una se pone roja sola:
+// LAS SEIS REGLAS, y cada una se pone roja sola:
 //
 //   1. Con UN solo dueno en `.github/CODEOWNERS`, `AGENTS.md` tiene que traer el
 //      recuadro del desvio, completo: quien lo aprobo y cuando, que revision lo
@@ -31,17 +31,33 @@
 //   2. Con DOS o mas duenos, el recuadro tiene que haberse retirado: un desvio
 //      que sobrevive a su condicion de retiro deja de ser una excepcion
 //      declarada y pasa a ser la regla por la puerta de atras.
-//   3. Mientras el desvio rija, ningun artefacto de un change ACTIVO nombra como
-//      aprobador o revisor al builder par que el desvio declara inexistente.
+//   3. Mientras el desvio rija, el `aprueba:` / `revisa:` de un change ACTIVO
+//      toma uno de los valores de una LISTA CERRADA (VALORES_DEL_DESVIO). Y al
+//      reves: retirado el desvio, ninguno sigue nombrandolo. Hasta el
+//      2026-09-18 esta regla buscaba nombres PROHIBIDOS con una regex, y la
+//      revision adversarial del carril le paso por al lado con cinco formas de
+//      escribir lo mismo (`builder-2`, «el otro builder», un valor YAML en
+//      bloque, la clave con mayuscula, una linea en blanco antes del `---`).
+//      Una lista de lo que vale no tiene esas grietas: todo lo demas es rojo.
 //   4. Todo change archivado desde la fecha del desvio lleva su revision
 //      adversarial registrada adentro (`revision-adversarial.md`), con al menos
-//      dos lentes y un veredicto. «La revision cruzada se reemplaza por una
-//      revision adversarial registrada en el change» sin esta regla seria una
-//      promesa, y este marco no cuenta las promesas como guardrail.
+//      dos lentes que dicen que miran y que encontraron, al menos dos de ellas
+//      con evidencia verificable (una ruta, un comando o un sha), y un veredicto
+//      escrito. Hasta el 2026-09-18 contaba ENCABEZADOS: tres lineas vacias
+//      `## Lente` / `## Lente` / `## Veredicto` pasaban, y el propio mensaje de
+//      error las dictaba. Una carpeta del archive sin fecha es rojo: sin fecha
+//      la regla no sabe si se archivo bajo el desvio, y saltearla en silencio
+//      era un fail-open.
 //   5. El desvio NO alcanza al PO: todo change activo con un delta de
 //      `gobierno-contribucion` lo nombra en el VALOR del `aprueba:` de su
-//      proposal. Medido al escribir esta regla: `reglas-al-dia` lo decia solo en
-//      un comentario al costado, que ningun lector de frontmatter ve.
+//      proposal, y el valor EMPIEZA con el rol («PO», «PO (...)», «PO y ...»):
+//      una mencion negada —«revision adversarial (no el PO)»— no es el PO.
+//   6. Y la aprobacion, no solo su declaracion: todo change archivado desde la
+//      fecha del desvio que trae un delta de `gobierno-contribucion` lleva en su
+//      proposal `aprobado_por_po: AAAA-MM-DD`, una fecha real y no posterior al
+//      archive. La regla 5 mira lo que un change ACTIVO dice que va a pasar; sin
+//      esta, uno en `pendiente-de-revision` se archivaba igual con el banco y el
+//      guardrail de deltas en verde (medido por la revision del carril).
 //
 // POR QUE EL DESVIO VIVE EN AGENTS.md Y NO EN `.projects-desvios.json`, medido y
 // no supuesto. La sonda `es_distribuidor` de `marco-ci.yml` NO lee ese archivo
@@ -83,8 +99,34 @@ export const VALOR_APRUEBA = "revision adversarial (desvio del marco: un solo ma
 /** Donde queda registrada la revision que reemplaza a la cruzada. */
 export const ARCHIVO_REVISION = "revision-adversarial.md";
 
-/** Un aprobador que, mientras rige el desvio, no existe. */
-const APROBADOR_QUE_NO_EXISTE = /builder\s+par|builder\s*2\b|builder que no lo escribi/i;
+/** LA LISTA CERRADA de lo que `aprueba:` / `revisa:` pueden valer mientras rige el
+ *  desvio. Todo lo que no este aca es rojo, se escriba como se escriba. «PO (PO)»
+ *  es la forma que ya usa `capa-descubrimiento`: el rol con su nombre de rol. */
+export const VALORES_DEL_DESVIO = Object.freeze([
+  VALOR_APRUEBA,
+  "PO",
+  "PO (PO)",
+  `PO (el delta de gobierno-contribucion) y ${VALOR_APRUEBA}`,
+]);
+
+/** Un valor que nombra la revision del desvio: retirado el desvio, es rojo. */
+const NOMBRA_EL_DESVIO = /desv[ií]o del marco/i;
+
+/** El PO en el VALOR, y no de costado: el valor EMPIEZA con el rol. */
+const EMPIEZA_CON_EL_PO = /^PO(?:$| \(| y )/;
+
+/** Una evidencia que se puede ir a mirar: una ruta o un archivo (con o sin
+ *  `:linea`), un comando, o un sha. Entre backticks, que es como la escriben las
+ *  revisiones reales; el sha, suelto y con al menos un digito. Un comando que
+ *  corre un paquete de npm trae su `@scope/paquete`, y esa barra ya lo hace ruta:
+ *  por eso el ejecutor no esta en la lista (y el check de ejecutores del marco lo
+ *  leeria como una invocacion sin version). */
+const COMANDOS = ["node", "git", "grep", "gh", "sed", "find", "pnpm", "bash", "openspec"];
+const EVIDENCIA = new RegExp(
+  "`(?:[^`\\n]*(?:/|\\.(?:mjs|js|ts|md|ya?ml|json|tf|sh|cmd)\\b|:\\d+)[^`\\n]*|(?:" +
+    COMANDOS.join("|") +
+    ")\\b[^`\\n]*)`|\\b(?=[0-9a-f]*\\d)(?=[0-9a-f]*[a-f])[0-9a-f]{7,40}\\b",
+);
 
 // ---------------------------------------------------------------------------
 // LOS LECTORES
@@ -190,16 +232,33 @@ export function frontmatter(texto) {
   return lineas.slice(1, fin).map((l, k) => ({ linea: k + 2, texto: l }));
 }
 
-/** La regla 3 sobre UN archivo: los `aprueba:` / `revisa:` que nombran al builder
- *  par. `informado:` queda fuera a proposito: estar informado no es una
- *  compuerta, y que el rol exista como destinatario no es una afirmacion falsa. */
-export function aprobadoresQueNoExisten(ruta, texto) {
+/** La regla 3 sobre UN archivo: los `aprueba:` / `revisa:` que no valen.
+ *
+ *  Con el desvio vigente (`rige`), vale solo un valor de VALORES_DEL_DESVIO; el
+ *  comentario al costado se descarta, como lo descarta cualquier lector de YAML.
+ *  Retirado, lo que no vale es seguir nombrando el desvio. Y en los dos casos es
+ *  rojo el frontmatter que un lector no ve: una clave con mayuscula o indentada
+ *  (`Aprueba:` no es `aprueba:` para nadie que lo parsee) y un `---` que no esta
+ *  en la primera linea. Un .md SIN frontmatter no es rojo: los deltas de spec no
+ *  lo llevan, y no declarar aprobador no es nombrar a uno que no existe.
+ *  `informado:` queda fuera a proposito: estar informado no es una compuerta. */
+export function aprobadoresFueraDeRegla(ruta, texto, rige = true) {
+  const lineas = texto.replace(/^\uFEFF/, "").split(/\r?\n/);
+  const primera = lineas.findIndex((l) => l.trim() !== "");
+  if (primera > 0 && lineas[primera].trim() === "---") {
+    return [{ ruta, linea: primera + 1, campo: "frontmatter", valor: `empieza en la linea ${primera + 1} y no en la 1, asi que nadie lo lee` }];
+  }
   const salida = [];
   for (const { linea, texto: l } of frontmatter(texto) ?? []) {
-    const m = l.match(/^(aprueba|revisa):\s*(.*)$/);
+    const m = l.match(/^(\s*)(aprueba|revisa)\s*:\s*(.*)$/i);
     if (!m) continue;
-    const valor = m[2].replace(/\s+#.*$/, "").trim();
-    if (APROBADOR_QUE_NO_EXISTE.test(valor)) salida.push({ ruta, linea, campo: m[1], valor });
+    const campo = m[2];
+    const valor = m[3].replace(/\s+#.*$/, "").trim();
+    if (m[1] || campo !== campo.toLowerCase()) {
+      salida.push({ ruta, linea, campo, valor: `clave escrita «${m[1]}${campo}:», que un lector de frontmatter no reconoce` });
+    } else if (rige ? !VALORES_DEL_DESVIO.includes(valor) : NOMBRA_EL_DESVIO.test(valor)) {
+      salida.push({ ruta, linea, campo, valor });
+    }
   }
   return salida;
 }
@@ -223,27 +282,101 @@ export function artefactosActivos() {
   return salida.sort();
 }
 
+/** Las secciones `## ...` de un markdown: encabezado y cuerpo. */
+function secciones(texto) {
+  return texto
+    .split(/^(?=## )/m)
+    .filter((s) => s.startsWith("## "))
+    .map((s) => {
+      const [encabezado, ...cuerpo] = s.split(/\r?\n/);
+      return { encabezado, cuerpo: cuerpo.join("\n") };
+    });
+}
+
+/** Lo que le falta a UNA revision adversarial para serlo. [] si esta bien.
+ *
+ *  LIMITE DECLARADO: esto decide que hay contenido y que hay evidencia que se
+ *  puede ir a mirar, no que la evidencia pruebe lo que la lente dice. Eso no se
+ *  decide con un patron, y por eso la exigencia de evidencia es «al menos dos
+ *  lentes» y no «cada una»: una lente de contrato puede argumentar en prosa
+ *  (medido sobre las seis revisiones reales del 2026-09-17, que tienen entre dos y
+ *  cuatro lentes con evidencia cada una). */
+export function faltasDeLaRevision(revision) {
+  const faltas = [];
+  const todas = secciones(revision);
+  const lentes = todas.filter((s) => /^## Lente\b/.test(s.encabezado));
+  if (lentes.length < 2) faltas.push(`tiene ${lentes.length} lente(s), y una sola mirada es una relectura`);
+  for (const [i, lente] of lentes.entries()) {
+    const nombre = lente.encabezado.replace(/^## Lente\s*\d*\s*[—:.-]*\s*/, "");
+    if (!/\p{L}/u.test(nombre)) faltas.push(`la lente ${i + 1} no dice que mira (su encabezado es «${lente.encabezado.trim()}»)`);
+    if (!lente.cuerpo.trim()) faltas.push(`la lente ${i + 1} no dice que encontro: esta vacia`);
+  }
+  const conEvidencia = lentes.filter((l) => EVIDENCIA.test(l.cuerpo)).length;
+  if (lentes.length >= 2 && conEvidencia < 2) {
+    faltas.push(`${conEvidencia} lente(s) citan algo que se pueda ir a mirar (una ruta, un comando o un sha), y hacen falta dos`);
+  }
+  const veredicto = todas.find((s) => /^## Veredicto\b/.test(s.encabezado));
+  if (!veredicto) faltas.push("no tiene veredicto");
+  else if (!veredicto.cuerpo.trim()) faltas.push("el veredicto esta vacio");
+  return faltas;
+}
+
 /** La regla 4 sobre una lista de archives: los que se archivaron bajo el desvio
- *  y no traen su revision registrada, o la traen sin lentes o sin veredicto. */
+ *  y no traen su revision registrada, o la traen sin contenido. Una carpeta sin
+ *  fecha es rojo, no se saltea. */
 export function archivesSinRevision(archives, desde) {
   const salida = [];
   for (const { carpeta, revision } of archives) {
     const fecha = carpeta.slice(0, 10);
-    if (!esFecha(fecha) || fecha < desde) continue;
-    if (revision === null) {
+    if (!esFecha(fecha)) {
       salida.push(
-        `${carpeta}: se archivo el ${fecha}, bajo el desvio que rige desde el ${desde}, y no trae ${ARCHIVO_REVISION}. ` +
-          `Con un solo mantenedor esa revision es lo unico que reemplaza a la cruzada. Arreglo: escribila en la carpeta ` +
-          `del change —al menos dos lentes (\`## Lente ...\`), cada una con su pregunta y su evidencia, y un \`## Veredicto\`—`,
+        `${carpeta}: la carpeta del archive no empieza con una fecha AAAA-MM-DD, asi que esta regla no puede saber si se ` +
+          `archivo bajo el desvio. Arreglo: renombrarla con la fecha del archive (\`git mv\`), como las demas`,
       );
       continue;
     }
-    const lentes = (revision.match(/^## Lente\b/gm) ?? []).length;
-    if (lentes < 2 || !/^## Veredicto\b/m.test(revision)) {
+    if (fecha < desde) continue;
+    if (revision === null) {
       salida.push(
-        `${carpeta}/${ARCHIVO_REVISION} tiene ${lentes} lente(s) y ${/^## Veredicto\b/m.test(revision) ? "" : "NO "}` +
-          `tiene veredicto. Una sola mirada no es una revision adversarial: es una relectura. Arreglo: al menos dos ` +
-          `\`## Lente ...\` y un \`## Veredicto\``,
+        `${carpeta}: se archivo el ${fecha}, bajo el desvio que rige desde el ${desde}, y no trae ${ARCHIVO_REVISION}. ` +
+          `Con un solo mantenedor esa revision es lo unico que reemplaza a la cruzada. Arreglo: correrla y registrarla ` +
+          `en la carpeta del change, con el formato de las del 2026-09-17 (openspec/changes/archive/2026-09-17-*)`,
+      );
+      continue;
+    }
+    const faltas = faltasDeLaRevision(revision);
+    if (faltas.length) {
+      salida.push(
+        `${carpeta}/${ARCHIVO_REVISION} no es una revision todavia: ${faltas.join("; ")}. Cada lente es una pregunta ` +
+          `distinta hecha al change, con lo que se encontro al hacerla; el veredicto dice si se archiva y por que. ` +
+          `Arreglo: correr la revision, no completar el formato`,
+      );
+    }
+  }
+  return salida;
+}
+
+/** La regla 6 sobre una lista de archives: los que tocan `gobierno-contribucion`,
+ *  se archivaron bajo el desvio y no traen la constancia de la aprobacion del PO
+ *  en su proposal. La fecha no puede ser posterior al archive: se aprueba antes
+ *  de fundir, no despues. */
+export function archivesSinAprobacionDelPo(archives, desde) {
+  const salida = [];
+  for (const { carpeta, tocaGobierno, proposal } of archives) {
+    const fecha = carpeta.slice(0, 10);
+    if (!tocaGobierno || !esFecha(fecha) || fecha < desde) continue;
+    const linea = (frontmatter(proposal ?? "") ?? []).find((l) => /^aprobado_por_po:/.test(l.texto));
+    const valor = linea ? linea.texto.replace(/^aprobado_por_po:\s*/, "").replace(/\s+#.*$/, "").trim() : "";
+    let problema = null;
+    if (!linea) problema = "no trae `aprobado_por_po:` en el frontmatter de su proposal";
+    else if (!esFecha(valor)) problema = `su \`aprobado_por_po:\` dice «${valor}», que no es una fecha AAAA-MM-DD`;
+    else if (valor > fecha) problema = `su \`aprobado_por_po:\` es del ${valor}, posterior al archive`;
+    if (problema) {
+      salida.push(
+        `${carpeta}: trae un delta de \`gobierno-contribucion\`, se archivo el ${fecha} bajo el desvio y ${problema}. ` +
+          `Esa capability la aprueba el PO y el desvio no lo reemplaza: sin la constancia, un change que seguia en ` +
+          `\`pendiente-de-revision\` se funde igual. Arreglo: si el PO lo aprobo, que lo deje escrito en el proposal ` +
+          `con la fecha en que lo hizo; si no, devolver el change a openspec/changes/ hasta que lo apruebe`,
       );
     }
   }
@@ -258,7 +391,7 @@ export function gateDelPoAusente(change, tocaGobierno, proposal) {
   if (!tocaGobierno) return null;
   const linea = (frontmatter(proposal ?? "") ?? []).find((l) => /^aprueba:/.test(l.texto));
   const valor = linea ? linea.texto.replace(/^aprueba:\s*/, "").replace(/\s+#.*$/, "").trim() : "";
-  if (/\bPO\b/.test(valor)) return null;
+  if (EMPIEZA_CON_EL_PO.test(valor)) return null;
   return (
     `openspec/changes/${change}/proposal.md${linea ? `:${linea.linea}` : ""} trae un delta de \`gobierno-contribucion\` ` +
     `y su \`aprueba:\` ${linea ? `dice «${valor}»` : "no existe"}. Esa capability la aprueba el PO, y el desvio de la ` +
@@ -284,16 +417,20 @@ function changesActivos() {
     });
 }
 
-/** Los archives del arbol, con su revision si la tienen. */
+/** Los archives del arbol, con su revision si la tienen, si tocan
+ *  `gobierno-contribucion` y su proposal. */
 function archivesDelArbol() {
   const base = path.join(RAIZ, "openspec/changes/archive");
+  const leerSiExiste = (abs) => (fs.existsSync(abs) ? fs.readFileSync(abs, "utf8") : null);
   return fs
     .readdirSync(base, { withFileTypes: true })
     .filter((e) => e.isDirectory())
-    .map((e) => {
-      const rev = path.join(base, e.name, ARCHIVO_REVISION);
-      return { carpeta: e.name, revision: fs.existsSync(rev) ? fs.readFileSync(rev, "utf8") : null };
-    });
+    .map((e) => ({
+      carpeta: e.name,
+      revision: leerSiExiste(path.join(base, e.name, ARCHIVO_REVISION)),
+      tocaGobierno: fs.existsSync(path.join(base, e.name, "specs", "gobierno-contribucion")),
+      proposal: leerSiExiste(path.join(base, e.name, "proposal.md")),
+    }));
 }
 
 const CODEOWNERS = () => leer(".github/CODEOWNERS");
@@ -322,17 +459,21 @@ test("desvio · con un solo dueno el desvio esta declarado y completo; con dos, 
   assert.deepEqual(problemas, [], problemas.join("\n"));
 });
 
-test("desvio · ningun change activo nombra como aprobador al builder par que el desvio declara inexistente", () => {
-  if (!bloqueDelDesvio(AGENTS())) return; // retirado: el builder par existe y nombrarlo es correcto
-  const hallazgos = artefactosActivos().flatMap((r) => aprobadoresQueNoExisten(r, leer(r)));
+test("desvio · el `aprueba:` de cada change activo vale lo que el desvio admite, y retirado, deja de nombrarlo", () => {
+  const rige = bloqueDelDesvio(AGENTS()) !== null;
+  const hallazgos = artefactosActivos().flatMap((r) => aprobadoresFueraDeRegla(r, leer(r), rige));
   assert.deepEqual(
     hallazgos.map((h) => `${h.ruta}:${h.linea} ${h.campo}: ${h.valor}`),
     [],
-    "estas lineas nombran como aprobador a alguien que en este repositorio no existe, y un change que espera una " +
-      "revision imposible no se cierra nunca. Arreglo: reemplaza el valor por " +
-      `«${VALOR_APRUEBA}», o por «PO» si el artefacto es el proposal o el spec de un change que toca ` +
-      "`gobierno-contribucion` (esa aprobacion el desvio no la toca). Los comentarios que acotan el gate del PO se " +
-      "conservan",
+    rige
+      ? "mientras rige el desvio, estas lineas nombran como aprobador algo que no es un valor de la lista cerrada, o " +
+          "estan escritas donde ningun lector de frontmatter las ve. Un aprobador que no existe deja un change " +
+          "esperando una revision imposible. Arreglo: la clave en minuscula y al margen, dentro de un frontmatter que " +
+          "empieza en la linea 1, y el valor uno de estos —los comentarios que acotan el gate del PO se conservan " +
+          `al costado—: ${VALORES_DEL_DESVIO.map((v) => `«${v}»`).join(", ")}`
+      : "el recuadro del desvio se retiro de AGENTS.md y estas lineas siguen nombrando la revision del desvio como " +
+          "aprobador: ya hay un segundo builder, y el change dice que no hace falta. Arreglo: devolverlas al rol que " +
+          "aprueba ese artefacto (el builder par, o el PO en lo que toca `gobierno-contribucion`)",
   );
 });
 
@@ -354,6 +495,13 @@ test("desvio · todo change archivado bajo el desvio trae su revision adversaria
   const desde = fechaDelDesvio(bloque);
   assert.ok(desde, "el recuadro del desvio no tiene fecha legible, y sin ella esta regla no sabe desde cuando mirar");
   const mal = archivesSinRevision(archivesDelArbol(), desde);
+  assert.deepEqual(mal, [], mal.join("\n"));
+});
+
+test("desvio · todo change de gobierno-contribucion archivado bajo el desvio trae la constancia del PO", () => {
+  const bloque = bloqueDelDesvio(AGENTS());
+  if (!bloque) return;
+  const mal = archivesSinAprobacionDelPo(archivesDelArbol(), fechaDelDesvio(bloque));
   assert.deepEqual(mal, [], mal.join("\n"));
 });
 
@@ -417,11 +565,11 @@ test("MUERDE · el frontmatter que nombra al builder par se caza; `informado:` y
     "",
     "# Cuerpo que dice Builder 2 y no es frontmatter",
   ].join("\n");
-  const h = aprobadoresQueNoExisten("x/proposal.md", texto);
+  const h = aprobadoresFueraDeRegla("x/proposal.md", texto);
   assert.deepEqual(h.map((x) => `${x.linea} ${x.campo}`), ["4 aprueba"]);
-  assert.deepEqual(aprobadoresQueNoExisten("x/design.md", "---\nrevisa: el builder que no lo escribió\n---\n").length, 1);
-  assert.deepEqual(aprobadoresQueNoExisten("x/tasks.md", `---\naprueba: ${VALOR_APRUEBA}\n---\n`), []);
-  assert.deepEqual(aprobadoresQueNoExisten("x/proposal.md", "---\naprueba: PO  # gobierno-contribucion\n---\n"), []);
+  assert.deepEqual(aprobadoresFueraDeRegla("x/design.md", "---\nrevisa: el builder que no lo escribió\n---\n").length, 1);
+  assert.deepEqual(aprobadoresFueraDeRegla("x/tasks.md", `---\naprueba: ${VALOR_APRUEBA}\n---\n`), []);
+  assert.deepEqual(aprobadoresFueraDeRegla("x/proposal.md", "---\naprueba: PO  # gobierno-contribucion\n---\n"), []);
 });
 
 test("MUERDE · un change de gobierno-contribucion sin el PO en el VALOR de `aprueba:` se caza", () => {
@@ -436,7 +584,9 @@ test("MUERDE · un change de gobierno-contribucion sin el PO en el VALOR de `apr
 });
 
 test("MUERDE · un archive bajo el desvio sin revision, o con una sola lente, se caza; uno anterior no", () => {
-  const buena = "# Revision\n\n## Lente 1 — contrato\n\nx\n\n## Lente 2 — evidencia\n\ny\n\n## Veredicto\n\narchivable\n";
+  const buena =
+    "# Revision\n\n## Lente 1 — contrato\n\nel ADDED no existe en `openspec/specs/x/spec.md`\n\n" +
+    "## Lente 2 — mordida\n\n`node --test pruebas/x.test.mjs` → 1 rojo al mutar\n\n## Veredicto\n\narchivable\n";
   const mal = archivesSinRevision(
     [
       { carpeta: "2026-08-19-viejo", revision: null },
@@ -451,4 +601,80 @@ test("MUERDE · un archive bajo el desvio sin revision, o con una sola lente, se
   assert.match(mal[0], /^2026-09-17-sin-revision: /);
   assert.match(mal[1], /^2026-09-18-una-lente\//);
   assert.match(mal[2], /^2026-09-18-sin-veredicto\//);
+});
+
+// ---------------------------------------------------------------------------
+// LAS EVASIONES QUE ENCONTRO LA REVISION ADVERSARIAL DEL CARRIL (2026-09-18).
+// ---------------------------------------------------------------------------
+
+test("MUERDE · un aprobador fuera de la lista cerrada se caza en cualquiera de sus formas", () => {
+  const evasiones = {
+    "valor YAML en bloque": "---\naprueba: >-\n  Builder 2 (builder par)\n---\n",
+    "el rol con guion": "---\naprueba: builder-2\n---\n",
+    "el otro builder": "---\nrevisa: el otro builder\n---\n",
+    "la clave con mayuscula": "---\nAprueba: Builder 2 (builder par)\n---\n",
+    "la clave indentada": "---\n  aprueba: Builder 2 (builder par)\n---\n",
+    "una linea en blanco antes del ---": "\n---\naprueba: Builder 2 (builder par)\n---\n",
+  };
+  for (const [forma, texto] of Object.entries(evasiones)) {
+    assert.equal(aprobadoresFueraDeRegla("x/proposal.md", texto, true).length, 1, `«${forma}» tenia que cazarse`);
+  }
+  // CONTRAPESO: los valores reales, con su comentario al costado y sus lineas de
+  // comentario de continuacion, e `informado:`, NO se cazan.
+  const validos = [
+    `---\naprueba: ${VALOR_APRUEBA}  # NO el \`dri\`: hasta el 2026-08-24\n---\n`,
+    "---\naprueba: PO  # toca `gobierno-contribucion` (quien aprueba que),\n             # que es el gate del PO\ninformado: PO / Builder 2\n---\n",
+    "---\naprueba: PO (PO)          # es su modelo operativo\n---\n",
+    `---\naprueba: PO (el delta de gobierno-contribucion) y ${VALOR_APRUEBA}\n---\n`,
+    `---\nrevisa: ${VALOR_APRUEBA}\n---\n`,
+    "# sin frontmatter: un delta de spec no lo lleva\n\nBuilder 2 en el cuerpo\n",
+  ];
+  for (const texto of validos) assert.deepEqual(aprobadoresFueraDeRegla("x/proposal.md", texto, true), [], texto);
+});
+
+test("MUERDE · retirado el desvio, un `aprueba:` que sigue nombrandolo se caza; el builder par no", () => {
+  assert.equal(aprobadoresFueraDeRegla("x/tasks.md", `---\naprueba: ${VALOR_APRUEBA}\n---\n`, false).length, 1);
+  assert.deepEqual(aprobadoresFueraDeRegla("x/tasks.md", "---\naprueba: Builder 2 (builder par)\n---\n", false), []);
+});
+
+test("MUERDE · el PO nombrado de costado, o negado, no es el PO en el valor", () => {
+  for (const valor of ["revision adversarial (no el PO)", "Builder 1 (PO: no aplica)", "sin PO"]) {
+    assert.notEqual(gateDelPoAusente("x", true, `---\naprueba: ${valor}\n---\n`), null, `«${valor}» tenia que cazarse`);
+  }
+  for (const valor of ["PO", "PO (PO)", "PO  # comentario", `PO (el delta de gobierno-contribucion) y ${VALOR_APRUEBA}`]) {
+    assert.equal(gateDelPoAusente("x", true, `---\naprueba: ${valor}\n---\n`), null, `«${valor}» no tenia que cazarse`);
+  }
+});
+
+test("MUERDE · una revision con los encabezados y sin contenido se caza, y la carpeta sin fecha tambien", () => {
+  const cascaras = {
+    "solo encabezados": "## Lente\n## Lente\n## Veredicto\n",
+    "lentes sin cuerpo": "## Lente 1 — contrato\n\n## Lente 2 — evidencia\n\n## Veredicto\n\narchivable\n",
+    "lentes sin evidencia": "## Lente 1 — contrato\n\nbien\n\n## Lente 2 — evidencia\n\nbien\n\n## Veredicto\n\narchivable\n",
+    "veredicto vacio":
+      "## Lente 1 — contrato\n\n`openspec/specs/x/spec.md:3`\n\n## Lente 2 — mordida\n\n`node --test x.test.mjs` → rojo\n\n## Veredicto\n",
+  };
+  for (const [caso, revision] of Object.entries(cascaras)) {
+    assert.equal(archivesSinRevision([{ carpeta: "2026-09-20-x", revision }], "2026-09-17").length, 1, `«${caso}» tenia que cazarse`);
+  }
+  assert.equal(archivesSinRevision([{ carpeta: "sin-fecha-x", revision: null }], "2026-09-17").length, 1, "la carpeta sin fecha no se saltea");
+});
+
+test("MUERDE · un change de gobierno-contribucion archivado sin la constancia del PO se caza", () => {
+  const conFecha = (f) => `---\nartefacto: proposal\naprueba: PO\naprobado_por_po: ${f}\n---\n`;
+  const mal = archivesSinAprobacionDelPo(
+    [
+      { carpeta: "2026-09-18-sin-constancia", tocaGobierno: true, proposal: "---\naprueba: PO\n---\n" },
+      { carpeta: "2026-09-18-fecha-rota", tocaGobierno: true, proposal: conFecha("pronto") },
+      { carpeta: "2026-09-18-aprobado-despues", tocaGobierno: true, proposal: conFecha("2026-09-19") },
+      { carpeta: "2026-09-18-bien", tocaGobierno: true, proposal: conFecha("2026-09-18") },
+      { carpeta: "2026-09-18-tecnico", tocaGobierno: false, proposal: "---\naprueba: x\n---\n" },
+      { carpeta: "2026-08-19-anterior", tocaGobierno: true, proposal: null },
+    ],
+    "2026-09-17",
+  );
+  assert.equal(mal.length, 3, mal.join("\n"));
+  assert.match(mal[0], /^2026-09-18-sin-constancia/);
+  assert.match(mal[1], /^2026-09-18-fecha-rota/);
+  assert.match(mal[2], /^2026-09-18-aprobado-despues/);
 });
