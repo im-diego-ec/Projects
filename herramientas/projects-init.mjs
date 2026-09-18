@@ -3170,6 +3170,111 @@ export function rutasDelRender(textoDeOutputs) {
     .filter(Boolean);
 }
 
+/** CON QUE ACTION SE RENDERIZA LA CONSTITUCION DEL PROYECTO NUEVO: la del tag que
+ *  su `ci.yml` pina, no la del clon.
+ *
+ *  EL DEFECTO QUE ESTO CIERRA, medido el 2026-09-18 (revision adversarial del
+ *  porte, RV-L3L11-01). El render usaba la action DEL CLON y el CI del proyecto la
+ *  verifica con la DEL TAG. Con un clon de main que lleva un canonico que ningun
+ *  release publico todavia —la 1.10.0 contra un andamio que pina v1.9.6, cuyo
+ *  canonico termina en la 1.7.0— el proyecto nacia con dos `::error::` («declara
+ *  la version 1.10.0 y esta copia del marco es la 1.7.0»), `ci-ok` en rojo y el
+ *  despliegue sin dispararse. Es lo que `herramientas/plantilla-repos/personalizar.yml`
+ *  ya resolvia para las plantillas trayendo el marco en la version que declara el
+ *  `ci.yml` del proyecto, «no `main`».
+ *
+ *  Por eso: el pin se lee del `ci.yml` YA INSTANCIADO del destino —el mismo que va
+ *  a correr el CI, sin una segunda declaracion que pueda divergir— y, si el clon
+ *  tiene ese tag, la action se extrae de el con git (`ls-tree` + `cat-file`: sin
+ *  `tar`, que no es igual en los tres sistemas) a un directorio temporal.
+ *
+ *  Sin el tag (una descarga en ZIP, un clon sin tags) NO se corta el camino: se
+ *  renderiza con la del clon. Y se AVISA solo cuando el aviso es verdad: si el
+ *  canonico del clon declara una version MAYOR que el pin, ningun release la
+ *  publico todavia (la version del canonico es la del release que la publica,
+ *  `actions/constitucion/canonico/manifiesto.json`), y el primer CI va a ser rojo.
+ *  Si no es mayor, el clon y el tag dicen lo mismo —la huella del canonico no
+ *  deja cambiar el texto sin agregar una version— y avisar seria ruido para
+ *  quien arranca con doble clic. */
+export function accionDeConstitucion(raizMarco, destino, git = gitDelMarco) {
+  const delClon = path.join(raizMarco, "actions", "constitucion", "constitucion.mjs");
+  const ci = path.join(destino, ".github", "workflows", "ci.yml");
+  const pin = /\/actions\/constitucion@(v\d+\.\d+\.\d+)\b/.exec(fs.existsSync(ci) ? fs.readFileSync(ci, "utf8") : "")?.[1];
+  if (!pin) return { script: delClon, pin: null, desde: "clon", limpiar: () => {} };
+
+  let blobs = null;
+  try {
+    blobs = git(raizMarco, ["ls-tree", "-r", "-z", `${pin}^{commit}`, "--", "actions/constitucion"])
+      .toString("utf8")
+      .split("\0")
+      .filter(Boolean)
+      .map((linea) => {
+        const [meta, ruta] = linea.split("\t");
+        const [, tipo, sha] = meta.split(" ");
+        return { tipo, sha, ruta };
+      })
+      .filter((e) => e.tipo === "blob");
+  } catch {
+    blobs = null;
+  }
+  if (blobs?.some((b) => b.ruta === "actions/constitucion/constitucion.mjs")) {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "projects-init-constitucion-"));
+    try {
+      for (const b of blobs) {
+        const abs = path.join(dir, ...b.ruta.split("/"));
+        fs.mkdirSync(path.dirname(abs), { recursive: true });
+        fs.writeFileSync(abs, git(raizMarco, ["cat-file", "blob", b.sha]));
+      }
+    } catch (e) {
+      fs.rmSync(dir, { recursive: true, force: true });
+      return delClonConAviso(delClon, raizMarco, pin, `no pude extraer la action de ${pin} (${e.message})`);
+    }
+    return {
+      script: path.join(dir, "actions", "constitucion", "constitucion.mjs"),
+      pin,
+      desde: "tag",
+      limpiar: () => fs.rmSync(dir, { recursive: true, force: true }),
+    };
+  }
+  return delClonConAviso(delClon, raizMarco, pin, `el tag ${pin} no esta en el clon`);
+}
+
+function delClonConAviso(delClon, raizMarco, pin, motivo) {
+  const salida = { script: delClon, pin, desde: "clon", limpiar: () => {} };
+  let version = null;
+  try {
+    const m = JSON.parse(fs.readFileSync(path.join(raizMarco, "actions", "constitucion", "canonico", "manifiesto.json"), "utf8"));
+    version = m.versiones?.at(-1)?.version ?? null;
+  } catch {
+    // Sin manifiesto legible no se puede afirmar que el primer CI sea rojo: se dice igual.
+    return {
+      ...salida,
+      aviso:
+        `::warning::${motivo}, y no pude leer que version del canonico trae el clon del marco ` +
+        `(actions/constitucion/canonico/manifiesto.json), asi que no se si la porcion del marco que se renderiza ` +
+        `con la action del clon coincide con la que el CI del proyecto verifica con ${pin}. Si no coincide, el job ` +
+        `\`constitucion\` va a dar rojo en el primer push. Arreglo: \`git -C "${raizMarco}" fetch --tags\` y volver ` +
+        `a correr con --forzar.`,
+    };
+  }
+  if (!version || compararVersiones(version, pin.slice(1)) <= 0) return salida;
+  return {
+    ...salida,
+    aviso:
+      `::warning::el CI del proyecto verifica la constitucion con actions/constitucion@${pin} y ${motivo}, asi que la ` +
+      `porcion del marco se renderizo con la action del clon, que trae el canonico ${version}: una version que ` +
+      `${pin} no publica. El proyecto va a nacer con el job \`constitucion\` en ROJO («declara la version ${version} y ` +
+      `esta copia del marco es la …»), y con el \`ci-ok\` y el despliegue detras. Pasa con un clon de main entre un ` +
+      `cambio del canonico y el release que lo publica, o con una descarga en ZIP, que no trae tags. Arreglo: ` +
+      `\`git -C "${raizMarco}" fetch --tags\` y volver a correr con --forzar; si el marco se bajo en ZIP, bajar ` +
+      `el de la version ${pin} (la pagina de releases del marco) en vez del de main, y correr desde ese.`,
+  };
+}
+
+function gitDelMarco(raizMarco, args) {
+  return execFileSync("git", args, { cwd: raizMarco, stdio: ["ignore", "pipe", "ignore"], maxBuffer: 64 * 1024 * 1024 });
+}
+
 async function main(argv) {
   // ── El piso de Node, antes de tocar NADA ──
   // El aviso sale por stderr a proposito: `--ejemplo` escribe el JSON en stdout y
@@ -3830,10 +3935,18 @@ async function main(argv) {
     const salidaDelRender = path.join(bandeja, "outputs.txt");
     fs.writeFileSync(salidaDelRender, "", "utf8");
     let artefactos;
+    // La action del tag que pina el `ci.yml` del destino, no la del clon: ver
+    // accionDeConstitucion.
+    const accion = accionDeConstitucion(raizMarco, o.destino);
     try {
-      console.log("render de la porcion del marco de la constitucion");
+      console.log(
+        accion.desde === "tag"
+          ? `render de la porcion del marco de la constitucion (con la action de ${accion.pin}, la que verifica el CI del proyecto)`
+          : "render de la porcion del marco de la constitucion",
+      );
+      if (accion.aviso) console.error(accion.aviso);
       try {
-        execFileSync(process.execPath, [path.join(raizMarco, "actions/constitucion/constitucion.mjs")], {
+        execFileSync(process.execPath, [accion.script], {
           cwd: o.destino,
           stdio: "inherit",
           env: { ...process.env, CONSTITUCION_MODO: "escribir", GITHUB_OUTPUT: salidaDelRender },
@@ -3845,6 +3958,7 @@ async function main(argv) {
       artefactos = rutasDelRender(fs.readFileSync(salidaDelRender, "utf8"));
     } finally {
       fs.rmSync(bandeja, { recursive: true, force: true });
+      accion.limpiar();
     }
     if (artefactos.length === 0) {
       console.error(

@@ -51,8 +51,8 @@ author: la organización
 #     2026-08-22 tampoco hay ventana en la que estar atrasado sea verde. El
 #     codigo todavia sabe avisar hasta un exigible_desde posterior a la
 #     publicacion, pero el manifiesto que viaja aca declara siempre las dos fechas
-#     iguales y el banco del marco (pruebas/la-ventana-no-vuelve.test.mjs) pone
-#     rojo cualquier otra: con distribucion por version exacta, el aviso previo ya
+#     iguales y nunca futuras, y el banco del marco (pruebas/la-ventana-no-vuelve.test.mjs)
+#     pone rojo cualquier otra: con distribucion por version exacta, el aviso previo ya
 #     lo da el PR de bump. El campo y el output se retiran en v2.
 #   · .projects-valores.json ausente -> ::error:: en los dos modos. Es un atraso de
 #     adopcion y no una manipulacion, pero desde que la ventana de gracia se retiro
@@ -240,7 +240,8 @@ outputs:
   exigible_desde:
     description: >-
       Fecha desde la cual esa version es exigible. Es siempre la de su
-      publicacion: el banco del marco rechaza un manifiesto que declare otra.
+      publicacion, y nunca futura: el banco del marco rechaza un manifiesto que
+      declare otra.
       Se conserva por compatibilidad y se retira en v2.
     value: ${{ steps.constitucion.outputs.exigible_desde }}
   superficies:

@@ -122,9 +122,9 @@ import { invocacionesDe, leerWorkflows, main as mainCableado } from "./cableado.
  * INALCANZABLE POR DATOS: la versión exigible es la publicada (decisión D1 del PO:
  * una compuerta cuyo arreglo está en el árbol del consumidor se exige en rojo el día
  * que sale), y `pruebas/la-ventana-no-vuelve.test.mjs` pone rojo un manifiesto que
- * declare otra fecha. La rama, el campo y el output `exigible_desde` se retiran en
- * v2, donde quitar un output deja de ser un breaking a escondidas. Ver el change
- * ventana-vencida. */
+ * declare otra fecha, o una que todavía no llegó. La rama, el campo y el output
+ * `exigible_desde` se retiran en v2, donde quitar un output deja de ser un breaking
+ * a escondidas. Ver el change ventana-vencida. */
 
 const MS_POR_DIA = 86400000;
 

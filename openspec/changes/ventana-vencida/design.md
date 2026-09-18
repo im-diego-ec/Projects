@@ -191,3 +191,67 @@ después, sobre 700. La frase nueva cabe en una línea.
 - **El resumen de cada corrida imprime «exigible desde».** Es verdad —es la misma fecha
   que la publicación— y se va con el output en v2.
 
+
+## Adenda del 2026-09-18 — la revisión adversarial del carril
+
+### D12. Las dos fechas iguales no alcanzan: tampoco pueden ser futuras
+
+**El hueco.** La regla de D7 pedía `exigible_desde` igual a `publicada` y no miraba
+**cuáles**. Una entrada con las dos en el futuro la pasaba, y la rama de aviso de
+`hallazgoPorFecha` volvía a ser alcanzable: medido por la revisión, un consumidor con el
+artefacto en 1.7.0 salía `exit 0` con «Hasta el 2026-12-01 esto es un aviso». No es un
+caso de laboratorio: la entrada del canónico se abre con número tentativo antes del
+release, y la skill del release mandaba «refrescar las dos fechas», que es acordarse.
+
+**Decisión.** Una tercera regla en `la-ventana-no-vuelve.test.mjs`: ninguna fecha del
+manifiesto es posterior a hoy, medido en UTC+14 —el día más adelantado del planeta—
+para que la hora a la que se corre no ponga rojo un release legítimo. Es monótona: lo
+que hoy pasa, pasa mañana. Como el PR del release corre el banco el día que se corta y
+el tag se crea sobre ese merge, una fecha futura no llega a publicarse.
+
+**Descartado: igualar `publicada` a la fecha del CHANGELOG.** Es lo que sugería la
+revisión, y se midió antes de escribirlo: la entrada «1.7.0» dice 2026-08-31, la sección
+[1.7.0] del CHANGELOG dice 2026-08-23, y ese texto del canónico lo publicó la v1.8.0 del
+2026-09-01 (`git show v1.8.0:actions/constitucion/canonico/manifiesto.json`). La igualdad
+pondría rojo un dato histórico que no se corrige sin cambiar la versión que declaran los
+artefactos de los consumidores; y lo que protege —que el aviso no se vuelva alcanzable—
+ya lo cubre la regla de hoy.
+
+### D13. El proyecto nace con la constitución de su pin, no con la del clon
+
+**El defecto** (RV-L3L11-01, severidad alta). La 1.10.0 de este change y de
+`el-canonico-dice-como-se-trabaja` vive en el árbol antes de su release, y el andamio
+pina `actions/constitucion@v1.9.6`, cuyo canónico termina en la 1.7.0. `projects-init`
+renderizaba con la action **del clon** y el CI del proyecto verifica con la **del
+tag**: reproducido con un proyecto generado desde este árbol y verificado con
+`git archive v1.9.6 actions/constitucion`, `exit=1` y dos `::error::` («declara la
+version 1.10.0 y esta copia del marco es la 1.7.0»). Con eso, `ci-ok` rojo y el
+despliegue sin dispararse. En local salía verde: se verificaba con la misma action.
+
+**Decisión.** `projects-init` lee el pin del `ci.yml` ya instanciado del destino y, si
+el clon tiene ese tag, extrae la action con git (`ls-tree` + `cat-file`, sin `tar`) y
+renderiza con ella. Es lo que `herramientas/plantilla-repos/personalizar.yml` ya hacía
+para las plantillas, «no `main`», por el mismo motivo medido. Misma reproducción con el
+arreglo: `exit=0`, cero `::error::`.
+
+**Sin el tag no se corta el camino.** Una descarga en ZIP —el camino acompañado de
+`docs/04`— no trae tags. Ahí se renderiza con el clon, y la herramienta avisa **solo si
+el aviso es verdad**: si el canónico del clon declara una versión mayor que el pin,
+ningún release la publicó y el primer CI va a ser rojo. Si no es mayor, el clon y el tag
+dicen lo mismo (la huella no deja cambiar el texto sin agregar una versión) y un aviso
+sería ruido para quien arranca con doble clic.
+
+**Alternativas descartadas.**
+
+- **Que ningún cambio del canónico llegue a `main` antes de su release**, con un banco
+  que exija que la última versión del manifiesto no supere el pin del andamio. Cierra
+  también el camino ZIP, pero en este porte estaría rojo por construcción hasta que el
+  lote 38 mueva los pines, y decide cómo se integra el porte a `main`: es una decisión
+  del PO, no de este change. Queda como tarea abierta con su motivo.
+- **Bajar la action del pin por la red.** Agrega una dependencia de red a una
+  herramienta que corre en la máquina de quien arranca, para cubrir la ventana entre un
+  merge y un release. No compensa.
+
+**Clasificación de distribución.** `herramientas/projects-init.mjs` es **herramienta
+del marco**: corre desde el clon y no viaja al proyecto. Contrato: corrección de
+comportamiento (patch) — el proyecto nace con lo que su propio CI verifica.

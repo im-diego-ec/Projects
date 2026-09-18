@@ -198,9 +198,11 @@ cambio en esta version: `manifiesto.json` necesita una entrada nueva en `version
 con `publicada` y `exigible_desde`, y las dos son SIEMPRE la misma fecha, la del
 release: un cambio del canonico es exigible el dia que se publica (la ventana de gracia
 de 28 dias se retiro el 2026-08-22 y el estreno con aviso el 2026-09-17 — ver el change
-ventana-vencida). Otra fecha pone rojo `actions/constitucion/pruebas/la-ventana-no-vuelve.test.mjs`.
-Si la entrada ya existe porque el change que toco el canonico la agrego con el numero
-tentativo, aca se corrige el numero y se refrescan las dos fechas. Sin esa entrada, el
+ventana-vencida). Otra fecha pone rojo `actions/constitucion/pruebas/la-ventana-no-vuelve.test.mjs`,
+y tambien una fecha posterior a hoy: la fecha es la del dia en que el release sale, no la
+del dia en que se lo planea. Si la entrada ya existe porque el change que toco el canonico
+la agrego con el numero tentativo (y la fecha de ese dia), aca se corrige el numero y se
+refrescan las dos fechas. Sin esa entrada, el
 artefacto de los consumidores queda distinto del canonico y el check no puede decir por
 que.
 

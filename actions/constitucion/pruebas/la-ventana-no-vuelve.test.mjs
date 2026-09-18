@@ -48,6 +48,22 @@ const MANIFIESTO = path.join(CANONICO, "manifiesto.json");
 //   2. Ninguna superficie que le describe el veredicto a quien la lee promete un
 //      aviso previo al rojo. Y en positivo: la regla del canonico que habla del
 //      artefacto atrasado dice que es ROJO.
+//   3. Ninguna version del manifiesto declara una fecha FUTURA. La regla 1 sola no
+//      alcanzaba, y lo midio la revision adversarial del carril (2026-09-18): una
+//      entrada con `publicada` y `exigible_desde` iguales y las dos en el futuro
+//      pasaba la regla 1 y volvia alcanzable la rama de aviso —un consumidor con el
+//      artefacto atrasado salia exit 0 hasta esa fecha—. Y es un caso plausible: la
+//      entrada del canonico se abre con un numero tentativo antes del release, y la
+//      skill del release manda refrescar las fechas, que es acordarse. Con esta
+//      regla el PR del release no pasa con una fecha que todavia no llego, y el
+//      tag se crea sobre ese merge. Es monotona: una fecha que hoy pasa, pasa manana.
+//      NO se compara `publicada` con la fecha del CHANGELOG, y se midio por que: la
+//      entrada «1.7.0» dice 2026-08-31, la seccion [1.7.0] del CHANGELOG dice
+//      2026-08-23, y ese texto lo publico la v1.8.0 del 2026-09-01 (`git show
+//      v1.8.0:actions/constitucion/canonico/manifiesto.json`). Una igualdad contra
+//      el CHANGELOG pondria rojo un dato historico que ya no se puede corregir sin
+//      cambiar la version que declaran los artefactos de los consumidores, y lo que
+//      protege —que el aviso no se vuelva alcanzable— ya lo cubre esta regla.
 //
 // LIMITE DECLARADO de la regla 2: es una lista cerrada de redacciones que YA
 // estuvieron escritas, cada una con su origen. Caza que vuelvan esas, no una
@@ -60,6 +76,21 @@ const MANIFIESTO = path.join(CANONICO, "manifiesto.json");
 export function segundasFechas(manifiesto) {
   const versiones = Array.isArray(manifiesto?.versiones) ? manifiesto.versiones : [];
   return versiones.filter((v) => v?.exigible_desde !== v?.publicada);
+}
+
+/** Las versiones del manifiesto con una fecha posterior a `hoy` (AAAA-MM-DD), en
+ *  cualquiera de los dos campos. Con las dos iguales (regla 1) basta una, pero se
+ *  miran las dos: la rama de aviso de hallazgoPorFecha la dispara `exigible_desde`. */
+export function publicacionesFuturas(manifiesto, hoy) {
+  const versiones = Array.isArray(manifiesto?.versiones) ? manifiesto.versiones : [];
+  return versiones.filter((v) => [v?.publicada, v?.exigible_desde].some((f) => typeof f === "string" && f > hoy));
+}
+
+/** El dia mas adelantado del calendario en este instante: el de UTC+14, la zona
+ *  horaria mas al este. Cualquier «hoy» local de quien corta un release es menor o
+ *  igual, asi que la regla 3 no da rojo por la hora a la que se corre. */
+export function hoyEnAlgunLugar(ahora = Date.now()) {
+  return new Date(ahora + 14 * 3600 * 1000).toISOString().slice(0, 10);
 }
 
 /** Las redacciones que prometian la ventana, cada una con el lugar donde estuvo. */
@@ -170,6 +201,21 @@ test("la-ventana · el manifiesto que viaja con la action declara UNA sola fecha
   );
 });
 
+test("la-ventana · ninguna version del manifiesto declara una fecha que todavia no llego", () => {
+  const manifiesto = JSON.parse(fs.readFileSync(MANIFIESTO, "utf8"));
+  const hoy = hoyEnAlgunLugar();
+  const futuras = publicacionesFuturas(manifiesto, hoy);
+  assert.deepEqual(
+    futuras.map((v) => `${v.version}: publicada ${v.publicada}, exigible_desde ${v.exigible_desde}`),
+    [],
+    `estas versiones del canonico declaran una fecha posterior a hoy (${hoy} en UTC+14, el dia mas adelantado del ` +
+      "planeta). Con las dos fechas iguales la regla de la fecha unica pasa, pero un consumidor con el artefacto " +
+      "atrasado queda en exit 0 con un ::warning:: hasta esa fecha: la ventana de gracia de vuelta, por datos. " +
+      "Arreglo: la fecha de una version es la del dia en que sale el release, no la del dia en que se planea; si la " +
+      "entrada es tentativa, lleva la fecha de hoy y el release la refresca al cortarse.",
+  );
+});
+
 test("la-ventana · ninguna superficie que describe el veredicto promete un aviso previo al rojo", () => {
   const encontradas = [];
   for (const ruta of superficiesQueDescriben()) {
@@ -206,6 +252,37 @@ test("MUERDE · una segunda fecha se caza, y la fecha unica no", () => {
   assert.deepEqual(segundasFechas(futura).map((v) => v.version), ["1.4.0"]);
   const sinFecha = { versiones: [{ version: "1.5.0", publicada: "2026-09-02" }] };
   assert.deepEqual(segundasFechas(sinFecha).map((v) => v.version), ["1.5.0"], "sin la fecha exigible tambien son dos verdades");
+});
+
+test("MUERDE · una publicacion futura se caza aunque las dos fechas sean iguales; hoy y el pasado no", () => {
+  // EL HUECO que encontro la revision adversarial del carril (2026-09-18): la regla 1
+  // pedia fechas IGUALES y no miraba CUALES. Una entrada con las dos en el futuro
+  // volvia alcanzable la rama de aviso de hallazgoPorFecha: un consumidor atrasado
+  // salia exit 0 con «::warning:: Hasta el 2026-12-01 esto es un aviso».
+  const hoy = "2026-09-18";
+  const conEntrada = (publicada) => ({
+    versiones: [
+      { version: "1.7.0", publicada: "2026-08-31", exigible_desde: "2026-08-31" },
+      { version: "1.10.0", publicada, exigible_desde: publicada },
+    ],
+  });
+  assert.deepEqual(publicacionesFuturas(conEntrada("2026-12-01"), hoy).map((v) => v.version), ["1.10.0"]);
+  assert.deepEqual(publicacionesFuturas(conEntrada("2026-09-19"), hoy).map((v) => v.version), ["1.10.0"], "manana ya es futuro");
+  // CONTRAPESO: la entrada tentativa con fecha pasada, el release cortado el mismo dia
+  // que su entrada, y las versiones viejas, no.
+  assert.deepEqual(publicacionesFuturas(conEntrada("2026-09-17"), hoy), []);
+  assert.deepEqual(publicacionesFuturas(conEntrada("2026-09-18"), hoy), []);
+  // Una exigibilidad futura con la publicacion en el pasado tambien es futura: la
+  // rama de aviso la dispara `exigible_desde`, no `publicada`.
+  const soloExigible = { versiones: [{ version: "1.10.0", publicada: "2026-09-17", exigible_desde: "2026-12-01" }] };
+  assert.deepEqual(publicacionesFuturas(soloExigible, hoy).map((v) => v.version), ["1.10.0"]);
+});
+
+test("MUERDE · el hoy de la regla es el mas adelantado del planeta, no el de la maquina que corre", () => {
+  // 23:30 del 17 en UTC-5 (Quito) son las 04:30 del 18 en UTC y ya el 18 en UTC+14.
+  assert.equal(hoyEnAlgunLugar(Date.parse("2026-09-18T04:30:00Z")), "2026-09-18");
+  // Y a las 11:00 UTC del 17, en Kiribati ya es el 18: un release cortado alla no da rojo.
+  assert.equal(hoyEnAlgunLugar(Date.parse("2026-09-17T11:00:00Z")), "2026-09-18");
 });
 
 test("MUERDE · cada promesa vencida se caza con su redaccion original, y la corregida no", () => {

@@ -188,6 +188,21 @@ mueve sobre un cambio incompatible.
   mecánico. El documento se retiró y el bloque quedó declarado no aplicable, con lo
   que cada tarea protegía nombrado al lado. Para consumidores: nada.
 
+- **Un proyecto recién armado desde un clon del marco podía nacer con el job
+  `constitucion` en rojo.** `projects-init` renderizaba la porción del marco con la
+  action del clon, y el CI del proyecto la verifica con la del tag que pina su
+  `ci.yml`. Con un canónico que el clon trae y ningún release publicó todavía —la
+  1.10.0 de esta versión, mientras el andamio pina la anterior—, el proyecto nacía con
+  dos `::error::`, `ci-ok` en rojo y el despliegue sin dispararse. Ahora, si el clon
+  tiene el tag del pin, la constitución se renderiza con la action de ese tag. Si no lo
+  tiene (una descarga en ZIP no trae tags) y el canónico del clon va adelante del pin,
+  la herramienta lo avisa con el arreglo: `git -C <clon> fetch --tags` y volver a
+  correr con `--forzar`. Para consumidores: nada que hacer en un repo ya creado. **Si
+  armás un proyecto desde una descarga en ZIP de `main` antes de que salga el release
+  que publica este canónico, va a nacer con ese rojo**: bajá el ZIP de la versión que
+  pina su `ci.yml` (la página de releases del marco) en vez del de `main`, o regenerá la
+  porción con el comando de la primera entrada de «Cambiado», con esa versión.
+
 - **La documentación de `actions/constitucion` prometía una ventana de gracia que ya no
   existe.** El encabezado de `action.yml` decía, en presente, «la ventana de gracia es
   para reglas nuevas, no para ediciones a mano»; la descripción del output
@@ -627,6 +642,13 @@ mueve sobre un cambio incompatible.
   (`794bbaf`), donde la frase sobrevivió una semana porque «contar menciones no
   distingue la nota histórica del texto que sigue prometiendo». Para consumidores:
   nada; corre en el CI de Projects.
+
+- **Una versión del canónico tampoco puede declarar una fecha futura.** El banco de la
+  ventana pedía las dos fechas iguales y no miraba cuáles: una entrada con las dos en el
+  futuro lo pasaba, y un repo atrasado habría quedado en `exit 0` con un aviso hasta esa
+  fecha. Ahora el PR del marco que lo intente da rojo, medido contra el día más
+  adelantado del planeta (UTC+14). Para consumidores: nada; ninguna versión publicada
+  usó una fecha futura.
 
 ### Corregido
 

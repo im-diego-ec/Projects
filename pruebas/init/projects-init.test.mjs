@@ -1165,8 +1165,10 @@ test("la unica entrada que puede llegar a un shell es el pin, y esta acotada", (
         "si no calza. Un `;` o un backtick no llegan al shell",
     ],
     [
-      "path.join(raizMarco)",
-      "la ruta del script de la constitucion dentro del clon del marco; ademas esa invocacion no lleva shell",
+      "accion.script",
+      "la ruta del script de la constitucion: la del clon del marco, o la que accionDeConstitucion extrae del tag " +
+        "del pin a un directorio temporal que ella misma crea con mkdtemp. Ninguna de las dos sale de una entrada " +
+        "de la persona, y esa invocacion no lleva shell",
     ],
     [
       "`repos/${org}/${proyecto}/rulesets`",

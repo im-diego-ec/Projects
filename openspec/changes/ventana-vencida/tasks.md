@@ -52,7 +52,7 @@ donde la política dice una cosa y el manifiesto otra.
       desde el dia que la version se publica`, pero `action.yml:66` seguía diciendo en
       presente «La ventana de gracia es para reglas nuevas, no para ediciones a mano», y
       la descripción del output ofrecía «un estreno con aviso». Corregido en la 2.3:
-      `action.yml:48-56`, `:66-69` y `:240-244`. El output sigue publicándose
+      `action.yml:48-56`, `:66-69` y `:240-245`. El output sigue publicándose
       (`constitucion.mjs:1451`).
 - [x] 1.4 Las dos pruebas de la ventana, reescritas (no borradas): la que exigía el piso de
       28 días pasa a exigir que **cero días sea válido**, y la de `urgente` pasa a exigir
@@ -76,7 +76,7 @@ donde la política dice una cosa y el manifiesto otra.
       **Hecho, con un resto:** `git grep -n -e "28 dias" -e "28 días" -e DIAS_DE_GRACIA
       -e urgente -- actions .claude/skills/projects-release plantilla ':!*/pruebas/*'` →
       seis líneas, **todas en pasado** («Hubo hasta el 2026-08-22…», `actions/README.md:843`)
-      y una ajena (`plantilla/infra/adaptadores.md:113`, «lo menos urgente»). El resto:
+      y una ajena (`plantilla/infra/adaptadores.md:125`, «lo menos urgente»). El resto:
       el README y la skill seguían **ofreciendo** el estreno con aviso; ver 2.4.
 - [x] 1.6 Entrada en el CHANGELOG **en este mismo PR**, en la sección de la versión que se
       publica, con «Para consumidores» diciendo **en mayúsculas** que el PR de bump de un
@@ -104,11 +104,11 @@ donde la política dice una cosa y el manifiesto otra.
       2026-09-28»; restaurado.
 - [x] 2.2 **El canónico dice rojo, y gana su versión** (D8):
       `20-marco-version.md:50` «Un artefacto atrasado es **rojo** desde el PR de bump que
-      lo deja atrás»; `manifiesto.json:60` entrada `1.10.0` (número tentativo, lo corrige
+      lo deja atrás»; `manifiesto.json:61` entrada `1.10.0` (número tentativo, lo corrige
       el release), fechas iguales, huella `006fa20b…9939`. `leerCanonico()` → `1.10.0 696
       [] 90c41b5865e9`: 696 de 700 líneas, cero problemas.
 - [x] 2.3 **La action deja de prometerla**, sin tocar comportamiento:
-      `action.yml:48-56`, `:66-69`, `:240-244`; `constitucion.mjs` cabecera (`:39-52`),
+      `action.yml:48-56`, `:66-69`, `:240-245`; `constitucion.mjs` cabecera (`:39-52`),
       la nota de «hoy» (`:86`), el bloque de la ventana (`:111-129`), `validarManifiesto`
       (`:309-330`), `verificar` (`:965-977`), la rama sin valores (`:1043-1045`),
       `hallazgoPorFecha` (`:1313-1319`) y la asimetría de `main` (`:1417-1423`);
@@ -116,7 +116,7 @@ donde la política dice una cosa y el manifiesto otra.
       verde.
 - [x] 2.4 **La documentación deja de ofrecer el estreno con aviso:**
       `actions/README.md:851-859` («La versión exigible es la publicada, sin excepción»),
-      `.claude/skills/projects-release/SKILL.md:196-206` (las dos fechas son SIEMPRE la
+      `.claude/skills/projects-release/SKILL.md:196-208` (las dos fechas son SIEMPRE la
       misma, y qué banco lo exige), `plantilla/.github/workflows/actualizar-marco.yml:39`
       (el comentario que decía «hasta que el check pase de aviso a rojo»), y los dos
       comentarios de prueba que lo describían (`constitucion.test.mjs:682-691` y
@@ -143,6 +143,44 @@ donde la política dice una cosa y el manifiesto otra.
       no la hace este lote (el archive del porte va en una pasada final). El delta es un
       ADDED en `calidad-codigo`: al fundirlo, revisar que el `## Purpose` de la capability
       nombre la constitución (Rigel lo encontró corto tres archives seguidos).
+
+## 3. La revisión adversarial del carril (2026-09-18)
+
+- [x] 3.1 **La fecha única tampoco puede ser futura** (FO-S1, D12). Refutación escrita
+      primero: `la-ventana-no-vuelve.test.mjs` → `tests 8 / pass 7 / fail 1`, la
+      nueva en rojo. Con la regla: `tests 10 / pass 10`. Mordida sobre el árbol:
+      la 1.10.0 del manifiesto a `2026-12-01` en las dos fechas → la regla de la
+      fecha única sigue verde y la nueva da `not ok` con «1.10.0: publicada
+      2026-12-01, exigible_desde 2026-12-01»; restaurado. Contrapeso en la misma
+      refutación: la entrada tentativa del 2026-09-17 y un release del mismo día no
+      se cazan. La igualdad contra el CHANGELOG se descartó con la medición de la
+      1.7.0 (D12). Dicen «o una fecha que todavía no llegó» el bloque de la
+      ventana en `constitucion.mjs`, la cabecera y el output de `action.yml`, la
+      skill del release y el delta (un escenario nuevo).
+- [x] 3.2 **El proyecto nace con la constitución de su pin** (RV-L3L11-01, D13). Banco
+      nuevo, `pruebas/init/la-constitucion-nace-con-el-pin.test.mjs`, escrito
+      primero: `tests 4 / pass 2 / fail 2` («actual: 'render del-arbol', expected:
+      'render del-tag'» y el aviso ausente). Con `accionDeConstitucion` en
+      `herramientas/projects-init.mjs`: `tests 4 / pass 4`. Reproducción de punta a
+      punta con la herramienta real sobre este árbol, verificada con
+      `git archive v1.9.6 actions/constitucion`: antes `exit=1` y dos `::error::`;
+      después «render … con la action de v1.9.6», `exit=0` y cero `::error::`. El
+      delta gana el escenario «Un repositorio se crea desde un clon del marco que va
+      adelante de su release». La auditoría de argumentos de
+      `pruebas/init/projects-init.test.mjs` («la unica entrada que puede llegar a un
+      shell es el pin») cambió su residuo declarado `path.join(raizMarco)` por
+      `accion.script`, con su motivo: la invocación sigue sin shell.
+- [ ] 3.3 **El camino ZIP sigue naciendo rojo mientras el canónico del árbol vaya
+      adelante del pin** (el resto de RV-L3L11-01): sin tags no hay action del pin
+      que usar, y la herramienta solo puede avisarlo. **Motivo:** cerrarlo es decidir
+      que ningún cambio del canónico llega a `main` antes de su release —un banco que
+      exija que la última versión de `manifiesto.json` no supere el pin de
+      `plantilla/.github/workflows/ci.yml`—, y ese banco estaría rojo en todo el
+      porte hasta que el lote 38 mueva los pines. Lo decide el PO junto con cómo se
+      integra el porte a `main`; mientras tanto, los fragmentos 03 y 11 lo avisan.
+- [x] 3.4 **Las citas por línea de este archivo**, rehechas contra el árbol final
+      (RV-L4-01): la 2.2 citaba `manifiesto.json:60` para la 1.10.0, que está en
+      `:61`. Ver la tabla de abajo.
 
 ## Fuera de alcance, declarado
 

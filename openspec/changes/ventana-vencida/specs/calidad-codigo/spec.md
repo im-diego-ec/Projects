@@ -19,7 +19,8 @@ puede acumular durante semanas sin que nadie haya decidido acumularla.
 
 La versión exigible SHALL ser la publicada, sin excepción: la fecha desde la que una
 versión del canónico es exigible SHALL ser la de su publicación, y el marco SHALL
-rechazar, antes de publicarla, una versión que declare otra. El marco se distribuye por
+rechazar, antes de publicarla, una versión que declare otra, o que declare una fecha que
+todavía no llegó. El marco se distribuye por
 versión exacta, así que el aviso previo ya lo da el pull request de bump, que es donde el
 cambio se lee antes de entrar; y el arreglo —regenerar el artefacto— está dentro del árbol
 del propio repositorio. NO SHALL existir ninguna vía por la que un repositorio atrasado
@@ -66,6 +67,15 @@ comparar.
 #### Scenario: Una versión del canónico declara una fecha de exigibilidad distinta de su publicación
 - **WHEN** el canónico que el marco se prepara a publicar declara, para alguna de sus versiones, una fecha de exigibilidad distinta de la de su publicación
 - **THEN** la verificación del propio marco falla antes de publicar, nombrando la versión y las dos fechas, con el arreglo —igualarlas— escrito en el mensaje, porque una segunda fecha es una ventana de gracia reintroducida como dato
+
+#### Scenario: Una versión del canónico declara una publicación futura
+- **WHEN** el canónico que el marco se prepara a publicar declara, para alguna de sus versiones, una fecha posterior al día en curso, aunque la de exigibilidad sea igual a la de publicación
+- **THEN** la verificación del propio marco falla antes de publicar, nombrando la versión y sus fechas, porque hasta esa fecha un repositorio atrasado terminaría en cero
+
+#### Scenario: Un repositorio se crea desde un clon del marco que va adelante de su release
+- **WHEN** la herramienta de arranque crea un repositorio desde un clon del marco cuyo canónico es más nuevo que la versión que el andamio le pina
+- **THEN** la porción del marco del repositorio nuevo se genera con la versión pinada, la misma con la que su pipeline la verifica
+- **AND** si el clon no trae esa versión, el repositorio se crea igual y la herramienta lo avisa nombrando la versión pinada, la del clon y el fallo que viene, con el comando que lo evita
 
 #### Scenario: La porción del marco vuelve a prometer un aviso previo
 - **WHEN** la regla de la porción del marco que habla del artefacto atrasado deja de decir que es un fallo, o vuelve a prometer un aviso antes del fallo
