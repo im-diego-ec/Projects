@@ -919,27 +919,30 @@ jobs:
   # con la misma sonda —`cambios.outputs.es_distribuidor`, que mira ARCHIVOS y no
   # nombres— y la otra mitad de las dos vive en el ci.yml del marco, por ruta local.
   #
-  # EL @v1 DE ABAJO SIGUE SIENDO @v1, Y AHORA SE SABE POR QUE. El comentario viejo lo
-  # defendia con un motivo cierto MIENTRAS el paso corriera en el repo del marco: pinar
-  # la version que se esta cortando pone en rojo al propio PR que la corta, porque el
-  # tag se crea despues del merge (medido el 2026-08-22: "Unable to resolve action
-  # ...@v1.4.2"). Con el job salteado en el distribuidor esa ref ya no se resuelve
-  # nunca durante el CI del marco, asi que ESA imposibilidad desaparecio: el pin exacto
-  # ya es tecnicamente posible, igual que en actions/constitucion.
+  # VERSION EXACTA, COMO TODAS LAS DEMAS, y por que tardo. Esta linea fue la ultima
+  # invocacion interna del marco por el tag mayor movil. Mientras la action fue un PASO
+  # del job openspec, el pin exacto era imposible: pinar la version que se esta cortando
+  # ponia en rojo al propio PR que la corta, porque el tag se crea despues del merge
+  # (medido el 2026-08-22: "Unable to resolve action ...@v1.4.2"). Desde la 1.8.0 es
+  # este job, salteado en el distribuidor, asi que durante el CI del marco esta ref no
+  # se resuelve NUNCA y el pin exacto es posible, igual que en actions/constitucion. Se
+  # hizo en el change guardrail-deltas-por-version-exacta.
   #
-  # No se hace aca porque lo que queda no es un problema de este archivo: este es el
-  # ULTIMO `@v1` vivo del marco, y retirarlo es una decision de DISTRIBUCION —el paso
-  # del release que mueve el tag, los consumidores que todavia pinan @v1, y las
-  # superficies de prosa que afirman que v1 sigue vivo, entre ellas la asercion
-  # "v1 sigue vivo donde el marco dice que vive" de pruebas/andamio/pinado.test.mjs,
-  # que se pone ROJA si esta linea se pina—. Mover un paso de job no autoriza a retirar
-  # un canal de distribucion de paso.
+  # LO QUE CERRO: un consumidor pinado a marco-ci.yml@vX.Y.Z recibia este workflow en
+  # X.Y.Z y esta action de donde apuntara el tag movil, sin PR. Su pin exacto era una
+  # media verdad y el no podia arreglarlo: la linea no vive en su arbol. Desde este
+  # cambio, lo que corre es exactamente lo que el pin dice.
   #
-  # EL RESIDUO QUE SIGUE VIVO, dicho entero: un consumidor pinado a marco-ci.yml@vX.Y.Z
-  # recibe ESTE workflow en X.Y.Z y esta action en la ultima 1.x. Esta acotado a UNA
-  # action —un verificador de deltas, no logica de producto— y el banco del pinado lo
-  # exceptua por lista, con nombre y archivo, para que una segunda invocacion interna
-  # no herede la excepcion en silencio.
+  # LO QUE NO CERRO, dicho entero: las versiones YA PUBLICADAS hasta la 1.9.6 llevan
+  # adentro la linea vieja, y un consumidor pinado a una de ellas sigue resolviendo el
+  # tag movil hasta que mergee su PR de bump. Si el release lo sigue moviendo o no es
+  # una decision de distribucion que queda escrita en el paso 5 de la skill del release.
+  #
+  # Y LA PARTICION QUE LO HACE POSIBLE NO DEPENDE DE QUE ALGUIEN SE ACUERDE:
+  # pruebas/andamio/refs-propias.test.mjs EVALUA el `if` de todo job con un `uses:`
+  # remoto propio y se pone rojo si corre en el repo del marco; y
+  # pruebas/andamio/pinado.test.mjs exige que esta linea sea la version mas alta del
+  # CHANGELOG, asi que el paso 1 del release la mueve junto con las demas.
   #
   # EL COSTO, declarado: un job mas por corrida en cada consumidor (un checkout, un
   # setup-node y un lector de specs; el techo son 10 minutos). Se paga a cambio de que
@@ -951,11 +954,10 @@ jobs:
   # El script viaja DENTRO de la action, asi que ningun proyecto vendora una copia que
   # se pueda quedar vieja.
   #
-  # Y EL RESTO DE LOS `uses:` DEL MARCO NO DEPENDEN DE QUE ALGUIEN SE ACUERDE:
+  # Y NINGUN `uses:` DEL MARCO DEPENDE DE QUE ALGUIEN SE ACUERDE:
   # pruebas/andamio/pinado.test.mjs exige que todo `uses:` del marco sea igual a la
-  # version mas alta del CHANGELOG, y la unica excepcion es esta linea, declarada por
-  # lista con archivo y action — una segunda invocacion interna con @v1 pone rojo ese
-  # banco en vez de heredar la excepcion.
+  # version mas alta del CHANGELOG, sin lista de excepciones: una invocacion interna
+  # por tag movil pone rojo ese banco, y el arreglo es particionar su job, no eximirla.
   # ---------------------------------------------------------------------------
   deltas:
     name: deltas-openspec
@@ -987,7 +989,7 @@ jobs:
         with: { node-version: "${{ inputs.version_node }}" }
 
       - name: Deltas de OpenSpec sin perdida de escenarios
-        uses: im-diego-ec/Projects/actions/guardrail-deltas@v1
+        uses: im-diego-ec/Projects/actions/guardrail-deltas@v1.9.6
         with:
           instalar-node: "false"
 
@@ -3896,7 +3898,7 @@ jobs:
         # La version que el consumidor pidio, no la que traiga la imagen del runner:
         # este job leia manifiestos con un node que nadie eligio.
         with: { node-version: "${{ inputs.version_node }}" }
-      # Version exacta, no @v1: ver el motivo largo en el paso de deltas de OpenSpec.
+      # Version exacta, como la de guardrail-deltas: ver el motivo largo en el job deltas.
       - name: Constitucion del marco cableada
         uses: im-diego-ec/Projects/actions/constitucion@v1.9.6
         with:

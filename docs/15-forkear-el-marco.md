@@ -54,24 +54,27 @@ git ls-files -z -- '.github/workflows/*' \
   | xargs -0 grep -nE '^[[:space:]]*(-[[:space:]]+)?uses:[[:space:]]*"?im-diego-ec/'
 ```
 
-Al 2026-08-24 devuelve dos líneas de `.github/workflows/marco-ci.yml`:
-`actions/guardrail-deltas@v1` y `actions/constitucion@v1.9.6`. **Las dos hay que
-reescribirlas con la cuenta del fork**, y es lo primero que se hace: hasta que eso
-pase, el fork no es un marco, es un cliente del marco de al lado.
+Devuelve dos líneas de `.github/workflows/marco-ci.yml`, las dos por **versión
+exacta**: `actions/guardrail-deltas` y `actions/constitucion`, cada una en un job que
+se saltea en el repo que distribuye el marco. **Las dos hay que reescribirlas con la
+cuenta del fork**, y es lo primero que se hace: hasta que eso pase, el fork no es un
+marco, es un cliente del marco de al lado.
 
-⚠️ **Y con ellas viajan los tags.** La primera va por `@v1` y la segunda por una
-versión exacta; los dos refs tienen que existir **en el fork**. Un fork hecho por el
-botón de GitHub se los lleva; uno hecho clonando y empujando a un repo vacío, **no**,
-salvo que el push lleve `--tags`. Comprobalo en el fork:
+⚠️ **Y con ellas viajan los tags.** El ref de esas dos líneas —la versión exacta del
+último release— tiene que existir **en el fork**. Un fork hecho por el botón de GitHub
+se lleva los tags; uno hecho clonando y empujando a un repo vacío, **no**, salvo que
+el push lleve `--tags`. Comprobalo en el fork:
 
 ```bash
 git ls-remote --tags origin | grep -E 'refs/tags/(v1|v1\.[0-9]+\.[0-9]+)$'
 ```
 
-Si `v1` no está, el job de deltas del fork falla con `Unable to resolve action`. Ese
-tag no es decorativo y no se puede retirar: `marco-ci.yml` referencia a una de sus
-propias actions hermanas por `@v1` porque GitHub no admite expresiones en `uses:`, y
-pinar la versión que se está cortando pondría en rojo al PR que la corta.
+Si la versión exacta no está, los jobs `deltas-openspec` y `constitucion-cableada` de
+los consumidores del fork fallan con `Unable to resolve action`. El tag mayor `v1` ya no
+lo necesita el árbol actual: hasta la 1.9.6, `marco-ci.yml` invocaba el guardrail de
+deltas por `@v1`, y desde el change `guardrail-deltas-por-version-exacta` lo invoca por
+versión exacta. Un fork necesita `v1` solo si alguno de sus consumidores pina una
+versión publicada hasta la 1.9.6, que lo resuelve por dentro.
 
 ## 2. Lo que el fork REPARTE con la cuenta original adentro
 
@@ -171,7 +174,8 @@ node --test pruebas/andamio/pinado.test.mjs
 ## Checklist del fork
 
 - [ ] Los dos `uses:` de `.github/workflows/marco-ci.yml` reescritos con la cuenta del fork
-- [ ] Los tags `v1` y `vX.Y.Z` existen en el fork (`git ls-remote --tags origin`)
+- [ ] El tag `vX.Y.Z` existe en el fork, y `v1` solo si algún consumidor del fork pina
+      una versión hasta la 1.9.6 (`git ls-remote --tags origin`)
 - [ ] `.github/CODEOWNERS` con equipos que **existen y tienen gente** en la cuenta nueva
 - [ ] Las cinco líneas `{{ORG}}/Projects` de `plantilla/` revisadas contra dónde vive el fork
 - [ ] `Settings → Actions → General → Access` habilitado si el fork es privado

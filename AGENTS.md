@@ -150,8 +150,8 @@ nueva como **PR de Dependabot en su propio repo**. Nada del marco cambia en un
 consumidor sin que exista un PR que alguien pueda leer y mergear: si una versión
 trae un check nuevo, el rojo aparece **dentro de ese PR**.
 
-> **El tag mayor móvil `v1` dejó de ser el canal el 2026-08-21, y sobrevive en una sola
-> línea.** Hasta la 1.3.0 era el canal:
+> **El tag mayor móvil `v1` dejó de ser el canal el 2026-08-21, y el marco ya no lo
+> invoca en ninguna línea.** Hasta la 1.3.0 era el canal:
 > apuntaba al último release de la 1.x y los consumidores recibían todo sin tocar
 > nada. Cambió porque el 2026-08-19 un check nuevo enrojeció un repo que el día
 > anterior pasaba, y nadie lo había pedido. Y **no se pudo retirar** cuando se midió
@@ -159,12 +159,26 @@ trae un check nuevo, el rojo aparece **dentro de ese PR**.
 > actions hermanas por `@v1`. El pin exacto del consumidor era una **media
 > verdad**.
 >
-> Se intentó pinarlas por versión exacta y el CI del release 1.4.2 lo refutó: el tag se
-> crea **después** del merge, así que la línea pone en rojo al PR que la corta, y GitHub
-> no admite expresiones en `uses:` para que un reusable referencie su propio ref. Así que
-> `@v1` sobrevive en **una** línea (`actions/guardrail-deltas`), exceptuada por lista
-> exacta en `pruebas/andamio/pinado.test.mjs`, y el paso 5 del release la mueve. **No la
-> uses para nada más**: una segunda `@v1` pone rojo el banco, a propósito.
+> Pinarlas por versión exacta chocaba con el release, y el CI del 1.4.2 lo midió: el tag
+> se crea **después** del merge, así que una línea que pina la versión que se está
+> cortando pone en rojo al PR que la corta, y GitHub no admite expresiones en `uses:`
+> para que un reusable referencie su propio ref. Lo que destrabó el nudo fue sacar cada
+> invocación interna a un **job que se saltea en el repo del marco** —la última,
+> `actions/guardrail-deltas`, desde la 1.8.0— y correr la misma pieza por ruta local en
+> el `ci.yml` del marco. Un job salteado no resuelve nada, así que el pin exacto dejó de
+> ser circular, y desde el change `guardrail-deltas-por-version-exacta` todas van por
+> versión exacta. Lo cobran dos bancos, sin lista de excepciones:
+> `pruebas/andamio/pinado.test.mjs` (ningún `uses:` del marco por tag móvil) y
+> `pruebas/andamio/refs-propias.test.mjs` (toda referencia remota propia vive en un job
+> particionado, y la partición se evalúa, no se busca como texto). **Una invocación
+> interna nueva no se exime: se particiona.**
+>
+> **El tag sigue existiendo y no se borra**: las versiones publicadas hasta la 1.9.6 lo
+> llevan adentro de su `marco-ci.yml`, y un consumidor pinado a una de ellas lo resuelve
+> en cada corrida. Moverlo ya no le sirve a ninguna línea del árbol: su único efecto es
+> empujar el `guardrail-deltas` nuevo, **sin PR**, a esos consumidores. Por eso el paso 5
+> del release no lo mueve sin OK humano (⚠️ abajo), y si se congela del todo o se sigue
+> moviendo es una decisión pendiente, que va con la apertura de la línea `v2`.
 
 - Cada release lleva un tag inmutable `vX.Y.Z`, y **el release mueve los pines
   internos** del marco a esa versión. No depende de que nadie se acuerde:

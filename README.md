@@ -245,8 +245,9 @@ El `ci.yml` que el scaffold trae ya apunta a la **versión exacta** del marco y 
 lo único de CI que se copia: un llamador delgado. El proyecto nace consumiendo la
 mecánica del marco por referencia, no con una copia que se va a quedar vieja.
 
-> **Nunca `@v1` en el repo de un proyecto.** El tag existe, pero solo para una línea
-> interna del marco (ver `AGENTS.md`). Para un consumidor es una trampa: Dependabot no
+> **Nunca `@v1` en el repo de un proyecto.** El tag existe, pero solo porque las versiones
+> publicadas hasta la 1.9.6 lo llevan adentro (ver `AGENTS.md`); el marco de hoy no lo
+> invoca en ninguna línea. Para un consumidor es una trampa: Dependabot no
 > propone bump para un tag mayor —para él ya es la mayor vigente—, así que un repo pinado
 > así no recibe versiones nuevas por PR y **no aparece en el censo de consumidores**. Es
 > el modo de falla más callado de todo el bootstrap.

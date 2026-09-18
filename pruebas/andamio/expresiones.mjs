@@ -37,6 +37,18 @@
 // Fuente: la referencia de expresiones de GitHub Actions ("Literals",
 // "Operators", tabla de coercion a numero), leida el 2026-09-17.
 
+/** La clave con la que un banco le DECLARA al evaluador las funciones que modela.
+ *
+ *  Es un simbolo y no un nombre porque ningun `if:` puede nombrarlo: una condicion
+ *  que dijera `funciones.x` no tiene que encontrar este mapa. Y es opt-in a proposito:
+ *  un banco que no la pasa sigue viendo que CUALQUIER funcion lanza, que es la
+ *  garantia de la que dependen los bancos del despliegue. Hoy la usa
+ *  `refs-propias.test.mjs`, que necesita `cancelled()` porque los jobs particionados
+ *  de marco-ci.yml la llevan en su condicion. Solo funciones SIN argumentos: las de
+ *  estado del job (`success()`, `failure()`, `cancelled()`, `always()`), cuyo valor
+ *  lo fija el banco para el escenario que mide. */
+export const FUNCIONES = Symbol("funciones");
+
 /** Lo que GitHub considera verdadero. */
 export function veraz(v) {
   return !(v === false || v === null || v === undefined || v === "" || v === 0 || Number.isNaN(v));
@@ -207,7 +219,7 @@ export function evaluar(expresion, contexto) {
     }
     if (t.tipo === "id") {
       pos += 1;
-      if (es("(")) throw new Error(`funcion no soportada por el evaluador: ${t.valor}(...) en: ${limpio}`);
+      if (es("(")) return llamada(t.valor);
       if (!(t.valor in contexto)) throw new Error(`el contexto "${t.valor}" no esta en el banco: ${limpio}`);
       let v = contexto[t.valor];
       for (;;) {
@@ -231,6 +243,21 @@ export function evaluar(expresion, contexto) {
       return v;
     }
     throw new Error(`no se esperaba "${t.valor}" en: ${limpio}`);
+  }
+  // Una funcion solo se evalua si el banco la DECLARO (ver FUNCIONES) y se llama sin
+  // argumentos. Todo lo demas lanza con el mismo mensaje de siempre: un evaluador que
+  // adivina una funcion es un verde falso con otra forma.
+  function llamada(nombre) {
+    const declaradas = contexto[FUNCIONES] ?? {};
+    if (!Object.hasOwn(declaradas, nombre)) {
+      throw new Error(`funcion no soportada por el evaluador: ${nombre}(...) en: ${limpio}`);
+    }
+    come("(");
+    if (!es(")")) {
+      throw new Error(`funcion no soportada por el evaluador: ${nombre}(...) con argumentos en: ${limpio}`);
+    }
+    come(")");
+    return declaradas[nombre]();
   }
 
   const v = o();

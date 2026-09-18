@@ -1479,7 +1479,8 @@ const JOB_SUGERIDO = [
   "      - uses: actions/checkout@v7",
   "      - uses: actions/setup-node@v7",
   '        with: { node-version: "22" }',
-  // Version exacta y no @v1: el tag mayor EXISTE pero es interno del marco, y un
+  // Version exacta y no @v1: el tag mayor EXISTE pero no es un canal —solo lo
+  // resuelven por dentro las versiones del marco publicadas hasta la 1.9.6—, y un
   // consumidor pinado a @v1 no recibe PR de bump de Dependabot ni aparece en el
   // censo — el modo de falla mas callado del bootstrap (README.md, «Nunca @v1 en el
   // repo de un proyecto»).

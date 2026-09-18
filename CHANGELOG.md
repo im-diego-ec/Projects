@@ -194,6 +194,31 @@ mueve sobre un cambio incompatible.
   catálogo decía «la misma forma de tres partes que usa `pendientes.tf`», que con cuatro partes
   habría mentido en verde. Para consumidores: nada; es contenido del andamio.
 
+- **El release deja de mover `v1` por defecto.** Con el marco sin ninguna invocación
+  por `@v1`, el único efecto de moverlo era empujar código sin pull request a quien
+  pine una versión publicada hasta la 1.9.6. La skill del release decía que moverlo no
+  pedía OK aparte, contra `AGENTS.md`, que lo lista entre lo que pide OK humano; ahora
+  el paso para, con el comando que mide si moverlo cambiaría algo. Medido el
+  2026-09-17: `v1` apunta a la 1.8.0 desde el 2026-09-01, así que en la práctica no se
+  movió en ninguna 1.9.x. Si se congela formalmente o se vuelve a mover queda como
+  decisión pendiente para la línea `v2`. El tag **no se borra**: las versiones hasta la
+  1.9.6 lo resuelven por dentro.
+
+  **Para consumidores: nada.**
+
+- **La partición que hace posible el pin exacto tiene compuerta propia.** Un banco
+  nuevo, `pruebas/andamio/refs-propias.test.mjs`, **evalúa** la condición de todo job
+  del marco que invoca una pieza propia por referencia remota, y se pone rojo si ese
+  job corre en el repositorio del marco —donde el pull request que corta una versión
+  lo mataría— o si no corre en ningún lado; y exige que cada pieza salteada corra por
+  ruta local en el CI del marco. Hasta hoy, un tercer job sin partición o una condición
+  `always() || <partición>` pasaban el banco entero en verde. `pinado.test.mjs` pierde
+  su lista de excepciones: una invocación interna nueva por tag móvil es roja, y el
+  arreglo es particionar su job. Viene de Rigel 2.4.0, con la condición evaluada en vez
+  de buscada como texto.
+
+  **Para consumidores: nada**; son bancos del repositorio del marco.
+
 ### Corregido
 
 - **Cinco páginas seguían prometiendo una publicación automática que ya no ocurre**, y
@@ -305,6 +330,24 @@ mueve sobre un cambio incompatible.
 
   **Para consumidores: nada.** El workflow de dos ambientes todavía no salió en
   ninguna versión publicada.
+
+- **El guardrail de deltas ya no viaja por el tag móvil `v1`: tu pin exacto es
+  verdad entera.** Tu `ci.yml` pina `marco-ci.yml@vX.Y.Z`, pero adentro el job
+  `deltas-openspec` invocaba `actions/guardrail-deltas@v1`: cada vez que el release
+  movía `v1`, el guardrail nuevo corría en tu repositorio sin ningún pull request. Era
+  la «media verdad» que `AGENTS.md` ya reconocía, y el motivo del `@v1` —que pinar la
+  versión que se corta ponía en rojo al pull request que la corta— había desaparecido
+  en la 1.8.0, cuando el guardrail pasó a un job que se saltea en el repositorio del
+  marco. Ahora esa línea va por versión exacta, como todas las demás, y el release la
+  mueve con el resto de los pines. El job, el nombre del check, sus permisos y su
+  resultado no cambian. Viene de Rigel 2.3.0, donde el mismo tag le llevó a sus
+  consumidores un guardrail endurecido sin pull request.
+
+  **Para consumidores: nada.** Mientras sigas en una versión hasta la 1.9.6, tu
+  `marco-ci.yml` sigue resolviendo `v1`, que apunta a la 1.8.0 y tiene el mismo
+  guardrail que la 1.9.6; el tag no se mueve más sin un OK humano explícito, así que
+  nada cambia bajo tus pies sin un pull request. Si mantenés un fork del marco, el tag
+  que tiene que existir en el fork es el de la versión exacta (`docs/15-forkear-el-marco.md`).
 
 ### Añadido
 
