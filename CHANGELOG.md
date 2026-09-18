@@ -981,15 +981,18 @@ mueve sobre un cambio incompatible.
   primer sujeto fue el propio marco: `capa-descubrimiento` declaraba una fecha que
   ningún workflow leía y que vencía el 2026-09-21. Viene de Rigel 1.14.0, con el
   lector de frontmatter adaptado: descarta los comentarios de YAML, que con el lector
-  original apagaban la declaración en silencio. No agrega permisos: el job sigue con
-  `contents: read`, auditado acción por acción.
+  original apagaban la declaración en silencio, y lee la clave sin distinguir
+  mayúsculas ni comillas (`Experimental: true` y `"experimental": true` también
+  declaran; la misma clave dos veces con valores distintos es rojo). No agrega
+  permisos: el job sigue con `contents: read`, auditado acción por acción.
 
   **Para consumidores: nada**, mientras no declares un change experimental. Si no hay
   ninguno, el paso imprime «el paso es inerte» y sale 0. Si declarás
-  `experimental: true` en algún artefacto de un change, agregá en el mismo
-  frontmatter `veredicto_antes_de: AAAA-MM-DD`; si el rojo aparece en tu PR de bump,
-  el mensaje trae el change, la fecha y las tres salidas: escribir el veredicto,
-  correr la fecha con el motivo escrito o descartar el change.
+  `experimental: true` en algún artefacto de un change —con esa grafía o cualquier
+  otra de la clave—, agregá en el mismo frontmatter `veredicto_antes_de: AAAA-MM-DD`;
+  si el rojo aparece en tu PR de bump, el mensaje trae el change, la fecha y las tres
+  salidas: escribir el veredicto, correr la fecha con el motivo escrito o descartar el
+  change.
 
 ### Corregido
 

@@ -78,7 +78,7 @@ sale 1 con «capa-descubrimiento se declaró experimental con veredicto_antes_de
    correcta que no existe en el calendario también.
 2. **Job nuevo `canonico-versionado` en el `ci.yml` del marco**, que no viaja. Toda
    entrada de `versiones[]` del ancestro común del PR que ya está **publicada** (su
-   número no es mayor que el `## [X.Y.Z]` más alto del CHANGELOG de la punta de `main`)
+   número no es mayor que el `## [X.Y.Z]` más alto del CHANGELOG de la base del PR)
    sigue en la cabeza con la misma `huella_canonico`, o con la misma ausencia de
    huella. O sea que mover el canónico después de publicar exige agregar una entrada:
    `versiones[]` crece. La

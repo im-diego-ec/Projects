@@ -91,7 +91,8 @@ propio mensaje prohíbe: pegar la huella nueva sobre una entrada ya publicada.
 **Decisión.** Un job en el `ci.yml` del marco que compara el manifiesto del ancestro
 común del PR con el de la cabeza: toda entrada **publicada** del ancestro sigue en la
 cabeza con la misma huella (o la misma ausencia de huella). Publicada = su número no es
-mayor que el `## [X.Y.Z]` más alto del CHANGELOG **de la punta de `main`**. Si el PR no
+mayor que el `## [X.Y.Z]` más alto del CHANGELOG **de la base del PR, tal como la trae
+el evento**. Si el PR no
 toca el manifiesto, el job es inerte y dice que el cuerpo lo cobra el banco de la huella.
 
 **Por qué «publicada» y no «la última».** El plan del porte decía la regla de Rigel
@@ -110,8 +111,8 @@ release olvida corregir el número previsto de la entrada (quedó `1.9.9` y sali
 `1.10.0`), con «la nombra» esa entrada quedaría reescribible para siempre. Con el número,
 queda congelada en cuanto sale cualquier versión posterior.
 
-**Desde dónde se mide: el ancestro común para el manifiesto, la punta de `main` para el
-CHANGELOG.** GitHub manda como base del PR la punta de `main`. Si la rama salió antes de
+**Desde dónde se mide: el ancestro común para el manifiesto, la base del PR para el
+CHANGELOG.** GitHub manda como base del PR la punta de `main` al momento del evento. Si la rama salió antes de
 un release, esa punta trae una versión que la rama no tiene, y comparar contra ella
 culpa al PR de «sacarla». Medido con el banco: con la base en la punta, el caso de la
 rama atrasada que no toca el manifiesto sale **1**; con el ancestro común, 0. Lo que sí
@@ -120,6 +121,18 @@ se lee de la punta es el CHANGELOG, porque es lo más nuevo que se sabe de qué 
 texto a quien la pinó, y eso es rojo con un mensaje que dice «actualizala con main». El
 job del CHANGELOG compara contra la punta (dos puntos); acá no alcanzaba, porque allá el
 error de esa forma es un verde de más y acá sería un rojo que no se entiende.
+
+**Límite declarado (hallazgo FO-H5 de la revisión adversarial): «la punta» es la del
+evento, no la del merge.** La base sale de `github.event.pull_request.base.sha`: la punta
+de `main` cuando se abrió o se empujó por última vez el PR. Si `main` publica una versión
+**después** de ese push, el verde de este check queda rancio —juzgó con un tope viejo—, y
+re-correrlo reusa el mismo payload. Lo tapa en la práctica que el release edita la misma
+entrada del manifiesto (un conflicto de merge obliga a actualizar la rama), pero no lo
+cierra. Lo que lo cierra es que el ruleset de `main` exija ramas al día antes de mergear,
+y eso es configuración de GitHub, fuera del árbol: queda como pendiente (tasks 5.6).
+**Descartado: leer el CHANGELOG de `origin/main` recién traído.** Arreglaría el re-run,
+que pasaría a ver la punta de ese momento, pero no el caso de fondo —nadie re-corre un
+check verde—, y cambiaría la fuente del tope sin cerrar el hueco.
 
 **Por qué el CHANGELOG y no los tags.** El CHANGELOG está en el árbol, se lee sin red y
 es la misma fuente que ya usa `pruebas/andamio/pinado.test.mjs` para los pines. Los tags

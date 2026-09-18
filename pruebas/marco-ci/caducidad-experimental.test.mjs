@@ -17,6 +17,9 @@
 //     `true` y el change pasaba por no-experimental: un verde mudo. Aca el comentario se
 //     descarta.
 //   - Un `experimental:` que no es booleano (`si`, `yes`) es rojo, no un salteo.
+//   - La CLAVE se lee sin comillas y en minusculas (hallazgo FO-H4 de la revision
+//     adversarial del porte): `Experimental: true` tambien declara, y la misma clave dos
+//     veces con valores distintos es rojo.
 //   - Una fecha con forma AAAA-MM-DD pero que no existe en el calendario (2026-13-01) es
 //     roja: la comparacion de cadenas la aceptaria y venceria en una fecha que no existe.
 //
@@ -244,6 +247,66 @@ test("ROJO: un `experimental:` que no es booleano no se toma por falso en silenc
   const r = correr(raiz);
   assert.equal(r.exit, 1, r.salida);
   assert.match(r.salida, /no es un booleano/);
+});
+
+// LA MISMA REGLA, DEL LADO DE LA CLAVE (hallazgo FO-H4 de la revision adversarial
+// del porte). «Un valor que no se puede leer no se toma por falso en silencio» valia
+// para el valor y no para la clave: `Experimental: true` o `"experimental": true`
+// —YAML valido los dos— dejaban el change leido como NO experimental, y el paso
+// terminaba en verde diciendo que era inerte. Un change asi no caducaba nunca.
+test("ROJO: la clave con otra grafia (mayuscula o entre comillas) tambien declara experimental", () => {
+  for (const [nombre, clave] of [
+    ["mayuscula", "Experimental"],
+    ["comillas", '"experimental"'],
+    ["comillas-simples", "'experimental'"],
+    ["todo-mayusculas", "EXPERIMENTAL"],
+  ]) {
+    const raiz = repo(`clave-${nombre}`, {
+      "openspec/changes/experimento/design.md": artefacto({ artefacto: "design", [clave]: "true" }),
+    });
+    const r = correr(raiz);
+    assert.equal(r.exit, 1, `${clave}: true se leyo como no experimental\n${r.salida}`);
+    assert.match(r.salida, /veredicto_antes_de/, `${clave}: el rojo tiene que ser el de la fecha que falta`);
+  }
+});
+
+test("la fecha y el veredicto con otra grafia de su clave tambien se leen", () => {
+  // El lado simetrico: si la clave de la fecha o la del veredicto no se normalizaran,
+  // el mismo change quedaria rojo por una fecha que SI declaro.
+  const raiz = repo("claves-grafia", {
+    "openspec/changes/experimento/design.md": artefacto({
+      Artefacto: "design",
+      Experimental: "true",
+      '"Veredicto_Antes_De"': "2026-10-15",
+    }),
+  });
+  const r = correr(raiz);
+  assert.equal(r.exit, 0, r.salida);
+  assert.match(r.salida, /vence 2026-10-15/);
+});
+
+test("ROJO: la misma clave declarada dos veces con valores distintos no se resuelve en silencio", () => {
+  // Con la clave normalizada, `experimental: false` y `Experimental: true` son la misma
+  // declaracion dicha dos veces. Quedarse con cualquiera de las dos es adivinar.
+  const raiz = repo("clave-doble", {
+    "openspec/changes/experimento/design.md": artefacto({
+      artefacto: "design",
+      experimental: "false",
+      Experimental: "true",
+    }),
+  });
+  const r = correr(raiz);
+  assert.equal(r.exit, 1, r.salida);
+  assert.match(r.salida, /no es un booleano/);
+});
+
+test("las claves que no son del paso siguen sin hacer ruido, con cualquier grafia", () => {
+  const raiz = repo("otras-claves", {
+    "openspec/changes/un-change/proposal.md": artefacto({ Artefacto: "proposal", DRI: "alguien", '"aprueba"': "PO" }),
+  });
+  const r = correr(raiz);
+  assert.equal(r.exit, 0, r.salida);
+  assert.match(r.salida, /inerte/);
 });
 
 test("el archive NO se mira: la historia inmutable no caduca", () => {

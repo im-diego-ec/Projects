@@ -1019,7 +1019,16 @@ jobs:
              *  Solo las claves de primer nivel. Las lineas de comentario se saltean y el
              *  comentario al final de un valor se descarta: en este marco los
              *  frontmatter los llevan, y tomar el valor crudo convertia
-             *  `experimental: true  # ver ...` en algo que no es `true`. */
+             *  `experimental: true  # ver ...` en algo que no es `true`.
+             *
+             *  LA CLAVE SE NORMALIZA: sin comillas y en minusculas. La regla de abajo
+             *  -un valor que no se puede leer no se toma por falso en silencio- valia
+             *  para el valor y no para la clave, y `Experimental: true` o
+             *  `"experimental": true` (YAML valido los dos) dejaban el change leido
+             *  como NO experimental: no caducaba nunca y el paso decia que era inerte.
+             *  Y si la misma clave normalizada aparece dos veces con valores
+             *  distintos, los dos quedan juntos: el valor resultante no es ni un
+             *  booleano ni una fecha, y eso es rojo en vez de una eleccion a ciegas. */
             function frontmatter(texto) {
               const lineas = texto.replace(/^\uFEFF/, "").split(/\r?\n/);
               if (lineas[0].trim() !== "---") return {};
@@ -1031,10 +1040,15 @@ jobs:
               const campos = {};
               for (const linea of lineas.slice(1, fin)) {
                 if (/^\s*(#|$)/.test(linea)) continue;
-                const m = linea.match(/^([A-Za-z_][A-Za-z0-9_-]*)\s*:(.*)$/);
+                const m = linea.match(/^(["\x27]?)([A-Za-z_][A-Za-z0-9_-]*)\1\s*:(.*)$/);
                 if (!m) continue;
-                const valor = m[2].replace(/\s+#.*$/, "").trim().replace(/^(["\x27])(.*)\1$/, "$2");
-                campos[m[1]] = valor;
+                const clave = m[2].toLowerCase();
+                const valor = m[3].replace(/\s+#.*$/, "").trim().replace(/^(["\x27])(.*)\1$/, "$2");
+                if (campos[clave] !== undefined && campos[clave] !== valor) {
+                  campos[clave] = campos[clave] + " y tambien " + valor;
+                } else {
+                  campos[clave] = valor;
+                }
               }
               return campos;
             }

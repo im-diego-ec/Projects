@@ -1018,9 +1018,9 @@ jobs:
   # quien no cometio el error y no lo puede arreglar.
   #
   # LA REGLA. Toda entrada de versiones[] del ancestro comun del PR que ya esta
-  # publicada (su numero no es mayor que la version mas alta del CHANGELOG de la punta
-  # de main) sigue en la cabeza con la misma huella_canonico, o con la misma ausencia de
-  # huella. O sea que la unica forma de mover el canonico despues de publicar es agregar
+  # publicada (su numero no es mayor que la version mas alta del CHANGELOG de la base
+  # del PR, tal como la trae el evento) sigue en la cabeza con la misma huella_canonico,
+  # o con la misma ausencia de huella. O sea que la unica forma de mover el canonico despues de publicar es agregar
   # una entrada: versiones[] crece. La entrada PENDIENTE (numero mayor que el ultimo
   # publicado) si se reescribe, porque todavia no la recibio nadie, y el release corrige
   # su numero en su mismo PR, como dice la nota del manifiesto. El porque del ancestro
@@ -1078,12 +1078,22 @@ jobs:
           resolver base "${BASE}"
           resolver cabeza "${CABEZA}"
 
-          # LO QUE CAMBIA ESTE PR se mide desde el ancestro comun, no desde la punta de
-          # main: con una rama atrasada, la punta trae versiones que main publico
-          # despues, y comparar contra ella culparia al PR de "sacarlas". Lo que SI se
-          # lee de la punta es el CHANGELOG, porque es lo mas nuevo que se sabe de que
-          # salio: si main publico una version mientras tanto, reescribirla aca tambien
-          # es rojo.
+          # LO QUE CAMBIA ESTE PR se mide desde el ancestro comun, no desde la base:
+          # con una rama atrasada, la base trae versiones que main publico despues, y
+          # comparar contra ella culparia al PR de "sacarlas". Lo que SI se lee de la
+          # base es el CHANGELOG, porque es lo mas nuevo que el evento sabe de que
+          # salio: si main publico una version antes del ultimo push del PR, reescribirla
+          # aca tambien es rojo.
+          #
+          # LIMITE DECLARADO (hallazgo FO-H5 de la revision adversarial del porte). La
+          # base es la del PAYLOAD del evento (pull_request.base.sha), no la punta de
+          # main al momento de mergear. Si main publica una version DESPUES del ultimo
+          # push del PR, el verde de este check queda rancio: juzgo con un tope viejo, y
+          # re-correrlo reusa el mismo payload. En la practica lo tapa que el release
+          # edita la misma entrada del manifiesto (conflicto de merge que obliga a
+          # actualizar la rama). Lo que lo cierra del todo es que el ruleset de main
+          # exija ramas al dia, y eso es configuracion de GitHub, no de este archivo:
+          # pendiente en el tasks.md del change el-experimental-caduca.
           if ! DESDE="$(git merge-base "${BASE}" "${CABEZA}" 2>/dev/null)"; then
             echo "::error::no pude calcular el ancestro comun entre la base (${BASE}) y la cabeza (${CABEZA}) del PR. Sin el no se puede separar lo que cambia este PR de lo que cambio main despues, y este check NO se declara verde por no haber podido medir. Arreglo: el checkout de este job necesita fetch-depth: 0"
             exit 1

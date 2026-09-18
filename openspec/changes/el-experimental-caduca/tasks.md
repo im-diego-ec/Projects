@@ -80,6 +80,22 @@ el commit sobre el que arranca. Toda verificación es por código de salida.
       rojo con «actualizala con main». `# tests 17 · # pass 17 · # fail 0`. Escenarios
       nuevos en el delta de `calidad-codigo`.
 
+- [x] 2.7 **La clave del frontmatter se normaliza** (hallazgo FO-H4 de la revisión
+      adversarial). `Experimental: true` o `"experimental": true` —YAML válido— dejaban el
+      change leído como no experimental y el paso en verde diciendo «inerte». Rojo
+      primero: cuatro casos nuevos en `pruebas/marco-ci/caducidad-experimental.test.mjs`
+      (cuatro grafías de la clave, fecha y veredicto con otra grafía, la misma clave dos
+      veces con valores distintos, claves ajenas sin ruido) contra el paso de `fcc9548`
+      → `# tests 21 · # pass 18 · # fail 3`. Después, `frontmatter()` del paso le saca las
+      comillas a la clave, la pasa a minúsculas y junta los dos valores si la misma
+      clave aparece dos veces con valores distintos —el resultado no es booleano ni
+      fecha, y eso es rojo— → `21/21`. `actionlint` → `rc=0`.
+- [x] 2.8 **El comentario del job `canonico` decía «la punta de main»** (hallazgo FO-H5,
+      que la revisión dejó como no confirmado). La base es la del payload del evento; el
+      comentario del paso, el encabezado del job, el proposal y el design lo dicen así, y
+      el design declara el límite: un verde calculado antes de que `main` publique una
+      versión queda rancio. Lo que lo cierra es 5.6.
+
 ## 3. `capa-descubrimiento`: el requirement sale, la fecha se corre
 
 - [x] 3.1 Su delta de `gobierno-contribucion` pierde «El estado experimental de un change
@@ -142,3 +158,11 @@ el commit sobre el que arranca. Toda verificación es por código de salida.
       `capa-descubrimiento` con un ADR (D3). No es tarea de este change: si no ocurre,
       el paso de este change pone rojo el CI de Projects el 2026-10-16, que es lo que
       tiene que pasar.
+- [ ] 5.6 **Que el ruleset de `main` exija ramas al día antes de mergear** (hallazgo FO-H5
+      de la revisión adversarial). Sin eso, el verde de `canonico-versionado` puede venir
+      de una base anterior a la publicación de una versión, y el PR que reescribe esa
+      entrada entra igual si no choca con el release en el texto. Es configuración de
+      GitHub, no del árbol, y `main` todavía no tiene ruleset
+      (`.github/proteccion-main.md`): acto del administrador del repo. Destino: la misma
+      decisión que active el ruleset; hasta entonces, el límite queda escrito en el
+      design y en el comentario del paso.
