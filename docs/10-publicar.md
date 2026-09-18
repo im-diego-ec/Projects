@@ -113,8 +113,14 @@ Va **adentro de los environments `dev` y `produccion`** de tu repositorio, cada
 uno limitado a la rama `main` —el paso a paso está en el README del sitio—, y no
 como secreto del repositorio. La diferencia no es de orden: un secreto del
 repositorio lo lee cualquier job de cualquier workflow, y este token **publica en
-producción**. El de un environment limitado a `main` solo llega a un job que
-corre con código que ya pasó por un pull request.
+producción**. El de un environment solo lo recibe un job que declara ese
+environment, y la regla de rama `main` lo cierra a un disparo a mano desde otra
+rama o a un workflow nuevo que alguien agregue: es la **segunda llave**. La
+primera, la que frena al código de un pull request abierto desde un fork, es la
+condición de cada job del despliegue: exige que lo haya disparado un `push` a
+`main` de este repositorio. El environment no la reemplaza, porque cuando el
+despliegue lo dispara el CI, GitHub compara la regla de rama contra `main`
+aunque el código venga de un fork.
 
 Hasta el 2026-09-17 el andamio lo mandaba a los secretos del repositorio, y el
 despliegue se podía disparar con el código de un pull request abierto desde un

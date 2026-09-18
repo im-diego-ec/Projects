@@ -231,9 +231,20 @@ misma regla que `marco-ci.yml` ya cumple en sus checkouts.
 - **Los repositorios que ya tienen el defecto.** El scaffold no viaja y nada del
   marco mira hoy el `desplegar.yml` de un consumidor. Un check referenciado que
   lo detecte —un `workflow_run` que lee secretos sin mirar el evento ni el
-  repositorio del commit— pondría en rojo a `plantilla-sitio` el día del bump, o
-  sea que por la decisión D1 del PO es un **breaking** y va a la v2. Queda como
-  pendiente.
+  repositorio del commit— pondría en rojo a `plantilla-sitio` el día del bump, y
+  **por la decisión D1 del PO eso es lo que corresponde, no un breaking**: una
+  compuerta nueva se exige en rojo el día que sale, y la excepción (aviso, o
+  breaking hacia la v2) es solo para un arreglo que queda fuera del árbol del
+  consumidor. Acá el arreglo es reemplazar el `if:` de su `desplegar.yml`, dentro
+  de su árbol, y el parche exacto ya está en «Para consumidores»: va en un MINOR,
+  en rojo, con ese parche. La mitad que sí queda fuera del árbol —crear los
+  environments y mover los secretos— no la ve ningún check y ya se avisa en
+  amarillo (D5). La versión anterior de este párrafo lo mandaba a la v2 citando la
+  D1 al revés (hallazgo RV-H2 de la revisión adversarial). No se construye en este
+  change porque es un diseño propio —qué forma de disparo cuenta, cómo se reconoce
+  un job que lee un secreto— y un check nuevo en el pipeline de todo consumidor,
+  que se ensaya contra `plantilla-sitio` antes de publicarse. Queda como pendiente
+  (tasks 8.5).
 - **Que GitHub llene el contexto como el banco lo simula.** Los campos salen del
   esquema publicado de la API y de la referencia de eventos; no hay un runner de
   GitHub en este banco. La prueba contra un repositorio real queda pendiente.

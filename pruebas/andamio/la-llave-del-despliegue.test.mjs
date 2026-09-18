@@ -393,6 +393,31 @@ test("la guia manda la credencial a los environments, no a los secretos del repo
   assert.match(pagina, /`produccion`/, "docs/10 tiene que nombrar el environment donde vive el token");
 });
 
+test("la guia no le atribuye al environment la guarda contra el fork: esa es la condicion del job", () => {
+  // Hallazgo RV-H3 de la revision adversarial del porte. docs/10 y el README del sitio
+  // decian que un environment limitado a `main` solo le llega a codigo que ya paso por
+  // un pull request. Bajo `workflow_run` el GITHUB_REF es siempre la rama por defecto
+  // (design D1 de el-despliegue-no-le-da-la-llave-al-fork), asi que la politica de rama
+  // del environment DEJA PASAR un job disparado por el CI de un fork: lo que lo frena es
+  // la condicion de cada job. Quien lee la frase vieja cree que alcanza con el
+  // environment, y en el plan que no lo ofrece cree que quedo desprotegido.
+  //
+  // LIMITE DECLARADO: son las formas exactas que aparecieron, no un detector de la idea.
+  const aplanar = (t) => t.replace(/\r?\n[ \t]*>?[ \t]*/g, " ").replace(/[ \t]+/g, " ");
+  const FALSAS = [
+    "solo llega a un job que corre con código que ya pasó por un pull request",
+    "donde únicamente llega código que ya pasó por un pull request",
+  ];
+  for (const [ruta, nombre] of [[README_SITIO, "plantilla/sitio/README.md"], [PAGINA_PUBLICAR, "docs/10-publicar.md"]]) {
+    const texto = aplanar(fs.readFileSync(ruta, "utf-8"));
+    for (const f of FALSAS) {
+      assert.ok(!texto.includes(f), `${nombre} le atribuye al environment una garantia que no da: «${f}»`);
+    }
+    assert.match(texto, /segunda llave/, `${nombre} tiene que decir que el environment es la segunda llave`);
+    assert.match(texto, /condición/, `${nombre} tiene que nombrar la condición del job como la guarda contra el fork`);
+  }
+});
+
 // ---------------------------------------------------------------------------
 // LAS REFUTACIONES: el caso ROJO, demostrado contra las condiciones REALES que
 // tenia el defecto, y una mutacion por cada clausula de las guardas. Cada una

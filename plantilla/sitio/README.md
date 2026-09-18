@@ -111,8 +111,13 @@ dos veces —una con el nombre `dev` y otra con `produccion`—, y en cada uno:
 > **Por qué en un environment y no como secreto del repositorio.** Un secreto del
 > repositorio lo puede leer cualquier job de cualquier workflow de tu repo; el de
 > un environment limitado a `main` solo lo recibe un job que declara ese
-> environment y corre desde `main`. Este token **publica en producción**, así que
-> tiene que estar donde únicamente llega código que ya pasó por un pull request.
+> environment, y no uno disparado a mano desde otra rama. Este token **publica en
+> producción**, así que le conviene esa **segunda llave**. La primera —la que
+> impide que el código de un pull request abierto desde un fork llegue al token—
+> es la condición de cada job de `.github/workflows/desplegar.yml`: exige que el
+> despliegue lo haya disparado un `push` a `main` de este repositorio. El
+> environment no la reemplaza: cuando el despliegue lo dispara el CI, GitHub
+> compara la regla de rama contra `main` aunque el código venga de un fork.
 >
 > **Y por qué también en `dev`:** Cloudflare no deja acotar un token a un solo
 > sitio —el permiso de Workers es de la cuenta entera—, así que la credencial de

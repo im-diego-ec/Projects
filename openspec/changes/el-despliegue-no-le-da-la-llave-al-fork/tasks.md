@@ -84,6 +84,16 @@ al change se citan en el proposal contra `fde8f4e`.
 - [x] 3.2 `docs/10-publicar.md:112`: el token va en los environments, no en los
       secretos del repositorio, con la excepción y el puntero al CHANGELOG.
       Evidencia: caso «la guia manda la credencial a los environments» (`:373`).
+- [x] 3.3 **La guía le atribuía al environment la guarda contra el fork** (hallazgo
+      RV-H3 de la revisión adversarial). `docs/10-publicar.md` y el paso 4 de
+      `plantilla/sitio/README.md` decían que el environment limitado a `main` solo le
+      llega a código que ya pasó por un pull request; bajo `workflow_run` el
+      `GITHUB_REF` es siempre `main` (D1), así que eso lo garantiza la condición del
+      job, no el environment. Rojo primero: caso nuevo en
+      `pruebas/andamio/la-llave-del-despliegue.test.mjs` (las dos frases, y que las dos
+      páginas digan «segunda llave» y nombren la condición) → `# tests 15 · # pass 14
+      · # fail 1`. Reescritas las dos: el environment es la segunda llave, la condición
+      del job es la primera → `15/15`, y `pruebas/docs/` en verde.
 
 ## 4. Bancos existentes que el cambio obligó a tocar, y por qué
 
@@ -169,8 +179,15 @@ al change se citan en el proposal contra `fde8f4e`.
 - [ ] 8.5 **Detectar el defecto en los consumidores que ya lo tienen**: un check
       referenciado (en `marco-ci.yml`) que marque un `workflow_run` que lee
       secretos sin mirar el evento ni el repositorio del commit. Pondría en rojo a
-      `plantilla-sitio` el día del bump: por la decisión D1 del PO es breaking y va
-      a la línea v2 (lote 38) o a un change propio.
+      `plantilla-sitio` el día del bump, y por la decisión D1 del PO eso es lo que
+      corresponde: el arreglo —el `if:` de su `desplegar.yml`— está dentro de su
+      árbol, así que va en un **MINOR, exigible en rojo**, con el parche del
+      fragmento 0a en «Para consumidores». No es breaking ni va a la v2: la versión
+      anterior de esta tarea lo decía citando la D1 al revés (hallazgo RV-H2 de la
+      revisión adversarial; design, «Qué lo hace cumplir solo, y qué no»). Destino:
+      un change propio, con su diseño y su ensayo contra `plantilla-sitio`; no entra
+      acá porque este change cierra el andamio y ese check es contrato nuevo del
+      reusable.
 - [ ] 8.6 **Analizadores de terceros para workflows** (zizmor, poutine): este lote
       tiene prohibido agregarlos. Quedan para un change que los evalúe y los pine
       por SHA.
