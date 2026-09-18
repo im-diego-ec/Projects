@@ -681,6 +681,26 @@ jobs:
     # Minimo real por job: clona el arbol del consumidor y corre dos lectores de
     # specs. No consulta ninguna API de GitHub, asi que no recibe el
     # pull-requests: read que si necesita el job "cambios".
+    #
+    # RE-AUDITADO el 2026-09-17 antes de estrenar "Estado experimental con fecha de
+    # veredicto", accion por accion y no por parecido con los pasos hermanos:
+    #
+    #   | accion del paso                            | permiso que necesita         |
+    #   | ------------------------------------------ | ---------------------------- |
+    #   | `[ -d openspec/changes ]`                  | contents: read (el checkout) |
+    #   | `readdirSync` de openspec/changes/         | contents: read (el checkout) |
+    #   | `readFileSync` de cada `.md` de un change  | contents: read (el checkout) |
+    #   | comparar dos cadenas de fecha              | ninguno                      |
+    #   | `console.log` de `::error::`               | ninguno: protocolo del runner |
+    #
+    # No hay llamada de red, no lee GITHUB_TOKEN, no invoca gh ni git y no escribe
+    # nada: el paso no agrega un solo permiso. La auditoria se escribe igual siendo el
+    # resultado "no hace falta nada", porque la leccion se repitio tres veces y las
+    # tres fue el mismo razonamiento ("este paso se parece al de al lado") sobre
+    # codigo que corre en el pipeline de todos los consumidores. Si maniana un paso
+    # de este job pide un permiso nuevo, pruebas/andamio/piso-del-reusable.test.mjs
+    # exige que el piso que el marco declara en sus tres archivos lo nombre, y
+    # pruebas/andamio/permisos-por-job.test.mjs que el bloque siga escrito.
     permissions:
       contents: read
     steps:
@@ -932,6 +952,194 @@ jobs:
           echo "::warning::el arbol instalado del CLI de OpenSpec no expone un ejecutable unico en node_modules/.bin, asi que este paso vuelve al ejecutor de paquetes y la validacion corre SIN la medicion del arbol de arriba. Es un fallo DEL MARCO, no de tu repo: el campo bin del paquete cambio de forma. Abri un issue en el repo del marco con el listado de node_modules/.bin que sigue"
           ls -la "${CLI}/node_modules/.bin" || true
           npx --yes --ignore-scripts "@fission-ai/openspec@${VERSION_OPENSPEC}" validate --all --strict
+
+      # UN CHANGE ACTIVO Y SIN ARCHIVAR *ES* EL ESTADO EXPERIMENTAL DEL MARCO: la
+      # propuesta existe, esta revisada, es citable y no es contrato. El mecanismo es
+      # correcto y tiene un modo de falla obvio, el ZOMBI: un change que nadie archiva
+      # ni descarta se queda ahi, envejece, y al anio siguiente nadie sabe si es una
+      # promesa o basura.
+      #
+      # Entonces un change que declara `experimental: true` declara TAMBIEN
+      # `veredicto_antes_de: AAAA-MM-DD`. Dos rojos y no uno: declararse experimental
+      # SIN fecha tambien falla, porque si no la puerta de escape es no poner la fecha.
+      # La fecha vence al TERMINAR el dia declarado: ese dia todavia es verde.
+      #
+      # ES INERTE PARA TODO LO DEMAS, y por eso es MINOR y no breaking: un change que
+      # no se declara experimental no ve este paso. Ningun repositorio que hoy pasa
+      # falla maniana por esta linea.
+      #
+      # Y ES DOGFOODEABLE SIN CONSUMIDOR: corre sobre `openspec/changes/` de cualquier
+      # repo, incluido el del marco, que lo ejecuta por ruta local en cada PR. Su
+      # primer sujeto fue `capa-descubrimiento`, que declaraba la fecha 2026-09-21 y
+      # ningun workflow la leia. Viene de Rigel 1.14.0 (commit 08f3b2e), adaptado en el
+      # change `el-experimental-caduca`: el lector de frontmatter descarta los
+      # comentarios de YAML, que en este repo van al final de los valores y con el
+      # lector original apagaban la declaracion en silencio. Banco:
+      # pruebas/marco-ci/caducidad-experimental.test.mjs.
+      - name: Estado experimental con fecha de veredicto
+        shell: bash
+        run: |
+          [ -d openspec/changes ] || {
+            echo "el repo no tiene openspec/changes/: nada que caducar"
+            exit 0
+          }
+
+          # El programa va inline por el mismo motivo que los pasos hermanos (un
+          # heredoc no puede cerrar dentro de un bloque de YAML indentado) y viaja
+          # entre comillas SIMPLES de shell: adentro no hay ni una comilla simple
+          # literal (se escribe \x27), y los $ de sus expresiones regulares son del
+          # lenguaje.
+          # shellcheck disable=SC2016
+          node -e '
+            const { readFileSync, readdirSync } = require("node:fs");
+            const { join } = require("node:path");
+
+            const escapar = (valor) =>
+              String(valor).replace(/%/g, "%25").replace(/\r/g, "%0D").replace(/\n/g, "%0A");
+
+            /** AAAA-MM-DD y ademas un dia que existe: 2026-13-01 tiene la forma y no la fecha. */
+            function esFecha(texto) {
+              if (!/^[0-9]{4}-[0-9]{2}-[0-9]{2}$/.test(texto)) return false;
+              const d = new Date(texto + "T00:00:00Z");
+              return !Number.isNaN(d.getTime()) && d.toISOString().slice(0, 10) === texto;
+            }
+
+            // La fecha entra por el entorno para que el banco sea determinista. El
+            // workflow NO la setea, asi que en una corrida real es el dia de hoy en UTC,
+            // el reloj del runner: un check de caducidad cuyo banco dependa del
+            // calendario se pone rojo solo, un martes cualquiera, por un motivo que no
+            // es el suyo.
+            const HOY = process.env.HOY_ISO || new Date().toISOString().slice(0, 10);
+            if (!esFecha(HOY)) {
+              console.log("::error title=Caducidad experimental::" + escapar("HOY_ISO no es una fecha AAAA-MM-DD: " + HOY));
+              process.exit(1);
+            }
+
+            /** El frontmatter de un .md, sin dependencias: el primer bloque entre ---.
+             *  Solo las claves de primer nivel. Las lineas de comentario se saltean y el
+             *  comentario al final de un valor se descarta: en este marco los
+             *  frontmatter los llevan, y tomar el valor crudo convertia
+             *  `experimental: true  # ver ...` en algo que no es `true`. */
+            function frontmatter(texto) {
+              const lineas = texto.replace(/^\uFEFF/, "").split(/\r?\n/);
+              if (lineas[0].trim() !== "---") return {};
+              let fin = -1;
+              for (let i = 1; i < lineas.length; i += 1) {
+                if (lineas[i].trim() === "---") { fin = i; break; }
+              }
+              if (fin < 0) return {};
+              const campos = {};
+              for (const linea of lineas.slice(1, fin)) {
+                if (/^\s*(#|$)/.test(linea)) continue;
+                const m = linea.match(/^([A-Za-z_][A-Za-z0-9_-]*)\s*:(.*)$/);
+                if (!m) continue;
+                const valor = m[2].replace(/\s+#.*$/, "").trim().replace(/^(["\x27])(.*)\1$/, "$2");
+                campos[m[1]] = valor;
+              }
+              return campos;
+            }
+
+            /** Los .md de un change, recursivo. Los enlaces simbolicos no se siguen. */
+            function artefactosDe(dir) {
+              const salida = [];
+              for (const entrada of readdirSync(dir, { withFileTypes: true })) {
+                const ruta = join(dir, entrada.name);
+                if (entrada.isDirectory()) salida.push(...artefactosDe(ruta));
+                else if (entrada.isFile() && entrada.name.endsWith(".md")) {
+                  salida.push({ ruta, campos: frontmatter(readFileSync(ruta, "utf8")) });
+                }
+              }
+              return salida;
+            }
+
+            const RAIZ = join("openspec", "changes");
+            // El archive/ no se mira: es historia inmutable, y mirarlo dejaria rojo
+            // para siempre a todo repo con un experimento cerrado.
+            const activos = readdirSync(RAIZ, { withFileTypes: true })
+              .filter((e) => e.isDirectory() && e.name !== "archive")
+              .map((e) => e.name)
+              .sort();
+
+            const problemas = [];
+            const vigentes = [];
+
+            for (const change of activos) {
+              const artefactos = artefactosDe(join(RAIZ, change));
+
+              // Un `experimental:` que no es booleano es rojo y no un salteo:
+              // `experimental: si` es alguien declarando el estado con otra palabra.
+              const raros = artefactos.filter(
+                (a) => a.campos.experimental !== undefined && !/^(true|false)$/i.test(a.campos.experimental)
+              );
+              if (raros.length) {
+                problemas.push(
+                  change + " declara experimental: " + raros[0].campos.experimental + " (" + raros[0].ruta + "), que no es un " +
+                    "booleano. Un valor que no se puede leer no se toma por falso en silencio. Arreglo: experimental: true " +
+                    "o experimental: false"
+                );
+                continue;
+              }
+
+              // Un change es experimental si CUALQUIERA de sus artefactos lo declara.
+              // No se exige que lo digan todos: el estado es del change, no del archivo.
+              const declara = artefactos.filter((a) => String(a.campos.experimental).toLowerCase() === "true");
+              if (declara.length === 0) continue;
+
+              const conFecha = artefactos.filter((a) => a.campos.veredicto_antes_de);
+              if (conFecha.length === 0) {
+                problemas.push(
+                  change + " se declara experimental (" + declara[0].ruta + ") y ningun artefacto suyo declara " +
+                    "veredicto_antes_de. Sin fecha el estado experimental no caduca nunca, que es como un change " +
+                    "se vuelve un zombi: nadie sabe si es una promesa o basura. Arreglo: agregar " +
+                    "veredicto_antes_de: AAAA-MM-DD al frontmatter, con la fecha en que el experimento tiene que " +
+                    "tener veredicto"
+                );
+                continue;
+              }
+
+              const malas = conFecha.filter((a) => !esFecha(a.campos.veredicto_antes_de));
+              if (malas.length) {
+                problemas.push(
+                  change + " declara veredicto_antes_de: " + malas[0].campos.veredicto_antes_de + " (" + malas[0].ruta +
+                    "), que no es una fecha AAAA-MM-DD que exista. Una fecha que no se puede comparar no caduca, y " +
+                    "lo no verificable es rojo y nunca exito mudo. Arreglo: escribirla como AAAA-MM-DD"
+                );
+                continue;
+              }
+
+              // La MAS TEMPRANA manda. Si dos artefactos discrepan, tomar la mas lejana
+              // dejaria que agregar un archivo con fecha nueva corriera el vencimiento
+              // sin que nadie lo decidiera. Correr la fecha es correrla en TODOS.
+              const vence = conFecha.map((a) => a.campos.veredicto_antes_de).sort()[0];
+              const tieneVeredicto = artefactos.some((a) => String(a.campos.artefacto).toLowerCase() === "veredicto");
+
+              if (tieneVeredicto) {
+                vigentes.push(change + " (veredicto escrito)");
+              } else if (vence < HOY) {
+                problemas.push(
+                  change + " se declaro experimental con veredicto_antes_de: " + vence + ", esa fecha ya paso (hoy " +
+                    HOY + ") y ningun artefacto suyo declara artefacto: veredicto. El experimento vencio sin " +
+                    "conclusion. Arreglo, y las tres salidas son legitimas: escribir el veredicto (un .md del change " +
+                    "con artefacto: veredicto en el frontmatter), correr la fecha con el motivo escrito en el " +
+                    "proposal y en TODOS los artefactos que la declaran, o descartar el change"
+                );
+              } else {
+                vigentes.push(change + " (vence " + vence + ")");
+              }
+            }
+
+            if (problemas.length) {
+              for (const p of problemas) console.log("::error title=Caducidad experimental::" + escapar(p));
+              process.exit(1);
+            }
+
+            if (vigentes.length === 0) {
+              console.log("ningun change activo se declara experimental: el paso es inerte");
+            } else {
+              console.log(vigentes.length + " change(s) experimental(es) con fecha de veredicto vigente o con veredicto escrito (hoy " + HOY + "):");
+              for (const v of vigentes) console.log("  " + v);
+            }
+          '
 
   # ---------------------------------------------------------------------------
   # EL GUARDRAIL DE DELTAS, EN SU PROPIO JOB Y CON LA MISMA PARTICION QUE LA

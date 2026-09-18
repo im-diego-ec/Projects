@@ -219,6 +219,22 @@ mueve sobre un cambio incompatible.
 
   **Para consumidores: nada**; son bancos del repositorio del marco.
 
+- **En el CI del marco, una versión publicada del canónico ya no se puede reescribir.**
+  El banco de la huella ataba el texto de la constitución a la última versión del
+  manifiesto, pero no veía el atajo que su propio mensaje prohibía: pegar la huella
+  nueva sobre la entrada de una versión que ya salió. Medido: con una regla nueva en
+  el canónico y la huella pegada sobre la 1.7.0, los 418 casos de `actions/` daban
+  verde, y el rojo habría caído en el CI de un consumidor al día con esa versión. Un
+  job nuevo del `ci.yml` del marco, `canonico-versionado`, compara el manifiesto de
+  la base del PR con el de la cabeza: una versión que el CHANGELOG ya publicó no
+  cambia de huella, de número ni desaparece. La entrada pendiente del próximo release
+  sí se puede corregir. Viene de Rigel 1.14.0, adaptado a la huella que Projects ya
+  tenía.
+
+  **Para consumidores: nada.** El job vive en el repositorio del marco y no viaja; lo
+  que te protege es que el texto de la versión que pinás no puede cambiar bajo el
+  mismo número.
+
 ### Corregido
 
 - **Cinco páginas seguían prometiendo una publicación automática que ya no ocurre**, y
@@ -953,6 +969,27 @@ mueve sobre un cambio incompatible.
   **Para consumidores: nada obligatorio.** Si querés cerrar el hueco ya, pasale
   `rutas_carril_docs` al job que llama a `marco-ci.yml`, con la lista del default y
   `^\.github/[^/]*$` en lugar de `^\.github/`.
+
+- **Un change que se declara experimental caduca por fecha, y el pipeline lo cobra.**
+  Paso nuevo en el job `openspec` de `marco-ci.yml`, «Estado experimental con fecha de
+  veredicto»: un change activo que declara `experimental: true` en cualquiera de sus
+  artefactos tiene que declarar también `veredicto_antes_de: AAAA-MM-DD`, y es rojo si
+  no la declara, si no es una fecha que exista o si ya pasó sin un artefacto con
+  `artefacto: veredicto`. La fecha vence al terminar el día declarado, manda la más
+  temprana del change y el `archive/` no se mira. Existe contra el zombi: el change
+  que nadie confirma ni descarta y que al año nadie sabe si es promesa o resto. El
+  primer sujeto fue el propio marco: `capa-descubrimiento` declaraba una fecha que
+  ningún workflow leía y que vencía el 2026-09-21. Viene de Rigel 1.14.0, con el
+  lector de frontmatter adaptado: descarta los comentarios de YAML, que con el lector
+  original apagaban la declaración en silencio. No agrega permisos: el job sigue con
+  `contents: read`, auditado acción por acción.
+
+  **Para consumidores: nada**, mientras no declares un change experimental. Si no hay
+  ninguno, el paso imprime «el paso es inerte» y sale 0. Si declarás
+  `experimental: true` en algún artefacto de un change, agregá en el mismo
+  frontmatter `veredicto_antes_de: AAAA-MM-DD`; si el rojo aparece en tu PR de bump,
+  el mensaje trae el change, la fecha y las tres salidas: escribir el veredicto,
+  correr la fecha con el motivo escrito o descartar el change.
 
 ### Corregido
 

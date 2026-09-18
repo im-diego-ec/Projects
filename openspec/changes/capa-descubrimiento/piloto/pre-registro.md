@@ -5,7 +5,7 @@ aprueba: revision adversarial (desvio del marco: un solo mantenedor, ver AGENTS.
 informado: PO
 estado: no-corrido (el experimento se descartó el 2026-08-22; ver el encabezado)
 experimental: true
-veredicto_antes_de: 2026-09-21
+veredicto_antes_de: 2026-10-15  # era 2026-09-21; la corrio el PO el 2026-09-17 (D3), motivo en proposal.md
 ---
 
 # capa-descubrimiento — el experimento que no se corrió

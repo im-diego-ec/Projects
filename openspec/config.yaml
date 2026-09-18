@@ -49,8 +49,11 @@ rules:
       `pendiente-de-revision`, `aprobado-en-sesion`, `en-ejecucion`,
       `archivado`. Los campos opcionales que el marco ya usa son
       `experimental` (booleano) y `veredicto_antes_de` (fecha ISO), y van
-      juntos - un change experimental sin fecha de veredicto es permanente
-      por defecto"
+      juntos - el paso «Estado experimental con fecha de veredicto» del
+      workflow reusable pone rojo al change experimental sin fecha, y al que
+      llega al día siguiente de su fecha sin un artefacto que declare
+      `artefacto: veredicto`. Manda la fecha más temprana del change, así que
+      correrla es correrla en todos los artefactos que la declaran"
     - "`dri` y `aprueba` NO pueden nombrar a la misma persona. Un autor que
       se aprueba a sí mismo no es un review, y hoy nada lo detiene - el
       repositorio corre con `required_approving_review_count` en `0` y
