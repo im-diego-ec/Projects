@@ -25,6 +25,7 @@ import { readFileSync } from "node:fs";
 
 import { scriptDelPaso, RAIZ } from "./extraer.mjs";
 import { repoDeJuguete, escribir, commit, correrBash, limpiarTodo } from "./util.mjs";
+import { porque } from "../porque.mjs";
 
 const PASO = "Permisos del agente sin escritura";
 const script = scriptDelPaso(PASO);
@@ -179,15 +180,21 @@ test("permisos · la severidad la decide la sonda por archivos, no un nombre", (
     new URL("../../.github/workflows/marco-ci.yml", import.meta.url),
     "utf8",
   );
+  // La evidencia son las lineas que nombran la sonda, no el archivo entero: marco-ci.yml tiene
+  // miles de lineas y el recorte de porque() se quedaria con el final, que no es donde esta.
+  const lineasCon = (texto, que) => texto.split("\n").filter((l) => l.includes(que)).join("\n");
   assert.match(
     texto,
     /ES_DISTRIBUIDOR="\$\{ES_DISTRIBUIDOR\}" \\/,
-    "el paso tiene que pasarle la respuesta de la sonda al programa que clasifica los permisos",
+    porque(
+      "el paso tiene que pasarle la respuesta de la sonda al programa que clasifica los permisos",
+      lineasCon(texto, "ES_DISTRIBUIDOR"),
+    ),
   );
   assert.match(
     script,
     /git ls-files --error-unmatch -- plantilla\/\.github\/workflows\/ci\.yml/,
-    "la sonda de este paso tiene que mirar archivos rastreados",
+    porque("la sonda de este paso tiene que mirar archivos rastreados", lineasCon(script, "git ls-files")),
   );
 });
 
@@ -256,21 +263,29 @@ test("desvios · uno COMPLETO no avisa: el aviso distingue, no grita siempre", (
 test("desvios · MUTACION · sin la comprobacion, la entrada a medias pasa muda", () => {
   // Anti-vacuidad: se quita el predicado del aviso y se comprueba que el aviso
   // desaparece. Si no desapareciera, los casos de arriba estarian midiendo otra cosa.
-  const ancla = 'if (!quien || !fechaReal) {';
+  const ancla = 'if (!quien || !fechaValida) {';
   assert.ok(script.includes(ancla), "el ancla de la mutacion ya no esta en el paso");
   const mutado = script.replace(ancla, "if (false) {");
 
   const { permiso, motivo } = DESVIO_COMPLETO;
   const raiz = repo({ distribuidor: true, desvios: { desvios: [{ permiso, motivo }] } });
-  assert.match(correr(raiz).salida, /Desvio de permiso incompleto/, "el paso sano tiene que avisar");
-  assert.doesNotMatch(correr(raiz, mutado).salida, /Desvio de permiso incompleto/, "el mutado no puede seguir avisando");
+  const sano = correr(raiz).salida;
+  const roto = correr(raiz, mutado).salida;
+  assert.match(sano, /Desvio de permiso incompleto/, porque("el paso sano tiene que avisar", sano));
+  assert.doesNotMatch(roto, /Desvio de permiso incompleto/, porque("el mutado no puede seguir avisando", roto));
 });
 
 test("desvios · una FECHA IMPOSIBLE tambien avisa, como hace la action", () => {
   // Los dos lectores SEGUIAN divergiendo despues del primer arreglo, y en el caso
   // exacto que el aviso vino a cerrar: el paso miraba solo la FORMA
   // (/^\d{4}-\d{2}-\d{2}$/) y `constitucion.mjs` usa `esFecha`, que ademas exige que
-  // la fecha exista. Con "2026-13-45" la action daba ::error:: y el paso pasaba MUDO.
+  // Date.parse la acepte. Con "2026-13-45" la action daba ::error:: y el paso pasaba MUDO.
+  //
+  // CORRECCION DE ESTE COMENTARIO (2026-09-17): decia que `esFecha` «exige que la fecha
+  // exista», y no: Date.parse rechaza el mes 13 y el dia 32, pero acepta el 30 de
+  // febrero. El paso se habia alineado a esa lectura equivocada y avisaba sobre fechas
+  // que la action acepta. La tabla entera de grafias, por los dos lectores, la ata ahora
+  // desvio-de-permiso-una-sola-norma.test.mjs.
   const raiz = repo({
     distribuidor: true,
     desvios: {

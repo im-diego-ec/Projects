@@ -415,6 +415,7 @@ diff.
 │   └── workflows/         # REFERENCIADO: marco-ci.yml (el reusable que consumen los proyectos)
 │                          #   + ci.yml (el CI propio, dogfooding) + aviso-version.yml (avisa cada
 │                          #   release a los consumidores) + claude.yml (el bot @claude, acotado)
+│                          #   + reproducir-intermitente.yml (repite un banco N veces, a mano)
 ├── actions/               # REFERENCIADO: composite actions (una carpeta por action, con su action.yml)
 │   └── README.md          #   catálogo: qué hace cada una, inputs/outputs y permisos mínimos
 ├── plantilla/             # SCAFFOLD: el árbol que se copia UNA vez al crear un proyecto,

@@ -51,6 +51,16 @@ export function repoDeJuguete(prefijo = "repo-") {
   git(raiz, "config", "user.email", "banco@projects.invalid");
   git(raiz, "config", "user.name", "Banco del marco");
   git(raiz, "config", "commit.gpgsign", "false");
+  // Y LOS TAGS TAMBIEN. Con `tag.gpgsign = true` en la config GLOBAL de quien corre el banco
+  // —lo normal en una maquina que firma, que es la de quien publica— un `git tag <n>` crea un
+  // tag ANOTADO y falla con `fatal: no tag message?`, porque no hay editor que abrir dentro de
+  // un `execFileSync`. En Rigel costo trece rojos de un banco que nadie habia tocado (2026-09-14,
+  // commit c38e542 de alla); aca estaba latente porque ningun banco crea tags todavia.
+  //
+  // LO QUE HACE ESTO DISTINTO DE UN DEFECTO CUALQUIERA: el veredicto del banco dependia de una
+  // CONFIGURACION AJENA AL ARBOL. El mismo commit pasaba o fallaba segun quien lo corriera. Lo
+  // fija `util-aisla-la-config.test.mjs`, forzando la config global que lo dispara.
+  git(raiz, "config", "tag.gpgsign", "false");
   return raiz;
 }
 

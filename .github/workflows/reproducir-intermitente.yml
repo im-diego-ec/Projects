@@ -1,0 +1,280 @@
+name: Reproducir un banco intermitente
+
+run-name: >-
+  ${{ inputs.vueltas }} vueltas de ${{ inputs.banco }} (${{ inputs.forma }})
+
+# ---------------------------------------------------------------------------
+# UN INSTRUMENTO DE MEDICION, NO UNA COMPUERTA.
+#
+# POR QUE EXISTE. Un banco que falla en CI sobre un arbol que no toca su pieza, pasa al
+# re-correr el mismo job sin cambiar una linea y pasa en local tiene un resultado que NO es
+# funcion del arbol: eso alcanza para saber que es un defecto, y no alcanza para arreglarlo.
+# Arreglar sin reproducir deja la prueba igual de intermitente y con una explicacion encima.
+# Lo primero es conseguir una falla a voluntad, y para eso hace falta correr el banco muchas
+# veces DONDE FALLA, que es un runner y no la maquina de nadie. Este repo ya tuvo el sintoma:
+# `distribuidor` y `bitacora` cayeron una vez cada uno bajo la carga del banco completo y
+# pasaron aislados (el encabezado de `exigirQueHayaCorrido` en pruebas/marco-ci/util.mjs).
+#
+# DE DONDE VIENE. Del porte de Rigel: el instrumento (commit b047c16 de alla, issue #476), su
+# vuelta cero (c38e542) y la medicion que sobrevive a un corte (0448928, PR #540). Se trae ya
+# con los tres arreglos, porque cada uno fue un error que el instrumento cometio midiendo.
+#
+# LAS DOS FORMAS, Y LA SEGUNDA ES LA QUE IMPORTA:
+#
+#   - `solo`  : el archivo por su cuenta. La mas rapida.
+#   - `banco` : junto a los MISMOS archivos con los que ci.yml lo corre, en una sola invocacion
+#               de `node --test`. El corredor de Node paraleliza por archivo, asi que esta
+#               forma es la unica que puede reproducir una causa de CONCURRENCIA —un temporal
+#               compartido, un limite de descriptores, un reloj—. Concluir «no reproduce»
+#               corriendo solo el archivo seria descartar la hipotesis mas probable sin
+#               haberla probado.
+#
+# EL GRUPO SALE DE ci.yml, NO DE UN PATRON UNICO, y es la adaptacion a Projects. Alla el CI
+# corria todo junto; aca ci.yml hace TRES invocaciones separadas —actions/**/pruebas, pruebas/**
+# sin pruebas/init, y pruebas/init con su techo por archivo—, y un banco solo compite por
+# recursos con los de SU invocacion. Mezclar las tres mediria una concurrencia que el CI no
+# tiene. Los patrones son los de ci.yml, letra por letra, y los ata
+# pruebas/banco/reproducir-intermitente.test.mjs: si ci.yml cambia uno y este no, rojo.
+#
+# NO SE PUEDE APAGAR SOLO. Si el banco pasa las N vueltas, el job sale VERDE y lo dice con el
+# numero: «N vueltas, 0 fallas». Un verde asi no prueba que no haya intermitencia —prueba que
+# no aparecio en N— y el resumen lo escribe con esas palabras, porque leerlo como «arreglado»
+# es exactamente lo que dejaria el defecto cerrado sobre nada.
+# ---------------------------------------------------------------------------
+
+on:
+  workflow_dispatch:
+    inputs:
+      banco:
+        description: "Ruta del banco a repetir, relativa a la raiz del repositorio"
+        required: true
+        default: pruebas/marco-ci/distribuidor.test.mjs
+      vueltas:
+        description: "Cuantas veces correrlo (un entero positivo)"
+        required: true
+        default: "40"
+      forma:
+        description: "banco = con los mismos archivos con que lo corre ci.yml | solo = el archivo aparte"
+        required: true
+        default: banco
+        type: choice
+        options: [banco, solo]
+
+permissions:
+  contents: read
+
+jobs:
+  repetir:
+    name: repetir
+    runs-on: ubuntu-latest
+    # 180 Y NO EL DOBLE DE UNA CORRIDA NORMAL, que es el criterio del resto de los techos: aca la
+    # duracion la elige quien lo dispara (las vueltas). El tope esta declarado y el paso lo
+    # compara contra su propia estimacion antes de empezar. Esta escrito DOS veces —aca y en
+    # TOPE_MINUTOS del paso— porque timeout-minutes no llega al run: por ninguna variable; el
+    # banco de este workflow exige que las dos cifras coincidan.
+    timeout-minutes: 180
+    # Solo lee el arbol: no llama a ninguna API ni escribe nada fuera del runner. El artifact de
+    # los logs lo sube upload-artifact con su propio token de runtime, que no depende de estos
+    # permisos.
+    permissions:
+      contents: read
+    steps:
+      # EL ENTORNO TIENE QUE SER EL DEL JOB QUE SE QUIERE REPRODUCIR, y eso no es detalle. En Rigel
+      # la primera corrida de este instrumento reporto «REPRODUJO» en 40 de 40 vueltas sobre cinco
+      # casos que fallaban por su propio entorno: a su checkout le faltaba la historia y le faltaba
+      # pnpm, que el job real si tenia. Aca el job real (pruebas-actions, y la pata ubuntu con el
+      # Node del runner de pruebas-init) hace un checkout por defecto y setup-node 22, sin mas: se
+      # copia eso. Si algun dia el job real gana un paso de entorno, la vuelta cero de abajo lo
+      # delata antes de contar una sola falla.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        with: { node-version: "22" }
+
+      # UN INSTRUMENTO, NO UNA COMPUERTA: su rojo significa «reprodujo», que es el resultado que se
+      # busca, y su verde significa «no aparecio en N vueltas», que no es lo mismo que «no hay».
+      # Las dos lecturas van escritas en el resumen del job.
+      - name: Repetir el banco y contar las fallas
+        shell: bash
+        env:
+          BANCO: ${{ inputs.banco }}
+          VUELTAS: ${{ inputs.vueltas }}
+          FORMA: ${{ inputs.forma }}
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+
+          if [ ! -f "${BANCO}" ]; then
+            echo "::error::no existe el banco '${BANCO}'. Se pasa la ruta relativa a la raiz del repositorio, por ejemplo pruebas/marco-ci/distribuidor.test.mjs"
+            exit 1
+          fi
+          case "${BANCO}" in
+            *.test.mjs) ;;
+            *)
+              echo "::error::'${BANCO}' no es un banco: el CI solo junta archivos *.test.mjs, asi que repetir otra cosa no reproduce nada que el CI haga"
+              exit 1
+              ;;
+          esac
+          # Un numero de vueltas que no es un entero positivo haria que el bucle no corriera NINGUNA
+          # y el job saliera verde diciendo «0 fallas»: un «no reprodujo» sobre cero vueltas.
+          if ! printf '%s' "${VUELTAS}" | grep -qE '^[1-9][0-9]*$'; then
+            echo "::error::vueltas='${VUELTAS}' no es un entero positivo. Con eso el bucle no correria ninguna vuelta y este job diria «0 fallas» sin haber medido nada"
+            exit 1
+          fi
+
+          # EL GRUPO: la MISMA invocacion de `node --test` en la que ci.yml corre este banco. Los
+          # patrones son los de ci.yml, letra por letra (los ata el banco de este workflow).
+          # Ningun arreglo se expande sin saber que tiene algo: con `set -u`, expandir uno vacio es
+          # un error en el bash 3.2 de macOS, y el banco de este workflow corre el paso ahi tambien.
+          TECHO=""
+          case "${BANCO}" in
+            pruebas/init/*)
+              # El job pruebas-init, que ademas le pone un techo a cada archivo.
+              DE="init"
+              TECHO="--test-timeout=120000"
+              ;;
+            actions/*) DE="actions" ;;
+            pruebas/*) DE="pruebas" ;;
+            *)
+              echo "::error::'${BANCO}' no esta bajo actions/ ni bajo pruebas/, asi que ningun paso de ci.yml lo corre y no hay invocacion que reproducir"
+              exit 1
+              ;;
+          esac
+
+          if [ "${FORMA}" = "solo" ]; then
+            ARCHIVOS=("${BANCO}")
+          else
+            if [ "${DE}" = "init" ]; then
+              GRUPO=(pruebas/init/*.test.mjs)
+            else
+              if ! shopt -s globstar 2> /dev/null; then
+                echo "::error::la forma 'banco' junta los archivos con globstar, igual que ci.yml, y este bash (${BASH_VERSION}) no lo tiene. El runner de este workflow (ubuntu-latest) si lo tiene: si ves esto, el paso se corrio en otro lado. La forma 'solo' no lo necesita"
+                exit 1
+              fi
+              if [ "${DE}" = "actions" ]; then
+                GRUPO=(actions/**/pruebas/*.test.mjs)
+              else
+                # El paso de ci.yml que corre pruebas/** excluye pruebas/init/, que corre aparte.
+                TODAS=(pruebas/**/*.test.mjs)
+                GRUPO=()
+                if [ ${#TODAS[@]} -gt 0 ]; then
+                  for P in "${TODAS[@]}"; do
+                    case "${P}" in
+                      pruebas/init/*) continue ;;
+                    esac
+                    GRUPO+=("${P}")
+                  done
+                fi
+              fi
+            fi
+            # El banco tiene que estar en su grupo: si no, ningun patron del CI lo junta y lo que
+            # se repetiria es una invocacion que el CI no hace.
+            ESTA=false
+            if [ ${#GRUPO[@]} -gt 0 ]; then
+              for P in "${GRUPO[@]}"; do
+                if [ "${P}" = "${BANCO}" ]; then ESTA=true; fi
+              done
+            fi
+            if [ "${ESTA}" != true ]; then
+              echo "::error::'${BANCO}' no cae bajo el patron con el que ci.yml junta su grupo, asi que el CI no lo corre. Revisa la ruta (relativa a la raiz, sin ./) o mira pruebas/banco/integridad.test.mjs, que es el que vigila que todo banco caiga bajo algun patron"
+              exit 1
+            fi
+            ARCHIVOS=("${GRUPO[@]}")
+          fi
+
+          echo "forma '${FORMA}': ${#ARCHIVOS[@]} archivo(s) por vuelta, ${VUELTAS} vuelta(s)"
+          SALIDAS="${RUNNER_TEMP}/salidas"
+          mkdir -p "${SALIDAS}"
+
+          # Una vuelta: la invocacion del grupo, con su techo por archivo si lo tiene, y la salida
+          # entera a su archivo.
+          vuelta() {
+            if [ -n "${TECHO}" ]; then
+              node --test "${TECHO}" "${ARCHIVOS[@]}" > "$1" 2>&1
+            else
+              node --test "${ARCHIVOS[@]}" > "$1" 2>&1
+            fi
+          }
+
+          # LA VUELTA CERO, Y ES LA QUE VUELVE HONESTO A ESTE INSTRUMENTO. Antes de contar ninguna
+          # falla como «reprodujo», el banco tiene que pasar UNA vez. Si la linea de base ya esta
+          # roja, lo que este job mide es su propio entorno —y decir «REPRODUJO» sobre eso es un
+          # falso positivo, que es exactamente la clase que se esta cazando—. Paso de verdad en
+          # Rigel: 40 de 40 «reprodujeron» sobre cinco casos que fallaban por su instalacion.
+          #
+          # El tope declarado del job, para comparar contra la estimacion de abajo. Se escribe aca
+          # porque timeout-minutes no llega al run: por ninguna variable.
+          TOPE_MINUTOS=180
+          T0=$(date +%s)
+
+          echo "== vuelta 0: la linea de base =="
+          if ! vuelta "${SALIDAS}/vuelta-0-base.txt"; then
+            echo "::error::la LINEA DE BASE ya esta roja, asi que este job no puede distinguir una intermitencia de su propio entorno. NO se cuenta ninguna vuelta. Lo que sigue son los casos que fallan siempre: arreglalos, o alinea el entorno de este workflow con el del job que quieras reproducir"
+            grep -E "not ok|AssertionError|la evidencia" "${SALIDAS}/vuelta-0-base.txt" | head -30 || true
+            exit 1
+          fi
+          echo "linea de base VERDE: a partir de aca, una falla es una intermitencia"
+
+          # CUANTO VA A TARDAR, DICHO ANTES DE EMPEZAR. En Rigel la primera corrida con la linea
+          # de base verde murio en el timeout-minutes a la vuelta 38 de 40 SIN imprimir su cuenta:
+          # 44 minutos de medicion y el job no reporto nada. Con la duracion de la vuelta cero se
+          # sabe de antemano si el presupuesto alcanza, y eso convierte una cancelacion muda en un
+          # limite declarado. Redondea para arriba: un «~0 minutos» no le dice nada a nadie.
+          SEGUNDOS_BASE=$(($(date +%s) - T0))
+          ESTIMADO=$(((SEGUNDOS_BASE * VUELTAS + 59) / 60))
+          echo "::notice::la vuelta de base tardo ${SEGUNDOS_BASE}s, asi que ${VUELTAS} vueltas son ~${ESTIMADO} minuto(s). El tope de este job es ${TOPE_MINUTOS} minuto(s)"
+          if [ "${ESTIMADO}" -gt "${TOPE_MINUTOS}" ]; then
+            echo "::warning::el presupuesto NO alcanza para las ${VUELTAS} vueltas (~${ESTIMADO} min contra un tope de ${TOPE_MINUTOS}). El job se va a cortar antes de terminar: la cuenta parcial se imprime igual en cada vuelta, pero el numero final no va a ser el que pediste. Arreglo: menos vueltas, o subir timeout-minutes y TOPE_MINUTOS juntos"
+          fi
+
+          FALLAS=0
+          for ((i = 1; i <= VUELTAS; i++)); do
+            # UNA LINEA POR VUELTA CON EL ACUMULADO, y no un punto. Un punto no sobrevive a una
+            # cancelacion: el job muere y lo unico que queda es una fila de caracteres que hay que
+            # contar a mano, que es lo que paso en Rigel. Con el acumulado, el log dice en todo
+            # momento cuantas vueltas van y cuantas fallaron, y una corrida cortada sigue siendo
+            # una medicion.
+            if vuelta "${SALIDAS}/vuelta-${i}.txt"; then
+              echo "vuelta ${i}/${VUELTAS}: ok (${FALLAS} falla(s) hasta aca)"
+            else
+              FALLAS=$((FALLAS + 1))
+              echo "vuelta ${i}/${VUELTAS}: FALLO (${FALLAS} falla(s) hasta aca)"
+              echo "::warning::REPRODUJO en la vuelta ${i}"
+              # Solo las lineas del fallo: el log completo de una vuelta son miles de lineas y el
+              # runner las recorta, que es como se pierde justo lo que se estaba buscando. El log
+              # entero queda en el artifact.
+              grep -E "not ok|AssertionError|Input:|la evidencia" "${SALIDAS}/vuelta-${i}.txt" | head -40 || true
+            fi
+          done
+
+          {
+            echo "## ${VUELTAS} vuelta(s) de \`${BANCO}\` en forma \`${FORMA}\`"
+            echo ""
+            echo "**${FALLAS} falla(s).**"
+            echo ""
+            if [ "${FALLAS}" -eq 0 ]; then
+              echo "No aparecio en ${VUELTAS} vueltas. **Eso NO es «no hay intermitencia»**: es que no"
+              echo "aparecio en ${VUELTAS}. Con una tasa de 1 en 100, la probabilidad de no verla en"
+              echo "${VUELTAS} vueltas es alta. Lo que este verde acredita es la cota, no la ausencia."
+            else
+              echo "Reprodujo. Las vueltas que fallaron estan arriba con sus aserciones, y el log"
+              echo "completo de cada una quedo en el artifact."
+            fi
+          } >> "${GITHUB_STEP_SUMMARY}"
+
+          echo "${VUELTAS} vueltas, ${FALLAS} falla(s)"
+          # El rojo del job es «reprodujo», que es el resultado util. Se declara al reves de lo
+          # habitual a proposito, y por eso este workflow no gatea nada.
+          [ "${FALLAS}" -eq 0 ]
+
+      # La misma action y el mismo SHA que ya usa el andamio (plantilla/.github/workflows/ci.yml):
+      # no entra ninguna action de terceros nueva al marco, y el Dependabot del marco la vigila
+      # aca igual que al resto de .github/workflows/.
+      - name: Guardar los logs de las vueltas
+        if: always()
+        uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5
+        with:
+          name: vueltas-${{ github.run_id }}
+          path: ${{ runner.temp }}/salidas
+          retention-days: 14
+          if-no-files-found: warn

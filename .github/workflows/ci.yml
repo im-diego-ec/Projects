@@ -505,7 +505,9 @@ jobs:
       # tercera, actions/upload-artifact, no se invoca en .github/workflows y su
       # unica linea vive en el andamio; su SHA para el tag v5 es
       # 330a01c490aca151604b8cf639adc76d48f6c5d4, resuelto contra la API publica y
-      # anotado aca para que ese cambio tampoco necesite red.
+      # anotado aca para que ese cambio tampoco necesite red. (Foto del 2026-08-25:
+      # desde el 2026-09-17 reproducir-intermitente.yml tambien la invoca, con ese
+      # mismo SHA.)
       #
       # Lo que NO mira, declarado: no juzga si el SHA apunta a un commit real ni
       # si la version es la ultima. Eso es de Dependabot (.github/dependabot.yml),
@@ -1210,9 +1212,88 @@ jobs:
             );
           ' "${DIR}/base.json" "${DIR}/cabeza.json" "${DIR}/changelog.md" "${MANIFIESTO}"
 
+  # LAS ASERCIONES QUE TAPAN SU EVIDENCIA, SOLO EN LOS BANCOS QUE ESTE PR TOCA.
+  #
+  # `assert.match` y `assert.doesNotMatch` SIN mensaje imprimen el regex Y EL INPUT.
+  # Con mensaje imprimen solo el mensaje: el input se pierde. O sea que agregar un
+  # mensaje —el reflejo correcto en casi cualquier otro assert— EMPEORA el
+  # diagnostico de esos dos, y se paga el dia que caen en CI: el log dice el motivo y
+  # se calla lo que paso. El arreglo es `porque(motivo, evidencia)` de
+  # pruebas/porque.mjs. Viene del porte de Rigel (commit d71c40c, issue #491 de alla).
+  #
+  # MIRA EL DIFF Y NO EL ARBOL, y eso es la decision de la pieza y no una comodidad.
+  # El arbol ya tiene cientos (la herramienta imprime el numero en cada corrida). Un
+  # banco repo-wide NACERIA ROJO sobre todas, y un rojo que no se puede cerrar se
+  # destraba escribiendo con apuro. Mirando el diff, la puerta se cierra sin pedir la
+  # barrida: el banco que un PR toca sale limpio ENTERO, y la deuda baja por area.
+  #
+  # TRES PUNTOS EN EL DIFF, no dos: lo que cuenta es lo que el PR cambio desde que se
+  # separo de main (`BASE...CABEZA`, desde la base comun). Con dos puntos, un banco que
+  # entro a main DESPUES de abrir el PR apareceria como tocado por este, y el rojo
+  # caeria sobre deuda ajena.
+  #
+  # POR QUE ES ROJO Y NO AVISO: por lo mismo que el job del CHANGELOG. Este check vive
+  # en el ci.yml de Projects y no viaja a ningun consumidor; los unicos afectados son
+  # quienes tocan un banco del marco, y un aviso dirigido a quien lo escribio no avisa.
+  aserciones:
+    name: aserciones-con-evidencia
+    # Solo en PRs: en un push a main no hay diff de PR que acotar.
+    if: github.event_name == 'pull_request'
+    timeout-minutes: 10
+    runs-on: ubuntu-latest
+    # Clona el arbol y lee su historia local; no llama a ninguna API de GitHub, asi
+    # que pull-requests: read no se le concede.
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          # La base comun del PR tiene que estar en el clon, y con el default (1) no
+          # esta.
+          fetch-depth: 0
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        with: { node-version: "22" }
+
+      - name: Las aserciones que este PR toca no tapan su evidencia
+        shell: bash
+        env:
+          BASE: ${{ github.event.pull_request.base.sha }}
+          CABEZA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+
+          if ! git cat-file -e "${BASE}^{commit}" 2>/dev/null || ! git cat-file -e "${CABEZA}^{commit}" 2>/dev/null; then
+            echo "::error::no pude resolver la base (${BASE}) o la cabeza (${CABEZA}) del PR. Sin las dos no hay diff que mirar, y este check NO se declara verde por no haber podido medir. Arreglo: el checkout de este job necesita fetch-depth: 0"
+            exit 1
+          fi
+
+          # A un archivo y no a una sustitucion de proceso, a proposito: el codigo de
+          # salida de un `< <(git diff ...)` se pierde, y un diff que fallo daria una
+          # lista vacia que se leeria como "este PR no toca bancos". Asi, un fallo de git
+          # mata el paso por `set -e` con su propio mensaje. Los borrados quedan fuera
+          # (--diff-filter=d): un banco que el PR elimina no tiene aserciones que juzgar.
+          LISTA="${RUNNER_TEMP}/bancos-tocados"
+          git -c core.quotePath=false diff -z --name-only --diff-filter=d "${BASE}...${CABEZA}" -- '*.test.mjs' > "${LISTA}"
+
+          TOCADOS=()
+          while IFS= read -r -d '' F; do
+            TOCADOS+=("${F}")
+          done < "${LISTA}"
+
+          if [ ${#TOCADOS[@]} -eq 0 ]; then
+            echo "::notice::este PR no toca ningun banco (*.test.mjs), asi que no hay aserciones que mirar. La deuda del arbol, como referencia:"
+            node pruebas/aserciones-con-evidencia.mjs
+            exit 0
+          fi
+
+          echo "== bancos que toca este PR =="
+          printf '%s\n' "${TOCADOS[@]}"
+          node pruebas/aserciones-con-evidencia.mjs "${TOCADOS[@]}"
+
   ci_ok:
     name: ci-ok
-    needs: [marco, pruebas_actions, pruebas_init, higiene, constitucion, deltas, changelog, canonico]
+    needs: [marco, pruebas_actions, pruebas_init, higiene, constitucion, deltas, changelog, canonico, aserciones]
     if: always()
     # 5 minutos: no hace checkout ni toca la red, solo lee los resultados de sus needs.
     timeout-minutes: 5
@@ -1302,6 +1383,22 @@ jobs:
               success | skipped) ;;
               *)
                 echo "::error::el check de las versiones publicadas del canonico termino en '${{ needs.canonico.result }}'"
+                exit 1
+                ;;
+            esac
+          fi
+          # El de las aserciones sigue la misma regla y por el mismo motivo: tambien
+          # mira el diff del PR, asi que en un push a main se saltea a proposito.
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            [ "${{ needs.aserciones.result }}" = "success" ] || {
+              echo "::error::el check de las aserciones con evidencia termino en '${{ needs.aserciones.result }}'. Si es un rojo, el paso anoto cada asercion ciega con su archivo y su linea: el arreglo es envolver el mensaje con porque() de pruebas/porque.mjs"
+              exit 1
+            }
+          else
+            case "${{ needs.aserciones.result }}" in
+              success | skipped) ;;
+              *)
+                echo "::error::el check de las aserciones con evidencia termino en '${{ needs.aserciones.result }}'"
                 exit 1
                 ;;
             esac

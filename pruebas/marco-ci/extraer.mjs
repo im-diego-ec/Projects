@@ -32,10 +32,33 @@ export function scriptDelPaso(nombre, ruta = RUTA_WORKFLOW) {
     throw new Error(`no existe ningun paso llamado "${nombre}" en ${ruta}`);
   }
 
+  // La sangria del guion del paso pedido: es la de TODOS los pasos de su lista.
+  const sangriaDelPaso = lineas[inicio].length - lineas[inicio].replace(/^\s+/, "").length;
+
   let sangria = -1;
   let indiceRun = -1;
   for (let i = inicio + 1; i < lineas.length; i += 1) {
-    if (/^\s*- name: /.test(lineas[i])) break;
+    // EL LIMITE ES CUALQUIER PASO, CON NOMBRE O SIN EL, y la diferencia no es teorica. Cortar
+    // solo en `- name: ` se pasaba de largo cuando el paso siguiente arranca con `- id:`,
+    // `- uses:`, `- if:` o cualquier otra clave, y entonces este extractor devolvia el `run:` DEL
+    // SIGUIENTE como si fuera del paso pedido: el banco que lo pidio media el script de otro y
+    // salia verde. Lo midio Rigel el 2026-09-03 (commit c12f831 de alla); aca estaba latente
+    // porque ningun paso nombrado sin `run:` queda justo antes de uno sin nombre con `run:`.
+    //
+    // Y EL FIN DE LA LISTA TAMBIEN ES LIMITE: una linea con MENOS sangria que el guion (el job
+    // siguiente, otra clave del job) cierra la lista de pasos. Sin eso, el ultimo paso de un job
+    // sin `run:` se llevaba el primero del job de abajo. Los comentarios no cuentan: en YAML no
+    // cierran nada, y el encabezado de un job puede tener comentarios a cualquier sangria.
+    //
+    // La sangria se toma del propio paso pedido y no se fija en un numero: el mismo extractor
+    // lee marco-ci.yml, ci.yml y los workflows del andamio, y no tienen por que coincidir. Lo
+    // fija pruebas/marco-ci/extraer.test.mjs.
+    const linea = lineas[i];
+    if (linea.trim() !== "" && !/^\s*#/.test(linea)) {
+      const propia = linea.length - linea.replace(/^\s+/, "").length;
+      if (propia < sangriaDelPaso) break;
+      if (propia === sangriaDelPaso && /^\s*- /.test(linea)) break;
+    }
     const marca = lineas[i].match(/^(\s*)run: \|\s*$/);
     if (marca) {
       sangria = marca[1].length;

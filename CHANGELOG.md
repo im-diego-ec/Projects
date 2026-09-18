@@ -529,6 +529,39 @@ mueve sobre un cambio incompatible.
 
   **Para consumidores: nada.** En tu repo ese paso se omite, como antes.
 
+- **El aviso sobre un desvío de permiso incompleto dejó de afirmar un error que la
+  action no da.** El paso «Permisos del agente sin escritura» de `marco-ci.yml`
+  exigía que la fecha de un desvío **existiera**, y creía que así validaba «como la
+  action». La action no lo hace: `esFecha` acepta el 30 de febrero. Con
+  `"fecha": "2026-02-30"`, el paso avisaba *«la action de la constitución ya lo da por
+  ERROR»* sobre un desvío que la action aceptaba. Ahora el paso usa el mismo predicado.
+  Lo encontró el banco nuevo que ata los dos lectores comparando su comportamiento, que
+  pone rojo la próxima divergencia. Exigir que la fecha exista, en los dos lectores a la
+  vez, es un endurecimiento y queda para v2.
+
+  **Para consumidores: nada.** Ningún veredicto cambia. Si un desvío tuyo tenía una fecha
+  así, deja de salir el aviso.
+
+- **Un desvío que nombra a la vez una `regla` y un `permiso` ya no pasa en silencio.** La
+  action lo rechaza (`desvio-ambiguo`), y el paso de permisos lo absorbía sin decir nada:
+  era rojo por un camino y verde por el otro. Ahora el paso **avisa** (`Desvio de permiso
+  ambiguo`) y **sigue absorbiendo**, igual que con los demás desvíos incompletos, hasta la
+  línea mayor siguiente.
+
+  **Para consumidores: nada que hacer para seguir en verde.** Si aparece el aviso, parte
+  la entrada en dos: una con la regla y otra con el permiso.
+
+- **El extractor de pasos de los bancos devolvía el script del paso de al lado.** Cortaba
+  solo en `- name:`. Al pedir un paso sin `run:` seguido de uno que arranca con `- id:` o
+  `- uses:`, o al pedir el último paso de un job, devolvía un script ajeno y el banco medía
+  otra cosa en verde. Estaba latente. Viene de Rigel (c12f831). **Para consumidores: nada**
+  (banco del marco).
+
+- **Los bancos no dependen de la configuración git de quien los corre.** El repo de
+  juguete apagaba la firma de commits y no la de tags. En una máquina que firma tags, un
+  `git tag` moría con `fatal: no tag message?`. En Rigel costó trece rojos (c38e542); acá
+  estaba latente. **Para consumidores: nada** (banco del marco).
+
 ### Añadido
 
 - **Está medido que la API de este andamio corre en un Worker sin tocarla.** La ruta
@@ -1083,6 +1116,31 @@ mueve sobre un cambio incompatible.
   fecha de gracia.
 
   **Para consumidores: nada.** Es un banco del repositorio del marco.
+
+- **Las aserciones que tapan su evidencia dejan de entrar.** `assert.match` y
+  `assert.doesNotMatch` con mensaje imprimen **solo** el mensaje y pierden el input, así
+  que el día que caen en CI dicen el motivo y se callan lo que pasó. Se agrega
+  `pruebas/porque.mjs`, con `porque(motivo, evidencia)`, y un job nuevo de `ci.yml`,
+  `aserciones-con-evidencia`. Ese job pone rojo el PR que deja una aserción así en un
+  banco que toca, y la anota con archivo y línea. La deuda del resto del árbol (281) se
+  publica en cada corrida y no bloquea. Viene de Rigel (d71c40c). **Y la herramienta de
+  Rigel tenía acá un falso negativo del 14%**, medido contra el AST de un parser: una regex
+  con comillas le escondía las aserciones que venían después. Se arregló antes de
+  cablearla. **Para consumidores: nada** (CI del marco).
+
+- **Un instrumento para reproducir un banco intermitente**:
+  `.github/workflows/reproducir-intermitente.yml`, que se dispara a mano. Repite un banco
+  N veces en la misma invocación con que lo corre `ci.yml`. Antes de contar, corre una
+  vuelta de línea de base: si ya está roja, dice que mide su propio entorno. Deja una línea
+  por vuelta con el acumulado, así que una corrida cortada sigue siendo una medición, y un
+  verde dice que es una cota y no una ausencia. Viene de Rigel (b047c16, c38e542 y el PR
+  #540 todavía abierto, 0448928). Reusa el `upload-artifact` que el andamio ya pina.
+  **Para consumidores: nada** (CI del marco).
+
+- **Las continuaciones de línea cortadas por un comentario o una línea vacía ponen rojo el
+  banco de sintaxis.** Es shell válido que corre el comando sin sus argumentos, y
+  `bash -n` no lo ve. Viene de Rigel (cffa81f). **Para consumidores: nada** (banco del
+  marco).
 
 ### Corregido
 
