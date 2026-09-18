@@ -109,10 +109,15 @@
 //    quien recibe el PR de bump entiende. Esa persona puede no saber leer un `::error::`.
 //    Rigel hizo el mismo cambio de política en su 2.0.0 sin esta mitad; acá se cobra con
 //    la MISMA regla que las páginas para quien no es técnico (`docs/01-introduccion.md`):
-//    la lista y la forma viven en `pruebas/docs/lectura.mjs` y se importan, no se copian.
-//    Lo que va entre backticks queda afuera, como en esas páginas: un archivo o un
-//    comando se escriben como son. LÍMITE DECLARADO: mide palabras, no si la sección se
-//    entiende, ni si el arreglo ESTÁ escrito — eso lo pregunta la plantilla de PR.
+//    la lista, la forma y el tope viven en `pruebas/docs/lectura.mjs` y se importan, no
+//    se copian. Lo que va entre backticks queda afuera, como en esas páginas —un archivo
+//    o un comando se escriben como son—, y con el MISMO techo que ellas
+//    (`TOPE_DE_JERGA_ENTRE_BACKTICKS`): decía «la misma regla» y no lo aplicaba, así que
+//    una sección escrita entera en jerga entrecomillada salía verde acá y roja allá
+//    (revisión adversarial del porte, RV-L4-06). Es el tope de una PÁGINA aplicado a una
+//    sección más corta, o sea el lado indulgente: medido, no elegido, y no se inventa un
+//    número propio. LÍMITE DECLARADO: mide palabras, no si la sección se entiende, ni si
+//    el arreglo ESTÁ escrito — eso lo pregunta la plantilla de PR.
 
 import { readFileSync, realpathSync } from "node:fs";
 import { resolve } from "node:path";
@@ -122,7 +127,13 @@ import { fileURLToPath } from "node:url";
 // porque nació para medir docs/; se importa y no se copia para que haya UNA lista: si se
 // agrega una palabra allá, esta compuerta la cobra sin que nadie toque este archivo (lo
 // exige un caso del banco, palabra por palabra).
-import { SIN_TRADUCCION, jergaDeOficio, jergaPorForma } from "../pruebas/docs/lectura.mjs";
+import {
+  SIN_TRADUCCION,
+  TOPE_DE_JERGA_ENTRE_BACKTICKS,
+  jergaDeOficio,
+  jergaEntreBackticks,
+  jergaPorForma,
+} from "../pruebas/docs/lectura.mjs";
 import {
   FORMATOS,
   LIMITE_POR_DEFECTO,
@@ -304,6 +315,17 @@ export function jergaEnParaConsumidores(cuerpo) {
   return [...new Set([...porLista, ...jergaPorForma(texto)])];
 }
 
+/** Los fragmentos entre backticks de `### Para consumidores` que cargan jerga, SÓLO si
+ *  pasan el tope de las páginas para quien no es técnico; si no, `[]`. Hasta el tope, un
+ *  nombre que se copia tal cual es legítimo; por encima, la sección está escrita en
+ *  jerga con comillas. */
+export function jergaEntreBackticksEnParaConsumidores(cuerpo) {
+  const { encontrada, texto } = extraerParaConsumidores(cuerpo);
+  if (!encontrada) return [];
+  const fragmentos = jergaEntreBackticks(texto, SIN_TRADUCCION);
+  return fragmentos.length > TOPE_DE_JERGA_ENTRE_BACKTICKS ? fragmentos : [];
+}
+
 /**
  * Mide cada sección que el aviso todavía puede mandar y devuelve un hallazgo por cada
  * defecto encontrado. Cada hallazgo trae su `motivo`, porque los tres piden arreglos
@@ -321,8 +343,9 @@ export function jergaEnParaConsumidores(cuerpo) {
  *  · `"placeholder-con-cambios"` — la sección sigue con el texto de fábrica y la
  *    entrada YA declara cambios. Trae sus títulos (o el texto suelto que encontró).
  *  · `"jerga-en-para-consumidores"` — la sección está y su prosa usa jerga de oficio que
- *    las páginas para quien no es técnico tienen prohibida. UNO por sección (la jerga no
- *    depende del dialecto). Trae `palabras`.
+ *    las páginas para quien no es técnico tienen prohibida, o la mete entre backticks por
+ *    encima del tope de esas páginas. UNO por sección (la jerga no depende del
+ *    dialecto). Trae `palabras` y `entreBackticks` (vacío si no pasa el tope).
  *  · `"recorte"` — la sección está y el mensaje no entra. UNO por (sección, dialecto),
  *    porque puede entrar en uno y no en el otro. Trae `formato` y `largo`.
  *
@@ -408,7 +431,10 @@ export function medir(changelog, limite = LIMITE_POR_DEFECTO, env = process.env,
       hallazgos.push({ etiqueta: c.etiqueta, motivo: "placeholder-con-cambios", subsecciones: anuncioVacioConCambios });
     } else {
       const palabras = jergaEnParaConsumidores(c.seccion.cuerpo);
-      if (palabras.length > 0) hallazgos.push({ etiqueta: c.etiqueta, motivo: "jerga-en-para-consumidores", palabras });
+      const entreBackticks = jergaEntreBackticksEnParaConsumidores(c.seccion.cuerpo);
+      if (palabras.length > 0 || entreBackticks.length > 0) {
+        hallazgos.push({ etiqueta: c.etiqueta, motivo: "jerga-en-para-consumidores", palabras, entreBackticks });
+      }
       for (const r of recortes) hallazgos.push({ etiqueta: c.etiqueta, motivo: "recorte", ...r });
     }
 
@@ -526,14 +552,24 @@ export function main(argv = process.argv.slice(2), env = process.env) {
     }
 
     if (h.motivo === "jerga-en-para-consumidores") {
+      const queDice = [
+        h.palabras.length > 0 ? `en su prosa, ${h.palabras.join(", ")}` : null,
+        h.entreBackticks.length > 0
+          ? `${h.entreBackticks.length} fragmentos entre backticks con jerga (${h.entreBackticks.join(", ")}), por encima ` +
+            `del tope de ${TOPE_DE_JERGA_ENTRE_BACKTICKS} que tienen esas paginas`
+          : null,
+      ]
+        .filter(Boolean)
+        .join("; y ");
       console.log(
         `::error file=${ruta}::la seccion [${h.etiqueta}] dice su "### Para consumidores" con jerga de oficio: ` +
-          `${h.palabras.join(", ")}. Esa seccion es lo que el aviso manda y lo que el PR de actualizacion de cada ` +
+          `${queDice}. Esa seccion es lo que el aviso manda y lo que el PR de actualizacion de cada ` +
           "consumidor pone adelante, y quien lo recibe puede no ser tecnico. Desde la decision D1 del PO una " +
           "compuerta nueva sale en rojo el dia que sale (AGENTS.md, «Qué es BREAKING»), y eso solo es justo si el " +
           "arreglo se entiende. Arreglo: decirlo con palabras corrientes, con la misma regla que docs/01-introduccion.md " +
-          "(la lista vive en pruebas/docs/lectura.mjs); si la palabra es un nombre que hay que copiar tal cual —un " +
-          "archivo, un comando—, ponerla entre backticks"
+          "(la lista y el tope viven en pruebas/docs/lectura.mjs); si la palabra es un nombre que hay que copiar tal " +
+          "cual —un archivo, un comando—, ponerla entre backticks, y si los nombres entre backticks pasan el tope, la " +
+          "seccion esta contando el como y no el que: decir que tiene que hacer el consumidor"
       );
       continue;
     }

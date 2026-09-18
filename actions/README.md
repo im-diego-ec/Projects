@@ -835,7 +835,8 @@ caro posible, porque le diría a un consumidor que haga algo que no corresponde.
   propio de Projects (job `changelog-en-el-pr`) y pone rojo el PR si falta la
   sección o está vacía, si el texto de fábrica del release quedó encima de cambios reales, si
   la sección usa la jerga de oficio que las páginas para quien no es técnico tienen
-  prohibida (fuera de backticks) o si el mensaje no entra en el límite en **alguno
+  prohibida (en la prosa, o entre backticks por encima del tope que tienen esas
+  páginas) o si el mensaje no entra en el límite en **alguno
   de los dos dialectos**; mide
   `[No publicado]`, la versión más alta y toda versión cuyo aviso cambia en el PR
   (con el `CHANGELOG.md` de su base), con las mismas funciones de esta action. Un repo que use la action sin esa

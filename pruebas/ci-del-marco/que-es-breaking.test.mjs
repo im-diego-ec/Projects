@@ -36,6 +36,7 @@ import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 
 import { evolucionSegunElIndice } from "../docs/lectura.mjs";
+import { pendienteDelPorte } from "./carril-del-porte.mjs";
 
 const RAIZ = join(import.meta.dirname, "..", "..");
 const leer = (rel) => readFileSync(join(RAIZ, rel), "utf8");
@@ -138,6 +139,12 @@ export const REGLA_VIEJA = [
   // .github/PULL_REQUEST_TEMPLATE.md:50 y CHANGELOG.md:22 — la pregunta atada a una
   // linea mayor que ya no es el canal.
   "breaking para @v1",
+  // openspec/specs/calidad-codigo/spec.md:268 — la PREMISA de la regla: «el marco se
+  // consume por un tag movil, asi que una verificacion nueva aparece en el pipeline de
+  // cada proyecto sin que nadie la haya leido: por eso se estrena en modo aviso». Dejo
+  // de ser cierta el 2026-08-21 (revision adversarial del porte, RV-L4-05).
+  "se consume por un tag móvil",
+  "se consume por un tag movil",
 ];
 
 export function normalizarProsa(texto) {
@@ -153,6 +160,38 @@ export function normalizarProsa(texto) {
 export function frasesViejas(texto) {
   const prosa = normalizarProsa(texto);
   return REGLA_VIEJA.filter((f) => prosa.includes(f));
+}
+
+/**
+ * Frases viejas que SIGUEN escritas en una superficie porque su correccion tiene DUENO:
+ * un change activo que la va a reescribir. La exencion vale mientras ese change este en
+ * `openspec/changes/` —activo—, y vence sola el dia que se archiva o se descarta: si para
+ * entonces la frase sigue ahi, el caso de abajo es rojo sin que nadie se acuerde.
+ *
+ * Un residuo sin fecha de vencimiento no es un residuo declarado, es una exencion
+ * permanente con otro nombre. Por eso cada entrada nombra a su dueno, y otro caso exige
+ * que ese dueno lo tenga anotado como tarea ABIERTA.
+ */
+export const PREMISAS_CON_DUENO = [
+  {
+    // La premisa de la ventana de gracia de la COBERTURA. El change que se hace cargo de
+    // esa ventana —la cierra el 2026-09-30, decision D9 del PO— es el que reescribe su
+    // justificacion; `ventana-vencida` ya lo declaro asi (su design, D6). Corregirla aca
+    // exigia un MODIFIED de un requirement de ~230 lineas que ese change tambien va a
+    // tocar: dos deltas sobre el mismo requirement en carriles distintos es el conflicto
+    // de archive que el marco no sabe resolver solo.
+    superficie: "openspec/specs/calidad-codigo/spec.md",
+    frases: ["se consume por un tag móvil", "se consume por un tag movil"],
+    dueno: "openspec/changes/la-ventana-se-cierra",
+  },
+];
+
+/** Las frases viejas de una superficie que ninguna premisa con dueno ACTIVO exime.
+ *  `duenoActivo(ruta)` dice si el change dueno sigue en `openspec/changes/`. */
+export function frasesSinDueno(rel, frases, duenoActivo, premisas = PREMISAS_CON_DUENO) {
+  return frases.filter(
+    (f) => !premisas.some((p) => p.superficie === rel && p.frases.includes(f) && duenoActivo(p.dueno)),
+  );
 }
 
 /** Lo que el CHANGELOG dice ANTES de su primera entrada: el preambulo. Las entradas son
@@ -187,7 +226,13 @@ function superficies() {
   const canonico = readdirSync(join(RAIZ, "actions", "constitucion", "canonico"))
     .filter((f) => f.endsWith(".md"))
     .map((f) => `actions/constitucion/canonico/${f}`);
-  return [AGENTS, PLANTILLA_PR, "README.md", "plantilla/AGENTS.md", ...skills, ...docs, ...canonico].filter((p) =>
+  // LOS SPECS VIVOS DICTAN: son el contrato vigente del marco, no su historia (esa esta
+  // en `openspec/changes/archive/`). No entraban, y ahi seguia escrita la premisa de la
+  // regla vieja sin que nada la viera (RV-L4-05).
+  const specsVivos = readdirSync(join(RAIZ, "openspec", "specs"), { withFileTypes: true })
+    .filter((d) => d.isDirectory())
+    .map((d) => `openspec/specs/${d.name}/spec.md`);
+  return [AGENTS, PLANTILLA_PR, "README.md", "plantilla/AGENTS.md", ...skills, ...docs, ...canonico, ...specsVivos].filter((p) =>
     existsSync(join(RAIZ, p)),
   );
 }
@@ -313,9 +358,10 @@ test("ninguna superficie que dicta la regla vuelve a decir la regla vieja", () =
   assert.ok(candidatas.length > 20, `solo ${candidatas.length} superficies: el recorrido se rompio`);
   assert.ok(candidatas.includes(SKILL_RELEASE) && candidatas.includes(GLOSARIO), "el recorrido perdio la skill o el glosario");
 
+  const duenoActivo = (ruta) => existsSync(join(RAIZ, ruta));
   const encontradas = [];
   for (const rel of candidatas) {
-    for (const f of frasesViejas(leer(rel))) encontradas.push(`${rel}: "${f}"`);
+    for (const f of frasesSinDueno(rel, frasesViejas(leer(rel)), duenoActivo)) encontradas.push(`${rel}: "${f}"`);
   }
   assert.deepEqual(
     encontradas,
@@ -328,15 +374,43 @@ test("ninguna superficie que dicta la regla vuelve a decir la regla vieja", () =
   );
 });
 
+test("MUERDE: una premisa con dueno se exime solo mientras el dueno este activo", () => {
+  const premisas = [{ superficie: "s.md", frases: ["frase vieja"], dueno: "openspec/changes/dueno" }];
+  assert.deepEqual(frasesSinDueno("s.md", ["frase vieja"], () => true, premisas), [], "con el dueno activo, exenta");
+  assert.deepEqual(frasesSinDueno("s.md", ["frase vieja"], () => false, premisas), ["frase vieja"], "archivado el dueno, roja");
+  assert.deepEqual(frasesSinDueno("otra.md", ["frase vieja"], () => true, premisas), ["frase vieja"], "la exencion es de UNA superficie");
+});
+
+test("toda premisa con dueno esta anotada como tarea ABIERTA en su change", () => {
+  // Sin esto la exencion dura lo que el change dueno tarde en archivarse, y el dueno
+  // puede no saber que la tiene: la vencida lo haria rojo en el PR de su archive, que
+  // es tarde para descubrir un trabajo.
+  for (const p of PREMISAS_CON_DUENO) {
+    const tareas = join(RAIZ, p.dueno, "tasks.md");
+    if (!existsSync(tareas)) continue; // archivado o descartado: el caso de las superficies ya es exigible
+    // Cada tarea con sus lineas de continuacion: la ruta puede caer en la segunda.
+    const abiertas = readFileSync(tareas, "utf8")
+      .split(/\r?\n(?=\s*- \[)/)
+      .filter((t) => /^\s*- \[ \]/.test(t));
+    assert.ok(
+      abiertas.some((t) => t.includes(p.superficie)),
+      `${p.dueno}/tasks.md no tiene ninguna tarea abierta que nombre ${p.superficie}, y este banco le exime ahi ` +
+        `${JSON.stringify(p.frases)}. Arreglo: anotarle la tarea al dueno, o corregir la frase y sacar la exencion`,
+    );
+  }
+});
+
 // El preambulo del CHANGELOG no se puede reescribir en la rama del porte (los carriles
 // no editan CHANGELOG.md y la reescritura viaja como .porte/10-que-es-breaking.patch).
-// Mientras ese parche exista SIN aplicar, el caso queda como `todo`: se ve en cada corrida
-// y no pone rojo el banco. El dia que `.porte/` desaparezca —la integracion lo borra—, el
-// caso se vuelve exigible SOLO: si el parche no se aplico, es rojo.
+// Mientras ese parche exista, EN EL CARRIL el caso queda `todo`: se ve en cada corrida y
+// no pone rojo el banco. Camino a main deja de estar aplazado aunque el archivo siga
+// ahi —lo decide `pendienteDelPorte`, y un PR a main con `.porte/` es rojo en
+// carril-del-porte.test.mjs—, asi que el aplazamiento no puede sobrevivir a la
+// integracion (revision adversarial del porte, FO-H3).
 const PARCHE_PENDIENTE = ".porte/10-que-es-breaking.patch";
 test(
   "el preambulo del CHANGELOG dice la misma regla",
-  { todo: existsSync(join(RAIZ, PARCHE_PENDIENTE)) && `pendiente de aplicar ${PARCHE_PENDIENTE} al integrar` },
+  { todo: pendienteDelPorte(RAIZ, PARCHE_PENDIENTE) && `pendiente de aplicar ${PARCHE_PENDIENTE} al integrar` },
   () => {
     const texto = preambulo(leer(CHANGELOG));
     assert.deepEqual(

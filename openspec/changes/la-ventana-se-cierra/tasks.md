@@ -100,6 +100,16 @@ el commit sobre el que arranca. Toda verificación es por código de salida.
       depende del día). Banco que ata las tres frases:
       `pruebas/ci-del-marco/ventanas-con-dueno.test.mjs:470`; contra el README de
       `0b85ee4` → `# fail 1`, las tres frases en `actions/README.md`.
+- [ ] 3.6 **La premisa vencida de la ventana sigue en el spec vivo hasta el archive.**
+      `openspec/specs/calidad-codigo/spec.md` la justifica con «el marco se consume por
+      un tag móvil, así que una verificación nueva aparece en el pipeline de cada
+      proyecto sin que nadie la haya leído», que dejó de ser cierto el 2026-08-21 (pin
+      exacto y PR de bump). El MODIFIED de este change sobre «La cobertura de pruebas
+      alcanza el mínimo acordado y no retrocede» ya la reescribe, reproduciendo TODOS sus
+      escenarios; la tarea se cierra cuando el archive lo funda en el spec vivo.
+      `pruebas/ci-del-marco/que-es-breaking.test.mjs` exime esa frase mientras este
+      change esté activo y la pone roja el día que se archive o se descarte (revisión
+      adversarial del porte, RV-L4-05; el change `que-es-breaking` le dejó el residuo).
 
 ## 4. La decisión, para el PO
 

@@ -114,7 +114,9 @@ Nada es **scaffold** ni **regenerado**, y ninguna pieza **referenciada** cambia:
   el banco un caso sobre el preámbulo marcado `todo` **mientras ese archivo exista**.
   Se ve en cada corrida (`# todo 1`) y no pone rojo el banco; el día que la integración
   borre `.porte/`, el caso se vuelve exigible sin que nadie lo toque, y si el parche no
-  se aplicó, es rojo.
+  se aplicó, es rojo. **Corregida por la revisión adversarial (decisión 10):** el
+  aplazamiento ya no depende de que la integración borre la carpeta; camino a main se
+  exige aunque siga ahí.
 - **Descartada: excluir el `CHANGELOG.md` del banco.** El preámbulo quedaría sin guardia
   para siempre, y es lo primero que lee un consumidor en su PR de bump.
 - **Descartada: el caso en rojo ya.** La verificación del lote exige cero fallas y el
@@ -132,6 +134,11 @@ se integra un cambio a `main`») y nada más: el resto del parche es idéntico.
 
 ### 9. Lo que este change NO toca, con el motivo
 
+- **La premisa vencida de la ventana de cobertura** (`openspec/specs/calidad-codigo/spec.md:268`,
+  «el marco se consume por un tag móvil…»). Es un residuo **con dueño**: el change
+  `la-ventana-se-cierra`, que cierra esa ventana el 2026-09-30, lo tiene como tarea 3.3.
+  Ver la decisión 11: el banco la exime solo mientras ese change esté activo.
+
 - **`marco-ci.yml:3494-3498` y `pruebas/marco-ci/permisos-compuerta.test.mjs:204-208`**
   explican el modo aviso del desvío incompleto «por la regla de `AGENTS.md`». Con la
   regla nueva ese motivo queda viejo —el arreglo cabe en el repositorio del
@@ -146,6 +153,65 @@ se integra un cambio a `main`») y nada más: el resto del parche es idéntico.
   regla de su día. Reescribirlos falsearía el porqué de sus decisiones.
 - **La apertura de la línea 2** y el estado de `v1`: lote 38 y lote 6.
 
+## Decisiones de la revisión adversarial (2026-09-17)
+
+### 10. Lo que el porte aplaza no llega aplazado a main (FO-H3)
+
+El caso del preámbulo quedaba `todo` mientras existiera el archivo del parche, y un
+`todo` que falla no cambia la salida de `node --test`: si la integración aplicaba el 08
+y no el 10 y dejaba `.porte/`, el caso quedaba apagado para siempre. «La integración lo
+borra» era una promesa.
+
+- **Elegida: un solo interruptor, `pendienteDelPorte`** (`pruebas/ci-del-marco/carril-del-porte.mjs`),
+  que aplaza solo si el archivo existe **y** la corrida no va a main —lo dicen
+  `GITHUB_BASE_REF` y `GITHUB_REF`, que GitHub pone en todo paso—; y un caso que pone
+  rojo `.porte/` en un PR a main o en un push a main. Los bancos corren en el job
+  `pruebas-actions`, en los dos eventos.
+- **Descartada: un paso nuevo en `ci.yml`.** Sería un paso inline sin banco, que es lo
+  que el lote 8 acaba de cerrar para su propio paso; el banco ya corre donde hace falta.
+- **Descartada: sacar el `todo` en el carril.** La rama del porte no puede editar el
+  `CHANGELOG.md`: sería rojo permanente, y un rojo permanente enseña a ignorar el rojo.
+
+### 11. La premisa con dueño, exenta hasta que el dueño se archive (RV-L4-05)
+
+El banco no recorría `openspec/specs/`, y ahí seguía escrita la premisa de la regla
+retirada. Los specs vivos entran al recorrido y la frase entra a `REGLA_VIEJA`.
+
+- **Elegida: una exención atada al dueño.** `PREMISAS_CON_DUENO` nombra la superficie,
+  la frase y el change que la va a corregir; vale mientras ese change esté en
+  `openspec/changes/` y vence sola cuando se archiva o se descarta. Otro caso exige que
+  el dueño la tenga como tarea **abierta** en su `tasks.md` (se agregó la 3.3 a
+  `la-ventana-se-cierra`).
+- **Descartada: un MODIFIED acá.** El requirement de la cobertura tiene unas 230 líneas
+  y `la-ventana-se-cierra` lo va a modificar al cerrar la ventana: dos deltas sobre el
+  mismo requirement en carriles distintos es un conflicto de archive que ningún banco
+  resuelve, y un MODIFIED que no reproduzca todos sus escenarios los borra en silencio.
+- **Descartada: sólo declararlo en este design.** Depende de que alguien se acuerde el
+  día del archive del otro change.
+
+### 12. El tope de la jerga entre backticks es el de las páginas (RV-L4-06)
+
+La compuerta decía cobrar la jerga «con la MISMA regla que las páginas» y no aplicaba su
+tope de menciones entre backticks.
+
+- **Elegida: importar `jergaEntreBackticks` y `TOPE_DE_JERGA_ENTRE_BACKTICKS`** de
+  `pruebas/docs/lectura.mjs`. Es el tope de una página aplicado a una sección más corta:
+  el lado indulgente, pero medido y compartido.
+- **Descartada: un tope proporcional a la sección.** Sería un número inventado, sin
+  medición detrás, y una segunda regla que diverge de la primera.
+- **Descartada: corregir la frase «la misma regla».** Deja el hueco abierto.
+
+### 13. Un `aprueba:` no cita un desvío que no existe (RV-L4-09)
+
+Los tres changes del carril citan el desvío de review de `AGENTS.md`, que declara el
+carril L1. Integrados sin L1, remiten al vacío.
+
+- **Elegida: declarar la dependencia en cada proposal y un banco**
+  (`pruebas/ci-del-marco/aprueba-cita-lo-que-existe.test.mjs`) que exige que `AGENTS.md`
+  declare el desvío por su identificador si algún artefacto activo lo cita. En el carril
+  queda `todo` por `pendienteDelPorte`; camino a main se exige.
+- **Descartada: sólo declararlo.** El orden de integración es memoria.
+
 ## Qué lo hace cumplir solo
 
 | Propiedad | Comprobación | Dónde falla |
@@ -153,8 +219,11 @@ se integra un cambio a `main`») y nada más: el resto del parche es idéntico.
 | La plantilla de PR ofrece exactamente la lista cerrada | `que-es-breaking.test.mjs` («la plantilla de PR ofrece EXACTAMENTE…») | CI, job del banco de pasos |
 | La lista tiene el caso del arreglo fuera del repositorio | ídem («la lista cerrada nombra el caso…») | ídem |
 | Ninguna superficie vuelve a la regla vieja | ídem («ninguna superficie que dicta la regla…») | ídem |
-| El preámbulo del `CHANGELOG.md` dice la regla nueva | ídem, `todo` hasta que `.porte/` desaparezca | ídem, desde la integración |
-| «Para consumidores» sin jerga de oficio | `herramientas/aviso-entra-en-el-mensaje.mjs`, paso del job `changelog-en-el-pr` | CI del PR que escribe el `CHANGELOG.md` |
+| El preámbulo del `CHANGELOG.md` dice la regla nueva | ídem, `todo` solo en el carril del porte (`pendienteDelPorte`) | ídem, en todo PR a main y en main |
+| `.porte/` no llega a main | `carril-del-porte.test.mjs` | CI del PR a main, y el push a main |
+| La premisa vieja con dueño se corrige antes de que el dueño se archive | `que-es-breaking.test.mjs` (exención atada al dueño y tarea abierta exigida) | CI del PR que archiva o descarta al dueño |
+| «Para consumidores» sin jerga de oficio, ni en prosa ni entre backticks por encima del tope | `herramientas/aviso-entra-en-el-mensaje.mjs`, paso del job `changelog-en-el-pr` | CI del PR que escribe el `CHANGELOG.md` |
+| Un `aprueba:` que cita el desvío apunta a una declaración que existe | `aprueba-cita-lo-que-existe.test.mjs` | CI del PR a main |
 
 **Lo que sigue siendo disciplina, dicho como deuda:** que cada PR clasifique bien su
 propio cambio, y que el arreglo de una compuerta nueva **esté** escrito en «Para

@@ -112,6 +112,15 @@ y `plantilla-aplicacion`.
   sigue publicando en cada integración a `main` hasta que copie el archivo nuevo. La
   viñeta que decía lo contrario se corrige.
 
+## Dependencia de integración
+
+El `aprueba:` de este change cita el desvío de review del marco («un solo mantenedor,
+ver AGENTS.md»), y **ese desvío no está declarado en esta rama**: lo declara el change
+`el-marco-declara-su-desvio-de-review` del carril L1 del porte. Este change **se integra
+después de ese, o junto con él** (tarea 7.5), y no depende de la memoria de nadie:
+`pruebas/ci-del-marco/aprueba-cita-lo-que-existe.test.mjs` pone rojo el PR a `main` que
+traiga una cita del desvío sin su declaración.
+
 ## Distribución y compatibilidad
 
 Nada de este change viaja a un consumidor. `AGENTS.md`, la plantilla de PR, la skill del

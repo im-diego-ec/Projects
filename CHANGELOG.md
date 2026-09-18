@@ -1400,17 +1400,20 @@ nuevo (ver «Cambiado»).
   — es el workflow propio del marco.
 
 - **«Para consumidores» se escribe para quien no es técnico, y el PR que la escribe en
-  jerga sale rojo.** `herramientas/aviso-entra-en-el-mensaje.mjs` suma una cuarta causa:
-  la sección de `[No publicado]` o de la versión más alta usa, fuera de backticks, la
-  jerga de oficio que tienen prohibida las páginas como `docs/01-introduccion.md`. La
-  lista no se copia: se importa de `pruebas/docs/lectura.mjs`. Es la otra mitad de la
+  jerga sale rojo.** `herramientas/aviso-entra-en-el-mensaje.mjs` suma una causa: una
+  sección que la compuerta mide usa la jerga de oficio que tienen prohibida las páginas
+  como `docs/01-introduccion.md`, en la prosa o entre backticks por encima del mismo
+  tope que esas páginas. La lista y el tope no se copian: se importan de
+  `pruebas/docs/lectura.mjs`. Es la otra mitad de la
   regla de arriba: exigir una compuerta el día que sale solo es justo si quien recibe el
   PR de bump entiende el arreglo. **Para consumidores: nada** — corre en el CI del marco.
 - **Un banco ata la definición de incompatible a sus copias.**
   `pruebas/ci-del-marco/que-es-breaking.test.mjs` exige que la plantilla de PR ofrezca
   exactamente la lista cerrada de `AGENTS.md`, con la misma frase, y que ninguna
   superficie que dicta la regla vuelva a decir la vieja. A Rigel le pasó: su skill de
-  release contradijo su `AGENTS.md` dos días sin que nada se pusiera rojo. **Para
+  release contradijo su `AGENTS.md` dos días sin que nada se pusiera rojo. Recorre
+  también los specs vivos; la premisa vieja que sigue en el de la cobertura queda
+  eximida solo mientras el change que cierra esa ventana esté activo. **Para
   consumidores: nada.**
 
 ### Corregido

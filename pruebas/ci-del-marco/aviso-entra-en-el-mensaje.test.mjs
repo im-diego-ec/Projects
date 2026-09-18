@@ -39,7 +39,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import * as laAction from "../../actions/aviso-version/aviso-version.mjs";
-import { SIN_TRADUCCION } from "../docs/lectura.mjs";
+import { SIN_TRADUCCION, TOPE_DE_JERGA_ENTRE_BACKTICKS } from "../docs/lectura.mjs";
 import { scriptDelPaso } from "../marco-ci/extraer.mjs";
 import {
   ENTRADA_SIN_PUBLICAR,
@@ -1021,3 +1021,45 @@ test("ROJO PRIMERO: lanzada como programa por una ruta con «..», la compuerta 
     assert.equal(r.status, 1, `salio ${r.status}: la guarda de «programa principal» contesto que no y no midio nada\n${r.stdout}${r.stderr}`);
     assert.match(r.stdout, /::error/);
   }));
+
+// ---------------------------------------------------------------------------
+// RV-L4-06 — la jerga entre backticks, con el MISMO tope que las paginas
+// ---------------------------------------------------------------------------
+//
+// La compuerta decia cobrar la jerga «con la MISMA regla que las paginas para quien no
+// es tecnico», y dejaba afuera todo lo que va entre backticks, «como en esas paginas».
+// Pero esas paginas tienen ademas un techo para esa escotilla
+// (`TOPE_DE_JERGA_ENTRE_BACKTICKS`, en pruebas/docs/lectura.mjs): una seccion escrita
+// entera en jerga entrecomillada salia verde aca y roja alla. Ahora el techo es el mismo,
+// importado y no copiado.
+
+test("ROJO PRIMERO: un «Para consumidores» escrito en jerga entre backticks, por encima del tope de las paginas, es ROJO", () => {
+  // La reproduccion de la revision: doce fragmentos con jerga, contra un tope de diez.
+  const r = medir(
+    changelogCon(
+      "Actualizá el `workflow`, el `check`, el `token`, el `pipeline`, el `deploy`, el `merge`, el `branch`, " +
+        "el `runner`, el `release`, el `tag` y el `payload` en tu `stack`.",
+    ),
+    LIMITE_POR_DEFECTO,
+    {},
+  );
+  const hallazgos = jergaDe(r);
+  assert.equal(hallazgos.length, 1, `la seccion entera en jerga entrecomillada salio verde:\n${JSON.stringify(r.hallazgos)}`);
+  assert.equal(hallazgos[0].entreBackticks?.length, 12, "y nombra los fragmentos, que es lo que se reescribe");
+});
+
+test("el tope es EL de las paginas, importado: en el tope, verde; uno mas, rojo", () => {
+  const conFragmentos = (n) => changelogCon(`Copiá ${SIN_TRADUCCION.slice(0, n).map((p) => `\`${p}\``).join(", ")} tal cual.`);
+  assert.deepEqual(jergaDe(medir(conFragmentos(TOPE_DE_JERGA_ENTRE_BACKTICKS), LIMITE_POR_DEFECTO, {})), [], "en el tope");
+  assert.equal(jergaDe(medir(conFragmentos(TOPE_DE_JERGA_ENTRE_BACKTICKS + 1), LIMITE_POR_DEFECTO, {})).length, 1, "uno mas");
+});
+
+test("el ::error:: de la jerga entre backticks dice cuantos fragmentos y cual es el tope", () => {
+  const { codigo, dicho } = conTexto(
+    changelogCon(`Copiá ${SIN_TRADUCCION.slice(0, TOPE_DE_JERGA_ENTRE_BACKTICKS + 2).map((p) => `\`${p}\``).join(", ")}.`),
+  );
+  assert.equal(codigo, 1);
+  const error = errores(dicho).join("\n");
+  assert.match(error, new RegExp(`${TOPE_DE_JERGA_ENTRE_BACKTICKS + 2} fragmentos entre backticks`));
+  assert.match(error, new RegExp(`tope de ${TOPE_DE_JERGA_ENTRE_BACKTICKS}`));
+});

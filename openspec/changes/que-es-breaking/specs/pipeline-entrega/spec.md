@@ -23,10 +23,14 @@ existente por su actualización.
 
 La sección para consumidores de las versiones que el aviso todavía puede mandar SHALL
 estar escrita sin la jerga de oficio que tienen prohibida las páginas para quien no es
-técnico, y el pull request que la escribe SHALL ponerse en rojo si no lo está. Toda
-superficie del marco que repita la lista SHALL repetirla completa y sin casos de más, y
-ninguna superficie que dicte la regla SHALL volver a clasificar un endurecimiento como
-incompatible por sí mismo; si una lo hace, el CI del marco SHALL ponerse en rojo.
+técnico —con la misma regla que esas páginas, incluido el tope de menciones entre
+marcas de código—, y el pull request que la escribe SHALL ponerse en rojo si no lo
+está. Toda superficie del marco que repita la lista SHALL repetirla completa y sin casos
+de más, y ninguna superficie que dicte la regla —incluidos los specs vivos— SHALL volver
+a clasificar un endurecimiento como incompatible por sí mismo ni a sostener la premisa
+de la regla retirada; si una lo hace, el CI del marco SHALL ponerse en rojo. Una premisa
+cuya corrección tiene dueño —un change activo que la anota como tarea abierta— SHALL
+admitirse solo mientras ese change siga activo.
 
 #### Scenario: Una compuerta nueva que el consumidor arregla en su repositorio
 - **WHEN** una versión agrega una compuerta que un consumidor no cumple y cuyo arreglo es un cambio en su propio repositorio
@@ -49,13 +53,21 @@ incompatible por sí mismo; si una lo hace, el CI del marco SHALL ponerse en roj
 - **THEN** el CI del pull request que la escribe se pone en rojo nombrando las palabras y el arreglo
 
 #### Scenario: Un nombre que hay que copiar tal cual
-- **WHEN** la sección para consumidores nombra un archivo o un comando entre marcas de código
+- **WHEN** la sección para consumidores nombra un archivo o un comando entre marcas de código, sin pasar el tope de esas menciones que tienen las páginas para quien no es técnico
 - **THEN** esa mención no cuenta como jerga
+
+#### Scenario: La sección escrita en jerga entre marcas de código
+- **WHEN** la sección para consumidores mete entre marcas de código más menciones con jerga que el tope de las páginas para quien no es técnico
+- **THEN** el CI del pull request que la escribe se pone en rojo nombrando los fragmentos y el tope
 
 #### Scenario: Una copia de la lista que se separa de la fuente
 - **WHEN** la plantilla de pull request del marco ofrece un caso de incompatibilidad que la lista cerrada no tiene, u omite uno que tiene
 - **THEN** el CI del marco se pone en rojo nombrando los casos que sobran y los que faltan
 
 #### Scenario: Una superficie que vuelve a la regla retirada
-- **WHEN** una superficie que dicta la regla —la constitución del marco, su plantilla de pull request, sus procedimientos o su documentación vigente— vuelve a decir que endurecer una compuerta es incompatible por sí mismo
+- **WHEN** una superficie que dicta la regla —la constitución del marco, su plantilla de pull request, sus procedimientos, su documentación vigente o sus specs vivos— vuelve a decir que endurecer una compuerta es incompatible por sí mismo, o que el marco se consume por un puntero móvil
 - **THEN** el CI del marco se pone en rojo nombrando el archivo y la frase
+
+#### Scenario: Una premisa retirada cuya corrección tiene dueño
+- **WHEN** un spec vivo conserva la premisa de la regla retirada y un change activo tiene anotada como tarea abierta su corrección
+- **THEN** el CI no se pone en rojo por esa frase mientras el change siga activo, y se pone en rojo el día que se archive o se descarte sin haberla corregido

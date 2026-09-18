@@ -159,3 +159,30 @@ cada uno está escrito en la evidencia.
 - [ ] 6.4 **Revisión adversarial con lentes independientes, registrada acá.** Motivo:
       el marco tiene un solo mantenedor (desvío D8); va en la pasada final del porte.
 - [ ] 6.5 **Archive.** Motivo: va en la pasada final, después de 6.4.
+
+## 7. Hallazgos de la revisión adversarial (2026-09-17)
+
+- [x] 7.1 **FO-H3 — el `todo` que podía sobrevivir a la integración.** Rojo primero:
+      `GITHUB_BASE_REF=main node --test pruebas/ci-del-marco/que-es-breaking.test.mjs`
+      salía 0 con el preámbulo viejo. Ahora el caso usa `pendienteDelPorte`
+      (`pruebas/ci-del-marco/carril-del-porte.mjs`) y un caso nuevo pone rojo `.porte/`
+      camino a main. Con `GITHUB_BASE_REF=main`, los tres bancos del carril dan
+      `ℹ fail 3` —el preámbulo, `.porte/` y la cita del desvío—; sin él, `ℹ fail 0` y
+      `ℹ todo 2`. Mutación: `destinoEsMain` que nunca dice main → `ℹ fail 3`.
+- [x] 7.2 **RV-L4-05 — la premisa en el spec vivo.** El recorrido suma
+      `openspec/specs/*/spec.md` y `REGLA_VIEJA` suma «se consume por un tag móvil». Rojo
+      primero: sin exención, `openspec/specs/calidad-codigo/spec.md: "se consume por un
+      tag móvil"`. `PREMISAS_CON_DUENO` la exime mientras `la-ventana-se-cierra` esté
+      activo, y otro caso exige que ese change la tenga como tarea abierta (se le agregó
+      la 3.3). Mutación: el dueño apuntando a su carpeta de archive → `ℹ fail 1`.
+- [x] 7.3 **RV-L4-06 — el tope entre backticks.** La compuerta importa
+      `jergaEntreBackticks` y `TOPE_DE_JERGA_ENTRE_BACKTICKS`. Rojo primero: 3 casos
+      nuevos rojos (la reproducción de 12 fragmentos, el borde del tope y el
+      `::error::`). Mutación: tope apagado → `ℹ fail 3`. La skill, `actions/README.md` y
+      el fragmento de CHANGELOG dicen el tope.
+- [x] 7.4 **RV-L4-09 — la cita del desvío.** Banco
+      `pruebas/ci-del-marco/aprueba-cita-lo-que-existe.test.mjs` (dos casos que muerden y
+      uno sobre el árbol, `todo` en el carril) y la dependencia escrita en el proposal.
+- [ ] 7.5 **Integrar después de `el-marco-declara-su-desvio-de-review` (carril L1)**, o
+      junto con él. Hasta entonces el caso de 7.4 queda `todo` en el carril y es rojo en
+      un PR a `main`.

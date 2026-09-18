@@ -307,7 +307,7 @@ linea vieja. Sin el segundo argumento mide solo las dos primeras y lo dice con u
 | Que cada una tenga su `### Para consumidores` | Sin ella el aviso manda la entrada entera, recortada si no entra |
 | Que esa seccion tenga texto (no vacia, ni solo un comentario) | Vacia, el aviso manda «Que tiene que hacer un consumidor:» y nada debajo |
 | Que el texto de fabrica no quede encima de cambios reales | El centinela del paso 1: hay cambios y el anuncio diria que no hay ninguno |
-| Que su `### Para consumidores` no use jerga de oficio (la lista de `pruebas/docs/lectura.mjs`, fuera de backticks) | Una compuerta nueva sale en rojo el dia que sale solo si su arreglo se entiende sin ser tecnico (`AGENTS.md`, «Que es BREAKING») |
+| Que su `### Para consumidores` no use jerga de oficio (la lista y el tope de `pruebas/docs/lectura.mjs`: en la prosa, y entre backticks por encima del mismo tope que esas paginas) | Una compuerta nueva sale en rojo el dia que sale solo si su arreglo se entiende sin ser tecnico (`AGENTS.md`, «Que es BREAKING») |
 | Que el mensaje entre en el limite | El `::warning::` de la action llega DESPUES de mandar el mensaje recortado |
 
 Va como tabla para que agregar un cobro nuevo sea agregar una fila y no reescribir
