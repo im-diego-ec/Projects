@@ -19,6 +19,7 @@ import { after } from "node:test";
 import { readFileSync } from "node:fs";
 
 import { commit, correr, escribir, limpiar, repoNuevo } from "./ayuda.mjs";
+import { fechasEnCodigo } from "../../../pruebas/ci-del-marco/fechas-en-codigo.mjs";
 import {
   agregarPorPaquete,
   diasEntre,
@@ -740,15 +741,23 @@ test("sin NINGUN reporte, un piso declarado NO enrojece el total: ahi no desapar
 // el bloque de archive; la tarea esta escrita ahi.
 // ---------------------------------------------------------------------------
 
+/** Toda fecha AAAA-MM-DD escrita en una linea de CODIGO del comparador, con su
+ *  linea. No mira el nombre de nada: el comparador no tiene ninguna fecha legitima
+ *  en su codigo —la unica que consulta es la que el paquete declara en su deuda, y
+ *  esa llega por el package.json—, asi que cualquiera es una amnistia hasta que se
+ *  demuestre lo contrario. Las de sus comentarios cuentan historia y no cuentan. */
+function amnistiasConFecha(texto) {
+  return fechasEnCodigo(texto, "js").map((f) => `:${f.linea} ${f.texto}`);
+}
+
 test("el comparador no tiene ninguna amnistia con fecha", () => {
   const comparador = readFileSync(new URL("../medir-cobertura-diff.mjs", import.meta.url), "utf8");
 
-  // Una constante con una fecha ISO al lado de una palabra de amnistia es
-  // exactamente la forma que tenia VENTANA_DE_GRACIA_HASTA.
-  assert.equal(
-    /const\s+[A-Z_]*(?:VENTANA|GRACIA|AMNISTIA|ESTRENO)[A-Z_]*\s*=\s*"\d{4}-\d{2}-\d{2}"/.test(comparador),
-    false,
-    "volvio una amnistia con fecha al comparador: la-ventana-se-cierra la borro"
+  assert.deepEqual(
+    amnistiasConFecha(comparador),
+    [],
+    "volvio una fecha al codigo del comparador: la-ventana-se-cierra borro la ultima amnistia, y la unica fecha " +
+      "que la verificacion puede consultar es la que el paquete declara en su deuda"
   );
 
   // Y no queda ninguna via por la que el nivel de un hallazgo se decida con una
@@ -756,6 +765,23 @@ test("el comparador no tiene ninguna amnistia con fecha", () => {
   for (const nombre of ["VENTANA_DE_GRACIA", "ventanaHasta", "enVentana", "enGracia", "sin-plazo-en-gracia"]) {
     assert.equal(comparador.includes(nombre), false, `el comparador todavia nombra ${nombre}`);
   }
+});
+
+test("MUERDE: la amnistia se ve por su fecha, no por como se llama", () => {
+  // Hallazgo FO-H1 de la revision adversarial del porte. Este caso buscaba una
+  // constante en MAYUSCULAS con VENTANA, GRACIA, AMNISTIA o ESTRENO en el nombre, mas
+  // una lista fija de identificadores viejos: la forma camelCase que el propio
+  // comparador uso por dentro, o un nombre cualquiera, volvian sin que nada lo viera.
+  for (const forma of [
+    'const ventanaDeGracia = "2026-12-31";',
+    'const PLAZO_DE_ESTRENO = "2026-12-31";',
+    'if (hoy <= "2026-12-31") return "amarillo";',
+  ]) {
+    assert.notDeepEqual(amnistiasConFecha(forma), [], `no vio la fecha en: ${forma}`);
+  }
+  // Y una fecha en un comentario es historia, no una amnistia: el comparador cuenta
+  // en sus comentarios cuando vivio la ventana, y eso no puede ser rojo.
+  assert.deepEqual(amnistiasConFecha("// Vivio hasta el 2026-09-30 y aflojaba TRES veredictos"), []);
 });
 
 // ---------------------------------------------------------------------------

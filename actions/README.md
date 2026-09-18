@@ -628,7 +628,6 @@ saltea el job entero.
 | El `minimo` del paso es menor que el del marco | El total se sigue comparando contra el del marco |
 | Ningún reporte reclama archivos de un paquete | **No medido**, con `::warning::`. El plano del diff ya enrojece si hay líneas agregadas |
 | Todo lo que los reportes reclaman está excluido con su motivo | Pasa, y los motivos quedan escritos en el resumen |
-| Un paquete sin declaración, dentro de la ventana de estreno | Pasa en amarillo, nombrando el día en que será rojo |
 | `FNDA:` que no se pudieron emparejar con sus `FN:` | Pasa, con `::warning::`: el total de funciones se publica como aproximado, no como exacto |
 
 ### Límites declarados
@@ -702,9 +701,10 @@ enrojecido.
 node --test "actions/cobertura-diff/pruebas/*.test.mjs"
 ```
 
-El banco del total corre con la ventana de estreno **cerrada**
-(`COBERTURA_HOY` en una fecha posterior) porque lo que hay que fijar es el régimen
-permanente; la ventana tiene sus dos pruebas propias, una a cada lado de la fecha.
+El banco del total fija `COBERTURA_HOY` en un día fijo para que los plazos de las
+deudas declaradas no dependan del calendario de quien lo corre. El veredicto de un
+paquete **sin** declaración no depende de ningún día: un caso lo corre en los tres
+días que la ventana de estreno retirada distinguía y exige rojo en los tres.
 
 ---
 

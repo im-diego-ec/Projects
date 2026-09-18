@@ -122,11 +122,15 @@ const EPSILON = 1e-9;
 //
 // QUE IMPIDE QUE VUELVA. Tres bancos, y ninguno depende de que alguien se
 // acuerde: actions/cobertura-diff/pruebas/cobertura-total.test.mjs («el
-// comparador no tiene ninguna amnistia con fecha») mira este archivo;
+// comparador no tiene ninguna amnistia con fecha») exige que ninguna linea de
+// codigo de este archivo escriba una fecha AAAA-MM-DD;
 // pruebas/ci-del-marco/ventanas-con-dueno.test.mjs exige un change dueno para
-// cualquier fecha de gracia en el codigo del marco o del andamio; y
+// toda fecha AAAA-MM-DD escrita en una linea de codigo del marco o del andamio,
+// salvo las citas que exceptua una por una con su motivo; y
 // pruebas/ci-del-marco/sin-exigibilidad-futura.test.mjs cierra la puerta de los
-// DATOS (el manifiesto del canonico).
+// DATOS (el manifiesto del canonico). Ninguno mira el nombre de la variable, y
+// ninguno ve una fecha armada en tiempo de ejecucion: ese limite esta escrito en
+// pruebas/ci-del-marco/fechas-en-codigo.mjs.
 
 // ---------------------------------------------------------------- resumen ---
 

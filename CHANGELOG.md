@@ -278,9 +278,14 @@ mueve sobre un cambio incompatible.
   `::notice::` te lo recuerda en cada corrida, y en v2 el input se quita y pasarlo hace
   fallar la corrida entera.
 
-  Ojo con la dirección: para un repo que sube a esta versión **después** del 2026-10-01,
-  el job **afloja** (de rojo en la 1.9.6 a aviso) hasta v2. Es deliberado (D9); los
-  hallazgos siguen saliendo como `::warning::` en el resumen de la corrida.
+  **Cambio de contrato dentro de la línea 1, decidido por el PO (D9):** el default de
+  `ventana_terraform` pasa de `"2026-09-30"` a `""` y el input deja de tener efecto. Por
+  la regla del marco eso es un cambio de comportamiento por un default, y va escrito acá
+  para que no te sorprenda: para un repo que sube a esta versión **después** del
+  2026-10-01, el job **afloja** (de rojo en la 1.9.6 a aviso) hasta v2, y si pasabas una
+  fecha ya vencida para que te detuviera antes, también pasa a aviso. Los hallazgos
+  siguen saliendo como `::warning::` en el resumen de la corrida; si querés que te
+  detengan antes de v2, arreglalos con los comandos de arriba.
 
 ### Eliminado
 
@@ -1071,8 +1076,11 @@ mueve sobre un cambio incompatible.
 
 - **La compuerta de fechas con dueño mira también el andamio y la asignación YAML de una
   línea** (`VENTANA_X: "AAAA-MM-DD"`, también comentada), que era la forma exacta de la
-  fecha del andamio y la que no veía. Su anti-vacuidad corre sobre un árbol fabricado,
-  porque en el marco ya no queda ninguna fecha de gracia.
+  fecha del andamio y la que no veía. Y deja de fiarse del nombre: cuenta toda fecha
+  AAAA-MM-DD escrita en una línea de código del marco o del andamio (también `.ts` y los
+  `run:` de los workflows), con las citas exceptuadas una por una y con su motivo. Su
+  anti-vacuidad corre sobre un árbol fabricado, porque en el marco ya no queda ninguna
+  fecha de gracia.
 
   **Para consumidores: nada.** Es un banco del repositorio del marco.
 

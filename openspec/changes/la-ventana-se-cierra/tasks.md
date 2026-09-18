@@ -50,6 +50,22 @@ el commit sobre el que arranca. Toda verificación es por código de salida.
 - [x] 2.5 MUERDE de la forma nueva: la asignación con y sin comillas, comentada, y los dos
       falsos positivos que no puede producir (una clave que lee un input, una fecha con
       otra clave) (`pruebas/ci-del-marco/ventanas-con-dueno.test.mjs:235`).
+      Las anclas de 2.1 a 2.5 son de `0b85ee4`; 2.6 las corrió.
+- [x] 2.6 **La compuerta deja de fiarse del nombre** (hallazgo FO-H1 de la revisión
+      adversarial). Rojo primero: el sujeto sintético gana las cuatro formas que el
+      nombre no delata —camelCase, `PLAZO_DE_ESTRENO`, un `.ts` del andamio, una fecha en
+      un `run:`— más un comentario y la prueba de un paquete que no cuentan; contra el
+      escaneo de `0b85ee4`: `# tests 5 · # pass 4 · # fail 1`. Después, el lector
+      `pruebas/ci-del-marco/fechas-en-codigo.mjs` (toda fecha AAAA-MM-DD en una línea de
+      código, por lenguaje) y `CITAS_QUE_NO_SON_PLAZOS` (`ventanas-con-dueno.test.mjs:140`,
+      diez citas exceptuadas por línea y con motivo): `# tests 8 · # pass 8`. Casos
+      nuevos: `:405` (toda cita encuentra su línea; con `(incidente 2026-08-05)` cambiado
+      a mano a `…-06` → `# fail 2`, la fecha huérfana y la cita sin línea), `:429` (la
+      excepción es de la línea), `:452` (comentario sí, código no, por lenguaje). El
+      hermano `actions/cobertura-diff/pruebas/cobertura-total.test.mjs:753` usa el mismo
+      lector; su caso `:770` con la lógica vieja → `# tests 59 · # pass 58 · # fail 1`, con
+      la nueva → `59/59`. Comentario de `medir-cobertura-diff.mjs` («QUE IMPIDE QUE
+      VUELVA») y requirement ADDED del delta con dos escenarios nuevos.
 
 ## 3. La ventana de cobertura se borra
 
@@ -76,6 +92,14 @@ el commit sobre el que arranca. Toda verificación es por código de salida.
       (`git status actions/constitucion` limpio).
 - [x] 3.4 Documentación que prometía la ventana: `actions/README.md:436-445` y el
       comentario del plano del total en `plantilla/.github/workflows/ci.yml:481-485`.
+- [x] 3.5 **Lo que 3.4 dejó** (hallazgo RV-H1): la fila «Un paquete sin declaración,
+      dentro de la ventana de estreno → Pasa en amarillo» de la tabla de casos de
+      `actions/README.md` (borrada: la fila «sin motivo ni fecha → Rojo» ya lo dice) y el
+      párrafo del banco del total que describía «sus dos pruebas propias» (reescrito:
+      `COBERTURA_HOY` fija los plazos de las deudas, y el veredicto sin declaración no
+      depende del día). Banco que ata las tres frases:
+      `pruebas/ci-del-marco/ventanas-con-dueno.test.mjs:470`; contra el README de
+      `0b85ee4` → `# fail 1`, las tres frases en `actions/README.md`.
 
 ## 4. La decisión, para el PO
 
@@ -121,6 +145,14 @@ el commit sobre el que arranca. Toda verificación es por código de salida.
 
 ## 6. Spec, validación y CHANGELOG
 
+- [x] 6.0 Contrato reclasificado (hallazgo RV-H5): no es patch sino un **cambio de
+      contrato dentro de la línea 1, autorizado por la D9** —el default de
+      `ventana_terraform` pasa de `"2026-09-30"` a `""` y cambia el comportamiento—.
+      Nombrado así en el proposal, en el design (D2) y en «Para consumidores» del
+      fragmento 07. Y el `MODIFIED` ya no dice «toda excepción escrita acá, y hoy no hay
+      ninguna» (hallazgo RV-H4): la exención de `.github/` que agrega
+      `el-marco-deja-de-afirmar-lo-que-no-hace` existe; el texto dice ahora que toda
+      excepción está en el contrato, que ninguna es por fecha, y remite a ese requirement.
 - [x] 6.1 Delta de `calidad-codigo`: `MODIFIED` del requirement de cobertura con sus **19**
       escenarios (comparados a mano por título contra el spec vivo: ninguno falta ni
       sobra), y dos `ADDED` cuyos títulos no existen en el spec vivo ni en otro change.
@@ -149,10 +181,15 @@ el commit sobre el que arranca. Toda verificación es por código de salida.
 - [ ] 7.3 **Revisión adversarial con lentes independientes**, registrada en este change
       (desvío D8: un solo mantenedor). Destino: la pasada final del porte.
 - [ ] 7.4 **Al archivar**: el caso «el comparador no tiene ninguna amnistía con fecha»
-      (`actions/cobertura-diff/pruebas/cobertura-total.test.mjs:743`) suma la mitad del
+      (`actions/cobertura-diff/pruebas/cobertura-total.test.mjs:753`) suma la mitad del
       spec —que `openspec/specs/calidad-codigo/spec.md` no prometa ninguna fecha de
       cierre—, que hoy sería rojo por el orden del flujo y no por un defecto.
 - [ ] 7.5 **En v2** (lo cobra solo `terraform-en-ci.test.mjs:482` en el PR de la 2.0.0):
       `GRAVEDAD_TERRAFORM: error`, quitar el input `ventana_terraform`, y el
       `hashicorp/setup-terraform` pinado por SHA que el encabezado del job describe
       (action de terceros: requiere OK humano).
+- [ ] 7.6 **Archivar junto con `el-marco-deja-de-afirmar-lo-que-no-hace`**, o después: el
+      `MODIFIED` de cobertura remite a la exención de `.github/` como «su propio
+      requirement», y ese requirement lo agrega el otro change. Archivado este solo, la
+      remisión quedaría apuntando a un requirement que el spec vivo todavía no tiene.
+      Destino: la pasada final del porte.

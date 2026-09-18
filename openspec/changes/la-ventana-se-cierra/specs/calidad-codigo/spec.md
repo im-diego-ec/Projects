@@ -12,12 +12,18 @@ tratarse como fallo, porque un plazo sin dueño vence sin que nadie lo decida. D
 no es mencionar: un change que nombra la fecha para decir que no la toca NO SHALL
 contar como su dueño.
 
-La comprobación SHALL reconocer la fecha en todas las formas en que una ventana ya se
-escribió en este repositorio: una constante del código, el valor por defecto de un
-parámetro de un workflow reutilizable, y una asignación de una sola línea en la
-definición de un pipeline, también cuando la línea está comentada como ejemplo para
-copiar. El andamio SHALL estar dentro de su alcance: una fecha que viaja en el andamio
-vence en el repositorio de otro, sin pull request de actualización que la anuncie.
+La comprobación SHALL reconocer la fecha por la fecha y NO por el nombre de lo que la
+guarda: toda fecha escrita en una línea de código de producción —no en un comentario—
+SHALL contar, en cualquiera de los lenguajes del marco y del andamio, incluidas las
+definiciones de pipeline y las órdenes escritas directamente en un paso. El nombre lo
+elige quien escribe la ventana; la fecha no la puede esconder. Además SHALL reconocerla
+en las formas en que una ventana ya se escribió en este repositorio aunque la línea
+esté comentada como ejemplo para copiar: una asignación de una sola línea y el valor
+por defecto de un parámetro de un workflow reutilizable. Una fecha de código que es una
+cita —cuándo se midió o se decidió algo— y no un plazo SHALL exceptuarse por su línea y
+con su motivo escrito, y una excepción que ya no encuentra su línea SHALL fallar. El
+andamio SHALL estar dentro de su alcance: una fecha que viaja en el andamio vence en el
+repositorio de otro, sin pull request de actualización que la anuncie.
 
 Y la comprobación NO SHALL poder pasar en vacío: su capacidad de ver cada forma SHALL
 demostrarse sobre un sujeto fabricado, porque con cero fechas vivas «toda fecha tiene
@@ -41,6 +47,14 @@ archivado sin destino ni declaración SHALL tratarse como olvido.
 #### Scenario: Una fecha de gracia que viaja en el andamio
 - **WHEN** una definición de pipeline del andamio asigna en una sola línea una fecha hasta la cual una compuerta afloja
 - **THEN** la comprobación la ve igual que la del código del marco y exige su dueño, porque esa fecha vencería en el repositorio de un proyecto sin que nada se lo anuncie
+
+#### Scenario: Una fecha de gracia con un nombre que no la delata
+- **WHEN** el código de producción o el andamio compara el día de la corrida contra una fecha escrita en una línea de código, sea cual sea el nombre de lo que la guarda, el lenguaje del archivo, o aunque no haya ningún nombre
+- **THEN** la comprobación la ve y exige su dueño igual que si la variable se llamara ventana
+
+#### Scenario: Una fecha de código que es una cita
+- **WHEN** una línea de código de producción escribe una fecha dentro de un mensaje que cuenta cuándo se midió o se decidió algo
+- **THEN** la comprobación la deja pasar solo si está exceptuada por esa línea con su motivo escrito, y falla el día en que la excepción ya no encuentra su línea
 
 #### Scenario: Un change que menciona la fecha sin hacerse cargo
 - **WHEN** la única referencia a una fecha viva en los changes activos es una mención de paso
@@ -181,8 +195,10 @@ métrica medible NO SHALL fallar —no apagó ninguna comparación que existiera
 SHALL nombrarse en la corrida: una deuda que nadie nombra envejece en el manifiesto
 y se paga sola sin que nadie sepa que estaba.
 
-**Toda excepción a esta verificación SHALL estar escrita acá y no solo en el código,
-y hoy no hay ninguna.** La medición que lo obliga: la primera implementación se
+**Toda excepción a esta verificación SHALL estar escrita en el contrato y no solo en el
+código, y ninguna SHALL depender de una fecha.** La que existe —la configuración del
+proveedor de CI, que no se mide como código de aplicación— tiene su propio
+requirement. La medición que lo obliga: la primera implementación se
 estrenó con una ventana de gracia que vivía en un comentario del comparador, y contra
 el consumidor real —un paquete a 70,70% de funciones sin deuda declarada— la
 integración salía en verde mientras el escenario de este mismo requirement prometía

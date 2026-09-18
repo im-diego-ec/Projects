@@ -17,7 +17,7 @@ estado: en-ejecucion
 | `actions/README.md` | Documentación del referenciado | Se lee desde el repo del marco; describe la action que se consume. |
 | `openspec/changes/la-ventana-se-cierra/specs/calidad-codigo/spec.md` | **Canónico** (al archivar) | Contrato del marco: `ADDED` dos requirements, `MODIFIED` el de cobertura. |
 | `openspec/cobertura-de-requirements.md` | Canónico (censo) | Tres anclas se movieron (la copia retirada corrió las líneas del `ci.yml` del andamio) y la fila del state apunta ahora al job del reusable. |
-| `actions/cobertura-diff/pruebas/*`, `pruebas/ci-del-marco/ventanas-con-dueno.test.mjs`, `pruebas/ci-del-marco/sin-exigibilidad-futura.test.mjs` (nuevo), `pruebas/andamio/terraform-en-ci.test.mjs`, `pruebas/init/plataforma.test.mjs`, `pruebas/docs/lo-que-lee-el-consumidor.test.mjs` | Del repositorio del marco, no viajan | Bancos. |
+| `actions/cobertura-diff/pruebas/*`, `pruebas/ci-del-marco/ventanas-con-dueno.test.mjs`, `pruebas/ci-del-marco/fechas-en-codigo.mjs` (nuevo, lector compartido por los dos bancos de fechas), `pruebas/ci-del-marco/sin-exigibilidad-futura.test.mjs` (nuevo), `pruebas/andamio/terraform-en-ci.test.mjs`, `pruebas/init/plataforma.test.mjs`, `pruebas/docs/lo-que-lee-el-consumidor.test.mjs` | Del repositorio del marco, no viajan | Bancos. |
 | `herramientas/projects-init.mjs` (un comentario) | Herramienta del marco, no viaja | Su comentario decía que el `[ -d ]` se medía en el `ci.yml` del andamio; ahora se mide en el reusable. |
 
 ## D1 — Se borra la ventana de cobertura entera, no la constante
@@ -49,6 +49,16 @@ PO la cierra.
 
 **Descartado: quitarlo.** Quitar un input es breaking (`AGENTS.md`, «Qué es BREAKING»):
 un consumidor que lo pasa en su `with:` rompe la corrida entera. Va en v2.
+
+**Lo que sí es: un cambio de contrato dentro de la línea 1, autorizado por la D9.**
+Dejar el input sin efecto y bajarle el default de `"2026-09-30"` a `""` cambia el
+comportamiento por un default, y `AGENTS.md` («Qué es BREAKING») lo cuenta como breaking:
+desde el 2026-10-01, un consumidor con hallazgos de Terraform pasa de rojo con la 1.9.6 a
+verde con aviso con esta versión —el «seguir en verde haciendo algo distinto» que esa
+sección nombra—, y quien pasaba una fecha ya vencida para endurecer antes también
+afloja. La D9 del PO elige esto a sabiendas («`ventana_terraform` queda como no-op hasta
+v2»), así que va en la línea 1; lo que no se puede es llamarlo patch. Se nombra como
+cambio de contrato en el proposal y en «Para consumidores» del fragmento 07.
 
 **Descartado: dejar el default en `"2026-09-30"`.** Con un default no vacío el paso no
 puede distinguir «el consumidor lo pasó» de «llegó el default», así que no puede avisar a
@@ -141,6 +151,28 @@ encuentra algo» sobre el árbol real sería rojo para siempre o habría que dej
 ventana falsa. El caso nuevo arma un árbol con las tres formas y un fixture de banco que
 no tiene que contar.
 
+**Y deja de fiarse del nombre (hallazgo FO-H1 de la revisión adversarial).** Las tres
+formas eran tres NOMBRES: una constante en mayúsculas con VENTANA/GRACIA/HASTA/EXIGIBLE,
+sólo en `.mjs`/`.js`/`.yml`. La revisión midió cuatro que pasaban por al lado —un
+camelCase como el `ventanaHasta` que el comparador usó por dentro, un
+`PLAZO_DE_ESTRENO`, un `.ts` del andamio y una fecha escrita directo en un `run:`— y con
+cualquiera `ventanasVivas()` devolvía `[]`. Ahora cuenta **toda fecha AAAA-MM-DD en una
+línea de código** de producción, se llame como se llame
+(`pruebas/ci-del-marco/fechas-en-codigo.mjs`), en JavaScript, TypeScript, YAML, shell y
+los ejecutables sin extensión que declaran su intérprete. Las diez fechas de código que
+hoy son citas («medido el…», «desde el…» dentro de un mensaje o de una `description`)
+se exceptúan **por línea**, con motivo, en `CITAS_QUE_NO_SON_PLAZOS`; una excepción que ya
+no encuentra su línea es roja, y eso es también la anti-vacuidad sobre el árbol real.
+El caso hermano de `cobertura-total.test.mjs` usa el mismo lector: el comparador no
+escribe ninguna fecha en código.
+
+**Descartado: filtrar por «fecha futura».** Una ventana con fecha pasada está cerrada, y
+filtrar por el reloj habría dejado el banco sin excepciones. Pero haría depender del
+calendario un banco del change que saca el calendario de las compuertas.
+
+**Límite declarado:** una fecha armada en tiempo de ejecución (`new Date(2031, 0, 1)`,
+una concatenación) no se ve. Está escrito en el lector y en el comentario del comparador.
+
 **Descartado: prohibir toda ventana en el código.** La D1 terminó el modo aviso como
 regla general, no como imposibilidad; la regla del dueño deja la puerta con una decisión
 escrita en un change.
@@ -162,8 +194,12 @@ manifiesto real en memoria.
   `openspec/specs/calidad-codigo/spec.md`). Los tres de la ventana conservan su título
   —el CLI compara por nombre y no hay `REMOVED` de escenario— y dicen lo que pasa ahora,
   como en Rigel. Salen los dos párrafos de la ventana y el de «la fecha de cierre escrita
-  acá»; entran «toda excepción escrita acá, y hoy no hay ninguna» y «la verificación no
-  consulta ninguna fecha salvo la que declaró el paquete».
+  acá»; entran «toda excepción escrita en el contrato, ninguna por fecha» y «la
+  verificación no consulta ninguna fecha salvo la que declaró el paquete». La primera
+  versión decía «escrita acá, y hoy no hay ninguna», y era falsa: el change
+  `el-marco-deja-de-afirmar-lo-que-no-hace` agrega la exención de `.github/` en otro
+  requirement de la misma capacidad (hallazgo RV-H4). El texto la nombra y remite a su
+  requirement; los dos changes se archivan juntos en la pasada final.
 - `ADDED` «Toda fecha que afloja una compuerta tiene un change que la posee»: ya estaba en
   este change; gana el andamio, la forma de una línea, la anti-vacuidad sintética y la
   ventana por datos del calendario del marco.

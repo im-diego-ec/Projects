@@ -120,5 +120,11 @@ Hay **tres** consumidores reales, los tres en `@v1.9.6`: `im-diego-ec/custodia-b
   scaffold: **no viaja con el bump**. El parche manual está en el fragmento del
   CHANGELOG (borrar el paso; el job del reusable hace lo mismo).
 
-Contrato: **patch**. Nada se quita ni se vuelve requerido; el input sigue aceptándose. La
-clasificación de distribución de cada pieza está en el design.
+Contrato: **cambio de contrato dentro de la línea 1, autorizado por la D9 del PO**. Nada
+se quita ni se vuelve requerido y el input sigue aceptándose, pero su default pasa de
+`"2026-09-30"` a `""` y deja de tener efecto: `AGENTS.md` cuenta como breaking «cambiar
+un valor por defecto de forma que cambie el comportamiento», y acá cambia —desde el
+2026-10-01, un repo con hallazgos de Terraform pasa de rojo con la 1.9.6 a aviso con esta
+versión—. La D9 lo decide así hasta v2 (design, D2), y «Para consumidores» lo nombra como
+cambio de contrato. El endurecimiento de la cobertura, en cambio, es exigible el día que
+sale (D1). La clasificación de distribución de cada pieza está en el design.
