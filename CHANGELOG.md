@@ -104,8 +104,9 @@ mueve sobre un cambio incompatible.
   una sección nueva del propio `tasks.md`; donde la tarea pedía una corrida, se
   corrió sobre un repositorio de juguete armado desde el andamio. Es el porte de la
   misma auditoría que Rigel hizo sobre su copia en la 1.11.0 (`ccb4c8a` y
-  `9f8fec7`). Para consumidores: nada; no cambia una línea que un repositorio
-  ejecute ni reciba.
+  `9f8fec7`). Las citas por línea de esa auditoría se rehicieron contra el árbol
+  final del porte, después de que otros lotes movieran los archivos citados. Para
+  consumidores: nada; no cambia una línea que un repositorio ejecute ni reciba.
 - **El bloque de estreno de ese change ya no manda a mover `v1`.** Se escribió
   cuando el tag móvil era el canal y había que amortiguar el estreno con una ventana
   de gracia; las dos premisas caducaron antes de esta auditoría (versión exacta desde

@@ -301,10 +301,10 @@ nombra la puerta de atrás en vez de fingir que no existe.
 >    desde el 2026-08-21 el marco se consume por versión exacta, y el rojo de una
 >    versión nueva aparece **dentro del PR de bump**, donde se lee antes de mergear.
 >    El mecanismo de fechas quedó como opt-in de quien publica
->    (`actions/constitucion/constitucion.mjs:111-124`), y todas las versiones de
+>    (`actions/constitucion/constitucion.mjs:111-127`), y todas las versiones de
 >    `actions/constitucion/canonico/manifiesto.json` declaran `exigible_desde` igual
 >    a `publicada`. Lo que el CI de Projects rechaza hoy es una exigibilidad
->    **anterior** a la publicación (`constitucion.test.mjs:701`), no una demasiado
+>    **anterior** a la publicación (`constitucion.test.mjs:703`), no una demasiado
 >    cercana. Y desde el change `ventana-vencida` (2026-09-17) tampoco es opt-in:
 >    `actions/constitucion/pruebas/la-ventana-no-vuelve.test.mjs` pone rojo una
 >    `exigible_desde` distinta de `publicada`.
@@ -439,17 +439,17 @@ el emisor; la propiedad sigue siendo la misma.
 
 | Requirement | Check | Falla cuando |
 |---|---|---|
-| Artefacto presente y al día | job `constitucion` de `plantilla/.github/workflows/ci.yml:89`, que corre `actions/constitucion` en modo `verificar` (`:115-117`) y cuelga de `ci-ok` (`:594-615`) | falta el artefacto (`artefacto-faltante`, `constitucion.mjs:1151`) o declara una versión menor que la del canónico pinado (`artefacto-atrasado`, `:1174`): `::error::` desde el día de publicación; `::warning::` solo si esa versión declaró de antemano una exigibilidad posterior |
-| El contenido es el que el marco publica | ídem | el cuerpo difiere del re-render de la versión que declara, con fin de línea normalizado (`artefacto-divergente`, `:1274`); una cabecera subida a mano tampoco pasa (`artefacto-sello-incoherente` y `artefacto-adelantado`, `:1242-1263`) |
-| Cadena de carga intacta, por superficie declarada | ídem | una superficie declarada no importa el artefacto fuera de bloques de código (`cadena-rota`, `:1285` y `:1293`) |
-| Desvío con motivo, aprobador y fecha | ídem | falta cualquiera de los tres (`desvio-sin-motivo`, `desvio-sin-aprobador`, `desvio-sin-fecha`, `:885-926`) |
-| Desvío que sobrevivió a su regla | ídem | el id que nombra no existe en el canónico de la versión pinada (`desvio-muerto`, `:902`), con el motivo en el mensaje |
+| Artefacto presente y al día | job `constitucion` de `plantilla/.github/workflows/ci.yml:89`, que corre `actions/constitucion` en modo `verificar` (`:115-117`) y cuelga de `ci-ok` (`:594-615`) | falta el artefacto (`artefacto-faltante`, `constitucion.mjs:1154`) o declara una versión menor que la del canónico pinado (`artefacto-atrasado`, `:1177`): `::error::` desde el día de publicación; `::warning::` solo si esa versión declaró de antemano una exigibilidad posterior |
+| El contenido es el que el marco publica | ídem | el cuerpo difiere del re-render de la versión que declara, con fin de línea normalizado (`artefacto-divergente`, `:1277`); una cabecera subida a mano tampoco pasa (`artefacto-sello-incoherente` y `artefacto-adelantado`, `:1245-1266`) |
+| Cadena de carga intacta, por superficie declarada | ídem | una superficie declarada no importa el artefacto fuera de bloques de código (`cadena-rota`, `:1288` y `:1296`) |
+| Desvío con motivo, aprobador y fecha | ídem | falta cualquiera de los tres (`desvio-sin-motivo`, `desvio-sin-aprobador`, `desvio-sin-fecha`, `:889-930`) |
+| Desvío que sobrevivió a su regla | ídem | el id que nombra no existe en el canónico de la versión pinada (`desvio-muerto`, `:906`), con el motivo en el mensaje |
 | Que el consumidor cablee la verificación | job `constitucion-cableada` de `marco-ci.yml:3871`, modo `cableado` (`:3900`) | el repo versiona `.projects-valores.json` y ningún workflow que GitHub ejecute invoca la verificación colgada del veredicto (aviso si todavía no adoptó) |
 | Permisos del agente sin autorización de escritura | paso `Permisos del agente sin escritura` (`marco-ci.yml:3149`) | una entrada del allowlist autoriza una operación mutante y no está declarada como desvío |
 | Ejecutores del allowlist pinados | `Ejecutores de paquetes pinados`, **ya existente** (`marco-ci.yml:1956`) | una invocación por un ejecutor que descarga no lleva versión exacta |
 | Piso de permisos recomendado | `actions/constitucion` (lo declara el manifiesto y lo mide quien lo transporta), `::warning::` | falta una entrada del piso — **rojo a propósito no, porque un permiso de menos es fricción y no riesgo** |
 | Allowlist no versionado | paso `Permisos del agente sin escritura`, `::warning::` (`marco-ci.yml:3237`) | el repo no rastrea `.claude/settings.json`: lo no rastreado no se puede mirar, y callarse sería declararlo sano |
-| El manifiesto del canónico es válido | job `pruebas_actions` del `ci.yml` de **Projects** (`.github/workflows/ci.yml:142-156`), sobre `actions/constitucion/pruebas/` | una versión declara una exigibilidad **anterior** a su publicación, las versiones están desordenadas o les faltan fechas, o el canónico se pasa de su presupuesto de líneas (`constitucion.test.mjs:701`, `:743`, `:766`, `:777`) |
+| El manifiesto del canónico es válido | job `pruebas_actions` del `ci.yml` de **Projects** (`.github/workflows/ci.yml:142-156`), sobre `actions/constitucion/pruebas/` | una versión declara una exigibilidad **anterior** a su publicación, las versiones están desordenadas o les faltan fechas, o el canónico se pasa de su presupuesto de líneas (`constitucion.test.mjs:703`, `:745`, `:768`, `:779`) |
 | El `AGENTS.md` del proyecto no contradice al artefacto | **— sin check** | no hay forma mecánica de distinguir «lo dice distinto» de «lo contradice». La mitigación real es de migración: el texto derivado del marco se borra del archivo del proyecto, así el duplicado no existe |
 | El agente obedece lo que lee | **— sin check, y no puede haberlo** | ver la última sección |
 
@@ -461,7 +461,7 @@ el emisor; la propiedad sigue siendo la misma.
 > de por qué el bloque 0 era bloqueante —que sí se cumplió: el canónico trae lo
 > rescatado— y el `tasks.md` declara el bloque 6 no aplicable, con su motivo. Los
 > consumidores reales de Projects nacieron después de que el mecanismo existiera: el
-> arranque les genera el artefacto (`herramientas/projects-init.mjs:3836-3839`), así
+> arranque les genera el artefacto (`herramientas/projects-init.mjs:3949-3952`), así
 > que no hay nada que migrar, solo que medir en el cierre (tarea 7.3).
 
 El orden importa y el primer bloque es bloqueante: **si la primera regeneración

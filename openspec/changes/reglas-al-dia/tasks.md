@@ -424,7 +424,7 @@ contramedidas son obligatorias y esta es la primera.
       es scaffold; el check llega por el carril referenciado, y esa asimetría es
       del diseño). Evidencia: el artifact descargable en una corrida de fixture.
       **ABIERTA, y no por falta de código: el artifact sale VACÍO.** La mitad de
-      la action está (`actions/constitucion/constitucion.mjs:1580-1593` deja el
+      la action está (`actions/constitucion/constitucion.mjs:1582-1595` deja el
       artefacto al día en `$RUNNER_TEMP/.projects-al-dia` en cada corrida) y el
       paso que lo sube también (`plantilla/.github/workflows/ci.yml:122-127`),
       pero `upload-artifact` excluye los archivos ocultos por defecto desde su
@@ -456,7 +456,7 @@ contramedidas son obligatorias y esta es la primera.
 >
 > Lo que el bloque protegía sí tiene dueño en Projects, y no es una migración. Los tres
 > consumidores reales (todos en `@v1.9.6`) nacieron con el mecanismo ya publicado: el
-> arranque les genera el artefacto (`herramientas/projects-init.mjs:3836-3839`), así
+> arranque les genera el artefacto (`herramientas/projects-init.mjs:3949-3952`), así
 > que no hay texto copiado a mano que rescatar. Que estén al día y en verde es la
 > tarea **7.3**, que queda abierta.
 >
@@ -470,7 +470,7 @@ contramedidas son obligatorias y esta es la primera.
       el nombre del check requerido `ci-ok`, el porqué de los invariantes de
       propiedades y la regla de ejecutores pinados— está en el canónico que recibe
       todo consumidor de Projects, y lo fija
-      `actions/constitucion/pruebas/constitucion.test.mjs:826`.
+      `actions/constitucion/pruebas/constitucion.test.mjs:828`.
 - [x] 6.2 **No aplica.** Alinear el allowlist del agente de ese mismo repositorio
       con el piso y con los ejecutores pinados. En un consumidor de Projects eso lo
       miran solos el paso «Ejecutores de paquetes pinados»
@@ -483,7 +483,7 @@ contramedidas son obligatorias y esta es la primera.
 - [x] 6.4 **No aplica.** Arreglar la regla invertida de ese repositorio sobre la
       instancia de identidad de dev. La regla correcta, con `APP_ENV=prod` como
       guard estructural, está en el canónico
-      (`actions/constitucion/canonico/40-fronteras.md:106`, id
+      (`actions/constitucion/canonico/40-fronteras.md:129`, id
       `dev-no-contacta-usuarios`), y el desvío declarado es el mecanismo que un
       consumidor de Projects usaría para apartarse de ella: impreso pegado a la
       regla, medido en la fila 2.6 de la auditoría. Lo que la tarea arreglaba era
@@ -609,6 +609,19 @@ desde `plantilla/` con los marcadores resueltos, sobre el que se ejecutó
 `marco-ci.yml` extraídos del YAML igual que lo hacen sus bancos. Nada de eso se
 escribió en el repositorio: vivió en un directorio temporal.
 
+**Rehecha el 2026-09-18** (revisión adversarial del carril, RV-L4-01). Después de
+escrita esta sección, los lotes 3 y 11 del porte movieron `constitucion.mjs`,
+`constitucion.test.mjs`, `40-fronteras.md`, `10-openspec.md` y el manifiesto, y de 30
+citas medidas en esos archivos 22 apuntaban a otra línea: a un `});`, a un separador, o
+a prosa de otra regla. Se remapearon contra el árbol del 2026-09-18 con
+`git diff -U0 98a638a` archivo por archivo, y cada una se comprobó con el contenido de
+la línea citada **igual** al del día en que se escribió. Cuatro se corrigieron a mano
+porque su propia línea cambió: el render de `herramientas/projects-init.mjs` (que ahora
+usa la action del pin), el bloque de la ventana en `constitucion.mjs` (dos líneas más),
+y `manifiesto.json:3`, que vale 738 y no 700. Las citas son las de ese día: si otro lote
+vuelve a mover estos archivos, el ancla que no se mueve es el nombre de la prueba o el id
+de la regla que cada fila nombra.
+
 **Por qué importa dejarlo escrito y no tildar y seguir.** Un `tasks.md` que dice 2/41
 sobre un change casi terminado empuja a rehacer lo hecho. Esta sección existe para
 que el próximo que lo abra vea de dónde salió cada marca, y pueda refutarla.
@@ -617,39 +630,39 @@ que el próximo que lo abra vea de dónde salió cada marca, y pueda refutarla.
 
 | # | Qué la prueba |
 | --- | --- |
-| 0.1 | En `actions/constitucion/canonico/`: `max-turns 5` (`70-agentes-modelos.md:33`), `$10/$50 vs $3/$15 por MTok` (`:38-39`), `devDeps → runtime → auth` (`40-fronteras.md:52`), lección repetida **3 veces** (`50-seguridad-observabilidad.md:40`), y el `Closes` con su fecha, 2026-08-13, cazado en review (`80-github.md:27-32`). El ejecutor del bot: `plantilla/.github/workflows/claude.yml:251-253` (`--model sonnet --effort medium --max-turns 5`). El número del issue de origen del orden de riesgo **no** se copió a propósito: era de un repositorio ajeno a Projects |
-| 0.2 | `el-proyecto-no-edita-el-marco` en `actions/constitucion/canonico/00-preambulo.md:26-31`, con sus dos caminos (parámetro que falta o change en Projects). El guardrail de deltas en `actions/constitucion/canonico/10-openspec.md:29-45`. **La premisa cambió**: el canónico ya no lo llama hueco, dice que el guardrail **caza** los dos casos y nombra el límite que sí queda (el archive cuenta operaciones declaradas); lo fija `actions/constitucion/pruebas/regresiones-auditoria.test.mjs:820` |
-| 0.3 | Las tres reglas con id: `40-fronteras.md:73` (`escalar-modelo-exige-ok-previo`), `:82` (`config-de-repo-u-organizacion-exige-ok-previo`), `:91` (`apartarse-de-la-infra-base-exige-preguntar-antes`). El texto viejo que había que reemplazar: `grep -rc "cuando la tarea lo paga" actions/constitucion/canonico/` → `0` en los once archivos. Lo fijan `constitucion.test.mjs:804` y `:816` |
-| 0.4 | `plantilla/.prettierignore:32` (`.projects/`), `:35` (`.cursor/rules/00-marco.mdc`), `:49-50` (los artefactos del CLI de OpenSpec, por el mismo motivo). El arranque renderiza el artefacto al nacer (`herramientas/projects-init.mjs:3836-3839`), y la medición de `pnpm format:check` sobre un repo recién nacido está anotada en el mismo archivo (`:43-44`). `prettier` no se volvió a correr en esta auditoría: no está instalado en el árbol del marco, e instalarlo sería una dependencia nueva |
+| 0.1 | En `actions/constitucion/canonico/`: `max-turns 5` (`70-agentes-modelos.md:33`), `$10/$50 vs $3/$15 por MTok` (`:38-39`), `devDeps → runtime → auth` (`40-fronteras.md:75`), lección repetida **3 veces** (`50-seguridad-observabilidad.md:40`), y el `Closes` con su fecha, 2026-08-13, cazado en review (`80-github.md:27-32`). El ejecutor del bot: `plantilla/.github/workflows/claude.yml:251-253` (`--model sonnet --effort medium --max-turns 5`). El número del issue de origen del orden de riesgo **no** se copió a propósito: era de un repositorio ajeno a Projects |
+| 0.2 | `el-proyecto-no-edita-el-marco` en `actions/constitucion/canonico/00-preambulo.md:26-31`, con sus dos caminos (parámetro que falta o change en Projects). El guardrail de deltas en `actions/constitucion/canonico/10-openspec.md:33-49`. **La premisa cambió**: el canónico ya no lo llama hueco, dice que el guardrail **caza** los dos casos y nombra el límite que sí queda (el archive cuenta operaciones declaradas); lo fija `actions/constitucion/pruebas/regresiones-auditoria.test.mjs:820` |
+| 0.3 | Las tres reglas con id: `40-fronteras.md:96` (`escalar-modelo-exige-ok-previo`), `:105` (`config-de-repo-u-organizacion-exige-ok-previo`), `:114` (`apartarse-de-la-infra-base-exige-preguntar-antes`). El texto viejo que había que reemplazar: `grep -rc "cuando la tarea lo paga" actions/constitucion/canonico/` → `0` en los once archivos. Lo fijan `constitucion.test.mjs:806` y `:818` |
+| 0.4 | `plantilla/.prettierignore:32` (`.projects/`), `:35` (`.cursor/rules/00-marco.mdc`), `:49-50` (los artefactos del CLI de OpenSpec, por el mismo motivo). El arranque renderiza el artefacto al nacer (`herramientas/projects-init.mjs:3949-3952`), y la medición de `pnpm format:check` sobre un repo recién nacido está anotada en el mismo archivo (`:43-44`). `prettier` no se volvió a correr en esta auditoría: no está instalado en el árbol del marco, e instalarlo sería una dependencia nueva |
 | 0.5 | Ya tildada. `* text=auto eol=lf` en `plantilla/.gitattributes:24` y en `.gitattributes:23` |
-| 0.6 | `"presupuesto_lineas": 700` en `actions/constitucion/canonico/manifiesto.json:3`, verificado en `actions/constitucion/constitucion.mjs:277-283`. El rojo al excederlo: `constitucion.test.mjs:766` (presupuesto 3). Medido hoy con `leerCanonico`: **697 de 700** |
-| 1.1 | Los ocho casos del delta, en `actions/constitucion/pruebas/constitucion.test.mjs`: ausente (`:165`, `:176`), atrasado en ventana (`:189`) y el mismo día sin ventana (`:726`), editado a mano (`:384`), no cargado (`:426`, `:455`), referencia dentro de un bloque de código (`:444`), desvío válido (`:511`), desvío huérfano (`:580`), fin de línea y formateador (`:609`, `:621`). Corren en el CI de Projects: job `pruebas_actions`, `.github/workflows/ci.yml:142` y `:156`. Hoy: `node --test actions/constitucion/pruebas/*.test.mjs` → **234 pass, 0 fail** |
+| 0.6 | `"presupuesto_lineas"` en `actions/constitucion/canonico/manifiesto.json:3` —700 al escribir esta fila; 738 desde `el-canonico-dice-como-se-trabaja`, con su nota—, verificado en `actions/constitucion/constitucion.mjs:280-286`. El rojo al excederlo: `constitucion.test.mjs:768` (presupuesto 3). Medido el 2026-09-17 con `leerCanonico`: **697 de 700**; el 2026-09-18, **733 de 738** |
+| 1.1 | Los ocho casos del delta, en `actions/constitucion/pruebas/constitucion.test.mjs`: ausente (`:165`, `:176`), atrasado en ventana (`:189`) y el mismo día sin ventana (`:728`), editado a mano (`:384`), no cargado (`:426`, `:455`), referencia dentro de un bloque de código (`:444`), desvío válido (`:511`), desvío huérfano (`:580`), fin de línea y formateador (`:609`, `:621`). Corren en el CI de Projects: job `pruebas_actions`, `.github/workflows/ci.yml:142` y `:156`. Hoy: `node --test actions/constitucion/pruebas/*.test.mjs` → **234 pass, 0 fail** |
 | 1.2 | Ya tildada. `git ls-files .claude \| wc -l` → `6` |
-| 2.1 | `git ls-files actions/constitucion/canonico \| wc -l` → `11`, y el script se corre desde `${GITHUB_ACTION_PATH}` (`actions/constitucion/action.yml:293`). La action no tiene ningún input de token, y el job del andamio que la invoca pide solo `contents: read` (`plantilla/.github/workflows/ci.yml:104-105`) |
-| 2.2 | `leerCanonico` sobre el canónico real → **86 ids, 86 únicos**, cero problemas. El formato de versión lo valida `constitucion.test.mjs:743` (sin versiones, fechas mal o desordenado es inválido). La marca `urgente` **se retiró** con el piso de 28 días (1.6.0) y hoy no cambia nada: `constitucion.test.mjs:711` |
-| 2.3 | Cabecera `<!-- projects:constitucion version=… sha=… superficie=… -->` en `constitucion.mjs:735`. Render del canónico real sin llaves: `constitucion.test.mjs:785`. Sobre el repositorio de juguete: `grep -cE "\{\{[A-Z0-9_]+\}\}"` → `0` en las dos superficies. El hallazgo `desvio-con-marcadores` (`constitucion.mjs:1113`) y su banco (`regresiones-auditoria.test.mjs:620`, `:648`) |
+| 2.1 | `git ls-files actions/constitucion/canonico \| wc -l` → `11`, y el script se corre desde `${GITHUB_ACTION_PATH}` (`actions/constitucion/action.yml:299`). La action no tiene ningún input de token, y el job del andamio que la invoca pide solo `contents: read` (`plantilla/.github/workflows/ci.yml:104-105`) |
+| 2.2 | `leerCanonico` sobre el canónico real → **86 ids, 86 únicos**, cero problemas. El formato de versión lo valida `constitucion.test.mjs:745` (sin versiones, fechas mal o desordenado es inválido). La marca `urgente` **se retiró** con el piso de 28 días (1.6.0) y hoy no cambia nada: `constitucion.test.mjs:713` |
+| 2.3 | Cabecera `<!-- projects:constitucion version=… sha=… superficie=… -->` en `constitucion.mjs:739`. Render del canónico real sin llaves: `constitucion.test.mjs:787`. Sobre el repositorio de juguete: `grep -cE "\{\{[A-Z0-9_]+\}\}"` → `0` en las dos superficies. El hallazgo `desvio-con-marcadores` (`constitucion.mjs:1116`) y su banco (`regresiones-auditoria.test.mjs:620`, `:648`) |
 | 2.4 | Medido en el repositorio de juguete, con un desvío declarado sobre `dev-no-contacta-usuarios`: modo escribir → `exit 0`; `rm -rf .projects .cursor` y otra vez modo escribir → `exit 0`, `.projects-desvios.json` sigue en la raíz y el artefacto regenerado vuelve a traer el desvío (1 bloque «DESVÍO DECLARADO»); modo verificar → `exit 0`, 0 `::error::` |
 | 2.5 | En el repositorio de juguete, el modo escribir emite `.projects/AGENTS-marco.md` y `.cursor/rules/00-marco.mdc`, con la misma versión y el mismo sha en la cabecera (`version=1.7.0 sha=22d439df187b`). Las dos salidas comparadas por contenido: `constitucion.test.mjs:488`. El emisor de Cursor no se recortó |
 | 2.6 | En el artefacto del repositorio de juguete, la regla está en la línea 350, el desvío en la **359** y la regla siguiente en la 363: pegado, no al final. El motivo se reimprime como `::notice::desvio vigente sobre dev-no-contacta-usuarios …` en la corrida de verificar. Bancos: `constitucion.test.mjs:511` y `:534` |
 | 3.1 | Job `constitucion` en `plantilla/.github/workflows/ci.yml:89`, **sin `if` de solo-docs** (`:81-83` dice por qué), que invoca la action en `modo: verificar` (`:115-117`) y cuelga del veredicto: `needs` en `:594`, `if: always()` en `:595` y el resultado consultado en `:615` |
 | 3.2 | `constitucion.test.mjs:609` (CRLF no es divergencia), `:621` (espacios finales y saltos de más), `:632` (qué deja `normalizar`). Fuera del formateador: fila 0.4 |
-| 3.3 | Hallazgo `desvio-muerto` en `constitucion.mjs:902`; `constitucion.test.mjs:580` (rojo con el motivo que tenía escrito) y `:598` (un desvío muerto no se imprime) |
-| 3.4 | **Reescrita.** El piso se retiró en la 1.6.0 (`CHANGELOG.md:2524`); la política retirada y el mecanismo que queda están en `constitucion.mjs:111-124`. Lo que el CI de Projects rechaza hoy: exigibilidad anterior a la publicación (`constitucion.test.mjs:701`), manifiesto inválido (`:743`), presupuesto excedido (`:766`), y el manifiesto real validado entero (`:777`). Cero días es lo normal: `:692` |
+| 3.3 | Hallazgo `desvio-muerto` en `constitucion.mjs:906`; `constitucion.test.mjs:580` (rojo con el motivo que tenía escrito) y `:598` (un desvío muerto no se imprime) |
+| 3.4 | **Reescrita.** El piso se retiró en la 1.6.0 (`CHANGELOG.md:2524`); la política retirada y el mecanismo que queda están en `constitucion.mjs:111-127`. Lo que el CI de Projects rechaza hoy: exigibilidad anterior a la publicación (`constitucion.test.mjs:703`), manifiesto inválido (`:745`), presupuesto excedido (`:768`), y el manifiesto real validado entero (`:779`). Cero días es lo normal: `:694` |
 | 3.5 | `permissions: contents: read` declarado por job en `plantilla/.github/workflows/ci.yml:104-105` (con el porqué en `:100-103`) y en `.github/workflows/marco-ci.yml:3883-3884`. Acción por acción: `actions/checkout` → `contents: read`; `actions/setup-node` → ninguno; `actions/constitucion` → ninguno (lee el árbol, no llama a la API: `actions/constitucion/action.yml:7-15`); `actions/upload-artifact` → ninguno del `GITHUB_TOKEN` (usa la credencial de runtime del runner). Que todo job declare sus permisos lo exige `pruebas/andamio/permisos-por-job.test.mjs` sobre los dos árboles |
-| 3.6 | Job `constitucion-cableada` en `.github/workflows/marco-ci.yml:3871`, con `modo: cableado` en `:3900`, que **parsea** el YAML (`actions/constitucion/cableado.mjs`). Bancos: `cableado.test.mjs` (38 pass), `refutaciones-ronda-3.test.mjs` (43 pass) y `refutaciones-ronda-4.test.mjs` (43 pass). El residuo que la tarea declara —lo que el `run:` hace con el valor ya leído— sigue declarado, ahora como 🟠 modo aviso: `actions/constitucion/action.yml:95-117` y la fila 15 de `docs/11-reglas-no-escritas.md` |
-| 3.7 | `artefacto-sello-incoherente` (`constitucion.mjs:1242`) y `artefacto-adelantado` (`:1250`, `:1263`). Bancos: `constitucion.test.mjs:221` (versión subida a mano con el sello de esta copia: rojo), `:253` (dos refs distintas: aviso), `:291` (escritor en la ref del verificador: rojo, se escriba como se escriba), `:318` |
+| 3.6 | Job `constitucion-cableada` en `.github/workflows/marco-ci.yml:3871`, con `modo: cableado` en `:3900`, que **parsea** el YAML (`actions/constitucion/cableado.mjs`). Bancos: `cableado.test.mjs` (38 pass), `refutaciones-ronda-3.test.mjs` (43 pass) y `refutaciones-ronda-4.test.mjs` (43 pass). El residuo que la tarea declara —lo que el `run:` hace con el valor ya leído— sigue declarado, ahora como 🟠 modo aviso: `actions/constitucion/action.yml:99-121` y la fila 15 de `docs/11-reglas-no-escritas.md` |
+| 3.7 | `artefacto-sello-incoherente` (`constitucion.mjs:1245`) y `artefacto-adelantado` (`:1253`, `:1266`). Bancos: `constitucion.test.mjs:221` (versión subida a mano con el sello de esta copia: rojo), `:253` (dos refs distintas: aviso), `:291` (escritor en la ref del verificador: rojo, se escriba como se escriba), `:318` |
 | 3.8 | Los dos caminos: el marco corre la compuerta por ruta local (`.github/workflows/ci.yml:834-845`, `uses: ./actions/constitucion`) y el consumidor la hereda por `marco-ci.yml` con la ref publicada; el veredicto cobra el salteo y solo lo acepta en el distribuidor (`.github/workflows/marco-ci.yml:4208`). `git ls-tree v1.9.6 actions/constitucion/` → trae `action.yml`. Las pruebas que resuelven las referencias propias contra la base de objetos de git: `refutaciones-ronda-3.test.mjs:648` y `:695`; la que corre el comando exacto del paso sobre este árbol: `:719`. **Límite**: esas pruebas miran los workflows de `.github/workflows`, no las refs del andamio; llevarlas a `plantilla/` y volverlas fail-closed es de otro change del porte de Rigel (`las-actions-publicadas-resuelven-y-se-documentan`) |
 | 4.1 | Paso `Permisos del agente sin escritura`, `.github/workflows/marco-ci.yml:3149`. Medido con su programa inline extraído del YAML: `Bash(git push *)` sin desvío → `exit 1` con `::error … Permiso de escritura sin desvio declarado`; la misma entrada con un desvío de permiso con motivo, aprobador y fecha → `exit 0`. Banco: `pruebas/marco-ci/permisos-compuerta.test.mjs` |
-| 4.2 | El piso vive una sola vez, en `actions/constitucion/canonico/manifiesto.json:4-35`, y lo mide `actions/constitucion`. Bancos en `regresiones-auditoria.test.mjs`: se mide contra el allowlist y no contra una copia (`:374`), mutar el canónico mueve el veredicto (`:387`), allowlist ausente no se declara sano (`:435`), sale como aviso y jamás como rojo (`:450`), el relleno no cubre (`:678`), la propiedad se busca dentro de una entrada (`:697`) |
+| 4.2 | El piso vive una sola vez, en `actions/constitucion/canonico/manifiesto.json:5-36`, y lo mide `actions/constitucion`. Bancos en `regresiones-auditoria.test.mjs`: se mide contra el allowlist y no contra una copia (`:374`), mutar el canónico mueve el veredicto (`:387`), allowlist ausente no se declara sano (`:435`), sale como aviso y jamás como rojo (`:450`), el relleno no cubre (`:678`), la propiedad se busca dentro de una entrada (`:697`) |
 | 4.3 | `.github/workflows/marco-ci.yml:3236-3237`. Medido con el paso entero (bash más node) sobre un consumidor de juguete sin `.claude/settings.json` rastreado → `exit 0` con `::warning file=.claude/settings.json::este repo no rastrea .claude/settings.json …` |
 | 4.4 | `grep -c "name: Ejecutores de paquetes pinados" .github/workflows/marco-ci.yml` → `1` (`:1956`). La nota que apunta al vecino, dentro del paso de permisos: `.github/workflows/marco-ci.yml:3104-3108` |
 | 4.5 | El recorte, en `.github/workflows/marco-ci.yml:3553`. Bancos: `regresiones-auditoria.test.mjs:766`, `:781` y `:794`. **Mutación corrida hoy**: sacando el `replace` de esa línea, fallan `:766` y `:781`; con el archivo restaurado, `git diff --stat` vacío |
-| 5.1 | `wc -l plantilla/AGENTS.md` → **199** (era 355), con el import en `:17`. La precedencia, en prosa y en el canónico: `actions/constitucion/canonico/00-preambulo.md:17-24`. Las reglas que la copia con pérdidas había perdido, fijadas en `constitucion.test.mjs:826` |
+| 5.1 | `wc -l plantilla/AGENTS.md` → **199** (era 355), con el import en `:17`. La precedencia, en prosa y en el canónico: `actions/constitucion/canonico/00-preambulo.md:17-24`. Las reglas que la copia con pérdidas había perdido, fijadas en `constitucion.test.mjs:828` |
 | 5.2 | `plantilla/.github/workflows/actualizar-marco.yml`: `schedule` semanal y `workflow_dispatch` (`:88-91`), `contents: write` y `pull-requests: write` solo en su job (`:113-115`), la action en `modo: escribir` (`:173-176`), rama propia (`:124`) y `push` a esa rama, nunca a `main` (`:215`). La corrida en un repositorio recién creado está anotada en `:248-251`. Validado como código por los bancos que recorren `plantilla/.github/workflows` (`pruebas/andamio/permisos-por-job.test.mjs`, `pruebas/andamio/techo-de-tiempo.test.mjs`). **Su límite está declarado en el propio archivo** (`:14-32`): ante una versión nueva es un no-op, porque corre con el pin viejo. Eso no es esta tarea, es el ADR 005 |
 | 5.4 | `CHANGELOG.md:3776-3812`, sección «Para consumidores» de la 1.3.0: los pasos obligatorios (seis, uno más que los que pedía la tarea: cablear el job), el estreno y qué pasa si no se hace nada |
 | 7.1 | La 1.3.0 es MINOR (`CHANGELOG.md:2976`) y trae el mecanismo (`:3447`). Las cuatro versiones del canónico con `exigible_desde` igual a `publicada`, medido con `node -e` sobre `manifiesto.json`: `1.3.0`, `1.4.2`, `1.6.0`, `1.7.0` → las cuatro `IGUAL` |
-| 7.2 | `AGENTS.md:144-163` («Versionado»: `v1` dejó de ser el canal el 2026-08-21 y sobrevive en una sola línea). El andamio pina exacto: `plantilla/.github/workflows/ci.yml:50` y `:115`, `plantilla/.github/workflows/actualizar-marco.yml:174`, los tres en `@v1.9.6`. La única invocación con `@v1` hoy es `.github/workflows/marco-ci.yml:990` (`guardrail-deltas`), y lo fija `pruebas/andamio/pinado.test.mjs:203` y `:268` |
-| 7.5 | `docs/11-reglas-no-escritas.md:659-664` (la regla entra a «Lo que YA es automático») y `:666-701` (los cuatro huecos, declarados como deuda) |
+| 7.2 | `AGENTS.md:146-165` («Versionado»: `v1` dejó de ser el canal el 2026-08-21 y sobrevive en una sola línea). El andamio pina exacto: `plantilla/.github/workflows/ci.yml:50` y `:115`, `plantilla/.github/workflows/actualizar-marco.yml:174`, los tres en `@v1.9.6`. La única invocación con `@v1` hoy es `.github/workflows/marco-ci.yml:990` (`guardrail-deltas`), y lo fija `pruebas/andamio/pinado.test.mjs:203` y `:268` |
+| 7.5 | `docs/11-reglas-no-escritas.md:665-670` (la regla entra a «Lo que YA es automático») y `:672-707` (los cuatro huecos, declarados como deuda) |
 
 ### No aplica (5), declarado
 
@@ -664,3 +677,20 @@ en la tarea misma con dónde vive hoy.
 | 5.3 | El artifact `constitucion-al-dia` sale **vacío**: `upload-artifact` excluye los ocultos desde su v4.4 y las tres rutas empiezan con punto. Lo porta el change `el-marco-deja-de-afirmar-lo-que-no-hace` (`include-hidden-files: true` e `if-no-files-found: error` en el andamio), que se trabaja en paralelo. No se arregla acá para no editar dos veces las mismas líneas del andamio |
 | 7.3 | Medir a los tres consumidores reales en `@v1.9.6`: su veredicto agregado en verde en la rama por defecto, con el job `constitucion` en `success`. Esta auditoría no lee repositorios consumidores; se hace en la pasada de cierre, solo lectura |
 | 7.4 | El archive, que espera la aprobación del PO sobre el delta corregido de `gobierno-contribucion`, la revisión adversarial registrada y la 5.3. La ampliación del `Purpose` que la tarea pide sigue haciendo falta en Projects |
+
+### De la revisión adversarial del carril (2026-09-18)
+
+- [x] **RV-L4-01** Las citas por línea de esta auditoría, rehechas contra el árbol final
+      (ver «Rehecha el 2026-09-18», arriba), y las del `design.md` que citan este
+      repositorio (`constitucion.mjs`, `constitucion.test.mjs`, `projects-init.mjs`). Las
+      de `design.md` que citan el `AGENTS.md` o el `README.md` de los repositorios de
+      origen no se tocaron: son de otro árbol.
+- [ ] **Que una cita por línea que se corre deje de pasar en verde.** El requirement vivo
+      «La evidencia que cita un change vive donde el change dice» (`calidad-codigo`) lo
+      pide, y su comprobación mira que el archivo exista, no que la línea siga siendo la
+      citada: esta auditoría quedó con 22 de 30 citas corridas y todo verde. **Motivo:** un
+      check que ponga rojo la cita que cae en una línea vacía o en puntuación sola cazaría
+      la mayoría, pero recorre las citas de todos los changes activos —incluidos los de
+      otros carriles del porte— y las históricas («corrido sobre el árbol sin tocar»)
+      apuntan a propósito a líneas que ya no existen. Se decide en la pasada final, con los
+      carriles integrados.
