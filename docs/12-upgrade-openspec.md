@@ -66,15 +66,25 @@ esté **ausente** ya no depende de que nadie se acuerde.
 Para saber qué versión está pineada hoy, sin adivinar. Desde la raíz del clon del
 marco:
 
+<!-- projects:comando pin-de-openspec -->
 ```bash
 awk '/^      version_openspec:/{f=1} f && /default:/{print; exit}' .github/workflows/marco-ci.yml
 ```
 
 **Verificación del comando:** tiene que imprimir **una** línea `default: "X.Y.Z"`
 con un número de verdad. Si imprime vacío, no estás parado en el checkout del
-marco. Es el mismo comando que usan las skills `projects-adoptar` y
-`projects-archive-change`, a propósito: dos formas distintas de buscar el mismo pin
-son dos formas de que una envejezca.
+marco. Es el mismo comando que usa la skill `projects-adoptar`, a propósito: dos
+formas distintas de buscar el mismo pin son dos formas de que una envejezca. Y ya
+no depende de que alguien lo mire: el comentario `projects:comando pin-de-openspec`
+que va encima marca el bloque en las dos, y
+[`herramientas/comandos-compartidos.mjs`](../herramientas/comandos-compartidos.mjs)
+pone rojo el banco del marco si difieren en un solo carácter.
+
+Esta página decía que el comando lo usaban **dos** skills, y la segunda
+—`projects-archive-change`— hace rato que lee el pin con
+`aplicar-deltas.mjs --pin-openspec`, que da error en vez de imprimir vacío. Nadie
+comparaba los dos textos, así que nadie lo vio: es exactamente la divergencia que
+esa herramienta existe para cazar.
 
 `awk` no viene con Windows nativo. Esta forma corre igual en las tres —`node` es el
 mismo programa en todas, y la guía de arranque ya lo declara así— e imprime **solo

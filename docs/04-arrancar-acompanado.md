@@ -1178,6 +1178,16 @@ que la pantalla no te haya mostrado ya. Por eso se puede mandar sin leerla enter
 imprime en vivo con su barra de progreso. Si el rojo fue de uno de ellos,
 copiala de tu terminal: el archivo te dice cuál de los pasos la produjo.
 
+**Y al lado queda otro archivo, más corto: `registro-de-friccion.md`.** No es la
+pantalla entera: es solo lo que la corrida **tuvo que rodear** —una comprobación que
+no pudo hacer, una pregunta que hubo que contestar dos veces—, y la herramienta lo
+deja **siempre** que termina bien, también cuando no rodeó nada, justo antes de la
+línea `LISTO`. No lleva el nombre de tu proyecto ni el de tu cuenta, porque su lugar
+es el repositorio del marco: la herramienta te **ofrece** mandarlo ahí y solo lo hace
+si escribís `si`. Si no, a tu proyecto no le pasa nada, y queda impreso el comando
+para mandarlo otro día. Mandarlo es lo que le avisa al marco dónde se traba la gente,
+sin que nadie tenga que acordarse de contarlo.
+
 ---
 
 ## Si algo no coincide con lo que dice acá

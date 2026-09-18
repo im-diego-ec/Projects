@@ -471,6 +471,15 @@ sin `pnpm-lock.yaml`, corré `corepack pnpm install` y guardá ese archivo.
   lista logins en vez de contar contra una cifra escrita y remite al control automático. Para
   consumidores: nada.
 
+- **`plantilla/.gitignore` ignora `registro-de-friccion.md` y `.projects-friccion.json`.** Los
+  deja `projects init` en la raíz del proyecto y son de esa corrida, no del proyecto; sin la
+  línea, la puerta web —que copia el proyecto armado y hace `git add -A`— guardaba el registro
+  en el repositorio de la persona. Para consumidores: llega a los proyectos nuevos; uno
+  existente no tiene esos archivos y no necesita la línea.
+- **La plantilla del registro de fricción dice qué parte ya no se llena a mano** (la que ve la
+  herramienta) y cuál sí (el reloj, los ajustes de GitHub, el primer change); `docs/05`,
+  `docs/04` y el índice de `docs/` lo dicen también. Para consumidores: nada.
+
 ### Eliminado
 
 - **El andamio ya no trae su propia copia del paso «Formato y validez de las raices de
@@ -863,6 +872,11 @@ sin `pnpm-lock.yaml`, corré `corepack pnpm install` y guardá ese archivo.
   mal llenado (medido el 2026-09-18). Ahora saca por bytes cualquiera de las tres BOM de
   Windows; un JSON roto sigue fallando con su error. `docs/05` deja de decir que 5.1 rompe ese
   paso. Viene de Rigel 1.14.0 (commit d7e5e63). Para consumidores: nada.
+
+- **`docs/12-upgrade-openspec.md` ya no afirma que la skill `projects-archive-change` lee el
+  pin de OpenSpec con su mismo comando**: hace rato que lo lee con `aplicar-deltas.mjs
+  --pin-openspec`. Nadie comparaba los dos textos; ahora el par que sí comparte el comando
+  (con `projects-adoptar`) tiene compuerta. Para consumidores: nada.
 
 ### Añadido
 
@@ -1698,6 +1712,37 @@ sin `pnpm-lock.yaml`, corré `corepack pnpm install` y guardá ese archivo.
   declara, con su fila en el backlog; `pruebas/docs/grep-y-tildes.test.mjs` mide la
   afirmación para que no envejezca. Viene de Rigel 2.5.0 (commit 89e89c7), corregida: el cero
   falso depende del locale. Para consumidores: nada.
+
+- **`projects init` no dice `LISTO` sin dejar su registro de fricción.** Al terminar bien, y
+  antes de la línea `LISTO`, escribe `registro-de-friccion.md` en la raíz del proyecto —al lado
+  de la bitácora— con lo que la corrida tuvo que rodear: cada `::warning::` que emitió al
+  seguir por el camino conservador (entra solo, sin que nadie lo anote) y cada respuesta del
+  asistente que se rechazó o hizo volver atrás (sin lo que la persona escribió, y aunque el
+  asistente y el arranque corran en dos procesos, como los corren los lanzadores). Seis clases
+  cerradas —las cinco de Rigel más `PREGUNTA`—, cada apartamiento con su punto exacto; sin
+  apartamientos, lo dice en vez de no existir, y con ellos la pantalla dice que no es un éxito
+  limpio. No lleva el nombre del proyecto, la cuenta ni rutas de la máquina. Hasta ahora el
+  registro era una plantilla que había que acordarse de llenar, y su única instancia era de
+  otra organización; en su primera corrida encontró dos defectos que nadie había visto (la
+  protección de `main` se mide antes de que el repositorio exista en el camino del doble clic,
+  y el aviso del tipo de cuenta culpa a una sesión de `gh` que sí está abierta). Viene de
+  Rigel 1.14.0 (change `2026-09-01-arranque-ejecutable`, commit 8b24629), adaptado: allá lo
+  abre una skill paralela a la guía; acá lo deja la herramienta que ya ejecuta el arranque.
+  Para consumidores: nada; es de la herramienta de arranque, que no corre en su pipeline.
+- **El registro se ofrece al marco y se manda solo con un `si`.** Con terminal, la
+  herramienta propone abrirlo como issue en el repositorio del marco del que salió el clon (un
+  fork lo manda a su fork); Enter es «no», y sin terminal no llama a `gh`. Si no se manda,
+  queda impreso `gh issue create … --body-file <ruta>` para hacerlo después; un envío que falla
+  es `::warning::` con ese comando. Rigel sale 1 si no puede abrirlo: acá el proyecto ya está
+  armado, y un rojo mandaría a reabrir el lanzador contra un destino ocupado. Para
+  consumidores: nada.
+- **`herramientas/comandos-compartidos.mjs`: el comando que una guía y una skill dicen
+  compartir se escribe igual en las dos.** Compara byte a byte los bloques marcados con
+  `<!-- projects:comando <id> -->` (el fin de línea no cuenta; sin marcas, un lado ausente o
+  una marca sin bloque es rojo), sobre el único par real de hoy: `docs/12-upgrade-openspec.md`
+  y la skill `projects-adoptar`, que leen el pin de OpenSpec con el mismo comando. El banco del
+  marco lo corre en cada PR. Viene de Rigel 1.14.0 (commits 4565182, d7e5e63 y 6e9574f). Para
+  consumidores: nada.
 
 ### Corregido
 

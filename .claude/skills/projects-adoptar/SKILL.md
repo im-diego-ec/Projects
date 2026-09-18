@@ -249,9 +249,14 @@ Averigua el pin **desde un checkout del marco** — no esta escrito en el repo
 consumidor: vive en el `default` del input `version_openspec` del workflow
 reusable, y el consumidor lo hereda sin repetirlo.
 
+<!-- projects:comando pin-de-openspec -->
 ```bash
 awk '/^      version_openspec:/{f=1} f && /default:/{print; exit}' .github/workflows/marco-ci.yml
 ```
+
+Es el mismo comando que `docs/12-upgrade-openspec.md`, byte a byte: el comentario de
+arriba lo marca en los dos, y `herramientas/comandos-compartidos.mjs` pone rojo el banco
+del marco si difieren. Si hay que cambiarlo, se cambia en los dos en el mismo PR.
 
 **Verificacion:** imprime una linea `default: "X.Y.Z"` con un numero de verdad
 (al 2026-08-19, `default: "1.9.0"`). Si imprime vacio, no estas en el checkout

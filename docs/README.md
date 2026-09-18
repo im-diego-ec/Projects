@@ -105,7 +105,7 @@ copian a otro repositorio cuando hacen falta.
 | [adopciones/](adopciones/) | Un archivo fechado por adopción: dónde se trabó de verdad quien arrancó un proyecto siguiendo la guía. Hoy: [2026-08-24-supply-chain.md](adopciones/2026-08-24-supply-chain.md) | **Histórico** — cada archivo es el registro de una corrida y no se edita después; lo que se corrige con ellos es [05-arrancar-tecnico.md](05-arrancar-tecnico.md) |
 | [plantillas/postmortem.md](plantillas/postmortem.md) | Convención y plantilla de post-mortem | **Scaffold** — no viaja en `plantilla/`: se copia al proyecto cuando hace falta el primer post-mortem, y desde ahí es del proyecto |
 | [plantillas/runbook.md](plantillas/runbook.md) | Convención y plantilla de runbook | **Scaffold** — igual: se copia con el primer runbook, no al crear el repo |
-| [plantillas/registro-de-friccion.md](plantillas/registro-de-friccion.md) | Con qué se anota dónde se traba alguien que arranca un proyecto, mientras lo arranca; el resultado se guarda en `docs/adopciones/` de este repo | **Canónico** — la plantilla se queda acá (corrige la guía del marco, no el repo del proyecto); cada adopción deja su archivo fechado en `adopciones/` |
+| [plantillas/registro-de-friccion.md](plantillas/registro-de-friccion.md) | Con qué se anota dónde se traba alguien que arranca un proyecto, mientras lo arranca; el resultado se guarda en `docs/adopciones/` de este repo. La parte que ve la herramienta de arranque ya no se anota a mano: la deja ella en `registro-de-friccion.md` al terminar, y ofrece mandarla a este repositorio | **Canónico** — la plantilla se queda acá (corrige la guía del marco, no el repo del proyecto); cada adopción deja su archivo fechado en `adopciones/` |
 
 ## Lo que se lee acá y vive en otra carpeta
 

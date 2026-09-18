@@ -945,6 +945,13 @@ trabó, la corrección va en el mismo PR que la arregla.
 [registro de fricción](plantillas/registro-de-friccion.md) *mientras* corrés esta
 guía, no después. Se guarda en `docs/adopciones/AAAA-MM-DD-<proyecto>.md`.
 
+**La parte de las fases 2 y 3 ya la escribe la herramienta.** Al terminar,
+`projects init` deja `registro-de-friccion.md` en la raíz del proyecto —antes de
+`LISTO`, y también cuando no hubo nada que rodear— con cada `::warning::` de la corrida
+y cada pregunta del asistente rechazada, y ofrece mandarlo como issue al repositorio del
+marco. Lo que sigue siendo a mano es lo que la herramienta no ve: el reloj, las fases 0
+y 1, de la 4 en adelante, y cualquier comando de esta guía que hayas tenido que cambiar.
+
 Sus dos reglas de uso, acá también porque son las que se rompen: **no arregles la
 guía mientras la corrés** —arreglar sobre la marcha te deja un documento que
 funciona para vos y para nadie más, y borra el dato que vinimos a buscar— y **un

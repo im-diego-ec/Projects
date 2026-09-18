@@ -152,8 +152,9 @@ const esSi = (r) => /^(s|si|sí|y|yes)$/i.test(String(r ?? "").trim());
 
 /** Si gh tiene una sesion abierta. Primero `gh api user`, que es un DATO igual en
  *  toda version; si no contesta (sin red), `gh auth status`, leyendo el codigo y
- *  el texto con el MISMO patron que usa el comprobador del Paso 0. */
-function haySesion(correr) {
+ *  el texto con el MISMO patron que usa el comprobador del Paso 0. La usa tambien
+ *  el registro de friccion, para ofrecer mandarlo al marco con la misma regla. */
+export function haySesion(correr) {
   const login = correr(["api", "user", "--jq", ".login"], TIMEOUT_DE_CONSULTA);
   if (bien(login) && FORMA_DE_CUENTA.test(login.stdout.trim())) return true;
   const estado = correr(["auth", "status"], TIMEOUT_DE_CONSULTA);

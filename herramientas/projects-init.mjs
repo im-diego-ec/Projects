@@ -670,17 +670,7 @@ export function abrirBitacora(consola = console) {
  *  (para saber si el defecto ya esta arreglado) y las banderas (para saber si
  *  faltaba una). */
 export function encabezadoDeBitacora(argv, ahora) {
-  const version = (() => {
-    try {
-      return execFileSync("git", ["rev-parse", "--short", "HEAD"], {
-        cwd: ESTE_DIRECTORIO,
-        encoding: "utf-8",
-        stdio: ["ignore", "pipe", "ignore"],
-      }).trim();
-    } catch {
-      return "desconocida (esto no es un clon de git)";
-    }
-  })();
+  const version = versionDelMarco();
   return [
     "BITACORA DEL ARRANQUE",
     "",
@@ -701,6 +691,20 @@ export function encabezadoDeBitacora(argv, ahora) {
     "─".repeat(72),
     "",
   ];
+}
+
+/** La version del marco desde la que corre esta herramienta: el commit del clon. La
+ *  escriben la bitacora y el registro de friccion, y por eso vive en un solo lugar. */
+export function versionDelMarco() {
+  try {
+    return execFileSync("git", ["rev-parse", "--short", "HEAD"], {
+      cwd: ESTE_DIRECTORIO,
+      encoding: "utf-8",
+      stdio: ["ignore", "pipe", "ignore"],
+    }).trim();
+  } catch {
+    return "desconocida (esto no es un clon de git)";
+  }
 }
 
 /** Donde va la bitacora, que NO es el mismo lugar segun como haya salido.
@@ -3770,7 +3774,42 @@ function preguntarEnLaTerminal(texto) {
   });
 }
 
+/** LA CORRIDA, ENVUELTA POR SU REGISTRO DE FRICCION.
+ *
+ *  El registro se abre ANTES de todo y mira la consola hasta el final: cada
+ *  `::warning::` de la corrida --cada vez que esta herramienta siguio por el camino
+ *  conservador-- entra solo, sin una llamada al lado de cada aviso que alguien
+ *  tenga que acordarse de escribir. Ver herramientas/registro-de-friccion.mjs.
+ *  Se suelta en el `finally`: un banco que la importe no puede quedarse con la
+ *  consola tocada, igual que con la bitacora.
+ *
+ *  EL MODULO SE CARGA CUANDO HACE FALTA, como projects-repositorio y registro-npm,
+ *  y por el mismo motivo: esta herramienta tiene que poder correr copiada sola
+ *  fuera de su arbol (hay bancos que lo hacen). Medido: con un import estatico,
+ *  un modulo que no esta al lado mata el proceso ANTES de la primera linea, sin
+ *  `::error::` y sin bitacora. Si falta, la corrida sigue y lo dice fuerte al
+ *  final, donde iba el registro. */
 async function main(argv) {
+  let modulo = null;
+  let porQueNo = null;
+  try {
+    modulo = await import("./registro-de-friccion.mjs");
+  } catch (e) {
+    porQueNo = e?.message ?? String(e);
+  }
+  const friccion = modulo
+    ? modulo.crearRegistro({ fase: "el comienzo" })
+    : { fase: "", apartamientos: [], anotar() {}, enFase() {} };
+  const vigia = modulo ? modulo.vigilarAvisos(friccion) : { soltar() {} };
+  try {
+    return await correrLaHerramienta(argv, friccion, { modulo, porQueNo });
+  } finally {
+    vigia.soltar();
+  }
+}
+
+async function correrLaHerramienta(argv, friccion, registroDeFriccion) {
+  const friccionMod = registroDeFriccion.modulo;
   // ── El piso de Node, antes de tocar NADA ──
   // El aviso sale por stderr a proposito: `--ejemplo` escribe el JSON en stdout y
   // normalmente se redirige a un archivo. Una linea de aviso ahi lo corrompe.
@@ -3807,7 +3846,10 @@ async function main(argv) {
   // escribiste. Este pregunta y ESCRIBE ESE MISMO ARCHIVO — no es una segunda
   // puerta al motor, es un generador de la entrada que el motor ya acepta. Todo
   // lo que sigue mas abajo corre igual para los dos.
+  // Lo que dice el registro del camino cuando el asistente corre en ESTE proceso.
+  let caminoDelAsistente = null;
   if (o.asistente) {
+    friccion.enFase("el asistente");
     const asis = await import("./projects-asistente.mjs");
     const versiones = await import("./projects-versiones.mjs");
 
@@ -3942,6 +3984,7 @@ async function main(argv) {
         return 1;
       }
       resultado = await asis.correrAsistente(preguntarPorTeclado, previos, FORMATOS, (linea) => process.stdout.write(`${linea}\n`), { ORG_MARCO: marco });
+      for (const t of resultado.tropiezos ?? []) friccion.anotar(t);
       // EL TIPO DE CUENTA SE MIDE, NO SE PREGUNTA. Decide que forma de
       // CODEOWNERS viaja, y en una cuenta de usuario los equipos de GitHub NO
       // EXISTEN: `@cuenta/equipo` no asigna a nadie, nunca, sin decir una
@@ -4014,6 +4057,26 @@ async function main(argv) {
       // de su proyecto salia como si no hubiera ninguno.
       fs.writeFileSync(rutaDesvios, jsonParaElArchivo(rutaDesvios, { desvios: resultado.desvios }));
       process.stdout.write(`Escrito: ${rutaDesvios}  (${resultado.desvios.length} desvio(s) declarado(s))\n`);
+    }
+
+    // LO QUE EL ASISTENTE ANOTO, para el proceso del arranque. Los lanzadores
+    // corren este paso y el arranque en DOS procesos (`--solo-valores` y despues
+    // `--valores`), asi que sin este archivo lo anotado se perdia aca. Vive al
+    // lado de los otros tres, lo ignoran el .gitignore del marco y el del
+    // andamio, y el arranque lo consume cuando deja el registro.
+    caminoDelAsistente = { reparto: asis.reparto(resultado.respuestas, REQUERIDOS) };
+    try {
+      if (!friccionMod) throw new Error(`falta herramientas/registro-de-friccion.mjs: ${registroDeFriccion.porQueNo}`);
+      friccionMod.escribirPendiente(path.dirname(path.resolve(salida)), {
+        fecha: new Date().toISOString(),
+        reparto: caminoDelAsistente.reparto,
+        apartamientos: friccion.apartamientos.filter((a) => a.punto.startsWith("el asistente")),
+      });
+    } catch (e) {
+      console.error(
+        `::warning::no pude dejar anotado lo que el asistente registro (${e.message}). El registro de friccion ` +
+          "del arranque va a salir sin las preguntas donde te trabaste; nada mas cambia.",
+      );
     }
 
     // `--solo-valores` es el gemelo interactivo de `--ejemplo`: deja el archivo
@@ -4103,6 +4166,7 @@ async function main(argv) {
   }
 
   // ── Valores ──
+  friccion.enFase("los valores y la copia");
   let crudos;
   try {
     // Con leerValores y no con JSON.parse a secas: un archivo escrito desde
@@ -4311,6 +4375,7 @@ async function main(argv) {
   // arranque sale rojo, main() vuelve con 1 y no imprime las tareas humanas —
   // pero el documento ya quedo con el estado REAL, que es justo lo que hay que
   // leer despues de un rojo. Ver el bloque de arriba para el defecto que cierra.
+  friccion.enFase("la proteccion de main");
   const proteccion = sondarProteccion({ org: valores.ORG, proyecto: valores.PROYECTO });
   const escrituraDeProteccion = escribirProteccionMedida(o.destino, { ...proteccion, org: valores.ORG, proyecto: valores.PROYECTO, forma: formaDe(valores) });
   if (!escrituraDeProteccion.ok) {
@@ -4335,12 +4400,14 @@ async function main(argv) {
   // escrito con esos equipos, y es ahora cuando hay algo concreto que contrastar.
   // Solo avisa —el arreglo es de quien administra la organizacion— y en una cuenta
   // personal no pregunta nada. Ver el bloque de clasificarEquiposDelPO.
+  friccion.enFase("los equipos del PO");
   for (const linea of lineasDeEquiposDelPO(comprobarEquiposDelPO(valores), valores).lineas) {
     if (linea.startsWith("::warning::")) console.error(linea);
     else console.log(linea);
   }
 
   // ── Las dos herramientas que el andamio no puede traer ──
+  friccion.enFase("OpenSpec y la constitucion");
   if (o.herramientas) {
     // El guard de mas arriba ya exigio que el archivo EXISTA antes de escribir
     // nada; esto cubre lo que existsSync no cubre —permisos, un directorio con
@@ -4517,6 +4584,7 @@ async function main(argv) {
   //     paso, como se arregla, y exit 1. Un rojo aca es un rojo REAL: es el
   //     mismo que daria el CI en el primer push, adelantado a la maquina donde
   //     se arregla en un minuto.
+  friccion.enFase("el arranque (instalar, formatear, verificar)");
   let arranque = null;
   // Los pasos salen del manifiesto que se acaba de escribir, no de una lista
   // fija: un sitio no tiene `datos` que generar y mandarselo lo mataba en 2/4.
@@ -4658,6 +4726,7 @@ async function main(argv) {
   //
   // El modulo se carga aca y no arriba: importa de este archivo, y un import
   // estatico en las dos direcciones evalua uno antes que el otro.
+  friccion.enFase("el repositorio");
   let repoMod = null;
   try {
     repoMod = await import("./projects-repositorio.mjs");
@@ -4695,6 +4764,27 @@ async function main(argv) {
   } else if (repoMod) {
     estadoGit = repoMod.medirRepositorio(o.destino);
   }
+
+  // ── El registro de friccion: la condicion de termino ──
+  //
+  // VA ACA, ANTES DE «LISTO», y no es un paso mas. La corrida ya termino --el
+  // repositorio incluido, que es de donde salen los ultimos avisos-- y lo que
+  // todavia no se dijo es que tuvo que rodear para llegar. Si esto fuera un paso
+  // opcional al final, se omitiria; va antes de la linea que declara el exito
+  // para que no haya LISTO sin registro. Ver dejarElRegistroDeFriccion.
+  await dejarElRegistroDeFriccion({
+    friccion,
+    registroDeFriccion,
+    argv,
+    destino: o.destino,
+    rutaDeValores: o.valores,
+    valores,
+    forma,
+    plataforma,
+    raizMarco,
+    repoMod,
+    caminoDelAsistente,
+  });
 
   // ── Lo que queda, y es humano ──
   console.log("");
@@ -4821,6 +4911,156 @@ async function main(argv) {
   console.log(`     node <clon-del-marco>/herramientas/projects-versiones.mjs --raiz ${citarRuta(o.destino)}`);
   console.log("Sin terminal (en CI) solo imprime el informe y sale 0: nunca pregunta ni escribe.");
   return 0;
+}
+
+/** Las rutas que el registro tapa, con el nombre que las reemplaza. Van las dos
+ *  formas de cada una --la escrita y la resuelta--: en macOS la carpeta temporal
+ *  cuelga de un enlace (/var -> /private/var) y un aviso puede imprimir cualquiera
+ *  de las dos. */
+function rutasQueSeTapan({ destino, dirValores, raizMarco }) {
+  const con = (ruta, como) => {
+    const salida = [];
+    if (!ruta) return salida;
+    const abs = path.resolve(ruta);
+    salida.push({ ruta: abs, como });
+    try {
+      salida.push({ ruta: fs.realpathSync(abs), como });
+    } catch {
+      // Si no se puede resolver, queda la forma escrita.
+    }
+    return salida;
+  };
+  return [
+    ...con(destino, "<destino>"),
+    ...con(dirValores, "<carpeta-de-valores>"),
+    ...con(raizMarco, "<clon-del-marco>"),
+    ...con(os.tmpdir(), "<temporal>"),
+    ...con(os.homedir(), "~"),
+  ];
+}
+
+/** DEJA EL REGISTRO DE FRICCION DE ESTA CORRIDA, y ofrece mandarlo al marco.
+ *
+ *  QUE DEFECTO CIERRA. El registro de friccion era una plantilla en blanco
+ *  (docs/plantillas/registro-de-friccion.md) que alguien tenia que acordarse de
+ *  llenar mientras corria la guia. Lo que esta herramienta ya sabia --cada aviso
+ *  de un camino conservador, cada pregunta del asistente rechazada-- se imprimia y
+ *  se perdia, y la guia quedaba PARECIENDO sana. Viene de Rigel 1.14.0 (change
+ *  2026-09-01-arranque-ejecutable), adaptado en herramientas/registro-de-friccion.mjs.
+ *
+ *  LA CONDICION DE TERMINO ES EL ARCHIVO. Se escribe siempre --tambien sin
+ *  apartamientos, porque «no hubo nada que rodear» tiene que distinguirse de
+ *  «nadie miro»-- en el proyecto, al lado de la bitacora; si ahi no se puede, en
+ *  la carpeta temporal; y si tampoco, entero por pantalla, que la bitacora copia.
+ *  Mandarlo como issue al repositorio del marco se OFRECE y se confirma: es
+ *  visible desde afuera, igual que crear el repositorio del proyecto.
+ *
+ *  SOLO LAS CORRIDAS QUE TERMINAN. Una que falla ya tiene su rojo y su bitacora, y
+ *  lo que el asistente anoto queda sin consumir para el reintento. */
+async function dejarElRegistroDeFriccion({
+  friccion,
+  registroDeFriccion,
+  argv,
+  destino,
+  rutaDeValores,
+  valores,
+  forma,
+  plataforma,
+  raizMarco,
+  repoMod,
+  caminoDelAsistente,
+}) {
+  const m = registroDeFriccion.modulo;
+  if (!m) {
+    console.log("");
+    console.error(
+      `::warning::no pude cargar herramientas/registro-de-friccion.mjs (${registroDeFriccion.porQueNo}), asi que ` +
+        "esta corrida NO deja su registro de friccion: lo que tuvo que rodear esta solo en la bitacora. Pasa cuando " +
+        "esta herramienta corre copiada fuera de su clon; desde un clon completo del marco no falta.",
+    );
+    return;
+  }
+  friccion.enFase("el cierre");
+  const dirValores = path.dirname(path.resolve(rutaDeValores));
+  let reparto = caminoDelAsistente?.reparto ?? null;
+  let delAsistente = Boolean(caminoDelAsistente);
+  if (!caminoDelAsistente) {
+    const pendiente = m.leerPendiente(dirValores);
+    if (pendiente.existe && pendiente.ok) {
+      delAsistente = true;
+      reparto = pendiente.datos.reparto ?? null;
+      friccion.apartamientos.unshift(...pendiente.datos.apartamientos);
+    } else if (pendiente.existe) {
+      console.error(
+        `::warning::no pude leer ${pendiente.ruta} (${pendiente.error}), que es lo que el asistente anoto en su ` +
+          "corrida: el registro sale sin las preguntas donde te trabaste.",
+      );
+    }
+  }
+  const camino = !delAsistente
+    ? "un archivo de valores escrito sin el asistente"
+    : reparto
+      ? `el asistente: ${reparto.preguntas} preguntas; de los ${reparto.total} valores del archivo, ${reparto.derivados} ` +
+        "los derivo el asistente sin preguntarlos"
+      : "el asistente";
+  const apartamientos = friccion.apartamientos;
+  const texto = m.redactar(
+    m.cuerpo({
+      procedimiento: "arranque",
+      apartamientos,
+      contexto: {
+        fecha: new Date().toISOString(),
+        camino,
+        forma,
+        plataforma,
+        marco: versionDelMarco(),
+        maquina: `${process.platform} ${process.arch} · node ${process.version}`,
+        // Las banderas y no la invocacion entera: la invocacion lleva rutas.
+        banderas: argv.filter((a) => a.startsWith("--")).join(" ") || "ninguna",
+      },
+    }),
+    { valores, rutas: rutasQueSeTapan({ destino, dirValores, raizMarco }) },
+  );
+  const titulo = m.tituloDelRegistro("arranque", apartamientos.length);
+  // ABSOLUTA: la ruta viaja al comando `gh issue create --body-file` que se imprime
+  // para despues, y ese comando se pega desde cualquier carpeta.
+  const ruta = m.escribirRegistro(baseDeBitacora(path.resolve(destino), 0), texto);
+
+  console.log("");
+  console.log("── EL REGISTRO DE FRICCION ──");
+  if (apartamientos.length === 0) {
+    console.log("Esta corrida no se aparto de lo escrito en ningun punto, y eso tambien queda registrado:");
+  } else {
+    console.log(
+      `ESTA CORRIDA SE APARTO DE LO ESCRITO EN ${apartamientos.length} PUNTO(S). El proyecto quedo armado, pero NO es ` +
+        "un exito limpio: quien siga este mismo camino se va a chocar con lo mismo. Esta todo en:",
+    );
+  }
+  if (!ruta) {
+    console.error(
+      "::warning::no pude escribir el registro de friccion ni en el proyecto ni en la carpeta temporal. Va entero " +
+        "aca abajo, y queda tambien en la bitacora: copialo de ahi.",
+    );
+    console.log(texto);
+  } else {
+    console.log(`  ${ruta}`);
+  }
+  // Absorbido: si quedara, la proxima corrida lo contaria dos veces.
+  m.consumirPendiente(dirValores);
+  if (!ruta) return;
+
+  await m.ofrecerElIssue({
+    repo: m.repoDelRemoto(leerRemoto(raizMarco)),
+    titulo,
+    ruta,
+    preguntar: process.stdin.isTTY ? preguntarEnLaTerminal : null,
+    ejecutar: repoMod?.ejecutarDeVerdad
+      ? (programa, args, { timeout } = {}) => repoMod.ejecutarDeVerdad(programa, args, { timeout })
+      : undefined,
+    haySesion: repoMod?.haySesion
+      ? () => repoMod.haySesion((args, t) => repoMod.ejecutarDeVerdad("gh", args, { timeout: t }))
+      : undefined,
+  });
 }
 
 /** "Me invocaron a MI?", resuelto por realpath en los dos lados.
