@@ -1,7 +1,7 @@
 ---
 artefacto: proposal
 dri: Builder 1
-aprueba: "revision adversarial (desvio del marco: un solo mantenedor, ver AGENTS.md)"
+aprueba: revision adversarial (desvio del marco: un solo mantenedor, ver AGENTS.md)
 informado: PO / Builder 2
 estado: en-ejecucion
 ---

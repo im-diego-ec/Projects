@@ -1,7 +1,7 @@
 ---
 artefacto: design
 dri: Builder 1
-aprueba: "revision adversarial (desvio del marco: un solo mantenedor, ver AGENTS.md)"
+aprueba: revision adversarial (desvio del marco: un solo mantenedor, ver AGENTS.md)
 estado: en-ejecucion
 ---
 
