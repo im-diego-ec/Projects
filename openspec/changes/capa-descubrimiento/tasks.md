@@ -1,7 +1,7 @@
 ---
 artefacto: tasks
 dri: Builder 1
-aprueba: Builder 2 (builder par)  # el delta lo gatea además PO (PO) por CODEOWNERS
+aprueba: revision adversarial (desvio del marco: un solo mantenedor, ver AGENTS.md)  # el delta lo gatea además PO (PO) por CODEOWNERS
 informado: PO
 estado: pendiente-de-revision
 experimental: true

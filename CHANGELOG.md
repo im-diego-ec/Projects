@@ -76,6 +76,24 @@ mueve sobre un cambio incompatible.
   y espera. Se dice acá porque el criterio del repo es que endurecer un check que un
   repo verde ya pasaba es incompatible aunque no rompa ningún archivo.
 
+- **El marco declara que tiene un solo mantenedor, y deja de esperar una revisión
+  que no puede llegar.** `AGENTS.md` pedía que lo que escribe un builder lo revise
+  el otro, y en este repositorio hay una sola identidad con permiso de escritura:
+  GitHub pide la revisión a los dueños excepto al autor, así que la revisión
+  cruzada no estaba debilitada, no existía. El costo era medible: 58 artefactos de
+  22 changes nombraban como aprobador a un «Builder 2 (builder par)» que no está,
+  y once changes terminados esperaban en `pendiente-de-revision` sin salida.
+  Ahora `AGENTS.md` lo declara como desvío (`github-review-cruzado-automatizado`),
+  pegado al flujo que anula: la revisión cruzada se reemplaza por una **revisión
+  adversarial con lentes independientes, registrada dentro de cada change**; se
+  retira el día que haya un segundo handle con escritura, con el comando que lo
+  mide; y **no alcanza a la aprobación del PO** sobre `gobierno-contribucion`. Es
+  el desvío que Rigel declaró en su 1.10.0 (commit `e48860d`), con una diferencia:
+  allá quedó escrito, acá lo sostiene un banco. No vive en `.projects-desvios.json`
+  porque esa ruta de la raíz es la que el asistente usa para el proyecto que arma
+  con doble clic. Para consumidores: nada; es el gobierno del repositorio del
+  marco y no viaja.
+
 ### Corregido
 
 - **Cinco páginas seguían prometiendo una publicación automática que ya no ocurre**, y
@@ -92,6 +110,18 @@ mueve sobre un cambio incompatible.
   si producción sale sola y lo contrasta contra las cuatro páginas, en los dos sentidos.
   Si mañana la promoción vuelve a ser automática, se pone roja hasta que las páginas lo
   digan.
+
+- **La introducción se contradecía sobre qué publica el marco.** Arriba decía que
+  el marco no publica en internet y la sección 6 dice que un sitio para leer sí se
+  publica. Ahora dice lo que es: la aplicación todavía no, el sitio sí. Para
+  consumidores: nada.
+- **Un escenario del contrato fijaba un hecho con fecha.** El de la introducción
+  exigía declarar «que el marco todavía no publica la aplicación», que el día que
+  la publique habría obligado a declarar algo falso. Ahora exige declarar cada
+  tramo que el marco todavía no cubre para la forma elegida. Para consumidores:
+  nada.
+- **Un caso del banco del piso de permisos decía «exactamente» y comprobaba «al
+  menos».** Se renombró a lo que comprueba. Para consumidores: nada.
 
 ### Añadido
 
@@ -481,6 +511,23 @@ mueve sobre un cambio incompatible.
   preguntó** —con Supabase elegido, las cinco de AWS no se hacen y volver no pasa
   por ellas—, y lo ya contestado se conserva: se vuelve, se corrige, y de ahí en
   adelante se avanza con Enter sin reescribir nada.
+
+- **Un banco que sostiene el desvío en cinco direcciones.**
+  `pruebas/ci-del-marco/desvio-de-review-del-marco.test.mjs` se pone rojo si hay un
+  solo dueño en `CODEOWNERS` y el desvío falta o está incompleto; si hay dos y el
+  desvío sigue puesto; si un change activo vuelve a nombrar al builder par; si un
+  change se archiva sin su `revision-adversarial.md`; y si un change que toca
+  `gobierno-contribucion` no nombra al PO en su `aprueba:`. Para consumidores:
+  nada; corre solo en el CI del marco.
+- **Seis changes terminados pasan al contrato vivo.** Revisados bajo el desvío y
+  archivados: `el-andamio-dice-la-verdad`, `el-comando-que-se-pega-funciona`,
+  `el-piso-del-reusable-se-mide`, `los-changes-citan-lo-que-existe`,
+  `orden-de-lectura` y `una-sola-lista-de-plataformas`. Ocho requirements nuevos:
+  cuatro en `calidad-codigo`, y nacen `base-tecnologica` y
+  `documentacion-del-marco`. El contrato vivo pasa de 41 a 49 requirements. Los
+  seis que tocan `gobierno-contribucion` quedan revisados y esperando el OK del
+  PO. Para consumidores: nada que hacer; lo que esos changes cambiaron ya está en
+  las entradas de arriba, y archivarlos no cambia comportamiento.
 
 ### Corregido
 

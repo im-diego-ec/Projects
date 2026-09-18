@@ -122,7 +122,7 @@ test("el reusable exige algo: si no, todo lo de abajo pasa vacuamente", () => {
   assert.ok(exige.size > 0, "no se leyo ningun permissions: de job en el reusable; la compuerta quedaria mirando al vacio");
 });
 
-test("los tres bloques declaran EXACTAMENTE el piso que el reusable exige", () => {
+test("los tres bloques conceden AL MENOS el piso que el reusable exige (de mas no es el fallo que esto ataja)", () => {
   const exige = alcancesQueExigeElReusable();
   const faltantes = [];
   for (const rel of DECLARAN) {

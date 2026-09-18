@@ -1,7 +1,7 @@
 ---
 artefacto: design
 dri: Builder 1
-aprueba: Builder 2 (builder par)
+aprueba: revision adversarial (desvio del marco: un solo mantenedor, ver AGENTS.md)
 estado: pendiente-de-revision
 ---
 

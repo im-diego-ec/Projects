@@ -50,6 +50,16 @@
 # autor, que no puede darsela—. Por eso esa regla no se activa, y el motivo es
 # este y no la falta de tiempo. Estado real de la proteccion de main, medido y
 # con su comando, en .github/proteccion-main.md.
+#
+# EL DESVIO QUE ESTO OBLIGA A DECLARAR, desde el 2026-09-17. Con un solo owner
+# la revision cruzada que pide AGENTS.md no tiene de donde salir, y AGENTS.md
+# la declara como desvio (`github-review-cruzado-automatizado`), con una
+# revision adversarial registrada en cada change como reemplazo. SU CONDICION
+# DE RETIRO SE LEE DE ESTE ARCHIVO: el dia que aca aparezca un segundo handle
+# —con permiso de escritura, que es lo que lo vuelve owner de verdad—,
+# pruebas/ci-del-marco/desvio-de-review-del-marco.test.mjs se pone rojo hasta
+# que el recuadro de AGENTS.md se retire y los `aprueba:` vuelvan al builder
+# par. Y al reves: borrar el recuadro con un solo owner tambien es rojo.
 # ---------------------------------------------------------------------------
 
 *                                  @im-diego-ec

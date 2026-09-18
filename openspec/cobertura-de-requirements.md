@@ -76,17 +76,27 @@ tabla que dice que algo *no* está verificado envejece hacia el lado que nadie a
 porque un `ninguno` de más no rompe nada — solo hace tomar decisiones con un mapa
 equivocado. El re-conteo del 2026-08-31 es el que sigue.
 
-**Medido el 2026-08-31: 41 requirements vivos en 8 capabilities**
-(12 `calidad-codigo` + 4 `despliegue-ci` + 2 `gestion-secretos` +
+**Medido el 2026-09-17: 49 requirements vivos en 10 capabilities**
+(16 `calidad-codigo` + 4 `despliegue-ci` + 2 `gestion-secretos` +
 3 `gobierno-contribucion` + 5 `observabilidad` + 6 `operacion-infra` +
-4 `pipeline-entrega` + 5 `verificacion-desplegada`). Hay además **4 capabilities en
-vuelo** —`base-tecnologica`, que nace en el change `stack-estandar`,
-`documentacion-del-marco`, que nace en `orden-de-lectura`, y
-`promocion-por-ambientes`, que nace en el change del mismo nombre, y `capa-descubrimiento`,
-que nace en `menu-que-no-miente`—: ninguna existe todavía en
+4 `pipeline-entrega` + 5 `verificacion-desplegada` + 1 `base-tecnologica` +
+3 `documentacion-del-marco`). Hay además **2 capabilities en
+vuelo** —`promocion-por-ambientes`, que nace en el change del mismo nombre, y
+`capa-descubrimiento`, que nace en `menu-que-no-miente`—: ninguna existe todavía en
 `openspec/specs/`, y sus secciones van al final, porque una capability que nace en un
 change y no en los specs vivos es la asimetría que hay que ver antes de que se
 consolide, no después.
+
+**Qué movió el re-conteo del 2026-09-17.** Ese día se archivaron seis changes
+terminados que esperaban una revisión cruzada imposible —el marco tiene un solo
+mantenedor, y `AGENTS.md` lo declara como desvío con la revisión adversarial como
+reemplazo—. Entraron cuatro requirements a `calidad-codigo`, y
+`base-tecnologica` y `documentacion-del-marco` dejaron de estar en vuelo: sus
+secciones siguen más abajo, ahora como contrato vivo. Lo que eso esconde, dicho
+para que no se lea como que desapareció: los tres requirements que `stack-estandar`
+propone para `base-tecnologica` siguen **en vuelo sobre una capability viva**, y
+esta página —como con cualquier otro change en vuelo sobre una capability que ya
+existe— no les da fila hasta que se archiven.
 
 **Esa cuenta decía «una» hasta el 2026-08-31, y no es una errata: es el mismo defecto
 otra vez.** `documentacion-del-marco` llevaba semanas en vuelo y esta página no la
@@ -97,7 +107,7 @@ entera **que sí la tiene**. Desde hoy no se escribe a mano: la lista sale de mi
 `openspec/changes/*/specs/` contra `openspec/specs/`, y lo mide
 [`pruebas/docs/cobertura-de-requirements.test.mjs`](../pruebas/docs/cobertura-de-requirements.test.mjs).
 
-**Resumen de la medición: 24 de 41 requirements tienen al menos una compuerta que
+**Resumen de la medición: 32 de 49 requirements tienen al menos una compuerta que
 falla sola; 17 no la tienen.** Los 17 siguen concentrados donde el marco reparte poco
 o nada de la pieza que los ejecutaría: `verificacion-desplegada` (4 de 5),
 `observabilidad` (4 de 5) y `despliegue-ci` (2 de 4). El andamio ya reparte un
@@ -108,7 +118,7 @@ especifica *sobre esa secuencia* sigue sin tener dónde fallar.
 
 ---
 
-## calidad-codigo — 12 requirements, 11 con compuerta
+## calidad-codigo — 16 requirements, 15 con compuerta
 
 | Requirement | Lo que lo hace fallar solo | Ruta y ancla (2026-08-31) |
 |---|---|---|
@@ -124,6 +134,10 @@ especifica *sobre esa secuencia* sigue sin tener dónde fallar.
 | La cobertura de pruebas alcanza el mínimo acordado y no retrocede | La composite action de cobertura, en sus dos planos (líneas del cambio y total del paquete), más el paso del marco que verifica que el andamio reparta el umbral | `actions/cobertura-diff/action.yml:151`; paso «El andamio reparte el umbral del total del marco» de `.github/workflows/marco-ci.yml` |
 | Las reglas de identidad visual del área viajan como reglas de lint verificadas | El banco de las reglas de identidad del andamio: exige el bloque con alcance propio y severidad de error, que cada expresión compile, que acepte su violación y rechace el trabajo honesto, y que cada regla de la constitución tenga estado decidido — y muta copias del andamio para probar que cada comprobación MUERDE | `pruebas/marca/reglas-marca.test.mjs` (mutaciones desde `:261`); el bloque verificado vive en `plantilla/eslint.config.mjs` |
 | El esqueleto que entrega el andamio encaja consigo mismo | El banco de acoples del andamio, seis comprobaciones con su mutación al lado | `pruebas/andamio/acoples-del-andamio.test.mjs:134` (.env), `:207` (nombre de la base), `:305` (no-root), `:388` (arquitectura), `:542` (contrato), `:669` (organización a mano) |
+| Un comando que la herramienta manda a ejecutar tiene que poder ejecutarse | **parcial**: el banco extrae los comandos que la herramienta imprime, comprueba que cada ruta vuelva como UN argumento y ejecuta el de punta a punta con el clon en una ruta con espacio. Los dos comandos que imprime `main()` —el del esqueleto de ejemplo y el de `projects-versiones`— usan la misma función pero ningún caso los mide | `pruebas/init/comando-pegable.test.mjs:92` y `:146`; `pruebas/init/el-doble-clic-llega.test.mjs:56` |
+| Una ruta del sistema de archivos no se deriva de la parte de una URL | **parcial**: el banco del guardrail de deltas se pone rojo si su ruta viaja codificada, pero SOLO corrido desde un clon con un espacio en la ruta —medido el 2026-09-17: 13 de 13 rojos ahí, cero en un clon sin espacio, que es el caso del CI—. Nada recorre el código buscando `.pathname` | `actions/guardrail-deltas/pruebas/guardrail-deltas.test.mjs:188` |
+| El piso de permisos que se documenta es el que el reusable exige | Lee los `permissions:` que declaran los jobs del reusable y exige que las tres copias del piso —incluida la del andamio— concedan al menos eso, con un permiso comentado contando como ausente | `pruebas/andamio/piso-del-reusable.test.mjs:125`, con las mutaciones en `:141` y `:150` |
+| La evidencia que cita un change vive donde el change dice | **parcial**: toda cita al canónico desde un change activo tiene que apuntar a un archivo que exista. Que el texto citado siga diciendo lo mismo —la tercera cláusula— no lo mira ningún caso | `pruebas/ci-del-marco/changes-citan-lo-que-existe.test.mjs:71`, con la mutación en `:81` |
 
 **El que no tiene compuerta, y por qué.** «Test de regresión obligatorio por defecto
 conocido» es indecidible con un escaneo: distinguir un test que REPRODUCE el defecto de
@@ -276,30 +290,28 @@ esta capability compartan el mismo hueco no es cuatro problemas: es uno, y tiene
 
 ---
 
-## base-tecnologica — capability EN VUELO, 4 requirements, 1 con compuerta
+## base-tecnologica — 1 requirement, 1 con compuerta
 
-No existe en `openspec/specs/`: nace en `openspec/changes/stack-estandar/specs/`
-(2 de 24 tareas al 2026-08-31) y gana un requirement más en
-`openspec/changes/una-sola-lista-de-plataformas/specs/`. Se lista acá **antes** de que
-se consolide, porque una capability que solo vive en un change es invisible para quien
-lee los specs vivos de punta a punta.
+Existe en `openspec/specs/` desde el 2026-09-17, cuando se archivó
+`una-sola-lista-de-plataformas` (hoy en `openspec/changes/archive/`). Hasta ese día
+figuraba en esta página como capability EN VUELO con cuatro requirements: los otros
+tres son los que propone `stack-estandar`, que siguen en vuelo sobre una capability
+que ya existe —y, por decisión del PO del 2026-09-17, a reescribir: manda el modelo
+de capacidades, no la base única que esos tres describen—.
 
-| Requirement | Lo que lo hace fallar solo | Ruta y ancla (2026-08-31) |
+| Requirement | Lo que lo hace fallar solo | Ruta y ancla (2026-09-17) |
 |---|---|---|
-| El marco publica una base tecnológica única y es la primera opción | **ninguno** | — |
-| Apartarse de la base se pregunta antes de implementar | **ninguno** | — |
-| La base es la primera opción, no una jaula | **ninguno** | — |
 | Lo que la constitución admite y lo que la herramienta entrega no divergen en silencio | cruza las CUATRO copias de la lista de plataformas y exige que coincidan; y que una pendiente no figure como implementada | `pruebas/andamio/una-sola-lista-de-plataformas.test.mjs` |
 
 ---
 
-## documentacion-del-marco — capability EN VUELO, 3 requirements, 3 con compuerta
+## documentacion-del-marco — 3 requirements, 3 con compuerta
 
-Tampoco existe en `openspec/specs/`: nace en
-`openspec/changes/orden-de-lectura/specs/`, y gana un requirement más en
-`openspec/changes/el-andamio-dice-la-verdad/specs/`. Es la única capability en vuelo que **ya
-tiene compuertas corriendo**, y por eso su ausencia de esta página era el peor tipo de
-hueco: no faltaba deuda, faltaba cobertura que ya estaba pagada.
+Existe en `openspec/specs/` desde el 2026-09-17, cuando se archivaron
+`el-andamio-dice-la-verdad` y `orden-de-lectura` (hoy en `openspec/changes/archive/`).
+Mientras estuvo en vuelo fue la única capability de esta página que **ya tenía
+compuertas corriendo**, y por eso su ausencia de la página, hasta el 2026-08-31, era el
+peor tipo de hueco: no faltaba deuda, faltaba cobertura que ya estaba pagada.
 
 | Requirement | Lo que lo hace fallar solo | Ruta y ancla (2026-08-31) |
 |---|---|---|

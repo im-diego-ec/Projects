@@ -1,7 +1,7 @@
 ---
 artefacto: proposal
 dri: Builder 1
-aprueba: Builder 2 (builder par) # NO el `dri`: hasta el 2026-08-24 este campo decía
+aprueba: revision adversarial (desvio del marco: un solo mantenedor, ver AGENTS.md) # NO el `dri`: hasta el 2026-08-24 este campo decía
                               # `Builder 1`, o sea el propio autor, y un autor que se
                               # aprueba a sí mismo no es un review. Con
                               # `required_approving_review_count` en `0` y

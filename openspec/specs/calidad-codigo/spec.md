@@ -499,3 +499,96 @@ traer el nombre de ninguna organización escrito a mano.
 #### Scenario: El esqueleto nombra una organización a mano
 - **WHEN** una pieza del esqueleto trae el nombre de una organización escrito literalmente en vez de la sustitución que el andamio resuelve
 - **THEN** la verificación falla, porque ese literal viaja a todos los proyectos y ninguno lo corrige
+
+### Requirement: Un comando que la herramienta manda a ejecutar tiene que poder ejecutarse
+
+Cuando una herramienta del marco imprime un comando para que una persona lo
+copie y lo ejecute, ese comando SHALL ser ejecutable tal cual se imprimió, sin
+que quien lo recibe tenga que corregirlo.
+
+Toda ruta del sistema de archivos que viaje dentro de un comando impreso SHALL
+entrecomillarse cuando contenga espacios o cualquier carácter que la shell
+interprete. La comprobación NO SHALL depender de que la ruta de quien corre la
+herramienta esté libre de espacios: las carpetas donde las personas guardan sus
+cosas los tienen.
+
+#### Scenario: El clon vive en una ruta con espacios
+
+- **WHEN** la herramienta imprime un comando que nombra una ruta con espacios
+- **THEN** la ruta viaja entrecomillada y el comando se ejecuta sin editarlo
+
+#### Scenario: El comando impreso se ejecuta de verdad
+
+- **WHEN** el banco verifica un comando que la herramienta propone
+- **THEN** lo extrae de la salida y lo ejecuta, en vez de comprobar que el texto se parezca al esperado
+
+### Requirement: Una ruta del sistema de archivos no se deriva de la parte de una URL
+
+El código del marco NO SHALL construir rutas del sistema de archivos con la
+propiedad `pathname` de una URL. `pathname` devuelve la ruta percent-encoded, de
+modo que un espacio viaja como `%20` y produce una ruta que no existe. La
+conversión SHALL hacerse con la función que la biblioteca estándar provee para
+eso.
+
+Este requirement aplica a rutas de archivos. NO aplica a la lectura del componente
+de una URL de red, que es el uso legítimo de esa propiedad.
+
+#### Scenario: Un banco arma la ruta de un directorio del repositorio
+
+- **WHEN** una prueba necesita la ruta de un directorio del repositorio a partir de la URL de su propio módulo
+- **THEN** la obtiene con la conversión de URL a ruta, y no leyendo `pathname`
+
+#### Scenario: Una ruta percent-encoded llega a una herramienta
+
+- **WHEN** una herramienta recibe un directorio que no existe porque la ruta viajó codificada
+- **THEN** el banco que la ejerce falla, en vez de pasar en verde sobre un directorio vacío
+
+### Requirement: El piso de permisos que se documenta es el que el reusable exige
+
+Cuando el marco documenta qué permisos hay que concederle a su workflow
+reusable, esa declaración SHALL comprobarse contra los permisos que los jobs del
+reusable declaran de verdad, y SHALL fallar cuando se quede corta.
+
+La comprobación SHALL cubrir **todas** las copias de esa declaración, incluida la
+que el andamio reparte a los proyectos nuevos. Una copia que quede corta SHALL
+tratarse como fallo aunque las demás estén al día.
+
+#### Scenario: Un job del reusable gana un permiso
+
+- **WHEN** un job del workflow reusable declara un permiso que las copias del piso documentado no conceden
+- **THEN** el pipeline falla nombrando el archivo y el permiso que falta
+
+#### Scenario: El andamio reparte el piso
+
+- **WHEN** el andamio entrega su plantilla de integración continua a un proyecto nuevo
+- **THEN** el piso que esa plantilla concede cubre lo que el reusable exige en ese momento
+
+### Requirement: La evidencia que cita un change vive donde el change dice
+
+Cuando un change cite un artefacto de la constitución canónica como evidencia de
+lo que el marco ya declara, esa ruta SHALL existir, y el pipeline SHALL
+comprobarlo sobre todos los changes activos.
+
+La comprobación NO SHALL exigir que exista toda ruta citada: un change propone
+crear archivos, y citar lo que todavía no existe es parte de su trabajo. SHALL
+acotarse a los artefactos que se citan como evidencia de lo ya vigente.
+
+Cuando el texto citado haya cambiado de sentido, corregir la ruta NO SHALL
+tratarse como suficiente: el change SHALL declararlo de forma visible antes de
+poder ejecutarse, porque una cita con la ruta correcta y el contenido cambiado
+parece consistente y no lo está.
+
+#### Scenario: Un change cita un canónico renombrado
+
+- **WHEN** un change activo cita un archivo de la constitución canónica que no existe
+- **THEN** el pipeline falla nombrando el change y la ruta
+
+#### Scenario: Un change cita un archivo que propone crear
+
+- **WHEN** un change cita una ruta que todavía no existe porque el propio change la va a crear
+- **THEN** el pipeline no falla por eso, porque proponer no es citar evidencia
+
+#### Scenario: La ruta se corrige y el texto ya no dice lo mismo
+
+- **WHEN** el artefacto citado sigue existiendo pero su contenido cambió de sentido
+- **THEN** el change lo declara de forma visible antes de ejecutarse, en vez de quedar pareciendo consistente

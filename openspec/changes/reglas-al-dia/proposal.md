@@ -1,9 +1,10 @@
 ---
 artefacto: proposal
 dri: Builder 1
-aprueba: Builder 2 (builder par)  # y PO (PO) el delta: la capability de
-                              # gobernanza del trabajo la gatea el PO por
-                              # CODEOWNERS (.github/CODEOWNERS, últimas líneas)
+aprueba: PO (el delta de gobierno-contribucion) y revision adversarial (desvio del marco: un solo mantenedor, ver AGENTS.md)
+                              # la capability de gobernanza del trabajo la gatea
+                              # el PO por CODEOWNERS (.github/CODEOWNERS, últimas
+                              # líneas); el desvío de la revisión cruzada no la toca
 informado: PO / Builder 2
 estado: pendiente-de-revision
 ---

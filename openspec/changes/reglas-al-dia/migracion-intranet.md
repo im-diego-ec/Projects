@@ -2,7 +2,7 @@
 artefacto: migracion-consumidor
 consumidor: im-diego-ec/intranet
 dri: Builder 1
-aprueba: Builder 2 (builder par) — y el PO donde toca gobernanza
+aprueba: revision adversarial (desvio del marco: un solo mantenedor, ver AGENTS.md) — y el PO donde toca gobernanza
 informado: PO
 estado: pendiente-de-revision
 ---

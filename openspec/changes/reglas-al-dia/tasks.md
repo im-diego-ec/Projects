@@ -1,7 +1,7 @@
 ---
 artefacto: tasks
 dri: Builder 1
-aprueba: Builder 2 (builder par)  # el delta de gobierno-contribucion lo gatea
+aprueba: revision adversarial (desvio del marco: un solo mantenedor, ver AGENTS.md)  # el delta de gobierno-contribucion lo gatea
                               # además PO (PO) por CODEOWNERS
 informado: PO / Builder 2
 estado: pendiente-de-revision

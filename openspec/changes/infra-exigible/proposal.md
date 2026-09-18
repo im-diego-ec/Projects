@@ -1,7 +1,7 @@
 ---
 artefacto: proposal
 dri: Builder 1
-aprueba: Builder 2 (builder par) # NO el PO: en este repo su gate está acotado a
+aprueba: revision adversarial (desvio del marco: un solo mantenedor, ver AGENTS.md) # NO el PO: en este repo su gate está acotado a
                              # `gobierno-contribucion` (.github/CODEOWNERS,
                              # últimas dos líneas). Este delta toca
                              # `operacion-infra`.

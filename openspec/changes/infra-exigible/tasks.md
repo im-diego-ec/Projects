@@ -1,7 +1,7 @@
 ---
 artefacto: tasks
 dri: Builder 1
-revisa: Builder 2 (builder par)
+revisa: revision adversarial (desvio del marco: un solo mantenedor, ver AGENTS.md)
 estado: pendiente-de-revision
 ---
 

@@ -57,6 +57,37 @@ una sorpresa?** Si la respuesta es sí, era un change.
 6. **Verify + archive** → cierra cuando los specs vivos validan `--strict`, las
    tareas tienen evidencia y el `CHANGELOG.md` refleja el cambio.
 
+> ⚠️ **DESVÍO DECLARADO — `github-review-cruzado-automatizado`.** Los puntos 1, 2, 3
+> y 5 piden que lo que escribe un builder lo revise el otro, y «GitHub y estilo» pide
+> review cruzado en cada PR. **En este repositorio hay una sola identidad con permiso
+> de escritura**, y ocupa los tres roles —PO, Builder 1 y Builder 2—: la revisión
+> cruzada no está debilitada, no tiene de dónde salir. Rige desde el 2026-09-17,
+> aprobado por el PO en la sesión que decidió el porte de Rigel (change
+> `el-marco-declara-su-desvio-de-review`).
+>
+> **Lo que la reemplaza:** una **revisión adversarial con lentes independientes** —cada
+> lente con su pregunta y su evidencia, y un veredicto—, registrada **dentro del
+> change** en `revision-adversarial.md` antes de archivarlo. Mientras rija, el
+> `aprueba:` de un artefacto que no toca `gobierno-contribucion` dice
+> `revision adversarial (desvio del marco: un solo mantenedor, ver AGENTS.md)`.
+>
+> **Por qué vive acá y no en `.projects-desvios.json`:** esa ruta de la raíz es la que
+> el asistente usa para el proyecto que arma cuando se lo abre con doble clic
+> (`.gitignore` la ignora por eso), y el marco no renderiza su propia porción de la
+> constitución: este archivo es lo único que el agente carga sin buscarlo.
+>
+> **Se retira** el día que haya un segundo handle con permiso de escritura
+> (`gh api "repos/{owner}/{repo}/collaborators" --jq '.[] | "\(.login): \(.role_name)"'`
+> hoy devuelve uno solo) y `.github/CODEOWNERS` lo nombre. Ese día este recuadro se
+> borra y los `aprueba:` vuelven al builder par; mientras siga puesto con dos dueños,
+> `pruebas/ci-del-marco/desvio-de-review-del-marco.test.mjs` está en rojo.
+>
+> Lo que **no** cambia: la aprobación del PO sobre los proposals y specs que tocan
+> `gobierno-contribucion`, que ningún builder —ni ninguna revisión adversarial— puede
+> dar por él; los roles siguen siendo roles (reasignarlos es editar
+> `.github/CODEOWNERS`, un solo lugar); y todo cambio sigue entrando por PR con el
+> veredicto agregado de CI en verde.
+
 **Por qué acá el PO no aprueba proposals y specs, y en un proyecto sí.** En un
 repo de producto esos artefactos son el QUE y el POR QUÉ del negocio, y el PO es
 su dueño. En Projects no hay producto: **todo** change es técnico del estándar de

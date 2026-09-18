@@ -57,6 +57,16 @@ rules:
       `require_code_owner_review` en `false`, así que CODEOWNERS sugiere
       revisores y no gatea. Mientras esa configuración siga así, este campo
       es la única constancia escrita de quién revisó"
+    - "Mientras rija el desvío `github-review-cruzado-automatizado` declarado
+      en `AGENTS.md` (una sola identidad con permiso de escritura), el
+      builder par no existe - `aprueba` y `revisa` de un artefacto que no toca
+      `gobierno-contribucion` valen `revision adversarial (desvio del marco: un
+      solo mantenedor, ver AGENTS.md)`, y esa revisión queda registrada en
+      `revision-adversarial.md` dentro del change antes de archivarlo. El
+      proposal y el spec que tocan `gobierno-contribucion` siguen diciendo
+      `PO` - el desvío no toca esa aprobación. Nombrar al builder par, o
+      archivar sin la revisión, pone rojo
+      `pruebas/ci-del-marco/desvio-de-review-del-marco.test.mjs`"
   specs:
     - Usar escenarios con viñetas WHEN / THEN bajo `#### Scenario:` (prosa en
       español, keywords en inglés). No usar Dado / Cuando / Entonces

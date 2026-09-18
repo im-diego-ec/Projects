@@ -1,7 +1,7 @@
 ---
 artefacto: proposal
 dri: Builder 1
-aprueba: Builder 2 (builder par)  # change técnico de `calidad-codigo`
+aprueba: revision adversarial (desvio del marco: un solo mantenedor, ver AGENTS.md)  # change técnico de `calidad-codigo`
 informado: PO / Builder 2
 estado: pendiente-de-revision
 ---

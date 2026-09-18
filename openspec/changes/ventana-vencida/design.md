@@ -1,7 +1,7 @@
 ---
 artefacto: design
 dri: Builder 1
-revisa: el builder que no lo escribió
+revisa: revision adversarial (desvio del marco: un solo mantenedor, ver AGENTS.md)
 estado: pendiente-de-revision
 ---
 
