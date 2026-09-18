@@ -361,6 +361,15 @@ algo antes de empujar.
   lo que corre CI en el carril de código. Si el comando local y el de CI
   divergen, la regla se muere sola porque deja de servir.
 
+En el repositorio del marco, la mitad de validar el pipeline ya tiene su
+comando: `node herramientas/actionlint-local.mjs` corre actionlint en la
+**misma** versión que el CI —la lee del input `version_actionlint` de
+`marco-ci.yml`— y el hook `herramientas/hooks/pre-push` lo usa en vez del
+binario que haya en el `PATH`. Y dice cuándo su verde vale menos que el del
+CI: sin shellcheck, actionlint deja de revisar los bloques `run:` **sin
+avisar** (medido el 2026-09-18: el mismo workflow con un `SC2016` sale 0), así
+que la herramienta lo anuncia en vez de llamarlo válido.
+
 ---
 
 ## 8. Ramas siempre desde `main` actualizado
@@ -493,6 +502,56 @@ automatiza — ni debería).
 
 ---
 
+## 11. Un cero de `grep` sobre prosa con tildes no es una verificación
+
+**La regla.** Cuando un conteo de `grep` o `git grep` sobre texto en castellano
+se usa como evidencia —en un design, en un `tasks.md`, en un commit—, el patrón
+no pone un comodín de un carácter (`.`, `[...]`) ni `-i` sobre una letra con
+tilde, y **el cero se confirma con un control**: el mismo comando tiene que
+encontrar un ejemplo que se sabe que está.
+
+**Por qué.** Porque el mismo comando cuenta distinto según la máquina, y ninguna
+de las dos avisa. Medido el 2026-09-18 con git 2.54, sobre un archivo que dice
+«revisión trimestral» dos veces:
+
+```bash
+LC_ALL=C git grep -c 'revisi.n trimestral'       # 0: el . ve un byte, y la «ó» son dos
+git grep -F -c 'revisión trimestral'             # 2: el literal, en cualquier locale
+git grep -E -c 'revisi(ó|o)n trimestral'         # 2: la alternancia, también
+```
+
+Con un locale UTF-8 —el del runner de GitHub y el de casi todas las terminales—
+el `.` sí matchea la «ó», y el primer comando da 2. Con `LC_ALL=C` o POSIX —un
+contenedor mínimo, un script que fija el locale, un hook— da **0**, sale **1**, y
+se lee como «no hay ninguna». Lo mismo con `-i`: en `LC_ALL=C` no pliega las
+mayúsculas con tilde, así que `-i 'AUTOMATIZACIÓN'` no encuentra «automatización».
+Y aparte de todo eso, `-i` nunca pliega acentos: `revision` sin tilde no encuentra
+`revisión` en ningún locale (la guía técnica lo cuenta con un ancla de esta misma
+página).
+
+El caso que la compró viene de un marco que comparte origen con este (hallazgo
+del 2026-09-10, portado con el change `el-arranque-no-supone-el-shell-ni-la-cuenta`):
+un design apoyaba una conclusión en `git grep -in 'revisi.n trimestral'`, que daba
+0; escrito de otra forma daba 22. Allá quedó anotado como «git grep compara
+bytes»; la medición de acá lo corrige: compara bytes **en el locale C**, y en el
+resto no. Justamente por eso no alcanza con saberlo: el patrón que en tu máquina
+funciona es el que en otra da el cero.
+
+**Estado**: 🔴 DISCIPLINA, y declarada como tal: **no se puede volver check**.
+Distinguir a máquina un `grep` bien escrito de uno que no puede matchear exige
+adivinar qué quería encontrar quien lo escribió, y un lint que marque todo `.`
+cerca de una vocal sería ruido que enseña a ignorarlo. Lo que sí es automático es
+que esta página no pueda envejecer mintiendo:
+`pruebas/docs/grep-y-tildes.test.mjs` mide el comportamiento de arriba con el
+`git` de la máquina y exige que esta regla lo siga diciendo.
+
+**Qué se hace en su lugar.** Las dos formas de arriba —literal con `-F`, o la
+letra con y sin tilde en alternancia— y el control positivo en la misma
+evidencia: un conteo que da cero se escribe junto a uno que da más de cero con el
+mismo comando.
+
+---
+
 ## Backlog de automatización
 
 Ordenado por relación valor/costo. Los primeros tres son días-hombre de
@@ -516,6 +575,7 @@ una tarde entre todos y cierran las clases de error más caras.
 | 14 | Publicar una versión del marco AVISA a los consumidores | — | bajo | 🔴 |
 | 15 | **A01** — que el rojo de la compuerta LLEGUE al check requerido | — | alto | 🟠 |
 | 16 | **A16** — que un permiso de allowlist no autorice descargar sin pinar | — | alto | 🟠 |
+| 24 | Un cero de `grep` sobre prosa con tildes usado como evidencia | 11 | — | 🔴 (no se puede volver check: ver la regla 11; su afirmación la mide `pruebas/docs/grep-y-tildes.test.mjs`) |
 | ~~20~~ | ~~«El CHANGELOG es obligatorio en el PR que introduce el cambio» esta enunciado y no tiene check~~ **CERRADO el 2026-08-23**: el job `changelog-en-el-pr` del `ci.yml` del marco exige que un PR que toque `actions/`, `.github/workflows/`, `plantilla/` o `herramientas/` toque tambien `CHANGELOG.md`, con el arreglo en el mensaje. Se estreno en ROJO y no en aviso, contra lo que esta fila proponia: la regla del modo aviso protege a los CONSUMIDORES de un rojo que nadie les anuncio, y este check vive en el ci.yml de Projects — no viaja a ninguno. Un aviso dirigido a quien lo escribio no avisa nada. Banco: `pruebas/ci-del-marco/changelog-en-el-pr.test.mjs`, 8 casos, que EXTRAE el script del YAML en vez de copiarlo, e incluye el rojo, el fail-closed cuando la base no resuelve, y que un diff vacio no se reporte como exito |
 | 19 | El pin interno del marco se repite en veintiun lugares en vez de derivarse | Desde que `v1` dejo de ser el canal, `marco-ci.yml` referencia a sus actions hermanas por version exacta, y la version aparece tambien en `actions/README.md`, el andamio y las skills. Son **veintiun** literales en siete archivos que el release tiene que mover juntos (contados el 2026-08-22 con el grep que declara la skill del release; la fila decia catorce). NO es disciplina —`pruebas/andamio/pinado.test.mjs` se pone rojo si uno queda atras— pero sigue siendo repeticion, y el rojo llega en el PR de release y no antes. La version derivada existe y no se hizo por no poder verificar su contrato desde esta maquina: GitHub expone `github.job_workflow_ref` a un workflow reusable y `GITHUB_ACTION_REF` a una composite action, las dos con el ref con el que se resolvieron, asi que un paso podria emitir el pin en vez de repetirlo. Requiere confirmar el formato exacto de esas variables contra la documentacion antes de depender de ellas |
 | 18 | El check del pin del andamio mira `uses:`, no la prosa | `pruebas/andamio/pinado.test.mjs` verifica que ningun `uses:` del marco apunte a `@v1` y que todo pin exacto sea la version mas alta del CHANGELOG. La PROSA queda fuera a proposito: un primer intento la incluia y se puso rojo con cuatro hallazgos que eran todos correctos —el `grep -nE` de la verificacion de la skill de adopcion, el `sed -E` de projects-validar-consumidor, un `@vX.Y.Z` de documentacion y un marcador `@<version exacta>`—. Distinguir un ref inventado de un regex citado en prosa no es decidible con un escaneo de texto, y un check que se pone rojo cuando la documentacion esta BIEN escrita ensena a ignorarlo. Consecuencia: un `@v1` en la prosa del andamio lo caza el review, no el check. La version derivada exige que el andamio no escriba refs en prosa: que cada mencion sea una transclusion del pin real, y para eso hace falta un paso de render que hoy no existe |

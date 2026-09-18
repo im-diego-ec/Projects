@@ -56,10 +56,20 @@ pasó a ser público. Lo que queda es lo que de verdad necesita a una persona.
    (Settings → Advanced Security), y cargar los secretos para publicar
    (Settings → Secrets and variables → Actions). El último además es imposible en
    principio: esos valores solo los tenés vos.
-4. Borrar esta sección y este párrafo. **Recién ahí** corre la verificación final:
-   `grep -rnE "\{\{[A-Z0-9_]+\}\}" --exclude-dir=node_modules --exclude-dir=.git .` no debe
-   devolver nada (esta sección es la única que menciona la doble llave a propósito; el
-   patrón exige mayúsculas para no marcar las expresiones `${{ ... }}` de GitHub Actions).
+4. Borrar esta sección y este párrafo. **Recién ahí** corre la verificación final, que no
+   debe devolver nada:
+
+   ```bash
+   git grep --untracked -nE "\{\{[A-Z0-9_]+\}\}"
+   ```
+
+   Tres cosas del comando. `git grep` y no `grep -r`, porque viene con git: corre igual en
+   bash, en PowerShell y en cmd, y ya se saltea `node_modules` y todo lo que `.gitignore`
+   excluye. `--untracked`, porque sin esa bandera `git grep` solo mira lo que ya está
+   commiteado, y esta sección es justamente de **antes** del primer commit: sin ella el
+   comando dice que no queda nada aunque quede. Y el patrón exige mayúsculas para no marcar
+   las expresiones `${{ ... }}` de GitHub Actions. (Esta sección es la única que menciona la
+   doble llave a propósito.)
 
 ---
 

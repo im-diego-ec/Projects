@@ -1171,6 +1171,13 @@ test("la unica entrada que puede llegar a un shell es el pin, y esta acotada", (
         "de la persona, y esa invocacion no lleva shell",
     ],
     [
+      "`orgs/${org}/teams/${equipo}/members`",
+      "la ruta del equipo en la consulta de los equipos del PO. comprobarEquiposDelPO valida ORG, EQUIPO_PO y " +
+        "EQUIPO_BUILDERS contra FORMATOS inmediatamente antes —alfanumerico con guiones, sin un solo metacaracter " +
+        "de shell— y devuelve «no-se-sabe» sin invocar nada si no calzan; y esa invocacion va con shell: false. " +
+        "pruebas/init/equipos-del-po.test.mjs lo comprueba con un slug que trae un `;`",
+    ],
+    [
       "`repos/${org}/${proyecto}/rulesets`",
       "la ruta del repositorio en la sonda de proteccion de main. sondarProteccion valida las dos piezas " +
         "inmediatamente antes contra FORMATOS.ORG.patron y FORMA_DE_REPO_EN_GITHUB, que no admiten ni un " +
@@ -1178,7 +1185,12 @@ test("la unica entrada que puede llegar a un shell es el pin, y esta acotada", (
         "sistema operativo. El caso de mas abajo lo comprueba sobre los VALORES",
     ],
   ]);
-  const invocaciones = [...codigo.matchAll(/execFileSync\(([^,]+),\s*\[([^\]]*)\]/g)];
+  // EL VECTOR SE LEE SALTANDO LOS LITERALES, no hasta el primer `]`. Con
+  // `[^\]]*` un argumento literal que lleva un corchete —el `".[].login"` que
+  // la consulta de equipos le pasa a `--jq`— cortaba la lectura a mitad de la
+  // cadena y dejaba un residuo que no existe (`".[`). Aca un literal entre
+  // comillas o entre acentos graves se consume entero, con lo que tenga adentro.
+  const invocaciones = [...codigo.matchAll(/execFileSync\(([^,]+),\s*\[((?:"(?:[^"\\]|\\.)*"|`(?:[^`\\]|\\.)*`|[^\]"`])*)\]/g)];
   assert.ok(
     invocaciones.length >= 3,
     `solo ${invocaciones.length} invocacion(es) de execFileSync: si cambiaron de forma, este control dejo de mirar lo que cree que mira`,

@@ -448,6 +448,29 @@ sin `pnpm-lock.yaml`, corré `corepack pnpm install` y guardá ese archivo.
   que quiera subir lo hace en un solo PR con los dos paquetes al mismo rango, y corre
   `pnpm install` y `pnpm verificar`.
 
+- **La verificación final del bootstrap es `git grep --untracked -nE "..."`**
+  (`plantilla/AGENTS.md`, «Antes del primer commit»). El `grep -rnE ... --exclude-dir=...`
+  anterior no corre en PowerShell ni en cmd; y `git grep` a secas —la forma de Rigel 1.8.0,
+  commit 0629661— solo mira lo commiteado, así que antes del primer commit decía que no
+  quedaba nada aunque quedara (medido). Para consumidores: llega a los proyectos nuevos; en
+  uno existente esa sección ya la borró quien terminó el bootstrap.
+- **`plantilla/.github/proteccion-main.md`: los comandos de contraste encadenan el id solos y
+  declaran su shell, y las reglas diferidas dicen qué condición las reactiva.** El id se busca
+  por el nombre del ruleset (`main-protegida`) en vez de copiar un `<id>` a mano —en bash ni
+  siquiera es un argumento—, y la nota avisa que en PowerShell `gh` parte `--jq` por los
+  espacios (`accepts 1 arg(s), received 3`). La tabla de diferidas suma la columna
+  «Condición que la reactiva», que el requirement «Branch protection documentada como paso
+  manual» ya exigía, y marca la aprobación requerida como la primera a encender: con 0
+  aprobaciones el gate del PO que `CODEOWNERS` cablea no se exige. Viene de Rigel 1.8.0
+  (commits 0629661 y 7886e79). Para consumidores: llega a los proyectos nuevos; uno existente
+  que lo quiera copia la tabla de diferidas y la sección «Contrastar lo escrito» de
+  `plantilla/.github/proteccion-main.md`.
+- **`docs/05-arrancar-tecnico.md`, fase 1, deja de describir otra organización.** Decía que el
+  equipo `po` estaba vacío (`--jq 'length'   # hoy: 0`), nombraba un project «Roadmap del
+  área» y handles de terceros: residuo del fork. Ahora comprueba según el tipo de cuenta,
+  lista logins en vez de contar contra una cifra escrita y remite al control automático. Para
+  consumidores: nada.
+
 ### Eliminado
 
 - **El andamio ya no trae su propia copia del paso «Formato y validez de las raices de
@@ -833,6 +856,13 @@ sin `pnpm-lock.yaml`, corré `corepack pnpm install` y guardá ese archivo.
   de `plantilla/sitio/package.json`.
 - **Fe de erratas de la 1.7.0**: su entrada decía que `middleware/requestId.ts` entró
   «con su prueba», y no la tenía; la tiene desde esta versión. Para consumidores: nada.
+
+- **`projects init` lee el archivo de valores escrito desde Windows PowerShell.** Con la BOM
+  que deja `Out-File -Encoding utf8` (o el UTF-16 de `>` en PowerShell 5.1) salía 1 con
+  `Unexpected token ... is not valid JSON`, y el mensaje se leía como si el archivo estuviera
+  mal llenado (medido el 2026-09-18). Ahora saca por bytes cualquiera de las tres BOM de
+  Windows; un JSON roto sigue fallando con su error. `docs/05` deja de decir que 5.1 rompe ese
+  paso. Viene de Rigel 1.14.0 (commit d7e5e63). Para consumidores: nada.
 
 ### Añadido
 
@@ -1632,6 +1662,36 @@ sin `pnpm-lock.yaml`, corré `corepack pnpm install` y guardá ese archivo.
   juzgada por `medir-cobertura-diff.mjs` corriendo de verdad; exclusiones muertas en rojo)
   y las secciones 2b y 2c de `pruebas/andamio/acoples-del-andamio.test.mjs`. Para
   consumidores: nada; viven en el CI del marco.
+
+- **`projects init` contrasta el PO contra los equipos de la organización.** En una
+  organización, el `CODEOWNERS` del andamio le da proposal y specs al equipo `EQUIPO_PO`, y
+  ese cableado fallaba en silencio si el equipo estaba vacío, si todos sus miembros eran
+  también builders, si tenía más de una persona fuera de builders o si la única no era el
+  `PO` declarado: GitHub no asigna a nadie, o deja que un builder satisfaga el gate del PO, y
+  no lo dice. Al terminar, la herramienta lista los dos equipos en solo lectura y avisa con el
+  arreglo y el comando para mirarlo; «no pude mirar» se dice con su motivo, y en una cuenta
+  personal no consulta nada. Es aviso y no rojo porque el arreglo es de quien administra la
+  organización. El mismo control, a pedido: `node herramientas/projects-doctor.mjs --valores
+  <archivo>` (ahí un problema medido sale 1). Viene de Rigel 1.14.0 (commit b8836af), que
+  deriva el PO de sus equipos; acá se porta la propiedad, no la derivación. Para
+  consumidores: nada; es de la herramienta de arranque.
+- **`herramientas/actionlint-local.mjs`: actionlint con el pin del CI, en tu máquina.** Lee
+  la versión del `default` de `version_actionlint` en `marco-ci.yml`, verifica el checksum
+  contra el mismo release y usa el shellcheck del `PATH` pasado explícito. Sin shellcheck,
+  actionlint deja de revisar los bloques `run:` **sin avisar** (medido: un SC2016 sale 0), así
+  que la herramienta lo anuncia y no llama «válido» a ese verde; en Windows apaga la
+  integración que se cuelga, y tiene techo de tiempo. El hook `pre-push` la usa en vez del
+  binario del `PATH` (hallazgos bloquean; «no pude correr» avisa y deja empujar), y el
+  `::error::` del paso de actionlint de `marco-ci.yml` la nombra. No baja shellcheck: su
+  release no publica checksums. Viene de Rigel 2.7.0 (commit 218e5f6). Para consumidores:
+  nada en el pipeline; el texto del rojo de actionlint cambia. Un consumidor puede reproducir
+  ese rojo con `node <clon-de-Projects>/herramientas/actionlint-local.mjs` desde su repo.
+- **Regla 11 de `docs/11-reglas-no-escritas.md`: un cero de `grep` sobre prosa con tildes no
+  es una verificación.** Medido: `LC_ALL=C git grep -c 'revisi.n trimestral'` da 0 sobre un
+  archivo que lo dice dos veces, y con un locale UTF-8 da 2. No se puede volver check y así se
+  declara, con su fila en el backlog; `pruebas/docs/grep-y-tildes.test.mjs` mide la
+  afirmación para que no envejezca. Viene de Rigel 2.5.0 (commit 89e89c7), corregida: el cero
+  falso depende del locale. Para consumidores: nada.
 
 ### Corregido
 

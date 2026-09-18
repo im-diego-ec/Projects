@@ -1543,7 +1543,7 @@ jobs:
 
           "${TMP}/actionlint" --version
           if ! "${TMP}/actionlint" -color; then
-            echo "::error::las definiciones de pipeline no pasan la validacion (archivo y linea, arriba). Reproducilo local instalando actionlint ${VERSION_ACTIONLINT} y corriendolo en la raiz del repo"
+            echo "::error::las definiciones de pipeline no pasan la validacion (archivo y linea, arriba). Reproducilo local con la misma version (${VERSION_ACTIONLINT}): desde la raiz del repo, node <clon-de-Projects>/herramientas/actionlint-local.mjs baja la version que declara ese clon, verifica su checksum y la corre con el shellcheck de tu PATH (sin shellcheck no revisa los bloques run:, y lo dice). En el repo del marco: node herramientas/actionlint-local.mjs"
             exit 1
           fi
           echo "definiciones de pipeline validas"

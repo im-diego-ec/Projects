@@ -1534,6 +1534,37 @@ function nombrarControl(v) {
   return `${nombre ?? `\\x${c.toString(16).padStart(2, "0")}`} en la posicion ${i}`;
 }
 
+/** Lee el archivo de valores TOLERANDO la marca de orden de bytes (BOM) que ponen
+ *  los shells de Windows, y lo devuelve parseado. Un JSON realmente roto sigue
+ *  tirando su SyntaxError: la tolerancia es de codificacion, no de contenido.
+ *
+ *  EL DEFECTO QUE CIERRA, medido el 2026-09-18 con el esqueleto de `--ejemplo`: con
+ *  EF BB BF adelante —lo que deja `>` o `Out-File -Encoding utf8` en Windows
+ *  PowerShell— esta herramienta salia 1 con `Unexpected token '﻿' ... is not
+ *  valid JSON`, y con UTF-16 LE —el `>` de Windows PowerShell 5.1— igual. El
+ *  archivo se ve perfecto en el editor, el comando que lo escribio no dio error, y
+ *  el mensaje se lee como si la persona lo hubiera llenado mal.
+ *
+ *  POR BYTES, Y LAS TRES. Rigel (1.14.0, commit d7e5e63) llego aca en su tercera
+ *  vuelta: primero le pidio a la guia un `file valores.json` que "tiene que decir
+ *  UTF-8", y el mismo `>` produjo UTF-8 CON BOM, `file` dijo UTF-8 y la herramienta
+ *  igual salio 1. Mirar la codificacion que se vio una vez deja roto el caso
+ *  siguiente; mirar los bytes cubre las tres BOM que un shell de Windows puede
+ *  poner. La BOM se SACA, no se decodifica: dejada adentro, la primera clave se
+ *  llamaria "﻿PROYECTO" y la herramienta diria `falta PROYECTO`. */
+export function leerValores(ruta) {
+  const b = fs.readFileSync(ruta);
+  let texto;
+  if (b.length >= 3 && b[0] === 0xef && b[1] === 0xbb && b[2] === 0xbf) texto = b.subarray(3).toString("utf8");
+  else if (b.length >= 2 && b[0] === 0xff && b[1] === 0xfe) texto = b.subarray(2).toString("utf16le");
+  else if (b.length >= 2 && b[0] === 0xfe && b[1] === 0xff) {
+    // swap16 exige un largo par; un byte suelto al final es un archivo roto, y el
+    // JSON.parse de abajo lo dice con su propio error en vez de un RangeError.
+    texto = Buffer.from(b.subarray(2, b.length - ((b.length - 2) % 2))).swap16().toString("utf16le");
+  } else texto = b.toString("utf8");
+  return JSON.parse(texto);
+}
+
 export function validarValores(crudos) {
   const problemas = [];
   if (crudos === null || typeof crudos !== "object" || Array.isArray(crudos)) {
@@ -3194,6 +3225,206 @@ export function escribirProteccionMedida(destino, medido) {
   return { ok: true, error: null, avisos: r.avisos };
 }
 
+// ───────────── El PO que CODEOWNERS nombra, contra los equipos ─────────────
+//
+// EL DEFECTO QUE ESTE BLOQUE CIERRA. En una organizacion, el CODEOWNERS del
+// andamio le da proposal y specs al equipo EQUIPO_PO, y todo lo demas al equipo
+// EQUIPO_BUILDERS. Ese cableado falla EN SILENCIO de cuatro formas, y ninguna
+// produce un error en GitHub: el equipo del PO vacio (no se le pide el review a
+// nadie); todos sus miembros tambien builders (un builder satisface el gate del
+// PO desde el otro rol, que es lo que el propio CODEOWNERS dice que no puede
+// pasar); mas de una persona fuera de builders (no hay UN PO, y el valor PO que
+// nombran el README y las reglas no dice cual); o la unica de afuera no es la
+// que el proyecto declara. Hasta este bloque, esta herramienta escribia ese
+// CODEOWNERS sin preguntarle nada a GitHub.
+//
+// LA PROPIEDAD, y no la derivacion. Rigel (1.14.0, commit b8836af) DERIVA su PO
+// como "equipo po menos builders" y se planta si no es exactamente uno. Projects
+// no deriva el PO: lo declara el archivo de valores. Asi que lo que se comprueba
+// es que lo declarado y lo que GitHub tiene coincidan, con la misma regla de
+// "exactamente uno".
+//
+// AVISO Y NO ROJO, a proposito: el arreglo vive fuera del arbol del proyecto —es
+// la configuracion de los equipos de la organizacion— y cuando eso pasa el marco
+// avisa (decision D1). Pero nunca calla: "no pude mirar" sale con su motivo y con
+// el comando para mirarlo a mano, igual que la sonda de proteccion de arriba.
+//
+// SOLO LECTURA Y SOLO EN ORGANIZACIONES. En una cuenta personal los equipos no
+// existen y el CODEOWNERS del andamio usa handles: no hay nada que preguntar.
+
+/** Los estados en que la consulta MIDIO y encontro un cableado que no sostiene el
+ *  gate del PO. Es una lista para que quien decide el codigo de salida
+ *  (projects-doctor) no tenga que repetirla. */
+export const EQUIPOS_CON_PROBLEMA = new Set(["vacio", "solo-builders", "varios", "otro"]);
+
+/** Que dice la composicion de los dos equipos sobre el PO declarado. Pura: recibe
+ *  las listas de logins y no mide nada. Los handles se comparan sin mayusculas,
+ *  que es como los compara GitHub. */
+export function clasificarEquiposDelPO({ po, miembrosPo, miembrosBuilders }) {
+  const norm = (h) => String(h ?? "").toLowerCase();
+  const builders = new Set((miembrosBuilders ?? []).map(norm));
+  const soloPo = (miembrosPo ?? []).filter((m) => !builders.has(norm(m)));
+  const poEnBuilders = builders.has(norm(po));
+  let estado = "bien";
+  if (!(miembrosPo ?? []).length) estado = "vacio";
+  else if (soloPo.length === 0) estado = "solo-builders";
+  else if (soloPo.length > 1) estado = "varios";
+  else if (norm(soloPo[0]) !== norm(po)) estado = "otro";
+  return { estado, soloPo, poEnBuilders };
+}
+
+/** Que dijo `gh api orgs/<org>/teams/<equipo>/members --jq '.[].login'`.
+ *
+ *  Medido el 2026-09-18 contra la API: un equipo o una organizacion que no
+ *  existen salen 1 con `{"message":"Not Found",...,"status":"404"}` por stdout y
+ *  `gh: Not Found (HTTP 404)` por stderr. Un 404 NO se afirma como "el equipo no
+ *  existe": tambien es lo que contesta GitHub cuando tu cuenta no lo ve. */
+export function clasificarSondaDeEquipo({ presente = true, codigo = null, stdout = "", stderr = "", error = null } = {}) {
+  if (!presente) return { estado: "sin-gh", detalle: "no encontre el ejecutable `gh` en el PATH" };
+  const salida = String(stdout ?? "");
+  const err = String(stderr ?? "");
+  const todo = `${salida}\n${err}`;
+  if (codigo === 0) {
+    const miembros = salida
+      .split(/\r?\n/)
+      .map((l) => l.trim())
+      .filter(Boolean);
+    if (miembros.every((m) => FORMATOS.PO.patron.test(m))) return { estado: "medido", miembros, detalle: `${miembros.length} miembro(s)` };
+    return { estado: "no-se-sabe", detalle: "la consulta salio 0 y lo que contesto no son logins de GitHub" };
+  }
+  if (/"status"\s*:\s*"?404/.test(salida) || /\(HTTP 404\)/.test(todo)) return { estado: "sin-equipo", detalle: "GitHub contesto 404" };
+  if (/"status"\s*:\s*"?401/.test(salida) || /\(HTTP 401\)/.test(todo) || /gh auth login|GH_TOKEN environment variable|authentication token/i.test(todo)) {
+    return { estado: "sin-auth", detalle: err.trim().split("\n")[0] || "gh no esta autenticado" };
+  }
+  if (error || salida.trim() === "") return { estado: "sin-red", detalle: error || err.trim().split("\n")[0] || `la consulta salio ${codigo} sin cuerpo` };
+  return { estado: "no-se-sabe", detalle: `la consulta salio ${codigo}: ${(err.trim() || salida.trim()).split("\n")[0]}` };
+}
+
+/** El GET de los miembros de un equipo, y nada mas.
+ *
+ *  Mismo criterio que correrGh: `shell: false` —asi los valores no pasan nunca por
+ *  cmd.exe— y los dos que se interpolan ya se validaron contra FORMATOS en
+ *  comprobarEquiposDelPO, que no admite ni un metacaracter de shell. */
+function correrGhEquipo({ org, equipo }) {
+  try {
+    const stdout = execFileSync("gh", ["api", `orgs/${org}/teams/${equipo}/members`, "--paginate", "--jq", ".[].login"], {
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "pipe"],
+      timeout: TIMEOUT_DE_LA_SONDA,
+      shell: false,
+    });
+    return { presente: true, codigo: 0, stdout, stderr: "", error: null };
+  } catch (e) {
+    if (e?.code === "ENOENT") return { presente: false, codigo: null, stdout: "", stderr: "", error: "ENOENT" };
+    const vencio = e?.killed === true;
+    return {
+      presente: true,
+      codigo: typeof e?.status === "number" ? e.status : null,
+      stdout: String(e?.stdout ?? ""),
+      stderr: String(e?.stderr ?? ""),
+      error: vencio ? `la consulta no contesto en ${TIMEOUT_DE_LA_SONDA} ms` : typeof e?.status === "number" ? null : (e?.message ?? "fallo"),
+    };
+  }
+}
+
+/** Mide los dos equipos y clasifica. En una cuenta personal no pregunta nada.
+ *  Si el primer equipo no se pudo mirar, no pregunta el segundo: no cambiaria el
+ *  veredicto y es otra espera de red. */
+export function comprobarEquiposDelPO(valores, correr = correrGhEquipo) {
+  if (tipoDeCuentaDe(valores) !== "organizacion") return { estado: "no-aplica" };
+  for (const k of ["ORG", "EQUIPO_PO", "EQUIPO_BUILDERS"]) {
+    if (!FORMATOS[k].patron.test(String(valores?.[k] ?? ""))) {
+      return { estado: "no-se-sabe", detalle: `no se consulto: ${k} = ${JSON.stringify(valores?.[k])} no tiene la forma de ${FORMATOS[k].que}` };
+    }
+  }
+  const org = valores.ORG;
+  const miembros = {};
+  for (const equipo of [valores.EQUIPO_PO, valores.EQUIPO_BUILDERS]) {
+    if (miembros[equipo]) continue;
+    const s = clasificarSondaDeEquipo(correr({ org, equipo }));
+    if (s.estado !== "medido") return { ...s, equipo };
+    miembros[equipo] = s.miembros;
+  }
+  const miembrosPo = miembros[valores.EQUIPO_PO];
+  const miembrosBuilders = miembros[valores.EQUIPO_BUILDERS];
+  return { ...clasificarEquiposDelPO({ po: valores.PO, miembrosPo, miembrosBuilders }), miembrosPo, miembrosBuilders };
+}
+
+/** Lo que se imprime. `aviso` dice si hay algo que la persona tiene que mirar;
+ *  cada linea de aviso lleva `::warning::` y el arreglo escrito adentro. */
+export function lineasDeEquiposDelPO(r, valores) {
+  if (!r || r.estado === "no-aplica") return { aviso: false, lineas: [] };
+  const org = valores?.ORG;
+  const po = valores?.PO;
+  const eqPo = `${org}/${valores?.EQUIPO_PO}`;
+  const eqB = `${org}/${valores?.EQUIPO_BUILDERS}`;
+  const mirar = `gh api orgs/${org}/teams/${valores?.EQUIPO_PO}/members --jq '.[].login'`;
+  const lista = (xs) => (xs ?? []).join(", ");
+  const pre = "::warning::PO DE CODEOWNERS:";
+  const cierre =
+    ` Arreglarlo es un acto de quien administra la organizacion; esta herramienta no toca equipos. ` +
+    `Para mirarlo a mano: ${mirar}`;
+  switch (r.estado) {
+    case "bien":
+      return { aviso: false, lineas: [`PO de CODEOWNERS: medido — en ${eqPo} la unica persona que no es de ${eqB} es ${po}, el PO que declara el proyecto`] };
+    case "vacio":
+      return {
+        aviso: true,
+        lineas: [
+          `${pre} medido — el equipo ${eqPo} no tiene miembros. CODEOWNERS le da a ese equipo proposal y specs, y un ` +
+            `equipo vacio no le pide el review a nadie: el gate del PO no existe y GitHub no lo dice. Arreglo: agregar ` +
+            `a ${po} a ${eqPo}, y a nadie que sea de ${eqB}.${cierre}`,
+        ],
+      };
+    case "solo-builders":
+      return {
+        aviso: true,
+        lineas: [
+          `${pre} medido — todas las personas de ${eqPo} (${lista(r.miembrosPo ?? r.soloPo)}) son tambien de ${eqB}, ` +
+            `asi que un builder satisface el gate del PO desde el otro rol. Arreglo: que en ${eqPo} este ${po} y ` +
+            `nadie de ${eqB}.${cierre}`,
+        ],
+      };
+    case "varios":
+      return {
+        aviso: true,
+        lineas: [
+          `${pre} medido — en ${eqPo} hay ${r.soloPo.length} personas que no son de ${eqB} (${lista(r.soloPo)}), y el ` +
+            `proyecto declara UN PO, ${po}. Cualquiera de ellas satisface el gate, y esta herramienta no elige la ` +
+            `primera. Arreglo: dejar en ${eqPo} solo a quien es el PO, o corregir el valor PO del proyecto.${cierre}`,
+        ],
+      };
+    case "otro":
+      return {
+        aviso: true,
+        lineas: [
+          `${pre} medido — la unica persona de ${eqPo} que no es de ${eqB} es ${lista(r.soloPo)}, y el proyecto ` +
+            `declara PO = ${po}${r.poEnBuilders ? `, que ademas esta en ${eqB}` : ""}. El gate lo satisface ` +
+            `${lista(r.soloPo)}; el README y las reglas del proyecto nombran a ${po}. Arreglo: corregir el valor PO ` +
+            `del proyecto (en el archivo de valores y en .projects-valores.json), o corregir el equipo.${cierre}`,
+        ],
+      };
+    default: {
+      const comoSeDestraba = {
+        "sin-gh": "Instala GitHub CLI (https://cli.github.com) y corre",
+        "sin-auth": "Corre `gh auth login` y despues",
+        "sin-red": "Es un problema de red, no del equipo. Desde una maquina con salida a api.github.com, corre",
+        "sin-equipo":
+          `GitHub contesto 404 sobre ${org}/${r.equipo}: o ese slug no existe —y entonces CODEOWNERS nombra a un ` +
+          `equipo que no asigna a nadie—, o tu cuenta no lo ve. Revisa el slug en https://github.com/orgs/${org}/teams y corre`,
+        "no-se-sabe": "Si fue un 403, a la sesion de gh le puede faltar el permiso read:org (`gh auth refresh -s read:org`). Despues corre",
+      }[r.estado] ?? "Corre";
+      return {
+        aviso: true,
+        lineas: [
+          `${pre} no se pudo comprobar (${r.estado}: ${r.detalle ?? "sin detalle"}). «No pude mirar» no es «esta bien»: ` +
+            `nadie comprobo que ${eqPo} tenga exactamente a ${po} fuera de ${eqB}. ${comoSeDestraba}: ${mirar}`,
+        ],
+      };
+    }
+  }
+}
+
 // ─────────────────────────── El programa ───────────────────────────
 
 const EJEMPLO = {
@@ -3639,7 +3870,7 @@ async function main(argv) {
     let previos = {};
     if (fs.existsSync(rutaDeRespuestas)) {
       try {
-        previos = JSON.parse(fs.readFileSync(rutaDeRespuestas, "utf-8"));
+        previos = leerValores(rutaDeRespuestas);
         process.stdout.write(`Retomando lo que contestaste antes (${rutaDeRespuestas}). Enter mantiene cada respuesta.\n`);
       } catch {
         // Un archivo ilegible no es motivo para no dejar arrancar: se pregunta
@@ -3649,7 +3880,7 @@ async function main(argv) {
     } else if (o.valores && fs.existsSync(o.valores)) {
       // Compatibilidad con quien ya tiene un archivo de valores escrito a mano:
       // las claves que coinciden con una pregunta se ofrecen igual.
-      previos = JSON.parse(fs.readFileSync(o.valores, "utf-8"));
+      previos = leerValores(o.valores);
     }
     const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
 
@@ -3862,7 +4093,9 @@ async function main(argv) {
   // ── Valores ──
   let crudos;
   try {
-    crudos = JSON.parse(fs.readFileSync(o.valores, "utf8"));
+    // Con leerValores y no con JSON.parse a secas: un archivo escrito desde
+    // Windows PowerShell trae BOM, y eso no es un error de la persona.
+    crudos = leerValores(o.valores);
   } catch (e) {
     console.error(`::error::no pude leer ${o.valores}: ${e.message}`);
     return 1;
@@ -4080,6 +4313,17 @@ async function main(argv) {
   for (const aviso of escrituraDeProteccion.avisos) console.error(`::warning::${aviso}`);
   {
     const linea = avisoDeProteccion({ ...proteccion, org: valores.ORG, proyecto: valores.PROYECTO });
+    if (linea.startsWith("::warning::")) console.error(linea);
+    else console.log(linea);
+  }
+
+  // ── El PO que CODEOWNERS nombra, contra los equipos de la organizacion ──
+  //
+  // Aca y no antes por el mismo motivo que la proteccion: CODEOWNERS ya quedo
+  // escrito con esos equipos, y es ahora cuando hay algo concreto que contrastar.
+  // Solo avisa —el arreglo es de quien administra la organizacion— y en una cuenta
+  // personal no pregunta nada. Ver el bloque de clasificarEquiposDelPO.
+  for (const linea of lineasDeEquiposDelPO(comprobarEquiposDelPO(valores), valores).lineas) {
     if (linea.startsWith("::warning::")) console.error(linea);
     else console.log(linea);
   }

@@ -70,15 +70,17 @@ aplica nada ([12-upgrade-openspec.md, trampa 3](12-upgrade-openspec.md)).
 
 PowerShell nativo **sigue soportado** —hay quien no puede instalar WSL— y por eso los pares
 existen. Lo que **no** está soportado es `cmd.exe`, ni **Windows PowerShell 5.1**: la consola
-azul, `powershell.exe`, la que ya viene con el sistema. 5.1 rompe esta guía en dos lugares
-exactos: no entiende `&&` entre comandos (fases 4 y 5) —
+azul, `powershell.exe`, la que ya viene con el sistema. 5.1 rompe esta guía en un lugar
+exacto: no entiende `&&` entre comandos (fases 4 y 5) —
 
 ```
 The token '&&' is not a valid statement separator in this version.
 ```
 
-— y su redirección `>` escribe **UTF-16**, que es cómo el `valores.json` de la fase 2 sale
-ilegible para Node sin que nada lo avise. `pwsh` es una instalación aparte y contesta:
+— y ahí se corta. Había un segundo corte, y ya no está: su redirección `>` escribe
+**UTF-16 con BOM**, y el `valores.json` de la fase 2 salía ilegible para `projects init` sin
+que nada lo avisara. Hoy la herramienta lee las tres BOM que puede dejar un shell de Windows
+(ver la fase 2). `pwsh` es una instalación aparte y contesta:
 
 ```powershell
 $PSVersionTable.PSVersion.Major    # 7 o más
@@ -335,32 +337,45 @@ exige (la otra son las labels `area:*`, fase 6).
 Estas dos cosas dependen de otra persona. Si las dejás para el final, te bloquean
 el final.
 
-**1. El PO en la organización y en su equipo.**
+**1. El PO, y que lo que `CODEOWNERS` nombra sea una persona que puede aprobar.**
 
-⚠️ El equipo `po` de la organización está **vacío** (`members_count: 0`), y nada lo
-avisa: GitHub simplemente no asigna a nadie cuando `CODEOWNERS` nombra un equipo sin
-miembros. Sin el PO adentro **no hay quién apruebe el proposal ni los specs**, que
-es el primer paso del primer change.
+`CODEOWNERS` le da al PO los proposal y los specs, y nada falla si lo que nombra no es alguien
+que pueda aprobar: GitHub simplemente no le pide el review a nadie. Sin el PO **no hay quién
+apruebe el proposal ni los specs**, que es el primer paso del primer change. Cómo se comprueba
+depende de dónde vive el repo:
+
+- **En una cuenta personal** no hay equipos: `CODEOWNERS` nombra el handle del PO directo, y
+  `gh api users/<handle-del-po> --jq .name` contesta de quién es.
+- **En una organización**, el equipo del PO tiene que tener **exactamente una** persona que no
+  esté también en el equipo de builders, y esa persona es el PO. Se listan los logins de los
+  dos — no se cuentan contra un número escrito, que envejece y deja de decir cuál está mal:
 
 ```bash
-gh api orgs/im-diego-ec/teams/po/members --jq 'length'   # hoy: 0
+gh api orgs/<org>/teams/<equipo-po>/members --jq '.[].login'
+gh api orgs/<org>/teams/<equipo-builders>/members --jq '.[].login'
 ```
 
-⚠️ **El handle es `po`.** No es `dserrano` — ese es su nombre en Slack, y en
-GitHub pertenece a **otra persona**. Los tres handles "obvios" (`builder-uno`,
-`builder-dos`, `dserrano`) existen en GitHub y son de terceros reales. Poner uno de esos
-en `CODEOWNERS` no falla: asigna a un desconocido, o a nadie, sin decir nada.
+No hace falta compararlos a ojo: `projects init` hace esa cuenta solo al terminar la fase 3 y
+avisa si no da exactamente una persona, o si no es la que declaraste como `PO`. Para mirarlo
+antes —en esta fase, con el archivo de la fase 2 ya escrito— o después, cuando los equipos
+cambien, el mismo control a pedido:
+`node herramientas/projects-doctor.mjs --valores <ruta>/valores.json`.
+
+⚠️ **Un handle «obvio» puede ser de otra persona.** El nombre con que alguien aparece en el
+chat del equipo no es necesariamente su handle de GitHub, y un handle adivinado suele existir
+y ser de un tercero. Poner uno de esos en `CODEOWNERS` no falla: asigna a un desconocido, o a
+nadie, sin decir nada.
 
 **2. El issue macro en el Project del equipo.** Los pendientes macro **no** viven en el
 repo: van al Project del área, y los hijos —los sub-issues por bloque— no van al board.
 Decidido el 2026-08-23; la regla es la de la constitución y no cambió.
 
-Hoy el único project del área es *«Roadmap del área»* (project 2). Si el proyecto
-nuevo entra ahí, se renombra, y eso toca al repo que ya está en ese board: por eso está en
-esta fase y no en la última.
+Si el proyecto nuevo entra a un Project que ya existe, puede hacer falta renombrarlo, y eso
+toca a los repos que ya están en ese board: por eso está en esta fase y no en la última. Los
+que hay en tu cuenta:
 
 ```bash
-gh project list --owner po
+gh project list --owner <org>
 ```
 
 ---
@@ -398,11 +413,14 @@ cd <ruta-al-clon-de-projects>
 node herramientas/projects-init.mjs --ejemplo | Set-Content -Encoding utf8 valores.json
 ```
 
-El gemelo no usa `>` a propósito, y es el motivo por el que esta guía no soporta Windows
-PowerShell 5.1: ahí `>` escribe **UTF-16 con BOM**. El archivo se ve perfecto en el editor,
-y el `--valores` de la fase 3 lo rechaza con un error de sintaxis JSON sobre el primer
-carácter, que se lee como si lo hubieras llenado mal. `Set-Content -Encoding utf8` deja UTF-8
-sin BOM en `pwsh` 7, que es lo que Node espera.
+El gemelo usa `Set-Content -Encoding utf8`, que en `pwsh` 7 deja UTF-8 sin BOM. Si el
+archivo te sale con BOM igual —`>` en Windows PowerShell 5.1 escribe UTF-16, y
+`Out-File -Encoding utf8` le pone la marca a UTF-8—, **no pasa nada**: `projects init` lee
+las tres BOM que un shell de Windows puede poner. Mira los **bytes**, no el nombre de la
+codificación que muestra un editor o `file`, y un JSON que de verdad está mal sigue saliendo
+con su error. Lo que conviene comprobar antes de la fase 3 es justamente eso, que el archivo
+se lea y valide, y hay un comando que lo hace sin escribir nada:
+`node herramientas/projects-init.mjs --valores valores.json --destino . --vista-previa`.
 
 La tabla completa de qué es cada uno está en
 [`plantilla/README.md`](../plantilla/README.md), sección 2. Acá va sólo lo que
@@ -912,7 +930,7 @@ Bash, que corren sobre NTFS igual. La postura completa está en «Antes de empez
 | **Los `__pycache__` de la herramienta de descubrimiento** | Es la fila de arriba, con nombre y apellido: el `git add -A` del paso 6 —el commit antes de pedirle cambios a BMAD— muere con `Filename too long` adentro de `~/descubrimiento-<proyecto>`, y sin ese commit no hay deshacer | Ese directorio tiene su propio `git init` (paso 1) y ningún `.gitignore`. Escribile uno con `__pycache__/` y `.venv/`: son salida de la herramienta, no material del descubrimiento, y no hay razón para versionarlos |
 | **Fin de línea (CRLF)** | `pnpm verificar` sale rojo en el paso de formato sobre archivos que **nadie tocó**, y `git diff` no muestra nada: `[warn] Code style issues found in the above file(s). Run Prettier with --write to fix.` Está medido en este marco, el 2026-08-19: con `core.autocrlf=true` —el default de Git para Windows— los fixtures llegaban en CRLF, las pruebas los escribían en LF, y el diff veía el archivo entero reescrito: el caso «un cambio que solo **borra** líneas» pasaba a tener **2 líneas agregadas** y salía con **EXIT 1**. Quedaban 90 de 91 pruebas verdes, y la única roja lo era por el fin de línea del disco, no por el código | El andamio trae `.gitattributes` con `* text=auto eol=lf`, y por eso no es cosmético. Pero solo gobierna **desde** la fase 3: un checkout hecho antes ya está en CRLF en disco. `git config --global core.autocrlf false` y después `git add --renormalize .` |
 | **Mayúsculas del sistema de archivos** | Verde en tu máquina, rojo en el CI y solo ahí: `error TS2307: Cannot find module './Boton'`. macOS y Windows no distinguen `boton.tsx` de `Boton.tsx`; Linux sí. Su hermano peor es el renombre: `git mv boton.tsx Boton.tsx` en macOS o Windows **no hace nada y no dice nada**, así que el repo se queda con el nombre viejo y vos ves el nuevo | `git config core.ignorecase false` en el repo, y renombrar con `git mv -f`. El typecheck ya ayuda —`forceConsistentCasingInFileNames` está prendido en el `tsconfig.base.json` del andamio— pero solo sobre lo que pasa por el compilador: la ruta de una imagen, un nombre dentro de un glob o un archivo nombrado en el YAML del CI no los mira nadie hasta el runner |
-| **Windows PowerShell 5.1 en vez de `pwsh` 7** | Dos cortes exactos: `The token '&&' is not a valid statement separator in this version.` en las fases 4 y 5, y un `valores.json` en **UTF-16** que la fase 3 rechaza como JSON inválido en el primer carácter — lo que se lee como que llenaste mal el archivo | Instalar `pwsh` 7, que es un paquete aparte y convive con el 5.1. `$PSVersionTable.PSVersion.Major` tiene que decir 7 |
+| **Windows PowerShell 5.1 en vez de `pwsh` 7** | Un corte exacto: `The token '&&' is not a valid statement separator in this version.` en las fases 4 y 5. Había un segundo —un `valores.json` en **UTF-16** que la fase 3 rechazaba como JSON inválido en el primer carácter— y ya no corta: `projects init` lee las tres BOM de Windows | Instalar `pwsh` 7, que es un paquete aparte y convive con el 5.1. `$PSVersionTable.PSVersion.Major` tiene que decir 7 |
 | **`openspec archive` sobre Windows nativo** | Imprime **`Specs updated successfully`** y hace rollback de todo, specs incluidos. Verificado el 2026-08-14, reproducido dos veces | No mirar el mensaje: mirar `git status --short`. El procedimiento y los tres rodeos están en [12-upgrade-openspec.md, trampa 3](12-upgrade-openspec.md) |
 
 ---

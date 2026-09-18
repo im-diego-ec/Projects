@@ -28,7 +28,16 @@
 
 import { execFileSync, spawnSync } from "node:child_process";
 import process from "node:process";
-import { NODE_MINIMO, NODE_RECOMENDADO, compararVersiones, invocadoDirecto } from "./projects-init.mjs";
+import {
+  EQUIPOS_CON_PROBLEMA,
+  NODE_MINIMO,
+  NODE_RECOMENDADO,
+  compararVersiones,
+  comprobarEquiposDelPO,
+  invocadoDirecto,
+  leerValores,
+  lineasDeEquiposDelPO,
+} from "./projects-init.mjs";
 
 /** Si la salida va a una persona o a un log de CI. Con TTY se escribe para leer;
  *  sin TTY se agregan las anotaciones que GitHub Actions sabe subrayar. */
@@ -247,7 +256,41 @@ export function veredicto(estados, sesion) {
   return { codigo: 0, lineas: l };
 }
 
-export function main() {
+/** Con `--valores <archivo>`: el PO que CODEOWNERS va a nombrar, contra los
+ *  equipos de la organizacion.
+ *
+ *  POR QUE VIVE TAMBIEN ACA, si `projects init` ya lo comprueba solo al terminar.
+ *  Porque los equipos cambian DESPUES: entra alguien, se va el PO, un builder
+ *  queda en los dos. Esto es el mismo control —la misma funcion, no una copia—
+ *  corrido cuando uno quiera, antes o despues de instanciar, sin volver a armar
+ *  nada. Y es la unica forma de hacerlo en la fase 1 de la guia tecnica, que
+ *  pasa ANTES de que exista el repo.
+ *
+ *  El codigo de salida sigue la regla de este archivo: un problema MEDIDO bloquea
+ *  (1), "no pude mirar" avisa y no bloquea —no se afirma nada que no se midio—, y
+ *  una cuenta personal no tiene equipos que mirar. Leer el archivo tolera la BOM
+ *  de Windows, igual que `projects init`. */
+export function revisarEquipos(ruta, { leer = leerValores, comprobar = comprobarEquiposDelPO } = {}) {
+  let valores;
+  try {
+    valores = leer(ruta);
+  } catch (e) {
+    return { codigo: 1, lineas: [`${PROBLEMA} no pude leer ${ruta}: ${e.message}`] };
+  }
+  const r = comprobar(valores);
+  if (r.estado === "no-aplica") {
+    return { codigo: 0, lineas: ["  [    ] Equipos del PO: la cuenta es personal (TIPO_CUENTA no es «organizacion»), así que no hay equipos que comprobar"] };
+  }
+  const { lineas } = lineasDeEquiposDelPO(r, valores);
+  const bloquea = EQUIPOS_CON_PROBLEMA.has(r.estado);
+  const etiqueta = bloquea ? `${PROBLEMA} ` : `${AVISO} `;
+  return {
+    codigo: bloquea ? 1 : 0,
+    lineas: lineas.map((l) => (l.startsWith("::warning::") ? etiqueta + l.slice("::warning::".length) : `  [OK  ] ${l}`)),
+  };
+}
+
+export function main(argv = process.argv.slice(2)) {
   const estados = revisar();
   const sesion = sesionDeGitHub();
   for (const linea of lineasDelInforme(estados, sesion)) process.stdout.write(`${linea}\n`);
@@ -255,7 +298,17 @@ export function main() {
   const v = veredicto(estados, sesion);
   const escribir = v.codigo === 0 ? process.stdout : process.stderr;
   for (const linea of v.lineas) escribir.write(`${linea}\n`);
-  return v.codigo;
+
+  const i = argv.indexOf("--valores");
+  if (i === -1) return v.codigo;
+  if (!argv[i + 1]) {
+    process.stderr.write(`${PROBLEMA} --valores necesita la ruta del archivo de valores\n`);
+    return 1;
+  }
+  process.stdout.write("\n");
+  const e = revisarEquipos(argv[i + 1]);
+  for (const linea of e.lineas) (e.codigo === 0 ? process.stdout : process.stderr).write(`${linea}\n`);
+  return Math.max(v.codigo, e.codigo);
 }
 
 // `invocadoDirecto` y no la comparacion ingenua con `argv[1]`: esa falla
