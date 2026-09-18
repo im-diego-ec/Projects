@@ -15,7 +15,7 @@
 // eso el extractor tambien falla ruidoso: si un paso se renombra o pierde su
 // bloque "run:", esto tira y el banco se pone rojo en vez de dejar de probar en
 // silencio.
-import { readdirSync, readFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -246,6 +246,16 @@ export function pasosDe(ruta) {
   const lineas = readFileSync(ruta, "utf8").split(/\r?\n/);
   const pasos = [];
   for (let i = 0; i < lineas.length; i += 1) {
+    // EL CUERPO DE UN ESCALAR DE BLOQUE NO ES YAML: un `run: |` o un `description: |` pueden
+    // traer texto con forma de `steps:` y `- uses:` —un heredoc que imprime un workflow, un
+    // snippet para pegar— y eso no es un paso de nadie. Se saltea entero: todas las lineas con
+    // mas sangria que la clave que lo abre.
+    const bloque = lineas[i].match(/^(\s*)(-\s+)?[A-Za-z_][\w-]*:\s*[|>][-+0-9]*\s*(#.*)?$/);
+    if (bloque) {
+      const columna = bloque[1].length + (bloque[2] ?? "").length;
+      while (i + 1 < lineas.length && (lineas[i + 1].trim() === "" || sangriaDe(lineas[i + 1]) > columna)) i += 1;
+      continue;
+    }
     const marca = lineas[i].match(/^(\s*)steps:\s*(#.*)?$/);
     if (!marca) continue;
     const sangriaSteps = marca[1].length;
@@ -281,6 +291,7 @@ export function pasosDe(ruta) {
           textoRun: null,
           largo: 0,
           uses: null,
+          lineaUses: null,
           continueOnError: delJob,
           lineaNombre: null,
         };
@@ -295,7 +306,10 @@ export function pasosDe(ruta) {
         actual.lineaNombre = j + 1;
       } else if (k === "id") actual.id = escalar(crudo);
       else if (k === "if") actual.condicion = escalar(crudo);
-      else if (k === "uses") actual.uses = escalar(crudo);
+      else if (k === "uses") {
+        actual.uses = escalar(crudo);
+        actual.lineaUses = j + 1;
+      }
       else if (k === "continue-on-error") {
         const valor = escalar(crudo);
         actual.continueOnError = valor === "false" ? null : { valor, linea: j + 1, delJob: false };
@@ -337,7 +351,17 @@ export function pasosDe(ruta) {
  * Se saltean `.git`, `node_modules` y toda carpeta `pruebas/`: ahi viven FIXTURES —workflows y
  * actions de juguete que los bancos escriben a proposito rotos— y censarlos seria exigirle banco
  * a un caso de prueba.
+ *
+ * Y NO SE ENTRA A OTRO REPOSITORIO. Un worktree dentro del checkout (`.claude/worktrees/<rama>/`,
+ * que el .gitignore del marco ya contempla) trae una copia entera de los workflows: el censo de
+ * pasos sumaba los suyos y el veredicto dependia de la maquina (medido en la revision adversarial
+ * del porte: 63 pasos «sin estado» que no eran de este arbol). Es el UNICO recorrido del arbol
+ * que usan el censo de pasos y el lector del alcance de las actions
+ * (`pruebas/alcance-de-las-actions.mjs`), para que los dos no puedan discrepar sobre que arbol
+ * miran.
  */
+export const esOtroRepositorio = (abs) => existsSync(join(abs, ".git"));
+
 export function superficies(raiz = RAIZ) {
   const encontradas = [];
   const recorrer = (relativa) => {
@@ -345,6 +369,7 @@ export function superficies(raiz = RAIZ) {
       const hija = relativa === "" ? entrada.name : `${relativa}/${entrada.name}`;
       if (entrada.isDirectory()) {
         if ([".git", "node_modules", "pruebas"].includes(entrada.name)) continue;
+        if (esOtroRepositorio(join(raiz, hija))) continue;
         recorrer(hija);
       } else if (/(^|\/)action\.ya?ml$/.test(hija) || /(^|\/)\.github\/workflows\/[^/]+\.ya?ml$/.test(hija)) {
         encontradas.push(hija);

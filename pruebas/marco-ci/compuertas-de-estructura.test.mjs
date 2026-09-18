@@ -128,6 +128,60 @@ test("umbral · ROJO: un comentario no declara nada — ni el alcance ni una met
   assert.match(res.salida, /le falta: branches: minimo include:/);
 });
 
+test("umbral · ROJO: el alcance nombrado solo en un comentario de BLOQUE tampoco se declara", () => {
+  // Lo encontro la revision adversarial del porte (2026-09-18). El arreglo de arriba sacaba solo
+  // los comentarios de linea: un `include:` dentro de un `/** ... */` —la forma del JSDoc que ya
+  // tiene la base real— seguia cumpliendo la clausula.
+  const raiz = repoConUmbral("jsdoc");
+  const conJsdoc = baseVitest(80)
+    .replace('    include: ["src/**/*.ts"],\n', "")
+    .replace("export function", "/**\n * include: el alcance lo pone cada paquete (NO se declara aca)\n */\nexport function");
+  escribir(raiz, BASE_VITEST, conJsdoc);
+  const res = correrUmbral(raiz);
+  assert.equal(res.exit, 1, porque("un include en un comentario de bloque no declara el alcance", res.salida));
+  assert.ok(res.salida.includes("le falta: include:"), porque("el rojo no nombra el alcance", res.salida));
+});
+
+test("umbral · ROJO: un `include:` de OTRA clave no fija el alcance de la cobertura", () => {
+  // La otra mitad del mismo hallazgo: `test.include` elige que pruebas corren, no que codigo
+  // entra al calculo. El texto `include:` esta; la clausula no.
+  const raiz = repoConUmbral("otra-clave");
+  const otra = baseVitest(80).replace('    include: ["src/**/*.ts"],\n', "") + 'export const test = { include: ["**/*.test.ts"] };\n';
+  escribir(raiz, BASE_VITEST, otra);
+  const res = correrUmbral(raiz);
+  assert.equal(res.exit, 1, porque("un include que no es el de coverage paso por el alcance", res.salida));
+  assert.ok(res.salida.includes("le falta: include:"), porque("el rojo no nombra el alcance", res.salida));
+});
+
+test("umbral · ROJO: una metrica con un numero fijo no sigue al minimo que se le pasa", () => {
+  // `branches: 80` cumple el numero de hoy y no sube cuando un paquete pide mas: la base tiene
+  // que repartir el PARAMETRO, no una copia del numero.
+  const raiz = repoConUmbral("fijo");
+  escribir(raiz, BASE_VITEST, baseVitest(80).replace("branches: minimo", "branches: 80"));
+  const res = correrUmbral(raiz);
+  assert.equal(res.exit, 1, porque("una metrica fija paso como si siguiera al minimo", res.salida));
+  assert.ok(res.salida.includes("le falta: branches: minimo"), porque("el rojo no nombra la metrica", res.salida));
+});
+
+test("umbral · VERDE: el contrapeso — otro glob, un include partido en lineas y un exclude", () => {
+  const raiz = repoConUmbral("contrapeso");
+  const variada = baseVitest(80).replace(
+    '    include: ["src/**/*.ts"],\n',
+    '    include: [\n      "lib/**/*.{ts,tsx}",\n      "src/**/*.mjs",\n    ],\n    exclude: ["src/**/*.test.ts"],\n',
+  );
+  escribir(raiz, BASE_VITEST, variada);
+  const res = correrUmbral(raiz);
+  assert.equal(res.exit, 0, porque("una configuracion completa con otra forma salio roja", res.salida));
+});
+
+test("umbral · ROJO: una base que no carga no reparte nada, y lo dice", () => {
+  const raiz = repoConUmbral("no-carga");
+  escribir(raiz, BASE_VITEST, `${baseVitest(80)}\nesto no es javascript (\n`);
+  const res = correrUmbral(raiz);
+  assert.equal(res.exit, 1, porque("una base que no carga paso", res.salida));
+  assert.ok(res.salida.includes("no se pudo cargar"), porque("el rojo no dice que no cargo", res.salida));
+});
+
 test("umbral · ROJO: el andamio no reparte ninguna configuracion de cobertura", () => {
   const res = correrUmbral(repoConUmbral("sin-base", { base: false }));
   assert.equal(res.exit, 1, porque("sin base cada proyecto inventa su umbral", res.salida));

@@ -192,6 +192,41 @@ implementa el lote 17 del porte de Rigel (ver `proposal.md`).
       **No hecho**: no están instalados en esta máquina y el lote no agrega herramientas.
       Los corre el CI («Definiciones de pipeline validas» y su gemelo del andamio).
 
+## Bloque 7 — Lo que encontró la revisión adversarial (2026-09-18)
+
+- [x] 7.1 **La cláusula del umbral seguía cumpliéndose con texto que no declara nada**
+      (FO-S8). Un `include:` en un comentario de bloque, o de otra clave (`test.include`),
+      pasaba con «coincide con el del comparador». **Rojo primero:** tres casos nuevos en
+      `pruebas/marco-ci/compuertas-de-estructura.test.mjs` contra el paso anterior → `tests 28,
+      pass 25, fail 3` (el JSDoc, la otra clave y una base que no carga). **Arreglo:** el paso
+      carga el módulo con `node` y mira lo que devuelve `coberturaDelMarco()`, con otro mínimo
+      para ver que las métricas lo sigan (design D6). El contrapeso tiene caso: otro glob, un
+      `include` partido en líneas y un `exclude` salen verdes, y la base real también.
+      Resultado: `28/28`.
+- [x] 7.2 **El censo de pasos contaba los de un repositorio anidado** (RV-L3-03). Con un
+      worktree en `.claude/worktrees/<rama>/`, `superficies()` sumaba sus workflows. **Rojo,
+      medido sobre una copia del árbol con un worktree de juguete adentro:** `node --test
+      pruebas/marco-ci/cobertura-de-los-pasos.test.mjs` → «224 pasos en 30 superficies: 65 sin
+      estado», `fail 1`; con el arreglo, `17/17`. **Arreglo:** `superficies()` no entra a una
+      carpeta con su propio `.git` (`esOtroRepositorio` en `pruebas/marco-ci/extraer.mjs`), y
+      es el único recorrido del árbol: `pruebas/alcance-de-las-actions.mjs` dejó de tener el
+      suyo y lo usa. Caso MUERDE nuevo en `extraer.test.mjs` (un worktree y un clon anidados),
+      rojo contra el extractor anterior. De paso, `pasosDe()` saltea el cuerpo de un escalar de
+      bloque: un heredoc o un `description: |` con forma de `steps:` daban pasos fantasma (caso
+      nuevo, rojo contra el extractor anterior; sobre el árbol de hoy no había ninguno: los 112
+      pasos son los mismos antes y después).
+- [x] 7.3 **La deuda declarada no llegaba al runner como anotación** (RV-L3-05). `ci.yml`
+      corría `node --test` sin reporter y con Node 22, que para una salida que no es una
+      terminal usa TAP y le antepone «# » a lo que imprime el banco. **Medido con Node
+      22.23.2:** `node --test pruebas/marco-ci/cobertura-de-los-pasos.test.mjs | grep -c
+      '^::warning file='` → `0`; con `--test-reporter=spec` → `14`. La evidencia de 2.3 se había
+      medido con Node 24, cuyo default es spec. **Arreglo:** las tres invocaciones de `node
+      --test` de `ci.yml` fijan `--test-reporter=spec`, lo que arregla también a la hermana
+      (`actions/constitucion/pruebas/refutaciones-ronda-3.test.mjs`, que emite `::notice::` y
+      `::warning::` igual). Caso nuevo en `cobertura-de-los-pasos.test.mjs`: prueba la premisa
+      (TAP la tapa, spec no) y exige el reporter en cada invocación; rojo sin el cambio de
+      `ci.yml`.
+
 ## Pendiente fuera de este change
 
 - **El archive** va en la pasada final, después de la revisión adversarial. Al archivar,

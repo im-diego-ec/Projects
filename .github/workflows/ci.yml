@@ -134,6 +134,14 @@ jobs:
       # el resto del marco. Los archivos se pasan uno por uno a proposito:
       # `node --test <directorio>` no resuelve el patron en las versiones nuevas
       # de Node y el job quedaria rojo por una razon que no es la suya.
+      #
+      # --test-reporter=spec EN LAS TRES INVOCACIONES, y no por estetica. Con la
+      # salida que no es una terminal —la del runner—, Node 22 usa TAP, que le
+      # antepone "# " a todo lo que imprime un banco. El runner solo reconoce un
+      # comando que empieza con "::", asi que las anotaciones que un banco emite
+      # (la deuda del censo de pasos, los avisos de refutaciones-ronda-3) quedaban
+      # como comentarios perdidos en el log. Lo exige
+      # pruebas/marco-ci/cobertura-de-los-pasos.test.mjs.
       - name: Casos sinteticos de las composite actions
         shell: bash
         run: |
@@ -154,7 +162,7 @@ jobs:
           echo "== bancos de pruebas encontrados (node $(node --version)) =="
           printf '%s\n' "${PRUEBAS[@]}"
 
-          node --test "${PRUEBAS[@]}"
+          node --test --test-reporter=spec "${PRUEBAS[@]}"
 
       # Banco de los pasos INLINE de marco-ci.yml.
       #
@@ -221,7 +229,7 @@ jobs:
           echo "== bancos de los pasos inline encontrados (sin pruebas/init/, que corre en la matriz) =="
           printf '%s\n' "${PRUEBAS[@]}"
 
-          node --test "${PRUEBAS[@]}"
+          node --test --test-reporter=spec "${PRUEBAS[@]}"
 
   # LA HERRAMIENTA DE INIT, EN LOS TRES SISTEMAS OPERATIVOS Y EN LAS DOS VERSIONES
   # DE NODE QUE ELLA MISMA DECLARA.
@@ -396,7 +404,7 @@ jobs:
           # cuelgue de verdad ocurra. Lo que se corrige es el motivo escrito: un
           # comentario que atribuye un arreglo a una causa que despues se midio falsa
           # es peor que no tenerlo, porque el que venga lo va a creer.
-          if node --test --test-timeout=120000 "${PRUEBAS[@]}"; then
+          if node --test --test-reporter=spec --test-timeout=120000 "${PRUEBAS[@]}"; then
             echo "el banco de init pasa entero en $(uname -s) con node $(node --version)"
             exit 0
           fi

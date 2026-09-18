@@ -70,7 +70,9 @@ change hace cumplir.
 
 **Cinco estados, excluyentes:** con banco, deuda, sin rojo propio, action del marco,
 action de terceros. **Deuda** y **sin rojo** se separan porque no son lo mismo: la deuda es
-trabajo pendiente y sale por `::warning::` en cada corrida; «sin rojo» es un paso al que no
+trabajo pendiente y sale por `::warning::` en cada corrida (y llega al runner porque `ci.yml`
+corre sus bancos con `--test-reporter=spec`: con el TAP que Node 22 elige para una salida que
+no es una terminal, la anotación salía como comentario; ver el bloque 7 de `tasks.md`); «sin rojo» es un paso al que no
 hay banco que escribirle. Mezclarlos hace que «falta un banco» y «no hay banco que
 escribir» se lean igual. «Sin rojo» lleva un tipo cerrado —`plomeria`, `rojo-ajeno`,
 `aviso`— para que la excusa tenga que caer en una categoría con nombre.
@@ -139,13 +141,21 @@ medido». Al archivar, la fila de este requirement en la página de cobertura di
 ## D6. El umbral del andamio: el alcance, y solo en código
 
 `all: true` dejó de existir en vitest 4 y el andamio lo sacó; el paso lo seguía exigiendo y
-lo encontraba en el comentario que explica el retiro. **Decisión: exigir `include:` —lo que
-hoy fija el alcance— y buscar las cinco cláusulas solo en las líneas que no son comentario
-de línea.** Se filtra con `sed` y no con `grep -v`: un archivo que fuera todo comentario
-haría salir 1 a grep, y el `set -e` mataría el paso sin decir por qué.
+lo encontraba en el comentario que explica el retiro. **Decisión: exigir el alcance
+(`coverage.include`, no vacío) y las cuatro métricas leyendo lo que `coberturaDelMarco()`
+DEVUELVE, con el módulo cargado por `node`.** Se le pasa además otro mínimo para comprobar
+que las métricas lo sigan: una métrica con el número fijo cumple el de hoy y no sube cuando
+un paquete pide más.
 
-**Límite declarado:** un bloque `/* ... */` que nombre una cláusula todavía la cumple. La
-configuración del andamio no los usa para eso, y el caso se puede agregar si aparece.
+**Descartado:** la primera versión de esta decisión, que buscaba las cinco cláusulas como
+texto en las líneas que no son comentario de línea. Declaraba como límite que un bloque
+`/* ... */` que nombrara una cláusula todavía la cumplía, «y la configuración del andamio no
+los usa para eso». La revisión adversarial del porte (2026-09-18) midió que la clase seguía
+abierta por dos lados: el JSDoc que la base real ya tiene alcanza para cumplir `include:`, y un
+`include:` de otra clave (`test.include`, que elige pruebas y no código) también. Quitar
+además los bloques `/* */` habría cerrado el primero y no el segundo. Cargar el módulo cierra
+la clase: un comentario no devuelve nada, y una clave de otro objeto tampoco. Solo aplica al
+repo que distribuye el andamio; ningún consumidor corre esta parte del paso.
 
 **Contrato:** patch. En un consumidor el paso sale por su camino inerte antes de llegar a
 esta línea, así que ningún veredicto cambia.

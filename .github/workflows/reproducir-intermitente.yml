@@ -193,7 +193,11 @@ jobs:
           mkdir -p "${SALIDAS}"
 
           # Una vuelta: la invocacion del grupo, con su techo por archivo si lo tiene, y la salida
-          # entera a su archivo.
+          # entera a su archivo. El reporter NO se copia de ci.yml, a proposito: alla se fija spec
+          # para que las anotaciones de los bancos lleguen al runner, y aca la salida va a un
+          # archivo, el veredicto sale del codigo de salida y el grep de las fallas lee TAP ("not
+          # ok"), que es lo que Node 22 da cuando la salida no es una terminal. El reporter no
+          # cambia que archivos corren juntos, que es lo que este instrumento reproduce.
           vuelta() {
             if [ -n "${TECHO}" ]; then
               node --test "${TECHO}" "${ARCHIVOS[@]}" > "$1" 2>&1

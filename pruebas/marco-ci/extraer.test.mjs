@@ -220,6 +220,41 @@ test("pasosDe · ve TODOS los pasos, con y sin nombre, run de bloque y de una li
   assert.equal(conNombre.condicion, "always()", porque("el if: del paso se lee", conNombre));
 });
 
+test("MUERDE: pasosDe · el texto de un escalar de bloque no es un paso, aunque tenga forma de `steps:`", () => {
+  // Un `run: |` que imprime un workflow con un heredoc —lo que hace un paso que le muestra al
+  // consumidor que pegar— trae `steps:` y `- uses:` que no son de nadie. Lo mismo el texto de un
+  // `description: |`. El lector del alcance de las actions cuenta solo los `uses:` que devuelve
+  // pasosDe (revision adversarial del porte, 2026-09-18), asi que un paso fantasma ahi haria
+  // «alcanzada» a una action que ningun workflow invoca.
+  const yml = [
+    "on:",
+    "  workflow_dispatch:",
+    "    inputs:",
+    "      x:",
+    "        description: |",
+    "          steps:",
+    "            - uses: ./actions/de-la-descripcion",
+    "jobs:",
+    "  a:",
+    "    steps:",
+    "      - name: Imprime el snippet",
+    "        run: |",
+    "          cat <<'FIN'",
+    "          steps:",
+    "            - uses: ./actions/del-heredoc",
+    "          FIN",
+    "      - uses: ./actions/de-verdad",
+    "",
+  ].join("\n");
+  const pasos = pasosDe(escribir(carpetaTemporal("pasos-bloque-"), "wf.yml", yml));
+  assert.deepEqual(
+    pasos.map((p) => p.nombre ?? p.uses),
+    ["Imprime el snippet", "./actions/de-verdad"],
+    porque("el lector saco pasos del texto de un escalar de bloque", pasos),
+  );
+  assert.equal(pasos[1].lineaUses, 17, porque("la linea del uses: es la de la clave", pasos[1]));
+});
+
 test("pasosDe · continue-on-error: el del paso, el del job, y `false` no cuenta", () => {
   const pasos = pasosDe(escribir(carpetaTemporal("pasos-coe-"), "wf.yml", JUGUETE_PASOS));
   const coe = (nombre, n = 0) => pasos.filter((p) => (p.nombre ?? p.id ?? p.textoRun ?? p.uses) === nombre)[n].continueOnError;
@@ -262,4 +297,19 @@ test("superficies · recorre el arbol: el CI del marco, el andamio y las actions
   escribir(raiz, "actions/x/action.yml", "runs: {}\n");
   escribir(raiz, "actions/x/pruebas/fixtures/.github/workflows/juguete.yml", "jobs: {}\n");
   assert.deepEqual(superficies(raiz), ["actions/x/action.yml", "otra/.github/workflows/nuevo.yml"]);
+});
+
+test("MUERDE: superficies · un repositorio anidado (un worktree dentro del checkout) NO es del arbol", () => {
+  // Lo encontro la revision adversarial del porte (2026-09-18): con un worktree en
+  // `.claude/worktrees/<rama>/` —el patron que el .gitignore del marco ya contempla—, el censo
+  // de pasos sumaba sus pasos y el banco de cobertura de los pasos salia rojo con 63 «sin
+  // estado». El veredicto dependia de la maquina. Un worktree trae `.git` como ARCHIVO, y un
+  // clon anidado como DIRECTORIO: los dos cortan el recorrido.
+  const raiz = carpetaTemporal("superficies-anidado-");
+  escribir(raiz, ".github/workflows/propio.yml", "jobs: {}\n");
+  escribir(raiz, ".claude/worktrees/otra-rama/.git", "gitdir: /en/otro/lado\n");
+  escribir(raiz, ".claude/worktrees/otra-rama/.github/workflows/ajeno.yml", "jobs: {}\n");
+  escribir(raiz, "vendido/clon/.git/HEAD", "ref: refs/heads/main\n");
+  escribir(raiz, "vendido/clon/actions/y/action.yml", "runs: {}\n");
+  assert.deepEqual(superficies(raiz), [".github/workflows/propio.yml"], porque("el recorrido entro a un repositorio anidado", superficies(raiz)));
 });

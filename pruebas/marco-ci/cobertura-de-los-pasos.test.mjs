@@ -89,6 +89,7 @@
 // el paso que no ejecuto NADIE, nunca.
 import test from "node:test";
 import assert from "node:assert/strict";
+import { spawnSync } from "node:child_process";
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { basename, join, posix } from "node:path";
 
@@ -621,6 +622,43 @@ test("cobertura de los pasos · la deuda que queda sale por ::warning::, no en s
     deuda.length,
     declaradas,
     porque(`se avisaron ${deuda.length} deudas y las listas declaran ${declaradas}: los casos de arriba tendrian que haber explicado la diferencia`, REAL.problemas),
+  );
+});
+
+test("la deuda LLEGA al runner: toda invocacion de `node --test` de ci.yml usa el reporter que no la tapa", () => {
+  // Lo encontro la revision adversarial del porte (2026-09-18). La deuda sale por console.log de
+  // ESTE banco, y el job de ci.yml corre `node --test` con Node 22 y sin --test-reporter. Con la
+  // salida que no es una terminal —la del runner—, Node 22 usa TAP, que le antepone «# » a todo
+  // lo que imprime un banco: el runner solo reconoce un comando que empieza con «::», asi que las
+  // 14 deudas quedaban como comentarios perdidos. Con Node 24 el default es spec y no se nota:
+  // dependia de la maquina. La hermana en actions/constitucion/pruebas/refutaciones-ronda-3.test.mjs
+  // (::notice:: y ::warning:: por console.log) tenia el mismo destino.
+  //
+  // PRIMERO LA PREMISA, con el Node que corre esto: TAP la tapa y spec no.
+  const tmp = carpetaTemporal("reporter-");
+  const banco = escribir(tmp, "anota.test.mjs", 'import test from "node:test";\ntest("x", () => { console.log("::warning file=a,line=1::la deuda"); });\n');
+  // Sin NODE_TEST_CONTEXT: heredado de este mismo `node --test`, el hijo se comporta como un
+  // subproceso del corredor y no como el `node --test` de un paso de CI.
+  const entorno = { ...process.env };
+  delete entorno.NODE_TEST_CONTEXT;
+  const correr = (reporter) =>
+    spawnSync(process.execPath, ["--test", `--test-reporter=${reporter}`, banco], { encoding: "utf8", env: entorno }).stdout;
+  const enColumnaCero = (salida) => salida.split("\n").some((l) => l.startsWith("::warning file=a,line=1::"));
+  assert.equal(enColumnaCero(correr("tap")), false, porque("la premisa: con TAP la anotacion NO queda en la columna 0", correr("tap")));
+  assert.equal(enColumnaCero(correr("spec")), true, porque("con spec la anotacion queda en la columna 0", correr("spec")));
+
+  // Y LA PROPIEDAD, sobre el ci.yml real: cada `node --test` fija el reporter, en vez de heredar
+  // el que su version de Node elija para una salida que no es una terminal.
+  const ci = readFileSync(join(RAIZ, ".github", "workflows", "ci.yml"), "utf8").split("\n");
+  // Una invocacion es la linea que EMPIEZA con el comando (sola o como condicion de un if); un
+  // echo que la nombra en su texto no corre nada.
+  const invocaciones = ci.map((l, i) => ({ l, n: i + 1 })).filter(({ l }) => /^\s*(?:if\s+|!\s*)?node --test\b/.test(l));
+  assert.ok(invocaciones.length >= 3, porque("ci.yml corre sus bancos en al menos tres invocaciones; el lector dejo de verlas", invocaciones));
+  const sinReporter = invocaciones.filter(({ l }) => !l.includes("--test-reporter=spec")).map(({ l, n }) => `ci.yml:${n}: ${l.trim()}`);
+  assert.deepEqual(
+    sinReporter,
+    [],
+    porque("estas invocaciones dejan que Node elija el reporter, y con Node 22 en el runner es TAP: tapa las anotaciones de los bancos. Arreglo: --test-reporter=spec", sinReporter),
   );
 });
 

@@ -580,8 +580,9 @@ mueve sobre un cambio incompatible.
   por un comentario.** Exigía el texto `all: true` en la configuración de cobertura del
   andamio. vitest retiró esa opción en su mayor 4 y el andamio la sacó, pero el comentario
   que explica el retiro la nombra dos veces, y con eso el paso seguía en verde. Ahora
-  exige el alcance que la reemplaza (`include:`) y mira solo el código, no los
-  comentarios. Lo encontró el banco nuevo del paso en su primer caso rojo.
+  exige el alcance que la reemplaza (`include:`) y las cuatro métricas leyendo lo que la
+  configuración DEVUELVE, con el módulo cargado: ni un comentario ni una clave de otro
+  objeto cuentan. Lo encontró el banco nuevo del paso en su primer caso rojo.
 
   **Para consumidores: nada.** En un consumidor el paso sale antes por su camino inerte
   («no distribuye el comparador») con el mismo `::notice::`, y ningún veredicto cambia.
@@ -1189,7 +1190,11 @@ mueve sobre un cambio incompatible.
   rojo propio» con su tipo y motivo. Una action ajena se declara una vez. Una cita cuenta
   solo si es una cadena literal, y un nombre repetido en dos archivos necesita que el banco
   diga cuál: así el paso de Terraform de `marco-ci.yml` dejó de figurar con el banco de su
-  homónimo del andamio. **Para consumidores: nada** (banco del marco).
+  homónimo del andamio. La deuda llega al runner como anotación: el CI del marco corre sus
+  bancos con `--test-reporter=spec`, porque con el TAP que Node 22 usa en el runner las
+  anotaciones de un banco quedaban como comentarios. Y el censo no cuenta los pasos de un
+  repositorio anidado (un worktree dentro del checkout), que hacían depender el veredicto de
+  la máquina. **Para consumidores: nada** (banco y CI del marco).
 
 - **Un paso con `continue-on-error` no cuenta como compuerta.** Si lleva el modificador
   —en el paso o en su job, con cualquier valor que no sea `false`— el censo de pasos exige
