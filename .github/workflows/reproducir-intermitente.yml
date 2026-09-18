@@ -289,6 +289,11 @@ jobs:
       # La misma action y el mismo SHA que ya usa el andamio (plantilla/.github/workflows/ci.yml):
       # no entra ninguna action de terceros nueva al marco, y el Dependabot del marco la vigila
       # aca igual que al resto de .github/workflows/.
+      #
+      # include-hidden-files: false, decidido y no heredado: el paso de arriba solo escribe
+      # vuelta-0-base.txt y vuelta-N.txt en salidas/, ningun oculto. El marco exige que toda
+      # subida lo declare (pruebas/andamio/artefacto-de-la-constitucion.test.mjs): el default
+      # de upload-artifact los excluye sin avisar.
       - name: Guardar los logs de las vueltas
         if: always()
         uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5
@@ -296,4 +301,5 @@ jobs:
           name: vueltas-${{ github.run_id }}
           path: ${{ runner.temp }}/salidas
           retention-days: 14
+          include-hidden-files: false
           if-no-files-found: warn
