@@ -234,9 +234,10 @@ y otros al lado. Uno de ellos se llama `arrancar`, y es el del paso siguiente.
 **Cómo sabés que salió bien.** La carpeta existe y adentro está el archivo
 `arrancar`. Nada más.
 
-> **La ruta de esa carpeta la vas a necesitar en los Pasos 3 y 5**, pero no hace
-> falta que la busques ahora: **el Paso 1 la imprime en pantalla** apenas abrís
-> `arrancar`, en la segunda línea. Cuando llegues ahí, copiala de la pantalla.
+> **Si después seguís el camino a mano, la ruta de esa carpeta la vas a necesitar
+> en los Pasos 3 y 5**, pero no hace falta que la busques ahora: **el Paso 1 la
+> imprime en pantalla** apenas abrís `arrancar`, en la segunda línea. Cuando
+> llegues ahí, copiala de la pantalla. Con el doble clic no la vas a necesitar.
 
 > **Si ya sabés usar `gh`**, `gh repo clone im-diego-ec/Projects` hace lo mismo de
 > una. Si contesta `Could not resolve to a Repository`, no estás dentro de tu
@@ -275,9 +276,10 @@ computadora, y te dice si está todo o qué falta.
 > ```
 >
 > **Pero no es lo mismo, y conviene saberlo:** ese comando corre **sólo la
-> revisión**. El doble clic además te hace las preguntas y arma el proyecto
-> entero, sin que tengas que escribir un comando más. Si lo tipeás vos, después
-> tenés que seguir a mano.
+> revisión**. El doble clic además te hace las preguntas, arma el proyecto, lo
+> deja como repositorio y te ofrece subirlo a GitHub —o sea, los Pasos 2 a 5—,
+> sin que tengas que escribir un comando más. Si lo tipeás vos, después seguís a
+> mano desde el Paso 2. Los dos caminos están explicados justo abajo.
 
 **Qué vas a ver**, si está todo:
 
@@ -322,23 +324,87 @@ tenés que mirar.
 
 ---
 
-## Paso 2 — Crear el repositorio vacío · *2 minutos, más lo que tarde quien te lo apruebe*
+## Dos caminos desde acá
+
+Después de la revisión, la ventana de `arrancar` **sigue sola**. Desde este
+punto la guía tiene dos caminos que terminan en el mismo lugar, y conviene saber
+en cuál estás para no hacer dos veces lo mismo:
+
+| Si… | Qué hacés | Qué salteás |
+| --- | --- | --- |
+| **Abriste `arrancar` con doble clic** y la ventana siguió con las preguntas | Las contestás ahí mismo, y seguís leyendo acá abajo | **Los Pasos 2 a 5**: los hace la ventana |
+| **Corriste la revisión escribiendo el comando**, o preferís ir paso por paso | Seguís en el Paso 2 | Nada |
+
+### Lo que hace la ventana de `arrancar`, en orden
+
+1. **Te hace las preguntas** del Paso 3 y te muestra el resumen del Paso 4, para
+   que puedas arrepentirte antes de que se escriba nada.
+2. **Arma el proyecto** en una carpeta nueva **al lado** de la del marco, con el
+   nombre que elegiste. Es el Paso 5 entero, verificaciones incluidas, y lo que
+   ves en pantalla es lo que ese paso describe.
+3. **Lo deja como repositorio**, en la rama principal (`main`), con su primer
+   guardado. Para eso tu computadora tiene que saber tu nombre y tu correo: si no
+   los sabe, la ventana te dice los dos comandos para decírselos y **no guarda
+   nada con un nombre inventado**.
+4. **Te ofrece crearlo en GitHub y subirlo.** Es lo único de todo el camino que
+   se ve desde afuera, así que **no lo hace sin preguntarte**. Vas a ver algo así:
+
+   ```
+   Falta una cosa, y es la unica de todo el recorrido que se ve desde afuera: crear tu-usuario/tu-proyecto en GitHub
+   y subirle este primer guardado. Sin eso el proyecto vive solo en esta computadora.
+     Va a ser PÚBLICO: cualquiera puede LEER el código; nadie puede cambiarlo sin que lo apruebes.
+     ¿Lo creo y lo subo? Escribí "si" para crearlo (Enter lo deja para después):
+   ```
+
+   Público o privado sale de lo que contestaste en las preguntas. **Tenés que
+   escribir `si`**: apretar Enter no alcanza, y a propósito. Si lo escribís, la
+   señal de que salió bien es una línea que empieza con
+   **`REPOSITORIO CREADO Y SUBIDO`** seguida de la dirección. Si apretás Enter,
+   no se crea nada afuera y la ventana te deja escrito el comando exacto para
+   hacerlo cuando quieras.
+
+**Cuándo no te lo va a ofrecer, y qué hace en su lugar.** Si el nombre ya existe
+en GitHub, si la sesión de GitHub no está abierta o si falta el programa `gh`,
+no crea nada: te dice cuál de las tres fue y te deja los comandos para hacerlo
+después. Tu proyecto queda igual de armado y guardado en tu computadora.
+
+**Cómo sabés que el doble clic terminó bien.** La ventana termina con
+`LISTO. Tu proyecto esta en:` y la carpeta. Arriba de eso, la lista de lo que
+queda empieza diciendo **en qué estado quedó tu repositorio** —subido, sólo en tu
+computadora, o por qué no se pudo— con los comandos que falten, si falta alguno.
+
+**De ahí seguís en el Paso 6.** Los Pasos 2 a 5 ya están hechos, y en el Paso 9
+el primer envío también: sólo te queda mandar la portada.
+
+> **Si preferís que no te ofrezca subirlo**, abrí `arrancar` desde una terminal
+> agregándole `--sin-remoto` al final. El repositorio queda sólo en tu
+> computadora y la ventana te imprime el comando para subirlo el día que quieras.
+
+---
+
+## Paso 2 — Crear el repositorio vacío, a mano · *2 minutos, más lo que tarde quien te lo apruebe*
+
+> **Si usaste el doble clic, salteá este paso y los tres que siguen.** La ventana
+> de `arrancar` ya creó el repositorio en tu computadora y, si le dijiste que sí,
+> también en GitHub. Seguís en el Paso 6.
 
 **Qué vas a hacer.** Crear el repositorio en GitHub, vacío, y bajarlo a tu
-computadora. La herramienta del paso 5 **no crea repositorios**: escribe adentro
-de uno que ya existe.
+computadora. En este camino la herramienta del Paso 5 **escribe adentro de un
+repositorio que ya existe**, así que éste va primero. El doble clic lo hace al
+revés —arma primero y crea el repositorio al final, preguntándote antes—, y por
+eso allá este paso no existe.
 
-**Antes de copiar nada, comprobá dónde estás parado.** El proyecto nuevo va **al
-lado** del clon, nunca adentro:
+**Antes de copiar nada, comprobá dónde estás parado.** Abrí la terminal en la
+carpeta que **contiene** a la del marco —la de al lado, no la del marco—: el
+proyecto nuevo va **al lado** del clon, nunca adentro.
 
 ```bash
 pwd
 ```
 
-Si el Paso 1 lo hiciste tal cual está escrito, ya estás en el lugar correcto: ese
-bloque terminaba con `cd ..`, que te devolvió justo afuera del clon. La ruta que
-ves **no** tiene que terminar en `/Projects`. Si termina ahí, corré `cd ..` una
-vez —**una sola**— y volvé a comprobar.
+La ruta que ves **no** tiene que terminar en la carpeta del marco (`/Projects`, o
+`/Projects-main` si la bajaste como ZIP). Si termina ahí, corré `cd ..` una vez
+—**una sola**— y volvé a comprobar.
 
 **Qué copiar (cambiá `<org>` y `<proyecto>` por los tuyos):
 
@@ -376,6 +442,9 @@ está vacía salvo por la carpeta oculta `.git`.
 ---
 
 ## Paso 3 — Contestar las decisiones · *de 5 minutos a dos días*
+
+> **Con el doble clic esto ya lo hiciste**: son las preguntas de la ventana de
+> `arrancar`. Este paso es el del camino a mano.
 
 **Qué vas a hacer.** Contestar unas preguntas en castellano. El programa arma con
 tus respuestas el archivo que necesita para construir el proyecto, así que no
@@ -533,6 +602,10 @@ Acá depende de cuánto trabajo tuyo haya adentro:
 limpio es **borrar la carpeta del proyecto, volver a crearla vacía y correr el
 Paso 5 otra vez** con la respuesta corregida. Tarda lo mismo que la primera vez.
 
+**Pero si el doble clic ya lo subió a GitHub, no lo borres.** Borrar la carpeta
+no lo borra de GitHub, y volver a armarlo con el mismo nombre choca con que ese
+nombre ya existe. Seguí el camino de abajo, que sirve igual.
+
 **Si ya trabajaste ahí adentro**, no borres nada. El proyecto tiene un archivo
 `.projects-valores.json` con las 23 casillas y el valor que quedó en cada una:
 abrilo, buscá la que está mal, y reemplazá **ese valor viejo por el nuevo** en el
@@ -546,6 +619,9 @@ qué texto buscar.
 ---
 
 ## Paso 5 — Armar el repositorio y dejarlo en verde, de un tirón · *25 segundos (medido)*
+
+> **Con el doble clic esto también ya pasó**: es lo que hizo la ventana después
+> de las preguntas, y lo que describe este paso es lo que viste en ella.
 
 **Qué vas a hacer.** Un solo comando que hace **dos cosas seguidas**: copia el
 [andamio](02-glosario.md) —el árbol de archivos con el que nace un proyecto—
@@ -833,7 +909,24 @@ son las que viven adentro del recuadro.
 
 ### Después: el envío
 
-**Qué copiar:**
+**Qué copiar**, según cómo llegaste hasta acá. Son tres casos, y la lista de lo
+que queda que te imprimió la herramienta ya te dijo en cuál estás:
+
+**Si la ventana de `arrancar` dijo `REPOSITORIO CREADO Y SUBIDO`**, el primer
+envío ya está en GitHub y sólo falta mandar la portada, también directo:
+
+```bash
+git add README.md
+git commit -m "docs: la portada del proyecto"
+git push
+```
+
+**Si la ventana lo dejó sólo en tu computadora** —le dijiste que no, o no tenía
+cómo subirlo—, corré las dos primeras líneas de arriba y después el comando que
+empieza con `gh repo create` que la ventana te dejó escrito: crea el repositorio
+en GitHub y sube los dos guardados juntos.
+
+**Si lo hiciste a mano (Pasos 2 a 5):**
 
 ```bash
 git add -A

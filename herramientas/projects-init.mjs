@@ -356,6 +356,8 @@ export const BANDERAS = [
   "--asistente",
   "--solo-valores",
   "--version-openspec",
+  "--repositorio",
+  "--sin-remoto",
   "--help",
 ];
 
@@ -563,11 +565,32 @@ export function lineasDeVistaPrevia(raizAndamio, destino, valores, opciones = {}
   for (const paso of pasosSegunElManifiesto(manifiestoPodado(raizAndamio, forma)).corren) {
     l.push(`    · ${paso.titulo}`);
   }
+  // CON --repositorio LA PROMESA DE "NO SE TOCA GITHUB" DEJA DE SER CIERTA, y no
+  // se puede seguir imprimiendo: la corrida termina OFRECIENDO crear el
+  // repositorio en la cuenta de la persona. Lo que si sigue siendo cierto --y es
+  // lo que se promete en su lugar-- es que eso no pasa sin un si escrito.
+  if (opciones.repositorio) {
+    l.push("    · la carpeta queda como repositorio git, en la rama main, con su primer guardado");
+    if (opciones.remoto !== false) {
+      l.push(`    · y te ofrezco crear ${valores?.ORG ?? "<cuenta>"}/${valores?.PROYECTO ?? "<proyecto>"} en GitHub y subirlo: eso, sólo si lo confirmás`);
+    }
+  }
   l.push("");
   l.push("  LO QUE NO VA A PASAR, y conviene saberlo:");
-  l.push("    · No se publica nada en internet. Nadie va a poder entrar todavía.");
+  if (opciones.repositorio && opciones.remoto !== false) {
+    // Un repositorio PUBLICO en GitHub es codigo que cualquiera puede leer: "no se
+    // publica nada en internet" dejaria de ser verdad justo si la persona dice que si.
+    l.push("    · No se publica el proyecto: nadie va a poder entrar todavía. El código sólo se puede leer");
+    l.push("      desde afuera si confirmás subirlo a un repositorio público.");
+  } else {
+    l.push("    · No se publica nada en internet. Nadie va a poder entrar todavía.");
+  }
   l.push("    · No se gasta un peso: nada de esto usa una cuenta paga.");
-  l.push("    · No se toca ninguna cuenta tuya ni ningún ajuste de GitHub.");
+  if (opciones.repositorio && opciones.remoto !== false) {
+    l.push("    · No se crea nada en GitHub sin preguntarte, ni se toca ningún ajuste de tu cuenta o del repositorio.");
+  } else {
+    l.push("    · No se toca ninguna cuenta tuya ni ningún ajuste de GitHub.");
+  }
   l.push("    · Fuera de esa carpeta no se escribe nada.");
   if (opciones.simulado) {
     l.push("");
@@ -3057,7 +3080,7 @@ function valorDeBandera(argv, i, bandera) {
 }
 
 function argumentos(argv) {
-  const o = { herramientas: true, arranque: true, forzar: false };
+  const o = { herramientas: true, arranque: true, forzar: false, repositorio: false, remoto: true };
   for (let i = 0; i < argv.length; i++) {
     if (argv[i] === "--valores") o.valores = valorDeBandera(argv, ++i, "--valores");
     else if (argv[i] === "--destino") o.destino = valorDeBandera(argv, ++i, "--destino");
@@ -3069,6 +3092,17 @@ function argumentos(argv) {
     else if (argv[i] === "--asistente") o.asistente = true;
     else if (argv[i] === "--solo-valores") o.soloValores = valorDeBandera(argv, ++i, "--solo-valores");
     else if (argv[i] === "--version-openspec") o.versionOpenspec = valorDeBandera(argv, ++i, "--version-openspec");
+    // EL REPOSITORIO ES OPT-IN, y lo piden los lanzadores. El camino a mano de
+    // docs/04 crea el repositorio ANTES (Paso 2) y escribe adentro: prenderlo por
+    // defecto le cambiaria el comportamiento a quien ya lo usa asi. Ver
+    // herramientas/projects-repositorio.mjs.
+    else if (argv[i] === "--repositorio") o.repositorio = true;
+    // --sin-remoto IMPLICA --repositorio: es "el repositorio, pero solo en esta
+    // computadora". Sin esa implicacion seria una bandera que no hace nada sola.
+    else if (argv[i] === "--sin-remoto") {
+      o.repositorio = true;
+      o.remoto = false;
+    }
     // `--help` y `-h` son lo PRIMERO que tipea cualquiera frente a una
     // herramienta que no conoce, y hasta este cambio caian en el `throw` de
     // abajo: la respuesta a la pregunta mas basica era un error. Ahora imprimen
@@ -3110,6 +3144,11 @@ function lineasDeUso() {
     "  --version-openspec <x.y.z> pin del CLI de OpenSpec cuando no se puede leer del default de",
     "                             `version_openspec` en marco-ci.yml. Version EXACTA (0.9.4), no",
     "                             un rango: el valor se concatena en la linea de comandos de npx",
+    "  --repositorio              al final deja el destino como repositorio git (rama main) con su",
+    "                             primer guardado, y OFRECE crearlo en GitHub y subirlo: eso se hace",
+    "                             solo si lo confirmas en la terminal. Es lo que piden los lanzadores",
+    "  --sin-remoto               como --repositorio, pero sin tocar GitHub: el repositorio queda solo",
+    "                             en esta computadora y se imprime el comando para subirlo despues",
   ];
 }
 
@@ -3274,6 +3313,28 @@ function delClonConAviso(delClon, raizMarco, pin, motivo) {
 
 function gitDelMarco(raizMarco, args) {
   return execFileSync("git", args, { cwd: raizMarco, stdio: ["ignore", "pipe", "ignore"], maxBuffer: 64 * 1024 * 1024 });
+}
+
+/** UNA pregunta por la terminal, y nada mas. La usa el paso del repositorio para
+ *  la unica confirmacion que se ve desde afuera: crear el repositorio en GitHub.
+ *
+ *  EL FIN DE LA ENTRADA ES UN NO. `rl.question` no llama a su callback cuando la
+ *  entrada se cierra (el mismo defecto medido en el asistente, mas arriba): sin
+ *  el `close`, la promesa quedaba colgada y node salia 0 a mitad de la corrida.
+ *  Aca un cierre contesta "" --que no es un si-- y no se crea nada afuera. */
+function preguntarEnLaTerminal(texto) {
+  return new Promise((resolver) => {
+    const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
+    let contestada = false;
+    rl.question(texto, (respuesta) => {
+      contestada = true;
+      rl.close();
+      resolver(respuesta);
+    });
+    rl.on("close", () => {
+      if (!contestada) resolver("");
+    });
+  });
 }
 
 async function main(argv) {
@@ -3649,7 +3710,9 @@ async function main(argv) {
   // ocupada, que es justo cuando mas sirve --es la que contesta "¿y esto que me
   // va a hacer?"--. Por eso el aviso de la carpeta ocupada lo da ella misma.
   if (o.vistaPrevia) {
-    for (const linea of lineasDeVistaPrevia(raizAndamio, o.destino, valores, { simulado: true })) console.log(linea);
+    for (const linea of lineasDeVistaPrevia(raizAndamio, o.destino, valores, { simulado: true, repositorio: o.repositorio, remoto: o.remoto })) {
+      console.log(linea);
+    }
     return 0;
   }
 
@@ -4090,6 +4153,54 @@ async function main(argv) {
     }
   }
 
+  // ── El repositorio: la carpeta armada pasa a ser uno, y con un si, uno en GitHub ──
+  //
+  // EL DEFECTO QUE CIERRA. El lanzador de doble clic dejaba una CARPETA: el unico
+  // `init` de la cadena era el de OpenSpec. Y la lista de abajo afirmaba «el
+  // bootstrap va a main por PUSH DIRECTO» sin haber mirado si habia un main o un
+  // remoto. Ahora, con --repositorio, se deja el repositorio; y SIEMPRE --con la
+  // bandera o sin ella-- lo que se dice del primer envio sale de MEDIR el destino.
+  //
+  // El modulo se carga aca y no arriba: importa de este archivo, y un import
+  // estatico en las dos direcciones evalua uno antes que el otro.
+  let repoMod = null;
+  try {
+    repoMod = await import("./projects-repositorio.mjs");
+  } catch (e) {
+    console.error(
+      `::warning::no pude cargar herramientas/projects-repositorio.mjs (${e.message}). ` +
+        (o.repositorio
+          ? "Se pidio --repositorio y NO se hizo: la carpeta no quedo como repositorio git. "
+          : "") +
+        "Lo que sigue sobre el primer envio NO esta medido: mira `git status` en el destino antes de creerle.",
+    );
+  }
+  const visibilidad = repoMod ? repoMod.visibilidadDeLasRespuestas(o.valores) : null;
+  let estadoGit = null;
+  if (repoMod && o.repositorio) {
+    // EL PRIMER GUARDADO ES DE UN PROYECTO EN VERDE, o no es. Sin el arranque no
+    // hay lockfile y el CI corre con --frozen-lockfile; sin openspec/ el marco
+    // sale rojo en su primer paso. Guardar y subir eso seria estrenar el repo en
+    // rojo por una razon que esta misma corrida ya conoce.
+    const motivoSinGuardar = !o.herramientas
+      ? "se pidio --sin-herramientas, y sin `openspec init` el primer CI sale rojo en el paso que exige openspec/"
+      : !arranque
+        ? "el arranque no corrio (ver el aviso de arriba), y sin el install no hay lockfile"
+        : null;
+    estadoGit = await repoMod.dejarElRepositorio({
+      destino: o.destino,
+      org: valores.ORG,
+      proyecto: valores.PROYECTO,
+      visibilidad,
+      remoto: o.remoto,
+      listoParaGuardar: motivoSinGuardar === null,
+      motivoSinGuardar,
+      preguntar: process.stdin.isTTY ? preguntarEnLaTerminal : null,
+    });
+  } else if (repoMod) {
+    estadoGit = repoMod.medirRepositorio(o.destino);
+  }
+
   // ── Lo que queda, y es humano ──
   console.log("");
   console.log(
@@ -4098,24 +4209,14 @@ async function main(argv) {
       : "LISTO. Lo que sigue NO lo puede hacer esta herramienta:",
   );
   console.log("");
-  console.log("  EL ORDEN IMPORTA. Lo medido: el bootstrap va a main por PUSH DIRECTO y la");
-  console.log("  proteccion se aplica DESPUES. El plano del cambio de la compuerta de cobertura");
-  console.log("  mide las lineas que un PR agrega sin pruebas, y el commit fundacional agrega");
-  console.log("  el esqueleto entero: por PR sale rojo, por push a main sale `NO APLICABLE`.");
-  console.log("  Ademas `ci-ok` no aparece en la lista de checks del ruleset hasta que el CI");
-  console.log("  haya corrido una vez. Push -> CI verde -> recien ahi el ruleset -> y desde");
-  console.log("  ese momento todo por PR.");
-  console.log("");
-  console.log("  1. ANTES DEL PRIMER PUSH — llenar `README.md`:");
-  console.log("     El andamio deja un README con la estructura puesta y los valores ya");
-  console.log("     sustituidos, y con huecos marcados RELLENAR donde van las respuestas");
-  console.log("     que ninguna herramienta puede inventar: que hace el proyecto, su");
-  console.log("     alcance, que dispara cada despliegue, y el runbook de sus alarmas.");
-  console.log("     Es lo unico que GitHub renderiza en la portada del repo, o sea lo");
-  console.log("     primero que lee quien llega — y un README que quedo con los rotulos");
-  console.log("     del andamio no pone nada en rojo: se lee como si el proyecto no");
-  console.log("     tuviera la respuesta. Cuantos quedan lo dice el grep, no esta lista:");
-  console.log("          grep -n RELLENAR README.md");
+  // EL ORDEN DEL PRIMER ENVIO, segun lo medido: subido por esta corrida,
+  // repositorio sin remoto, carpeta sin git, o el camino a mano (con remoto y sin
+  // enviar). Sin el modulo --que ya aviso arriba-- queda solo la tarea de la
+  // portada, sin afirmar nada sobre un envio que no se pudo medir.
+  const primerEnvio = repoMod
+    ? repoMod.lineasDelPrimerEnvio(estadoGit, { destino: o.destino, org: valores.ORG, proyecto: valores.PROYECTO, visibilidad })
+    : ["  1. ANTES DEL PRIMER ENVIO — llenar `README.md`, los huecos marcados RELLENAR:", "          grep -n RELLENAR README.md"];
+  for (const linea of primerEnvio) console.log(linea);
   console.log("");
   // Esta linea decia "las 4 reglas probadas, no las 8" sobre CUALQUIER repo, sin
   // haber mirado ninguno. En la cuenta que hospeda el marco esas cuatro no

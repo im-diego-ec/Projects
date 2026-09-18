@@ -729,6 +729,28 @@ avisos.
   entrada de «El aviso de la próxima versión se mide en el PR que lo escribe». Si tu
   destino es Slack, declarar `formato: mrkdwn` arregla el encuadre y el cuerpo.
 
+- **La lista de lo que sigue deja de suponer un «PUSH DIRECTO» que no existe.**
+  `projects-init.mjs` afirmaba «el bootstrap va a main por PUSH DIRECTO» sobre
+  cualquier destino, incluida una carpeta sin git ni remoto. Ahora dice lo que
+  midió: carpeta sin repositorio (con los comandos para crearlo, guardarlo y
+  subirlo), repositorio sin remoto (con el `gh repo create` exacto), subido por esa
+  misma corrida (y cómo mandar la portada), o el camino a mano con su remoto, que
+  conserva el texto de siempre. Un checkout con el andamio sin guardar no se da por
+  enviado. La vista previa con `--repositorio` deja de prometer «no se toca
+  GitHub».
+  Para consumidores: nada.
+- **`docs/04-arrancar-acompanado.md` deja de contradecirse entre el doble clic y el
+  camino a mano.** Decía que el doble clic «arma el proyecto entero» y, en el
+  Paso 2, mandaba a clonar con `gh repo create --clone` sobre la carpeta que el
+  lanzador ya había llenado; remitía a un `cd ..` de un bloque que no existe; y
+  afirmaba sin condición que la herramienta «no crea repositorios». Ahora la guía
+  se parte en «Dos caminos desde acá»: el del doble clic salta los Pasos 2 a 5 y el
+  primer envío del 9, y el a mano los recorre, sin esas tres contradicciones. Un
+  banco nuevo (`pruebas/init/el-doble-clic-deja-un-repo.test.mjs`, con git de
+  verdad y `gh` simulado) exige `.git`, rama `main` y `origin`, y conserva el caso
+  rojo de la invocación de antes.
+  Para consumidores: nada.
+
 ### Añadido
 
 - **Está medido que la API de este andamio corre en un Worker sin tocarla.** La ruta
@@ -1430,6 +1452,26 @@ avisos.
   también los specs vivos; la premisa vieja que sigue en el de la cobertura queda
   eximida solo mientras el change que cierra esa ventana esté activo. **Para
   consumidores: nada.**
+
+- **El doble clic deja un repositorio, no una carpeta.** Los tres lanzadores
+  (`arrancar.sh`, `arrancar.command`, `arrancar.cmd`) armaban el proyecto en
+  `../<PROYECTO>` y el único `init` de toda la cadena era el de OpenSpec: la
+  persona terminaba con una carpeta sin git. Ahora el Paso 2 le pide a
+  `projects-init.mjs` la bandera nueva `--repositorio`, que deja el destino como
+  repositorio en la rama `main` con su primer guardado —solo si la identidad de git
+  está configurada (sin ella, git inventa una con el nombre de la máquina, medido) y
+  el proyecto quedó en verde— y **ofrece** crearlo en GitHub y subirlo con
+  `gh repo create <cuenta>/<proyecto> --source=. --remote=origin --push`. Eso último
+  pasa solo si hay `gh` con sesión, el nombre está libre y la persona escribe «si»:
+  Enter, cualquier otra respuesta o la falta de terminal no crean nada. La
+  visibilidad sale de la respuesta que el asistente ya guardó. Lo publicado se
+  comprueba en el disco (`origin` y `origin/main` igual a `HEAD`), no por el código
+  de salida de `gh`. Todo lo que no se pudo hacer sale como `::warning::` con los
+  comandos exactos. `--sin-remoto` (en `projects-init.mjs` y en los lanzadores) deja
+  el repositorio solo en la máquina. La lógica vive en un módulo nuevo,
+  `herramientas/projects-repositorio.mjs`, sin shell en ningún sistema.
+  Para consumidores: nada. Es herramienta del marco que corre desde el clon y no
+  viaja al proyecto; la invocación sin la bandera escribe lo mismo que antes.
 
 ### Corregido
 
