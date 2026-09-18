@@ -334,6 +334,10 @@ sigue publicando en cada merge hasta que copies el archivo nuevo (ver «Cambiado
   consumidores` de fábrica**, que es lo que la compuerta nueva acepta; un banco extrae
   ese bloque de la skill y lo pasa por la misma compuerta. **Para consumidores: nada.**
 
+- **La compuerta del aviso mide cada dialecto que la action acepta**, porque la
+  traducción cambia el largo, y el `::error::` nombra el dialecto que no entra. **Para
+  consumidores: nada** — corre en el CI del marco.
+
 ### Eliminado
 
 - **El andamio ya no trae su propia copia del paso «Formato y validez de las raices de
@@ -645,6 +649,14 @@ sigue publicando en cada merge hasta que copies el archivo nuevo (ver «Cambiado
   y afirmaba que el aviso salía «con el cuerpo completo» mientras lo recortaba. Ahora
   dice a cuánto se recortó y, según la rama, manda a escribir la sección o a acortarla.
   **Para consumidores: nada** — cambia el texto de dos `::warning::`.
+
+- **El mensaje del aviso mezclaba dos dialectos**: su encuadre usaba el de Slack (`*`)
+  y el cuerpo del CHANGELOG el de Markdown (`**`), así que ningún destino lo mostraba
+  entero bien. Ahora el mensaje entero habla el dialecto declarado. **Para
+  consumidores:** si invocás la action y **no** declarás `formato`, la línea «Qué tiene
+  que hacer un consumidor:» pasa de `*…*` a `**…**` —es el único cambio del mensaje por
+  default, medido sobre todo el CHANGELOG—; si tu destino es Slack, declarar
+  `formato: mrkdwn` arregla esa línea y el cuerpo.
 
 ### Añadido
 
@@ -1307,6 +1319,26 @@ sigue publicando en cada merge hasta que copies el archivo nuevo (ver «Cambiado
   `aviso-version.yml`, el simulacro emite `::warning::` en vez de `::notice::` y el
   nombre de la corrida dice «SIMULACRO (no envia)». `simulacro` sigue marcado por
   defecto, a propósito. **Para consumidores: nada** — es el workflow propio del marco.
+
+- **`actions/aviso-version` acepta el dialecto del destino: input opcional `formato`,
+  `markdown` o `mrkdwn`.** `markdown` (lo que se usa sin declarar nada) manda el
+  `CHANGELOG.md` tal cual, para Teams y Discord; `mrkdwn` lo traduce al de Slack
+  —negrita con un asterisco, tachado, enlaces, encabezados, tablas como lista
+  etiquetada, párrafos y viñetas cortados en una sola línea— sin tocar el código, y con
+  la negrita que envuelve código emparejada. Un valor distinto es **rojo**, sin
+  payload y con el arreglo. El input no tiene default en `action.yml`, así que cada
+  corrida dice con un `::notice::` qué dialecto usó y si alguien lo declaró. Medido el
+  2026-09-17: el aviso de 18 de las 19 secciones del CHANGELOG llegaría a Slack con 870
+  `**` a la vista; en `mrkdwn`, ninguna. Portado de Rigel (1.16.0 y 2.4.0), con la
+  continuación de las viñetas que Rigel dejó sin juntar. **Para consumidores: nada**
+  si no invocás la action (ninguno de los consumidores medidos la invoca). Si la
+  invocás y tu destino es Slack, agregá `formato: mrkdwn`; en un workflow copiado del
+  marco va como **variable** de repositorio `AVISO_VERSION_FORMATO` —pestaña
+  Variables, no Secrets: `vars.*` no ve secretos y el aviso cae al default.
+- **El workflow del aviso del marco advierte si el dialecto quedó cargado como
+  secret.** Compara `secrets.AVISO_VERSION_FORMATO` con vacío —sin leer su valor— y
+  emite `::warning::` con el arreglo; no detiene el envío. **Para consumidores: nada**
+  — es el workflow propio del marco.
 
 ### Corregido
 

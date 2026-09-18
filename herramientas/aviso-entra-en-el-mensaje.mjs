@@ -27,9 +27,13 @@
 // donde vive el número: `action.yml` no declara default para `limite` a propósito, y
 // el banco lo exige.
 //
-// UN SOLO DIALECTO: el aviso de Projects manda Markdown tal cual (action.yml, «LIMITES
-// DECLARADOS»). El día que aprenda otro, esta compuerta tiene que medir los dos,
-// porque la conversión cambia el largo.
+// SE MIDE CADA DIALECTO QUE LA ACTION ACEPTA (`FORMATOS`, importado de ella y no
+// copiado). La conversión a mrkdwn cambia el largo —una tabla se vuelve lista
+// etiquetada y crece, una negrita pierde dos asteriscos y achica—, así que pasar en
+// markdown no prueba nada sobre un destino que declaró mrkdwn. Y no se mide solo el
+// dialecto que este repo tenga configurado: la compuerta corre en el PR, que no ve las
+// variables del workflow del aviso, y un verde que dependa de adivinar el destino es
+// un verde a medias.
 //
 // ── SE MIDEN DOS SECCIONES, Y LA SEGUNDA ES LA QUE A RIGEL LE FALTABA ─────────────
 //
@@ -85,6 +89,7 @@ import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import {
+  FORMATOS,
   LIMITE_POR_DEFECTO,
   construirMensaje,
   enlacesDelRelease,
@@ -180,12 +185,15 @@ export function esPlaceholderConCambios(cuerpo) {
  * defecto encontrado. Cada hallazgo trae su `motivo`, porque los tres piden arreglos
  * distintos:
  *
- *  · `"sin-para-consumidores"` — la sección no tiene `### Para consumidores`. Trae
- *    `largo` (el armado SIN techo, lo que se mandaría si entrara), `llega` (lo que de
- *    verdad sale, ya pasado por `recortar`) y `recortado`.
+ *  · `"sin-para-consumidores"` — la sección no tiene `### Para consumidores`. UNO por
+ *    sección, no por dialecto: la ausencia no depende del dialecto, y dos `::error::`
+ *    idénticos no agregan un dato. Trae, por dialecto, `largos` (el armado SIN techo,
+ *    lo que se mandaría si entrara) y `llegan` (lo que de verdad sale, ya pasado por
+ *    `recortar`), y `recortadoEnAlgunDialecto`.
  *  · `"placeholder-con-cambios"` — la sección sigue con el texto de fábrica y la
  *    entrada YA tiene otras subsecciones. Trae sus títulos.
- *  · `"recorte"` — la sección está y el mensaje no entra. Trae `largo`.
+ *  · `"recorte"` — la sección está y el mensaje no entra. UNO por (sección, dialecto),
+ *    porque puede entrar en uno y no en el otro. Trae `formato` y `largo`.
  *
  * Son EXCLUYENTES por sección, a propósito: cuando falta el encabezado no se emite
  * también el recorte, porque el arreglo es el mismo y ya se dice; y el centinela va
@@ -219,28 +227,43 @@ export function medir(changelog, limite = LIMITE_POR_DEFECTO, env = process.env)
   const candidatos = [];
   for (const c of porMedir) {
     const params = { version: c.version, seccion: c.seccion, ...enlacesDelRelease(c.version, env) };
+    const largos = {};
+    const llegan = {};
+    const recortes = [];
+    let sinParaConsumidores = false;
 
-    // DOS ARMADOS, y los dos hacen falta. Sin techo para saber el largo DE VERDAD:
-    // `construirMensaje` devuelve el mensaje ya recortado, así que su largo nunca excede
-    // el límite y reportarlo diría «3451 contra un límite de 3500», que no es un
-    // diagnóstico, es un acertijo. Y con el límite real para que el veredicto lo dé la
-    // misma función que recorta en producción, y no una comparación propia.
-    const completo = construirMensaje({ ...params, limite: Number.MAX_SAFE_INTEGER });
-    const conTecho = construirMensaje({ ...params, limite });
-    const largo = completo.mensaje.length;
-    const llega = conTecho.mensaje.length;
-    const { sinParaConsumidores } = completo;
+    for (const formato of FORMATOS) {
+      // DOS ARMADOS POR DIALECTO, y los dos hacen falta. Sin techo para saber el largo
+      // DE VERDAD: `construirMensaje` devuelve el mensaje ya recortado, así que su largo
+      // nunca excede el límite y reportarlo diría «3451 contra un límite de 3500», que no
+      // es un diagnóstico, es un acertijo. Y con el límite real para que el veredicto lo
+      // dé la misma función que recorta en producción, y no una comparación propia.
+      const completo = construirMensaje({ ...params, formato, limite: Number.MAX_SAFE_INTEGER });
+      const conTecho = construirMensaje({ ...params, formato, limite });
+      largos[formato] = completo.mensaje.length;
+      llegan[formato] = conTecho.mensaje.length;
+      // Sale de `extraerParaConsumidores` sobre el cuerpo del changelog, que es el mismo
+      // en todos los dialectos: los armados coinciden y se lee el último.
+      sinParaConsumidores = completo.sinParaConsumidores;
+      if (conTecho.recortado) recortes.push({ formato, largo: completo.mensaje.length });
+    }
     const anuncioVacioConCambios = esPlaceholderConCambios(c.seccion.cuerpo);
 
     if (sinParaConsumidores) {
-      hallazgos.push({ etiqueta: c.etiqueta, motivo: "sin-para-consumidores", largo, llega, recortado: conTecho.recortado });
+      hallazgos.push({
+        etiqueta: c.etiqueta,
+        motivo: "sin-para-consumidores",
+        largos,
+        llegan,
+        recortadoEnAlgunDialecto: recortes.length > 0,
+      });
     } else if (anuncioVacioConCambios) {
       hallazgos.push({ etiqueta: c.etiqueta, motivo: "placeholder-con-cambios", subsecciones: anuncioVacioConCambios });
-    } else if (conTecho.recortado) {
-      hallazgos.push({ etiqueta: c.etiqueta, motivo: "recorte", largo });
+    } else {
+      for (const r of recortes) hallazgos.push({ etiqueta: c.etiqueta, motivo: "recorte", ...r });
     }
 
-    candidatos.push({ etiqueta: c.etiqueta, version: c.version, estimada: c.estimada, largo, llega, sinParaConsumidores });
+    candidatos.push({ etiqueta: c.etiqueta, version: c.version, estimada: c.estimada, largos, llegan, sinParaConsumidores });
   }
 
   return { sinCandidatos: false, faltaSinPublicar: !sinPublicar.encontrada, candidatos, hallazgos, limite };
@@ -280,16 +303,19 @@ export function main(argv = process.argv.slice(2), env = process.env) {
     );
   }
 
+  const porDialecto = (valores) => FORMATOS.map((f) => `${f}=${valores[f] ?? "?"}`).join(" ");
   for (const c of candidatos) {
     const nota = c.estimada ? ` (version estimada ${c.version})` : "";
     const seccion = c.sinParaConsumidores ? " — SIN «Para consumidores»" : "";
-    console.log(`[${c.etiqueta}]${nota}: ${c.largo} caracteres armados, ${c.llega} llegan — limite ${limite}${seccion}`);
+    console.log(
+      `[${c.etiqueta}]${nota}: armados ${porDialecto(c.largos)}; llegan ${porDialecto(c.llegan)} — limite ${limite}${seccion}`
+    );
   }
 
   if (hallazgos.length === 0) {
     console.log(
-      "✓ el aviso manda su seccion «Para consumidores» y entra sin recortarse, para las secciones que todavia se " +
-        "pueden mandar: " +
+      `✓ el aviso manda su seccion «Para consumidores» y entra sin recortarse en ${FORMATOS.join(" y ")}, para las ` +
+        "secciones que todavia se pueden mandar: " +
         candidatos.map((c) => `[${c.etiqueta}]`).join(" y ")
     );
     return 0;
@@ -311,14 +337,15 @@ export function main(argv = process.argv.slice(2), env = process.env) {
     }
 
     if (h.motivo === "sin-para-consumidores") {
-      const queLlega = h.recortado
-        ? `Y no llega ni siquiera entero: se recorta a ${h.llega}, asi que el destino recibe el principio de la ` +
-          "entrada mas un enlace al release: ni resumen ni entrada."
+      const queLlega = h.recortadoEnAlgunDialecto
+        ? "Y no llega ni siquiera entero: " +
+          FORMATOS.map((f) => `${f} se recorta a ${h.llegan[f] ?? "?"}`).join(" y ") +
+          ", asi que el destino recibe el principio de la entrada mas un enlace al release: ni resumen ni entrada."
         : "Eso es lo que llega al destino, entero.";
       console.log(
         `::error file=${ruta}::la seccion [${h.etiqueta}] no tiene "### Para consumidores", asi ` +
           "que el aviso NO manda un resumen: cae al fail-open y ARMA el mensaje con el CUERPO " +
-          `ENTERO de la entrada (${h.largo} caracteres, contra un limite de ${limite}) — con los ` +
+          `ENTERO de la entrada (${porDialecto(h.largos)}, contra un limite de ${limite}) — con los ` +
           `motivos internos del marco y la prosa que no le toca a nadie adentro. ${queLlega} ` +
           "Arreglo: ESCRIBIRLA. Un `### Para consumidores` con el resumen accionable, aunque sea " +
           "para decir «nada que hacer hoy»; el aviso pasa a mandar solo esa seccion y el detalle se " +
@@ -330,8 +357,8 @@ export function main(argv = process.argv.slice(2), env = process.env) {
 
     const esVersionCortada = h.etiqueta !== ENTRADA_SIN_PUBLICAR;
     console.log(
-      `::error file=${ruta}::la seccion [${h.etiqueta}] se recortaria (${h.largo} caracteres contra un ` +
-        `limite de ${limite}). ` +
+      `::error file=${ruta}::la seccion [${h.etiqueta}] en dialecto '${h.formato}' se recortaria ` +
+        `(${h.largo} caracteres contra un limite de ${limite}). ` +
         (esVersionCortada
           ? "Es la version mas alta del changelog: si este PR la esta cortando, ese es EXACTAMENTE " +
             "el mensaje que sale al canal en cuanto se publique el tag, y el ::warning:: de la " +

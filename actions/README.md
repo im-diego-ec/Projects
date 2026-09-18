@@ -752,6 +752,9 @@ jobs:
         uses: im-diego-ec/Projects/actions/aviso-version@v1.9.6
         with:
           version: ${{ github.event.release.tag_name }}
+          # Solo si el destino es Slack. Es VARIABLE de repositorio, no secret:
+          # vars.* no ve secretos, y el aviso caeria al default sin poder notarlo.
+          formato: ${{ vars.AVISO_VERSION_FORMATO }}
       - shell: bash
         env:
           DESTINO: ${{ secrets.AVISO_VERSION_DESTINO }}
@@ -762,6 +765,16 @@ jobs:
 En el evento `release` el checkout cae en el commit del tag publicado, así que
 el changelog que se lee es el de **esa** versión.
 
+**El mensaje habla el dialecto del destino.** El `CHANGELOG.md` está escrito en
+Markdown, que es lo que renderizan Teams y Discord; Slack habla **mrkdwn**, donde la
+negrita lleva **un** asterisco. Sin declarar nada, el aviso sale en `markdown` —el
+cuerpo tal cual y el encuadre también en markdown—; con `formato: mrkdwn` se traduce
+entero: negrita, tachado, enlaces y encabezados, las tablas como lista etiquetada y
+los párrafos y viñetas cortados a 80 columnas en una sola línea, porque Slack no
+renderiza una negrita que cruce un salto de línea. El código, cercado o en línea, no
+se toca nunca: es lo que el consumidor va a copiar y pegar. Cada corrida dice con un
+`::notice::` qué dialecto usó y si alguien lo declaró.
+
 ### Inputs
 
 | Input | Default | Para qué |
@@ -770,6 +783,7 @@ el changelog que se lee es el de **esa** versión.
 | `changelog` | `CHANGELOG.md` | Ruta del changelog, relativa al working directory |
 | `limite` | la constante `LIMITE_POR_DEFECTO` del script | Largo máximo del mensaje; por encima recorta y lo dice. Sin default en `action.yml` a propósito: el número vive en un solo lugar |
 | `campo` | `text` | Campo de texto del payload JSON (`content` para Discord) |
+| `formato` | la constante `FORMATO_POR_DEFECTO` del script (`markdown`) | Dialecto del destino: `markdown` (Teams, Discord) o `mrkdwn` (Slack). Otro valor es **rojo**. Sin default en `action.yml` a propósito: vacío le dice al script que nadie lo declaró, y el `::notice::` lo anuncia |
 | `salida` | `$RUNNER_TEMP/aviso-version.json` | Dónde escribir el payload |
 
 ### Outputs
@@ -787,6 +801,8 @@ el changelog que se lee es el de **esa** versión.
 | Situación | Veredicto |
 | --- | --- |
 | Entrada con su sección «Para consumidores» | Mensaje completo, con los dos enlaces |
+| Cualquier corrida | `::notice::` con el dialecto que usó y si lo declaró alguien o cayó al default |
+| `formato` con un valor que no es `markdown` ni `mrkdwn` | **Rojo**, sin payload, nombrando los dos valores válidos |
 | Entrada **sin** esa sección | `::warning::` y el mensaje se **arma con el cuerpo completo** de la versión: se manda de más, no de menos. Si ese cuerpo no entra en el límite, llega recortado y el aviso dice a cuánto |
 | Entrada con líneas `BREAKING` | `::warning::` y el mensaje las pone **primero**, cada viñeta entera aunque venga envuelta en varias líneas |
 | Mensaje más largo que el límite | `::warning::` con el largo al que recortó, deja el enlace al release y da el arreglo **de su rama**: sin la sección, escribirla; con la sección, acortarla |
@@ -800,11 +816,16 @@ caro posible, porque le diría a un consumidor que haga algo que no corresponde.
 
 ### Límites declarados
 
-- **El mensaje viaja como Markdown, tal cual lo escribe el CHANGELOG.** No hay
-  traducción al dialecto de ningún destino (Slack no renderiza `**negrita**`
-  igual que GitHub): hacerla sería cablear un proveedor, que es justo lo que
-  este diseño no hace. Lo que se gana es que el aviso y el changelog son el
-  mismo texto, verificable carácter por carácter.
+- **Dos dialectos, y el destino sigue sin cablearse.** `markdown` es el changelog
+  tal cual; `mrkdwn` es la única traducción, y es de dialecto, no de proveedor.
+  Google Chat entiende la negrita de mrkdwn; un destino que hable un tercer
+  dialecto es un change del marco, no una configuración. En `mrkdwn` la tabla
+  pierde la alineación en columnas (no la información: cada valor viaja con su
+  encabezado) y un encabezado pierde su nivel.
+- **La pieza no puede saber si el dialecto quedó en el lugar equivocado.** Sabe si
+  el input llegó vacío, y lo dice; no sabe por qué. El workflow del propio marco
+  agrega lo que sí puede ver: si existe un **secret** `AVISO_VERSION_FORMATO`
+  —el error de cargarlo en la pestaña equivocada—, y lo advierte sin leer su valor.
 - **El payload es `{"<campo>": "<mensaje>"}` y nada más.** Sirve para Slack,
   Google Chat y Teams con `text`, y para Discord con `content`. Un destino que
   exija otra forma es un change del marco, no una configuración.
@@ -812,8 +833,8 @@ caro posible, porque le diría a un consumidor que haga algo que no corresponde.
   al escribirla.** `herramientas/aviso-entra-en-el-mensaje.mjs` corre en el CI
   propio de Projects (job `changelog-en-el-pr`) y pone rojo el PR si falta la
   sección, si el texto de fábrica del release quedó encima de cambios reales o si
-  el mensaje no entra en el límite; mide `[No publicado]` y la versión más alta,
-  con las mismas funciones de esta action. Un repo que use la action sin esa
+  el mensaje no entra en el límite en **alguno de los dos dialectos**; mide
+  `[No publicado]` y la versión más alta, con las mismas funciones de esta action. Un repo que use la action sin esa
   compuerta la detecta recién al avisar, cuando la versión ya está publicada.
 - **Esta action no envía nada, así que no puede garantizar que el aviso llegue.**
   Lo que el workflow que la consuma no puede hacer es callarse: sin destino

@@ -23,10 +23,13 @@
 // de verdad, con el limite que la action usa de verdad. Sin esa asercion, «usa el
 // pipeline real» es una frase.
 //
-// UN SOLO DIALECTO. Rigel mide markdown y mrkdwn porque su aviso traduce; el de
-// Projects manda Markdown tal cual (action.yml, «LIMITES DECLARADOS»), asi que cada
-// seccion se mide una vez. El dia que el aviso aprenda un segundo dialecto, esta
-// compuerta tiene que medir los dos: la conversion cambia el largo.
+// CADA DIALECTO QUE LA ACTION ACEPTA. Hasta el lote 36 del porte el aviso mandaba
+// Markdown tal cual y cada seccion se media una vez. Desde que aprende mrkdwn (el de
+// Slack), la conversion cambia el largo —una tabla se vuelve lista etiquetada y crece,
+// una negrita pierde dos asteriscos y achica—, asi que pasar en markdown no prueba nada
+// sobre un destino que declaro mrkdwn. Los casos que antes contaban UN hallazgo de
+// recorte ahora cuentan uno por dialecto, y los largos se leen por dialecto: el cambio
+// de esas aserciones es el cambio de la compuerta, no una tolerancia nueva.
 
 import test from "node:test";
 import assert from "node:assert/strict";
@@ -34,7 +37,7 @@ import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { LIMITE_POR_DEFECTO, main as mainDelAviso } from "../../actions/aviso-version/aviso-version.mjs";
+import * as laAction from "../../actions/aviso-version/aviso-version.mjs";
 import {
   ENTRADA_SIN_PUBLICAR,
   PLACEHOLDER_SIN_CAMBIOS,
@@ -43,6 +46,11 @@ import {
   medir,
   versionMasAlta,
 } from "../../herramientas/aviso-entra-en-el-mensaje.mjs";
+
+const { LIMITE_POR_DEFECTO, main: mainDelAviso } = laAction;
+/** Los dialectos que la action acepta. Si la action no los exporta todavia, el banco
+ *  mide contra el unico que existia, y los casos nuevos caen por su propia razon. */
+const FORMATOS = laAction.FORMATOS ?? ["markdown"];
 
 const RAIZ = join(import.meta.dirname, "..", "..");
 const CHANGELOG_REAL = join(RAIZ, "CHANGELOG.md");
@@ -118,9 +126,10 @@ async function conTemporal(fn) {
   }
 }
 
-/** Lo que la action escribe de verdad para una version, con el limite que se le pase. */
-async function payloadDelAviso(dir, changelog, version, limite) {
-  const salida = join(dir, `payload-${version}.json`);
+/** Lo que la action escribe de verdad para una version, con el limite y el dialecto que
+ *  se le pasen. `formato` vacio es «no declarado», igual que un input sin valor. */
+async function payloadDelAviso(dir, changelog, version, limite, formato = "") {
+  const salida = join(dir, `payload-${version}-${formato || "default"}.json`);
   const log = console.log;
   console.log = () => {};
   let codigo;
@@ -130,6 +139,7 @@ async function payloadDelAviso(dir, changelog, version, limite) {
       AVISO_CHANGELOG: changelog,
       AVISO_SALIDA: salida,
       AVISO_LIMITE: limite === null ? "" : String(limite),
+      AVISO_FORMATO: formato,
     });
   } finally {
     console.log = log;
@@ -147,21 +157,24 @@ test("una seccion corta entra, y la compuerta ve el encabezado", () => {
   assert.deepEqual(r.hallazgos, []);
   const [c] = r.candidatos;
   assert.equal(c.etiqueta, ENTRADA_SIN_PUBLICAR);
-  assert.ok(c.largo > 0, "reporta el largo");
+  for (const f of FORMATOS) assert.ok(c.largos?.[f] > 0, `reporta el largo en ${f}`);
   assert.equal(c.sinParaConsumidores, false, "el fixture trae el encabezado, y la compuerta lo ve");
 });
 
-test("una seccion que se pasa del limite es ROJO, con el largo REAL", () => {
+test("una seccion que se pasa del limite es ROJO en cada dialecto, con el largo REAL", () => {
+  // Un hallazgo POR DIALECTO: la prosa del relleno no cambia con la conversion, asi que
+  // se pasa en los dos, y cada uno trae su largo.
   const r = medir(changelogCon(rellenoQuePasa(LIMITE_POR_DEFECTO)), LIMITE_POR_DEFECTO, {});
-  assert.equal(r.hallazgos.length, 1);
-  const [h] = r.hallazgos;
-  assert.equal(h.etiqueta, ENTRADA_SIN_PUBLICAR, "el hallazgo nombra la seccion que lo produjo");
-  assert.equal(h.motivo, "recorte");
-  assert.ok(
-    h.largo > LIMITE_POR_DEFECTO,
-    `el largo reportado (${h.largo}) tiene que ser el REAL, no el del mensaje ya recortado: ` +
-      "reportar un numero menor al limite convierte el diagnostico en un acertijo",
-  );
+  assert.deepEqual(r.hallazgos.map((h) => h.formato), FORMATOS);
+  for (const h of r.hallazgos) {
+    assert.equal(h.etiqueta, ENTRADA_SIN_PUBLICAR, "el hallazgo nombra la seccion que lo produjo");
+    assert.equal(h.motivo, "recorte");
+    assert.ok(
+      h.largo > LIMITE_POR_DEFECTO,
+      `el largo reportado en ${h.formato} (${h.largo}) tiene que ser el REAL, no el del mensaje ya recortado: ` +
+        "reportar un numero menor al limite convierte el diagnostico en un acertijo",
+    );
+  }
 });
 
 test("una entrada SIN seccion «Para consumidores» es ROJA aunque el largo entre", () => {
@@ -174,7 +187,9 @@ test("una entrada SIN seccion «Para consumidores» es ROJA aunque el largo entr
   const r = medir(changelog, LIMITE_POR_DEFECTO, {});
   const [c] = r.candidatos;
   assert.equal(c.sinParaConsumidores, true);
-  assert.ok(c.largo < LIMITE_POR_DEFECTO, `el cuerpo entra (${c.largo} de ${LIMITE_POR_DEFECTO}): el rojo no es por el largo`);
+  for (const f of FORMATOS) {
+    assert.ok(c.largos[f] < LIMITE_POR_DEFECTO, `el cuerpo entra en ${f} (${c.largos[f]} de ${LIMITE_POR_DEFECTO}): el rojo no es por el largo`);
+  }
   assert.deepEqual(
     r.hallazgos.map((h) => [h.etiqueta, h.motivo]),
     [[ENTRADA_SIN_PUBLICAR, "sin-para-consumidores"]],
@@ -201,10 +216,13 @@ test("LA ENTRADA ENORME SIN RESUMEN: el consejo es ESCRIBIRLA, no acortarla, y d
     assert.match(err[0], /ESCRIBIRLA/, "el arreglo correcto en esta rama es escribir la seccion");
 
     // Y el numero que dice que LLEGA sale de la misma funcion que recorta en produccion:
-    // se compara contra el payload que la action escribe de verdad.
-    const m = /Y no llega ni siquiera entero: se recorta a (\d+)/.exec(err[0]);
-    assert.ok(m, `el error tiene que decir cuanto llega de verdad:\n${err[0]}`);
-    assert.equal(Number(m[1]), (await payloadDelAviso(dir, changelog, "3.1.0", null)).length);
+    // se compara contra el payload que la action escribe de verdad, en cada dialecto.
+    assert.match(err[0], /Y no llega ni siquiera entero:/, `el error tiene que decir cuanto llega de verdad:\n${err[0]}`);
+    for (const f of FORMATOS) {
+      const m = new RegExp(`${f} se recorta a (\\d+)`).exec(err[0]);
+      assert.ok(m, `el error no dice cuanto llega en ${f}:\n${err[0]}`);
+      assert.equal(Number(m[1]), (await payloadDelAviso(dir, changelog, "3.1.0", null, f)).length, `en ${f}`);
+    }
     assert.doesNotMatch(err[0], /Eso es lo que llega al destino, entero\./, "no puede afirmar que llega entero");
   }));
 
@@ -226,14 +244,16 @@ test("CONTROL POSITIVO: con la seccion presente y sobre el limite, sigue mandand
     const { codigo, dicho } = correr([changelog]);
     assert.equal(codigo, 1);
     const err = errores(dicho);
-    assert.equal(err.length, 1);
-    assert.match(err[0], /acortar la seccion «Para consumidores»/);
-    assert.match(err[0], /se recortaria/);
+    assert.equal(err.length, FORMATOS.length, "un ::error:: de recorte por dialecto");
+    for (const [i, f] of FORMATOS.entries()) {
+      assert.match(err[i], /acortar la seccion «Para consumidores»/);
+      assert.match(err[i], new RegExp(`en dialecto '${f}' se recortaria`));
+    }
   }));
 
 test("el limite se puede subir, y entonces la misma seccion entra", () => {
   const relleno = rellenoQuePasa(LIMITE_POR_DEFECTO);
-  assert.equal(medir(changelogCon(relleno), LIMITE_POR_DEFECTO, {}).hallazgos.length, 1, "con el limite normal, rojo");
+  assert.equal(medir(changelogCon(relleno), LIMITE_POR_DEFECTO, {}).hallazgos.length, FORMATOS.length, "con el limite normal, rojo en cada dialecto");
   assert.deepEqual(medir(changelogCon(relleno), 100000, {}).hallazgos, [], "subir el input `limite` es una salida legitima");
 });
 
@@ -244,16 +264,20 @@ test("el limite se puede subir, y entonces la misma seccion entra", () => {
 test("EL PR DE RELEASE: mide la version recien cortada, no solo el [No publicado] vacio", () => {
   const r = medir(changelogRecienCortado("1.10.0", rellenoQuePasa(LIMITE_POR_DEFECTO)), LIMITE_POR_DEFECTO, {});
   const recortes = r.hallazgos.filter((h) => h.motivo === "recorte");
-  assert.equal(recortes.length, 1, "la seccion cortada se pasa, y el PR de release tiene que verlo");
-  assert.equal(recortes[0].etiqueta, "1.10.0", "el hallazgo sale de la version recien cortada, que es la que el `release` va a mandar");
-  assert.ok(recortes[0].largo > LIMITE_POR_DEFECTO);
+  assert.equal(recortes.length, FORMATOS.length, "la seccion cortada se pasa en cada dialecto, y el PR de release tiene que verlo");
+  for (const h of recortes) {
+    assert.equal(h.etiqueta, "1.10.0", "el hallazgo sale de la version recien cortada, que es la que el `release` va a mandar");
+    assert.ok(h.largo > LIMITE_POR_DEFECTO);
+  }
 });
 
 test("el [No publicado] recien vaciado no tapa a la version cortada, ni suma hallazgos propios", () => {
   const r = medir(changelogRecienCortado("1.10.0", rellenoQuePasa(LIMITE_POR_DEFECTO)), LIMITE_POR_DEFECTO, {});
   const sinPublicar = r.candidatos.find((c) => c.etiqueta === ENTRADA_SIN_PUBLICAR);
   assert.ok(sinPublicar, "se mide igual: es la seccion que escribe el PR siguiente");
-  assert.ok(sinPublicar.largo < LIMITE_POR_DEFECTO, "el [No publicado] vaciado entra: ese verde es el que tapaba el problema");
+  for (const f of FORMATOS) {
+    assert.ok(sinPublicar.largos[f] < LIMITE_POR_DEFECTO, `el [No publicado] vaciado entra en ${f}: ese verde es el que tapaba el problema`);
+  }
   assert.deepEqual(
     r.hallazgos.filter((h) => h.etiqueta === ENTRADA_SIN_PUBLICAR),
     [],
@@ -289,7 +313,10 @@ test("una [No publicado] larga es roja aunque la version cortada entre", () => {
     "",
   ].join("\n");
   const r = medir(changelog, LIMITE_POR_DEFECTO, {});
-  assert.deepEqual(r.hallazgos.map((h) => [h.etiqueta, h.motivo]), [[ENTRADA_SIN_PUBLICAR, "recorte"]]);
+  assert.deepEqual(
+    r.hallazgos.map((h) => [h.etiqueta, h.motivo, h.formato]),
+    FORMATOS.map((f) => [ENTRADA_SIN_PUBLICAR, "recorte", f]),
+  );
 });
 
 // ---------------------------------------------------------------------------
@@ -386,20 +413,83 @@ test("el largo que reporta la compuerta es el del payload que la action escribe"
     // REAL de la action, sobre el CHANGELOG REAL de este repo, con el limite que la
     // action recibe de action.yml y no con la constante: comparar la constante contra si
     // misma es exactamente como Rigel dejo de ver sus dos numeros separados.
+    //
+    // Y POR DIALECTO: la compuerta arma cada uno con `formato` y la action lo recibe como
+    // AVISO_FORMATO. Si una de las dos dejara de pasarlo, este caso compara un mensaje
+    // traducido contra uno sin traducir y se pone rojo.
     const declarado = defaultDeActionYml();
     const limite = declarado === null ? LIMITE_POR_DEFECTO : Number(declarado);
     const cortada = medir(readFileSync(CHANGELOG_REAL, "utf8"), limite, {}).candidatos.find((c) => !c.estimada);
     assert.ok(cortada, "el CHANGELOG de este repo tiene al menos una version publicada");
 
-    const enviado = await payloadDelAviso(dir, CHANGELOG_REAL, cortada.version, declarado);
-    const armadoSinTecho = await payloadDelAviso(dir, CHANGELOG_REAL, cortada.version, Number.MAX_SAFE_INTEGER);
-    assert.equal(
-      cortada.largo,
-      armadoSinTecho.length,
-      `la compuerta mide ${cortada.largo} y la action arma ${armadoSinTecho.length}: una compuerta que mide otro ` +
-        "mensaje que el que se envia no vigila nada",
-    );
-    assert.equal(cortada.llega, enviado.length, `la compuerta dice que llegan ${cortada.llega} y la action manda ${enviado.length}`);
+    for (const f of FORMATOS) {
+      const enviado = await payloadDelAviso(dir, CHANGELOG_REAL, cortada.version, declarado, f);
+      const armadoSinTecho = await payloadDelAviso(dir, CHANGELOG_REAL, cortada.version, Number.MAX_SAFE_INTEGER, f);
+      assert.equal(
+        cortada.largos?.[f],
+        armadoSinTecho.length,
+        `en ${f} la compuerta mide ${cortada.largos?.[f]} y la action arma ${armadoSinTecho.length}: una compuerta que ` +
+          "mide otro mensaje que el que se envia no vigila nada",
+      );
+      assert.equal(cortada.llegan?.[f], enviado.length, `en ${f} la compuerta dice que llegan ${cortada.llegan?.[f]} y la action manda ${enviado.length}`);
+    }
+  }));
+
+// ---------------------------------------------------------------------------
+// Cada dialecto, porque la conversion cambia el largo
+// ---------------------------------------------------------------------------
+
+/** Una tabla en «Para consumidores» con encabezados largos y celdas cortas: en markdown
+ *  cada fila son unas barras; en mrkdwn cada fila es una viñeta con TODAS las etiquetas
+ *  repetidas. Es la forma realista en que un mensaje entra en un dialecto y no en el otro. */
+const changelogConTabla = (filas) =>
+  changelogCon(
+    [
+      "| Consumidor | Resultado de la medicion | Que tiene que hacer |",
+      "| --- | --- | --- |",
+      ...Array.from({ length: filas }, (_, i) => `| c${i} | verde | nada |`),
+    ].join("\n"),
+  );
+
+test("ROJO PRIMERO: la compuerta mide CADA dialecto que la action acepta, no uno", () => {
+  const r = medir(changelogCon("Nada que hacer."), LIMITE_POR_DEFECTO, {});
+  assert.deepEqual(Object.keys(r.candidatos[0].largos ?? {}), [...(laAction.FORMATOS ?? [])], "un largo por dialecto de la action");
+  assert.ok(FORMATOS.includes("mrkdwn"), "la action acepta mrkdwn, y la compuerta lo tiene que medir");
+});
+
+test("ROJO PRIMERO: un mensaje que entra en markdown y NO en mrkdwn es rojo, nombrando el dialecto", () => {
+  // El limite se DERIVA de lo que mide la propia compuerta sin techo: justo el largo en
+  // markdown, que entra, mientras mrkdwn —con las etiquetas repetidas en cada fila— se
+  // pasa. Afinarlo a mano dejaria de significar «entra en uno y no en el otro» el dia
+  // que cambie el encuadre.
+  const changelog = changelogConTabla(30);
+  const { largos } = medir(changelog, Number.MAX_SAFE_INTEGER, {}).candidatos[0];
+  assert.ok(largos?.mrkdwn > largos?.markdown, `la tabla tiene que crecer en mrkdwn: ${JSON.stringify(largos)}`);
+
+  const r = medir(changelog, largos.markdown, {});
+  assert.deepEqual(
+    r.hallazgos.map((h) => [h.motivo, h.formato]),
+    [["recorte", "mrkdwn"]],
+    "markdown entra justo en el limite y mrkdwn no: un solo hallazgo, y del dialecto que se pasa",
+  );
+});
+
+test("el ::error:: del recorte nombra el dialecto que no entra", () =>
+  conTemporal((dir) => {
+    // Con el limite REAL de la action: se agregan filas hasta que mrkdwn se pasa, y en ese
+    // punto markdown todavia entra (cada fila crece mucho mas en mrkdwn).
+    let filas = 1;
+    while (medir(changelogConTabla(filas), Number.MAX_SAFE_INTEGER, {}).candidatos[0].largos?.mrkdwn <= LIMITE_POR_DEFECTO) filas += 1;
+    const texto = changelogConTabla(filas);
+    assert.ok(medir(texto, Number.MAX_SAFE_INTEGER, {}).candidatos[0].largos.markdown <= LIMITE_POR_DEFECTO, "markdown todavia entra");
+
+    const ruta = join(dir, "CHANGELOG.md");
+    writeFileSync(ruta, texto);
+    const { codigo, dicho } = correr([ruta]);
+    assert.equal(codigo, 1);
+    const err = errores(dicho);
+    assert.equal(err.length, 1, `un solo dialecto se pasa:\n${err.join("\n")}`);
+    assert.match(err[0], /en dialecto 'mrkdwn' se recortaria/);
   }));
 
 // ---------------------------------------------------------------------------

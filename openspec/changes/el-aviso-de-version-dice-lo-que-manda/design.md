@@ -86,6 +86,10 @@ manda Markdown tal cual (`action.yml`, «LIMITES DECLARADOS»), así que se mide
 Cuando el lote 36 agregue el dialecto, la compuerta tiene que medir los dos: queda
 escrito en su encabezado y en el banco.
 
+**Cerrado por el change `el-aviso-habla-el-dialecto-del-destino` (lote 36):** la
+compuerta mide cada dialecto que la action acepta (`FORMATOS`, importado de ella) y
+nombra el que no entra. Esta decisión queda como estaba cuando se tomó.
+
 ### 5. Dónde corre la compuerta
 
 - **Elegida: un paso del job `changelog-en-el-pr`**, sólo en pull requests, después
