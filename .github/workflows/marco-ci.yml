@@ -665,7 +665,7 @@ jobs:
           # cwd. Ningun paso de este job hace fetch ni push, asi que no cuesta nada.
           persist-credentials: false
 
-      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
         with: { node-version: "${{ inputs.version_node }}" }
 
       # El pin viaja por `env` y no interpolado en el `run`: es la convencion de este
@@ -982,7 +982,7 @@ jobs:
           # repo llamador: no se le escribe en el .git/config.
           persist-credentials: false
 
-      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
         # La version que el consumidor pidio, no la que traiga la imagen del runner.
         with: { node-version: "${{ inputs.version_node }}" }
 
@@ -1103,7 +1103,7 @@ jobs:
       # version deja de ser la que sopla la imagen: `inputs.version_node`, el mismo
       # numero que el job de openspec. La description de ese input decia "para el
       # guardrail y el CLI de OpenSpec" justamente porque higiene no lo honraba.
-      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
         with: { node-version: "${{ inputs.version_node }}" }
 
       # HUECO 1 — "regenerado" era la unica forma de distribucion del marco que
@@ -3850,7 +3850,7 @@ jobs:
           # Mismo motivo que los otros tres checkouts de este archivo: no se le deja
           # el token del llamador en el .git/config a un arbol de un tercero.
           persist-credentials: false
-      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
         # La version que el consumidor pidio, no la que traiga la imagen del runner:
         # este job leia manifiestos con un node que nadie eligio.
         with: { node-version: "${{ inputs.version_node }}" }
